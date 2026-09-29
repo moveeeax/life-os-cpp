@@ -20,7 +20,7 @@
 #      is mentioned in docs/CONFIG.md ("the full table" is now gated).
 #   3. Reverse: every ENV a docs/CONFIG.md table row documents is still
 #      read somewhere in src/ — stale doc rows fail.
-#   4. Helm: every all-caps `- name:` env in the cpp-api / cpp-worker
+#   4. Helm: every all-caps `- name:` env in the life-os-cpp / life-os-cpp-worker
 #      deployment templates is an env the code reads — a renamed or removed
 #      knob can no longer leave a dead env line behind. (The full
 #      helm-coverage direction — every knob reachable via helm — is the
@@ -162,7 +162,7 @@ for env in sorted(doc_table_envs - known_envs):
 
 # --- 5. helm deployments set only envs the code reads ------------------------
 HELM_ENV_RE = re.compile(r"(?m)^\s*-\s*name:\s*([A-Z][A-Z0-9_]+)\s*$")
-for chart in ("cpp-api", "cpp-worker"):
+for chart in ("life-os-cpp", "life-os-cpp-worker"):
     dep = repo / "helm" / chart / "templates" / "deployment.yaml"
     if not dep.is_file():
         continue

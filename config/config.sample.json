@@ -19,14 +19,14 @@
     "pre_stop_delay_sec": 5
   },
   "logging": {
-    "name": "cpp_api",
+    "name": "life_os_cpp",
     "file": "logs/app.log",
     "level": "info",
     "format": "${LOG_FORMAT:-text}"
   },
   "observability": {
     "metrics_address": "0.0.0.0:9090",
-    "service_name": "cpp_api_service",
+    "service_name": "life_os_cpp_service",
     "otlp_endpoint": "${OTLP_ENDPOINT:-}",
     "trace_stdout": "${TRACE_STDOUT:-false}"
   },
@@ -79,22 +79,6 @@
       ]
     }
   },
-  "storage": {
-    "backend": "${STORAGE_BACKEND:-local}",
-    "public_base_url": "${STORAGE_PUBLIC_BASE_URL:-}",
-    "local": {
-      "root": "${STORAGE_LOCAL_ROOT:-data/uploads}"
-    },
-    "s3": {
-      "endpoint": "${S3_ENDPOINT:-}",
-      "region": "${S3_REGION:-us-east-1}",
-      "bucket": "${S3_BUCKET:-}",
-      "access_key": "${S3_ACCESS_KEY:-}",
-      "secret_key": "${S3_SECRET_KEY:-}",
-      "timeout_sec": "${S3_TIMEOUT_SEC:-10}",
-      "connect_timeout_sec": "${S3_CONNECT_TIMEOUT_SEC:-2}"
-    }
-  },
   "mail": {
     "enabled": "${MAIL_ENABLED:-false}",
     "via_jobs": "${MAIL_VIA_JOBS:-true}",
@@ -115,7 +99,7 @@
       "brokers": "localhost:9092",
       "producer": {
         "enabled": false,
-        "client_id": "cpp_producer"
+        "client_id": "life_os_cpp_producer"
       },
       "consumer": {
         "enabled": false,
@@ -200,9 +184,6 @@
   },
   "outbox": {
     "drain_interval_sec": "${OUTBOX_DRAIN_INTERVAL_SEC:-0}"
-  },
-  "content": {
-    "enabled": "${CONTENT_ENABLED:-false}"
   },
   "billing": {
     "enabled": "${BILLING_ENABLED:-false}",

@@ -5,13 +5,13 @@
     "threads": 4
   },
   "logging": {
-    "name": "cpp_api",
+    "name": "life_os_cpp",
     "file": "logs/app.log",
     "level": "warn"
   },
   "observability": {
     "metrics_address": "0.0.0.0:9090",
-    "service_name": "cpp_api_bench"
+    "service_name": "life_os_cpp_bench"
   },
   "database": {
     "primary": "postgresql://postgres:postgres@postgres:5432/appdb",

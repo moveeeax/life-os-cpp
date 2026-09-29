@@ -5,8 +5,8 @@
 # Stands up the cpp-env umbrella (API + worker + frontend + Mailpit) in ns
 # `demo`, wired to the cluster's SHARED infra (see values-demo.yaml's header):
 #   - Postgres: CNPG cluster `postgresql` in ns `db` — this script bootstraps
-#     the `cpp-api-demo` role + database + required extensions idempotently,
-#     and mirrors the credentials into the ns-db secret `postgresql-cpp-api-demo`
+#     the `life-os-cpp-demo` role + database + required extensions idempotently,
+#     and mirrors the credentials into the ns-db secret `postgresql-life-os-cpp-demo`
 #     (the naming pattern every other tenant of that cluster follows);
 #   - Redis: shared Sentinel Redis in ns `db`, logical DB 1 (REDIS_DB
 #     isolation — needs images ≥ 1.5.4); the password is READ from the ns-db
@@ -23,17 +23,17 @@
 # Env overrides: KUBE_CONTEXT, DEMO_NAMESPACE, DEMO_RELEASE, DEMO_ADMIN_EMAIL.
 set -euo pipefail
 
-CTX="${KUBE_CONTEXT:-admin@talos-nbg1}"
+CTX="${KUBE_CONTEXT:-YOUR_KUBE_CONTEXT}"
 NS="${DEMO_NAMESPACE:-demo}"
 RELEASE="${DEMO_RELEASE:-demo}"
 ADMIN_EMAIL="${DEMO_ADMIN_EMAIL:-admin@demo.tarassov.me}"
 # Fixed (not random) so it can be documented in the README; override if you fork.
-ADMIN_PASS="${DEMO_ADMIN_PASS:-DemoAdmin-2026}"
+ADMIN_PASS="${DEMO_ADMIN_PASS:-change-me-demo-pass}"
 
 DB_NS="db"
 DB_CLUSTER="postgresql"
-DB_NAME="cpp-api-demo"
-DB_ROLE="cpp-api-demo"
+DB_NAME="life-os-cpp-demo"
+DB_ROLE="life-os-cpp-demo"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CHART="$ROOT/helm/cpp-env"
@@ -115,12 +115,12 @@ helm --kube-context "$CTX" upgrade --install "$RELEASE" "$CHART" \
     --set credentials.dbPassword="$DB_PASS" \
     --set credentials.redisPassword="$REDIS_PASS" \
     --set credentials.jwtSecret="$JWT_SECRET" \
-    --set cpp-api.externalDatabase.password="$DB_PASS" \
-    --set cpp-api.externalRedis.password="$REDIS_PASS" \
-    --set cpp-api.auth.jwtSecret="$JWT_SECRET" \
-    --set cpp-worker.externalDatabase.password="$DB_PASS" \
-    --set cpp-worker.externalRedis.password="$REDIS_PASS" \
-    --set cpp-worker.auth.jwtSecret="$JWT_SECRET" \
+    --set life-os-cpp.externalDatabase.password="$DB_PASS" \
+    --set life-os-cpp.externalRedis.password="$REDIS_PASS" \
+    --set life-os-cpp.auth.jwtSecret="$JWT_SECRET" \
+    --set life-os-cpp-worker.externalDatabase.password="$DB_PASS" \
+    --set life-os-cpp-worker.externalRedis.password="$REDIS_PASS" \
+    --set life-os-cpp-worker.auth.jwtSecret="$JWT_SECRET" \
     --wait --timeout 10m
 
 echo "==> Waiting for the API rollout"
@@ -131,15 +131,15 @@ echo "==> Ensuring demo admin ($ADMIN_EMAIL) + seeding sample users"
 # Newest RUNNING pod: right after a rollout the label still matches the old
 # replica set's terminating pod, and exec-ing into it fails with "container
 # not found" (bit this deploy script on the 1.5.4 rollout).
-POD="$(kubectl --context "$CTX" -n "$NS" get pod -l app.kubernetes.io/name=cpp-api \
+POD="$(kubectl --context "$CTX" -n "$NS" get pod -l app.kubernetes.io/name=life-os-cpp \
     --field-selector=status.phase=Running \
     --sort-by=.metadata.creationTimestamp \
     -o jsonpath='{.items[-1:].metadata.name}')"
 # config path is positional and must precede the mode flag.
 kubectl --context "$CTX" -n "$NS" exec "$POD" -- \
-    /app/cpp_api_template config/config.json --create-admin "$ADMIN_EMAIL" "$ADMIN_PASS" || true
+    /app/life_os_cpp config/config.json --create-admin "$ADMIN_EMAIL" "$ADMIN_PASS" || true
 kubectl --context "$CTX" -n "$NS" exec "$POD" -- \
-    /app/cpp_api_template config/config.json --seed-fake 8 || true
+    /app/life_os_cpp config/config.json --seed-fake 8 || true
 
 cat <<EOF
 

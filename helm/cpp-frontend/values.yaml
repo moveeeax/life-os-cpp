@@ -4,7 +4,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/moveeeax/cpp-rapid-rest-template-frontend
+  repository: docker.io/your-registry/your-project/life-os-cpp-frontend
   tag: ""  # Defaults to chart appVersion
   pullPolicy: IfNotPresent
 
@@ -15,10 +15,10 @@ fullnameOverride: ""
 # ---------------------------------------------------------------
 # Backend the SPA's nginx proxies /api/* to. Keeping the API same-origin
 # behind the frontend means session cookies stay first-party. Point `service`
-# at the cpp-api Service name (its Helm fullname, e.g. "<release>-cpp-api").
+# at the life-os-cpp Service name (its Helm fullname, e.g. "<release>-life-os-cpp").
 # ---------------------------------------------------------------
 backend:
-  service: cpp-api
+  service: life-os-cpp
   port: 8080
 
 # ---------------------------------------------------------------

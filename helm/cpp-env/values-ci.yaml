@@ -9,7 +9,7 @@ credentials:
   dbPassword: "ci-db-pass"
   redisPassword: "ci-redis-pass"
   jwtSecret: "ci-jwt-secret-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-cpp-api:
+life-os-cpp:
   mail:
     enabled: true # force the {{- if .Values.mail.enabled }} branch so MAIL_VIA_JOBS renders
     viaJobs: true
@@ -23,7 +23,7 @@ cpp-api:
   auth:
     mode: jwt
     jwtSecret: "ci-jwt-secret-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-cpp-worker:
+life-os-cpp-worker:
   app:
     baseUrl: "https://app.ci.ci.example.test"
   externalDatabase:

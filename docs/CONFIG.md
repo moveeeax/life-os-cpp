@@ -36,7 +36,7 @@ Set `CONFIG_FILE` to point at a different JSON file (e.g.
 
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
-| `API_PUBLIC_PATHS` | `api.public_paths` | csv | `/`, the probes (`/healthz,/ready,/health,/metrics`), `/api/v1/docs`, `/api/v1/openapi.yaml`, `/api/v1/auth/{login,register,refresh}`, `/api/v1/account/confirm/*`, `/api/v1/account/reset-password-request`, `/api/v1/account/reset-password/*`, `/api/v1/account/change-email/*`, `/api/v1/account/join-from-invite/*`, `/api/v1/public/posts`, `/api/v1/public/posts/*`, `/posts/*`, `/sitemap.xml`, `/uploads/*` (`Utils::Strings::kDefaultPublicPathsCsv`) | Paths that bypass auth. Exact-match; a trailing `*` is a prefix match (used for the token-bearing account routes). FULL OVERRIDE of the built-in default — prefer the extra key below for additions. |
+| `API_PUBLIC_PATHS` | `api.public_paths` | csv | `/`, the probes (`/healthz,/ready,/health,/metrics`), `/api/v1/docs`, `/api/v1/openapi.yaml`, `/api/v1/auth/{login,register,refresh}`, `/api/v1/account/confirm/*`, `/api/v1/account/reset-password-request`, `/api/v1/account/reset-password/*`, `/api/v1/account/change-email/*`, `/api/v1/account/join-from-invite/*` (`Utils::Strings::kDefaultPublicPathsCsv`) | Paths that bypass auth. Exact-match; a trailing `*` is a prefix match (used for the token-bearing account routes). FULL OVERRIDE of the built-in default — prefer the extra key below for additions. |
 | `API_PUBLIC_PATHS_EXTRA` | `api.public_paths_extra` | csv | — | ADDITIVE companion to `API_PUBLIC_PATHS`: entries are appended to the resolved public-paths set (built-in default or override), same matching rules. Use it to open extra routes (a payment-provider webhook, a public feed) without re-listing — and risking silently dropping — the default set. |
 | `CORS_ALLOWED_ORIGINS` | `cors.allowed_origins` | csv | — | Empty disables CORS |
 
@@ -104,37 +104,16 @@ Set `CONFIG_FILE` to point at a different JSON file (e.g.
 | `DOCS_ENABLED` | `docs.enabled` | bool | `false` | Mount `/api/v1/docs` + `/api/v1/openapi.yaml` — dev only |
 | `DOCS_OPENAPI_PATH` | `docs.openapi_path` | string | `docs/openapi.yaml` | Path served at `/api/v1/openapi.yaml` |
 
-<!-- init-project:content:start -->
-## Object storage
-
-`Storage::get()` is a get/put/remove seam (`src/storage/Storage.hpp`). Two
-backends ship: `local` (filesystem) and `s3` (SigV4 — MinIO/AWS/R2/…); anything
-else fails fast at boot. Swap in another store by subclassing `StorageBackend`.
-
-| Env | JSON key | Type | Default | Notes |
-|---|---|---|---|---|
-| `STORAGE_BACKEND` | `storage.backend` | string | `local` | `local` \| `s3`; any other value fails fast at boot |
-| `STORAGE_LOCAL_ROOT` | `storage.local.root` | string | `data/uploads` | Directory the local backend writes objects under (gitignored) |
-| `STORAGE_PUBLIC_BASE_URL` | `storage.public_base_url` | string | — | Prepended to a key by `url()` (e.g. a CDN base); empty → returns the bare key |
-| `S3_ENDPOINT` | `storage.s3.endpoint` | string | — | Required when `backend=s3` (boot fails without it) |
-| `S3_REGION` | `storage.s3.region` | string | `us-east-1` | |
-| `S3_BUCKET` | `storage.s3.bucket` | string | — | Required when `backend=s3` (boot fails without it) |
-| `S3_ACCESS_KEY` | `storage.s3.access_key` | string | — | |
-| `S3_SECRET_KEY` | `storage.s3.secret_key` | string | — | |
-| `S3_TIMEOUT_SEC` | `storage.s3.timeout_sec` | int | `10` | Per-request budget |
-| `S3_CONNECT_TIMEOUT_SEC` | `storage.s3.connect_timeout_sec` | int | `2` | Connect budget |
-<!-- init-project:content:end -->
-
 ## Observability
 
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
-| `LOG_NAME` | `logging.name` | string | `cpp_api` | |
+| `LOG_NAME` | `logging.name` | string | `life_os_cpp` | |
 | `LOG_FILE` | `logging.file` | string | `logs/app.log` | |
 | `LOG_LEVEL` | `logging.level` | enum | `info` | trace/debug/info/warn/error/critical |
 | `LOG_FORMAT` | `logging.format` | enum | `text` | `text` (human) or `json` (one JSON object per line for Loki/ELK) |
 | `METRICS_ADDRESS` | `observability.metrics_address` | string | `0.0.0.0:9090` | |
-| `SERVICE_NAME` | `observability.service_name` | string | `cpp_api_service` | Also emitted as `service` field in JSON logs |
+| `SERVICE_NAME` | `observability.service_name` | string | `life_os_cpp_service` | Also emitted as `service` field in JSON logs |
 | `OTLP_ENDPOINT` | `observability.otlp_endpoint` | string | — | OTLP HTTP traces endpoint. Empty + `trace_stdout=false` → no-op tracer |
 | `TRACE_STDOUT` | `observability.trace_stdout` | bool | `false` | Synchronous stdout span exporter for debugging. When `OTLP_ENDPOINT` is empty and this is off, tracing is a no-op |
 
@@ -197,7 +176,7 @@ For URL components: `REDIS_HOST`, `REDIS_PORT`.
 | `MESSAGING_ENABLED` | `messaging.enabled` | bool | `false` | Parent switch |
 | `KAFKA_BROKERS` | `messaging.kafka.brokers` | string | `localhost:9092` | |
 | `KAFKA_PRODUCER_ENABLED` | `messaging.kafka.producer.enabled` | bool | `false` | |
-| `KAFKA_PRODUCER_ID` | `messaging.kafka.producer.client_id` | string | `cpp_producer` | |
+| `KAFKA_PRODUCER_ID` | `messaging.kafka.producer.client_id` | string | `life_os_cpp_producer` | |
 | `KAFKA_CONSUMER_ENABLED` | `messaging.kafka.consumer.enabled` | bool | `false` | |
 | `KAFKA_GROUP_ID` | `messaging.kafka.consumer.group_id` | string | `cpp_consumer_group` | |
 
@@ -215,24 +194,6 @@ For URL components: `REDIS_HOST`, `REDIS_PORT`.
 | `JOBS_QUEUE_METRIC_REFRESH_SEC` | `jobs.queue_metric_refresh_sec` | int | `10` | Same bookkeeping for the waiting queue: `jobs_queue_depth{type="..."}` plus `type="_total"` |
 | `OUTBOX_DRAIN_INTERVAL_SEC` | `outbox.drain_interval_sec` | int | `0` | Transactional outbox (`src/jobs/Outbox.hpp`): how often the API pod relays `outbox` table rows to the job queue. `0` (default) disables draining — the pattern is opt-in; rows written via `Outbox::enqueue` sit in Postgres until a deploy enables this. Needs `jobs.enabled=true`. |
 | `DB_REPLICA_LAG_METRIC_REFRESH_SEC` | `database.replica_lag_metric_refresh_sec` | int | `15` | Refresh interval for the `db_replica_lag_seconds` gauge. Only registered when read replicas are configured (primary has no replay timestamp). |
-
-<!-- init-project:content:start -->
-## Content
-
-| Env | JSON key | Type | Default | Notes |
-|---|---|---|---|---|
-| `CONTENT_ENABLED` | `content.enabled` | bool | `false` | Master switch for the posts/uploads/sitemap module (`PostsController`, `ContentPagesController`, `UploadController`) — same on/off pattern as `JOBS_ENABLED`. Routes are always registered; handlers 404 while off (`/sitemap.xml` degrades to a root-only sitemap instead — see the content module design doc). |
-
-Enabling content on a deployment whose `API_PUBLIC_PATHS` overrides the
-built-in default (rather than leaving it unset) must also add the module's
-public paths to that override — `/posts/*`, `/sitemap.xml`,
-`/api/v1/public/posts`, `/api/v1/public/posts/*`, `/uploads/*` — or anonymous
-readers get 401/404 on routes the code otherwise treats as public. See
-`config/config.production.json`, which currently overrides `API_PUBLIC_PATHS`
-without these and intentionally ships with content still gated off. With the
-additive `API_PUBLIC_PATHS_EXTRA` key this footgun is avoidable: keep the
-override minimal (or unset) and add module paths through the extra key.
-<!-- init-project:content:end -->
 
 ## Billing module
 
@@ -282,7 +243,7 @@ outage can never affect the money path.
 | `MAIL_TEMPLATES_DIR` | `mail.templates_dir` | string | `templates/email` | Relative to the working directory |
 | `MAIL_TIMEOUT_SEC` | `mail.timeout_sec` | int | `30` | |
 
-## Worker (second binary, `cpp_api_template_worker`)
+## Worker (second binary, `life_os_life_os_cpp_worker`)
 
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
@@ -314,5 +275,5 @@ outage can never affect the money path.
   "auth":   { "mode": "jwt" }
 }
 
-CONFIG_FILE=config/local.json ./cpp_api_template
+CONFIG_FILE=config/local.json ./life_os_cpp
 ```

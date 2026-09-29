@@ -277,17 +277,6 @@ TEST_F(ConfigTest, RequireReturnsEnvOverValue) {
     EXPECT_EQ(config.require<std::string>("test.value", "CFG_REQUIRED"), "hello");
 }
 
-// init-project:content:start
-// ── Content module master switch (posts/uploads/sitemap) ──────────────────
-
-TEST_F(ConfigTest, ContentDisabledByDefault) {
-    // test_config_file (see SetUp) carries no "content" section — the flag
-    // must default off.
-    Config::initialize(test_config_file);
-    EXPECT_FALSE(Config::get().get<bool>("content.enabled", "CONTENT_ENABLED", false));
-}
-// init-project:content:end
-
 // ── M3: string-shaped leaves coerce to the requested type ───────────────────
 // substitute_env_placeholders writes every ${VAR:-default} expansion back as a
 // JSON *string*, so a typed key declared as "enabled": "${MAIL_ENABLED:-true}"

@@ -42,7 +42,7 @@ the lot the way CI does.
 ## Dev container — the inner loop with zero setup
 
 `.devcontainer/` opens the repo inside the CI-published builder image
-(`ghcr.io/moveeeax/cpp-rapid-rest-template/builder:cache`): compiler, cmake,
+(`docker.io/your-registry/your-project/life-os-cpp/builder:cache`): compiler, cmake,
 ninja and the entire prebuilt vcpkg world are already in it, so the first
 configure is ~15 s and `make test-local NAME='Foo*'` works immediately — no
 `VCPKG_ROOT`, no ~30-minute cold dependency build (the container preselects

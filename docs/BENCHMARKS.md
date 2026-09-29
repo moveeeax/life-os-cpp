@@ -56,7 +56,7 @@ preset on master — wrk against `/healthz` and `/api/v1/jobs` — plus three
 low-noise footprint metrics (runtime image size, cold start to `/ready`, idle
 RSS), and appends every point to a public trend:
 
-**<https://moveeeax.github.io/cpp-rapid-rest-template/dev/bench/>**
+**<https://moveeeax.github.io/life-os-cpp/dev/bench/>**
 
 Read it as a **trend**, not as absolute numbers: GitHub shared runners are
 noisy (±10–20% between nights is normal). A regression above 30% against the

@@ -47,14 +47,6 @@ const AdminJobsPage = lazy(() =>
 const AdminAuditPage = lazy(() =>
   import('@/pages/admin/Audit').then((m) => ({ default: m.AdminAuditPage })),
 );
-// init-project:content:start
-const AdminPostsPage = lazy(() =>
-  import('@/pages/admin/Posts').then((m) => ({ default: m.AdminPostsPage })),
-);
-const AdminMediaPage = lazy(() =>
-  import('@/pages/admin/Media').then((m) => ({ default: m.AdminMediaPage })),
-);
-// init-project:content:end
 const AdminBillingPage = lazy(() =>
   import('@/pages/admin/Billing').then((m) => ({ default: m.AdminBillingPage })),
 );
@@ -168,10 +160,6 @@ export const routes: RouteEntry[] = [
     navLabel: 'Audit',
     navIcon: ScrollText,
   },
-  // init-project:content:start
-  { path: '/admin/posts', element: <AdminPostsPage />, guard: 'admin' },
-  { path: '/admin/media', element: <AdminMediaPage />, guard: 'admin' },
-  // init-project:content:end
   // No navLabel — tiles-only (the /admin dashboard tile is
   // the entry point, not the top nav).
   { path: '/admin/billing', element: <AdminBillingPage />, guard: 'admin' },

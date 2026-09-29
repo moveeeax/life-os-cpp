@@ -83,8 +83,8 @@ question instead of grepping the tree.
 | [`RENDER-GATE.md`](RENDER-GATE.md) | Opt-in rendered-artifact gate for forks that render documents (Typst/LaTeX/HTML→PDF): contract, provenance rule, selftest, example CI job — not wired into this repo's CI |
 | [`RUNBOOK.md`](RUNBOOK.md) | Operator runbook: what to do when an alert fires (each alert's `runbook_url` anchors here) |
 | [`SLO.md`](SLO.md) | SLOs + alert thresholds — the rationale behind the Prometheus rules |
-| [`../helm/cpp-api/`](../helm/cpp-api/) | API Helm chart |
-| [`../helm/cpp-worker/`](../helm/cpp-worker/) | Worker Helm chart |
+| [`../helm/life-os-cpp/`](../helm/life-os-cpp/) | API Helm chart |
+| [`../helm/life-os-cpp-worker/`](../helm/life-os-cpp-worker/) | Worker Helm chart |
 | [`../helm/cpp-frontend/`](../helm/cpp-frontend/) | Frontend (nginx SPA) Helm chart |
 | [`../helm/cpp-env/`](../helm/cpp-env/) | Umbrella chart — full environment (api + worker + frontend), rendered by `make helm-validate` |
 

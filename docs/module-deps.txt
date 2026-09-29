@@ -32,7 +32,6 @@ api -> jobs
 api -> observability
 api -> repositories
 api -> security
-api -> storage
 api -> utils
 billing -> database
 billing -> domain
@@ -48,7 +47,6 @@ core -> messaging
 core -> observability
 core -> root
 core -> security
-core -> storage
 core -> tasks
 core -> utils
 database -> utils
@@ -82,6 +80,5 @@ root -> utils
 security -> cache
 security -> database
 security -> utils
-storage -> utils
 webhooks -> jobs
 webhooks -> utils

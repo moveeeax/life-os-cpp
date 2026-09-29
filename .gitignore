@@ -127,7 +127,7 @@ docker-compose.override.yml
 *.crt
 secrets/
 
-# Helm values with secrets (keep chart defaults under helm/cpp-api/, cpp-worker/).
+# Helm values with secrets (keep chart defaults under helm/life-os-cpp/, life-os-cpp-worker/).
 # Per-cluster overrides go in untracked files matching the patterns below.
 helm/values.yaml
 helm/values-worker.yaml

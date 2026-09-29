@@ -30,7 +30,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    project(cpp_api_template_fuzz CXX)
+    project(life_os_cpp_fuzz CXX)
 endif()
 
 if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")

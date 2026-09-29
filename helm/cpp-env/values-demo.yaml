@@ -8,7 +8,7 @@
 # Topology (2026-08-21): the demo runs on the cluster's SHARED infra instead
 # of per-namespace placeholders —
 #   Postgres  the CNPG cluster in ns `db` (postgresql-rw/-ro), database
-#             `cpp-api-demo` owned by role `cpp-api-demo`
+#             `life-os-cpp-demo` owned by role `life-os-cpp-demo`
 #             → postgres.enabled=false, nothing renders in-namespace;
 #   Redis     the Sentinel-managed shared Redis in ns `db`, LOGICAL DB 1 —
 #             REDIS_DB isolation (needs images ≥ 1.5.4) keeps the demo's
@@ -38,7 +38,7 @@ ingress:
   className: nginx
   clusterIssuer: letsencrypt-prod
   # Public ingress IP — external-dns creates the *.demo.tarassov.me A records.
-  externalDnsTarget: "46.225.37.165"
+  externalDnsTarget: "YOUR_INGRESS_IP"
 
 # Secrets are injected at deploy time by scripts/deploy-demo.sh (--set), never
 # committed. Left EMPTY (the chart-wide convention): a deploy that skips the
@@ -68,15 +68,15 @@ demoReset:
   enabled: true
   schedule: "0 */6 * * *"   # every 6 hours
 
-cpp-api:
+life-os-cpp:
   image:
     tag: "1.6.0"      # pinned known-good amd64 build (unprefixed — release.yml strips the v); bump when a newer one ships
   externalKafka:
     enabled: false
   externalDatabase:
     host: postgresql-rw.db.svc.cluster.local
-    name: cpp-api-demo
-    user: cpp-api-demo
+    name: life-os-cpp-demo
+    user: life-os-cpp-demo
     replicaHost: postgresql-ro.db.svc.cluster.local
     password: ""            # set by deploy-demo.sh
   externalRedis:
@@ -85,7 +85,7 @@ cpp-api:
     masterName: mymaster
     sentinelNodes: "redis-node-0.redis-headless.db.svc.cluster.local:26379,redis-node-1.redis-headless.db.svc.cluster.local:26379,redis-node-2.redis-headless.db.svc.cluster.local:26379"
     # Logical DB 1 — the shared instance's db 0 belongs to ns `www`. MUST match
-    # cpp-worker below (api enqueues, worker BRPOPs the same logical DB).
+    # life-os-cpp-worker below (api enqueues, worker BRPOPs the same logical DB).
     db: 1
     password: ""            # set by deploy-demo.sh (read from ns db secret)
   # Public origin for account-email links AND the sitemap/post URLs the
@@ -94,13 +94,6 @@ cpp-api:
   app:
     baseUrl: "https://app.demo.tarassov.me"
     name: "C++ REST Template — Demo"
-  # init-project:content:start
-  # The demo showcases the content module: posts + markdown delivery +
-  # admin uploads (stored on the pod's uploads emptyDir — throwaway, like
-  # everything here).
-  content:
-    enabled: true
-  # init-project:content:end
   tracing:
     enabled: true
     otlpEndpoint: "http://tempo.monitoring.svc.cluster.local:4318/v1/traces"
@@ -112,13 +105,13 @@ cpp-api:
       secure: true
       samesite: Lax
 
-cpp-worker:
+life-os-cpp-worker:
   image:
     tag: "1.6.0"
   externalDatabase:
     host: postgresql-rw.db.svc.cluster.local
-    name: cpp-api-demo
-    user: cpp-api-demo
+    name: life-os-cpp-demo
+    user: life-os-cpp-demo
     replicaHost: postgresql-ro.db.svc.cluster.local
     password: ""            # set by deploy-demo.sh
   externalRedis:
@@ -126,7 +119,7 @@ cpp-worker:
     useSentinel: true
     masterName: mymaster
     sentinelNodes: "redis-node-0.redis-headless.db.svc.cluster.local:26379,redis-node-1.redis-headless.db.svc.cluster.local:26379,redis-node-2.redis-headless.db.svc.cluster.local:26379"
-    db: 1                   # == cpp-api.externalRedis.db
+    db: 1                   # == life-os-cpp.externalRedis.db
     password: ""            # set by deploy-demo.sh (read from ns db secret)
   tracing:
     enabled: true

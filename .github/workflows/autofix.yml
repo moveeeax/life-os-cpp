@@ -56,7 +56,7 @@ jobs:
             exit 0
           fi
           git config user.name "moveeeax"
-          git config user.email "michael@tarassov.me"
+          git config user.email "you@tarassov.me"
           git add -u
           git commit -m "style: clang-format + regenerate OpenAPI TS schema (autofix)"
           git push

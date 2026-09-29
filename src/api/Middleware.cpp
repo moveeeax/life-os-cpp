@@ -512,11 +512,6 @@ void register_content_type_check() {
         // multipart/form-data is the legitimate non-JSON body class: file
         // uploads must reach the controller's own validation instead of
         // 415ing at this gate.
-        // init-project:content:start
-        // (In this template that's the content module's POST
-        // /api/v1/admin/uploads — UploadController then does the strict
-        // validation itself: admin gate + magic-byte sniff + size cap.)
-        // init-project:content:end
         const bool is_multipart = ct.starts_with("multipart/form-data");
         if (is_json || is_multipart)
             return {};

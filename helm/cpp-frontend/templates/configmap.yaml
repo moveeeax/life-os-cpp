@@ -7,7 +7,7 @@ metadata:
 data:
   # Overrides the nginx.conf baked into the image. The image hardcodes
   # `proxy_pass http://app:8080` (the docker-compose service name), which does
-  # not resolve in Kubernetes — here the /api upstream points at the cpp-api
+  # not resolve in Kubernetes — here the /api upstream points at the life-os-cpp
   # Service so the SPA stays the single same-origin entry point (cookies remain
   # first-party). $-prefixed tokens are nginx variables, not Helm.
   default.conf: |
@@ -62,34 +62,4 @@ data:
             proxy_connect_timeout 5s;
         }
 
-        # init-project:content:start
-        # Content module (content.enabled): markdown posts, sitemap and uploads
-        # are backend routes, not SPA routes — proxy them like /api/. With the
-        # module off the backend answers 404. KEEP IN SYNC with
-        # frontend/nginx.conf (the dev/compose copy of this config).
-        location = /sitemap.xml {
-            proxy_pass http://{{ .Values.backend.service }}:{{ .Values.backend.port }};
-            proxy_set_header Host              $host;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_http_version 1.1;
-        }
-        location ^~ /posts/ {
-            proxy_pass http://{{ .Values.backend.service }}:{{ .Values.backend.port }};
-            proxy_set_header Host              $host;
-            proxy_set_header X-Real-IP         $http_x_real_ip;
-            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_http_version 1.1;
-            proxy_read_timeout 30s;
-            proxy_connect_timeout 5s;
-        }
-        location ^~ /uploads/ {
-            proxy_pass http://{{ .Values.backend.service }}:{{ .Values.backend.port }};
-            proxy_set_header Host              $host;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_http_version 1.1;
-            proxy_read_timeout 30s;
-            proxy_connect_timeout 5s;
-        }
-        # init-project:content:end
     }

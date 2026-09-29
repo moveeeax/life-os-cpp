@@ -26,15 +26,15 @@ applied in autocommit mode.
 
 ## Ops
 
-- `./cpp_api_template --verify-migrations` — list pending files without
+- `./life_os_cpp --verify-migrations` — list pending files without
   applying (useful as a CI gate; exits 1 if any are pending). Wrapped by
   `make migrate-status`.
-- `./cpp_api_template --run-migrations` — apply pending migrations and exit
+- `./life_os_cpp --run-migrations` — apply pending migrations and exit
   (CLI-flag form of `RUN_MIGRATIONS_ONLY=1`; equivalent to `make migrate-local`
   for the native binary).
 - `DB_MIGRATIONS_ENABLED=false` — skip running migrations on app boot
   (set this when an init container is responsible instead).
-- `RUN_MIGRATIONS_ONLY=1 ./cpp_api_template` — env-var equivalent of
+- `RUN_MIGRATIONS_ONLY=1 ./life_os_cpp` — env-var equivalent of
   `--run-migrations`, convenient for Helm init-containers (any of `1`, `true`,
   `yes` counts as on).
 - `make migrate` (Docker) / `make migrate-local` (native) — wrappers around

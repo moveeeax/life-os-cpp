@@ -14,12 +14,12 @@
 #     --set credentials.dbPassword="$DB_PASS" \
 #     --set credentials.redisPassword="$REDIS_PASS" \
 #     --set credentials.jwtSecret="$JWT_SECRET" \
-#     --set cpp-api.externalDatabase.password="$DB_PASS" \
-#     --set cpp-api.externalRedis.password="$REDIS_PASS" \
-#     --set cpp-api.auth.jwtSecret="$JWT_SECRET" \
-#     --set cpp-worker.externalDatabase.password="$DB_PASS" \
-#     --set cpp-worker.externalRedis.password="$REDIS_PASS" \
-#     --set cpp-worker.auth.jwtSecret="$JWT_SECRET"
+#     --set life-os-cpp.externalDatabase.password="$DB_PASS" \
+#     --set life-os-cpp.externalRedis.password="$REDIS_PASS" \
+#     --set life-os-cpp.auth.jwtSecret="$JWT_SECRET" \
+#     --set life-os-cpp-worker.externalDatabase.password="$DB_PASS" \
+#     --set life-os-cpp-worker.externalRedis.password="$REDIS_PASS" \
+#     --set life-os-cpp-worker.auth.jwtSecret="$JWT_SECRET"
 #
 # NOTE: image tags below are pinned to the 1.5.3 release (unprefixed —
 # release.yml strips the v). Bump the three `image.tag` values to roll a
@@ -29,7 +29,7 @@
 env: stage
 baseDomain: tarassov.me
 
-cpp-api:
+life-os-cpp:
   image:
     tag: "1.6.0"
 
@@ -37,7 +37,7 @@ cpp-frontend:
   image:
     tag: "1.6.0"
 
-cpp-worker:
+life-os-cpp-worker:
   image:
     tag: "1.6.0"
   app:

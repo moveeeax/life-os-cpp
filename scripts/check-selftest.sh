@@ -353,7 +353,7 @@ PY
 #     charts sat on 1.4.0 while 1.5.x shipped (appVersion is the default image
 #     tag for standalone installs and the app.kubernetes.io/version label).
 break_chart_appversion_drift() {
-    python3 - "$1/helm/cpp-api/Chart.yaml" <<'PY'
+    python3 - "$1/helm/life-os-cpp/Chart.yaml" <<'PY'
 import re, sys
 path = sys.argv[1]
 with open(path, encoding="utf-8") as fh:
@@ -422,7 +422,7 @@ PY
 # 11. The prod overlay's rate limiter flipped to fail-open: a Redis blip
 #     would silently disable the login brute-force throttle.
 break_helm_fail_open() {
-    python3 - "$1/helm/cpp-api/values-prod.example.yaml" <<'PY'
+    python3 - "$1/helm/life-os-cpp/values-prod.example.yaml" <<'PY'
 import re, sys
 path = sys.argv[1]
 with open(path, encoding="utf-8") as fh:
@@ -447,11 +447,11 @@ import re, sys
 path = sys.argv[1]
 with open(path, encoding="utf-8") as fh:
     text = fh.read()
-# All three: credentials.jwtSecret plus the cpp-api / cpp-worker mirrors.
+# All three: credentials.jwtSecret plus the life-os-cpp / life-os-cpp-worker mirrors.
 text, n = re.subn(r'(?m)^(\s*)jwtSecret: ""', r'\1jwtSecret: "planted-by-check-selftest"', text)
 if n != 3:
     sys.exit("break_helm_committed_jwt: planted %d jwtSecret value(s) in %s — expected "
-             "exactly 3 (credentials + cpp-api + cpp-worker mirrors)" % (n, path))
+             "exactly 3 (credentials + life-os-cpp + life-os-cpp-worker mirrors)" % (n, path))
 with open(path, "w", encoding="utf-8") as fh:
     fh.write(text)
 PY
@@ -604,7 +604,7 @@ run_case helm-tag-drift check-version-sync.sh break_helm_tag_drift \
 
 run_case chart-appversion-drift check-version-sync.sh break_chart_appversion_drift \
     "CMakeLists.txt CHANGELOG.md helm .template-version" \
-    'appVersion drift: helm/cpp-api/Chart.yaml has appVersion "0.0.1"'
+    'appVersion drift: helm/life-os-cpp/Chart.yaml has appVersion "0.0.1"'
 
 run_case template-version-drift check-version-sync.sh break_template_version_drift \
     "CMakeLists.txt CHANGELOG.md helm .template-version" \
@@ -647,7 +647,7 @@ run_case changelog-broken-fragment 'assemble-changelog.sh --check' break_changel
     'changelog.d/selftest-planted.badtype.md' \
     "unknown type 'badtype'"
 
-CONFIG_SYNC_PATHS="src config/config.json config/config.sample.json docs/CONFIG.md docs/config-sync-allowlist.txt helm/cpp-api/templates/deployment.yaml helm/cpp-worker/templates/deployment.yaml"
+CONFIG_SYNC_PATHS="src config/config.json config/config.sample.json docs/CONFIG.md docs/config-sync-allowlist.txt helm/life-os-cpp/templates/deployment.yaml helm/life-os-cpp-worker/templates/deployment.yaml"
 
 run_case config-unregistered-key check-config-sync.sh break_config_unregistered_key \
     "$CONFIG_SYNC_PATHS" \

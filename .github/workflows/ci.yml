@@ -89,7 +89,7 @@ jobs:
           target: builder
           push: false
           load: true
-          tags: cpp-api-template:builder
+          tags: life-os-cpp-template:builder
           build-args: ENABLE_WERROR=ON
           secrets: |
             actions_results_url=${{ env.ACTIONS_RESULTS_URL }}
@@ -101,7 +101,7 @@ jobs:
 
       - name: Run full test suite
         # `make test` builds the test-runner stage with
-        # --cache-from cpp-rapid-rest-template:builder-latest. Alias the builder we just loaded
+        # --cache-from life-os-cpp:builder-latest. Alias the builder we just loaded
         # under that tag so the compose build is a cache hit instead of a full
         # recompile.
         #
@@ -114,7 +114,7 @@ jobs:
         env:
           CI_REQUIRE_INFRA: "1"
         run: |
-          docker tag cpp-api-template:builder cpp-rapid-rest-template:builder-latest
+          docker tag life-os-cpp-template:builder life-os-cpp:builder-latest
           make test
 
       - name: Dump logs on failure
@@ -335,7 +335,7 @@ jobs:
           target: runtime
           push: false
           load: true
-          tags: cpp-api-template:runtime-ci
+          tags: life-os-cpp-template:runtime-ci
           build-args: ENABLE_WERROR=ON
           secrets: |
             actions_results_url=${{ env.ACTIONS_RESULTS_URL }}
@@ -354,7 +354,7 @@ jobs:
           target: worker-runtime
           push: false
           load: true
-          tags: cpp-api-template-worker:runtime-ci
+          tags: life-os-cpp-template-worker:runtime-ci
           build-args: ENABLE_WERROR=ON
           secrets: |
             actions_results_url=${{ env.ACTIONS_RESULTS_URL }}
@@ -384,15 +384,15 @@ jobs:
               exit 1
             }
           }
-          check_image cpp-api-template:runtime-ci cpp_api_template
-          check_image cpp-api-template-worker:runtime-ci cpp_api_template_worker
+          check_image life-os-cpp-template:runtime-ci life_os_cpp
+          check_image life-os-cpp-template-worker:runtime-ci life_os_life_os_cpp_worker
 
       - name: API runtime binary starts
         # --print-routes returns before any Core init, so no Postgres/Redis is
         # needed and the check still proves the shipped binary loads and runs.
         if: steps.scope.outputs.relevant == 'true'
         run: |
-          docker run --rm cpp-api-template:runtime-ci --print-routes | tee routes.txt
+          docker run --rm life-os-cpp-template:runtime-ci --print-routes | tee routes.txt
           grep -q '/healthz' routes.txt
 
       - name: Worker runtime binary starts
@@ -402,7 +402,7 @@ jobs:
         # initialisers ran inside the runtime image.
         if: steps.scope.outputs.relevant == 'true'
         run: |
-          out="$(timeout 120 docker run --rm cpp-api-template-worker:runtime-ci config/no-such-config.json 2>&1 || true)"
+          out="$(timeout 120 docker run --rm life-os-cpp-template-worker:runtime-ci config/no-such-config.json 2>&1 || true)"
           printf '%s\n' "$out"
           printf '%s\n' "$out" | grep -q 'C++ API Worker Starting'
 
@@ -570,7 +570,7 @@ jobs:
           target: builder
           push: false
           load: true
-          tags: cpp-api-template:builder
+          tags: life-os-cpp-template:builder
           build-args: ENABLE_WERROR=ON
           secrets: |
             actions_results_url=${{ env.ACTIONS_RESULTS_URL }}
@@ -594,7 +594,7 @@ jobs:
               -v "$PWD":/src \
               -v "$PWD/.clang-tidy":/app/.clang-tidy:ro \
               --entrypoint /bin/bash \
-              cpp-api-template:builder -c "
+              life-os-cpp-template:builder -c "
                   apt-get update -qq && apt-get install -y -qq clang-tidy >/dev/null && \
                   run-clang-tidy -p /app/build -quiet -header-filter='src/.*' /app/src/ \
                       | tee /src/clang-tidy.log
@@ -686,7 +686,7 @@ jobs:
           target: builder
           push: false
           load: true
-          tags: cpp-api-template:builder
+          tags: life-os-cpp-template:builder
           build-args: ENABLE_WERROR=ON
           secrets: |
             actions_results_url=${{ env.ACTIONS_RESULTS_URL }}
@@ -718,7 +718,7 @@ jobs:
         # regression there is reported in minutes, not after the full build.
         if: steps.scope.outputs.relevant == 'true'
         run: |
-          NET=$(docker inspect cpp_api_test_postgres \
+          NET=$(docker inspect life_os_cpp_test_postgres \
             --format '{{range $k, $_ := .NetworkSettings.Networks}}{{$k}}{{end}}')
           docker run --rm \
               --network "$NET" \
@@ -730,7 +730,7 @@ jobs:
               -e ACTIONS_RESULTS_URL \
               -e ACTIONS_RUNTIME_TOKEN \
               --entrypoint /bin/bash \
-              cpp-api-template:builder -c "
+              life-os-cpp-template:builder -c "
                   set -e
                   cd /app
                   rm -rf build-san
@@ -742,16 +742,16 @@ jobs:
                       -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
                       -DCMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake \
                       -DVCPKG_INSTALLED_DIR=/app/build/vcpkg_installed  # reuse the builder stage's vcpkg tree (mirrors the sanitizer-builder Dockerfile stage); avoids a full vcpkg reinstall
-                  cmake --build build-san -j\$(nproc) --target cpp_api_template_tests_unit
+                  cmake --build build-san -j\$(nproc) --target life_os_cpp_tests_unit
                   ASAN_OPTIONS=halt_on_error=1:detect_leaks=1 \
                   UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
-                  ./build-san/cpp_api_template_tests_unit \
+                  ./build-san/life_os_cpp_tests_unit \
                       --gtest_color=yes
-                  cmake --build build-san -j\$(nproc) --target cpp_api_template_tests_integration
+                  cmake --build build-san -j\$(nproc) --target life_os_cpp_tests_integration
                   sccache --show-stats
                   ASAN_OPTIONS=halt_on_error=1:detect_leaks=1 \
                   UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
-                  ./build-san/cpp_api_template_tests_integration \
+                  ./build-san/life_os_cpp_tests_integration \
                       --gtest_color=yes
               "
 
@@ -839,7 +839,7 @@ jobs:
           target: builder
           push: false
           load: true
-          tags: cpp-api-template:builder
+          tags: life-os-cpp-template:builder
           build-args: ENABLE_WERROR=ON
           secrets: |
             actions_results_url=${{ env.ACTIONS_RESULTS_URL }}
@@ -863,7 +863,7 @@ jobs:
         # wiring, same unit-first ordering for the fast signal.
         if: steps.scope.outputs.relevant == 'true'
         run: |
-          NET=$(docker inspect cpp_api_test_postgres \
+          NET=$(docker inspect life_os_cpp_test_postgres \
             --format '{{range $k, $_ := .NetworkSettings.Networks}}{{$k}}{{end}}')
           docker run --rm \
               --network "$NET" \
@@ -875,7 +875,7 @@ jobs:
               -e ACTIONS_RESULTS_URL \
               -e ACTIONS_RUNTIME_TOKEN \
               --entrypoint /bin/bash \
-              cpp-api-template:builder -c "
+              life-os-cpp-template:builder -c "
                   set -e
                   cd /app
                   rm -rf build-tsan
@@ -887,14 +887,14 @@ jobs:
                       -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
                       -DCMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake \
                       -DVCPKG_INSTALLED_DIR=/app/build/vcpkg_installed
-                  cmake --build build-tsan -j\$(nproc) --target cpp_api_template_tests_unit
+                  cmake --build build-tsan -j\$(nproc) --target life_os_cpp_tests_unit
                   TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1 \
-                  ./build-tsan/cpp_api_template_tests_unit \
+                  ./build-tsan/life_os_cpp_tests_unit \
                       --gtest_color=yes
-                  cmake --build build-tsan -j\$(nproc) --target cpp_api_template_tests_integration
+                  cmake --build build-tsan -j\$(nproc) --target life_os_cpp_tests_integration
                   sccache --show-stats
                   TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1 \
-                  ./build-tsan/cpp_api_template_tests_integration \
+                  ./build-tsan/life_os_cpp_tests_integration \
                       --gtest_color=yes
               "
 

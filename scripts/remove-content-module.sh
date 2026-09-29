@@ -127,9 +127,9 @@ MARKED_FILES=(
     frontend/src/lib/api/queryKeys.ts
     frontend/src/pages/admin/Dashboard.tsx
     helm/cpp-frontend/templates/configmap.yaml
-    helm/cpp-api/values.yaml
-    helm/cpp-api/templates/deployment.yaml
-    helm/cpp-api/templates/secret.yaml
+    helm/life-os-cpp/values.yaml
+    helm/life-os-cpp/templates/deployment.yaml
+    helm/life-os-cpp/templates/secret.yaml
     helm/cpp-env/values-demo.yaml
     docs/CONFIG.md
     docker/.env.everything
@@ -163,7 +163,7 @@ echo "==> Stripped marker blocks from ${#MARKED_FILES[@]} shared files"
 # Helm Secret: drop the s3 term from the render-this-Secret-at-all condition
 # (the s3-secret-key data block itself was a marker block above).
 "${SED_INPLACE[@]}" -e 's| \.Values\.storage\.s3\.secretKey||' \
-    helm/cpp-api/templates/secret.yaml
+    helm/life-os-cpp/templates/secret.yaml
 echo "==> Patched includes, storage wiring, compose env, module-deps, helm secret"
 
 # ── 3b. Endpoints.hpp — the module's rows in Api::get_endpoints() ────────
@@ -229,8 +229,8 @@ awk '
     /^      "storage": \{/ { skip = 1 }
     /^      "messaging": \{/ { skip = 0 }
     !skip { print }
-' helm/cpp-api/templates/configmap.yaml >helm/cpp-api/templates/configmap.yaml.tmp
-mv helm/cpp-api/templates/configmap.yaml.tmp helm/cpp-api/templates/configmap.yaml
+' helm/life-os-cpp/templates/configmap.yaml >helm/life-os-cpp/templates/configmap.yaml.tmp
+mv helm/life-os-cpp/templates/configmap.yaml.tmp helm/life-os-cpp/templates/configmap.yaml
 echo "==> Removed storage/content config blocks (config.json, sample, helm ConfigMap)"
 
 # ── 4. Regenerate the typed frontend client ──────────────────────────────

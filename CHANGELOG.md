@@ -138,7 +138,7 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   at the cluster Tempo. Internal maintenance reads now use a raw replica
   connection (new `Database::with_replica_connection`, the replica twin of
   `with_primary_connection`) — no tracing, same LSN-comparing query.
-- The demo preset pins `cpp-api.app.baseUrl` — without it the sitemap and
+- The demo preset pins `life-os-cpp.app.baseUrl` — without it the sitemap and
   account-email links advertised the chart-default `app.example.com`
   (caught on the demo's first sitemap render after enabling content).
 - `deploy-demo.sh` execs into the newest RUNNING api pod — right after a
@@ -203,7 +203,7 @@ tarassov.me) backported every generic fix and gate the forks paid for
   config, `Core::<name>_enabled()`, compose and both helm charts in one
   command. 4-arg `with_repo_errors(cb, op, fn, after_fn)` for after-response
   side effects that can never double-fire the callback. `auth.csrf.enabled`
-  in the cpp-api chart. (#27)
+  in the life-os-cpp chart. (#27)
 - CI: `runtime-smoke` job (builds+starts the release images, checks `ldd` and
   the CA bundle), frontend nginx compose↔helm drift gate. (#19)
 - `docs/UPSTREAM.md` (fork↔template sync + backport-candidate discipline) and
@@ -258,7 +258,7 @@ Live-deploy fixes for the 1.5.0 content module.
 - Frontend nginx now proxies the content module's public routes
   (`/sitemap.xml`, `/posts/*`, `/uploads/*`) to the backend — they previously
   fell through to the SPA catch-all and served `index.html`.
-- The cpp-api chart gained the missing uploads-storage wiring
+- The life-os-cpp chart gained the missing uploads-storage wiring
   (`values.storage` → config.json → Secret → `S3_ENDPOINT`/`S3_SECRET_KEY`);
   a Helm deploy could previously only run the pod-local backend.
 - `client_max_body_size 6m` on the frontend `/api/` proxy — nginx's 1m
@@ -423,7 +423,7 @@ Patch release: trusted client-IP handling and two Helm deploy fixes.
   rate limiting is disabled) and applies the same trusted-IP logic; the audit
   now uses it. Capturing the *real* client IP still requires the edge to forward
   it (PROXY protocol on the LB + ingress-nginx) and `trust_proxy=true`.
-- **Helm**: guard the cpp-api `mail-smtp-password` Secret against a nil `mail`
+- **Helm**: guard the life-os-cpp `mail-smtp-password` Secret against a nil `mail`
   map, so `helm upgrade --reuse-values` (whose reused values omit the optional
   mail block) no longer fails to render.
 - **Helm**: pin the cpp-env umbrella + demo image tags to the v-prefixed release
@@ -582,7 +582,7 @@ Pre-release hardening + a public demo. No breaking API changes.
 
 ### Changed / Fixed
 - **Security:** constant-time bearer-token compare; the production auth-guard is
-  now actually armed (`APP_ENV` wired through config + Helm); the cpp-api chart
+  now actually armed (`APP_ENV` wired through config + Helm); the life-os-cpp chart
   defaults to `auth.mode=jwt` so a bare install can't ship a public API.
 - **Fork experience:** `make quickstart` / `up` build the fork's own code instead
   of pulling the upstream image; neutral registry default; CODEOWNERS and
@@ -769,6 +769,6 @@ First tagged release. Highlights of the pre-release hardening pass:
 - OpenSSL linked explicitly for HMAC-SHA256 (JWT signature) and SHA-256
   (Idempotency-Key body hash); constant-time compare via `CRYPTO_memcmp`.
 
-[Unreleased]: https://gitlab.com/tarassov.me/cpp-rapid-rest-template/-/compare/v1.2.0...master
-[1.2.0]: https://gitlab.com/tarassov.me/cpp-rapid-rest-template/-/compare/v1.1.0...v1.2.0
-[1.1.0]: https://gitlab.com/tarassov.me/cpp-rapid-rest-template/-/compare/v1.0.0...v1.1.0
+[Unreleased]: https://gitlab.com/tarassov.me/life-os-cpp/-/compare/v1.2.0...master
+[1.2.0]: https://gitlab.com/tarassov.me/life-os-cpp/-/compare/v1.1.0...v1.2.0
+[1.1.0]: https://gitlab.com/tarassov.me/life-os-cpp/-/compare/v1.0.0...v1.1.0

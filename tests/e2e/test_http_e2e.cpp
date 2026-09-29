@@ -10,7 +10,7 @@
  * server on a loopback port in a background thread, and talks to it with
  * drogon::HttpClient.
  *
- * Built as a SEPARATE executable (cpp_api_template_e2e): drogon::app() is a
+ * Built as a SEPARATE executable (life_os_cpp_e2e): drogon::app() is a
  * process-wide singleton whose run()/quit() cycle is once-per-process, so it
  * cannot coexist with suites that reset global state between tests.
  *
@@ -90,15 +90,6 @@ public:
         cfg["mail"]["enabled"] = false;
         cfg["database"]["migrations_enabled"] = true;
         cfg["database"]["migrations_dir"] = "migrations";
-        // init-project:content:start
-        // Content module: enable so PostsController/ContentPagesController
-        // routes aren't 404'd by Core::content_enabled(). No explicit
-        // "api.public_paths" override exists in this config to extend — this
-        // suite relies on Utils::Strings::kDefaultPublicPathsCsv, which
-        // already carries /posts/* and /sitemap.xml (added alongside this
-        // controller) as its fallback when the config omits the key.
-        cfg["content"]["enabled"] = true;
-        // init-project:content:end
 
         config_path_ = TestHelpers::create_temp_config(cfg.dump(2), "e2e_test_config.json");
         Core::initialize(config_path_);
@@ -291,25 +282,6 @@ TEST(HttpE2E, ContentTypeComparisonIsCaseInsensitive) {
     expect_matches_schema(resp, "POST", "/api/v1/auth/login");
 }
 
-// init-project:content:start
-TEST(HttpE2E, MultipartPassesContentTypeGate) {
-    // Uploads are multipart/form-data — the JSON content-type gate must let
-    // them through to the auth/controller layers. An anonymous multipart POST
-    // to the admin upload route therefore dies at AUTH (401), not at the gate
-    // (415). Regression: the gate once 415'd every upload before the
-    // controller's own validation ever ran.
-    REQUIRE_E2E_ENV();
-    auto req = HttpRequest::newHttpRequest();
-    req->setMethod(Post);
-    req->setPath("/api/v1/admin/uploads");
-    req->setBody("--x\r\nContent-Disposition: form-data; name=\"file\"\r\n\r\nhi\r\n--x--\r\n");
-    req->setContentTypeString("multipart/form-data; boundary=x");
-    auto resp = send(req);
-    EXPECT_EQ(resp->statusCode(), k401Unauthorized) << resp->getBody();
-    expect_matches_schema(resp, "POST", "/api/v1/admin/uploads");
-}
-// init-project:content:end
-
 TEST(HttpE2E, AuthMiddlewareGuardsNonPublicPaths) {
     REQUIRE_E2E_ENV();
     auto req = HttpRequest::newHttpRequest();
@@ -450,64 +422,6 @@ TEST(HttpE2E, AdminGateChecksPermissionBitmask) {
     EXPECT_EQ(user_resp->statusCode(), k403Forbidden);
     expect_matches_schema(user_resp, "GET", "/api/v1/admin/users");
 }
-
-// init-project:content:start
-TEST(HttpE2E, PostMarkdownServedOverWire) {
-    REQUIRE_E2E_ENV();
-    const auto now = Utils::Time::now_epoch_seconds();
-    json admin_claims = {{"sub", "e2e-content-admin"},
-                         {"iat", now},
-                         {"exp", now + 600},
-                         {"permissions", Domain::Permission::kAdminister}};
-    const auto admin_jwt = Security::Auth::issue_hs256_jwt(admin_claims, kSecret);
-
-    auto create = json_post("/api/v1/posts",
-                            {{"slug", "e2e-markdown-post"},
-                             {"title", "E2E Markdown Post"},
-                             {"body", "Hello from the wire."},
-                             {"status", "published"}});
-    create->addHeader("Authorization", "Bearer " + admin_jwt);
-    auto create_resp = send(create);
-    ASSERT_EQ(create_resp->statusCode(), k201Created) << create_resp->getBody();
-    expect_matches_schema(create_resp, "POST", "/api/v1/posts");
-
-    auto req = HttpRequest::newHttpRequest();
-    req->setPath("/posts/e2e-markdown-post");
-    auto resp = send(req);
-    ASSERT_EQ(resp->statusCode(), k200OK) << resp->getBody();
-    EXPECT_NE(resp->getHeader("content-type").find("text/markdown"), std::string::npos)
-        << resp->getHeader("content-type");
-    const std::string body(resp->getBody());
-    EXPECT_EQ(body.rfind("# ", 0), 0u) << body;  // starts with "# "
-}
-
-TEST(HttpE2E, SitemapListsPublishedPost) {
-    REQUIRE_E2E_ENV();
-    const auto now = Utils::Time::now_epoch_seconds();
-    json admin_claims = {{"sub", "e2e-content-admin-2"},
-                         {"iat", now},
-                         {"exp", now + 600},
-                         {"permissions", Domain::Permission::kAdminister}};
-    const auto admin_jwt = Security::Auth::issue_hs256_jwt(admin_claims, kSecret);
-
-    auto create = json_post(
-        "/api/v1/posts",
-        {{"slug", "e2e-sitemap-post"}, {"title", "E2E Sitemap Post"}, {"body", "Body."}, {"status", "published"}});
-    create->addHeader("Authorization", "Bearer " + admin_jwt);
-    auto create_resp = send(create);
-    ASSERT_EQ(create_resp->statusCode(), k201Created);
-    expect_matches_schema(create_resp, "POST", "/api/v1/posts");
-
-    auto req = HttpRequest::newHttpRequest();
-    req->setPath("/sitemap.xml");
-    auto resp = send(req);
-    ASSERT_EQ(resp->statusCode(), k200OK) << resp->getBody();
-    EXPECT_NE(resp->getHeader("content-type").find("application/xml"), std::string::npos)
-        << resp->getHeader("content-type");
-    const std::string body(resp->getBody());
-    EXPECT_NE(body.find("/posts/e2e-sitemap-post</loc>"), std::string::npos) << body;
-}
-// init-project:content:end
 
 }  // namespace
 

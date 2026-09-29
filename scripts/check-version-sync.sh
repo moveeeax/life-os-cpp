@@ -59,7 +59,7 @@ if [ "$cmake_version" != "$changelog_version" ]; then
 fi
 
 # --- helm image-tag pins (cpp-env umbrella overlays) -------------------------
-# Each tracked overlay pins exactly 3 app image tags (cpp-api, cpp-worker,
+# Each tracked overlay pins exactly 3 app image tags (life-os-cpp, life-os-cpp-worker,
 # cpp-frontend). The count is asserted so a restructure that stops the parser
 # from matching fails loudly instead of degrading into a green no-op.
 for overlay in values.yaml values-demo.yaml values-stage.yaml; do
@@ -68,7 +68,7 @@ for overlay in values.yaml values-demo.yaml values-stage.yaml; do
     count=0
     [ -n "$tags" ] && count="$(printf '%s\n' "$tags" | wc -l | tr -d ' ')"
     if [ "$count" -ne 3 ]; then
-        echo "✗ $path: expected exactly 3 pinned image tags (cpp-api, cpp-worker," >&2
+        echo "✗ $path: expected exactly 3 pinned image tags (life-os-cpp, life-os-cpp-worker," >&2
         echo "    cpp-frontend), parsed $count — the file layout changed under the" >&2
         echo "    parser; fix the pins or re-anchor this check." >&2
         fail=1
@@ -126,7 +126,7 @@ fi
 # --- Chart.yaml appVersion ---------------------------------------------------
 # Default image tag for standalone chart installs and the source of the
 # app.kubernetes.io/version label on every rendered object.
-for chart in cpp-api cpp-worker cpp-frontend cpp-env; do
+for chart in life-os-cpp life-os-cpp-worker cpp-frontend cpp-env; do
     path="helm/$chart/Chart.yaml"
     app_version="$(sed -n 's/^appVersion:[[:space:]]*"\([^"]*\)".*/\1/p' "$REPO/$path" | head -1)"
     if [ -z "$app_version" ]; then

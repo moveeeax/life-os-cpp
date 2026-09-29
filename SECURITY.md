@@ -78,7 +78,7 @@ Before shipping this template to production:
 
 ## Verifying release images and SBOMs
 
-Every release image (`ghcr.io/moveeeax/cpp-rapid-rest-template{,-worker,-frontend}`)
+Every release image (`docker.io/your-registry/your-project/life-os-cpp{,-worker,-frontend}`)
 is signed **keyless** with cosign from the release workflow's OIDC identity —
 there is no signing key to leak — and carries an SPDX SBOM as a cosign
 attestation (the same SBOM files are attached to the GitHub Release as assets).
@@ -87,13 +87,13 @@ To verify a pulled image and its SBOM:
 ```sh
 cosign verify \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp '^https://github.com/moveeeax/cpp-rapid-rest-template/\.github/workflows/release\.yml@refs/tags/v' \
-  ghcr.io/moveeeax/cpp-rapid-rest-template:<version>
+  --certificate-identity-regexp '^https://github.com/your-registry/your-project/life-os-cpp/\.github/workflows/release\.yml@refs/tags/v' \
+  docker.io/your-registry/your-project/life-os-cpp:<version>
 
 cosign verify-attestation --type spdxjson \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp '^https://github.com/moveeeax/cpp-rapid-rest-template/\.github/workflows/release\.yml@refs/tags/v' \
-  ghcr.io/moveeeax/cpp-rapid-rest-template:<version>
+  --certificate-identity-regexp '^https://github.com/your-registry/your-project/life-os-cpp/\.github/workflows/release\.yml@refs/tags/v' \
+  docker.io/your-registry/your-project/life-os-cpp:<version>
 ```
 
 Same commands for the `-worker` / `-frontend` images. Forks that publish their

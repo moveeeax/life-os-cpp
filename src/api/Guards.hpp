@@ -91,19 +91,6 @@
 
 namespace Api {
 
-// init-project:content:start
-/// Gate a content-module handler: when the content module is off
-/// (CONTENT_ENABLED=false) the whole surface answers 404 instead of a 500
-/// against a missing table. Returns false after responding — callers
-/// `if (!require_content_enabled(callback)) return;`.
-inline bool require_content_enabled(const std::function<void(const drogon::HttpResponsePtr&)>& callback) {
-    if (Core::content_enabled())
-        return true;
-    callback(ErrorResponse::not_found("content"));
-    return false;
-}
-// init-project:content:end
-
 /// Reject a path-parameter id that isn't a canonical 8-4-4-4-12 UUID with the
 /// shared 400 shape. Returns false after responding — callers
 /// `if (!require_valid_uuid(id, callback)) return;`.

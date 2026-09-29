@@ -1,12 +1,12 @@
 dependencies:
-- name: cpp-api
-  repository: file://../cpp-api
+- name: life-os-cpp
+  repository: file://../life-os-cpp
   version: 0.1.0
-- name: cpp-worker
-  repository: file://../cpp-worker
+- name: life-os-cpp-worker
+  repository: file://../life-os-cpp-worker
   version: 0.1.0
 - name: cpp-frontend
   repository: file://../cpp-frontend
   version: 0.1.0
-digest: sha256:b61b3cf36d854c8ee080637a6741c265023514d38a39b0980414927350ed75c0
-generated: "2026-06-20T10:27:16.695397+03:00"
+digest: sha256:b2bde830ac889702721d710068b4dad1f4cd385f280f072e78833b721a0c5655
+generated: "2026-09-29T12:55:07.553619+05:00"

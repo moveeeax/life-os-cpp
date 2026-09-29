@@ -163,7 +163,7 @@ public:
      * @param service_name Service name for traces
      * @param otlp_endpoint OTLP HTTP endpoint (empty = OStream fallback)
      */
-    void initialize(const std::string& service_name = "cpp_api_service", const std::string& otlp_endpoint = "");
+    void initialize(const std::string& service_name = "life_os_cpp_service", const std::string& otlp_endpoint = "");
 
     /**
      * @brief Get a tracer instance
@@ -197,7 +197,7 @@ public:
     void initialize(const std::string& log_name = "app",
                     const std::string& log_file = "logs/app.log",
                     const std::string& metrics_addr = "0.0.0.0:9090",
-                    const std::string& service_name = "cpp_api_service",
+                    const std::string& service_name = "life_os_cpp_service",
                     const std::string& otlp_endpoint = "",
                     const std::string& log_format = "text");
 
@@ -216,7 +216,7 @@ public:
 void initialize(const std::string& log_name = "app",
                 const std::string& log_file = "logs/app.log",
                 const std::string& metrics_addr = "0.0.0.0:9090",
-                const std::string& service_name = "cpp_api_service",
+                const std::string& service_name = "life_os_cpp_service",
                 const std::string& otlp_endpoint = "",
                 const std::string& log_format = "text");
 

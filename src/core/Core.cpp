@@ -36,7 +36,6 @@
 #include "security/Auth.hpp"
 #include "security/Idempotency.hpp"
 #include "security/RateLimit.hpp"
-#include "storage/Storage.hpp"
 #include "tasks/Tasks.hpp"
 #include "utils/Pg.hpp"
 #include "utils/Retry.hpp"
@@ -100,7 +99,6 @@ void Application::initialize(const std::string& config_path, InitMode mode) {
         }
 
         init_cache_(cfg);
-        Storage::initialize(cfg);
         if (mode != InitMode::Worker) {
             init_messaging_(cfg);
             Tasks::initialize();
@@ -184,12 +182,12 @@ void Application::validate_config_(Config::AppConfig& cfg) {
 }
 
 void Application::init_observability_(Config::AppConfig& cfg) {
-    auto log_name = cfg.get<std::string>("logging.name", "LOG_NAME", "cpp_api");
+    auto log_name = cfg.get<std::string>("logging.name", "LOG_NAME", "life_os_cpp");
     auto log_file = cfg.get<std::string>("logging.file", "LOG_FILE", "logs/app.log");
     auto log_level = cfg.get<std::string>("logging.level", "LOG_LEVEL", "info");
     auto log_format = cfg.get<std::string>("logging.format", "LOG_FORMAT", "text");
     auto metrics_addr = cfg.get<std::string>("observability.metrics_address", "METRICS_ADDRESS", "0.0.0.0:9090");
-    auto service_name = cfg.get<std::string>("observability.service_name", "SERVICE_NAME", "cpp_api_service");
+    auto service_name = cfg.get<std::string>("observability.service_name", "SERVICE_NAME", "life_os_cpp_service");
     auto otlp_endpoint = cfg.get<std::string>("observability.otlp_endpoint", "OTLP_ENDPOINT", "");
     Observability::initialize(log_name, log_file, metrics_addr, service_name, otlp_endpoint, log_format);
     Observability::get().logger().set_level(log_level);
@@ -294,7 +292,7 @@ void Application::init_database_(Config::AppConfig& cfg) {
                          std::chrono::milliseconds(stmt_timeout_ms));
 
     // db_queries_total{op, pool}: makes replica routing visible on the
-    // cpp-api Grafana dashboard. Same lifetime contract as retries_total.
+    // life-os-cpp Grafana dashboard. Same lifetime contract as retries_total.
     static prometheus::Family<prometheus::Counter>* db_queries_family = nullptr;
     db_queries_family = &Observability::get().metrics().create_counter(
         "db_queries_total", "Database operations by op (read|write|transaction) and serving pool (primary|replica)");
@@ -395,7 +393,7 @@ void Application::init_messaging_(Config::AppConfig& cfg) {
 
     if (cfg.get<bool>("messaging.kafka.producer.enabled", "KAFKA_PRODUCER_ENABLED", false)) {
         auto producer_id =
-            cfg.get<std::string>("messaging.kafka.producer.client_id", "KAFKA_PRODUCER_ID", "cpp_producer");
+            cfg.get<std::string>("messaging.kafka.producer.client_id", "KAFKA_PRODUCER_ID", "life_os_cpp_producer");
         Messaging::get().initialize_producer(brokers, producer_id);
     }
     if (cfg.get<bool>("messaging.kafka.consumer.enabled", "KAFKA_CONSUMER_ENABLED", false)) {
