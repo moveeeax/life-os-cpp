@@ -149,6 +149,8 @@ gates by construction. Hand-rolled versions usually don't.
    `scripts/`, `helm/` or `.github/workflows/`, with a nightly
    unconditional backstop in `.github/workflows/gates-nightly.yml`)
 3. `make lint-openapi` — spectral over `docs/openapi.yaml`
+   Touched `docs/openapi.yaml`? Also `make frontend-gen-api` and commit
+   `frontend/src/lib/api/schema.gen.ts` — the `frontend` CI job diffs it.
 4. `make test` — rebuild (docker layer cache) + full suite, ~2 min warm;
    what CI runs. In THIS repo step 4 runs only in CI (see the ban above);
    push and read the checks. `make test-quick` is an honest alias for it. `make
