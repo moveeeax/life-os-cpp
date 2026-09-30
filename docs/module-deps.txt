@@ -67,9 +67,13 @@ fitness/sync -> utils
 fitness/xiaomi -> domain/fitness
 fitness/xiaomi -> utils
 jobs -> cache
+jobs -> core
 jobs -> database
 jobs -> email
+jobs -> fitness/sync
+jobs -> fitness/xiaomi
 jobs -> observability
+jobs -> repositories/fitness
 jobs -> utils
 jobs -> webhooks
 observability -> utils
@@ -89,6 +93,7 @@ root -> email
 root -> jobs
 root -> observability
 root -> repositories
+root -> repositories/fitness
 root -> security
 root -> utils
 security -> cache

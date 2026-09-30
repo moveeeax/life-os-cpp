@@ -16,6 +16,7 @@
 #include "email/AccountEmailWorker.hpp"  // Email::AccountEmails::kJobType
 #include "jobs/BuiltinHandlers.hpp"
 #include "jobs/Dispatcher.hpp"
+#include "jobs/FitnessSyncHandler.hpp"
 #include "jobs/Job.hpp"
 
 using nlohmann::json;
@@ -76,6 +77,7 @@ TEST(JobDispatchTest, BuiltinHandlersAreRegistered) {
     Jobs::register_builtin_handlers();
     auto& d = Jobs::Dispatcher::get();
     EXPECT_TRUE(d.has_handler(Email::AccountEmails::kJobType));
+    EXPECT_TRUE(d.has_handler(Jobs::FitnessSync::kJobType));
     EXPECT_TRUE(d.has_handler("echo"));
     EXPECT_TRUE(d.has_handler("slow"));
     EXPECT_TRUE(d.has_handler("fail"));
