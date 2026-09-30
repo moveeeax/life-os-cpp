@@ -517,7 +517,7 @@ TEST_F(DataApiTest, ExportJsonCarriesTheBridgeEnvelope) {
     ASSERT_EQ(resp->statusCode(), k200OK) << resp->body();
     const auto body = body_of(resp);
     EXPECT_EQ(body["schema_version"], "1.0");
-    EXPECT_EQ(body["source"], "mi-fitness-api");
+    EXPECT_EQ(body["source"], "life-os-cpp");
     EXPECT_EQ(body["filters"]["start_date"], "2026-09-21");
     ASSERT_TRUE(body["records"].contains("daily_activity"));
     EXPECT_EQ(body["records"]["daily_activity"].size(), 1u);
