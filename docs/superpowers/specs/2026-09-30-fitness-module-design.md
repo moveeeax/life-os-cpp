@@ -69,10 +69,9 @@ src/fitness/                      ядро модуля
   xiaomi/                         CloudClient, Crypto, CurlTransport, HttpTransport,
                                   Credentials, Service, Normalize, Regions, DataKeys, Errors
   sync/SyncService.{hpp,cpp}
-  Query.hpp                       разбор from/to/limit/cursor из запроса
-                                  (сейчас DataController::parse_query)
   Export.{hpp,cpp}                конверт schema_version 1.0 и CSV с экранированием
-                                  формул (сейчас DataController::exportData и to_csv)
+                                  формул (сейчас DataController::exportData и to_csv);
+                                  разбор параметров запроса остается в контроллере
 src/domain/fitness/Health.hpp
 src/repositories/fitness/         восемь репозиториев, имена файлов как были
 src/jobs/FitnessSyncHandler.hpp   тип задачи fitness_sync
@@ -93,9 +92,12 @@ docs/fitness/                     parity-report-2026-09.md, спека порт�
 
 Включения меняются на новые пути: `"fitness/xiaomi/Service.hpp"`,
 `"repositories/fitness/SleepRepository.hpp"`, `"domain/fitness/Health.hpp"`.
-Пространства имен: `Fitness::Xiaomi`, `Fitness::Sync`, `Fitness::Export`,
-`Repositories::Fitness`, `Jobs::FitnessSync`. Тела `.cpp` компилируются в
-`app_core` через существующий GLOB, правок CMake не нужно.
+Пространства имен переносимого кода не меняются: `Xiaomi`, `Sync`,
+`Domain`, `Repositories` (переименование без локального компилятора это
+лишний риск ошибок, которые видны только в CI). Новые имена только у
+нового кода: `Jobs::FitnessSync`, `Fitness::Export`, `Api::FitnessController`.
+Тела `.cpp` компилируются в `app_core` через существующий GLOB, правок
+CMake не нужно.
 
 Имена таблиц не меняются (`xiaomi_credentials`, `daily_activity`,
 `sleep_sessions`, `workouts`, `body_measurements`, `heart_rate_samples`,
@@ -251,8 +253,9 @@ inline constexpr std::uint32_t kFitnessSync = 0x08;  // probe и sync
 - api: один `test_fitness_api.cpp` из трех прежних файлов, плюс новые
   случаи: 403 без бита `kFitnessRead` у пользователя с ролью User, 200 у
   Fitness Reader по API-ключу, 404 на любой маршрут при `FITNESS_ENABLED=false`;
-- e2e: тело ответа `GET /api/v1/fitness/coverage` проверяется против схемы
-  через существующий валидатор; `tests/e2e/openapi.gen.json` перегенерируется.
+- e2e: новых тестов нет (бакет требует полного цикла входа по HTTP, формы
+  ответов покрывает бакет api); `tests/e2e/openapi.gen.json` перегенерируется,
+  иначе падает проверка свежести.
 
 `tests/unit/test_job_dispatch.cpp` получает проверку `fitness_sync`.
 
