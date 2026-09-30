@@ -1776,6 +1776,889 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fitness/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enqueue a cloud sync run
+         * @description Creates a sync_runs journal row and puts an fitness_sync job on the queue. The run executes in the worker; poll the journal by run_id.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        from: string;
+                        /** Format: date */
+                        to: string;
+                        data_types?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Run queued */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                run_id: number;
+                                status: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Malformed range, unknown or duplicate data type */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Job queue unavailable (queue_unavailable) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/sync/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a sync run's journal entry */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Journal entry with per-type counters or error classes */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: Record<string, never>;
+                        };
+                    };
+                };
+                /** @description Unknown run id */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Journal unavailable (journal_unavailable) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/daily-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Daily activity rows */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rows in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DailyActivityListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/sleep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sleep sessions */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rows in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SleepListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/heart-rate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Heart rate samples */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                    type?: "passive" | "active" | "resting" | "manual";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rows in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HeartRateListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/stress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stress samples */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rows in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StressListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/spo2": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** SpO2 samples */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rows in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Spo2ListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/body": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Body measurements */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rows in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BodyListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/workouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Workouts */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rows in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkoutListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Per-day summary */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rows in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SummaryListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/abnormal-heart-beat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Abnormal heart beat events */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Events in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AbnormalListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Per-type coverage */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description First and last date, record count and last sync time per data type */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CoverageResponse"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export rows */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    format?: "json" | "csv";
+                    type?: "daily_activity" | "sleep" | "heart_rate" | "stress" | "spo2" | "body_measurements" | "workouts" | "abnormal_heart_beat";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description schema_version 1.0 envelope (json) or a flat table of one type (csv) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ExportResponse"];
+                        "text/csv": string;
+                    };
+                };
+                /** @description Malformed range, a range wider than 366 days, unknown type, or csv without a type */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Probe the Mi Fitness cloud — login, fetch one data key, count records
+         * @description Diagnostic route: performs a real two-step Xiaomi login and one signed
+         *     data fetch, returning only counts and a masked account id — never the
+         *     records themselves. The single place where the crypto port is verified
+         *     against the live cloud.
+         */
+        get: {
+            parameters: {
+                query: {
+                    key: "steps" | "calories" | "sleep" | "weight" | "heart_rate" | "spo2" | "stress" | "resting_heart_rate" | "abnormal_heart_beat";
+                    from: string;
+                    to: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Cloud reachable, credentials valid */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** @description Masked account id */
+                                account: string;
+                                region: string;
+                                key: string;
+                                records: number;
+                            };
+                        };
+                    };
+                };
+                /** @description Unknown data key or malformed date range */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A sync run is in progress — probe would rotate the token under it */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not configured, upstream refused authentication, or protocol mismatch */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing/packages": {
         parameters: {
             query?: never;
@@ -2799,25 +3682,6 @@ export interface components {
             user: components["schemas"]["User"];
             message: string;
         };
-        Post: {
-            /** Format: uuid */
-            id: string;
-            slug: string;
-            title: string;
-            summary: string;
-            body: string;
-            /** @enum {string} */
-            status: "draft" | "published";
-            topic: string;
-            tags: string[];
-            /** Format: date-time */
-            published_at: string | null;
-            created_at: string;
-            updated_at: string;
-        };
-        PostDetailResponse: {
-            data: components["schemas"]["Post"];
-        };
         BillingPackage: {
             /** Format: uuid */
             id: string;
@@ -3065,6 +3929,155 @@ export interface components {
                     /** Format: int64 */
                     revenue_cents: number;
                 }[];
+            };
+        };
+        DailyActivityListResponse: {
+            count: number;
+            /** @description Rows in the whole range, ignoring limit/offset */
+            total: number;
+            data: {
+                /** Format: date */
+                date?: string;
+                steps?: number;
+                distance_m?: number | null;
+                active_kcal?: number | null;
+                total_kcal?: number | null;
+                timezone?: string;
+            }[];
+        };
+        SleepListResponse: {
+            count: number;
+            /** @description Rows in the whole range, ignoring limit/offset */
+            total: number;
+            data: {
+                sleep_id?: string;
+                start_at?: string;
+                end_at?: string;
+                duration_minutes?: number;
+                time_asleep_minutes?: number;
+                time_awake_minutes?: number;
+                sleep_score?: number | null;
+                sleep_score_source?: string | null;
+                is_nap?: boolean;
+                timezone?: string;
+                stages?: Record<string, never>[];
+            }[];
+        };
+        HeartRateListResponse: {
+            count: number;
+            /** @description Rows in the whole range, ignoring limit/offset */
+            total: number;
+            data: {
+                timestamp?: string;
+                bpm?: number;
+                sample_type?: string;
+            }[];
+        };
+        StressListResponse: {
+            count: number;
+            /** @description Rows in the whole range, ignoring limit/offset */
+            total: number;
+            data: {
+                timestamp?: string;
+                stress_score?: number;
+                level?: string;
+            }[];
+        };
+        Spo2ListResponse: {
+            count: number;
+            /** @description Rows in the whole range, ignoring limit/offset */
+            total: number;
+            data: {
+                timestamp?: string;
+                spo2_pct?: number;
+            }[];
+        };
+        BodyListResponse: {
+            count: number;
+            /** @description Rows in the whole range, ignoring limit/offset */
+            total: number;
+            data: {
+                timestamp?: string;
+                weight_kg?: number;
+                bmi?: number | null;
+                body_fat_pct?: number | null;
+                muscle_mass_kg?: number | null;
+                water_pct?: number | null;
+                bone_mass_kg?: number | null;
+                visceral_fat_score?: number | null;
+                basal_metabolism_kcal?: number | null;
+                metabolic_age?: number | null;
+            }[];
+        };
+        WorkoutListResponse: {
+            count: number;
+            /** @description Rows in the whole range, ignoring limit/offset */
+            total: number;
+            data: {
+                workout_id?: string;
+                activity_type?: string;
+                start_at?: string;
+                end_at?: string;
+                duration_minutes?: number;
+                distance_m?: number | null;
+                calories_kcal?: number | null;
+                avg_heart_rate_bpm?: number | null;
+                max_heart_rate_bpm?: number | null;
+                avg_pace_sec_per_km?: number | null;
+                max_pace_sec_per_km?: number | null;
+                total_steps?: number | null;
+            }[];
+        };
+        SummaryListResponse: {
+            count: number;
+            /** @description Rows in the whole range, ignoring limit/offset */
+            total: number;
+            data: {
+                /** Format: date */
+                date?: string;
+                steps?: number;
+                distance_m?: number | null;
+                active_kcal?: number | null;
+                sleep_duration_minutes?: number | null;
+                sleep_score?: number | null;
+                resting_bpm?: number | null;
+            }[];
+        };
+        AbnormalListResponse: {
+            count: number;
+            total: number;
+            data: {
+                event_id?: string;
+                start_at?: string;
+                end_at?: string;
+                duration_seconds?: number | null;
+            }[];
+        };
+        CoverageResponse: {
+            data: {
+                [key: string]: {
+                    /** Format: date */
+                    first_date?: string | null;
+                    /** Format: date */
+                    last_date?: string | null;
+                    records?: number;
+                    last_sync_at?: string | null;
+                };
+            };
+        };
+        ExportResponse: {
+            schema_version: string;
+            source: string;
+            generated_at: string;
+            filters: {
+                dataset?: string | null;
+                /** Format: date */
+                start_date?: string;
+                /** Format: date */
+                end_date?: string;
+            };
+            records: {
+                [key: string]: Record<string, never>[];
             };
         };
     };
