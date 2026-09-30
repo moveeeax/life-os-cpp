@@ -1,10 +1,10 @@
 /**
- * @file test_xiaomi_transport.cpp
+ * @file test_fitness_transport.cpp
  * @brief Таймаут HTTP-запроса к облаку читается из конфига.
  *
  * Живой бэкфил июля-сентября упал на «Timeout was reached»: жёсткие 20 секунд
  * CurlTransport меньше времени ответа облака на глубокие диапазоны. Ручка
- * xiaomi.http_timeout_seconds (MI_FITNESS_HTTP_TIMEOUT) поднимает предел без
+ * fitness.xiaomi.http_timeout_seconds (MI_FITNESS_HTTP_TIMEOUT) поднимает предел без
  * пересборки; дефолт остаётся прежним.
  */
 
@@ -54,7 +54,7 @@ TEST_F(XiaomiTransportTimeoutTest, DefaultsToTwentySecondsWithoutConfig) {
 }
 
 TEST_F(XiaomiTransportTimeoutTest, ReadsTimeoutFromConfig) {
-    std::ofstream(kConfigFile) << R"({"xiaomi": {"http_timeout_seconds": 120}})";
+    std::ofstream(kConfigFile) << R"({"fitness": {"xiaomi": {"http_timeout_seconds": 120}}})";
     Config::initialize(kConfigFile);
     EXPECT_EQ(Xiaomi::Service::http_timeout_seconds(), 120);
 }
