@@ -23,6 +23,7 @@ question instead of grepping the tree.
 | [`CONFIG.md`](CONFIG.md) | Single table mapping every JSON key ↔ env var ↔ default |
 | [`TESTING.md`](TESTING.md) | Test buckets (unit/integration/api/e2e), day-to-day loops incl. the `.devcontainer` zero-setup inner loop, coverage, nightly libFuzzer targets (`tests/fuzz/`), the disabled-race note |
 | [`ORGS.md`](ORGS.md) | Multi-tenancy starter kit (`scripts/add-orgs.sh`): two role layers, fail-closed org context, claim/switch semantics, deny-by-default matrix |
+| [`fitness/parity-report-2026-09.md`](fitness/parity-report-2026-09.md) | Модуль fitness (Mi Fitness → Postgres): сверка порта с python-мостом; спека порта рядом в `fitness/` |
 | [`UPSTREAM.md`](UPSTREAM.md) | Fork↔template sync: `scripts/sync-upstream.sh` (three-way tarball patching for degit forks, `.template-version` stamp), git merge for full-history forks, the backport-candidate discipline for giving generic fixes back |
 | [`BENCHMARKS.md`](BENCHMARKS.md) | How to measure latency/throughput/footprint (`make bench` + presets) + a results template |
 | [`PATTERNS-FROM-FLASK-BASE.md`](PATTERNS-FROM-FLASK-BASE.md) | Authoritative list of patterns lifted from flask-base (file-level mapping included) |

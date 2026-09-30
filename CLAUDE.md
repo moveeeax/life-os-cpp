@@ -125,6 +125,13 @@ gates by construction. Hand-rolled versions usually don't.
    AS-IS — don't add an empty-expanding placeholder for a string key whose
    code default is non-empty (see `rate_limit.protected_paths` there).
 10. **Commits:** conventional commits, no AI-attribution trailers.
+11. **Fitness module:** feature bits `kFitnessRead`/`kFitnessSync` guard every
+    `/api/v1/fitness/*` handler (Guards.hpp `API_REQUIRE_PERMISSION` after the
+    `Core::fitness_enabled()` 404 check); config keys live under
+    `fitness.xiaomi.*` with the historical `MI_FITNESS_*` env names; table
+    names match mi-fitness-api so prod data moves by plain pg_dump. Nested
+    source dirs (`fitness/xiaomi`, `repositories/fitness`) are their own
+    nodes in `docs/module-deps.txt`.
 
 ## Gate sequence — run cheapest-first before pushing
 
