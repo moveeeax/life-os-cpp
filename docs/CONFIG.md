@@ -231,6 +231,14 @@ outage can never affect the money path.
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
 | `FITNESS_ENABLED` | `fitness.enabled` | bool | `false` | Master switch for the fitness module (`Core::fitness_enabled()`) — same on/off pattern as `BILLING_ENABLED`; routes stay registered, handlers 404 while off. |
+| `MI_FITNESS_TOKEN_KEY` | `fitness.xiaomi.token_key` | string | `""` | Base64 of the 32-byte libsodium secretbox key that seals the rotated Mi Fitness passToken in Postgres. Empty means the Xiaomi module is not configured; the probe endpoint answers 503 `not_configured`. Never log or commit this value |
+| `MI_FITNESS_USER_ID` | `fitness.xiaomi.user_id` | string | `""` | Numeric Xiaomi account id, seed only |
+| `MI_FITNESS_PASS_TOKEN` | `fitness.xiaomi.pass_token` | string | `""` | Seed passToken from the cluster Secret. The rotated token in Postgres always wins; this value is only written when the table is empty or reseed is set. Never log or commit |
+| `MI_FITNESS_REGION` | `fitness.xiaomi.region` | string | `cn` | Cloud region candidate (ru, cn, de, i2, sg, us) |
+| `MI_FITNESS_RESEED` | `fitness.xiaomi.reseed` | bool | `false` | Emergency lever: overwrite the stored token with the seed on next boot. Turn off afterwards |
+| `MI_FITNESS_CHUNK_DAYS` | `fitness.xiaomi.sync_chunk_days` | int | `7` | Width of one sync window in days |
+| `MI_FITNESS_SYNC_TYPE_TIMEOUT` | `fitness.xiaomi.sync_type_timeout_seconds` | int | `180` | Wall-clock budget per data type, checked between chunks. Raise for deep backfills. daily_activity aggregates over the whole range and writes once at the end, so a budget overrun for that type stores nothing for the run |
+| `MI_FITNESS_HTTP_TIMEOUT` | `fitness.xiaomi.http_timeout_seconds` | int | `20` | libcurl budget for ONE cloud request. Deep backfill responses take longer than the default |
 
 ## Mail (SMTP)
 

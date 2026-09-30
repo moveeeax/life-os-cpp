@@ -21,6 +21,10 @@
 #
 # Adding a genuinely new dependency? Add the edge here in the same PR and
 # say why in the PR description. Keep this file sorted.
+#
+# Nested directories are their own nodes (the gate keeps the full directory
+# of an include): fitness/xiaomi, fitness/sync, repositories/fitness,
+# domain/fitness are edges in their own right, not folded into their parent.
 
 api -> billing
 api -> cache
@@ -56,6 +60,12 @@ email -> jobs
 email -> repositories
 email -> security
 email -> utils
+fitness/sync -> database
+fitness/sync -> fitness/xiaomi
+fitness/sync -> repositories/fitness
+fitness/sync -> utils
+fitness/xiaomi -> domain/fitness
+fitness/xiaomi -> utils
 jobs -> cache
 jobs -> database
 jobs -> email
@@ -66,6 +76,10 @@ observability -> utils
 repositories -> database
 repositories -> domain
 repositories -> utils
+repositories/fitness -> database
+repositories/fitness -> domain/fitness
+repositories/fitness -> fitness/xiaomi
+repositories/fitness -> utils
 root -> api
 root -> cache
 root -> core
