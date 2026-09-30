@@ -36,7 +36,7 @@ spec:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["/app/life_os_life_os_cpp_worker"]
+          command: ["/app/life_os_cpp_worker"]
           ports:
             - name: health
               containerPort: {{ .Values.worker.healthPort }}

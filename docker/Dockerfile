@@ -1,7 +1,7 @@
 # Multi-stage Dockerfile for C++ API Template
 
 ARG APP_BINARY=life_os_cpp
-ARG WORKER_BINARY=life_os_life_os_cpp_worker
+ARG WORKER_BINARY=life_os_cpp_worker
 ARG TEST_BINARY=life_os_cpp_tests_unit
 
 # Stage 1: Build environment
@@ -264,7 +264,7 @@ CMD ["config/config.json"]
 
 # Stage 5: Worker runtime
 FROM runtime-base AS worker-runtime
-ARG WORKER_BINARY=life_os_life_os_cpp_worker
+ARG WORKER_BINARY=life_os_cpp_worker
 ENV WORKER_BINARY=${WORKER_BINARY}
 
 COPY --from=builder --chown=appuser:appuser /app/build/${WORKER_BINARY} /app/

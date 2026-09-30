@@ -385,7 +385,7 @@ jobs:
             }
           }
           check_image life-os-cpp-template:runtime-ci life_os_cpp
-          check_image life-os-cpp-template-worker:runtime-ci life_os_life_os_cpp_worker
+          check_image life-os-cpp-template-worker:runtime-ci life_os_cpp_worker
 
       - name: API runtime binary starts
         # --print-routes returns before any Core init, so no Postgres/Redis is

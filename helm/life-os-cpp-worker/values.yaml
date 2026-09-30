@@ -205,7 +205,7 @@ logging:
   level: info
   name: life_os_cpp_worker
   format: json             # text | json (LOG_FORMAT) — json required for log aggregators
-  serviceName: life_os_life_os_cpp_worker_service
+  serviceName: life_os_cpp_worker_service
 
 # ---------------------------------------------------------------
 # Tracing — OpenTelemetry OTLP exporter

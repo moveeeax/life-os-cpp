@@ -259,7 +259,7 @@ outage can never affect the money path.
 | `MAIL_TEMPLATES_DIR` | `mail.templates_dir` | string | `templates/email` | Relative to the working directory |
 | `MAIL_TIMEOUT_SEC` | `mail.timeout_sec` | int | `30` | |
 
-## Worker (second binary, `life_os_life_os_cpp_worker`)
+## Worker (second binary, `life_os_cpp_worker`)
 
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
