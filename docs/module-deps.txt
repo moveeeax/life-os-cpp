@@ -60,6 +60,7 @@ email -> jobs
 email -> repositories
 email -> security
 email -> utils
+fitness -> fitness/xiaomi
 fitness/sync -> database
 fitness/sync -> fitness/xiaomi
 fitness/sync -> repositories/fitness
