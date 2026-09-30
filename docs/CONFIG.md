@@ -226,6 +226,12 @@ notice) have no config keys of their own: they ride the generic
 `mail.via_jobs`, SMTP block). Delivery is best-effort by contract — a mail
 outage can never affect the money path.
 
+## Fitness module
+
+| Env | JSON key | Type | Default | Notes |
+|---|---|---|---|---|
+| `FITNESS_ENABLED` | `fitness.enabled` | bool | `false` | Master switch for the fitness module (`Core::fitness_enabled()`) — same on/off pattern as `BILLING_ENABLED`; routes stay registered, handlers 404 while off. |
+
 ## Mail (SMTP)
 
 | Env | JSON key | Type | Default | Notes |

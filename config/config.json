@@ -201,6 +201,21 @@
       "cancel_url": "${PAYPAL_CANCEL_URL:-}"
     }
   },
+  "fitness": {
+    "enabled": "${FITNESS_ENABLED:-false}",
+    "xiaomi": {
+      "token_key": "${MI_FITNESS_TOKEN_KEY:-}",
+      "user_id": "${MI_FITNESS_USER_ID:-}",
+      "pass_token": "${MI_FITNESS_PASS_TOKEN:-}",
+      "region": "${MI_FITNESS_REGION:-cn}",
+      "reseed": "${MI_FITNESS_RESEED:-false}",
+      "sync_chunk_days": "${MI_FITNESS_CHUNK_DAYS:-7}",
+      "sync_type_timeout_seconds": "${MI_FITNESS_SYNC_TYPE_TIMEOUT:-180}",
+      "http_timeout_seconds": "${MI_FITNESS_HTTP_TIMEOUT:-20}",
+      "sync_schedule_hours": "${MI_FITNESS_SYNC_SCHEDULE_HOURS:-0}",
+      "sync_window_days": "${MI_FITNESS_SYNC_WINDOW_DAYS:-2}"
+    }
+  },
   "worker": {
     "id": "worker-1",
     "types": ["default"],

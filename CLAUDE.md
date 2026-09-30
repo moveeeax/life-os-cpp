@@ -1,5 +1,18 @@
 # CLAUDE.md — agent guide for this repo
 
+## Запрет: локальная сборка
+
+Собирать этот проект локально запрещено. Ни `make test`, ни `make test-unit`,
+ни разовая компиляция отдельного файла компилятором, ни черновые пробы «на
+минутку». Единственный исполнитель сборки и тестов это GitHub Actions.
+
+Локально разрешено только то, чему не нужен компилятор: `clang-format`,
+`gitleaks`, гейты на shell и python (`scripts/check-*.sh`), рендер Helm,
+генератор векторов на python.
+
+Следствие принято сознательно: ошибки, которые видит только GCC или
+санитайзеры, находятся прогоном CI, и цикл задачи из-за этого длиннее.
+
 C++20 REST service template: Drogon + PostgreSQL + Redis, vcpkg/CMake,
 React SPA in `frontend/`, Helm charts in `helm/`. `docs/INDEX.md` is the
 map of all documentation; `docs/CONVENTIONS.md` is the pattern reference.
@@ -130,7 +143,8 @@ gates by construction. Hand-rolled versions usually don't.
    unconditional backstop in `.github/workflows/gates-nightly.yml`)
 3. `make lint-openapi` — spectral over `docs/openapi.yaml`
 4. `make test` — rebuild (docker layer cache) + full suite, ~2 min warm;
-   what CI runs. `make test-quick` is an honest alias for it. `make
+   what CI runs. In THIS repo step 4 runs only in CI (see the ban above);
+   push and read the checks. `make test-quick` is an honest alias for it. `make
    test-rerun` re-runs the previous binaries WITHOUT rebuilding — flake
    triage only, code edits do NOT land in it. Fastest inner loop for code
    changes: native `make test-local NAME='Foo*'` (docs/TESTING.md)

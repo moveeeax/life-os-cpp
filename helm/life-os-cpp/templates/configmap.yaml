@@ -65,6 +65,9 @@ data:
         "result_ttl": {{ .Values.jobs.resultTtl }},
         "max_retries": {{ .Values.jobs.maxRetries }}
       },
+      "fitness": {
+        "enabled": {{ .Values.fitness.enabled }}
+      },
       "billing": {
         "enabled": {{ .Values.billing.enabled }},
         "provider": {{ .Values.billing.provider | quote }},

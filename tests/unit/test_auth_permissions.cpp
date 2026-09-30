@@ -42,3 +42,15 @@ TEST(AuthPermissions, AccumulatedLowBitsAreNotAdmin) {
     r.permissions = Domain::Permission::kGeneral | Domain::Permission::kAdminister;
     EXPECT_TRUE(r.is_admin());
 }
+
+TEST(PermissionBits, FitnessBitsAreDistinctLowBits) {
+    using namespace Domain::Permission;
+    EXPECT_EQ(kFitnessRead, 0x04u);
+    EXPECT_EQ(kFitnessSync, 0x08u);
+    EXPECT_EQ(kFitnessRead & kFitnessSync, 0u);
+    EXPECT_EQ(kFitnessRead & kAuditRead, 0u);
+    EXPECT_EQ(kFitnessSync & kAdminister, 0u);
+    // Fitness Reader = 0x05, Fitness Operator = 0x0D (migration 015).
+    EXPECT_EQ(kGeneral | kFitnessRead, 0x05u);
+    EXPECT_EQ(kGeneral | kFitnessRead | kFitnessSync, 0x0Du);
+}
