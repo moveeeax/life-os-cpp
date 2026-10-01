@@ -137,6 +137,11 @@ private:
     // DLQ gauge, over jobs:queue:* instead of jobs:dlq:*.
     static void register_queue_depth_metric_(Config::AppConfig& cfg);
 
+    // Плановый синк модуля fitness: раз в fitness.xiaomi.sync_schedule_hours
+    // часов ставит в очередь окно последних sync_window_days суток. 0 выключает,
+    // выключенный модуль тоже.
+    static void register_fitness_sync_schedule_(Config::AppConfig& cfg);
+
     // Registers db_pool_active_connections + db_pool_size gauges, labeled by
     // pool (primary/replica). Saturation = active / size → 1.0 means acquire()
     // is about to start timing out; it's the cause the HighP99Latency alert

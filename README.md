@@ -595,6 +595,27 @@ CI-published builder image (`ghcr.io/…/builder:cache`) with the vcpkg world
 prebuilt inside — no `VCPKG_ROOT`, no cold compile; `make test-local
 NAME='Foo*'` works from the first minute (see `docs/TESTING.md`).
 
+## Модуль fitness
+
+Синхронизация данных Mi Fitness (Xiaomi Cloud) в Postgres, перенесена из
+[mi-fitness-api](https://github.com/moveeeax/mi-fitness-api). Включается
+`FITNESS_ENABLED=true`, учетные данные и ручки синка через `MI_FITNESS_*`
+(см. `docs/CONFIG.md`, раздел «Fitness module»). Маршруты под
+`/api/v1/fitness/`:
+
+| Маршрут | Право | Что делает |
+|---|---|---|
+| `GET probe` | fitness:sync | живая проверка учетных данных и связи с облаком |
+| `POST sync`, `GET sync/{id}` | fitness:sync | поставить синк в очередь, прочитать журнал |
+| `GET daily-activity`, `sleep`, `heart-rate`, `stress`, `spo2`, `body`, `workouts`, `abnormal-heart-beat` | fitness:read | данные за диапазон дат |
+| `GET summary`, `coverage`, `export` | fitness:read | сводка по дням, покрытие, выгрузка json/csv |
+
+Права это биты `kFitnessRead` (0x04) и `kFitnessSync` (0x08) в
+`src/domain/Role.hpp`; миграция 015 сеет роли «Fitness Reader» и
+«Fitness Operator». API-ключ наследует права роли своего пользователя,
+поэтому агенту хватает пользователя с ролью Reader и ключа из
+`POST /api/v1/account/api-keys`.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). TL;DR: conventional commits, clang-format

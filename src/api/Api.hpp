@@ -32,6 +32,7 @@
 #include "api/AuditController.hpp"
 #include "api/AuthController.hpp"
 #include "api/BillingController.hpp"
+#include "api/FitnessController.hpp"
 #include "api/HealthController.hpp"
 #include "api/JobsController.hpp"
 #include "api/Middleware.hpp"

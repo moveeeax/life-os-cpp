@@ -1169,6 +1169,515 @@
       }
      }
     }
+   },
+   "DailyActivityListResponse": {
+    "type": "object",
+    "required": [
+     "data",
+     "count",
+     "total"
+    ],
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "total": {
+      "type": "integer",
+      "description": "Rows in the whole range, ignoring limit/offset"
+     },
+     "data": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "date": {
+         "type": "string",
+         "format": "date"
+        },
+        "steps": {
+         "type": "integer"
+        },
+        "distance_m": {
+         "type": "number",
+         "nullable": true
+        },
+        "active_kcal": {
+         "type": "number",
+         "nullable": true
+        },
+        "total_kcal": {
+         "type": "number",
+         "nullable": true
+        },
+        "timezone": {
+         "type": "string"
+        }
+       }
+      }
+     }
+    }
+   },
+   "SleepListResponse": {
+    "type": "object",
+    "required": [
+     "data",
+     "count",
+     "total"
+    ],
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "total": {
+      "type": "integer",
+      "description": "Rows in the whole range, ignoring limit/offset"
+     },
+     "data": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "sleep_id": {
+         "type": "string"
+        },
+        "start_at": {
+         "type": "string"
+        },
+        "end_at": {
+         "type": "string"
+        },
+        "duration_minutes": {
+         "type": "integer"
+        },
+        "time_asleep_minutes": {
+         "type": "integer"
+        },
+        "time_awake_minutes": {
+         "type": "integer"
+        },
+        "sleep_score": {
+         "type": "integer",
+         "nullable": true
+        },
+        "sleep_score_source": {
+         "type": "string",
+         "nullable": true
+        },
+        "is_nap": {
+         "type": "boolean"
+        },
+        "timezone": {
+         "type": "string"
+        },
+        "stages": {
+         "type": "array",
+         "items": {
+          "type": "object"
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "HeartRateListResponse": {
+    "type": "object",
+    "required": [
+     "data",
+     "count",
+     "total"
+    ],
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "total": {
+      "type": "integer",
+      "description": "Rows in the whole range, ignoring limit/offset"
+     },
+     "data": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "timestamp": {
+         "type": "string"
+        },
+        "bpm": {
+         "type": "integer"
+        },
+        "sample_type": {
+         "type": "string"
+        }
+       }
+      }
+     }
+    }
+   },
+   "StressListResponse": {
+    "type": "object",
+    "required": [
+     "data",
+     "count",
+     "total"
+    ],
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "total": {
+      "type": "integer",
+      "description": "Rows in the whole range, ignoring limit/offset"
+     },
+     "data": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "timestamp": {
+         "type": "string"
+        },
+        "stress_score": {
+         "type": "integer"
+        },
+        "level": {
+         "type": "string"
+        }
+       }
+      }
+     }
+    }
+   },
+   "Spo2ListResponse": {
+    "type": "object",
+    "required": [
+     "data",
+     "count",
+     "total"
+    ],
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "total": {
+      "type": "integer",
+      "description": "Rows in the whole range, ignoring limit/offset"
+     },
+     "data": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "timestamp": {
+         "type": "string"
+        },
+        "spo2_pct": {
+         "type": "integer"
+        }
+       }
+      }
+     }
+    }
+   },
+   "BodyListResponse": {
+    "type": "object",
+    "required": [
+     "data",
+     "count",
+     "total"
+    ],
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "total": {
+      "type": "integer",
+      "description": "Rows in the whole range, ignoring limit/offset"
+     },
+     "data": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "timestamp": {
+         "type": "string"
+        },
+        "weight_kg": {
+         "type": "number"
+        },
+        "bmi": {
+         "type": "number",
+         "nullable": true
+        },
+        "body_fat_pct": {
+         "type": "number",
+         "nullable": true
+        },
+        "muscle_mass_kg": {
+         "type": "number",
+         "nullable": true
+        },
+        "water_pct": {
+         "type": "number",
+         "nullable": true
+        },
+        "bone_mass_kg": {
+         "type": "number",
+         "nullable": true
+        },
+        "visceral_fat_score": {
+         "type": "integer",
+         "nullable": true
+        },
+        "basal_metabolism_kcal": {
+         "type": "integer",
+         "nullable": true
+        },
+        "metabolic_age": {
+         "type": "integer",
+         "nullable": true
+        }
+       }
+      }
+     }
+    }
+   },
+   "WorkoutListResponse": {
+    "type": "object",
+    "required": [
+     "data",
+     "count",
+     "total"
+    ],
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "total": {
+      "type": "integer",
+      "description": "Rows in the whole range, ignoring limit/offset"
+     },
+     "data": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "workout_id": {
+         "type": "string"
+        },
+        "activity_type": {
+         "type": "string"
+        },
+        "start_at": {
+         "type": "string"
+        },
+        "end_at": {
+         "type": "string"
+        },
+        "duration_minutes": {
+         "type": "integer"
+        },
+        "distance_m": {
+         "type": "number",
+         "nullable": true
+        },
+        "calories_kcal": {
+         "type": "number",
+         "nullable": true
+        },
+        "avg_heart_rate_bpm": {
+         "type": "integer",
+         "nullable": true
+        },
+        "max_heart_rate_bpm": {
+         "type": "integer",
+         "nullable": true
+        },
+        "avg_pace_sec_per_km": {
+         "type": "number",
+         "nullable": true
+        },
+        "max_pace_sec_per_km": {
+         "type": "number",
+         "nullable": true
+        },
+        "total_steps": {
+         "type": "integer",
+         "nullable": true
+        }
+       }
+      }
+     }
+    }
+   },
+   "SummaryListResponse": {
+    "type": "object",
+    "required": [
+     "data",
+     "count",
+     "total"
+    ],
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "total": {
+      "type": "integer",
+      "description": "Rows in the whole range, ignoring limit/offset"
+     },
+     "data": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "date": {
+         "type": "string",
+         "format": "date"
+        },
+        "steps": {
+         "type": "integer"
+        },
+        "distance_m": {
+         "type": "number",
+         "nullable": true
+        },
+        "active_kcal": {
+         "type": "number",
+         "nullable": true
+        },
+        "sleep_duration_minutes": {
+         "type": "integer",
+         "nullable": true
+        },
+        "sleep_score": {
+         "type": "integer",
+         "nullable": true
+        },
+        "resting_bpm": {
+         "type": "integer",
+         "nullable": true
+        }
+       }
+      }
+     }
+    }
+   },
+   "AbnormalListResponse": {
+    "type": "object",
+    "required": [
+     "data",
+     "count",
+     "total"
+    ],
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "total": {
+      "type": "integer"
+     },
+     "data": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "event_id": {
+         "type": "string"
+        },
+        "start_at": {
+         "type": "string"
+        },
+        "end_at": {
+         "type": "string"
+        },
+        "duration_seconds": {
+         "type": "integer",
+         "nullable": true
+        }
+       }
+      }
+     }
+    }
+   },
+   "CoverageResponse": {
+    "type": "object",
+    "required": [
+     "data"
+    ],
+    "properties": {
+     "data": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "object",
+       "properties": {
+        "first_date": {
+         "type": "string",
+         "format": "date",
+         "nullable": true
+        },
+        "last_date": {
+         "type": "string",
+         "format": "date",
+         "nullable": true
+        },
+        "records": {
+         "type": "integer"
+        },
+        "last_sync_at": {
+         "type": "string",
+         "nullable": true
+        }
+       }
+      }
+     }
+    }
+   },
+   "ExportResponse": {
+    "type": "object",
+    "required": [
+     "schema_version",
+     "source",
+     "generated_at",
+     "filters",
+     "records"
+    ],
+    "properties": {
+     "schema_version": {
+      "type": "string"
+     },
+     "source": {
+      "type": "string"
+     },
+     "generated_at": {
+      "type": "string"
+     },
+     "filters": {
+      "type": "object",
+      "properties": {
+       "dataset": {
+        "type": "string",
+        "nullable": true
+       },
+       "start_date": {
+        "type": "string",
+        "format": "date"
+       },
+       "end_date": {
+        "type": "string",
+        "format": "date"
+       }
+      }
+     },
+     "records": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "array",
+       "items": {
+        "type": "object"
+       }
+      }
+     }
+    }
    }
   }
  },
@@ -2739,6 +3248,1064 @@
     }
    }
   },
+  "/api/v1/fitness/sync": {
+   "post": {
+    "summary": "Enqueue a cloud sync run",
+    "description": "Creates a sync_runs journal row and puts an fitness_sync job on the queue. The run executes in the worker; poll the journal by run_id.",
+    "tags": [
+     "fitness"
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "from",
+         "to"
+        ],
+        "properties": {
+         "from": {
+          "type": "string",
+          "format": "date"
+         },
+         "to": {
+          "type": "string",
+          "format": "date"
+         },
+         "data_types": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Run queued",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "run_id",
+            "status"
+           ],
+           "properties": {
+            "run_id": {
+             "type": "integer"
+            },
+            "status": {
+             "type": "string"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Malformed range, unknown or duplicate data type",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Job queue unavailable (queue_unavailable)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/sync/{id}": {
+   "get": {
+    "summary": "Read a sync run's journal entry",
+    "tags": [
+     "fitness"
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Journal entry with per-type counters or error classes",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object"
+          }
+         }
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Journal unavailable (journal_unavailable)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Unknown run id",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/daily-activity": {
+   "get": {
+    "summary": "Daily activity rows",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10000,
+       "default": 1000
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DailyActivityListResponse"
+        }
+       }
+      },
+      "description": "Rows in the range, time-ordered"
+     },
+     "400": {
+      "description": "Malformed range or pagination"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "503": {
+      "description": "Database unavailable"
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/sleep": {
+   "get": {
+    "summary": "Sleep sessions",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10000,
+       "default": 1000
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SleepListResponse"
+        }
+       }
+      },
+      "description": "Rows in the range, time-ordered"
+     },
+     "400": {
+      "description": "Malformed range or pagination"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "503": {
+      "description": "Database unavailable"
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/heart-rate": {
+   "get": {
+    "summary": "Heart rate samples",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10000,
+       "default": 1000
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
+     },
+     {
+      "name": "type",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "passive",
+        "active",
+        "resting",
+        "manual"
+       ]
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HeartRateListResponse"
+        }
+       }
+      },
+      "description": "Rows in the range, time-ordered"
+     },
+     "400": {
+      "description": "Malformed range or pagination"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "503": {
+      "description": "Database unavailable"
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/stress": {
+   "get": {
+    "summary": "Stress samples",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10000,
+       "default": 1000
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StressListResponse"
+        }
+       }
+      },
+      "description": "Rows in the range, time-ordered"
+     },
+     "400": {
+      "description": "Malformed range or pagination"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "503": {
+      "description": "Database unavailable"
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/spo2": {
+   "get": {
+    "summary": "SpO2 samples",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10000,
+       "default": 1000
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Spo2ListResponse"
+        }
+       }
+      },
+      "description": "Rows in the range, time-ordered"
+     },
+     "400": {
+      "description": "Malformed range or pagination"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "503": {
+      "description": "Database unavailable"
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/body": {
+   "get": {
+    "summary": "Body measurements",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10000,
+       "default": 1000
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BodyListResponse"
+        }
+       }
+      },
+      "description": "Rows in the range, time-ordered"
+     },
+     "400": {
+      "description": "Malformed range or pagination"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "503": {
+      "description": "Database unavailable"
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/workouts": {
+   "get": {
+    "summary": "Workouts",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10000,
+       "default": 1000
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WorkoutListResponse"
+        }
+       }
+      },
+      "description": "Rows in the range, time-ordered"
+     },
+     "400": {
+      "description": "Malformed range or pagination"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "503": {
+      "description": "Database unavailable"
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/summary": {
+   "get": {
+    "summary": "Per-day summary",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10000,
+       "default": 1000
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SummaryListResponse"
+        }
+       }
+      },
+      "description": "Rows in the range, time-ordered"
+     },
+     "400": {
+      "description": "Malformed range or pagination"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "503": {
+      "description": "Database unavailable"
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/abnormal-heart-beat": {
+   "get": {
+    "summary": "Abnormal heart beat events",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 10000,
+       "default": 1000
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AbnormalListResponse"
+        }
+       }
+      },
+      "description": "Events in the range, time-ordered"
+     },
+     "400": {
+      "description": "Malformed range or pagination"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "503": {
+      "description": "Database unavailable"
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/coverage": {
+   "get": {
+    "summary": "Per-type coverage",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CoverageResponse"
+        }
+       }
+      },
+      "description": "First and last date, record count and last sync time per data type"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "503": {
+      "description": "Database unavailable"
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/export": {
+   "get": {
+    "summary": "Export rows",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "format",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "json",
+        "csv"
+       ],
+       "default": "json"
+      }
+     },
+     {
+      "name": "type",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "daily_activity",
+        "sleep",
+        "heart_rate",
+        "stress",
+        "spo2",
+        "body_measurements",
+        "workouts",
+        "abnormal_heart_beat"
+       ]
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ExportResponse"
+        }
+       },
+       "text/csv": {
+        "schema": {
+         "type": "string"
+        }
+       }
+      },
+      "description": "schema_version 1.0 envelope (json) or a flat table of one type (csv)"
+     },
+     "400": {
+      "description": "Malformed range, a range wider than 366 days, unknown type, or csv without a type"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "503": {
+      "description": "Database unavailable"
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/probe": {
+   "get": {
+    "summary": "Probe the Mi Fitness cloud — login, fetch one data key, count records",
+    "description": "Diagnostic route: performs a real two-step Xiaomi login and one signed\ndata fetch, returning only counts and a masked account id — never the\nrecords themselves. The single place where the crypto port is verified\nagainst the live cloud.\n",
+    "tags": [
+     "fitness"
+    ],
+    "parameters": [
+     {
+      "name": "key",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "enum": [
+        "steps",
+        "calories",
+        "sleep",
+        "weight",
+        "heart_rate",
+        "spo2",
+        "stress",
+        "resting_heart_rate",
+        "abnormal_heart_beat"
+       ]
+      }
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Cloud reachable, credentials valid",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "account",
+            "region",
+            "key",
+            "records"
+           ],
+           "properties": {
+            "account": {
+             "type": "string",
+             "description": "Masked account id",
+             "six stars plus last two characters": null
+            },
+            "region": {
+             "type": "string"
+            },
+            "key": {
+             "type": "string"
+            },
+            "records": {
+             "type": "integer"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Unknown data key or malformed date range",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "A sync run is in progress — probe would rotate the token under it",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Not configured, upstream refused authentication, or protocol mismatch",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/billing/packages": {
    "get": {
     "summary": "List active top-up packages",
@@ -3516,7 +5083,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 62674,
-  "source_fnv1a64": "d419e570f82c04ac"
+  "source_bytes": 84220,
+  "source_fnv1a64": "b03c5a62c9b62d9d"
  }
 }

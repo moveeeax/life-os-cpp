@@ -199,6 +199,9 @@ spec:
             # only true credential and comes from the chart Secret.
             - name: BILLING_ENABLED
               value: {{ .Values.billing.enabled | quote }}
+            # fitness module — master switch; MI_FITNESS_* arrive via extraEnvFrom
+            - name: FITNESS_ENABLED
+              value: {{ .Values.fitness.enabled | quote }}
             {{- if .Values.billing.enabled }}
             - name: PAYPAL_ENV
               value: {{ .Values.billing.paypal.environment | quote }}

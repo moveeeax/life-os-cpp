@@ -5,7 +5,7 @@ replicaCount: 1
 
 image:
   # The worker image, NOT the API one — Makefile pushes it as <name>-worker.
-  repository: docker.io/your-registry/your-project/life-os-life-os-cpp-worker
+  repository: docker.io/your-registry/your-project/life-os-cpp-worker
   tag: ""  # Defaults to chart appVersion
   pullPolicy: IfNotPresent
 
@@ -111,7 +111,7 @@ worker:
   # MUST include "account_email" (transactional confirm/reset/change-email) and
   # "email.send" (generic ad-hoc email) — a worker that only drains "default"
   # silently leaves those jobs to pile up in Redis and no mail is ever sent.
-  types: "account_email,email.send,webhook.deliver"
+  types: "account_email,email.send,webhook.deliver,fitness_sync"
   concurrency: 2
   healthPort: 9091
   brpopTimeout: 5
@@ -152,6 +152,13 @@ jobs:
 # with the life-os-cpp chart. Env var set: BILLING_ENABLED
 # ---------------------------------------------------------------
 billing:
+  enabled: false
+
+# ---------------------------------------------------------------
+# fitness module — keep in sync with the life-os-cpp chart.
+# Env var set: FITNESS_ENABLED
+# ---------------------------------------------------------------
+fitness:
   enabled: false
 
 
@@ -198,7 +205,7 @@ logging:
   level: info
   name: life_os_cpp_worker
   format: json             # text | json (LOG_FORMAT) — json required for log aggregators
-  serviceName: life_os_life_os_cpp_worker_service
+  serviceName: life_os_cpp_worker_service
 
 # ---------------------------------------------------------------
 # Tracing — OpenTelemetry OTLP exporter

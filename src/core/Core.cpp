@@ -14,6 +14,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <memory>
 #include <optional>
 #include <pqxx/pqxx>
@@ -29,6 +30,7 @@
 #include "database/Database.hpp"
 #include "database/Migrations.hpp"
 #include "email/Mailer.hpp"
+#include "jobs/FitnessSyncHandler.hpp"
 #include "jobs/Jobs.hpp"
 #include "jobs/Outbox.hpp"
 #include "messaging/Messaging.hpp"
@@ -599,6 +601,32 @@ void Application::init_jobs_(Config::AppConfig& cfg) {
     register_dlq_metric_(cfg);
     register_queue_depth_metric_(cfg);
     register_outbox_drain_(cfg);
+    register_fitness_sync_schedule_(cfg);
+}
+
+void Application::register_fitness_sync_schedule_(Config::AppConfig& cfg) {
+    // Плановый синк живёт в API-поде: Tasks поднят только в серверном режиме,
+    // сам синк исполняет воркер через очередь. runEvery дрогона стреляет
+    // впервые через интервал, не при старте.
+    if (!Tasks::is_initialized() || !Database::is_initialized() || !Jobs::is_initialized())
+        return;
+    if (!fitness_enabled())
+        return;  // выключенный модуль не заводит таймер
+    const int hours = cfg.get<int>("fitness.xiaomi.sync_schedule_hours", "MI_FITNESS_SYNC_SCHEDULE_HOURS", 0);
+    if (hours <= 0)
+        return;  // opt-in: без ручки расписания нет
+    const int window = cfg.get<int>("fitness.xiaomi.sync_window_days", "MI_FITNESS_SYNC_WINDOW_DAYS", 2);
+    spdlog::info("fitness sync schedule enabled: every {}h, window {} day(s)", hours, window);
+    Tasks::schedule_recurring("fitness_sync_schedule", std::chrono::hours(hours), [window] {
+        if (!Database::is_initialized() || !Jobs::is_initialized())
+            return;
+        try {
+            Jobs::FitnessSync::enqueue_recent(window, static_cast<long long>(::time(nullptr)));
+        } catch (const std::exception& e) {
+            // База или очередь легли: тик пропущен, следующий повторит.
+            spdlog::warn("fitness sync schedule tick failed: {}", e.what());
+        }
+    });
 }
 
 void Application::register_outbox_drain_(Config::AppConfig& cfg) {

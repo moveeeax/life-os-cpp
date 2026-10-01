@@ -1,5 +1,18 @@
 # CLAUDE.md — agent guide for this repo
 
+## Запрет: локальная сборка
+
+Собирать этот проект локально запрещено. Ни `make test`, ни `make test-unit`,
+ни разовая компиляция отдельного файла компилятором, ни черновые пробы «на
+минутку». Единственный исполнитель сборки и тестов это GitHub Actions.
+
+Локально разрешено только то, чему не нужен компилятор: `clang-format`,
+`gitleaks`, гейты на shell и python (`scripts/check-*.sh`), рендер Helm,
+генератор векторов на python.
+
+Следствие принято сознательно: ошибки, которые видит только GCC или
+санитайзеры, находятся прогоном CI, и цикл задачи из-за этого длиннее.
+
 C++20 REST service template: Drogon + PostgreSQL + Redis, vcpkg/CMake,
 React SPA in `frontend/`, Helm charts in `helm/`. `docs/INDEX.md` is the
 map of all documentation; `docs/CONVENTIONS.md` is the pattern reference.
@@ -112,6 +125,13 @@ gates by construction. Hand-rolled versions usually don't.
    AS-IS — don't add an empty-expanding placeholder for a string key whose
    code default is non-empty (see `rate_limit.protected_paths` there).
 10. **Commits:** conventional commits, no AI-attribution trailers.
+11. **Fitness module:** feature bits `kFitnessRead`/`kFitnessSync` guard every
+    `/api/v1/fitness/*` handler (Guards.hpp `API_REQUIRE_PERMISSION` after the
+    `Core::fitness_enabled()` 404 check); config keys live under
+    `fitness.xiaomi.*` with the historical `MI_FITNESS_*` env names; table
+    names match mi-fitness-api so prod data moves by plain pg_dump. Nested
+    source dirs (`fitness/xiaomi`, `repositories/fitness`) are their own
+    nodes in `docs/module-deps.txt`.
 
 ## Gate sequence — run cheapest-first before pushing
 
@@ -123,14 +143,19 @@ gates by construction. Hand-rolled versions usually don't.
    && ./scripts/check-config-sync.sh && ./scripts/assemble-changelog.sh --check`
    — seconds, no build.
    Touched a `check-*` script (or assemble-changelog.sh)? Also run
-   `./scripts/check-selftest.sh` —
-   plants 20 breakages and requires every gate to catch and name them
+   `./scripts/check-selftest.sh` — in this FORK the template-version-drift
+   case self-skips (TEMPLATE_FORK=1: the stamp is owned by sync-upstream.sh
+   and legitimately lags after the fork's own first release) —
+   plants 19 breakages and requires every gate to catch and name them
    (needs helm+yq; in CI `gate-selftest` self-scopes to diffs touching
    `scripts/`, `helm/` or `.github/workflows/`, with a nightly
    unconditional backstop in `.github/workflows/gates-nightly.yml`)
 3. `make lint-openapi` — spectral over `docs/openapi.yaml`
+   Touched `docs/openapi.yaml`? Also `make frontend-gen-api` and commit
+   `frontend/src/lib/api/schema.gen.ts` — the `frontend` CI job diffs it.
 4. `make test` — rebuild (docker layer cache) + full suite, ~2 min warm;
-   what CI runs. `make test-quick` is an honest alias for it. `make
+   what CI runs. In THIS repo step 4 runs only in CI (see the ban above);
+   push and read the checks. `make test-quick` is an honest alias for it. `make
    test-rerun` re-runs the previous binaries WITHOUT rebuilding — flake
    triage only, code edits do NOT land in it. Fastest inner loop for code
    changes: native `make test-local NAME='Foo*'` (docs/TESTING.md)

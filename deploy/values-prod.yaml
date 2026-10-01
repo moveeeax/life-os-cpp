@@ -1,0 +1,75 @@
+# Боевые значения life-os-cpp в кластере talos-nbg1-tarassov-me,
+# namespace life-os. Секреты сюда не пишутся: всё чувствительное живёт в
+# Secret life-os-app и приходит через extraEnvFrom.
+
+image:
+  repository: ghcr.io/moveeeax/life-os-cpp
+  tag: "1.7.0"
+
+replicaCount: 1
+
+extraEnvFrom:
+  - secretRef:
+      name: life-os-app
+  # Ручки синка и расписание модуля fitness: deploy/sync-tuning-configmap.yaml.
+  # Таймер планового синка живёт в API-поде.
+  - configMapRef:
+      name: life-os-sync-tuning
+      optional: true
+
+externalDatabase:
+  host: postgresql-rw.db.svc.cluster.local
+  port: 5432
+  name: life_os
+  user: life-os
+  # Пароль приходит переменной DATABASE_PASSWORD из life-os-app.
+  password: ""
+  poolSize: 5
+  replicaHost: postgresql-ro.db.svc.cluster.local
+  migrationsEnabled: false
+
+migrations:
+  runAsInitContainer: true
+
+externalRedis:
+  url: "tcp://redis.db.svc.cluster.local:6379"
+  useSentinel: false
+  # Отдельный логический индекс: Redis общий, ключи не должны пересекаться
+  # с другими приложениями кластера. Индекс 3 унаследован от mi-fitness-api
+  # после его остановки.
+  db: 3
+
+ingress:
+  enabled: true
+  className: nginx
+  certManager:
+    clusterIssuer: letsencrypt-prod
+  hosts:
+    - host: life-os.tarassov.me
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - hosts: [life-os.tarassov.me]
+      secretName: life-os-tls
+
+auth:
+  cookies:
+    # Логин выдаёт токены куками __Host-*, и middleware читает их только при
+    # включённом флаге. Машинный доступ идёт по X-API-Key и от флага не зависит.
+    enabled: true
+    secure: true
+
+# Постановка заданий синка требует инициализированной очереди и на стороне
+# API, сами задания исполняет воркер.
+jobs:
+  enabled: true
+
+fitness:
+  enabled: true
+
+mail:
+  enabled: false
+
+tracing:
+  enabled: false

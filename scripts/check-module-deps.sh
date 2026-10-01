@@ -39,7 +39,7 @@ CORE_HPP_ALLOWED="main.cpp worker_main.cpp api/HealthController.hpp core/Core.cp
 fail=0
 
 # ── the declaration itself must not legalize a hard-forbidden edge ───────────
-allowed_edges="$(sed 's/#.*//' "$DEPS" | grep -E '^[a-z_]+ -> [a-z_]+$' || true)"
+allowed_edges="$(sed 's/#.*//' "$DEPS" | grep -E '^[a-z_/]+ -> [a-z_/]+$' || true)"
 if [ -z "$allowed_edges" ]; then
     echo "check-module-deps: no edges parsed from $DEPS — a gate with an empty" >&2
     echo "  allowlist would reject everything (or a typo'd one would check nothing)." >&2

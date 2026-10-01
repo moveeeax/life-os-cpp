@@ -28,8 +28,10 @@ namespace Domain {
  */
 namespace Permission {
 inline constexpr std::uint32_t kNone = 0x00;
-inline constexpr std::uint32_t kGeneral = 0x01;    // flask-base: GENERAL
-inline constexpr std::uint32_t kAuditRead = 0x02;  // read the audit trail (GET /api/admin/audit)
+inline constexpr std::uint32_t kGeneral = 0x01;      // flask-base: GENERAL
+inline constexpr std::uint32_t kAuditRead = 0x02;    // read the audit trail (GET /api/admin/audit)
+inline constexpr std::uint32_t kFitnessRead = 0x04;  // read /api/v1/fitness/* (data routes)
+inline constexpr std::uint32_t kFitnessSync = 0x08;  // fitness probe + sync enqueue/status
 // ADMINISTER is a DEDICATED sentinel bit, not 0xff "all bits": with the old
 // 0xff a role that merely accumulated the eight low feature bits would
 // ACCIDENTALLY satisfy is_admin (a privilege-escalation footgun). Bit 30

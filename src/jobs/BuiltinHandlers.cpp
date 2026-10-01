@@ -16,6 +16,7 @@
 #include "email/AccountEmailWorker.hpp"
 #include "email/GenericEmail.hpp"
 #include "jobs/Dispatcher.hpp"
+#include "jobs/FitnessSyncHandler.hpp"
 #include "webhooks/Webhooks.hpp"
 
 namespace Jobs {
@@ -32,6 +33,7 @@ void register_builtin_handlers() {
                        [](const json& payload) { return Email::SendEmail::process_job(payload); });
     // Outbound webhooks: signed POST to a subscriber URL, same retry/DLQ contract.
     d.register_handler(Webhooks::kJobType, [](const json& payload) { return Webhooks::process_job(payload); });
+    d.register_handler(FitnessSync::kJobType, [](const json& payload) { return FitnessSync::process_job(payload); });
     // Demo handlers used by examples/tests.
     d.register_handler("echo", [](const json& payload) { return payload; });
     d.register_handler("slow", [](const json& payload) -> json {

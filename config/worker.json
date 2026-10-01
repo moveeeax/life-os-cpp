@@ -7,7 +7,7 @@
   },
   "observability": {
     "metrics_address": "0.0.0.0:9090",
-    "service_name": "life_os_life_os_cpp_worker_service"
+    "service_name": "life_os_cpp_worker_service"
   },
   "database": {
     "primary": "postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-postgres}@${DATABASE_HOST:-localhost}:${DATABASE_PORT:-5432}/${DATABASE_NAME:-appdb}",
@@ -50,7 +50,8 @@
       "default",
       "account_email",
       "email.send",
-      "webhook.deliver"
+      "webhook.deliver",
+      "fitness_sync"
     ],
     "concurrency": 2,
     "health_port": 9091,
