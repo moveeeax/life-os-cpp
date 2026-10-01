@@ -50,7 +50,8 @@
       "default",
       "account_email",
       "email.send",
-      "webhook.deliver"
+      "webhook.deliver",
+      "fitness_sync"
     ],
     "concurrency": 2,
     "health_port": 9091,
