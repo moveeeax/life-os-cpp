@@ -5,7 +5,7 @@ replicaCount: 1
 
 image:
   # The worker image, NOT the API one — Makefile pushes it as <name>-worker.
-  repository: docker.io/your-registry/your-project/life-os-life-os-cpp-worker
+  repository: docker.io/your-registry/your-project/life-os-cpp-worker
   tag: ""  # Defaults to chart appVersion
   pullPolicy: IfNotPresent
 

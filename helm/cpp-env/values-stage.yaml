@@ -43,7 +43,7 @@ life-os-cpp-worker:
   app:
     baseUrl: https://app.stage.tarassov.me
   worker:
-    types: account_email,email.send,webhook.deliver
+    types: account_email,email.send,webhook.deliver,fitness_sync
 
 # Stage exposes the dev mailbox + traces (same as demo) for QA walkthroughs.
 jaeger:
