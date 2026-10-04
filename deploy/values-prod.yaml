@@ -39,19 +39,11 @@ externalRedis:
   # after it was stopped.
   db: 3
 
+# No ingress of its own: the frontend release (deploy/values-frontend-prod.yaml)
+# is the public entry point of life-os.tarassov.me and proxies /api/ to this
+# Service. Probes and /metrics are reachable only inside the cluster.
 ingress:
-  enabled: true
-  className: nginx
-  certManager:
-    clusterIssuer: letsencrypt-prod
-  hosts:
-    - host: life-os.tarassov.me
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - hosts: [life-os.tarassov.me]
-      secretName: life-os-tls
+  enabled: false
 
 auth:
   cookies:
