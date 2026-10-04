@@ -105,6 +105,37 @@ TEST(NormalizeSleep, MissingBothBoundariesSkipsTheRecord) {
     EXPECT_TRUE(sessions.empty());
 }
 
+// The cloud keeps every partial upload of a night as its own record: same
+// bedtime, growing wake-up time. They are one session, identified by bedtime.
+TEST(NormalizeSleep, SnapshotsOfOneNightCollapseToTheLongest) {
+    const auto sessions = normalize({
+        sleep_record(kBed, kBed + 1500),
+        sleep_record(kBed, kWake),
+        sleep_record(kBed, kBed + 17400),
+    });
+
+    ASSERT_EQ(sessions.size(), 1u);
+    EXPECT_EQ(sessions[0].end_epoch, kWake);
+    EXPECT_EQ(sessions[0].duration_minutes, 480);
+    EXPECT_EQ(sessions[0].sleep_id, "band-1_" + std::to_string(kBed));
+}
+
+TEST(NormalizeSleep, SnapshotAndFinalRecordShareOneSleepId) {
+    const auto partial = normalize({sleep_record(kBed, kBed + 1500)});
+    const auto full = normalize({sleep_record(kBed, kWake)});
+    ASSERT_EQ(partial.size(), 1u);
+    ASSERT_EQ(full.size(), 1u);
+    EXPECT_EQ(partial[0].sleep_id, full[0].sleep_id);
+}
+
+TEST(NormalizeSleep, SameBedtimeFromAnotherDeviceStaysSeparate) {
+    const auto sessions = normalize({
+        sleep_record(kBed, kWake, json::object(), "band-1"),
+        sleep_record(kBed, kWake, json::object(), "band-2"),
+    });
+    EXPECT_EQ(sessions.size(), 2u);
+}
+
 TEST(ApplySleepScores, SegmentBoundariesPickExactlyOneSession) {
     auto sessions = normalize({
         sleep_record(kBed, kWake),                                // main sleep

@@ -49,6 +49,13 @@ protected:
         return s;
     }
 
+    static int duration(const std::string& sleep_id) {
+        return Database::get().execute_read([&](auto& txn) {
+            auto r = txn.exec_params("SELECT duration_minutes FROM sleep_sessions WHERE sleep_id = $1", sleep_id);
+            return r[0][0].template as<int>();
+        });
+    }
+
     static nlohmann::json row(const std::string& sleep_id) {
         return Database::get().execute_read([&](auto& txn) {
             auto r = txn.exec_params(
@@ -94,6 +101,41 @@ TEST_F(SleepRepositoryTest, FreshScoreReplacesTheOldOne) {
     repo.upsert({session("s1", 78)});
     repo.upsert({session("s1", 81)});
     EXPECT_EQ(row("s1")["score"], "81");
+}
+
+// A later sync brings the same night with a later wake-up time: the row is
+// extended in place, and the score of the shorter bounds does not carry over.
+TEST_F(SleepRepositoryTest, LongerSnapshotExtendsTheNightAndDropsTheStaleScore) {
+    Repositories::SleepRepository repo;
+    auto partial = session("s1", 40);
+    partial.end_at = "2026-09-24T01:00:00+08:00";
+    partial.duration_minutes = 120;
+    repo.upsert({partial});
+
+    const auto counts = repo.upsert({session("s1")});
+    EXPECT_EQ(counts.updated, 1);
+
+    const auto r = row("s1");
+    EXPECT_EQ(r["rows"], 1);
+    EXPECT_EQ(r["score"], "null");
+    EXPECT_EQ(duration("s1"), 480);
+}
+
+// A sync window that only reaches the partial upload must not shrink a night
+// that is already stored in full.
+TEST_F(SleepRepositoryTest, ShorterSnapshotDoesNotShrinkTheNight) {
+    Repositories::SleepRepository repo;
+    repo.upsert({session("s1", 78)});
+
+    auto partial = session("s1");
+    partial.end_at = "2026-09-24T01:00:00+08:00";
+    partial.duration_minutes = 120;
+    const auto counts = repo.upsert({partial});
+    EXPECT_EQ(counts.added, 0);
+    EXPECT_EQ(counts.updated, 0);
+
+    EXPECT_EQ(duration("s1"), 480);
+    EXPECT_EQ(row("s1")["score"], "78");
 }
 
 TEST_F(SleepRepositoryTest, StagesRoundTripThroughJsonb) {

@@ -5,6 +5,11 @@
  * COALESCE(EXCLUDED.sleep_score, old) implements normalization rule 5: a
  * failed optional reports request on a repeated sync does not erase a
  * previously known score for the same bounds. A fresh valid score replaces the old one.
+ *
+ * sleep_id identifies a night by its bedtime, and the cloud re-uploads a night
+ * with a growing wake-up time. A later end extends the row and takes the new
+ * score as is (the old one belonged to shorter bounds); an earlier end is
+ * ignored.
  */
 
 #pragma once
@@ -44,10 +49,14 @@ public:
                     "end_at = EXCLUDED.end_at, duration_minutes = EXCLUDED.duration_minutes, "
                     "time_asleep_minutes = EXCLUDED.time_asleep_minutes, "
                     "time_awake_minutes = EXCLUDED.time_awake_minutes, "
-                    "sleep_score = COALESCE(EXCLUDED.sleep_score, sleep_sessions.sleep_score), "
-                    "sleep_score_source = COALESCE(EXCLUDED.sleep_score_source, "
-                    "                              sleep_sessions.sleep_score_source), "
+                    "sleep_score = CASE WHEN EXCLUDED.end_at = sleep_sessions.end_at "
+                    "  THEN COALESCE(EXCLUDED.sleep_score, sleep_sessions.sleep_score) "
+                    "  ELSE EXCLUDED.sleep_score END, "
+                    "sleep_score_source = CASE WHEN EXCLUDED.end_at = sleep_sessions.end_at "
+                    "  THEN COALESCE(EXCLUDED.sleep_score_source, sleep_sessions.sleep_score_source) "
+                    "  ELSE EXCLUDED.sleep_score_source END, "
                     "is_nap = EXCLUDED.is_nap, stages = EXCLUDED.stages, updated_at = now() "
+                    "WHERE EXCLUDED.end_at >= sleep_sessions.end_at "
                     "RETURNING (xmax = 0) AS inserted",
                     s.user_id,
                     s.sleep_id,
@@ -64,6 +73,9 @@ public:
                     s.sleep_score_source,
                     s.is_nap,
                     stages.dump());
+                if (r.empty()) {
+                    continue;  // a shorter snapshot of a night already stored in full
+                }
                 if (r[0][0].template as<bool>()) {
                     ++counts.added;
                 } else {
