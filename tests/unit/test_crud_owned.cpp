@@ -9,9 +9,9 @@
  *        (BillingController.cpp via BillingRepository, kOwnerColumn =
  *        "user_id"); list_owned/count_owned are instantiated by the output
  *        of `new-resource.sh <Entity> --owned` (the generated controller
- *        calls all three) — i.e. by FORK code, not by anything this repo
+ *        calls all three) — i.e. by generated code, not by anything this repo
  *        compiles. Without this test, a silently broken signature would
- *        pass CI here and detonate in every fork's first `--owned` resource.
+ *        pass CI here and break the first generated `--owned` resource.
  *
  *        Runs against the Database DI seam (Database::install_for_testing,
  *        same fake shape as test_database_seam.cpp) — no Postgres. The fake

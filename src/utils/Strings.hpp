@@ -3,7 +3,7 @@
  * @brief Small string helpers used in multiple modules.
  *
  * Declarations only — the bodies live in Strings.cpp (compiled once into
- * app_core; ADR 0003 as amended 2026-08-22). The kDefault*Csv path constants
+ * app_core; docs/ARCHITECTURE.md §4). The kDefault*Csv path constants
  * stay inline constexpr here: they are read directly by Auth / RateLimit /
  * BillingController and the tests, not just by the bodies below.
  */
@@ -124,8 +124,8 @@ std::unordered_set<std::string> merge_csv_sets(const std::string& base_csv, cons
 /// domain, mask the rest ("john.doe@example.com" -> "j***@example.com"). A
 /// single-char (or empty) local part is fully masked so it can't be recovered.
 /// Inputs without '@' are treated as the local part (defensive — not a real
-/// address). Use everywhere an address would otherwise land in a log line; raw
-/// PII in logs is inherited by every fork by default.
+/// address). Use everywhere an address would otherwise land in a log line, so raw
+/// PII stays out of the logs.
 std::string mask_email(const std::string& email);
 
 }  // namespace Utils::Strings

@@ -7,7 +7,7 @@
 -- touch_updated_at()`), so the function must exist before any resource
 -- migration runs — hence version 000, ahead of 001.
 --
--- (Migration 001 keeps its own users_touch_updated_at() for flask-base parity;
+-- (Migration 001 keeps its own users_touch_updated_at();
 -- new tables should use this shared one instead of duplicating the function.)
 --
 -- NOTE: MigrationRunner wraps each file in ONE transaction (under an advisory

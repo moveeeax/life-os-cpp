@@ -8,8 +8,8 @@
  *
  *        Scope of the seam (see the ErasedTxn note in Database.hpp): fakes
  *        observe statement templates + call counts and return EMPTY
- *        pqxx::results; faking row data needs the Phase 2 de-inline of the
- *        row/result layer.
+ *        pqxx::results; faking row data needs the row/result layer
+ *        de-inlined first.
  */
 
 #include <map>

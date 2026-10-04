@@ -149,7 +149,7 @@ helm/           life-os-cpp, life-os-cpp-worker, cpp-frontend, cpp-env umbrella
 deploy/         values for the owner's cluster: values-prod.yaml, values-worker-prod.yaml, db/
 frontend/       React SPA (Vite, TypeScript, Tailwind, TanStack Query), Dockerfile, nginx.conf
 scripts/        make-jwt.sh, smoke.sh, bench.sh, scaffolds (new-*.sh), CI gates (check-*.sh)
-docs/           openapi.yaml, CONFIG.md, TESTING.md, RUNBOOK.md, CONVENTIONS.md, SLO.md, adr/, fitness/
+docs/           openapi.yaml, CONFIG.md, TESTING.md, RUNBOOK.md, CONVENTIONS.md, SLO.md, ARCHITECTURE.md, fitness/
 tools/, third_party/, templates/, changelog.d/
 ```
 
@@ -210,8 +210,8 @@ after a Trivy scan. Alerts and what to do when they fire are in
 ## Documentation
 
 [`docs/INDEX.md`](docs/INDEX.md) is the navigator across every doc and config.
-Design decisions are recorded in [`docs/adr/`](docs/adr/) (Drogon, nlohmann
-json, header-only modules, global singletons, SPA split, API versioning).
+Design decisions are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (Drogon,
+nlohmann json, module layout, subsystem singletons, SPA split, API versioning).
 
 ## License
 

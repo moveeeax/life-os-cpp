@@ -198,13 +198,12 @@ set(COMMON_LIBS
 # it carries the shared third-party deps + the src/generated include dirs, so a
 # new dependency is added in ONE place and every target picks it up.
 #
-# STATIC since the Phase 2 modularity work (ADR 0003's 2026-08-22
-# amendment): de-inlined module bodies live in src/**/*.cpp and compile ONCE
-# here instead of once per binary. The GLOB mirrors the test-source GLOBs
+# STATIC (docs/ARCHITECTURE.md §4): de-inlined module bodies live in
+# src/**/*.cpp and compile ONCE here instead of once per binary. The GLOB mirrors the test-source GLOBs
 # below — a new src/<dir>/Foo.cpp is picked up automatically (CONFIGURE_DEPENDS
 # re-runs the glob per build); only the two binary entry points are excluded,
 # they stay per-executable. Modules are de-inlined by measured weight
-# (scripts/bench-incremental.sh), one module per PR — billing first.
+# (scripts/bench-incremental.sh).
 file(GLOB_RECURSE APP_CORE_SOURCES CONFIGURE_DEPENDS "src/*.cpp")
 list(REMOVE_ITEM APP_CORE_SOURCES
     ${CMAKE_SOURCE_DIR}/src/main.cpp

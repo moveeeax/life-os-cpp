@@ -18,7 +18,7 @@ export function useLogin() {
 
 export function useRegister() {
   return useMutation({
-    // No auto-login (flask-base parity): the backend sends a confirmation
+    // No auto-login: the backend sends a confirmation
     // email and the flow continues at /account/check-email. We don't read
     // the response body — registration succeeding is all the caller needs,
     // so this stays robust even if the endpoint stops echoing a user.

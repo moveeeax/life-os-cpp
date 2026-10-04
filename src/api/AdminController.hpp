@@ -2,8 +2,7 @@
  * @file AdminController.hpp
  * @brief Admin user-management endpoints.
  *
- * flask-base parity: app/admin/views.py — same routes, JSON shape
- * instead of HTML+flash. Every handler is gated by require_admin().
+ * Every handler is gated by require_admin().
  *
  * Routes (all under /api/admin):
  *   GET    /api/admin/users                      list users (paginated)
@@ -15,7 +14,7 @@
  *   GET    /api/admin/roles                      list roles
  *
  * Declarations only — the handler bodies live in AdminController.cpp
- * (compiled once into app_core; ADR 0003 as amended 2026-08-22). The route
+ * (compiled once into app_core; docs/ARCHITECTURE.md §4). The route
  * macros (ADD_METHOD_TO) must stay in this header: Drogon's METHOD_LIST
  * registration is part of the class definition, and
  * scripts/check-routes-registered.sh greps the src/api headers for them.

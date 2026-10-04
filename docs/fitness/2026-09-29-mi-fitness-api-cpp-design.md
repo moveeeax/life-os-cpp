@@ -4,16 +4,16 @@ Date: 2026-09-29. Status: pending approval.
 
 ## Why
 
-Today Mi Fitness data is pulled into the cluster by [mi_fitness_data_bridge](https://github.com/shkyyy18/mi_fitness_data_bridge) in Python: SQLite on a PVC plus an MCP server behind an HTTP proxy. The owner's task: replace it with an own C++ service on top of `cpp-rapid-rest-template`, with a REST API instead of MCP, data in Postgres and the token in a Secret.
+Today Mi Fitness data is pulled into the cluster by [mi_fitness_data_bridge](https://github.com/shkyyy18/mi_fitness_data_bridge) in Python: SQLite on a PVC plus an MCP server behind an HTTP proxy. The owner's task: replace it with an own C++ service, with a REST API instead of MCP, data in Postgres and the token in a Secret.
 
 Success looks like this: the service logs into the Xiaomi cloud on its own, pulls eight record types, stores them in Postgres and serves them over REST with the same numbers the current Python bridge returns for the same dates. After that the Python bridge, its PVC and `mcp-proxy` are removed from the cluster.
 
 ## Decisions made before the design
 
 1. A full port, including the Xiaomi adapter. The service never depends on Python at any point.
-2. One Xiaomi account, one API consumer. No registration, no roles, no mail, no billing. The base template was stripped to its minimal variant at the time (that script no longer exists in this repo).
-3. License AGPL-3.0-only. The port is done while reading AGPL code; a translation to another language is a derivative work. The template's MIT can be included in an AGPL project, not the other way round.
-4. Topology: one image, two deployments. REST in the main binary, sync in the worker via `Jobs` (the template's Redis queue with retries and DLQ). The schedule is set by a `Tasks::` timer in the API process.
+2. One Xiaomi account, one API consumer. No registration, no roles, no mail, no billing.
+3. License AGPL-3.0-only. The port is done while reading AGPL code; a translation to another language is a derivative work. The existing MIT-licensed code can be included in an AGPL project, not the other way round.
+4. Topology: one image, two deployments. REST in the main binary, sync in the worker via `Jobs` (the Redis queue with retries and DLQ). The schedule is set by a `Tasks::` timer in the API process.
 5. No PVC at all. State lives in Postgres, secrets in a Secret, the queue in Redis.
 6. The first stage covers all eight data types at once, not a single vertical slice.
 
@@ -27,7 +27,7 @@ Hence a two-tier storage scheme:
 2. The `xiaomi_credentials` table holds the current live token, encrypted with `crypto_secretbox_easy` from libsodium. The key never reaches the database.
 3. On start the service takes the token from the database. If the row is missing, it seeds it from the Secret. If `MI_FITNESS_RESEED=1` is set, it overwrites the database with the value from the Secret.
 
-A bonus: libsodium is already wired into the template and used in `src/security/Password.hpp`, and the pod needs no write access to cluster secrets.
+A bonus: libsodium is already wired into the service and used in `src/security/Password.hpp`, and the pod needs no write access to cluster secrets.
 
 ## Architecture
 
@@ -46,7 +46,7 @@ src/repositories/
 src/sync/
   SyncService.hpp/.cpp   range chunking, type order, idempotent writes, progress tracking
 src/jobs/
-  XiaomiSyncHandler      job handler in the worker, on top of the template's Jobs
+  XiaomiSyncHandler      job handler in the worker, on top of Jobs
 src/api/
   ActivityController SleepController WorkoutController BodyController SamplesController SyncController
 ```
@@ -121,11 +121,11 @@ Three service tables:
 2. `sync_state`: `data_type text primary key`, `last_sync_at timestamptz`, `last_record_timestamp timestamptz`, `records_count bigint`.
 3. `sync_runs`: `id bigserial`, `started_at`, `finished_at`, `status text` (`running`, `succeeded`, `failed`, `interrupted`), `requested_start date`, `requested_end date`, `data_types text[]`, `result jsonb` with the count of added, updated and skipped records per type.
 
-Writes go through `INSERT ... ON CONFLICT (key) DO UPDATE`, which gives idempotency instead of a manual existence check. Migrations are created with the template generator `make new-migration`.
+Writes go through `INSERT ... ON CONFLICT (key) DO UPDATE`, which gives idempotency instead of a manual existence check. Migrations are created with `make new-migration`.
 
 ## REST API
 
-Prefix `/api/v1`, authorization by the template's API key, responses in the template envelope, every route must be present at the same time in the controller, in `Api::get_endpoints()` and in `docs/openapi.yaml`, otherwise CI fails.
+Prefix `/api/v1`, authorization by API key, responses in the common envelope, every route must be present at the same time in the controller, in `Api::get_endpoints()` and in `docs/openapi.yaml`, otherwise CI fails.
 
 | Method and path | Parameters | Returns |
 | --- | --- | --- |
@@ -140,7 +140,7 @@ Prefix `/api/v1`, authorization by the template's API key, responses in the temp
 | `GET /api/v1/sync/{run_id}` | none | run status and per-type counters |
 | `GET /api/v1/export` | `format` ∈ `json, csv`, filters as for the others | export, semantically compatible with the Python bridge's `schema_version 1.0` |
 
-Input dates are strictly `YYYY-MM-DD`, `from` not later than `to`, filters include the bounds. Pagination as in the template: `limit`, `offset`, a next-page flag.
+Input dates are strictly `YYYY-MM-DD`, `from` not later than `to`, filters include the bounds. Pagination as in the other list routes: `limit`, `offset`, a next-page flag.
 
 Numeric fields absent in the data are returned as `null`, not as zero. This continues normalization rule 2 and is part of the API contract.
 
@@ -151,7 +151,7 @@ Numeric fields absent in the data are returned as `null`, not as zero. This cont
 3. The worker takes the job and walks the types sequentially, chunking the range of each type by `MI_FITNESS_CHUNK_DAYS` days, seven by default.
 4. Each type has its own time ceiling, `MI_FITNESS_SYNC_TYPE_TIMEOUT`, 180 seconds by default. For a four-month range that is not enough, so for history backfill the value is raised via the variable. The ceiling is per type, not per whole run.
 5. One sync runs at a time. The guarantee comes from the Postgres advisory lock `pg_try_advisory_lock`, not only from the queue setting. If the lock is not acquired, the job finishes with status `skipped`.
-6. A failure of one type does not cancel the others. The result of each type is written to `sync_runs.result`, and a failed job goes to the template's DLQ.
+6. A failure of one type does not cancel the others. The result of each type is written to `sync_runs.result`, and a failed job goes to the DLQ.
 7. Runs left unfinished at restart are marked `interrupted` and are not picked up automatically.
 
 ## Errors
@@ -168,14 +168,14 @@ The key problem of the port: the Python bridge has 297 tests, the new code has n
 1. Golden vectors for the crypto. A one-off Python script captures input-output pairs for RC4 with the 1024-byte discard, `signed_nonce` and the signature on fixed inputs, and stores them in `tests/fixtures/xiaomi_crypto_vectors.json`. The C++ test runs the same ones. This catches all algorithm porting errors without network and without an account.
 2. Normalization is checked on synthetic responses modeled on the format of the Python fixtures. Mandatory cases: two records in one minute from different devices, zero as missing data, sleep across midnight, a nap next to the main session, ambiguous score candidates, re-sync of the same range.
 3. The client is checked against a local mock server: the `&&&START&&&` prefix, missing required fields, a redirect to a foreign host, missing `serviceToken`, a cursor loop, token rotation mid-session.
-4. Repositories and the API are checked by the template's integration tests on a live Postgres, the e2e bucket validates responses against the `docs/openapi.yaml` schemas.
+4. Repositories and the API are checked by integration tests on a live Postgres, the e2e bucket validates responses against the `docs/openapi.yaml` schemas.
 5. Acceptance on real data: for the same week, the export from the Python bridge and from the new API must match on steps, distance, weight and sleep session bounds. This is the only check that catches protocol misunderstanding errors, and it is mandatory before the Python bridge is removed.
 
 ## What this project does not have
 
 1. MCP in any form.
-2. Multi-user mode, registration, roles, mail, billing, the content module, the template's React frontend.
-3. Kafka and mail sending: the template modules stay in the code but are disabled by the settings `MESSAGING_ENABLED`, `KAFKA_PRODUCER_ENABLED`, `KAFKA_CONSUMER_ENABLED`, `MAIL_ENABLED`. Cutting their code out is not worth the effort.
+2. Multi-user mode, registration, roles, mail, billing, the content module, the React frontend.
+3. Kafka and mail sending: these modules stay in the code but are disabled by the settings `MESSAGING_ENABLED`, `KAFKA_PRODUCER_ENABLED`, `KAFKA_CONSUMER_ENABLED`, `MAIL_ENABLED`. Cutting their code out is not worth the effort.
 4. Medical conclusions, condition assessments, recommendations. The service returns numbers.
 5. Storing other people's accounts and any public access to the data.
 

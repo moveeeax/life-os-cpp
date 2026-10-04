@@ -1,8 +1,8 @@
 {
  "openapi": "3.1.0",
  "info": {
-  "title": "C++ REST API Template",
-  "description": "Infrastructure endpoints for the C++ REST API template: health probes\nand a background-job API. Authentication is opt-in (auth.mode=jwt|bearer|none).\nRate-limiting and idempotency are driven by headers.\n",
+  "title": "life-os-cpp API",
+  "description": "Infrastructure endpoints of life-os-cpp: health probes\nand a background-job API. Authentication is opt-in (auth.mode=jwt|bearer|none).\nRate-limiting and idempotency are driven by headers.\n",
   "version": "1.0.0",
   "contact": {
    "name": "Platform team"
@@ -5083,7 +5083,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 84220,
-  "source_fnv1a64": "b03c5a62c9b62d9d"
+  "source_bytes": 84199,
+  "source_fnv1a64": "502fc884b2aee0ec"
  }
 }

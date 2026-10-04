@@ -6,8 +6,8 @@
  *
  * The shared controller helper Api::with_repo_errors() catches THESE bases,
  * not the concrete domain exceptions, so the api-side plumbing stays decoupled
- * from the demo auth domain: delete User/Role and the helper still compiles,
- * and a forked repository that throws its own NotFoundError/ConflictError
+ * from the auth domain: the helper does not depend on User/Role,
+ * and any repository that throws its own NotFoundError/ConflictError
  * subclass is mapped to the right status code automatically — no edit to the
  * shared handler.
  *
@@ -66,7 +66,7 @@ private:
  *        (invalid_text_representation: a non-UUID string handed to a UUID
  *        column). @p code is the stable machine code, @p message the
  *        human-readable detail. Same shape as ConflictError, distinct HTTP
- *        status. (Ported from the site fork, b676430 — it hit the bare-500
+ *        status. (Added after the bare-500
  *        path on non-UUID ids in billing routes.)
  */
 struct ValidationError : RepoError {

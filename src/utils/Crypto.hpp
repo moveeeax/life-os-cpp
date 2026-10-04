@@ -6,7 +6,7 @@
  * share one implementation instead of carrying near-identical copies.
  *
  * Declarations only — the bodies live in Crypto.cpp (compiled once into
- * app_core; ADR 0003 as amended 2026-08-22): including this header no longer
+ * app_core; docs/ARCHITECTURE.md §4): including this header no longer
  * pulls the OpenSSL headers into the including TU. Only std types survive in
  * the signatures.
  */

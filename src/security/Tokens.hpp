@@ -2,10 +2,8 @@
  * @file Tokens.hpp
  * @brief HMAC-signed timed single-purpose tokens for email links.
  *
- * flask-base parity: app/models/user.py — User.generate_*_token /
- * confirm_account / change_email / reset_password use itsdangerous's
- * URLSafeTimedSerializer (HMAC + timed payload). We reproduce the same
- * primitive in C++:
+ * Same primitive as itsdangerous's URLSafeTimedSerializer (HMAC + timed
+ * payload):
  *
  *   payload = JSON {"sub": "<uuid>", "purpose": "<confirm|reset|change_email>",
  *                   "exp": <unix>, ...optional...}
@@ -44,7 +42,7 @@ enum class Purpose {
     Confirm,        // initial email confirmation
     ResetPassword,  // forgot-password link
     ChangeEmail,    // confirm new email when changing
-    Invite,         // admin-invited new user (matches flask-base /join-from-invite)
+    Invite,         // admin-invited new user (join-from-invite)
     Preview,        // draft post preview link (sub = post id, not a user)
 };
 
@@ -82,7 +80,7 @@ inline std::string derive_key(std::string_view master, Purpose p) {
  *                       below means a confirm-token leak can't sign resets.
  * @param sub            Stable user identifier (usually the user UUID).
  * @param purpose        What this token is for. Verifier MUST check it.
- * @param ttl            Lifetime. flask-base defaults: confirm = 7d,
+ * @param ttl            Lifetime. Typical values: confirm = 7d,
  *                       reset = 1h, change_email = 1h, invite = 7d.
  * @param extra          Optional extra claims merged into payload (e.g.
  *                       {"new_email": "..."} for change-email tokens).

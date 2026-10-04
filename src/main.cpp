@@ -170,7 +170,6 @@ int run_verify_migrations(const std::string& config_file) {
 }
 
 // Run migrations (seeding the starter roles) then exit. Idempotent.
-// flask-base parity: manage.py setup_dev.
 int run_setup_dev(const std::string& config_file) {
     Core::initialize(config_file, Core::InitMode::MigrateOnly);
     std::cout << "setup-dev: migrations applied; roles seeded." << std::endl;
@@ -179,7 +178,7 @@ int run_setup_dev(const std::string& config_file) {
 }
 
 // Create an Administrator user, or upgrade the existing one to Administrator +
-// reset its password. flask-base parity: manage.py setup_general ADMIN_EMAIL.
+// reset its password.
 int run_create_admin(const std::string& config_file, const std::string& email, const std::string& password) {
     if (email.empty()) {
         std::cerr << "ERROR: --create-admin requires EMAIL [PASSWORD]" << std::endl;
@@ -208,8 +207,7 @@ int run_create_admin(const std::string& config_file, const std::string& email, c
     return 0;
 }
 
-// Insert N (default 10) fake users for dev/demo. flask-base parity:
-// manage.py add_fake_data — deterministic pattern instead of a Faker dep.
+// Insert N (default 10) fake users for dev/demo, in a deterministic pattern.
 int run_seed_fake(const std::string& config_file, const std::string& count_arg) {
     int n = 10;
     if (!count_arg.empty()) {
@@ -399,7 +397,7 @@ int main(int argc, char* argv[]) {
         }
 
         std::cout << "==================================================" << std::endl;
-        std::cout << "       C++ API Template Starting                  " << std::endl;
+        std::cout << "       life-os-cpp starting                       " << std::endl;
         std::cout << "==================================================" << std::endl;
         std::cout << "Loading configuration from: " << args.config_file << std::endl;
         std::filesystem::create_directories("logs");

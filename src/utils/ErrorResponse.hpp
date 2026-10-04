@@ -18,7 +18,7 @@
  * helpers below so the frontend always parses the same shape.
  *
  * Declarations only — the bodies live in ErrorResponse.cpp (compiled once
- * into app_core; ADR 0003 as amended 2026-08-22). The drogon include stays:
+ * into app_core; docs/ARCHITECTURE.md §4). The drogon include stays:
  * every builder RETURNS a drogon::HttpResponsePtr and Error carries a
  * drogon::HttpStatusCode — the header cannot shed the drogon dependency
  * without changing this API's types, which is out of scope here.

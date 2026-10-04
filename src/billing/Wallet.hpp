@@ -4,11 +4,11 @@
  *        ONLY code in this codebase allowed to write `wallet_entries` or
  *        `wallet_balances`. Everything else (the top-up endpoint, the
  *        provider webhook, the admin adjust endpoint — the module's HTTP
- *        layer — and a fork's charging flow) calls into these functions
+ *        layer — and any charging flow) calls into these functions
  *        instead of touching the ledger tables directly.
  *
  * Declarations only — the bodies live in Wallet.cpp (compiled once into
- * app_core; ADR 0003 as amended 2026-08-22).
+ * app_core; docs/ARCHITECTURE.md §4).
  *
  * Money invariants enforced here (see migrations/007_billing.sql):
  *   - every amount is a BIGINT (cents / credits) — no floating point;
@@ -42,8 +42,7 @@
  * delta (a wrong-but-non-negative result never trips `CHECK (credits >=
  * 0)`); fatal for a negative one (a correctly-sufficient refund/debit
  * against a real balance still computed as negative and 500'd). Root cause
- * never conclusively found — forensics live in the site fork's commit
- * b676430. See refund_capture's docs for the full diagnosis.
+ * never conclusively found. See refund_capture's docs for the full diagnosis.
  *
  * Every write also INSERTs the row (`VALUES ($1, 0) ON CONFLICT (user_id) DO
  * NOTHING`) BEFORE the `SELECT ... FOR UPDATE`, then closes with a plain
@@ -402,8 +401,8 @@ CreditResult adjust(const std::string& user_id,
  *        the balance-cache update in ONE transaction, or refuses cleanly.
  *
  * Deliberately NOT exposed as an HTTP endpoint by this service: WHAT a
- * credit buys — a render, an API call, a report — is fork domain. A fork's
- * service layer calls this function at its charge point (with the fork's own
+ * credit buys — a render, an API call, a report — is domain logic. The
+ * service layer calls this function at its charge point (with its own
  * natural idempotency key as @p reference: a job id, an order id, a request
  * id); the wallet only guarantees that whatever that charge is, it can
  * never post twice, never overdraw, and never desync the ledger from the

@@ -5,7 +5,7 @@
   "refresh": "15s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["cpp-template", "life-os-cpp-worker"],
+  "tags": ["life-os-cpp", "life-os-cpp-worker"],
   "time": {"from": "now-30m", "to": "now"},
   "title": "life-os-cpp-worker",
   "uid": "life-os-cpp-worker",

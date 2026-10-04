@@ -2,8 +2,7 @@
  * @file Mailer.hpp
  * @brief SMTP outbound mail via libcurl.
  *
- * flask-base parity: app/email.py uses Flask-Mail to push messages onto
- * Flask-RQ. We do the same shape: Mailer::send() is synchronous and
+ * Mailer::send() is synchronous and
  * cheap to call from a job worker; the controller submits a job rather
  * than blocking the request thread on SMTP I/O.
  *
@@ -59,7 +58,7 @@ struct MailerConfig {
 };
 
 struct Message {
-    std::string to;         // single recipient — flask-base stays single-recipient too
+    std::string to;         // single recipient
     std::string subject;    // prefix is added by Mailer; pass the bare subject
     std::string text_body;  // plain text alt
     std::string html_body;  // HTML body

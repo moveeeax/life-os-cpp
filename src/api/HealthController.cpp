@@ -78,8 +78,8 @@ void RootController::getRoot(const HttpRequestPtr&, std::function<void(const Htt
     for (const auto& ep : get_endpoints()) {
         endpoints_json.push_back({{"method", ep.method}, {"path", ep.path}, {"description", ep.description}});
     }
-    callback(Response::ok(
-        {{"message", "C++ API Template"}, {"version", version_or_unknown()}, {"endpoints", endpoints_json}}));
+    callback(
+        Response::ok({{"message", "life-os-cpp"}, {"version", version_or_unknown()}, {"endpoints", endpoints_json}}));
 }
 
 }  // namespace Api

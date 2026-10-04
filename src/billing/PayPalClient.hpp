@@ -5,8 +5,8 @@
  *        REST-based webhook signature verification.
  *
  * Declarations only — the bodies (and the libcurl dependency) live in
- * PayPalClient.cpp, compiled once into app_core (ADR 0003 as amended
- * 2026-08-22): including this header no longer pulls curl/json/spdlog into
+ * PayPalClient.cpp, compiled once into app_core (docs/ARCHITECTURE.md
+ * §4): including this header no longer pulls curl/json/spdlog into
  * the including TU.
  *
  * Mirrors S3Storage's libcurl usage in src/storage/Storage.hpp: one CURL easy

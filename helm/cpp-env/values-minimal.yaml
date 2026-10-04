@@ -8,8 +8,7 @@
 #     --set env=<env> --set baseDomain=<domain> --set cpp-{api,worker,frontend}.image.tag=<sha>
 #
 # NOT a security/prod config — credentials are still TEST defaults. Redis still
-# runs as Sentinel (true single-node Redis templating is a follow-up; see the
-# council roadmap T2 Phase 4). For zero-operator LOCAL dev use `make up` instead.
+# runs as Sentinel (true single-node Redis templating is a follow-up). For zero-operator LOCAL dev use `make up` instead.
 kafka:
   enabled: false
 jaeger:

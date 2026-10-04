@@ -5,7 +5,7 @@
  *          enqueue) don't pull UserRepository through the email layer.
  *          Included by worker_main.cpp and the integration tests.
  *          Declaration only — the body lives in AccountEmailWorker.cpp
- *          (compiled once into app_core; ADR 0003 as amended 2026-08-22).
+ *          (compiled once into app_core; docs/ARCHITECTURE.md §4).
  */
 
 #pragma once

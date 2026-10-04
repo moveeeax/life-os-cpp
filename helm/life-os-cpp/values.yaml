@@ -77,7 +77,7 @@ pdb:
 # ---------------------------------------------------------------
 # Network policy — restrict ingress/egress when enabled.
 #
-# Template ships with `enabled: false` because the selectors below hardcode
+# Ships with `enabled: false` because the selectors below hardcode
 # namespace names (ingress-nginx, monitoring, db) that vary per cluster.
 # Before flipping to true in production:
 #   1. Confirm your ingress-controller namespace and update fromSelectors.

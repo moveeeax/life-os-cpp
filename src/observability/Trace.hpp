@@ -18,7 +18,7 @@
  *
  *          Bodies (the parser, hex/random helpers and the thread-local
  *          ambient traceparent) live in Trace.cpp (compiled once into
- *          app_core; ADR 0003 as amended 2026-08-22).
+ *          app_core; docs/ARCHITECTURE.md §4).
  *
  *          This header (and Trace.cpp) is deliberately std-only — the one
  *          OpenTelemetry-coupled helper (to_remote_span_context) lives in

@@ -13,7 +13,7 @@
  *          controller with zero network calls.
  *
  * Declarations only — the handler bodies live in BillingController.cpp
- * (compiled once into app_core; ADR 0003 as amended 2026-08-22). The route
+ * (compiled once into app_core; docs/ARCHITECTURE.md §4). The route
  * macros (ADD_METHOD_TO) must stay in this header: Drogon's METHOD_LIST
  * registration is part of the class definition, and
  * scripts/check-routes-registered.sh greps the src/api headers for them.
@@ -145,8 +145,7 @@ public:
     //     will hammer this endpoint forever for a condition retrying can
     //     never fix.
     //
-    // Known limitations (inherited from the source fork, deliberately kept
-    // rather than silently diverging from its audited behavior):
+    // Known limitations (deliberately kept as is):
     //   - PAYMENT.CAPTURE.DENIED is not handled — a denied capture leaves the
     //     payment row 'created'/'approved' forever unless the return-flow
     //     capture endpoint happens to observe the failure; no failed-payment

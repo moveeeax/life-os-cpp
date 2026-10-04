@@ -6,7 +6,7 @@
 # docs/CONFIG.md, helm env lists, compose, prod overlay); until now only
 # human eyes kept them in sync, and the audit that motivated this gate found
 # 30+ keys the code reads that config.json never mentioned. This is the
-# lightweight drift DETECTOR from the modularity plan (Phase 3) — the full
+# lightweight drift DETECTOR — the full
 # single-registry generator is deferred; this gate just makes a forgotten
 # copy a CI failure instead of a code-review coin toss.
 #

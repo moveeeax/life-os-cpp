@@ -6,8 +6,8 @@
  *
  * Non-template bodies (URL/sentinel parsing, client construction, the
  * CacheManager wrappers and the global-instance lifecycle incl. the test
- * seam) live in Cache.cpp (compiled once into app_core; ADR 0003 as amended
- * 2026-08-22). The guarded_ member template and the cached<T> read-through
+ * seam) live in Cache.cpp (compiled once into app_core; docs/ARCHITECTURE.md
+ * §4). The guarded_ member template and the cached<T> read-through
  * helper are templates and stay here — the spdlog / redis++ /
  * nlohmann-json includes are load-bearing for their bodies.
  */
@@ -230,7 +230,7 @@ void reset_for_testing();
 // Return the cached value for `key`, or call `loader`, cache its result for
 // `ttl_sec`, and return it. T must be nlohmann-serializable (to_json/from_json
 // via ADL — every Domain DTO already is). Centralizes the get→miss→load→set
-// dance so each call site (and each fork) doesn't hand-roll it differently.
+// dance so each call site doesn't hand-roll it differently.
 //
 // FAIL-OPEN by design: if the cache is uninitialized/down, or the cached blob is
 // unparseable (e.g. the DTO's shape changed across a deploy), fall through to

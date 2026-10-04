@@ -71,7 +71,7 @@ struct AutoSpan {
  * Limits (honest): a fake can only return pqxx::result objects it can
  * construct — i.e. the EMPTY result. Enough to prove substitution, count
  * calls and inspect query templates; not enough to fake row data. Faking
- * populated results requires de-inlining the row/result layer (Phase 2).
+ * populated results requires de-inlining the row/result layer.
  */
 class ErasedTxn {
 public:
@@ -815,7 +815,7 @@ inline void shutdown() {
 // call counts against empty pqxx::results) and the non-template ops. It does
 // NOT cover with_primary_connection / with_replica_connection (raw
 // pqxx::connection — unfakeable without a server) or row data in results;
-// both need the Phase 2 de-inline of the row/result layer.
+// both need the row/result layer de-inlined first.
 inline void install_for_testing(std::unique_ptr<DatabaseManager> fake) {
     global_db = std::move(fake);
 }

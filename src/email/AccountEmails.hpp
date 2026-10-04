@@ -5,7 +5,7 @@
  *        AccountEmailWorker.hpp.
  *
  * Declarations only — the bodies live in AccountEmails.cpp (compiled once
- * into app_core; ADR 0003 as amended 2026-08-22). That's also where the
+ * into app_core; docs/ARCHITECTURE.md §4). That's also where the
  * jobs/Jobs.hpp include lives now — this header no longer contributes to
  * the email→jobs half of the include graph (same move as
  * Email::detail::via_jobs() in Mailer.cpp).
@@ -14,8 +14,7 @@
  * needs send_confirm_email() too, and pulling AccountController into
  * Auth (or vice versa) would cycle the include graph.
  *
- * Delivery is routed, not inlined (flask-base parity: app/email.py
- * pushes onto Flask-RQ):
+ * Delivery is routed, not inlined:
  *
  *   send_*()  ──Jobs enabled──▶ Jobs::submit("account_email", payload)
  *      │                              │

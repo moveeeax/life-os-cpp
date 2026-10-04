@@ -11,7 +11,7 @@
  *          any controller via Security::.
  *
  * Declarations only for the non-template bodies — they live in Auth.cpp
- * (compiled once into app_core; ADR 0003 as amended 2026-08-22). The enums,
+ * (compiled once into app_core; docs/ARCHITECTURE.md §4). The enums,
  * structs and constants below stay here.
  */
 
@@ -151,15 +151,14 @@ drogon::HttpResponsePtr require_role(const drogon::HttpRequestPtr& req, const st
  * @brief nullptr if the caller's email is confirmed (or auth is disabled);
  *        401 if anonymous; 403 if authenticated but unconfirmed. The "confirmed"
  *        boolean is read from the access JWT claim (minted at login), so no DB
- *        hit. flask-base parity: @confirmed_required. The flag is loaded
+ *        hit. The flag is loaded
  *        everywhere but not enforced by default — gate your domain's
  *        confirmation-required routes with API_REQUIRE_CONFIRMED.
  */
 drogon::HttpResponsePtr require_confirmed(const drogon::HttpRequestPtr& req);
 
 // ---------------------------------------------------------------------------
-// Permission bitmask helpers — flask-base parity: app/decorators.py
-// permission_required / admin_required.
+// Permission bitmask helpers.
 //
 // The access JWT carries a "permissions" int claim whose bits match the
 // constants in src/domain/Role.hpp (Permission::kGeneral, kAdminister, ...).

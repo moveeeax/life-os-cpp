@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
-  title: C++ REST API Template
+  title: life-os-cpp API
   description: |
-    Infrastructure endpoints for the C++ REST API template: health probes
+    Infrastructure endpoints of life-os-cpp: health probes
     and a background-job API. Authentication is opt-in (auth.mode=jwt|bearer|none).
     Rate-limiting and idempotency are driven by headers.
   version: 1.0.0

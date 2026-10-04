@@ -3,13 +3,12 @@
  * @brief Render email templates from disk via inja.
  *
  * Declarations only — the bodies live in Templates.cpp (compiled once
- * into app_core; ADR 0003 as amended 2026-08-22). That's also where the
+ * into app_core; docs/ARCHITECTURE.md §4). That's also where the
  * <inja/inja.hpp> include lives now, keeping inja out of every
  * consumer's include graph.
  *
- * flask-base parity: app/email.py renders Jinja2 templates with the
- * Flask app context. We use inja (a Jinja-subset engine for C++) and
- * pass a plain nlohmann::json as context.
+ * Rendering uses inja (a Jinja-subset engine for C++) with a plain
+ * nlohmann::json as context.
  *
  * Convention: every template ships as a .txt + .html pair under
  * templates/email/<name>.{txt,html}. Mailer expects both bodies, so
@@ -73,8 +72,7 @@ Pair render_pair(const std::string& name, const json& ctx);
 
 /**
  * @brief Common context fields injected into every template render.
- *        flask-base used Flask's `current_app.config['APP_NAME']` etc.;
- *        we pass them explicitly so a unit test can render templates
+ *        They are passed explicitly so a unit test can render templates
  *        without booting Config.
  */
 json default_context();

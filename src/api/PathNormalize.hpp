@@ -72,7 +72,7 @@ inline std::string normalize_path_for_metrics(const std::string& path) {
         i = j;
     }
 
-    // Optional API version segment (/api/v<N>/... — see ADR 0006), so the token
+    // Optional API version segment (/api/v<N>/... — see docs/ARCHITECTURE.md §7), so the token
     // routes are detected whether or not a version is present.
     auto is_version_seg = [](const auto& s) {
         if (s.size() < 2 || s[0] != 'v')

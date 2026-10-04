@@ -99,8 +99,7 @@ inline int next_metrics_port() {
  *   that thread observes the stop flag — i.e. until the current 2 s quantum
  *   expires. Because every Core-backed fixture boots Core (and therefore an
  *   exposer) per test, EVERY service-backed test would pay a flat ~2.01 s
- *   in TearDown, whatever it actually did (found downstream:
- *   cyber-accountant 879d15e, −680 s of CI per run).
+ *   in TearDown, whatever it actually did.
  *
  * Nothing under test scrapes the exposer: /metrics is served ONLY by the
  * exposer itself (no Drogon route), so no test loses coverage. The exposer
@@ -110,7 +109,7 @@ inline int next_metrics_port() {
  *
  * `auth.mode` is jwt (with kTestJwtSecret) rather than "none": with mode
  * none every API_REQUIRE_ADMIN / *_PERMISSION guard is a no-op, so RBAC
- * tests pass vacuously — the site fork shipped exactly that bug. Suites
+ * tests pass vacuously. Suites
  * that mint real tokens with their own kSecret keep overriding
  * auth.jwt.secret in config_overrides().
  */
@@ -312,7 +311,7 @@ inline void remove_temp_config(const std::string& path = "test_temp_config.json"
 
 /// Wipe the users table between tests. Requires Database to be initialized.
 /// CASCADE so tables with an FK to users (api_keys, and any owner-scoped
-/// resource a fork adds) are cleared too — plain TRUNCATE errors on a referenced
+/// resource added later) are cleared too — plain TRUNCATE errors on a referenced
 /// table.
 inline void truncate_users() {
     Database::get().execute_write([](auto& txn) {
@@ -323,21 +322,19 @@ inline void truncate_users() {
 
 /**
  * @brief Wipe ALL app data between tests, in one write transaction — the ONE
- *        place that knows the cleanup order (ported from the cyber-accountant
- *        fork's wipe_org_data, b4cdc99). Fixtures that used to hand-roll
+ *        place that knows the cleanup order. Fixtures that used to hand-roll
  *        multi-table TRUNCATE/DELETE sequences call this instead, so a new
  *        FK-ordered table only ever needs to be added here once.
  *
  *        Order matters twice:
  *        - `TRUNCATE users CASCADE` runs FIRST: api_keys (and any owner-scoped
- *          fork table) go with it via ON DELETE CASCADE, and users must be gone
+ *          table) go with it via ON DELETE CASCADE, and users must be gone
  *          before extra roles can be dropped (users.role_id is ON DELETE
  *          RESTRICT).
  *        - `DELETE FROM roles WHERE name NOT IN (...)` keeps migration 001's
  *          two seed roles; the ON CONFLICT re-insert below makes the wipe
  *          self-healing even if a test dropped them outright.
- *        audit_log / used_tokens carry no FKs and ride in one TRUNCATE (this
- *        fork has no content module, so there is no posts table).
+ *        audit_log / used_tokens carry no FKs and ride in one TRUNCATE.
  */
 inline void wipe_app_data() {
     Database::get().execute_write([](auto& txn) {

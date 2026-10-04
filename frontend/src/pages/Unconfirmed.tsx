@@ -8,9 +8,8 @@ import { api } from '@/lib/api/client';
 
 /**
  * Shown when the user is logged in but the access JWT carries
- * confirmed=false. flask-base parity: app/account/views.py
- * before_request blocks unconfirmed users from non-account routes
- * and redirects them to /unconfirmed.
+ * confirmed=false. Unconfirmed users are kept off non-account routes
+ * and redirected to /unconfirmed.
  */
 export function UnconfirmedPage() {
   const user = useMe().data ?? null;

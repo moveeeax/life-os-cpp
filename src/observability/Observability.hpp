@@ -7,7 +7,7 @@
  * Non-template bodies (sink/formatter wiring incl. the custom spdlog flags,
  * the prometheus builders, the OTel SDK pipeline setup/teardown and the
  * global-instance lifecycle) live in Observability.cpp (compiled once into
- * app_core; ADR 0003 as amended 2026-08-22) — so the heavy OTel SDK/exporter
+ * app_core; docs/ARCHITECTURE.md §4) — so the heavy OTel SDK/exporter
  * headers are no longer exposed to including TUs. The prometheus metric
  * headers stay here: create_counter/create_gauge/add_histogram return the
  * metric types by reference and every caller uses them directly.

@@ -1,6 +1,6 @@
 /**
  * @file User.hpp
- * @brief User row. flask-base parity: app/models/user.py.
+ * @brief User row.
  *
  * Domain-only — no SQL here, no password hashing here, no JWT here.
  * Persistence lives in src/repositories/UserRepository.hpp; password
@@ -22,8 +22,7 @@ struct User {
     std::string id;     // UUID v4 (text)
     std::string email;  // CITEXT, unique
     // Nullable so the invite flow can create a user before they set a
-    // password (parity with flask-base User.password_hash being NULL
-    // until /join-from-invite/).
+    // password (NULL until join-from-invite).
     std::optional<std::string> password_hash;
     std::optional<std::string> first_name;
     std::optional<std::string> last_name;
@@ -66,7 +65,7 @@ struct User {
     }
 
     /**
-     * @brief Check a permission bit. flask-base parity: User.can().
+     * @brief Check a permission bit.
      * @details Requires `role` to be loaded — controllers should always
      *          query through repository methods that join the role.
      */

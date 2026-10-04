@@ -2,10 +2,9 @@
  * @file AuthController.hpp
  * @brief Auth endpoints: register, login, logout, refresh, me.
  *
- * flask-base parity: app/account/views.py login() / register() / logout().
- * Differences from flask-base:
+ * Behaviour:
  *   - Returns JSON, not HTML. The frontend handles redirects.
- *   - Cookie-based session (HttpOnly + SameSite=Lax) instead of Flask-Login.
+ *   - Cookie-based session (HttpOnly + SameSite=Lax).
  *   - Refresh-token rotation: every /refresh returns a brand-new refresh JWT
  *     and invalidates the previous JTI in Redis. Logout deletes the JTI.
  *   - Email-confirmation token generation lives here so /register can fire
@@ -13,7 +12,7 @@
  *     Mailer). Until then we log the link at INFO level.
  *
  * Declarations only — the handler bodies live in AuthController.cpp
- * (compiled once into app_core; ADR 0003 as amended 2026-08-22). The route
+ * (compiled once into app_core; docs/ARCHITECTURE.md §4). The route
  * macros (ADD_METHOD_TO) must stay in this header: Drogon's METHOD_LIST
  * registration is part of the class definition, and
  * scripts/check-routes-registered.sh greps the src/api headers for them.
@@ -52,7 +51,7 @@ public:
     //
     // Body: { email, password, first_name?, last_name? }
     // Behaviour: creates an unconfirmed user, generates a confirm-email
-    // token, and (stage 2) emails it. NOT auto-login — flask-base parity:
+    // token, and (stage 2) emails it. NOT auto-login: the
     // user has to click the link, then log in.
     // ---------------------------------------------------------------------
     void registerUser(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
@@ -63,7 +62,7 @@ public:
     // Body: { email, password }
     // Returns: { user } + Set-Cookie access/refresh.
     // Generic 401 on either wrong email or wrong password (no user
-    // enumeration). flask-base does the same thing with one flash message.
+    // enumeration).
     // ---------------------------------------------------------------------
     void login(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
 

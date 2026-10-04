@@ -1,6 +1,6 @@
 # Spectral ruleset for docs/openapi.yaml. Starts from the standard OAS bundle
 # and relaxes a handful of rules that don't add value for an internal-first
-# template (operation-tag-defined, info-contact, etc.).
+# service (operation-tag-defined, info-contact, etc.).
 #
 # Ratchet up over time: when the spec is clean against `error` severity, flip
 # SPECTRAL_FAIL_SEVERITY=warn in CI to enforce the warnings too.

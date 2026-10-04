@@ -7,7 +7,7 @@
  * probe and sync, kFitnessRead for reads) -> 403; then parameter parsing -> 400.
  *
  * Declarations only — the handler bodies live in FitnessController.cpp
- * (compiled once into app_core; ADR 0003 as amended 2026-08-22). The route
+ * (compiled once into app_core; docs/ARCHITECTURE.md §4). The route
  * macros (ADD_METHOD_TO) must stay in this header: Drogon's METHOD_LIST
  * registration is part of the class definition, and
  * scripts/check-routes-registered.sh greps the src/api headers for them.

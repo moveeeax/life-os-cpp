@@ -4,8 +4,8 @@
  *
  * `--dump-config` resolves ${VAR} placeholders in place, so the raw tree
  * holds the real DB/Redis/SMTP/S3/JWT secrets — dumping it verbatim turns a
- * debugging aid into a credential printer (found live downstream:
- * tarassov.me round-3 L8). Header-only per ADR 0003 so the masking is unit
+ * debugging aid into a credential printer. Header-only per
+ * docs/ARCHITECTURE.md §4 so the masking is unit
  * -testable without linking the binary entry point.
  */
 
