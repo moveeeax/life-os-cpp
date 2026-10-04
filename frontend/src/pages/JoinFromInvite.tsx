@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import type { z } from 'zod';
 
 import { Button } from '@/components/ui/button';

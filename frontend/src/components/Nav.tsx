@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { LogOut, Menu, Moon, Sun, Wallet, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';

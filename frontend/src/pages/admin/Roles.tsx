@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Trash2, Pencil } from 'lucide-react';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';

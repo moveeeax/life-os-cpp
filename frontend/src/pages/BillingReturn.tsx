@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router';
 import { CheckCircle2, Clock } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';

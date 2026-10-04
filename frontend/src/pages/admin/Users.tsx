@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import { DataTable, type Column } from '@/components/DataTable';
 import { PaginationFooter } from '@/components/PaginationFooter';
