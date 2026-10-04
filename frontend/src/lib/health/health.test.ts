@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  alignToDays,
   dailyStats,
   daysInRange,
   fetchAllPages,
+  formatDelta,
   inRange,
   localDate,
   mean,
   nights,
   parseRange,
   rangeForDays,
+  validCustomRange,
   weightChange,
   widenRange,
 } from './index';
@@ -96,6 +99,94 @@ describe('rangeForDays / daysInRange / parseRange', () => {
   });
 });
 
+describe('custom range limits', () => {
+  const end = '2026-10-05';
+  it('accepts a range inside the limits', () => {
+    expect(validCustomRange('2026-08-01', '2026-08-10', end)).toBe(true);
+    expect(validCustomRange('2025-10-05', '2026-10-05', end)).toBe(true); // 366 days
+  });
+  it('rejects a half-typed year, a future end, a reversed or over-long range', () => {
+    expect(validCustomRange('0002-09-06', '2026-10-05', end)).toBe(false);
+    expect(validCustomRange('2019-12-31', '2020-01-05', end)).toBe(false);
+    expect(validCustomRange('2026-10-01', '2026-10-25', end)).toBe(false);
+    expect(validCustomRange('2026-08-10', '2026-08-01', end)).toBe(false);
+    expect(validCustomRange('2025-10-04', '2026-10-05', end)).toBe(false); // 367 days
+    expect(validCustomRange('', '2026-10-05', end)).toBe(false);
+    expect(validCustomRange('2026-02-30', '2026-03-05', end)).toBe(false);
+  });
+  it('makes parseRange fall back to the default for a URL outside the limits', () => {
+    const dflt = parseRange(new URLSearchParams(''), end);
+    expect(parseRange(new URLSearchParams('from=0002-09-06&to=2026-10-05'), end)).toEqual(dflt);
+    expect(parseRange(new URLSearchParams('from=2026-10-01&to=2026-10-25'), end)).toEqual(dflt);
+    expect(parseRange(new URLSearchParams('from=2020-01-01&to=2026-10-05'), end)).toEqual(dflt);
+  });
+});
+
+describe('alignToDays', () => {
+  const days = ['2026-10-01', '2026-10-02', '2026-10-03'];
+  it('puts each value on its day and leaves days without a row empty', () => {
+    const rows = [
+      { d: '2026-10-01', v: 1 },
+      { d: '2026-10-03', v: 3 },
+    ];
+    expect(
+      alignToDays(
+        days,
+        rows,
+        (r) => r.d,
+        (r) => r.v,
+      ),
+    ).toEqual([1, null, 3]);
+  });
+  it('lets the last row of a day win', () => {
+    const rows = [
+      { d: '2026-10-02', v: 5 },
+      { d: '2026-10-02', v: 7 },
+    ];
+    expect(
+      alignToDays(
+        days,
+        rows,
+        (r) => r.d,
+        (r) => r.v,
+      ),
+    ).toEqual([null, 7, null]);
+  });
+  it('does not let a later row without the value erase an earlier one', () => {
+    const rows: { d: string; v: number | null }[] = [
+      { d: '2026-10-02', v: 66.1 },
+      { d: '2026-10-02', v: null },
+    ];
+    expect(
+      alignToDays(
+        days,
+        rows,
+        (r) => r.d,
+        (r) => r.v,
+      ),
+    ).toEqual([null, 66.1, null]);
+  });
+  it('ignores rows outside the listed days', () => {
+    expect(
+      alignToDays(
+        days,
+        [{ d: '2026-09-30', v: 9 }],
+        (r) => r.d,
+        (r) => r.v,
+      ),
+    ).toEqual([null, null, null]);
+  });
+});
+
+describe('formatDelta', () => {
+  it('signs a change and names a negligible one', () => {
+    expect(formatDelta(1.26)).toBe('+1.3');
+    expect(formatDelta(-1.6)).toBe('-1.6');
+    expect(formatDelta(-0.04)).toBe('0.0');
+    expect(formatDelta(0)).toBe('0.0');
+  });
+});
+
 describe('dailyStats', () => {
   it('groups samples by local day and reports min, mean, max and count', () => {
     const rows = [
@@ -152,6 +243,17 @@ describe('nights', () => {
   });
   it('drops dates that only have sessions without stages', () => {
     expect(nights([session({ stages: [] })], 0)).toEqual([]);
+  });
+  it('leaves naps out even when they have stages and are longer', () => {
+    const list = nights(
+      [
+        session({ sleep_id: 'night', duration_minutes: 400 }),
+        session({ sleep_id: 'nap', duration_minutes: 600, is_nap: true }),
+      ],
+      0,
+    );
+    expect(list).toHaveLength(1);
+    expect(list[0].durationMinutes).toBe(400);
   });
   it('ignores an unknown stage name instead of failing', () => {
     const n = nights([session({ stages: [{ stage: 'weird', minutes: 5 }] })], 0);

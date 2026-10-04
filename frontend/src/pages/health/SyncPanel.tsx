@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { isFinalStatus, useCoverage, useProbe, useStartSync, useSyncRun } from '@/hooks/useHealth';
 import { apiErrorMessage } from '@/lib/api/client';
@@ -86,7 +86,24 @@ export function SyncPanel() {
   const run = useSyncRun(runId);
   const probe = useProbe();
 
-  const running = start.isPending || (run.data ? !isFinalStatus(run.data.status) : runId !== null);
+  // Watching a run: started, not final yet, and the status request has not failed.
+  const watching = runId !== null && !run.error && !(run.data && isFinalStatus(run.data.status));
+  const running = start.isPending || watching;
+
+  // A run that stays queued or running this long is most likely stuck (worker
+  // down). Say so instead of spinning for ever.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    setSlow(false);
+    if (!watching) return;
+    const t = setTimeout(() => setSlow(true), 10 * 60 * 1000);
+    return () => clearTimeout(t);
+  }, [watching, runId]);
+
+  const stopWatching = () => {
+    setRunId(null);
+    start.reset();
+  };
   const rangeValid = from !== '' && to !== '' && from <= to;
   const canStart = rangeValid && types.length > 0 && !running;
 
@@ -188,6 +205,11 @@ export function SyncPanel() {
           <button type="submit" disabled={!canStart} className={primaryButton}>
             {running ? 'Sync in progress…' : 'Start sync'}
           </button>
+          {runId !== null && (
+            <button type="button" onClick={stopWatching} className={secondaryButton}>
+              {watching ? 'Stop watching' : 'Clear'}
+            </button>
+          )}
           <button
             type="button"
             disabled={!rangeValid || probe.isPending || running}
@@ -207,7 +229,17 @@ export function SyncPanel() {
         )}
         {run.error != null && (
           <p role="alert" className="text-error-500">
-            {apiErrorMessage(run.error, 'Could not read the sync status.')}
+            Could not read the status of run #{runId}:{' '}
+            {apiErrorMessage(run.error, 'request failed')}. The run itself may still be going.{' '}
+            <button type="button" className="underline" onClick={() => run.refetch()}>
+              Check again
+            </button>
+          </p>
+        )}
+        {slow && watching && (
+          <p role="alert" className="text-warning-600 dark:text-warning-500">
+            This run has not finished in 10 minutes. The worker may be down; you can stop watching
+            and check the coverage table later.
           </p>
         )}
         {run.data && (

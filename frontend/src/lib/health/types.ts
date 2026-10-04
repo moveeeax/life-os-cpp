@@ -103,9 +103,9 @@ export interface SyncRun {
   id: number;
   started_at: string;
   finished_at: string | null;
-  status: string; // queued | running | succeeded | failed
-  requested_start: string;
-  requested_end: string;
+  status: string; // queued | running | succeeded | failed | interrupted | skipped
+  requested_start: string | null;
+  requested_end: string | null;
   data_types: string[];
   result: Record<string, unknown> | null;
 }
