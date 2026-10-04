@@ -46,6 +46,7 @@ run a license checker over `frontend/node_modules`.
 | react-router | MIT |
 | @fontsource-variable/outfit (Outfit font, The Outfit Project Authors) | SIL OFL-1.1 (font), MIT (package) |
 | @tanstack/react-query | MIT |
+| apexcharts, react-apexcharts | ApexCharts Community License: not an open-source licence; free for individuals and for organisations under USD 2M in annual revenue, see the packages' `LICENSE` |
 | react-hook-form, @hookform/resolvers | MIT |
 | zod | MIT |
 | @radix-ui/react-* | MIT |

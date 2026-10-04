@@ -16,6 +16,13 @@ export const qk = {
         ? (['billing', 'wallet'] as const)
         : (['billing', 'wallet', page] as const),
   },
+  /** Health section: every key starts with 'health' so a finished sync can invalidate them all. */
+  health: {
+    all: () => ['health'] as const,
+    list: (route: string, from: string, to: string) => ['health', route, from, to] as const,
+    coverage: () => ['health', 'coverage'] as const,
+    syncRun: (id: number) => ['health-sync-run', id] as const,
+  },
   admin: {
     users: (page?: number) =>
       page === undefined ? (['admin', 'users'] as const) : (['admin', 'users', page] as const),
