@@ -5,7 +5,8 @@ import { Layout } from '@/components/Layout';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { NotFoundPage } from '@/pages/NotFound';
 import { Permission } from '@/lib/auth/permissions';
-import { routes, type RouteEntry, type RouteGuard } from '@/routes/manifest';
+import { routes, type RouteEntry, type RouteGuard, type RouteLayout } from '@/routes/manifest';
+import { AppShell } from '@/shell/AppShell';
 
 /**
  * Guard groups expressed as layout routes: the wrapper renders once and
@@ -48,8 +49,8 @@ function RequireAdmin() {
   );
 }
 
-function routesFor(guard: RouteGuard): RouteEntry[] {
-  return routes.filter((r) => r.guard === guard);
+function routesFor(guard: RouteGuard, layout: RouteLayout = 'classic'): RouteEntry[] {
+  return routes.filter((r) => r.guard === guard && (r.layout ?? 'classic') === layout);
 }
 
 function renderRoute(r: RouteEntry) {
@@ -73,6 +74,16 @@ function renderRoute(r: RouteEntry) {
 export default function App() {
   return (
     <Routes>
+      {/* No frame: the full-screen sign-in page and its /login alias. */}
+      {routesFor('public', 'bare').map(renderRoute)}
+
+      {/* Dashboard shell: sidebar + header, signed-in and confirmed users. */}
+      <Route element={<AppShell />}>
+        <Route element={<RequireConfirmed />}>
+          {routesFor('confirmed', 'shell').map(renderRoute)}
+        </Route>
+      </Route>
+
       <Route element={<Layout />}>
         {/* Public pages */}
         {routesFor('public').map(renderRoute)}

@@ -1,0 +1,31 @@
+# Production values of the frontend (chart helm/cpp-frontend) in cluster
+# talos-nbg1-tarassov-me, namespace life-os, release name life-os-cpp-frontend.
+#
+# The frontend is the public entry point of life-os.tarassov.me: nginx serves
+# the SPA and proxies /api/ to the API Service. See docs/ARCHITECTURE.md §6.
+
+image:
+  repository: ghcr.io/moveeeax/life-os-cpp-frontend
+  tag: "1.7.2"
+
+replicaCount: 1
+
+# Service of the API release (helm release life-os-cpp) in the same namespace.
+backend:
+  service: life-os-cpp
+  port: 8080
+
+ingress:
+  enabled: true
+  className: nginx
+  certManager:
+    clusterIssuer: letsencrypt-prod
+  hosts:
+    - host: life-os.tarassov.me
+      paths:
+        - path: /
+          pathType: Prefix
+  # Same secret the API ingress has been using for this host.
+  tls:
+    - hosts: [life-os.tarassov.me]
+      secretName: life-os-tls

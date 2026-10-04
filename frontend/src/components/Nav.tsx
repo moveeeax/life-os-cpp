@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { BRAND } from '@/lib/brand';
 import { useLogout } from '@/hooks/useAuthMutations';
 import { useMe } from '@/hooks/useMe';
+import { useThemeToggle } from '@/hooks/useThemeToggle';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import { cn } from '@/lib/utils';
@@ -32,21 +33,7 @@ export function Nav() {
     enabled: !!user,
   });
 
-  // Minimal theme toggle: the .dark class drives Tailwind's dark: variants; the
-  // initial class is set pre-paint by the inline script in index.html.
-  const [dark, setDark] = useState(
-    () => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'),
-  );
-  const toggleTheme = () => {
-    const next = !dark;
-    setDark(next);
-    document.documentElement.classList.toggle('dark', next);
-    try {
-      localStorage.setItem('theme', next ? 'dark' : 'light');
-    } catch {
-      /* ignore */
-    }
-  };
+  const { dark, toggleTheme } = useThemeToggle();
 
   // Show the logged-out auth buttons (Log in / Register) only once /me has
   // RESOLVED to "no session" — me.isSuccess && !user. Gating on isSuccess

@@ -3,9 +3,9 @@ import { Shield, ScrollText } from 'lucide-react';
 
 import { Permission } from '@/lib/auth/permissions';
 
-import { HomePage } from '@/pages/Home';
+import { LoginRedirect, RootPage } from '@/pages/Root';
+import { HealthPage } from '@/pages/Health';
 import { AboutPage } from '@/pages/About';
-import { LoginPage } from '@/pages/Login';
 import { RegisterPage } from '@/pages/Register';
 import { CheckEmailPage } from '@/pages/CheckEmail';
 import { ConfirmEmailPage } from '@/pages/ConfirmEmail';
@@ -78,6 +78,7 @@ const AdminBillingPage = lazy(() =>
  * don't repeat it.
  */
 export type RouteGuard = 'public' | 'auth' | 'confirmed' | 'admin';
+export type RouteLayout = 'classic' | 'shell' | 'bare';
 
 export interface RouteEntry {
   path: string;
@@ -89,13 +90,22 @@ export interface RouteEntry {
   navIcon?: React.ComponentType<{ className?: string }>;
   /** Extra permission bit a non-admin route must carry (rare). */
   requirePermission?: number;
+  /**
+   * Which frame the page renders in. 'classic' (default): the top-nav Layout
+   * of the admin and account pages. 'shell': the dashboard shell with the
+   * sidebar. 'bare': no frame (the full-screen sign-in page).
+   */
+  layout?: RouteLayout;
 }
 
 export const routes: RouteEntry[] = [
   // ── Public ────────────────────────────────────────────────────────────
-  { path: '/', element: <HomePage />, guard: 'public', navLabel: 'Home' },
+  // `/` is the sign-in form for a guest and a redirect to the dashboard for
+  // a signed-in user. It keeps the 'Home' nav label so the classic top nav
+  // still has a way back to the dashboard.
+  { path: '/', element: <RootPage />, guard: 'public', navLabel: 'Home', layout: 'bare' },
   { path: '/about', element: <AboutPage />, guard: 'public', navLabel: 'About' },
-  { path: '/login', element: <LoginPage />, guard: 'public' },
+  { path: '/login', element: <LoginRedirect />, guard: 'public', layout: 'bare' },
   { path: '/register', element: <RegisterPage />, guard: 'public' },
   { path: '/account/check-email', element: <CheckEmailPage />, guard: 'public' },
   { path: '/account/confirm/:token', element: <ConfirmEmailPage />, guard: 'public' },
@@ -132,6 +142,12 @@ export const routes: RouteEntry[] = [
   { path: '/billing', element: <BillingPage />, guard: 'confirmed' },
   { path: '/billing/return', element: <BillingReturnPage />, guard: 'confirmed' },
   { path: '/billing/cancel', element: <BillingCancelPage />, guard: 'confirmed' },
+
+  // ── Dashboard shell ─────────────────────────────────────────────────────
+  // Sections of the dashboard. A section checks its own permission and shows
+  // a "no access" card: the guards' permission fallback is `/`, which would
+  // bounce a signed-in user straight back here.
+  { path: '/health', element: <HealthPage />, guard: 'confirmed', layout: 'shell' },
 
   // ── Admin — gated by Permission.Administer (0x40000000 sentinel) ────────
   {
