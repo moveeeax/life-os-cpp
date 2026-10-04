@@ -31,15 +31,15 @@ baseDomain: tarassov.me
 
 life-os-cpp:
   image:
-    tag: "1.7.2"
+    tag: "1.8.0"
 
 cpp-frontend:
   image:
-    tag: "1.7.2"
+    tag: "1.8.0"
 
 life-os-cpp-worker:
   image:
-    tag: "1.7.2"
+    tag: "1.8.0"
   app:
     baseUrl: https://app.stage.tarassov.me
   worker:
