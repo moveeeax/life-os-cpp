@@ -23,7 +23,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
-          <BrowserRouter>
+          {/* Synchronous navigation, as with react-router 6: the Suspense
+              fallback shows while a lazy page loads instead of the old page
+              staying on screen. */}
+          <BrowserRouter useTransitions={false}>
             <App />
           </BrowserRouter>
         </ToastProvider>

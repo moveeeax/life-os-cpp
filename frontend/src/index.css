@@ -37,6 +37,38 @@
     ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
     'Noto Color Emoji';
 
+  /* Tailwind 3 values of the palette shades in use. Tailwind 4 redefined
+     the palette in oklch, which shifts status badges, alerts and toasts.
+     A shade not listed here renders with the Tailwind 4 value. */
+  --color-amber-50: #fffbeb;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+  --color-amber-700: #b45309;
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+  --color-emerald-700: #047857;
+  --color-green-600: #16a34a;
+  --color-indigo-50: #eef2ff;
+  --color-indigo-300: #a5b4fc;
+  --color-indigo-500: #6366f1;
+  --color-indigo-700: #4338ca;
+  --color-orange-50: #fff7ed;
+  --color-orange-300: #fdba74;
+  --color-orange-500: #f97316;
+  --color-orange-700: #c2410c;
+  --color-red-50: #fef2f2;
+  --color-red-300: #fca5a5;
+  --color-red-500: #ef4444;
+  --color-red-700: #b91c1c;
+  --color-slate-50: #f8fafc;
+  --color-slate-300: #cbd5e1;
+  --color-slate-500: #64748b;
+  --color-slate-700: #334155;
+
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -92,6 +124,14 @@
      the browser's dimming of disabled controls in place. */
   :is(button, input, select, optgroup, textarea):disabled {
     opacity: revert;
+  }
+  /* Tailwind 3 preflight gave buttons the pointer cursor; Tailwind 4 does not. */
+  button,
+  [role='button'] {
+    cursor: pointer;
+  }
+  :disabled {
+    cursor: default;
   }
 }
 

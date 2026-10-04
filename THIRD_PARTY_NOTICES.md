@@ -43,7 +43,7 @@ run a license checker over `frontend/node_modules`.
 | Component | License |
 |---|---|
 | react, react-dom | MIT |
-| react-router-dom | MIT |
+| react-router | MIT |
 | @tanstack/react-query | MIT |
 | react-hook-form, @hookform/resolvers | MIT |
 | zod | MIT |
