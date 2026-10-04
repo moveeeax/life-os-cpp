@@ -4,7 +4,6 @@ import { Shield, ScrollText } from 'lucide-react';
 import { Permission } from '@/lib/auth/permissions';
 
 import { LoginRedirect, RootPage } from '@/pages/Root';
-import { HealthPage } from '@/pages/Health';
 import { AboutPage } from '@/pages/About';
 import { RegisterPage } from '@/pages/Register';
 import { CheckEmailPage } from '@/pages/CheckEmail';
@@ -26,6 +25,8 @@ import { BillingCancelPage } from '@/pages/BillingCancel';
 // so each factory maps the page's named export. App.tsx wraps these routes in
 // a <Suspense> boundary. (named → default shim kept inline to avoid per-page
 // barrel files.)
+// The Health section pulls in the chart library; keep it out of the sign-in bundle.
+const HealthPage = lazy(() => import('@/pages/Health').then((m) => ({ default: m.HealthPage })));
 const AdminDashboardPage = lazy(() =>
   import('@/pages/admin/Dashboard').then((m) => ({ default: m.AdminDashboardPage })),
 );
