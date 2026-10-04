@@ -1,0 +1,76 @@
+# Production values of life-os-cpp in cluster talos-nbg1-tarassov-me,
+# namespace life-os. No secrets here: everything sensitive lives in the
+# Secret life-os-app and arrives via extraEnvFrom.
+
+image:
+  repository: ghcr.io/moveeeax/life-os-cpp
+  tag: "1.7.0"
+
+replicaCount: 1
+
+extraEnvFrom:
+  - secretRef:
+      name: life-os-app
+  # Sync knobs and schedule of the fitness module: deploy/sync-tuning-configmap.yaml.
+  # The scheduled sync timer lives in the API pod.
+  - configMapRef:
+      name: life-os-sync-tuning
+      optional: true
+
+externalDatabase:
+  host: postgresql-rw.db.svc.cluster.local
+  port: 5432
+  name: life_os
+  user: life-os
+  # The password arrives as the DATABASE_PASSWORD variable from life-os-app.
+  password: ""
+  poolSize: 5
+  replicaHost: postgresql-ro.db.svc.cluster.local
+  migrationsEnabled: false
+
+migrations:
+  runAsInitContainer: true
+
+externalRedis:
+  url: "tcp://redis.db.svc.cluster.local:6379"
+  useSentinel: false
+  # Separate logical index: Redis is shared, keys must not collide with other
+  # applications in the cluster. Index 3 is inherited from mi-fitness-api
+  # after it was stopped.
+  db: 3
+
+ingress:
+  enabled: true
+  className: nginx
+  certManager:
+    clusterIssuer: letsencrypt-prod
+  hosts:
+    - host: life-os.tarassov.me
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - hosts: [life-os.tarassov.me]
+      secretName: life-os-tls
+
+auth:
+  cookies:
+    # Login issues tokens as __Host-* cookies, and the middleware reads them
+    # only when the flag is on. Machine access goes via X-API-Key and does not
+    # depend on the flag.
+    enabled: true
+    secure: true
+
+# Enqueueing sync jobs requires an initialized queue on the API side too;
+# the jobs themselves are executed by the worker.
+jobs:
+  enabled: true
+
+fitness:
+  enabled: true
+
+mail:
+  enabled: false
+
+tracing:
+  enabled: false

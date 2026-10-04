@@ -1,0 +1,21 @@
+# CODEOWNERS — auto-assigned reviewers per path.
+# Syntax: https://docs.github.com/en/repositories/managing-your-repositories-settings-and-features/customizing-your-repository/about-code-owners
+#
+# One owner for now. Branch protection that requires code-owner review
+# blocks every PR if a listed owner/team does not exist, so add specialised
+# teams (security, devops, product) only once they exist.
+
+# Default owners (catch-all).
+*                               @moveeeax
+
+# Security-sensitive areas; point at a security team once there is one.
+src/security/                   @moveeeax
+src/api/Api.hpp                 @moveeeax
+
+# Infrastructure.
+docker/                         @moveeeax
+helm/                           @moveeeax
+.github/                        @moveeeax
+
+# Docs / API contract.
+docs/openapi.yaml               @moveeeax

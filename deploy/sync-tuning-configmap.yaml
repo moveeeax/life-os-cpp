@@ -1,0 +1,18 @@
+# Sync knobs of the fitness module for production pods. The binary reads the values:
+# MI_FITNESS_SYNC_TYPE_TIMEOUT - ceiling per data type (docs/CONFIG.md);
+#   with the default 180 seconds a three-month daily_activity backfill does
+#   not finish, and a type is written in one pass after all chunks.
+# MI_FITNESS_HTTP_TIMEOUT - limit for a single request to the cloud.
+# Apply: kubectl apply -f deploy/sync-tuning-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: life-os-sync-tuning
+  namespace: life-os
+data:
+  MI_FITNESS_SYNC_TYPE_TIMEOUT: "1800"
+  MI_FITNESS_HTTP_TIMEOUT: "120"
+  # Scheduled sync: every 4 hours, a window of the last 2 days. The timer lives
+  # in the API pod, so the configmap is attached to both the API and the worker.
+  MI_FITNESS_SYNC_SCHEDULE_HOURS: "4"
+  MI_FITNESS_SYNC_WINDOW_DAYS: "2"

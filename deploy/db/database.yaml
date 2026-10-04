@@ -1,0 +1,13 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: life-os
+  namespace: db
+spec:
+  cluster:
+    name: postgresql
+  name: life_os
+  owner: life-os
+  ensure: present
+  # Deleting the resource must not take the data with it.
+  databaseReclaimPolicy: retain

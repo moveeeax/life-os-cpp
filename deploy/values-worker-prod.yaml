@@ -1,0 +1,50 @@
+# Production values of the life-os-cpp-worker: same namespace, same database
+# and Redis as the API. Secrets via extraEnvFrom from life-os-app.
+
+image:
+  repository: ghcr.io/moveeeax/life-os-cpp-worker
+  tag: "1.7.0"
+
+replicaCount: 1
+
+extraEnvFrom:
+  - secretRef:
+      name: life-os-app
+  - configMapRef:
+      name: life-os-sync-tuning
+      optional: true
+
+externalDatabase:
+  host: postgresql-rw.db.svc.cluster.local
+  port: 5432
+  name: life_os
+  user: life-os
+  password: ""
+  poolSize: 3
+  # Sync writes to the primary; the worker needs no replica.
+  replicaHost: ""
+  migrationsEnabled: false
+
+externalRedis:
+  url: "tcp://redis.db.svc.cluster.local:6379"
+  useSentinel: false
+  db: 3
+
+worker:
+  # The worker pulls only the listed queues: without fitness_sync, sync jobs
+  # would pile up in Redis silently. Mail is off, its queues are not subscribed.
+  types: "fitness_sync"
+  # One sync per system by construction.
+  concurrency: 1
+
+jobs:
+  enabled: true
+
+fitness:
+  enabled: true
+
+mail:
+  enabled: false
+
+tracing:
+  enabled: false
