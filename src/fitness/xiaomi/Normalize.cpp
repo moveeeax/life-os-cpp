@@ -358,6 +358,7 @@ std::vector<Domain::SleepSession> normalize_sleep(const std::vector<nlohmann::js
                                                   std::string_view user_id,
                                                   long& skipped) {
     std::vector<Domain::SleepSession> sessions;
+    std::map<std::string, std::size_t> by_id;  // sleep_id -> index in sessions
     for (const auto& item : records) {
         try {
             const auto payload = detail::parse_value(item);
@@ -416,7 +417,10 @@ std::vector<Domain::SleepSession> normalize_sleep(const std::vector<nlohmann::js
                     ? (item["time"].is_string() ? item["time"].get<std::string>()
                                                 : std::to_string(item["time"].get<std::int64_t>()))
                     : std::to_string(*end);
-            s.sleep_id = sid_part + "_" + time_part;
+            // Identity is the bedtime, not the record time: the cloud keeps
+            // every partial upload of a night as a separate record with the
+            // same bedtime and a later wake-up time.
+            s.sleep_id = sid_part + "_" + std::to_string(*start);
             s.source_record_id = item.contains("time") && !item["time"].is_null() ? time_part : "";
             s.timezone = item.value("zone_name", std::string()).empty() ? "UTC" : item["zone_name"].get<std::string>();
             s.collected_at = s.end_at;
@@ -437,7 +441,15 @@ std::vector<Domain::SleepSession> normalize_sleep(const std::vector<nlohmann::js
             s.is_nap = nap_lower == "true" || nap_lower == "1" || nap_lower == "\"true\"" || nap_lower == "\"1\"" ||
                        nap_lower == "\"yes\"";
             s.source_sid = sleep_source(item.contains("sid") ? item["sid"] : nlohmann::json());
-            sessions.push_back(std::move(s));
+            // Snapshots of one night collapse to the one that ends last.
+            if (const auto it = by_id.find(s.sleep_id); it != by_id.end()) {
+                if (s.end_epoch >= sessions[it->second].end_epoch) {
+                    sessions[it->second] = std::move(s);
+                }
+            } else {
+                by_id.emplace(s.sleep_id, sessions.size());
+                sessions.push_back(std::move(s));
+            }
         } catch (const std::exception&) {
             ++skipped;
         }
