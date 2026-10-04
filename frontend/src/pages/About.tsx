@@ -16,7 +16,7 @@ export function AboutPage() {
             cookies.
           </p>
           <p>
-            Frontend: Vite + React 18 + TanStack Query + react-hook-form + zod + Tailwind +
+            Frontend: Vite + React 19 + TanStack Query + react-hook-form + zod + Tailwind +
             shadcn/ui primitives.
           </p>
         </CardContent>
