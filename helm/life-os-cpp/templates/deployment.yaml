@@ -382,6 +382,10 @@ spec:
               mountPath: /app/logs
             - name: tmp
               mountPath: /tmp
+            # Drogon creates ./uploads/tmp/00..ff at startup and spools large
+            # request bodies there; the root filesystem is read-only.
+            - name: uploads
+              mountPath: /app/uploads
       volumes:
         - name: config
           configMap:
@@ -390,6 +394,11 @@ spec:
           emptyDir: {}
         - name: tmp
           emptyDir: {}
+        # Capped: request bodies land here, so the volume is client-writable.
+        # Past the limit the kubelet evicts the pod instead of filling the node.
+        - name: uploads
+          emptyDir:
+            sizeLimit: 256Mi
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
