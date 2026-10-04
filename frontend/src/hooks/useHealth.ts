@@ -20,19 +20,23 @@ import type {
 const BASE = '/api/v1/fitness';
 
 /** Every row of a paged fitness route for a date range. */
-function fetchRows<T>(route: string, range: DateRange): Promise<T[]> {
+function fetchRows<T>(route: string, range: DateRange, signal?: AbortSignal): Promise<T[]> {
   // The string cast picks the client's untyped overload: the spec types
   // `data` as plain objects, the row types live in lib/health/types.ts.
   const path: string = `${BASE}/${route}`;
   return fetchAllPages<T>((limit, offset) =>
-    api.getJson<Page<T>>(path, { query: { from: range.from, to: range.to, limit, offset } }),
+    api.getJson<Page<T>>(path, {
+      query: { from: range.from, to: range.to, limit, offset },
+      // Leaving a range cancels its remaining pages.
+      signal,
+    }),
   );
 }
 
 function useRows<T>(route: string, range: DateRange) {
   return useQuery({
     queryKey: qk.health.list(route, range.from, range.to),
-    queryFn: () => fetchRows<T>(route, range),
+    queryFn: ({ signal }) => fetchRows<T>(route, range, signal),
   });
 }
 
@@ -68,7 +72,14 @@ export function useStartSync() {
   });
 }
 
-/** Polls a sync run every 3 seconds until its status is final, then refreshes the charts. */
+/** How often a running sync is polled. */
+export const SYNC_POLL_MS = 3000;
+
+/**
+ * Polls a sync run until its status is final, then refreshes the charts.
+ * A failed poll stops the polling: the panel shows the error and lets the
+ * user stop watching or try again.
+ */
 export function useSyncRun(id: number | null) {
   const qc = useQueryClient();
   return useQuery({
@@ -80,8 +91,11 @@ export function useSyncRun(id: number | null) {
       if (isFinalStatus(run.status)) void qc.invalidateQueries({ queryKey: qk.health.all() });
       return run;
     },
-    refetchInterval: (query) =>
-      query.state.data && isFinalStatus(query.state.data.status) ? false : 3000,
+    retry: false,
+    refetchInterval: (query) => {
+      if (query.state.status === 'error') return false;
+      return query.state.data && isFinalStatus(query.state.data.status) ? false : SYNC_POLL_MS;
+    },
   });
 }
 

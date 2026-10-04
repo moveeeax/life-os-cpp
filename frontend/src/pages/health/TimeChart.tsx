@@ -19,6 +19,8 @@ interface TimeChartProps {
   stacked?: boolean;
   /** Axis titles, left then right. */
   yTitles: [string] | [string, string];
+  /** Fixed bounds per axis, left then right; an absent bound is picked by the chart. */
+  yBounds?: { min?: number; max?: number }[];
   /**
    * Draw lines across days without a value (sparse data such as weigh-ins).
    * The x axis becomes a time axis so the spacing between points stays true.
@@ -35,6 +37,7 @@ export function TimeChart({
   series,
   stacked,
   yTitles,
+  yBounds,
   connect,
   format,
   height = 300,
@@ -49,6 +52,8 @@ export function TimeChart({
   const yaxis: ApexOptions['yaxis'] = yTitles.map((text, i) => ({
     seriesName: series.filter((s) => (s.axis ?? 0) === i).map((s) => s.name),
     opposite: i === 1,
+    min: yBounds?.[i]?.min,
+    max: yBounds?.[i]?.max,
     title: { text, style: { color: muted, fontWeight: 400 } },
     labels: {
       style: { colors: muted },

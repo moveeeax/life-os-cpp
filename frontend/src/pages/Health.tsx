@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 
@@ -14,9 +15,13 @@ import {
 import { useMe } from '@/hooks/useMe';
 import { Permission, userCan } from '@/lib/auth/permissions';
 import {
+  MAX_RANGE_DAYS,
+  MIN_DATE,
   PRESETS,
+  alignToDays,
   dailyStats,
   daysInRange,
+  formatDelta,
   formatMinutes,
   inRange,
   localDate,
@@ -24,6 +29,7 @@ import {
   nights,
   parseRange,
   today,
+  validCustomRange,
   weightChange,
   type DateRange,
   type DayStat,
@@ -44,20 +50,8 @@ const C = {
   red: '#f04438',
 };
 
-/** Values aligned to the days of the period; null where a day has none. */
-function byDay<T>(
-  days: string[],
-  rows: T[],
-  date: (r: T) => string,
-  value: (r: T) => number | null,
-) {
-  const map = new Map<string, number | null>();
-  for (const r of rows) map.set(date(r), value(r));
-  return days.map((d) => map.get(d) ?? null);
-}
-
 const statSeries = (days: string[], stats: DayStat[], pick: (s: DayStat) => number) =>
-  byDay(
+  alignToDays(
     days,
     stats,
     (s) => s.date,
@@ -117,7 +111,7 @@ function Tiles({ range }: { range: DateRange }) {
           bNote ??
           (weight.delta === null
             ? `${weight.n} ${weight.n === 1 ? 'measurement' : 'measurements'}`
-            : `${weight.delta > 0 ? '+' : ''}${weight.delta.toFixed(1)} kg over ${weight.n} measurements`)
+            : `${formatDelta(weight.delta)} kg over ${weight.n} measurements`)
         }
       />
     </div>
@@ -156,13 +150,14 @@ function Charts({ range }: { range: DateRange }) {
       >
         <TimeChart
           days={days}
+          yBounds={[{ min: 0 }, { min: 0 }]}
           yTitles={['steps', 'kcal']}
           series={[
             {
               name: 'Steps',
               type: 'column',
               color: C.brand,
-              data: byDay(
+              data: alignToDays(
                 days,
                 act,
                 (r) => r.date,
@@ -174,7 +169,7 @@ function Charts({ range }: { range: DateRange }) {
               type: 'line',
               axis: 1,
               color: C.orange,
-              data: byDay(
+              data: alignToDays(
                 days,
                 act,
                 (r) => r.date,
@@ -195,6 +190,7 @@ function Charts({ range }: { range: DateRange }) {
       >
         <TimeChart
           days={days}
+          yBounds={[{ min: 0 }, { min: 0, max: 100 }]}
           stacked
           yTitles={['minutes', 'score']}
           format={(v, i) => (i < 4 ? formatMinutes(v) : String(v))}
@@ -203,7 +199,7 @@ function Charts({ range }: { range: DateRange }) {
               name: 'Deep',
               type: 'column',
               color: C.brand,
-              data: byDay(
+              data: alignToDays(
                 days,
                 night,
                 (n) => n.date,
@@ -214,7 +210,7 @@ function Charts({ range }: { range: DateRange }) {
               name: 'Light',
               type: 'column',
               color: C.sky,
-              data: byDay(
+              data: alignToDays(
                 days,
                 night,
                 (n) => n.date,
@@ -225,7 +221,7 @@ function Charts({ range }: { range: DateRange }) {
               name: 'REM',
               type: 'column',
               color: C.violet,
-              data: byDay(
+              data: alignToDays(
                 days,
                 night,
                 (n) => n.date,
@@ -236,7 +232,7 @@ function Charts({ range }: { range: DateRange }) {
               name: 'Awake',
               type: 'column',
               color: C.gray,
-              data: byDay(
+              data: alignToDays(
                 days,
                 night,
                 (n) => n.date,
@@ -248,7 +244,7 @@ function Charts({ range }: { range: DateRange }) {
               type: 'line',
               axis: 1,
               color: C.green,
-              data: byDay(
+              data: alignToDays(
                 days,
                 night,
                 (n) => n.date,
@@ -283,7 +279,7 @@ function Charts({ range }: { range: DateRange }) {
               name: 'Resting',
               type: 'line',
               color: C.green,
-              data: byDay(
+              data: alignToDays(
                 days,
                 summary.data ?? [],
                 (r) => r.date,
@@ -304,6 +300,7 @@ function Charts({ range }: { range: DateRange }) {
       >
         <TimeChart
           days={days}
+          yBounds={[{ min: 0, max: 100 }]}
           yTitles={['score']}
           series={[
             {
@@ -340,7 +337,7 @@ function Charts({ range }: { range: DateRange }) {
                 name: 'Weight, kg',
                 type: 'line',
                 color: C.brand,
-                data: byDay(
+                data: alignToDays(
                   days,
                   weighIns,
                   (r) => localDate(r.timestamp),
@@ -351,7 +348,7 @@ function Charts({ range }: { range: DateRange }) {
                 name: 'Muscle, kg',
                 type: 'line',
                 color: C.green,
-                data: byDay(
+                data: alignToDays(
                   days,
                   weighIns,
                   (r) => localDate(r.timestamp),
@@ -363,7 +360,7 @@ function Charts({ range }: { range: DateRange }) {
                 type: 'line',
                 axis: 1,
                 color: C.orange,
-                data: byDay(
+                data: alignToDays(
                   days,
                   weighIns,
                   (r) => localDate(r.timestamp),
@@ -484,56 +481,89 @@ const dateInput =
 
 function PeriodPicker() {
   const [params, setParams] = useSearchParams();
-  const range = parseRange(params, today());
+  const end = today();
+  const range = parseRange(params, end);
 
-  const setCustom = (from: string, to: string) => {
-    if (from && to && from <= to) setParams({ from, to }, { replace: true });
+  // The date inputs edit a draft. A date input reports every keystroke (a
+  // half-typed year arrives as 0002), so the range is applied only on blur or
+  // Enter, and only when it is inside the limits.
+  const [draft, setDraft] = useState({ from: range.from, to: range.to });
+  const [rejected, setRejected] = useState(false);
+  useEffect(() => {
+    setDraft({ from: range.from, to: range.to });
+    setRejected(false);
+  }, [range.from, range.to]);
+
+  const commit = () => {
+    if (draft.from === range.from && draft.to === range.to) return;
+    if (validCustomRange(draft.from, draft.to, end)) {
+      setParams({ from: draft.from, to: draft.to }, { replace: true });
+    } else {
+      setRejected(true);
+    }
+  };
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') commit();
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div
-        className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5 dark:border-gray-800 dark:bg-white/3"
-        role="group"
-        aria-label="Period"
-      >
-        {PRESETS.map((p) => (
-          <button
-            key={p}
-            type="button"
-            aria-pressed={range.preset === p}
-            onClick={() => setParams({ days: String(p) }, { replace: true })}
-            className={cn(
-              'rounded-md px-3 py-2 text-theme-sm font-medium',
-              range.preset === p
-                ? 'bg-brand-500 text-white'
-                : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white',
-            )}
-          >
-            {p} days
-          </button>
-        ))}
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex flex-wrap items-center gap-3">
+        <div
+          className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5 dark:border-gray-800 dark:bg-white/3"
+          role="group"
+          aria-label="Period"
+        >
+          {PRESETS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              aria-pressed={range.preset === p}
+              onClick={() => setParams({ days: String(p) }, { replace: true })}
+              className={cn(
+                'rounded-md px-3 py-2 text-theme-sm font-medium',
+                range.preset === p
+                  ? 'bg-brand-500 text-white'
+                  : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white',
+              )}
+            >
+              {p} days
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            aria-label="From"
+            aria-invalid={rejected}
+            value={draft.from}
+            min={MIN_DATE}
+            max={draft.to || end}
+            onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
+            onBlur={commit}
+            onKeyDown={onKeyDown}
+            className={dateInput}
+          />
+          <span className="text-gray-400">–</span>
+          <input
+            type="date"
+            aria-label="To"
+            aria-invalid={rejected}
+            value={draft.to}
+            min={draft.from || MIN_DATE}
+            max={end}
+            onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))}
+            onBlur={commit}
+            onKeyDown={onKeyDown}
+            className={dateInput}
+          />
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <input
-          type="date"
-          aria-label="From"
-          value={range.from}
-          max={range.to}
-          onChange={(e) => setCustom(e.target.value, range.to)}
-          className={dateInput}
-        />
-        <span className="text-gray-400">–</span>
-        <input
-          type="date"
-          aria-label="To"
-          value={range.to}
-          min={range.from}
-          max={today()}
-          onChange={(e) => setCustom(range.from, e.target.value)}
-          className={dateInput}
-        />
-      </div>
+      {rejected && (
+        <p role="alert" className="text-theme-xs text-error-500">
+          Pick a range of at most {MAX_RANGE_DAYS} days, from {MIN_DATE} to today.
+        </p>
+      )}
     </div>
   );
 }

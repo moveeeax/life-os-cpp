@@ -15,6 +15,11 @@ export const DEFAULT_PRESET: Preset = 30;
 
 const DAY_MS = 86_400_000;
 
+/** Earliest date a custom range may start on. */
+export const MIN_DATE = '2020-01-01';
+/** Longest custom range, in days. Raw samples are aggregated in the browser. */
+export const MAX_RANGE_DAYS = 366;
+
 function isIsoDate(s: string | null): s is string {
   if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
   const d = new Date(`${s}T00:00:00Z`);
@@ -65,18 +70,33 @@ export function daysInRange(range: DateRange): string[] {
   return out;
 }
 
+/**
+ * Whether `from`..`to` is a usable custom range: real dates, in order, not
+ * before MIN_DATE, not after `end` (today), and at most MAX_RANGE_DAYS long.
+ * A date input reports a half-typed year such as 0002; that is rejected here.
+ */
+export function validCustomRange(from: string | null, to: string | null, end: string): boolean {
+  if (!isIsoDate(from) || !isIsoDate(to)) return false;
+  if (from > to || from < MIN_DATE || to > end) return false;
+  const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS + 1;
+  return days <= MAX_RANGE_DAYS;
+}
+
 export interface ParsedRange extends DateRange {
   preset: Preset | 'custom';
 }
 
 /**
  * Period from the URL query: `?days=7|30|90` or `?from=…&to=…`. Anything
- * malformed, reversed or unknown falls back to the default preset.
+ * malformed, reversed, outside the limits or unknown falls back to the
+ * default preset.
  */
 export function parseRange(params: URLSearchParams, end: string): ParsedRange {
   const from = params.get('from');
   const to = params.get('to');
-  if (isIsoDate(from) && isIsoDate(to) && from <= to) return { preset: 'custom', from, to };
+  if (validCustomRange(from, to, end)) {
+    return { preset: 'custom', from: from as string, to: to as string };
+  }
   const days = Number(params.get('days'));
   const preset = (PRESETS as readonly number[]).includes(days) ? (days as Preset) : DEFAULT_PRESET;
   return { preset, ...rangeForDays(preset, end) };
@@ -128,12 +148,12 @@ export interface Night {
 
 /**
  * One night per local wake-up date: the longest session that has stages.
- * Sessions without stages (short daytime sleep) are left out.
+ * Naps and sessions without stages (short daytime sleep) are left out.
  */
 export function nights(sessions: SleepSession[], offsetMin?: number): Night[] {
   const best = new Map<string, SleepSession>();
   for (const s of sessions) {
-    if (!s.stages || s.stages.length === 0) continue;
+    if (s.is_nap || !s.stages || s.stages.length === 0) continue;
     const date = localDate(s.end_at, offsetMin);
     const cur = best.get(date);
     if (!cur || s.duration_minutes > cur.duration_minutes) best.set(date, s);
@@ -187,6 +207,32 @@ export async function fetchAllPages<T>(
     rows.push(...page.data);
     if (page.data.length === 0 || rows.length >= page.total) return rows;
   }
+}
+
+/**
+ * One value per day of `days`: the last row of a day that has a value. A
+ * later row without the value does not erase an earlier one. Days without a
+ * row, and rows outside `days`, give null.
+ */
+export function alignToDays<T>(
+  days: string[],
+  rows: T[],
+  date: (row: T) => string,
+  value: (row: T) => number | null | undefined,
+): (number | null)[] {
+  const byDate = new Map<string, number>();
+  for (const row of rows) {
+    const v = value(row);
+    if (typeof v === 'number' && Number.isFinite(v)) byDate.set(date(row), v);
+  }
+  return days.map((d) => byDate.get(d) ?? null);
+}
+
+/** A change with one decimal and a sign; a change that rounds to zero is `0.0`. */
+export function formatDelta(delta: number): string {
+  const r = Math.round(delta * 10) / 10;
+  if (r === 0) return '0.0';
+  return `${r > 0 ? '+' : ''}${r.toFixed(1)}`;
 }
 
 /** Minutes as `h:mm`. */
