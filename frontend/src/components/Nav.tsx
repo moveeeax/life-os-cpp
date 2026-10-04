@@ -82,7 +82,7 @@ export function Nav() {
         <div className="flex items-center gap-6">
           <Link
             to="/"
-            className="font-semibold rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="font-semibold rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             {BRAND}
           </Link>
@@ -96,7 +96,7 @@ export function Nav() {
                   to={r.path}
                   aria-current={isActive(r.path) ? 'page' : undefined}
                   className={cn(
-                    'flex items-center gap-1 rounded transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                    'flex items-center gap-1 rounded transition-colors hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                     isActive(r.path) ? 'font-medium text-primary' : 'text-muted-foreground',
                   )}
                 >
@@ -124,7 +124,7 @@ export function Nav() {
                   to="/account"
                   aria-current={isActive('/account') ? 'page' : undefined}
                   className={cn(
-                    'rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                    'rounded hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                     isActive('/account') ? 'text-primary' : 'text-muted-foreground',
                   )}
                 >
@@ -134,7 +134,7 @@ export function Nav() {
                   <Link
                     to="/billing"
                     aria-label="Wallet balance"
-                    className="flex items-center gap-1 rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    className="flex items-center gap-1 rounded text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     <Wallet className="h-3.5 w-3.5" />
                     {walletQ.data.data.balance.toLocaleString()}
@@ -184,7 +184,7 @@ export function Nav() {
                   aria-current={isActive(r.path) ? 'page' : undefined}
                   onClick={() => setMenuOpen(false)}
                   className={cn(
-                    'flex items-center gap-2 rounded px-2 py-2 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    'flex items-center gap-2 rounded px-2 py-2 hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
                     isActive(r.path) ? 'font-medium text-primary' : 'text-muted-foreground',
                   )}
                 >
@@ -200,7 +200,7 @@ export function Nav() {
                   aria-current={isActive('/account') ? 'page' : undefined}
                   onClick={() => setMenuOpen(false)}
                   className={cn(
-                    'rounded px-2 py-2 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    'rounded px-2 py-2 hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
                     isActive('/account') ? 'font-medium text-primary' : 'text-muted-foreground',
                   )}
                 >
@@ -211,7 +211,7 @@ export function Nav() {
                     to="/billing"
                     aria-label="Wallet balance"
                     onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-2 rounded px-2 py-2 text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex items-center gap-2 rounded px-2 py-2 text-muted-foreground hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <Wallet className="h-4 w-4" />
                     {walletQ.data.data.balance.toLocaleString()} credits

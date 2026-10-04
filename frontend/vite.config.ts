@@ -1,12 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 
 // In dev, proxy /api/* to the backend so the SPA can call relative URLs
 // and the cookies the backend sets land on the same origin. In prod the
 // frontend container's nginx config does the same proxy_pass.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },

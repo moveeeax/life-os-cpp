@@ -63,7 +63,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-full max-w-sm flex-col gap-2">
+      <div className="pointer-events-none fixed bottom-4 right-4 z-100 flex w-full max-w-sm flex-col gap-2">
         {toasts.map((t) => (
           <ToastItem key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />
         ))}
@@ -85,12 +85,12 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
       className="animate-in slide-in-from-right-4 fade-in pointer-events-auto flex items-start gap-3 rounded-md border border-border bg-card p-3 text-sm text-card-foreground shadow-lg"
     >
       <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', ACCENT[toast.variant])} aria-hidden />
-      <span className="flex-1 break-words">{toast.message}</span>
+      <span className="flex-1 wrap-break-word">{toast.message}</span>
       <button
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss notification"
-        className="shrink-0 rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="shrink-0 rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
       >
         <X className="h-4 w-4" />
       </button>

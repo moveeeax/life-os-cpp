@@ -13,7 +13,7 @@ export function Layout() {
     <div className="min-h-screen flex flex-col">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:shadow focus-visible:ring-2 focus-visible:ring-ring"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:shadow-sm focus-visible:ring-2 focus-visible:ring-ring"
       >
         Skip to main content
       </a>
