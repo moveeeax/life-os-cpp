@@ -26,7 +26,7 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     },
   },
-  // Plain-JS config files at the repo root (tailwind, postcss, this file).
+  // Plain-JS config files at the frontend root (this file).
   {
     files: ['*.js'],
     extends: [js.configs.recommended],
