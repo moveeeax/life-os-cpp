@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ChevronDown, LogOut, Menu, Moon, Sun, User, X } from 'lucide-react';
 
+import { useToast } from '@/components/ui/toaster';
 import { useLogout } from '@/hooks/useAuthMutations';
 import { useMe } from '@/hooks/useMe';
 import { useThemeToggle } from '@/hooks/useThemeToggle';
@@ -17,9 +18,11 @@ const menuItemClass =
 function UserMenu() {
   const user = useMe().data ?? null;
   const logout = useLogout();
+  const toast = useToast();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Close on outside click and on Escape.
   useEffect(() => {
@@ -28,7 +31,10 @@ function UserMenu() {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        buttonRef.current?.focus();
+      }
     };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
@@ -45,24 +51,35 @@ function UserMenu() {
     setOpen(false);
     try {
       await logout.mutateAsync();
-    } finally {
       navigate('/', { replace: true });
+    } catch {
+      toast.error('Could not sign out. Check the connection and try again.');
     }
   };
 
   return (
-    <div className="relative" ref={ref}>
+    <div
+      className="relative"
+      ref={ref}
+      onBlur={(e) => {
+        // Tabbing out of the panel closes it.
+        if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
+      }}
+    >
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
         aria-expanded={open}
+        aria-controls="user-menu"
         className="flex items-center text-gray-700 dark:text-gray-400"
       >
         <span className="me-3 flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-theme-sm font-semibold text-brand-500 dark:bg-brand-500/[0.12] dark:text-brand-400">
           {name.slice(0, 1).toUpperCase()}
         </span>
-        <span className="me-1 block max-w-40 truncate text-theme-sm font-medium">{name}</span>
+        <span className="me-1 hidden max-w-40 truncate text-theme-sm font-medium sm:block">
+          {name}
+        </span>
         <ChevronDown
           className={cn('size-4.5 transition-transform duration-200', open && 'rotate-180')}
           aria-hidden="true"
@@ -71,7 +88,7 @@ function UserMenu() {
 
       {open && (
         <div
-          role="menu"
+          id="user-menu"
           className="absolute inset-e-0 z-50 mt-4.25 flex w-65 flex-col rounded-2xl border border-gray-200 bg-white p-3 shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark"
         >
           <div className="border-b border-gray-200 px-3 pb-3 dark:border-gray-800">
@@ -84,18 +101,13 @@ function UserMenu() {
           </div>
           <ul className="flex flex-col gap-1 pt-3">
             <li>
-              <Link
-                to="/account"
-                role="menuitem"
-                className={menuItemClass}
-                onClick={() => setOpen(false)}
-              >
+              <Link to="/account" className={menuItemClass} onClick={() => setOpen(false)}>
                 <User className="size-5" aria-hidden="true" />
                 Profile
               </Link>
             </li>
             <li>
-              <button type="button" role="menuitem" className={menuItemClass} onClick={signOut}>
+              <button type="button" className={menuItemClass} onClick={signOut}>
                 <LogOut className="size-5" aria-hidden="true" />
                 Sign out
               </button>
@@ -110,7 +122,7 @@ function UserMenu() {
 // Layout and classes after TailAdmin's AppHeader (MIT), without search and
 // notifications.
 export function AppHeader() {
-  const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
+  const { isExpanded, isMobile, isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
   const { dark, toggleTheme } = useThemeToggle();
 
   const onToggle = () => {
@@ -119,13 +131,14 @@ export function AppHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex w-full border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+    <header className="sticky top-0 z-30 flex w-full border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
       <div className="flex grow items-center justify-between gap-2 px-3 py-3 sm:gap-4 xl:px-6 xl:py-4">
         <div className="flex items-center gap-2 sm:gap-4">
           <button
             type="button"
             onClick={onToggle}
             aria-label="Toggle sidebar"
+            aria-expanded={isMobile ? isMobileOpen : isExpanded}
             className={cn(
               'flex h-10 w-10 items-center justify-center rounded-lg border-gray-200 text-gray-500 lg:h-11 lg:w-11 xl:border dark:border-gray-800 dark:text-gray-400',
               isMobileOpen && 'bg-gray-100 dark:bg-white/3',

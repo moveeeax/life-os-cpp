@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router';
-import { Ellipsis, Shield } from 'lucide-react';
+import { Ellipsis, Shield, X } from 'lucide-react';
 
 import { useMe } from '@/hooks/useMe';
 import { userIsAdmin } from '@/lib/auth/permissions';
@@ -13,7 +13,8 @@ import { useSidebar } from './SidebarContext';
 // Layout and classes after TailAdmin's AppSidebar (MIT), reduced to a flat
 // list: no submenus, no i18n, lucide icons instead of bundled SVGs.
 export function AppSidebar() {
-  const { isExpanded, isMobileOpen, isHovered, setIsHovered, setIsMobileOpen } = useSidebar();
+  const { isExpanded, isMobile, isMobileOpen, isHovered, setIsHovered, setIsMobileOpen } =
+    useSidebar();
   const location = useLocation();
   const user = useMe().data ?? null;
   const wide = isExpanded || isHovered || isMobileOpen;
@@ -22,6 +23,20 @@ export function AppSidebar() {
   useEffect(() => {
     setIsMobileOpen(false);
   }, [location.pathname, setIsMobileOpen]);
+
+  // Escape closes the drawer.
+  useEffect(() => {
+    if (!isMobileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsMobileOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isMobileOpen, setIsMobileOpen]);
+
+  // A closed drawer is only moved off-screen; `inert` keeps its links out of
+  // the tab order and away from screen readers until it opens.
+  const closedDrawer = isMobile && !isMobileOpen;
 
   const isActive = (path: string) =>
     location.pathname === path || location.pathname.startsWith(`${path}/`);
@@ -33,7 +48,6 @@ export function AppSidebar() {
         <li key={s.key}>
           <span
             className={cn('menu-item menu-item-disabled', !wide && 'xl:justify-center')}
-            aria-disabled="true"
             title={`${s.label} (soon)`}
           >
             <Icon className="size-6 shrink-0" aria-hidden="true" />
@@ -54,6 +68,7 @@ export function AppSidebar() {
       <li key={s.key}>
         <Link
           to={s.path}
+          aria-label={s.label}
           aria-current={active ? 'page' : undefined}
           className={cn(
             'group menu-item',
@@ -81,16 +96,29 @@ export function AppSidebar() {
         wide ? 'w-72.5' : 'w-22.5',
         isMobileOpen ? 'translate-x-0' : '-translate-x-full',
       )}
+      inert={closedDrawer}
       onMouseEnter={() => !isExpanded && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onFocus={() => !isExpanded && !isMobile && setIsHovered(true)}
+      onBlur={() => setIsHovered(false)}
     >
-      <div className={cn('flex py-8', wide ? 'justify-start' : 'xl:justify-center')}>
+      <div className={cn('flex items-center py-8', wide ? 'justify-between' : 'xl:justify-center')}>
         <Link
           to={DASHBOARD_HOME}
           className="text-theme-xl font-semibold text-gray-800 dark:text-white/90"
         >
           {wide ? BRAND : BRAND.slice(0, 1)}
         </Link>
+        {isMobileOpen && (
+          <button
+            type="button"
+            onClick={() => setIsMobileOpen(false)}
+            aria-label="Close menu"
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5"
+          >
+            <X className="size-6" aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       <div className="no-scrollbar flex flex-1 flex-col overflow-y-auto duration-300 ease-linear">
@@ -112,6 +140,7 @@ export function AppSidebar() {
               <li>
                 <Link
                   to="/admin"
+                  aria-label="Admin"
                   className={cn('group menu-item menu-item-inactive', !wide && 'xl:justify-center')}
                 >
                   <Shield className="menu-item-icon-inactive size-6 shrink-0" aria-hidden="true" />

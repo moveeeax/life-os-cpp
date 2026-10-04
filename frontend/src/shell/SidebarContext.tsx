@@ -4,6 +4,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 // desktop, a drawer below the xl breakpoint, and hover-to-expand for the rail.
 interface SidebarState {
   isExpanded: boolean;
+  /** True below the xl breakpoint, where the sidebar is a drawer. */
+  isMobile: boolean;
   isMobileOpen: boolean;
   isHovered: boolean;
   toggleSidebar: () => void;
@@ -45,6 +47,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     <SidebarContext.Provider
       value={{
         isExpanded: isMobile ? false : isExpanded,
+        isMobile,
         isMobileOpen,
         isHovered,
         toggleSidebar: () => setIsExpanded((v) => !v),
