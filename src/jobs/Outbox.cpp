@@ -1,7 +1,7 @@
 /**
  * @file Outbox.cpp
- * @brief Body for src/jobs/Outbox.hpp — compiled once into app_core (ADR 0003
- *        as amended 2026-08-22). The only jobs TU that includes the Database
+ * @brief Body for src/jobs/Outbox.hpp — compiled once into app_core (docs/ARCHITECTURE.md
+ *        §4). The only jobs TU that includes the Database
  *        layer (edge declared in docs/module-deps.txt).
  */
 

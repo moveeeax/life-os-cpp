@@ -244,7 +244,7 @@ with open(path, "a", encoding="utf-8") as fh:
 PY
 }
 
-# 4. An unversioned /api route re-entering the registry — the ADR 0006
+# 4. An unversioned /api route re-entering the registry — the docs/ARCHITECTURE.md §7
 #    violation the versioning lint exists to stop.
 break_unversioned_registry_row() {
     python3 - "$1/src/api/Endpoints.hpp" <<'PY'

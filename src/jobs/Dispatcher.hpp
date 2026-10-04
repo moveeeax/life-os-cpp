@@ -10,7 +10,7 @@
  *        worker routes straight to the DLQ (no retry storm).
  *
  * Non-trivial bodies live in Dispatcher.cpp (compiled once into app_core;
- * ADR 0003 as amended 2026-08-22). The nlohmann json alias arrives via
+ * docs/ARCHITECTURE.md §4). The nlohmann json alias arrives via
  * jobs/Job.hpp.
  */
 

@@ -70,7 +70,7 @@
 /// Reject with 403 unless the caller's email is confirmed (401 if anonymous).
 /// No-op when auth is disabled. The confirmed flag is minted into the access
 /// JWT but NOT enforced by default — gate your domain's confirmation-required
-/// routes with this. flask-base parity: @confirmed_required.
+/// routes with this.
 #define API_REQUIRE_CONFIRMED(req, callback)                            \
     do {                                                                \
         if (auto _guard_err = Security::Auth::require_confirmed(req)) { \

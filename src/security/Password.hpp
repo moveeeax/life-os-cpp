@@ -2,9 +2,7 @@
  * @file Password.hpp
  * @brief Password hashing — argon2id via libsodium.
  *
- * flask-base parity: app/models/user.py uses werkzeug's
- * generate_password_hash + check_password_hash (PBKDF2-SHA256 by default).
- * We pick argon2id instead — it's the OWASP recommendation for password
+ * We pick argon2id — it's the OWASP recommendation for password
  * storage, libsodium ships a tested implementation, and the resulting
  * hash string is self-contained (`$argon2id$v=...$m=...$t=...$p=...$salt$hash`)
  * so we don't need a separate salt column.

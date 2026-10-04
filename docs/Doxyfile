@@ -1,9 +1,9 @@
-# Doxyfile for C++ API Template
+# Doxyfile for life-os-cpp
 
 # Project information
-PROJECT_NAME           = "C++ API Template"
+PROJECT_NAME           = "life-os-cpp"
 PROJECT_NUMBER         = 1.0.0
-PROJECT_BRIEF          = "Modular C++20 API Template with Drogon, PostgreSQL, Redis, and Kafka"
+PROJECT_BRIEF          = "C++20 REST service on Drogon with PostgreSQL and Redis"
 OUTPUT_DIRECTORY       = docs
 
 # Input configuration

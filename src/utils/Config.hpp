@@ -6,7 +6,7 @@
  *
  * Non-template bodies (file load/parse, ${VAR} expansion, path lookup, the
  * global instance lifecycle) live in Config.cpp (compiled once into app_core;
- * ADR 0003 as amended 2026-08-22). The typed accessors get / require /
+ * docs/ARCHITECTURE.md §4). The typed accessors get / require /
  * get_optional are templates and stay here. NOTE the spdlog include is
  * load-bearing and deliberate: the get<T> template body logs the
  * present-but-wrong-type case at ERROR (see its doc), so every including TU

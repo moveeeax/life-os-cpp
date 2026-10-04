@@ -58,9 +58,8 @@ void AdminController::createUser(const HttpRequestPtr& req, std::function<void(c
 
     with_repo_errors(callback, "admin createUser", [&] {
         const std::string hash = Security::Password::hash(body["password"].get<std::string>());
-        // Admin-created users land already-confirmed by default —
-        // matches flask-base where /admin/new-user skips the email
-        // confirmation step.
+        // Admin-created users land already-confirmed by default: the
+        // admin flow skips the email confirmation step.
         Repositories::UserRepository users;
         auto created = users.create(body["email"].get<std::string>(),
                                     hash,
@@ -136,7 +135,7 @@ void AdminController::updateUser(const HttpRequestPtr& req,
         return;
 
     // Self-protection: an admin can't change their own role away from
-    // admin (flask-base does the same check). Otherwise the very last
+    // admin. Otherwise the very last
     // admin can lock everyone out by accident.
     auto principal = Security::Auth::principal_of(req);
     const bool changing_self = principal && principal->subject == id;
@@ -196,8 +195,7 @@ void AdminController::deleteUser(const HttpRequestPtr& req,
     API_REQUIRE_ADMIN(req, callback);
     if (!require_user_id(id, callback))
         return;
-    // Self-protection — flask-base parity: app/admin/views.py
-    // delete_user explicitly refuses to delete current_user.
+    // Self-protection: an admin cannot delete their own account.
     auto principal = Security::Auth::principal_of(req);
     if (principal && principal->subject == id) {
         callback(ErrorResponse::bad_request("self_delete", "You cannot delete your own account; ask another admin"));

@@ -45,7 +45,7 @@ TEST(MessagingGuardTest, InitThrowsOnDoubleInitAndShutdownResets) {
 }
 
 // Smoke over the public API surface below Messaging::get() — the accessor
-// guards that forks hit first when wiring a producer/consumer. None of this
+// guards hit first when wiring a producer/consumer. None of this
 // touches librdkafka objects: everything must throw/report BEFORE any broker
 // I/O could happen.
 TEST(MessagingGuardTest, SystemAccessorsGuardBeforeComponentInit) {

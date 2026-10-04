@@ -5,7 +5,7 @@
  *        admin wallet-adjustment notices.
  *
  * Declarations only — the bodies live in BillingEmails.cpp (compiled once
- * into app_core; ADR 0003 as amended 2026-08-22).
+ * into app_core; docs/ARCHITECTURE.md §4).
  *
  * Routed through Email::SendEmail::send() (src/email/GenericEmail.hpp) — the
  * generic ad-hoc "email.send" job type, NOT a new job kind. Every public

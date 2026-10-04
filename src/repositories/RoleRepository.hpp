@@ -1,8 +1,6 @@
 /**
  * @file RoleRepository.hpp
  * @brief All SQL touching `roles` lives here.
- *
- * flask-base parity: app/models/user.py — Role queries via SQLAlchemy.
  */
 
 #pragma once

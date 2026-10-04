@@ -2,9 +2,8 @@
  * @file UserRepository.hpp
  * @brief All SQL touching `users` lives here.
  *
- * flask-base parity: app/models/user.py + the queries scattered across
- * app/account/views.py and app/admin/views.py. Everything is funnelled
- * through one class so controllers never touch pqxx directly.
+ * Everything is funnelled through one class so controllers never touch
+ * pqxx directly.
  *
  * Constraint violations surface as typed exceptions (DuplicateEmail,
  * UserNotFound) so the HTTP layer can map them to 409/404 without

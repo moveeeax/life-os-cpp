@@ -16,7 +16,7 @@
  *          It catches the GENERIC bases (Repositories::NotFoundError /
  *          ConflictError, defined in RepoErrors.hpp), NOT the concrete domain
  *          exceptions — so this header does not depend on UserRepository /
- *          RoleRepository, and a forked domain's own NotFoundError/ConflictError
+ *          RoleRepository, and any other domain's own NotFoundError/ConflictError
  *          subclasses map automatically with no edit here.
  */
 
@@ -88,7 +88,7 @@ inline bool with_repo_errors(const std::function<void(const drogon::HttpResponse
  *        throwing side effect can log, but can never be translated into a
  *        SECOND cb(...) invocation after the response was already sent.
  *
- * Incident this encodes (downstream billing fork, site cd8279c): a
+ * Incident this encodes: a
  * receipt-email dispatch placed INSIDE the guarded lambda threw after
  * callback() had already fired the success response; with_repo_errors' own
  * catch then mapped the throw and invoked callback() a second time. The fix

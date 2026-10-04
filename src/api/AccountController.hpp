@@ -3,16 +3,14 @@
  * @brief Account self-service: confirm-email, reset-password, change-email,
  *        change-password, resend-confirm.
  *
- * flask-base parity: app/account/views.py — same flows, JSON endpoints
- * instead of HTML+flash. Token routes accept the token as a path
- * segment so links in emails Just Work without query-string mangling.
+ * Token routes accept the token as a path segment so links in emails
+ * work without query-string mangling.
  *
  * All these handlers are intentionally minimal — render template,
- * issue Tokens, persist via UserRepository. No business logic beyond
- * what flask-base already specified.
+ * issue Tokens, persist via UserRepository.
  *
  * Declarations only — the handler bodies live in AccountController.cpp
- * (compiled once into app_core; ADR 0003 as amended 2026-08-22). The route
+ * (compiled once into app_core; docs/ARCHITECTURE.md §4). The route
  * macros (ADD_METHOD_TO) must stay in this header: Drogon's METHOD_LIST
  * registration is part of the class definition, and
  * scripts/check-routes-registered.sh greps the src/api headers for them.
@@ -71,8 +69,7 @@ public:
     // POST /api/account/reset-password-request
     //
     // Public. Body: { email }. Always returns 200 — we never reveal
-    // whether the email is registered (flask-base does the same with
-    // its flash message wording).
+    // whether the email is registered.
     // ---------------------------------------------------------------------
     void requestReset(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
 
@@ -90,7 +87,7 @@ public:
     //
     // Body: { new_email, password }. Verifies current password, mints
     // a token bearing the new_email, sends confirmation email to the
-    // *new* address (not the old one — flask-base behaviour).
+    // *new* address (not the old one).
     // ---------------------------------------------------------------------
     void requestChangeEmail(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
 
@@ -109,7 +106,7 @@ public:
     //
     // Public — the link in the admin invitation email points here. Verifies
     // the Invite token, sets the invitee's first password and confirms the
-    // account in a single write. flask-base parity: /join-from-invite/<token>.
+    // account in a single write.
     // ---------------------------------------------------------------------
     void joinFromInvite(const HttpRequestPtr& req,
                         std::function<void(const HttpResponsePtr&)>&& callback,
@@ -120,8 +117,8 @@ public:
     //
     // Body: { old_password, new_password }. Verifies the old password
     // against the stored hash; updates the hash. Doesn't invalidate
-    // existing sessions — that's a deliberate trade-off matching
-    // flask-base. If you need session-rotation, mint a fresh refresh
+    // existing sessions — that's a deliberate trade-off.
+    // If you need session-rotation, mint a fresh refresh
     // pair after the change.
     // ---------------------------------------------------------------------
     void changePassword(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);

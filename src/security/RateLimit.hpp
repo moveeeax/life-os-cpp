@@ -5,12 +5,12 @@
  *          over a per-identity sorted set — a true trailing window, immune to
  *          the classic 2x burst at fixed-window boundaries.
  *          Fail-open: if Redis is unavailable, requests pass through with a
- *          warning log — we prefer availability over strict enforcement for a
- *          template. Production deployments that need hard caps should set
+ *          warning log — we prefer availability over strict enforcement by
+ *          default. Production deployments that need hard caps should set
  *          fail_open=false (rejects with 503 instead).
  *
  * Declarations only for the non-template bodies — they live in RateLimit.cpp
- * (compiled once into app_core; ADR 0003 as amended 2026-08-22). The
+ * (compiled once into app_core; docs/ARCHITECTURE.md §4). The
  * Config/Decision structs and the Limiter class shape stay here.
  */
 

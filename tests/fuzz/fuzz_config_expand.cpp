@@ -2,8 +2,8 @@
  * @file fuzz_config_expand.cpp
  * @brief libFuzzer harness for Config::detail::expand_string /
  *        substitute_env_placeholders — the ${VAR} / ${VAR:-default}
- *        expansion runs over every string in the config file, which in a
- *        fork may embed operator-supplied text. Oracle: never crash/UB on
+ *        expansion runs over every string in the config file, which
+ *        may embed operator-supplied text. Oracle: never crash/UB on
  *        arbitrary bytes, both on a bare string and recursively through a
  *        JSON document. The environment is cleared and re-seeded in
  *        LLVMFuzzerInitialize so runs are deterministic and the fuzzer can

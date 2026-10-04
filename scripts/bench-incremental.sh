@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
 # Measure warm incremental rebuild time after touching each "hot" header — the
-# DATA GATE for the T1 de-header decision (ADR 0003). The header-only design is
+# DATA GATE for the de-header decision (docs/ARCHITECTURE.md §4). The header-only design is
 # only a problem if editing a hot module forces a slow rebuild; this measures
 # whether it actually does, instead of guessing.
 #
-# Decision rule (ADR 0003): if every hot-header rebuild is under 30s, the
+# Decision rule (docs/ARCHITECTURE.md §4): if every hot-header rebuild is under 30s, the
 # header-only design is fine and breaking it up is premature pessimization. If a
 # module exceeds 30s, THAT module is a candidate for extracting its bodies into
 # a single compiled object (the `app_core` static library), not the whole tree.
@@ -65,9 +65,9 @@ echo ""
 if [ "$worst_app" -le 30 ]; then
     echo "==> inner-loop verdict: worst app rebuild ${worst_app}s <= 30s — header-only is FINE for"
     echo "    day-to-day editing. If the FULL column is much larger, that's the 5 executables each"
-    echo "    recompiling the bodies — an app_core static lib (T1 Phase 2) would cut it, helping"
+    echo "    recompiling the bodies — the app_core static lib cuts it, helping"
     echo "    full builds + CI, not the inner loop. Worth it only if full-build/CI time is a pain."
 else
     echo "==> inner-loop verdict: worst app rebuild ${worst_app}s > 30s — even editing the app is"
-    echo "    slow; extract that module's bodies into app_core (T1 Phase 2)."
+    echo "    slow; extract that module's bodies into app_core."
 fi

@@ -161,9 +161,9 @@ TEST_F(DatabaseManagerTest, ExecuteWrite) {
     EXPECT_EQ(result[0][0].template as<std::string>(), "test_value");
 }
 
-// --- execute_transaction / execute_write_idempotent (fork-facing API) ---
-// Real-Postgres coverage for the two execute_* variants nothing in the
-// template calls in production code — forks do (documented in
+// --- execute_transaction / execute_write_idempotent ---
+// Real-Postgres coverage for the two execute_* variants nothing in
+// production code calls yet (documented in
 // docs/CONVENTIONS.md §3). The unit-level seam only proves they compile and
 // enter the hook (test_database_seam.cpp); these prove the actual semantics.
 

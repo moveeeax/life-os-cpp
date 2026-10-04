@@ -1,7 +1,6 @@
 -- Migration 001: users + roles + permission bitmask
--- flask-base parity: app/models/user.py — same shape, different storage.
 --
--- The Permission bitmask values match flask-base's `Permission` class:
+-- Permission bitmask values:
 --   GENERAL     = 0x01
 --   ADMINISTER  = dedicated sentinel bit (0x40000000) — see migration 004.
 --
@@ -35,7 +34,7 @@ CREATE TABLE IF NOT EXISTS roles (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_roles_one_default
     ON roles (is_default) WHERE is_default = TRUE;
 
--- Seed the two starter roles flask-base ships. Idempotent — re-running
+-- Seed the two starter roles. Idempotent — re-running
 -- the migration just no-ops because of the UNIQUE on name.
 INSERT INTO roles (name, permissions, is_default) VALUES
     ('User',          1,    TRUE),    -- 0x01 GENERAL
@@ -48,8 +47,7 @@ CREATE TABLE IF NOT EXISTS users (
     email         CITEXT       UNIQUE NOT NULL,
     -- argon2id hash from libsodium (crypto_pwhash_str). NULL is allowed so
     -- the invite flow can create a row before the user sets their own
-    -- password — exactly like flask-base's User.password_hash being
-    -- nullable until /join-from-invite/.
+    -- password (nullable until join-from-invite).
     password_hash TEXT,
     first_name    VARCHAR(64),
     last_name     VARCHAR(64),
@@ -64,7 +62,6 @@ CREATE INDEX IF NOT EXISTS idx_users_role_id ON users (role_id);
 CREATE INDEX IF NOT EXISTS idx_users_confirmed ON users (confirmed) WHERE confirmed = FALSE;
 
 -- updated_at trigger ----------------------------------------------------
--- flask-base parity: SQLAlchemy event hooks; we use a plain SQL trigger.
 CREATE OR REPLACE FUNCTION users_touch_updated_at() RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = now();

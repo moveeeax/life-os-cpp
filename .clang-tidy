@@ -1,5 +1,5 @@
 ---
-# Enterprise baseline for a C++20 service template.
+# Enterprise baseline for a C++20 service.
 # Philosophy: catch real bugs + modernize idioms, avoid pedantic noise.
 # Tighten the ignore list over time; errors-as-warnings should shrink toward zero.
 Checks: >

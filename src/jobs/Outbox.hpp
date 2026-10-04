@@ -60,7 +60,7 @@ inline constexpr int kStaleClaimSec = 300;
  *        from Database::execute_write / execute_transaction
  *        (Database::detail::TracingTxn — only exec/exec_params are used).
  *        @p kind must be a job type a worker handles (jobs/BuiltinHandlers.cpp
- *        or a fork-registered handler); @p payload is passed to Jobs::submit
+ *        or any other registered handler); @p payload is passed to Jobs::submit
  *        verbatim. Throws on SQL failure — which rolls the caller's
  *        transaction back, exactly the atomicity the pattern promises.
  */

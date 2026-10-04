@@ -764,7 +764,7 @@ jobs:
   tsan:
     runs-on: ubuntu-latest
     # ThreadSanitizer over the unit AND integration/api buckets. The codebase
-    # leans on inline singletons + atomics (ADR 0004) — exactly where races
+    # leans on inline singletons + atomics (docs/ARCHITECTURE.md §5) — exactly where races
     # hide, and the integration bucket is where the connection pools, the job
     # queue and the cache actually run multi-threaded against real
     # Postgres/Redis. Kept apart from the ASan job: TSan can't share a

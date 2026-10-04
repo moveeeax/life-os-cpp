@@ -11,8 +11,8 @@
  *          is worse than a rare double-processing.
  *
  * Declarations only for the non-template bodies — they live in
- * Idempotency.cpp (compiled once into app_core; ADR 0003 as amended
- * 2026-08-22). The Config struct and the attribute keys below stay here.
+ * Idempotency.cpp (compiled once into app_core; docs/ARCHITECTURE.md
+ * §4). The Config struct and the attribute keys below stay here.
  */
 
 #pragma once

@@ -7,8 +7,8 @@
  *        and only a live worker run would notice.
  *
  * Declaration only — the body (and its email/webhooks dependencies) lives in
- * BuiltinHandlers.cpp, compiled once into app_core (ADR 0003 as amended
- * 2026-08-22). That keeps jobs headers free of email/webhooks includes: the
+ * BuiltinHandlers.cpp, compiled once into app_core (docs/ARCHITECTURE.md
+ * §4). That keeps jobs headers free of email/webhooks includes: the
  * jobs→email header edge was one half of the email↔jobs include cycle.
  */
 

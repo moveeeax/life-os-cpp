@@ -6,7 +6,7 @@
  * The key property under test is DECOUPLING: the helper catches the generic
  * Repositories::NotFoundError / ConflictError bases, so a repository exception
  * it has never heard of — only deriving from those bases — still maps to the
- * right status without any edit to HandlerSupport. A forked domain that deletes
+ * right status without any edit to HandlerSupport. A domain without
  * User/Role keeps working.
  */
 

@@ -4,7 +4,7 @@
  * @details Orchestrates initialization and shutdown of all subsystems.
  *
  * Declarations only — the bodies live in Core.cpp (compiled once into
- * app_core; ADR 0003 as amended 2026-08-22): including this header no
+ * app_core; docs/ARCHITECTURE.md §4): including this header no
  * longer pulls the 13 subsystem headers (database/pqxx, cache/redis++,
  * jobs, Kafka, PayPal, mailer, storage, OTel/prometheus, ...) into the
  * including TU — those includes moved to Core.cpp. Only the binary entry

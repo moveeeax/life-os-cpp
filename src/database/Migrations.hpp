@@ -6,8 +6,8 @@
  *
  * Non-template bodies (directory scan, checksum verification, the
  * transactional/no-transaction apply paths and the global-instance
- * lifecycle) live in Migrations.cpp (compiled once into app_core; ADR 0003
- * as amended 2026-08-22) — so database/Database.hpp is no longer exposed to
+ * lifecycle) live in Migrations.cpp (compiled once into app_core; docs/ARCHITECTURE.md
+ * §4) — so database/Database.hpp is no longer exposed to
  * including TUs.
  */
 

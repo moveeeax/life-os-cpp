@@ -5,7 +5,7 @@
  *          using Redis lists (LPUSH/BRPOP) for distributed work queues.
  *
  * Declarations only — the bodies live in Jobs.cpp (compiled once into
- * app_core; ADR 0003 as amended 2026-08-22): including this header no
+ * app_core; docs/ARCHITECTURE.md §4): including this header no
  * longer pulls redis++/spdlog/Cache/Trace into the including TU. The
  * nlohmann json alias arrives via jobs/Job.hpp.
  */

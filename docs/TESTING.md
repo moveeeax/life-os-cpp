@@ -127,7 +127,7 @@ the curl TU), and anything needing Drogon types.
   instead of skipping it green). The **e2e** binary is still uninstrumented.
   Historical note: integration was unit-only for a while — compiling its TUs
   under ASan OOM'd an 8 GB build VM back when every heavy body was header-only;
-  the `app_core` STATIC extraction (ADR 0003 as amended) compiles those bodies
+  the `app_core` STATIC extraction (`ARCHITECTURE.md` §4) compiles those bodies
   once and removed the blocker.
 
 ## A disabled test that marks a real bug

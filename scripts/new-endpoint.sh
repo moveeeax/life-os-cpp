@@ -59,7 +59,7 @@ NAME="${ARGS[0]}"       # e.g. OrdersController
 METHOD_RAW="${ARGS[1]}" # Get | Post | Put | Delete | Patch
 ROUTE="${ARGS[2]}"      # e.g. /api/v1/orders
 
-# Enforce the versioning convention (docs/adr/0001-api-versioning.md): an API
+# Enforce the versioning convention (docs/ARCHITECTURE.md §7): an API
 # route must be /api/v<N>/... . Hard-reject (don't auto-prefix — that risks
 # /api/v1/api/v1/orders). Bare infra/probe routes are allowed unversioned.
 case "$ROUTE" in
@@ -67,7 +67,7 @@ case "$ROUTE" in
 /api/v[0-9]*/*) ;;                             # correctly versioned
 /api/*)
     echo "ERROR: API route '$ROUTE' must be versioned as /api/v<N>/... (e.g. /api/v1/orders)." >&2
-    echo "       See docs/adr/0001-api-versioning.md." >&2
+    echo "       See docs/ARCHITECTURE.md §7." >&2
     exit 2
     ;;
 esac

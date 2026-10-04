@@ -4,9 +4,6 @@ Drop numbered `.sql` files here — the `MigrationRunner` picks them
 up on boot, applies any that aren't already in `schema_migrations`, and
 records what it did. Naming: `NNN_description.sql` (e.g. `001_users.sql`).
 
-A starter schema lives in [`docs/EXAMPLES.md`](../docs/EXAMPLES.md) if you
-want a worked example.
-
 ## Generating a new migration
 
 ```bash

@@ -64,8 +64,8 @@ namespace Api {
  *          Tracing is registered on the pre-handling path so the server span
  *          is opened only for requests that will actually reach a handler.
  *
- *          The body lives in Api.cpp (compiled once into app_core; ADR 0003
- *          as amended 2026-08-22) — it, not this header, pulls spdlog.
+ *          The body lives in Api.cpp (compiled once into app_core; docs/ARCHITECTURE.md
+ *          §4) — it, not this header, pulls spdlog.
  */
 void register_controllers();
 

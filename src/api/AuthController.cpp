@@ -1,7 +1,7 @@
 /**
  * @file AuthController.cpp
  * @brief Bodies for src/api/AuthController.hpp — compiled once into
- *        app_core. Contract and flask-base parity notes are documented on
+ *        app_core. Contract notes are documented on
  *        the declarations in the header.
  */
 

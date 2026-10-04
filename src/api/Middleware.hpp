@@ -7,7 +7,7 @@
  *          Api::register_controllers() in Api.hpp.
  *
  * Declarations only — the bodies live in Middleware.cpp (compiled once into
- * app_core; ADR 0003 as amended 2026-08-22): including this header no longer
+ * app_core; docs/ARCHITECTURE.md §4): including this header no longer
  * pulls the OTel SDK, spdlog or the security module headers
  * (Auth/RateLimit/Idempotency/Csrf/ApiKeys) into the including TU. Only the
  * drogon request/response types survive in the signatures.

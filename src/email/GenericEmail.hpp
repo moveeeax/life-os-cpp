@@ -8,7 +8,7 @@
  *        so Jobs drives at-least-once delivery.
  *
  * Declarations only — the bodies live in GenericEmail.cpp (compiled once
- * into app_core; ADR 0003 as amended 2026-08-22). That's also where the
+ * into app_core; docs/ARCHITECTURE.md §4). That's also where the
  * jobs/Jobs.hpp include lives now — this header no longer contributes to
  * the email→jobs half of the include graph (same move as
  * Email::detail::via_jobs() in Mailer.cpp).

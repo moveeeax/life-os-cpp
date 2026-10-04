@@ -180,8 +180,7 @@ void MigrationRunner::initialize(const std::string& dir) {
         if (auto it = applied.find(mf.version); it != applied.end()) {
             // The runner keys on the VERSION NUMBER: a database that
             // recorded this version will never re-run the file, so an
-            // in-place edit silently never reaches it (bit a downstream
-            // fork on a billing migration — site 008_billing_refunds).
+            // in-place edit silently never reaches it.
             // The checksum turns that silent divergence into a boot
             // failure.
             if (!it->second.empty() && it->second != checksum) {

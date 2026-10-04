@@ -3,8 +3,7 @@
  * @brief Header-only CRTP base that supplies the mechanical read methods
  *        (find / list / count) every table repository otherwise re-implements,
  *        so a new resource only declares its table + columns and overrides the
- *        bespoke queries. The single biggest fork-velocity lever, and it stays
- *        header-only.
+ *        bespoke queries. Stays header-only.
  *
  * A derived repo provides four static constants and an Entity with from_row():
  *   class FooRepository : public CrudBase<FooRepository, Domain::Foo, std::string> {

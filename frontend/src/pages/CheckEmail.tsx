@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 /**
  * Static page shown right after Register. The backend has fired the
- * confirmation email but we don't auto-log-in (flask-base parity).
+ * confirmation email but we don't auto-log-in.
  */
 export function CheckEmailPage() {
   const location = useLocation();
