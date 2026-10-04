@@ -6,6 +6,30 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-10-05
+
+### Added
+- Health section of the dashboard (`/health`): tiles (steps, sleep, resting
+  heart rate, weight), per-day charts of activity, sleep stages and score, heart
+  rate, stress and body composition, tables of SpO2 and workouts, all over the
+  existing `/api/v1/fitness/*` routes for a period of 7, 30 or 90 days or a
+  custom range kept in the URL. Users with `fitness:sync` also get the coverage
+  table, a form that starts a sync run and follows it to completion, and a cloud
+  connection check. Charts use ApexCharts.
+- Dashboard shell in the frontend, adapted from TailAdmin React: `/` is a
+  full-screen sign-in form for a guest and a redirect to `/health` for a signed-in
+  user, `/login` redirects to `/`, and `/health` opens inside a sidebar layout
+  that lists the Life OS sections (Health is active, the rest are marked "soon").
+  The Health page is a placeholder until its charts ship. Admin and account pages
+  keep their layout. `deploy/values-frontend-prod.yaml` holds the prod values of
+  the frontend chart.
+
+### Changed
+- Frontend toolchain upgraded: React 19, Tailwind 4 (Vite plugin, theme in
+  `src/index.css`, no `tailwind.config.js` or PostCSS config), Vite 8, vitest 5,
+  `react-router` 8 in place of `react-router-dom` 6. The frontend image and the
+  CI jobs that install frontend dependencies run on Node 22. No page changes.
+
 ## [1.7.2] - 2026-10-04
 
 ### Changed
