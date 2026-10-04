@@ -24,6 +24,12 @@ function ShellContent() {
   const { isExpanded, isHovered } = useSidebar();
   return (
     <div className="min-h-screen bg-gray-50 font-outfit text-gray-800 xl:flex dark:bg-gray-950 dark:text-white/90">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:inset-s-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-gray-800 focus:shadow-theme-md"
+      >
+        Skip to main content
+      </a>
       <AppSidebar />
       <Backdrop />
       <div

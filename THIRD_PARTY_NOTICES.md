@@ -60,9 +60,12 @@ append its contents here.
 
 ## Derived work — TailAdmin
 
-The dashboard shell and the sign-in page of the frontend (`frontend/src/shell/`,
-`frontend/src/pages/SignIn.tsx`, and the tokens and menu utilities marked as
-such in `frontend/src/index.css`) are adapted from
+The dashboard shell and the sign-in page of the frontend are adapted from
+TailAdmin: the layout and class lists of `AppShell.tsx`, `AppSidebar.tsx`,
+`AppHeader.tsx` and `SidebarContext.tsx` in `frontend/src/shell/`, of
+`frontend/src/pages/SignIn.tsx`, the card classes of the dashboard pages, and
+the tokens and menu utilities marked as such in `frontend/src/index.css`.
+Source:
 **[TailAdmin React](https://github.com/TailAdmin/free-react-tailwind-admin-dashboard)**,
 which is MIT-licensed.
 
