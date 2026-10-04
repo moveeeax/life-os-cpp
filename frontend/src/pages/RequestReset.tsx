@@ -1,6 +1,6 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import type { z } from 'zod';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
