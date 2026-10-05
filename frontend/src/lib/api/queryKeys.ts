@@ -23,6 +23,15 @@ export const qk = {
     coverage: () => ['health', 'coverage'] as const,
     syncRun: (id: number) => ['health-sync-run', id] as const,
   },
+  /** Workout section. Lists are keyed under a prefix so one write invalidates every variant. */
+  workout: {
+    exercises: (filter?: Record<string, string>) =>
+      filter === undefined
+        ? (['workout', 'exercises'] as const)
+        : (['workout', 'exercises', JSON.stringify(filter)] as const),
+    routines: () => ['workout', 'routines'] as const,
+    routine: (id: string) => ['workout', 'routine', id] as const,
+  },
   admin: {
     users: (page?: number) =>
       page === undefined ? (['admin', 'users'] as const) : (['admin', 'users', page] as const),
