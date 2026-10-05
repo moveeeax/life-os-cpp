@@ -10,8 +10,10 @@ import { cn } from '@/lib/utils';
 import { cardClass, secondaryButton } from './styles';
 
 const TABS = [
-  { to: '/workout/routines', label: 'Routines' },
-  { to: '/workout/exercises', label: 'Exercises' },
+  { to: '/workout', label: 'Overview', end: true },
+  { to: '/workout/routines', label: 'Routines', end: false },
+  { to: '/workout/exercises', label: 'Exercises', end: false },
+  { to: '/workout/history', label: 'History', end: false },
 ];
 
 interface WorkoutFrameProps {
@@ -59,9 +61,10 @@ export function WorkoutFrame({ title, actions, children }: WorkoutFrameProps) {
           <NavLink
             key={tab.to}
             to={tab.to}
+            end={tab.end}
             className={({ isActive }) =>
               cn(
-                'rounded-lg px-4 py-2 text-theme-sm font-medium whitespace-nowrap transition',
+                'rounded-lg px-3 py-2 text-theme-sm font-medium whitespace-nowrap transition sm:px-4',
                 isActive
                   ? 'bg-brand-50 text-brand-500 dark:bg-brand-500/12 dark:text-brand-400'
                   : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5',

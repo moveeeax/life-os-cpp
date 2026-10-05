@@ -3,7 +3,8 @@ import { Link, useLocation } from 'react-router';
 import { Ellipsis, Shield, X } from 'lucide-react';
 
 import { useMe } from '@/hooks/useMe';
-import { userIsAdmin } from '@/lib/auth/permissions';
+import { useWorkoutEnabled } from '@/hooks/useWorkoutSession';
+import { Permission, userCan, userIsAdmin } from '@/lib/auth/permissions';
 import { BRAND } from '@/lib/brand';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +19,9 @@ export function AppSidebar() {
   const location = useLocation();
   const user = useMe().data ?? null;
   const wide = isExpanded || isHovered || isMobileOpen;
+  // A section whose backend module is switched off stays a "soon" item.
+  const workoutOn = useWorkoutEnabled(userCan(user, Permission.FitnessRead));
+  const off = workoutOn ? undefined : new Set(['workout']);
 
   // Close the drawer after a navigation on small screens.
   useEffect(() => {
@@ -131,7 +135,7 @@ export function AppSidebar() {
           >
             {wide ? 'Menu' : <Ellipsis className="size-6" aria-hidden="true" />}
           </h2>
-          <ul className="flex flex-col gap-1">{visibleSections(user).map(renderItem)}</ul>
+          <ul className="flex flex-col gap-1">{visibleSections(user, off).map(renderItem)}</ul>
         </nav>
 
         {userIsAdmin(user) && (

@@ -11,6 +11,7 @@ describe('visibleSections', () => {
   it('lists Health first and keeps every not-yet-built section as an inactive item', () => {
     const list = visibleSections(user(Permission.General | Permission.FitnessRead));
     expect(list[0]).toMatchObject({ key: 'health', path: '/health' });
+    expect(list.find((s) => s.key === 'workout')).toMatchObject({ path: '/workout' });
     expect(list.filter((s) => !s.path).map((s) => s.label)).toEqual([
       'Day',
       'Money',
@@ -18,7 +19,6 @@ describe('visibleSections', () => {
       'Goals',
       'Journal',
       'Learning',
-      'Workout',
       'Travel',
       'Work',
       'Freelance',
@@ -27,10 +27,25 @@ describe('visibleSections', () => {
     ]);
   });
 
+  it('shows a section whose module is off as not built yet, in its place', () => {
+    const who = user(Permission.General | Permission.FitnessRead);
+    const list = visibleSections(who, new Set(['workout']));
+    expect(list).toHaveLength(sections.length);
+    expect(list.find((s) => s.key === 'workout')?.path).toBeUndefined();
+    expect(list.map((s) => s.key)).toEqual(sections.map((s) => s.key));
+    // Without the permission the inactive item still shows, like the other unbuilt ones.
+    expect(
+      visibleSections(user(Permission.General), new Set(['workout'])).some(
+        (s) => s.key === 'workout',
+      ),
+    ).toBe(true);
+  });
+
   it('hides Health from a user without fitness:read but keeps the inactive items', () => {
     const list = visibleSections(user(Permission.General));
     expect(list.find((s) => s.key === 'health')).toBeUndefined();
-    expect(list).toHaveLength(sections.length - 1);
+    expect(list.find((s) => s.key === 'workout')).toBeUndefined();
+    expect(list).toHaveLength(sections.length - 2);
   });
 
   it('shows Health to an administrator through the sentinel bit', () => {
