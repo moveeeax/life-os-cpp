@@ -6,6 +6,42 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-10-06
+
+### Added
+- Mi account linking per user (backend). A signed-in user links a Xiaomi
+  account by QR sign-in through `/api/v1/fitness/account/*`: start an attempt,
+  confirm it in a Xiaomi app, and the service verifies the token, finds the
+  account's cloud region and stores the link sealed. The link has a status:
+  `ok`, or `reauth_required` once Xiaomi refuses the stored token. Credentials
+  moved from the single-row `xiaomi_credentials` to `mi_accounts` (one row per
+  user; migration 020 gives the existing account to the oldest administrator).
+- Profile page: a "Mi Fitness" block to link a Xiaomi account by QR sign-in
+  (scan the code in a Xiaomi app, or open the confirmation link on the phone),
+  see whether the saved sign-in still works, check it, pick or detect the cloud
+  region, and unlink with or without the synced data. Health and Workout show
+  "Link your Mi account" to a user without a link instead of empty charts, and
+  Health shows a notice when Xiaomi asks to sign in again.
+
+### Changed
+- Fitness and Workout data are per user. Every fitness route works on the
+  caller's own Mi account: reads return only the rows of that account (a user
+  without a link gets empty lists), a sync run belongs to an account and is
+  visible only to it, and the schedule enqueues one sync per linked account
+  whose token Xiaomi still accepts. Workout readiness, the body-weight snapshot
+  and the match with band data read the session owner's account. The default
+  role `User` gets `fitness:read` and `fitness:sync` (migration 021), so every
+  confirmed user has Health and Workout for their own data. An API key reads
+  the data of its own user: a key issued under another user no longer sees the
+  owner's data.
+
+### Removed
+- The Xiaomi credential seed from the environment: `MI_FITNESS_USER_ID`,
+  `MI_FITNESS_PASS_TOKEN`, `MI_FITNESS_REGION` and `MI_FITNESS_RESEED` are no
+  longer read. An account is linked from the profile; the region is detected
+  per account. `GET /api/v1/fitness/probe` without a linked account answers 409
+  `not_linked` instead of 503 `not_configured`.
+
 ## [1.9.0] - 2026-10-05
 
 ### Added
