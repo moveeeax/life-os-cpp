@@ -3748,7 +3748,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Edit a custom exercise, or the tracking mode and archived flag of a library one */
+        /**
+         * Edit a custom exercise, or the tracking mode and archived flag of a library one
+         * @description A library exercise is shared by every user. Only an administrator can change it, and only its tracking mode and archived flag.
+         */
         patch: {
             parameters: {
                 query?: never;
@@ -3773,7 +3776,7 @@ export interface paths {
                         "application/json": components["schemas"]["ExerciseResponse"];
                     };
                 };
-                /** @description Validation failed, or a content field of a library exercise (library_exercise_read_only) */
+                /** @description Validation failed, or a library exercise changed by a non-administrator or in a content field (library_exercise_read_only) */
                 400: {
                     headers: {
                         [name: string]: unknown;

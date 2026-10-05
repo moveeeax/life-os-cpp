@@ -239,8 +239,11 @@ void WorkoutController::updateExercise(const HttpRequestPtr& req, Callback&& cal
         patch.archived = body["archived"].get<bool>();
     }
 
+    // Library rows are shared by every user: only an administrator edits them.
+    const bool is_admin = Security::Auth::require_admin(req) == nullptr;
+
     with_repo_errors(callback, "workout.updateExercise", [&] {
-        callback(Response::ok(json{{"data", Repositories::ExerciseRepository().update(owner, id, patch)}}));
+        callback(Response::ok(json{{"data", Repositories::ExerciseRepository().update(owner, id, patch, is_admin)}}));
     });
 }
 

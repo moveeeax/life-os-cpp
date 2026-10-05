@@ -129,12 +129,14 @@ public:
     }
 
     /**
-     * @brief Apply a patch. A library row accepts only tracking_mode and
-     *        archived; a patch that touches its content is a ValidationError.
+     * @brief Apply a patch. A library row is shared by every user, so it
+     *        changes only when @p may_edit_library is set (administrators),
+     *        and then only in tracking_mode and archived. Anything else on a
+     *        library row is a ValidationError.
      * @throws ExerciseNotFound when the exercise does not exist or belongs to
      *         someone else.
      */
-    nlohmann::json update(const std::string& owner, const std::string& id, const Patch& p) {
+    nlohmann::json update(const std::string& owner, const std::string& id, const Patch& p, bool may_edit_library) {
         return Database::get().execute_write([&](auto& txn) {
             auto src = txn.exec_params(
                 "SELECT source FROM exercises WHERE id = $2 AND (source = 'library' OR owner_id = $1::uuid)",
@@ -143,7 +145,12 @@ public:
             if (src.empty()) {
                 throw ExerciseNotFound();
             }
-            if (src[0][0].template as<std::string>() == "library" && p.touches_content()) {
+            const bool is_library = src[0][0].template as<std::string>() == "library";
+            if (is_library && !may_edit_library) {
+                throw ValidationError("library_exercise_read_only",
+                                      "only an administrator can change a library exercise");
+            }
+            if (is_library && p.touches_content()) {
                 throw ValidationError("library_exercise_read_only",
                                       "only tracking_mode and archived can be changed on a library exercise");
             }

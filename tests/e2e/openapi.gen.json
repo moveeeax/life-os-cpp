@@ -5812,6 +5812,7 @@
    },
    "patch": {
     "summary": "Edit a custom exercise, or the tracking mode and archived flag of a library one",
+    "description": "A library exercise is shared by every user. Only an administrator can change it, and only its tracking mode and archived flag.",
     "tags": [
      "workout"
     ],
@@ -5842,7 +5843,7 @@
       }
      },
      "400": {
-      "description": "Validation failed, or a content field of a library exercise (library_exercise_read_only)",
+      "description": "Validation failed, or a library exercise changed by a non-administrator or in a content field (library_exercise_read_only)",
       "content": {
        "application/json": {
         "schema": {
@@ -6163,7 +6164,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 99647,
-  "source_fnv1a64": "a82543b1c55031eb"
+  "source_bytes": 99827,
+  "source_fnv1a64": "0875bdb8f63f9438"
  }
 }
