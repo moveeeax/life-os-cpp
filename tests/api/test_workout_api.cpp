@@ -431,7 +431,22 @@ protected:
             return;
         Database::get().execute_write([](auto& txn) {
             txn.exec("TRUNCATE TABLE workout_sessions CASCADE");
-            txn.exec("TRUNCATE TABLE heart_rate_samples, workouts, body_measurements");
+            txn.exec("TRUNCATE TABLE heart_rate_samples, workouts, body_measurements, mi_accounts");
+            // Band data belongs to a Mi account: the owner's is 't', the
+            // stranger's is 's'. The token is not read here, a dummy will do.
+            for (const auto& [id, account] : {std::pair<const char*, const char*>{kOwner, "t"}, {kStranger, "s"}}) {
+                txn.exec_params(
+                    "INSERT INTO users (id, email, confirmed, role_id) "
+                    "VALUES ($1::uuid, $2, TRUE, (SELECT id FROM roles ORDER BY id LIMIT 1)) "
+                    "ON CONFLICT DO NOTHING",
+                    std::string(id),
+                    std::string(id) + "@example.test");
+                txn.exec_params(
+                    "INSERT INTO mi_accounts (owner_id, xiaomi_user_id, pass_token_sealed, nonce) "
+                    "VALUES ($1::uuid, $2, 'x', 'x')",
+                    std::string(id),
+                    std::string(account));
+            }
             return true;
         });
     }
@@ -868,6 +883,91 @@ TEST_F(WorkoutSessionsTest, ReadinessReturnsNullsWithoutDataAndNumbersWithIt) {
     EXPECT_EQ(some["resting_bpm"], 52);
     EXPECT_EQ(some["resting_bpm_avg_30d"], 55);
     EXPECT_DOUBLE_EQ(some["bodyweight_kg"].get<double>(), 80.5);
+}
+
+// Band data of another user's Mi account never reaches this user's workout.
+TEST_F(WorkoutSessionsTest, HealthLinksUseOnlyTheOwnersAccount) {
+    // Everything below belongs to the stranger's account 's'.
+    sql("INSERT INTO body_measurements (user_id, timestamp, weight_kg) VALUES ('s', now() - interval '1 day', 60.5)");
+    sql("INSERT INTO heart_rate_samples (user_id, timestamp, bpm, sample_type) VALUES "
+        "('s', '2026-09-01T10:10:00Z', 100, 'active'), ('s', '2026-09-01T12:00:00Z', 60, 'passive'), "
+        "('s', now() - interval '2 hours', 49, 'resting')");
+    sql("INSERT INTO workouts (user_id, workout_id, activity_type, start_at, end_at, duration_minutes, "
+        "calories_kcal, avg_heart_rate_bpm, max_heart_rate_bpm) VALUES "
+        "('s', 'band-of-s', 'strength', '2026-09-01T10:05:00Z', '2026-09-01T10:55:00Z', 50, 300, 130, 150)");
+
+    const auto started = start(owner());
+    ASSERT_EQ(started->statusCode(), k201Created);
+    EXPECT_TRUE(body_of(started)["data"]["bodyweight_kg"].is_null());
+    const std::string id = body_of(started)["data"]["id"].get<std::string>();
+
+    const auto moved = patch_session(
+        owner(), id, json{{"started_at", "2026-09-01T10:00:00Z"}, {"finished_at", "2026-09-01T11:00:00Z"}});
+    ASSERT_EQ(moved->statusCode(), k200OK);
+    const json s = body_of(moved)["data"];
+    // The owner's own band has no samples at all: still waiting, not "no data".
+    EXPECT_EQ(s["health_status"], "pending");
+    EXPECT_EQ(s["hr_samples"], 0);
+    EXPECT_TRUE(s["hr_avg"].is_null());
+    EXPECT_TRUE(s["band_workout_id"].is_null());
+
+    const json chart = body_of(heart_rate(owner(), id))["data"];
+    EXPECT_TRUE(chart["samples"].empty());
+    EXPECT_TRUE(chart["latest_sample_at"].is_null());
+
+    HttpResponsePtr mine;
+    controller.readiness(TestHelpers::authed(owner(), Get), [&](const HttpResponsePtr& r) { mine = r; });
+    EXPECT_TRUE(body_of(mine)["data"]["resting_bpm"].is_null());
+    EXPECT_TRUE(body_of(mine)["data"]["bodyweight_kg"].is_null());
+
+    // The stranger does see their own data.
+    HttpResponsePtr theirs;
+    controller.readiness(TestHelpers::authed(stranger(), Get), [&](const HttpResponsePtr& r) { theirs = r; });
+    EXPECT_EQ(body_of(theirs)["data"]["resting_bpm"], 49);
+    EXPECT_DOUBLE_EQ(body_of(theirs)["data"]["bodyweight_kg"].get<double>(), 60.5);
+}
+
+TEST_F(WorkoutSessionsTest, ReconcileTouchesOnlyTheCallersSessions) {
+    const std::string id = body_of(start(owner()))["data"]["id"].get<std::string>();
+    ASSERT_EQ(patch_session(
+                  owner(), id, json{{"started_at", "2026-09-01T10:00:00Z"}, {"finished_at", "2026-09-01T11:00:00Z"}})
+                  ->statusCode(),
+              k200OK);
+    sql("INSERT INTO heart_rate_samples (user_id, timestamp, bpm, sample_type) VALUES "
+        "('t', '2026-09-01T10:10:00Z', 100, 'active')");
+
+    // The stranger re-runs the match for that day: the owner's session is not theirs to touch.
+    const auto strangers_sync = principal(
+        kStranger, Domain::Permission::kGeneral | Domain::Permission::kFitnessRead | Domain::Permission::kFitnessSync);
+    const auto foreign = reconcile(strangers_sync, json{{"from", "2026-09-01"}, {"to", "2026-09-01"}});
+    ASSERT_EQ(foreign->statusCode(), k200OK);
+    EXPECT_EQ(body_of(foreign)["data"]["reconciled"], 0);
+    EXPECT_EQ(body_of(get_session(owner(), id))["data"]["health_status"], "pending");
+
+    const auto own = reconcile(syncer(), json{{"from", "2026-09-01"}, {"to", "2026-09-01"}});
+    EXPECT_EQ(body_of(own)["data"]["reconciled"], 1);
+    EXPECT_EQ(body_of(get_session(owner(), id))["data"]["health_status"], "matched");
+}
+
+// Logging works without a band; the Health links are simply empty.
+TEST_F(WorkoutSessionsTest, UserWithoutALinkedAccountGetsNullsAndPending) {
+    sql("TRUNCATE TABLE mi_accounts");
+    sql("INSERT INTO body_measurements (user_id, timestamp, weight_kg) VALUES ('t', now() - interval '1 day', 80.5)");
+    sql("INSERT INTO heart_rate_samples (user_id, timestamp, bpm, sample_type) VALUES ('t', now(), 60, 'resting')");
+
+    const auto started = start(owner());
+    ASSERT_EQ(started->statusCode(), k201Created);
+    EXPECT_TRUE(body_of(started)["data"]["bodyweight_kg"].is_null());
+    const std::string id = body_of(started)["data"]["id"].get<std::string>();
+    const auto finished = patch_session(owner(), id, json{{"finish", true}});
+    ASSERT_EQ(finished->statusCode(), k200OK);
+    EXPECT_EQ(body_of(finished)["data"]["health_status"], "pending");
+
+    HttpResponsePtr ready;
+    controller.readiness(TestHelpers::authed(owner(), Get), [&](const HttpResponsePtr& r) { ready = r; });
+    ASSERT_EQ(ready->statusCode(), k200OK);
+    EXPECT_TRUE(body_of(ready)["data"]["resting_bpm"].is_null());
+    EXPECT_TRUE(body_of(ready)["data"]["bodyweight_kg"].is_null());
 }
 
 TEST_F(WorkoutSessionsTest, SessionRoutesNeedFitnessRead) {

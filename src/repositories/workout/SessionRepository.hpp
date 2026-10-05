@@ -108,7 +108,9 @@ public:
                 " INSERT INTO workout_sessions (owner_id, routine_id, name, bodyweight_kg) "
                 " VALUES ($1::uuid, $2::uuid, "
                 "  COALESCE((SELECT name FROM routines WHERE id = $2::uuid AND owner_id = $1::uuid), ''), "
-                "  (SELECT weight_kg FROM body_measurements ORDER BY timestamp DESC LIMIT 1)) "
+                "  (SELECT weight_kg FROM body_measurements "
+                "    WHERE user_id = (SELECT xiaomi_user_id FROM mi_accounts WHERE owner_id = $1::uuid) "
+                "    ORDER BY timestamp DESC LIMIT 1)) "
                 " RETURNING id), "
                 "x AS ("
                 " INSERT INTO session_exercises (session_id, exercise_id, position, target_sets, target_reps_min, "
@@ -208,7 +210,7 @@ public:
                         throw SessionNotFound();
                     }
                     if (p.touches_times() && r[0][0].template as<bool>()) {
-                        reconcile_in(txn, id, 0);
+                        reconcile_in(txn, id);
                     }
                     return *find_in(txn, owner, id);
                 });
@@ -349,12 +351,17 @@ public:
                 " 'samples', COALESCE((SELECT json_agg(json_build_object('timestamp', " +
                     iso("h.timestamp") +
                     ", 'bpm', h.bpm) ORDER BY h.timestamp) FROM heart_rate_samples h "
-                    "  WHERE h.timestamp >= s.started_at AND h.timestamp <= COALESCE(s.finished_at, now())), "
+                    "  WHERE h.user_id = acc.id AND h.timestamp >= s.started_at "
+                    "   AND h.timestamp <= COALESCE(s.finished_at, now())), "
                     "  '[]'::json), "
                     " 'latest_sample_at', (SELECT " +
                     iso("MAX(timestamp)") +
-                    " FROM heart_rate_samples)) "
-                    "FROM workout_sessions s WHERE s.id = $2::uuid AND s.owner_id = $1::uuid",
+                    " FROM heart_rate_samples WHERE user_id = acc.id)) "
+                    "FROM workout_sessions s "
+                    // The band data of the session's owner; no link, no samples.
+                    "LEFT JOIN LATERAL (SELECT xiaomi_user_id AS id FROM mi_accounts "
+                    "  WHERE owner_id = s.owner_id) acc ON true "
+                    "WHERE s.id = $2::uuid AND s.owner_id = $1::uuid",
                 owner,
                 id);
             if (r.empty()) {
@@ -369,52 +376,68 @@ public:
      *        mean: last night's sleep, resting heart rate, recent stress.
      *        A value without data is null.
      */
-    nlohmann::json readiness() {
+    nlohmann::json readiness(const std::string& owner) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec(
+            // Every number comes from the owner's Mi account; without a link
+            // acc.id is NULL and every value is null.
+            auto r = txn.exec_params(
                 "SELECT json_build_object("
                 // The longest non-nap sleep that ended in the last 18 hours.
-                " 'sleep_minutes', (SELECT duration_minutes FROM sleep_sessions WHERE NOT is_nap "
+                " 'sleep_minutes', (SELECT duration_minutes FROM sleep_sessions WHERE user_id = acc.id AND NOT is_nap "
                 "   AND end_at > now() - interval '18 hours' ORDER BY duration_minutes DESC LIMIT 1), "
-                " 'sleep_score', (SELECT sleep_score FROM sleep_sessions WHERE NOT is_nap "
+                " 'sleep_score', (SELECT sleep_score FROM sleep_sessions WHERE user_id = acc.id AND NOT is_nap "
                 "   AND end_at > now() - interval '18 hours' ORDER BY duration_minutes DESC LIMIT 1), "
                 // Mean over the last 30 days of each day's longest non-nap sleep.
                 " 'sleep_minutes_avg_30d', (SELECT ROUND(AVG(d))::int FROM (SELECT MAX(duration_minutes) AS d "
-                "   FROM sleep_sessions WHERE NOT is_nap AND end_at > now() - interval '30 days' "
+                "   FROM sleep_sessions WHERE user_id = acc.id AND NOT is_nap "
+                "    AND end_at > now() - interval '30 days' "
                 "   GROUP BY (end_at AT TIME ZONE 'UTC')::date) q), "
-                " 'resting_bpm', (SELECT bpm FROM heart_rate_samples WHERE sample_type = 'resting' "
+                " 'resting_bpm', (SELECT bpm FROM heart_rate_samples WHERE user_id = acc.id "
+                "   AND sample_type = 'resting' "
                 "   AND timestamp > now() - interval '24 hours' ORDER BY timestamp DESC LIMIT 1), "
                 " 'resting_bpm_avg_30d', (SELECT ROUND(AVG(bpm))::int FROM heart_rate_samples "
-                "   WHERE sample_type = 'resting' AND timestamp > now() - interval '30 days'), "
+                "   WHERE user_id = acc.id AND sample_type = 'resting' AND timestamp > now() - interval '30 days'), "
                 " 'stress', (SELECT ROUND(AVG(stress_score))::int FROM stress_samples "
-                "   WHERE timestamp > now() - interval '12 hours'), "
+                "   WHERE user_id = acc.id AND timestamp > now() - interval '12 hours'), "
                 " 'stress_avg_30d', (SELECT ROUND(AVG(stress_score))::int FROM stress_samples "
-                "   WHERE timestamp > now() - interval '30 days'), "
-                " 'bodyweight_kg', (SELECT weight_kg FROM body_measurements ORDER BY timestamp DESC LIMIT 1))");
+                "   WHERE user_id = acc.id AND timestamp > now() - interval '30 days'), "
+                " 'bodyweight_kg', (SELECT weight_kg FROM body_measurements WHERE user_id = acc.id "
+                "   ORDER BY timestamp DESC LIMIT 1)) "
+                "FROM (SELECT (SELECT xiaomi_user_id FROM mi_accounts WHERE owner_id = $1::uuid) AS id) acc",
+                owner);
             return nlohmann::json::parse(r[0][0].template as<std::string>());
         });
     }
 
     /**
-     * @brief Attach Mi Fitness data to every session that finished in the
-     *        last @p window_days days. Idempotent; returns how many sessions
-     *        were written.
+     * @brief Attach Mi Fitness data to the owner's sessions that finished in
+     *        the last @p window_days days. Idempotent; returns how many
+     *        sessions were written.
      */
-    long reconcile_recent(int window_days) {
-        return Database::get().execute_write([&](auto& txn) { return reconcile_in(txn, std::nullopt, window_days); });
+    long reconcile_recent(const std::string& owner, int window_days) {
+        return Database::get().execute_write([&](auto& txn) {
+            auto r = txn.exec_params(std::string(kReconcileHead) +
+                                         "s.owner_id = $1::uuid AND s.finished_at > now() - make_interval(days => $2)" +
+                                         kReconcileTail,
+                                     owner,
+                                     window_days);
+            return static_cast<long>(r.size());
+        });
     }
 
-    /// Reconcile sessions that finished on the given UTC dates (inclusive).
+    /// Reconcile the owner's sessions that finished on the given UTC dates (inclusive).
     /// @throws InvalidTimestamp when a date does not exist.
-    long reconcile_range(const std::string& from, const std::string& to) {
+    long reconcile_range(const std::string& owner, const std::string& from, const std::string& to) {
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
                     auto r = txn.exec_params(std::string(kReconcileHead) +
-                                                 "s.finished_at >= $1::date AND s.finished_at < $2::date + 1" +
+                                                 "s.owner_id = $3::uuid AND s.finished_at >= $1::date "
+                                                 "AND s.finished_at < $2::date + 1" +
                                                  kReconcileTail,
                                              from,
-                                             to);
+                                             to,
+                                             owner);
                     return static_cast<long>(r.size());
                 });
             },
@@ -437,31 +460,36 @@ private:
         return "to_char(" + expr + " AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"')";
     }
 
-    // Reconciliation, one statement. For each candidate session: heart-rate
-    // samples inside it, and the band workout that overlaps it by more than
+    // Reconciliation, one statement. The band data is that of the session
+    // owner's Mi account (cand.acct; NULL without a link, and then nothing
+    // matches and the session stays pending). For each candidate session:
+    // heart-rate samples inside it, and the band workout that overlaps it by more than
     // half of the session (the largest overlap when there are several). A band
     // workout's own heart rate wins over the sample-based one. Status:
     // matched with any data; otherwise pending while the newest sample in the
     // database is older than the session's end, no_data once newer ones exist.
     static constexpr const char* kReconcileHead =
         "WITH cand AS ("
-        " SELECT s.id, s.started_at, s.finished_at FROM workout_sessions s "
+        " SELECT s.id, s.started_at, s.finished_at, "
+        "  (SELECT m.xiaomi_user_id FROM mi_accounts m WHERE m.owner_id = s.owner_id) AS acct "
+        " FROM workout_sessions s "
         " WHERE s.finished_at IS NOT NULL AND ";
     static constexpr const char* kReconcileTail =
         "), "
         "hr AS ("
         " SELECT c.id, COUNT(h.bpm) AS n, ROUND(AVG(h.bpm))::int AS avg_bpm, MAX(h.bpm) AS max_bpm "
         " FROM cand c LEFT JOIN heart_rate_samples h "
-        "  ON h.timestamp >= c.started_at AND h.timestamp <= c.finished_at GROUP BY c.id), "
+        "  ON h.user_id = c.acct AND h.timestamp >= c.started_at AND h.timestamp <= c.finished_at "
+        " GROUP BY c.id), "
         "band AS ("
         " SELECT DISTINCT ON (c.id) c.id, w.workout_id, w.calories_kcal, w.avg_heart_rate_bpm, "
         "  w.max_heart_rate_bpm "
-        " FROM cand c JOIN workouts w ON w.start_at < c.finished_at AND w.end_at > c.started_at "
+        " FROM cand c JOIN workouts w "
+        "  ON w.user_id = c.acct AND w.start_at < c.finished_at AND w.end_at > c.started_at "
         " WHERE EXTRACT(EPOCH FROM (LEAST(c.finished_at, w.end_at) - GREATEST(c.started_at, w.start_at))) * 2 "
         "       > EXTRACT(EPOCH FROM (c.finished_at - c.started_at)) "
         " ORDER BY c.id, LEAST(c.finished_at, w.end_at) - GREATEST(c.started_at, w.start_at) DESC, "
-        "  w.workout_id), "
-        "latest AS (SELECT MAX(timestamp) AS ts FROM heart_rate_samples) "
+        "  w.workout_id) "
         "UPDATE workout_sessions s SET "
         " hr_samples = hr.n, "
         " hr_avg = COALESCE(band.avg_heart_rate_bpm, hr.avg_bpm), "
@@ -470,18 +498,16 @@ private:
         " health_status = CASE WHEN hr.n > 0 OR band.workout_id IS NOT NULL THEN 'matched' "
         "   WHEN latest.ts IS NULL OR latest.ts < s.finished_at THEN 'pending' ELSE 'no_data' END, "
         " reconciled_at = now() "
-        "FROM cand c JOIN hr ON hr.id = c.id LEFT JOIN band ON band.id = c.id CROSS JOIN latest "
+        "FROM cand c JOIN hr ON hr.id = c.id LEFT JOIN band ON band.id = c.id "
+        // The newest sample of the same account tells "not synced yet" from "no data".
+        "LEFT JOIN LATERAL (SELECT MAX(timestamp) AS ts FROM heart_rate_samples "
+        "  WHERE user_id = c.acct) latest ON true "
         "WHERE s.id = c.id RETURNING s.id";
 
-    /// One session by id, or every session finished in the last window_days.
+    /// One session by id, whoever owns it: the caller has checked the owner.
     template <typename Txn>
-    static long reconcile_in(Txn& txn, const std::optional<std::string>& id, int window_days) {
-        auto r = txn.exec_params(std::string(kReconcileHead) +
-                                     "(s.id = $1::uuid OR ($1::uuid IS NULL "
-                                     " AND s.finished_at > now() - make_interval(days => $2)))" +
-                                     kReconcileTail,
-                                 id,
-                                 window_days);
+    static long reconcile_in(Txn& txn, const std::string& id) {
+        auto r = txn.exec_params(std::string(kReconcileHead) + "s.id = $1::uuid" + kReconcileTail, id);
         return static_cast<long>(r.size());
     }
 

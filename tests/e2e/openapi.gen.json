@@ -4538,7 +4538,7 @@
   "/api/v1/fitness/sync": {
    "post": {
     "summary": "Enqueue a cloud sync run",
-    "description": "Creates a sync_runs journal row and puts an fitness_sync job on the queue. The run executes in the worker; poll the journal by run_id.",
+    "description": "Creates a sync_runs journal row for the caller's Mi account and puts a fitness_sync job on the queue. The run executes in the worker; poll the journal by run_id. Without a linked account the answer is 409 not_linked.",
     "tags": [
      "fitness"
     ],
@@ -4605,6 +4605,16 @@
      },
      "400": {
       "description": "Malformed range, unknown or duplicate data type",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "No Mi account is linked (not_linked)",
       "content": {
        "application/json": {
         "schema": {
@@ -8484,7 +8494,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 136309,
-  "source_fnv1a64": "fa5452a84d03bc40"
+  "source_bytes": 136576,
+  "source_fnv1a64": "cec73b5989667424"
  }
 }

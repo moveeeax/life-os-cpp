@@ -48,12 +48,13 @@ namespace {
 constexpr long kDefaultLimit = 1000;
 constexpr long kMaxLimit = 10000;
 
-/// Region day offset: cn is UTC+8, others UTC (same rule as sync range bounds).
-/// The region is the one of the linked account.
-long long region_offset_seconds() {
+/// Region day offset of the caller's account: cn is UTC+8, others UTC (same
+/// rule as sync range bounds). Without a link the offset does not matter:
+/// there are no rows to place.
+long long region_offset_seconds(const std::string& owner) {
     std::string region = "cn";
     try {
-        region = Repositories::MiAccountRepository("").first_region().value_or("cn");
+        region = Repositories::MiAccountRepository("").region_of(owner).value_or("cn");
     } catch (const std::exception&) {
         // An unreachable database is reported by the query that follows.
     }
@@ -67,6 +68,22 @@ bool require_user(const std::string& owner, const std::function<void(const HttpR
     }
     callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
     return false;
+}
+
+/// The Xiaomi id of the caller's linked account into @p account; empty when
+/// nothing is linked, which reads as "no rows". False (and a 503) when the
+/// database cannot be asked.
+bool resolve_account(const std::string& owner,
+                     std::string& account,
+                     const std::function<void(const HttpResponsePtr&)>& callback) {
+    try {
+        account = Repositories::MiAccountRepository("").xiaomi_id_of(owner).value_or("");
+        return true;
+    } catch (const std::exception& e) {
+        spdlog::warn("fitness account lookup unavailable: {}", e.what());
+        callback(ErrorResponse::service_unavailable("data_unavailable"));
+        return false;
+    }
 }
 
 /// now + offset as an ISO 8601 instant in UTC.
@@ -112,6 +129,18 @@ json account_status_body(const std::string& owner) {
             return;                                  \
         API_REQUIRE_PERMISSION(req, callback, perm); \
     } while (0)
+
+// A data route works on the caller's own account: module -> permission -> a
+// user account -> the Xiaomi id of their link (empty without one). Declares
+// `owner` and `account` in the method body, hence no do/while.
+#define FITNESS_ACCOUNT_GUARD(req, callback, perm)  \
+    FITNESS_GUARD(req, callback, perm);             \
+    API_REQUIRE_OWNER(req, callback, owner);        \
+    if (!require_user(owner, callback))             \
+        return;                                     \
+    std::string account;                            \
+    if (!resolve_account(owner, account, callback)) \
+    return
 
 bool FitnessController::require_enabled(const std::function<void(const HttpResponsePtr&)>& callback) {
     if (Core::fitness_enabled())
@@ -175,16 +204,12 @@ void FitnessController::respond_page(const std::function<Repositories::HealthRea
 // ── probe ────────────────────────────────────────────────────────────────────
 
 void FitnessController::probe(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
-    FITNESS_GUARD(req, callback, Domain::Permission::kFitnessSync);
-    API_REQUIRE_OWNER(req, callback, owner);
-    if (!require_user(owner, callback)) {
-        return;
-    }
+    FITNESS_ACCOUNT_GUARD(req, callback, Domain::Permission::kFitnessSync);
     // Sync and probe cannot run together: both log in, and every login
     // rotates the passToken. A live run in the journal means probe refuses
     // before going to the cloud.
     try {
-        if (Repositories::SyncRunRepository().any_running()) {
+        if (!account.empty() && Repositories::SyncRunRepository().any_running(account)) {
             callback(ErrorResponse::conflict("sync_in_progress", "a sync run is in progress, retry later"));
             return;
         }
@@ -310,7 +335,11 @@ void FitnessController::accountLinkStep(const HttpRequestPtr& req,
             try {
                 const int window =
                     Config::get().get<int>("fitness.xiaomi.sync_window_days", "MI_FITNESS_SYNC_WINDOW_DAYS", 2);
-                Jobs::FitnessSync::enqueue_recent(window, static_cast<long long>(::time(nullptr)));
+                Repositories::MiAccountRepository accounts("");
+                Jobs::FitnessSync::enqueue_recent(
+                    {owner, accounts.xiaomi_id_of(owner).value_or(""), accounts.region_of(owner).value_or("cn")},
+                    window,
+                    static_cast<long long>(::time(nullptr)));
             } catch (const std::exception& e) {
                 spdlog::warn("mi link: first sync was not enqueued: {}", e.what());
             }
@@ -342,12 +371,14 @@ void FitnessController::accountUnlink(const HttpRequestPtr& req,
         delete_data = body.value("delete_data", false);
     }
     with_repo_errors(callback, "fitness.accountUnlink", [&] {
-        // A running sync writes rows and may write a rotated token.
-        if (Repositories::SyncRunRepository().any_running()) {
+        Repositories::MiAccountRepository accounts("");
+        const auto linked = accounts.xiaomi_id_of(owner);
+        // A running sync of this account writes rows and may write a rotated token.
+        if (linked.has_value() && Repositories::SyncRunRepository().any_running(*linked)) {
             callback(ErrorResponse::conflict("sync_in_progress", "a sync run is in progress, retry later"));
             return;
         }
-        if (!Repositories::MiAccountRepository("").unlink(owner, delete_data)) {
+        if (!accounts.unlink(owner, delete_data)) {
             callback(ErrorResponse::not_found("mi_account"));
             return;
         }
@@ -388,14 +419,14 @@ void FitnessController::accountDetectRegion(const HttpRequestPtr& req,
     }
     Repositories::MiAccountRepository accounts(token_key);
     try {
-        // Detection logs in, and a login must not run next to a sync.
-        if (Repositories::SyncRunRepository().any_running()) {
-            callback(ErrorResponse::conflict("sync_in_progress", "a sync run is in progress, retry later"));
-            return;
-        }
         const auto credentials = accounts.load(owner);
         if (!credentials.has_value()) {
             callback(ErrorResponse::not_found("mi_account"));
+            return;
+        }
+        // Detection logs in, and a login must not run next to a sync of the account.
+        if (Repositories::SyncRunRepository().any_running(credentials->user_id)) {
+            callback(ErrorResponse::conflict("sync_in_progress", "a sync run is in progress, retry later"));
             return;
         }
         Xiaomi::CloudClient client(
@@ -428,7 +459,11 @@ void FitnessController::accountDetectRegion(const HttpRequestPtr& req,
 // ── sync ─────────────────────────────────────────────────────────────────────
 
 void FitnessController::syncEnqueue(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
-    FITNESS_GUARD(req, callback, Domain::Permission::kFitnessSync);
+    FITNESS_ACCOUNT_GUARD(req, callback, Domain::Permission::kFitnessSync);
+    if (account.empty()) {
+        callback(ErrorResponse::conflict("not_linked", "no Mi account is linked"));
+        return;
+    }
     json body = json::parse(std::string(req->body()), nullptr, /*allow_exceptions=*/false);
     if (body.is_discarded() || !body.is_object() || !body.contains("from") || !body.contains("to") ||
         !body["from"].is_string() || !body["to"].is_string()) {
@@ -468,10 +503,7 @@ void FitnessController::syncEnqueue(const HttpRequestPtr& req, std::function<voi
     }
 
     try {
-        Repositories::SyncRunRepository runs;
-        const long run_id = runs.create(from, to, data_types);
-        Jobs::get().submit(Jobs::FitnessSync::kJobType,
-                           json{{"run_id", run_id}, {"from", from}, {"to", to}, {"data_types", data_types}});
+        const long run_id = Jobs::FitnessSync::submit(owner, account, from, to, data_types);
         auto resp = Response::ok(json{{"data", {{"run_id", run_id}, {"status", "queued"}}}});
         resp->setStatusCode(k202Accepted);
         callback(resp);
@@ -486,7 +518,7 @@ void FitnessController::syncEnqueue(const HttpRequestPtr& req, std::function<voi
 void FitnessController::syncStatus(const HttpRequestPtr& req,
                                    std::function<void(const HttpResponsePtr&)>&& callback,
                                    const std::string& id) {
-    FITNESS_GUARD(req, callback, Domain::Permission::kFitnessSync);
+    FITNESS_ACCOUNT_GUARD(req, callback, Domain::Permission::kFitnessSync);
     long run_id = 0;
     try {
         std::size_t consumed = 0;
@@ -499,7 +531,8 @@ void FitnessController::syncStatus(const HttpRequestPtr& req,
         return;
     }
     try {
-        const auto row = Repositories::SyncRunRepository().get(run_id);
+        // A run is visible to the account it belongs to and to nobody else.
+        const auto row = account.empty() ? std::nullopt : Repositories::SyncRunRepository().get(run_id, account);
         if (!row.has_value()) {
             callback(ErrorResponse::not_found("run_not_found"));
             return;
@@ -515,24 +548,29 @@ void FitnessController::syncStatus(const HttpRequestPtr& req,
 
 void FitnessController::dailyActivity(const HttpRequestPtr& req,
                                       std::function<void(const HttpResponsePtr&)>&& callback) {
-    FITNESS_GUARD(req, callback, Domain::Permission::kFitnessRead);
+    FITNESS_ACCOUNT_GUARD(req, callback, Domain::Permission::kFitnessRead);
     Query q;
     if (!parse_query(req, q, callback))
         return;
-    respond_page([q] { return Repositories::HealthReadRepository().daily_activity(q.from, q.to, q.limit, q.offset); },
-                 callback);
+    respond_page(
+        [q, account] {
+            return Repositories::HealthReadRepository(account).daily_activity(q.from, q.to, q.limit, q.offset);
+        },
+        callback);
 }
 
 void FitnessController::sleep(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
-    FITNESS_GUARD(req, callback, Domain::Permission::kFitnessRead);
+    FITNESS_ACCOUNT_GUARD(req, callback, Domain::Permission::kFitnessRead);
     Query q;
     if (!parse_query(req, q, callback))
         return;
-    respond_page([q] { return Repositories::HealthReadRepository().sleep(q.from, q.to, q.limit, q.offset); }, callback);
+    respond_page(
+        [q, account] { return Repositories::HealthReadRepository(account).sleep(q.from, q.to, q.limit, q.offset); },
+        callback);
 }
 
 void FitnessController::heartRate(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
-    FITNESS_GUARD(req, callback, Domain::Permission::kFitnessRead);
+    FITNESS_ACCOUNT_GUARD(req, callback, Domain::Permission::kFitnessRead);
     Query q;
     if (!parse_query(req, q, callback))
         return;
@@ -542,73 +580,85 @@ void FitnessController::heartRate(const HttpRequestPtr& req, std::function<void(
         return;
     }
     respond_page(
-        [q, type] { return Repositories::HealthReadRepository().heart_rate(q.from, q.to, type, q.limit, q.offset); },
+        [q, type, account] {
+            return Repositories::HealthReadRepository(account).heart_rate(q.from, q.to, type, q.limit, q.offset);
+        },
         callback);
 }
 
 void FitnessController::stress(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
-    FITNESS_GUARD(req, callback, Domain::Permission::kFitnessRead);
+    FITNESS_ACCOUNT_GUARD(req, callback, Domain::Permission::kFitnessRead);
     Query q;
     if (!parse_query(req, q, callback))
         return;
-    respond_page([q] { return Repositories::HealthReadRepository().stress(q.from, q.to, q.limit, q.offset); },
-                 callback);
+    respond_page(
+        [q, account] { return Repositories::HealthReadRepository(account).stress(q.from, q.to, q.limit, q.offset); },
+        callback);
 }
 
 void FitnessController::spo2(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
-    FITNESS_GUARD(req, callback, Domain::Permission::kFitnessRead);
+    FITNESS_ACCOUNT_GUARD(req, callback, Domain::Permission::kFitnessRead);
     Query q;
     if (!parse_query(req, q, callback))
         return;
-    respond_page([q] { return Repositories::HealthReadRepository().spo2(q.from, q.to, q.limit, q.offset); }, callback);
+    respond_page(
+        [q, account] { return Repositories::HealthReadRepository(account).spo2(q.from, q.to, q.limit, q.offset); },
+        callback);
 }
 
 void FitnessController::body(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
-    FITNESS_GUARD(req, callback, Domain::Permission::kFitnessRead);
+    FITNESS_ACCOUNT_GUARD(req, callback, Domain::Permission::kFitnessRead);
     Query q;
     if (!parse_query(req, q, callback))
         return;
-    respond_page([q] { return Repositories::HealthReadRepository().body(q.from, q.to, q.limit, q.offset); }, callback);
+    respond_page(
+        [q, account] { return Repositories::HealthReadRepository(account).body(q.from, q.to, q.limit, q.offset); },
+        callback);
 }
 
 void FitnessController::workouts(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
-    FITNESS_GUARD(req, callback, Domain::Permission::kFitnessRead);
+    FITNESS_ACCOUNT_GUARD(req, callback, Domain::Permission::kFitnessRead);
     Query q;
     if (!parse_query(req, q, callback))
         return;
-    respond_page([q] { return Repositories::HealthReadRepository().workouts(q.from, q.to, q.limit, q.offset); },
-                 callback);
+    respond_page(
+        [q, account] { return Repositories::HealthReadRepository(account).workouts(q.from, q.to, q.limit, q.offset); },
+        callback);
 }
 
 void FitnessController::summary(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
-    FITNESS_GUARD(req, callback, Domain::Permission::kFitnessRead);
+    FITNESS_ACCOUNT_GUARD(req, callback, Domain::Permission::kFitnessRead);
     Query q;
     if (!parse_query(req, q, callback))
         return;
     // Sleep and resting heart rate windows start at local midnight in the
     // region's zone: the activity date is local (same rule as the sync
     // range bounds).
-    const long long offset = region_offset_seconds();
+    const long long offset = region_offset_seconds(owner);
     respond_page(
-        [q, offset] { return Repositories::HealthReadRepository().summary(q.from, q.to, q.limit, q.offset, offset); },
+        [q, offset, account] {
+            return Repositories::HealthReadRepository(account).summary(q.from, q.to, q.limit, q.offset, offset);
+        },
         callback);
 }
 
 void FitnessController::abnormalHeartBeat(const HttpRequestPtr& req,
                                           std::function<void(const HttpResponsePtr&)>&& callback) {
-    FITNESS_GUARD(req, callback, Domain::Permission::kFitnessRead);
+    FITNESS_ACCOUNT_GUARD(req, callback, Domain::Permission::kFitnessRead);
     Query q;
     if (!parse_query(req, q, callback))
         return;
     respond_page(
-        [q] { return Repositories::HealthReadRepository().abnormal_heart_beat(q.from, q.to, q.limit, q.offset); },
+        [q, account] {
+            return Repositories::HealthReadRepository(account).abnormal_heart_beat(q.from, q.to, q.limit, q.offset);
+        },
         callback);
 }
 
 void FitnessController::coverage(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
-    FITNESS_GUARD(req, callback, Domain::Permission::kFitnessRead);
+    FITNESS_ACCOUNT_GUARD(req, callback, Domain::Permission::kFitnessRead);
     try {
-        callback(Response::ok(json{{"data", Repositories::HealthReadRepository().coverage()}}));
+        callback(Response::ok(json{{"data", Repositories::HealthReadRepository(account).coverage()}}));
     } catch (const std::exception& e) {
         spdlog::warn("fitness coverage unavailable: {}", e.what());
         callback(ErrorResponse::service_unavailable("data_unavailable"));
@@ -616,7 +666,7 @@ void FitnessController::coverage(const HttpRequestPtr& req, std::function<void(c
 }
 
 void FitnessController::exportData(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
-    FITNESS_GUARD(req, callback, Domain::Permission::kFitnessRead);
+    FITNESS_ACCOUNT_GUARD(req, callback, Domain::Permission::kFitnessRead);
     const auto& kTypes = Fitness::Export::types();
     Query q;
     if (!parse_query(req, q, callback))
@@ -644,7 +694,7 @@ void FitnessController::exportData(const HttpRequestPtr& req, std::function<void
         return;
     }
     try {
-        Repositories::HealthReadRepository repo;
+        Repositories::HealthReadRepository repo(account);
         if (format == "json") {
             json records = json::object();
             if (type.empty()) {
@@ -671,6 +721,7 @@ void FitnessController::exportData(const HttpRequestPtr& req, std::function<void
     }
 }
 
+#undef FITNESS_ACCOUNT_GUARD
 #undef FITNESS_GUARD
 
 }  // namespace Api

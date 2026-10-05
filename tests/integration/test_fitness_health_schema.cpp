@@ -73,12 +73,12 @@ TEST_F(HealthSchemaTest, DuplicateNaturalKeyIsRejectedWithoutOnConflict) {
 
 TEST_F(HealthSchemaTest, SyncRunLifecycle) {
     Repositories::SyncRunRepository runs;
-    const long id = runs.create("2026-09-01", "2026-09-07", {"steps", "sleep"});
+    const long id = runs.create("1234567890", "2026-09-01", "2026-09-07", {"steps", "sleep"});
     ASSERT_GT(id, 0);
 
     runs.finish(id, "succeeded", nlohmann::json{{"steps", {{"added", 3}, {"updated", 1}}}});
 
-    const auto row = runs.get(id);
+    const auto row = runs.get(id, "1234567890");
     ASSERT_TRUE(row.has_value());
     EXPECT_EQ((*row)["status"], "succeeded");
     EXPECT_EQ((*row)["result"]["steps"]["added"], 3);
@@ -88,5 +88,5 @@ TEST_F(HealthSchemaTest, SyncRunLifecycle) {
 
 TEST_F(HealthSchemaTest, UnknownRunIsEmpty) {
     Repositories::SyncRunRepository runs;
-    EXPECT_FALSE(runs.get(999999).has_value());
+    EXPECT_FALSE(runs.get(999999, "1234567890").has_value());
 }

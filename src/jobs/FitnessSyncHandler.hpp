@@ -2,7 +2,7 @@
  * @file FitnessSyncHandler.hpp
  * @brief fitness_sync job handler: a full SyncService run in the worker.
  *
- * Payload: {run_id, from, to, data_types}. Credentials are those of the linked
+ * Payload: {run_id, owner_id, from, to, data_types}. Credentials are those of the linked
  * Mi account, read from the database with the key from config; no linked
  * account is not a queue failure but an honest not_linked status in the run
  * journal: retrying without a token is pointless.
@@ -33,22 +33,37 @@ namespace Jobs::FitnessSync {
 
 inline constexpr const char* kJobType = "fitness_sync";
 
+/// Create the run of an account and put its job on the queue. Returns the run id.
+inline long submit(const std::string& owner_id,
+                   const std::string& xiaomi_user_id,
+                   const std::string& from,
+                   const std::string& to,
+                   const std::vector<std::string>& data_types) {
+    Repositories::SyncRunRepository runs;
+    const long run_id = runs.create(xiaomi_user_id, from, to, data_types);
+    Jobs::get().submit(
+        kJobType,
+        nlohmann::json{
+            {"run_id", run_id}, {"owner_id", owner_id}, {"from", from}, {"to", to}, {"data_types", data_types}});
+    return run_id;
+}
+
 /**
- * @brief Enqueue a sync of the last @p window_days days.
+ * @brief Enqueue a sync of the last @p window_days days of one account.
  *
- * Days are counted in the region's zone (cn is UTC+8, others UTC, the same
- * rule as the range bounds in Xiaomi::range_to_timestamps): the UTC "today"
- * near the region's midnight lags a day behind, and the window would miss
- * the freshest data. Returns the run_id of the created run; database and
- * queue exceptions propagate to the caller.
+ * Days are counted in the zone of the account's region (cn is UTC+8, others
+ * UTC, the same rule as the range bounds in Xiaomi::range_to_timestamps): the
+ * UTC "today" near the region's midnight lags a day behind, and the window
+ * would miss the freshest data. Returns the run_id of the created run;
+ * database and queue exceptions propagate to the caller.
  */
-inline long enqueue_recent(int window_days, long long now_epoch) {
+inline long enqueue_recent(const Repositories::MiAccountRepository::Linked& account,
+                           int window_days,
+                           long long now_epoch) {
     if (window_days < 1) {
         window_days = 1;
     }
-    // Day bounds follow the region of the account that will be synced.
-    const std::string region = Repositories::MiAccountRepository("").first_region().value_or("cn");
-    const long long offset = (region.empty() || region == "cn") ? 8 * 3600 : 0;
+    const long long offset = (account.region.empty() || account.region == "cn") ? 8 * 3600 : 0;
 
     const auto day = [](long long epoch) {
         const std::chrono::sys_days d{
@@ -65,12 +80,28 @@ inline long enqueue_recent(int window_days, long long now_epoch) {
     };
     const std::string to = day(now_epoch + offset);
     const std::string from = day(now_epoch + offset - 86400LL * (window_days - 1));
+    return submit(account.owner_id, account.xiaomi_user_id, from, to, Sync::kAllDataTypes);
+}
 
-    Repositories::SyncRunRepository runs;
-    const long run_id = runs.create(from, to, Sync::kAllDataTypes);
-    Jobs::get().submit(
-        kJobType, nlohmann::json{{"run_id", run_id}, {"from", from}, {"to", to}, {"data_types", Sync::kAllDataTypes}});
-    return run_id;
+/**
+ * @brief The scheduled tick: one job per account whose token Xiaomi still
+ *        accepts. An account that asks to be linked again is skipped, its
+ *        sync could only fail. Returns how many jobs were enqueued; a failure
+ *        on one account does not stop the others.
+ */
+inline int enqueue_recent_for_all(int window_days, long long now_epoch) {
+    int enqueued = 0;
+    for (const auto& account : Repositories::MiAccountRepository("").list_syncable()) {
+        try {
+            enqueue_recent(account, window_days, now_epoch);
+            ++enqueued;
+        } catch (const std::exception& e) {
+            spdlog::warn("fitness sync schedule: account {} was not enqueued: {}",
+                         Xiaomi::mask_account_id(account.xiaomi_user_id),
+                         e.what());
+        }
+    }
+    return enqueued;
 }
 
 inline nlohmann::json process_job(const nlohmann::json& payload) {
@@ -98,18 +129,22 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
                     nlohmann::json{{"error", "not_configured"}, {"detail", "MI_FITNESS_TOKEN_KEY is not set"}});
         return {{"run_id", run_id}, {"status", "failed"}};
     }
-    // One sync per system for now: the oldest linked account.
+    // The run belongs to one account. A job enqueued before runs had an owner
+    // cannot be attributed.
+    if (!payload.contains("owner_id") || !payload["owner_id"].is_string()) {
+        runs.finish(run_id, "failed", nlohmann::json{{"error", "outdated_job"}});
+        return {{"run_id", run_id}, {"status", "failed"}};
+    }
+    const std::string owner_id = payload["owner_id"].get<std::string>();
     Repositories::MiAccountRepository accounts(token_key);
-    const auto account = accounts.load_first();
-    if (!account.has_value()) {
+    const auto credentials = accounts.load(owner_id);
+    if (!credentials.has_value()) {
         runs.finish(run_id, "failed", nlohmann::json{{"error", "not_linked"}, {"detail", "no Mi account is linked"}});
         return {{"run_id", run_id}, {"status", "failed"}};
     }
-    const std::string& owner_id = account->first;
-    runs.set_account(run_id, account->second.user_id);
 
     Sync::SyncService service(
-        Xiaomi::Service::transport(), account->second, [&accounts, &owner_id](const Xiaomi::Credentials& rotated) {
+        Xiaomi::Service::transport(), *credentials, [&accounts, &owner_id](const Xiaomi::Credentials& rotated) {
             accounts.store_rotated(owner_id, rotated);
         });
     const auto result = service.run(run_id, from, to, data_types);
@@ -132,7 +167,7 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         try {
             const int window =
                 Config::get().get<int>("fitness.xiaomi.sync_window_days", "MI_FITNESS_SYNC_WINDOW_DAYS", 2);
-            const long n = Repositories::SessionRepository().reconcile_recent(window + 1);
+            const long n = Repositories::SessionRepository().reconcile_recent(owner_id, window + 1);
             spdlog::info("workout reconcile after fitness sync {}: {} sessions", run_id, n);
         } catch (const std::exception& e) {
             spdlog::warn("workout reconcile after fitness sync {} failed: {}", run_id, e.what());

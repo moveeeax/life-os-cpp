@@ -17,6 +17,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -55,30 +56,36 @@ public:
         });
     }
 
-    /// The oldest link with its owner. The sync job uses it while the sync is
-    /// still one per system.
-    std::optional<std::pair<std::string, Xiaomi::Credentials>> load_first() {
-        return Database::get().execute_read(
-            [&](auto& txn) -> std::optional<std::pair<std::string, Xiaomi::Credentials>> {
-                auto r = txn.exec(
-                    "SELECT owner_id::text AS owner_id, xiaomi_user_id, pass_token_sealed, nonce, region "
-                    "FROM mi_accounts ORDER BY linked_at, owner_id LIMIT 1");
-                if (r.empty()) {
-                    return std::nullopt;
-                }
-                return std::make_pair(r[0]["owner_id"].template as<std::string>(), unseal_row(r[0]));
-            });
-    }
-
-    /// Region of the oldest link, without touching the token. For computing
-    /// the day bounds of a scheduled sync.
-    std::optional<std::string> first_region() {
+    /// Xiaomi id of this user's account, without touching the token: what
+    /// the reads filter by. nullopt without a link.
+    std::optional<std::string> xiaomi_id_of(const std::string& owner_id) {
         return Database::get().execute_read([&](auto& txn) -> std::optional<std::string> {
-            auto r = txn.exec("SELECT region FROM mi_accounts ORDER BY linked_at, owner_id LIMIT 1");
+            auto r = txn.exec_params("SELECT xiaomi_user_id FROM mi_accounts WHERE owner_id = $1::uuid", owner_id);
             if (r.empty()) {
                 return std::nullopt;
             }
             return r[0][0].template as<std::string>();
+        });
+    }
+
+    struct Linked {
+        std::string owner_id;
+        std::string xiaomi_user_id;
+        std::string region;
+    };
+
+    /// Accounts the schedule syncs: those whose token Xiaomi still accepts,
+    /// oldest link first.
+    std::vector<Linked> list_syncable() {
+        return Database::get().execute_read([&](auto& txn) {
+            std::vector<Linked> out;
+            for (const auto& row : txn.exec("SELECT owner_id::text, xiaomi_user_id, region FROM mi_accounts "
+                                            "WHERE status = 'ok' ORDER BY linked_at, owner_id")) {
+                out.push_back({row[0].template as<std::string>(),
+                               row[1].template as<std::string>(),
+                               row[2].template as<std::string>()});
+            }
+            return out;
         });
     }
 

@@ -12,6 +12,8 @@
 #pragma once
 
 #include <string>
+#include <string_view>
+#include <utility>
 
 #include <nlohmann/json.hpp>
 
@@ -21,6 +23,13 @@ namespace Repositories {
 
 class HealthReadRepository {
 public:
+    /**
+     * @param xiaomi_user_id the account whose rows are read: the fitness tables
+     *        are keyed by the Xiaomi id, and every query here filters by it.
+     *        An empty id (a user without a linked account) matches no row.
+     */
+    explicit HealthReadRepository(std::string xiaomi_user_id) : account_(std::move(xiaomi_user_id)) {}
+
     struct Page {
         nlohmann::json rows = nlohmann::json::array();
         long total = 0;
@@ -29,8 +38,8 @@ public:
     Page daily_activity(const std::string& from, const std::string& to, long limit, long offset) {
         return page(
             "SELECT date::text, steps, distance_m, active_kcal, total_kcal, timezone "
-            "FROM daily_activity WHERE date BETWEEN $1 AND $2 ORDER BY date",
-            "SELECT COUNT(*) FROM daily_activity WHERE date BETWEEN $1 AND $2",
+            "FROM daily_activity WHERE user_id = {ACC} AND date BETWEEN $1 AND $2 ORDER BY date",
+            "SELECT COUNT(*) FROM daily_activity WHERE user_id = {ACC} AND date BETWEEN $1 AND $2",
             from,
             to,
             limit,
@@ -131,17 +140,18 @@ public:
             "s.duration_minutes AS sleep_duration_minutes, s.sleep_score, hr.bpm AS resting_bpm "
             "FROM daily_activity a "
             "LEFT JOIN LATERAL (SELECT duration_minutes, sleep_score FROM sleep_sessions "
-            " WHERE NOT is_nap AND end_at >= " +
+            " WHERE user_id = {ACC} AND NOT is_nap AND end_at >= " +
             day_start + " AND end_at < " + day_start +
             " + interval '1 day' ORDER BY duration_minutes DESC LIMIT 1) s ON true "
             "LEFT JOIN LATERAL (SELECT bpm FROM heart_rate_samples "
-            " WHERE sample_type = 'resting' AND timestamp >= " +
+            " WHERE user_id = {ACC} AND sample_type = 'resting' AND timestamp >= " +
             day_start + " AND timestamp < " + day_start +
             " + interval '1 day' "
             " ORDER BY timestamp DESC LIMIT 1) hr ON true "
-            "WHERE a.date BETWEEN $1 AND $2 ORDER BY a.date";
+            "WHERE a.user_id = {ACC} AND a.date BETWEEN $1 AND $2 ORDER BY a.date";
         return page(select,
-                    "SELECT COUNT(*) FROM daily_activity WHERE date BETWEEN $1 AND $2 AND $3::bigint > -86401",
+                    "SELECT COUNT(*) FROM daily_activity WHERE user_id = {ACC} AND date BETWEEN $1 AND $2 "
+                    "AND $3::bigint > -86401",
                     from,
                     to,
                     limit,
@@ -182,21 +192,23 @@ public:
                 const std::string col(e.column);
                 // For timestamptz the date is taken in UTC, not the session zone.
                 const std::string day = col == "date" ? col : "(" + col + " AT TIME ZONE 'UTC')";
-                auto r = txn.exec(
+                auto r = txn.exec_params(
                     "SELECT json_build_object("
                     "'first_date', MIN(" +
-                    day +
-                    ")::date::text, "
-                    "'last_date', MAX(" +
-                    day +
-                    ")::date::text, "
-                    "'records', COUNT(*)) FROM " +
-                    std::string(e.table));
+                        day +
+                        ")::date::text, "
+                        "'last_date', MAX(" +
+                        day +
+                        ")::date::text, "
+                        "'records', COUNT(*)) FROM " +
+                        std::string(e.table) + " WHERE user_id = $1",
+                    account_);
                 out[e.type] = nlohmann::json::parse(r[0][0].template as<std::string>());
             }
-            auto s = txn.exec(
+            auto s = txn.exec_params(
                 "SELECT COALESCE(json_object_agg(data_type, to_char(last_sync_at AT TIME ZONE 'UTC', "
-                "'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"')), '{}'::json) FROM sync_state");
+                "'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"')), '{}'::json) FROM sync_state WHERE xiaomi_user_id = $1",
+                account_);
             const auto last = nlohmann::json::parse(s[0][0].template as<std::string>());
             for (auto& [type, entry] : out.items()) {
                 entry["last_sync_at"] = last.contains(type) ? last[type] : nlohmann::json();
@@ -238,9 +250,20 @@ private:
     /// Explicit AT TIME ZONE 'UTC': the date -> timestamptz cast takes
     /// midnight in the Postgres session zone, while the response promises UTC
     /// (phase 3 review, Important 4; production runs in Etc/UTC, the fix is defensive).
+    /// The account filter rides along: every caller reads one table of the account.
     static std::string day_range(const std::string& column) {
-        return "(" + column + " >= $1::date::timestamp AT TIME ZONE 'UTC' AND " + column +
+        return "(user_id = {ACC} AND " + column + " >= $1::date::timestamp AT TIME ZONE 'UTC' AND " + column +
                " < ($2::date + 1)::timestamp AT TIME ZONE 'UTC')";
+    }
+
+    /// Replace the {ACC} marker with the placeholder of the account parameter.
+    static std::string with_account(std::string sql, int index) {
+        static constexpr std::string_view kMarker = "{ACC}";
+        const std::string placeholder = "$" + std::to_string(index);
+        for (auto at = sql.find(kMarker); at != std::string::npos; at = sql.find(kMarker, at)) {
+            sql.replace(at, kMarker.size(), placeholder);
+        }
+        return sql;
     }
 
     template <typename... Extra>
@@ -251,22 +274,30 @@ private:
               long limit,
               long offset,
               Extra&&... extra) {
+        // The account is the last parameter of both statements; its number
+        // depends on how many extra parameters the query has.
+        const int extras = static_cast<int>(sizeof...(Extra));
+        const std::string select_sql = with_account(select, 5 + extras);
+        const std::string total_sql = with_account(count_sql, 3 + extras);
         Page out;
         Database::get().execute_read([&](auto& txn) {
-            auto agg =
-                txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (" + select + " LIMIT $3 OFFSET $4) t",
-                                from,
-                                to,
-                                limit,
-                                offset,
-                                extra...);
+            auto agg = txn.exec_params(
+                "SELECT COALESCE(json_agg(t), '[]'::json) FROM (" + select_sql + " LIMIT $3 OFFSET $4) t",
+                from,
+                to,
+                limit,
+                offset,
+                extra...,
+                account_);
             out.rows = nlohmann::json::parse(agg[0][0].template as<std::string>());
-            auto total = txn.exec_params(count_sql, from, to, std::forward<Extra>(extra)...);
+            auto total = txn.exec_params(total_sql, from, to, extra..., account_);
             out.total = total[0][0].template as<long>();
             return 0;
         });
         return out;
     }
+
+    std::string account_;
 };
 
 }  // namespace Repositories
