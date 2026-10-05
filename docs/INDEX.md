@@ -81,6 +81,7 @@ tree.
 | `new-module.sh` | Scaffold a feature-module master switch (config flag + `Core::<name>_enabled()` + compose/helm/docs wiring), following the fitness module's on/off pattern |
 | `new-migration.sh` | Generate the next `NNN_<slug>.sql` |
 | `new-react-page.sh` | Scaffold a frontend admin page (hook + query keys + route) |
+| `gen-exercise-seed.py` | Generate the exercise-library seed migration of the workout module from a pinned commit of yuhonas/free-exercise-db (a newer dataset goes into a new migration number) |
 | `gen-openapi-json.sh` | Convert `docs/openapi.yaml` into the committed `tests/e2e/openapi.gen.json` that the e2e binary validates response bodies against (needs pyyaml) |
 | `check-openapi-drift.sh` | Verify `Api::get_endpoints()` (src/api/Endpoints.hpp) ↔ `docs/openapi.yaml` (method, path) |
 | `check-routes-registered.sh` | Verify every controller ADD_METHOD_TO route is in `Api::get_endpoints()` (symmetric to the OpenAPI drift check) |

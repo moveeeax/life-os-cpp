@@ -161,6 +161,13 @@ billing:
 fitness:
   enabled: false
 
+# ---------------------------------------------------------------
+# workout module — keep in sync with the life-os-cpp chart.
+# Env var set: WORKOUT_ENABLED
+# ---------------------------------------------------------------
+workout:
+  enabled: false
+
 
 # ---------------------------------------------------------------
 # External PostgreSQL connection

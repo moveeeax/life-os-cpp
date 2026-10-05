@@ -242,6 +242,13 @@ outage can never affect the money path.
 | `MI_FITNESS_SYNC_SCHEDULE_HOURS` | `fitness.xiaomi.sync_schedule_hours` | int | `0` | Recurring sync period in hours, runs in the API pod and enqueues a job. `0` (default) disables the schedule |
 | `MI_FITNESS_SYNC_WINDOW_DAYS` | `fitness.xiaomi.sync_window_days` | int | `2` | How many recent days each scheduled sync covers, dates in the region zone |
 
+
+## Workout module
+
+| Env | JSON key | Type | Default | Notes |
+|---|---|---|---|---|
+| `WORKOUT_ENABLED` | `workout.enabled` | bool | `false` | Master switch for the workout module (`Core::workout_enabled()`): exercise library, routines, workout log. Same on/off pattern as `FITNESS_ENABLED`; routes stay registered, handlers 404 while off. The links to Mi Fitness data need the fitness module as well. |
+
 ## Mail (SMTP)
 
 | Env | JSON key | Type | Default | Notes |

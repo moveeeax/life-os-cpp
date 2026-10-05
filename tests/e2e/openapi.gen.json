@@ -1678,6 +1678,452 @@
       }
      }
     }
+   },
+   "Exercise": {
+    "type": "object",
+    "required": [
+     "id",
+     "source",
+     "name",
+     "category",
+     "primary_muscles",
+     "secondary_muscles",
+     "instructions",
+     "images",
+     "tracking_mode",
+     "archived"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "description": "Library id (e.g. Barbell_Squat) or custom_<hex> for own exercises"
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "library",
+       "custom"
+      ]
+     },
+     "name": {
+      "type": "string"
+     },
+     "category": {
+      "type": "string"
+     },
+     "equipment": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "level": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "force": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "mechanic": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "primary_muscles": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "secondary_muscles": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "instructions": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "images": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Paths under /exercise-media/"
+     },
+     "tracking_mode": {
+      "$ref": "#/components/schemas/ExerciseTrackingMode"
+     },
+     "archived": {
+      "type": "boolean"
+     }
+    }
+   },
+   "ExerciseTrackingMode": {
+    "type": "string",
+    "enum": [
+     "weight_reps",
+     "bodyweight_reps",
+     "duration",
+     "distance_duration"
+    ],
+    "description": "What a set of the exercise records."
+   },
+   "ExerciseResponse": {
+    "type": "object",
+    "required": [
+     "data"
+    ],
+    "properties": {
+     "data": {
+      "$ref": "#/components/schemas/Exercise"
+     }
+    }
+   },
+   "ExerciseListResponse": {
+    "type": "object",
+    "required": [
+     "data",
+     "count",
+     "total"
+    ],
+    "properties": {
+     "data": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/Exercise"
+      }
+     },
+     "count": {
+      "type": "integer"
+     },
+     "total": {
+      "type": "integer",
+      "description": "Rows matching the filters, ignoring limit/offset"
+     }
+    }
+   },
+   "ExerciseInput": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+     },
+     "category": {
+      "type": "string",
+      "maxLength": 120
+     },
+     "equipment": {
+      "type": "string",
+      "maxLength": 120
+     },
+     "primary_muscles": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+       "type": "string"
+      }
+     },
+     "secondary_muscles": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+       "type": "string"
+      }
+     },
+     "instructions": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+       "type": "string"
+      }
+     },
+     "tracking_mode": {
+      "$ref": "#/components/schemas/ExerciseTrackingMode"
+     },
+     "archived": {
+      "type": "boolean"
+     }
+    }
+   },
+   "RoutineSummary": {
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "weekday",
+     "position",
+     "note",
+     "exercise_count"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "name": {
+      "type": "string"
+     },
+     "weekday": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 7,
+      "description": "1 = Monday … 7 = Sunday"
+     },
+     "position": {
+      "type": "integer"
+     },
+     "note": {
+      "type": "string"
+     },
+     "exercise_count": {
+      "type": "integer"
+     }
+    }
+   },
+   "RoutineExercise": {
+    "type": "object",
+    "required": [
+     "id",
+     "exercise_id",
+     "position",
+     "target_sets",
+     "rest_seconds",
+     "note",
+     "exercise_name",
+     "tracking_mode",
+     "images",
+     "primary_muscles"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "exercise_id": {
+      "type": "string"
+     },
+     "position": {
+      "type": "integer"
+     },
+     "target_sets": {
+      "type": "integer"
+     },
+     "target_reps_min": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "target_reps_max": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "target_duration_seconds": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "rest_seconds": {
+      "type": "integer"
+     },
+     "note": {
+      "type": "string"
+     },
+     "exercise_name": {
+      "type": "string"
+     },
+     "tracking_mode": {
+      "$ref": "#/components/schemas/ExerciseTrackingMode"
+     },
+     "images": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "primary_muscles": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "Routine": {
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "weekday",
+     "position",
+     "note",
+     "exercises"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "name": {
+      "type": "string"
+     },
+     "weekday": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 7
+     },
+     "position": {
+      "type": "integer"
+     },
+     "note": {
+      "type": "string"
+     },
+     "exercises": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/RoutineExercise"
+      }
+     }
+    }
+   },
+   "RoutineResponse": {
+    "type": "object",
+    "required": [
+     "data"
+    ],
+    "properties": {
+     "data": {
+      "$ref": "#/components/schemas/Routine"
+     }
+    }
+   },
+   "RoutineListResponse": {
+    "type": "object",
+    "required": [
+     "data",
+     "count",
+     "total"
+    ],
+    "properties": {
+     "data": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/RoutineSummary"
+      }
+     },
+     "count": {
+      "type": "integer"
+     },
+     "total": {
+      "type": "integer"
+     }
+    }
+   },
+   "RoutineInput": {
+    "type": "object",
+    "required": [
+     "name",
+     "exercises"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+     },
+     "weekday": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 7
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 2000
+     },
+     "exercises": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+       "type": "object",
+       "required": [
+        "exercise_id"
+       ],
+       "properties": {
+        "exercise_id": {
+         "type": "string"
+        },
+        "target_sets": {
+         "type": [
+          "integer",
+          "null"
+         ],
+         "minimum": 1,
+         "maximum": 50
+        },
+        "target_reps_min": {
+         "type": [
+          "integer",
+          "null"
+         ],
+         "minimum": 1,
+         "maximum": 1000
+        },
+        "target_reps_max": {
+         "type": [
+          "integer",
+          "null"
+         ],
+         "minimum": 1,
+         "maximum": 1000
+        },
+        "target_duration_seconds": {
+         "type": [
+          "integer",
+          "null"
+         ],
+         "minimum": 1,
+         "maximum": 86400
+        },
+        "rest_seconds": {
+         "type": [
+          "integer",
+          "null"
+         ],
+         "minimum": 0,
+         "maximum": 3600
+        },
+        "note": {
+         "type": "string",
+         "maxLength": 2000
+        }
+       }
+      }
+     }
+    }
    }
   }
  },
@@ -5078,12 +5524,646 @@
      }
     }
    }
+  },
+  "/api/v1/workout/exercises": {
+   "get": {
+    "summary": "Search the exercise library and own exercises",
+    "tags": [
+     "workout"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "q",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "maxLength": 120
+      },
+      "description": "Substring of the name, case-insensitive"
+     },
+     {
+      "name": "muscle",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Primary or secondary muscle"
+     },
+     {
+      "name": "equipment",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "category",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "source",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "library",
+        "custom"
+       ]
+      }
+     },
+     {
+      "name": "archived",
+      "in": "query",
+      "schema": {
+       "type": "boolean",
+       "default": false
+      },
+      "description": "Include archived exercises"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Page of exercises ordered by name",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ExerciseListResponse"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "q too long or unknown source",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Missing fitness:read, or the principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Workout module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "summary": "Create a custom exercise",
+    "tags": [
+     "workout"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "allOf": [
+         {
+          "$ref": "#/components/schemas/ExerciseInput"
+         },
+         {
+          "type": "object",
+          "required": [
+           "name",
+           "tracking_mode"
+          ]
+         }
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Created",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ExerciseResponse"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ValidationError"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Missing fitness:read, or the principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Workout module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/workout/exercises/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "get": {
+    "summary": "Read one exercise",
+    "tags": [
+     "workout"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The exercise",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ExerciseResponse"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Missing fitness:read, or the principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Workout module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "summary": "Edit a custom exercise, or the tracking mode and archived flag of a library one",
+    "tags": [
+     "workout"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ExerciseInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The updated exercise",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ExerciseResponse"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed, or a content field of a library exercise (library_exercise_read_only)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Missing fitness:read, or the principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Workout module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/workout/routines": {
+   "get": {
+    "summary": "List routines",
+    "tags": [
+     "workout"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Routines ordered by weekday",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RoutineListResponse"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Missing fitness:read, or the principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Workout module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/workout/routines/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "get": {
+    "summary": "Read a routine with its exercises",
+    "tags": [
+     "workout"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The routine",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RoutineResponse"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "id is not a UUID",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Missing fitness:read, or the principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Workout module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "summary": "Create the routine with this id, or replace it and its exercises",
+    "tags": [
+     "workout"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RoutineInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The stored routine",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RoutineResponse"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed, id is not a UUID, or an exercise_id is unknown (unknown_exercise)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Missing fitness:read, or the principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Workout module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a routine",
+    "tags": [
+     "workout"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Deleted",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "message"
+         ],
+         "properties": {
+          "message": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "id is not a UUID",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Missing fitness:read, or the principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Workout module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
   }
  },
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 84199,
-  "source_fnv1a64": "502fc884b2aee0ec"
+  "source_bytes": 99647,
+  "source_fnv1a64": "a82543b1c55031eb"
  }
 }
