@@ -62,12 +62,13 @@ std::vector<Chunk> split_range(const std::string& from, const std::string& to, i
     return chunks;
 }
 
-/// Atomic queued -> running transition. false when another run is already in progress.
+/// Atomic queued -> running transition. false when another run of the same
+/// account is already in progress; runs of other accounts do not matter.
 ///
 /// Before claiming, stale running rows are marked interrupted: a worker killed
 /// mid-sync (OOM, node eviction) never clears its own row, and without this
-/// step the partial index one_running_sync_run would block every future run
-/// forever (Critical 2 of the final review). The stale threshold exceeds the
+/// step the partial index one_running_sync_run_per_account would block every
+/// future run of that account forever (Critical 2 of the final review). The stale threshold exceeds the
 /// longest honest duration: the per-type ceiling times the number of types,
 /// plus a margin.
 bool try_start(long run_id, long stale_seconds) {
@@ -75,8 +76,10 @@ bool try_start(long run_id, long stale_seconds) {
         return Database::get().execute_write([&](auto& txn) {
             txn.exec_params(
                 "UPDATE sync_runs SET status = 'interrupted', finished_at = now() "
-                "WHERE status = 'running' AND started_at < now() - make_interval(secs => $1::double precision)",
-                stale_seconds);
+                "WHERE status = 'running' AND started_at < now() - make_interval(secs => $1::double precision) "
+                "AND xiaomi_user_id = (SELECT xiaomi_user_id FROM sync_runs WHERE id = $2)",
+                stale_seconds,
+                run_id);
             // Only from queued: a redelivered job must not revive a closed run
             // or overwrite its journal (Important 4).
             auto r = txn.exec_params(
@@ -86,7 +89,7 @@ bool try_start(long run_id, long stale_seconds) {
             return !r.empty();
         });
     } catch (const std::exception&) {
-        // Violation of the partial unique index one_running_sync_run.
+        // Violation of the partial unique index one_running_sync_run_per_account.
         return false;
     }
 }
@@ -107,15 +110,16 @@ std::string shift_date(const std::string& date, int days) {
     return out;
 }
 
-void bump_sync_state(const std::string& data_type, long added) {
+void bump_sync_state(const std::string& xiaomi_user_id, const std::string& data_type, long added) {
     Database::get().execute_write([&](auto& txn) {
         txn.exec_params(
-            "INSERT INTO sync_state (data_type, last_sync_at, records_count) "
-            "VALUES ($1, now(), $2) "
-            "ON CONFLICT (data_type) DO UPDATE SET "
+            "INSERT INTO sync_state (xiaomi_user_id, data_type, last_sync_at, records_count) "
+            "VALUES ($3, $1, now(), $2) "
+            "ON CONFLICT (xiaomi_user_id, data_type) DO UPDATE SET "
             "last_sync_at = now(), records_count = sync_state.records_count + $2",
             data_type,
-            added);
+            added,
+            xiaomi_user_id);
         return true;
     });
 }
@@ -307,7 +311,7 @@ nlohmann::json SyncService::run(long run_id,
             if (suppressed > 0) {
                 entry["suppressed_steps"] = suppressed;
             }
-            bump_sync_state(data_type, counts.added);
+            bump_sync_state(credentials_.user_id, data_type, counts.added);
         } catch (const Xiaomi::MiFitnessAuthError& e) {
             any_failed = true;
             auth_dead = !logged_in;

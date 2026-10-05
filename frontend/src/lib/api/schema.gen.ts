@@ -1787,7 +1787,7 @@ export interface paths {
         put?: never;
         /**
          * Enqueue a cloud sync run
-         * @description Creates a sync_runs journal row and puts an fitness_sync job on the queue. The run executes in the worker; poll the journal by run_id.
+         * @description Creates a sync_runs journal row for the caller's Mi account and puts a fitness_sync job on the queue. The run executes in the worker; poll the journal by run_id. Without a linked account the answer is 409 not_linked.
          */
         post: {
             parameters: {
@@ -1824,6 +1824,15 @@ export interface paths {
                 };
                 /** @description Malformed range, unknown or duplicate data type */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No Mi account is linked (not_linked) */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };

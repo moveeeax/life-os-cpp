@@ -24,7 +24,11 @@ inline constexpr long long kSyncAdvisoryLockKey = 0x4d69466974;
 
 class SyncRunRepository {
 public:
-    long create(const std::string& from, const std::string& to, const std::vector<std::string>& data_types) {
+    /// A queued run of one Xiaomi account.
+    long create(const std::string& xiaomi_user_id,
+                const std::string& from,
+                const std::string& to,
+                const std::vector<std::string>& data_types) {
         // Types are internal identifiers without commas or braces, so the
         // array literal is built by concatenation without escaping.
         std::string array_literal = "{";
@@ -36,15 +40,16 @@ public:
         }
         array_literal += "}";
         return Database::get().execute_write([&](auto& txn) {
-            // Status queued, not running: the running row is one per system by
+            // Status queued, not running: the running row is one per account by
             // the partial unique index, and the executor must claim it with an
             // atomic transition, not the enqueuer.
             auto r = txn.exec_params(
-                "INSERT INTO sync_runs (status, requested_start, requested_end, data_types) "
-                "VALUES ('queued', $1, $2, $3::text[]) RETURNING id",
+                "INSERT INTO sync_runs (status, requested_start, requested_end, data_types, xiaomi_user_id) "
+                "VALUES ('queued', $1, $2, $3::text[], $4) RETURNING id",
                 from,
                 to,
-                array_literal);
+                array_literal,
+                xiaomi_user_id);
             return r[0][0].template as<long>();
         });
     }
@@ -57,15 +62,6 @@ public:
                 id,
                 status,
                 result.dump());
-            return true;
-        });
-    }
-
-    /// Record which Xiaomi account a run syncs: the link status of a user
-    /// shows the last run of their account.
-    void set_account(long id, const std::string& xiaomi_user_id) {
-        Database::get().execute_write([&](auto& txn) {
-            txn.exec_params("UPDATE sync_runs SET xiaomi_user_id = $2 WHERE id = $1", id, xiaomi_user_id);
             return true;
         });
     }
@@ -84,20 +80,26 @@ public:
         });
     }
 
-    /// Whether a live run exists: probe refuses to work during a sync.
-    bool any_running() {
-        return Database::get().execute_read(
-            [](auto& txn) { return !txn.exec("SELECT 1 FROM sync_runs WHERE status = 'running' LIMIT 1").empty(); });
+    /// Whether a run of this account is live: a probe or an unlink must not
+    /// log in or delete rows under it.
+    bool any_running(const std::string& xiaomi_user_id) {
+        return Database::get().execute_read([&](auto& txn) {
+            return !txn.exec_params("SELECT 1 FROM sync_runs WHERE status = 'running' AND xiaomi_user_id = $1 LIMIT 1",
+                                    xiaomi_user_id)
+                        .empty();
+        });
     }
 
-    std::optional<nlohmann::json> get(long id) {
+    /// A run of this account; a run of another account does not exist for the caller.
+    std::optional<nlohmann::json> get(long id, const std::string& xiaomi_user_id) {
         return Database::get().execute_read([&](auto& txn) -> std::optional<nlohmann::json> {
             auto r = txn.exec_params(
                 "SELECT id, started_at::text, finished_at::text, status, "
                 "requested_start::text, requested_end::text, "
                 "array_to_json(data_types)::text, result::text "
-                "FROM sync_runs WHERE id = $1",
-                id);
+                "FROM sync_runs WHERE id = $1 AND xiaomi_user_id = $2",
+                id,
+                xiaomi_user_id);
             if (r.empty()) {
                 return std::nullopt;
             }
