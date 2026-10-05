@@ -66,9 +66,10 @@ protected:
 TEST_F(MiAccountRepositoryTest, EmptyMeansNoLink) {
     Repositories::MiAccountRepository repo(kTestKeyB64);
     EXPECT_FALSE(repo.load(kAnna).has_value());
-    EXPECT_FALSE(repo.load_first().has_value());
+    EXPECT_FALSE(repo.xiaomi_id_of(kAnna).has_value());
+    EXPECT_TRUE(repo.list_syncable().empty());
     EXPECT_FALSE(repo.status(kAnna).has_value());
-    EXPECT_FALSE(repo.first_region().has_value());
+    EXPECT_FALSE(repo.region_of(kAnna).has_value());
     EXPECT_FALSE(repo.unlink(kAnna, true));
 }
 
@@ -83,9 +84,7 @@ TEST_F(MiAccountRepositoryTest, LinkRoundTripsAndSealsTheToken) {
     EXPECT_EQ(loaded->region, "cn");
     EXPECT_FALSE(repo.load(kBoris).has_value());
 
-    const auto first = repo.load_first();
-    ASSERT_TRUE(first.has_value());
-    EXPECT_EQ(first->first, kAnna);
+    EXPECT_EQ(repo.xiaomi_id_of(kAnna).value_or(""), "1111111111");
 
     const std::string stored = Database::get().execute_read([](auto& txn) {
         return txn.exec("SELECT pass_token_sealed FROM mi_accounts")[0][0].template as<std::string>();
@@ -168,7 +167,6 @@ TEST_F(MiAccountRepositoryTest, RegionIsSetOnlyToAKnownCandidate) {
     repo.link(kAnna, creds("1111111111"), false);
     EXPECT_TRUE(repo.set_region(kAnna, "sg", true));
     EXPECT_EQ(repo.region_of(kAnna).value_or(""), "sg");
-    EXPECT_EQ(repo.first_region().value_or(""), "sg");
     EXPECT_EQ((*repo.status(kAnna))["region_detected"], true);
     EXPECT_THROW(repo.set_region(kAnna, "evil.example", true), Xiaomi::MiFitnessAuthError);
     EXPECT_FALSE(repo.set_region(kBoris, "sg", true));
@@ -238,4 +236,27 @@ TEST_F(MiAccountRepositoryTest, RejectsHeaderInjectionAndUnknownRegion) {
                  Xiaomi::MiFitnessAuthError);
     EXPECT_THROW(repo.link(kAnna, {"1111111111", "bad token;", "cn"}, true), Xiaomi::MiFitnessAuthError);
     EXPECT_EQ(count("SELECT COUNT(*) FROM mi_accounts"), 0);
+}
+
+TEST_F(MiAccountRepositoryTest, XiaomiIdIsReadWithoutTheKey) {
+    Repositories::MiAccountRepository(kTestKeyB64).link(kAnna, creds("1111111111"), true);
+    // Reads filter by the id on every request; they must not need the sealing key.
+    Repositories::MiAccountRepository keyless("");
+    EXPECT_EQ(keyless.xiaomi_id_of(kAnna).value_or(""), "1111111111");
+    EXPECT_FALSE(keyless.xiaomi_id_of(kBoris).has_value());
+}
+
+TEST_F(MiAccountRepositoryTest, OnlyAccountsWithAnAcceptedTokenAreSynced) {
+    Repositories::MiAccountRepository repo(kTestKeyB64);
+    repo.link(kAnna, creds("1111111111"), true);
+    repo.link(kBoris, creds("2222222222"), true);
+    repo.set_region(kBoris, "sg", true);
+    ASSERT_EQ(repo.list_syncable().size(), 2u);
+
+    repo.mark_reauth_required(kAnna, "upstream_auth");
+    const auto syncable = repo.list_syncable();
+    ASSERT_EQ(syncable.size(), 1u);
+    EXPECT_EQ(syncable[0].owner_id, kBoris);
+    EXPECT_EQ(syncable[0].xiaomi_user_id, "2222222222");
+    EXPECT_EQ(syncable[0].region, "sg");
 }

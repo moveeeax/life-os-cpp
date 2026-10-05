@@ -60,6 +60,25 @@ json body_of(const HttpResponsePtr& resp) {
     return json::parse(std::string(resp->body()));
 }
 
+/// The test user with a linked Mi account of this Xiaomi id. Reads filter by
+/// the link; the token is not needed for them, so the row carries a dummy.
+void link_test_user(const std::string& xiaomi_id) {
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec("TRUNCATE TABLE mi_accounts");
+        txn.exec_params(
+            "INSERT INTO users (id, email, confirmed, role_id) "
+            "VALUES ($1::uuid, 'fitness-test@example.test', TRUE, (SELECT id FROM roles ORDER BY id LIMIT 1)) "
+            "ON CONFLICT DO NOTHING",
+            std::string(kTestUserId));
+        txn.exec_params(
+            "INSERT INTO mi_accounts (owner_id, xiaomi_user_id, pass_token_sealed, nonce) "
+            "VALUES ($1::uuid, $2, 'x', 'x')",
+            std::string(kTestUserId),
+            xiaomi_id);
+        return true;
+    });
+}
+
 }  // namespace
 
 // ── probe ────────────────────────────────────────────────────────────────────
@@ -198,10 +217,11 @@ TEST_F(XiaomiProbeTest, UpstreamAuthFailureIsReported) {
 // log in, and login rotates the token. While a running row is alive, probe
 // answers 409 without going to the cloud.
 TEST_F(XiaomiProbeTest, ProbeRefusesWhileASyncRunIsRunning) {
+    seed_credentials();
     Database::get().execute_write([](auto& txn) {
         txn.exec(
-            "INSERT INTO sync_runs (status, requested_start, requested_end, data_types) "
-            "VALUES ('running', '2026-09-01', '2026-09-02', '{daily_activity}')");
+            "INSERT INTO sync_runs (status, requested_start, requested_end, data_types, xiaomi_user_id) "
+            "VALUES ('running', '2026-09-01', '2026-09-02', '{daily_activity}', '1234567890')");
         return true;
     });
 
@@ -244,6 +264,7 @@ protected:
             txn.exec("TRUNCATE TABLE sync_runs");
             return true;
         });
+        link_test_user("1234567890");
     }
 
     HttpResponsePtr post_sync(const json& body) {
@@ -275,15 +296,43 @@ TEST_F(SyncApiTest, EnqueueCreatesARunAndAJob) {
 
     // The run log row exists and carries the range.
     Repositories::SyncRunRepository runs;
-    const auto row = runs.get(run_id);
+    const auto row = runs.get(run_id, "1234567890");
     ASSERT_TRUE(row.has_value());
     EXPECT_EQ((*row)["status"], "queued");
     EXPECT_EQ((*row)["requested_start"], "2026-09-22");
 
-    // The job sits in the queue with the same run_id.
+    // The job sits in the queue with the same run_id and the caller as its owner.
     auto job = Jobs::get().pick({"fitness_sync"}, 1);
     ASSERT_TRUE(job.has_value());
     EXPECT_EQ(job->payload["run_id"].get<long>(), run_id);
+    EXPECT_EQ(job->payload["owner_id"], kTestUserId);
+}
+
+// Without a linked account there is nothing to sync: the caller's state.
+TEST_F(SyncApiTest, EnqueueWithoutALinkedAccountIs409) {
+    Database::get().execute_write([](auto& txn) {
+        txn.exec("TRUNCATE TABLE mi_accounts");
+        return true;
+    });
+    const auto resp = post_sync({{"from", "2026-09-22"}, {"to", "2026-09-23"}});
+    ASSERT_NE(resp, nullptr);
+    EXPECT_EQ(resp->statusCode(), k409Conflict);
+    EXPECT_EQ(json::parse(std::string(resp->body()))["error"], "not_linked");
+}
+
+// A run is visible to the account it belongs to and to nobody else.
+TEST_F(SyncApiTest, StatusOfAnotherAccountsRunIs404) {
+    Repositories::SyncRunRepository runs;
+    const long foreign = runs.create("5555555555", "2026-09-01", "2026-09-07", {"sleep"});
+    EXPECT_EQ(get_status(std::to_string(foreign))->statusCode(), k404NotFound);
+
+    // And a user without a link sees no run at all, not even an unattributed one.
+    const long unattributed = runs.create("", "2026-09-01", "2026-09-07", {"sleep"});
+    Database::get().execute_write([](auto& txn) {
+        txn.exec("TRUNCATE TABLE mi_accounts");
+        return true;
+    });
+    EXPECT_EQ(get_status(std::to_string(unattributed))->statusCode(), k404NotFound);
 }
 
 TEST_F(SyncApiTest, EnqueueRejectsMalformedRange) {
@@ -300,7 +349,7 @@ TEST_F(SyncApiTest, EnqueueRejectsUnknownDataType) {
 
 TEST_F(SyncApiTest, StatusReturnsTheJournalEntry) {
     Repositories::SyncRunRepository runs;
-    const long id = runs.create("2026-09-01", "2026-09-07", {"sleep"});
+    const long id = runs.create("1234567890", "2026-09-01", "2026-09-07", {"sleep"});
     runs.finish(id, "succeeded", json{{"sleep", {{"added", 5}}}});
 
     auto resp = get_status(std::to_string(id));
@@ -349,6 +398,8 @@ protected:
                 "stress_samples, spo2_samples, body_measurements, workouts");
             return true;
         });
+        // The rows of these tests belong to Xiaomi account 42.
+        link_test_user("42");
     }
 
     static HttpRequestPtr ranged(const std::string& from, const std::string& to) {

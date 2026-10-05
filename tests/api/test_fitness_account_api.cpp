@@ -409,7 +409,7 @@ TEST_F(MiAccountApiTest, UnlinkKeepsOrDeletesTheData) {
 
     // A running sync blocks the unlink.
     Database::get().execute_write([](auto& txn) {
-        txn.exec("INSERT INTO sync_runs (status) VALUES ('running')");
+        txn.exec("INSERT INTO sync_runs (status, xiaomi_user_id) VALUES ('running', '1234567890')");
         return true;
     });
     EXPECT_EQ(unlink(user(kAnna))->statusCode(), k409Conflict);

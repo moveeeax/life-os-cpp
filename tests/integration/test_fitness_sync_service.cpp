@@ -26,6 +26,9 @@ using nlohmann::json;
 
 constexpr long long kNoon = 1790049600;  // 2026-09-22T12:00:00+08:00
 
+// The account every run here belongs to: the id the scripted login answers with.
+constexpr const char* kAccount = "1234567890";
+
 class SyncServiceTest : public TestHelpers::CoreBackedTest {
 protected:
     FakeHttpTransport transport;
@@ -99,10 +102,10 @@ TEST_F(SyncServiceTest, ChunkBoundaryDayIsAggregatedAcrossChunks) {
     transport.reply_encrypted(steps_page_at(1790613000, 25200, 226));  // steps
     transport.reply_encrypted(empty_page());                           // calories
 
-    const long id = runs.create("2026-09-22", "2026-09-30", {"daily_activity"});
+    const long id = runs.create(kAccount, "2026-09-22", "2026-09-30", {"daily_activity"});
     service().run(id, "2026-09-22", "2026-09-30", {"daily_activity"});
 
-    const auto row = runs.get(id);
+    const auto row = runs.get(id, kAccount);
     ASSERT_TRUE(row.has_value());
     EXPECT_EQ((*row)["status"], "succeeded");
     const long steps = Database::get().execute_read([](auto& txn) {
@@ -126,7 +129,7 @@ TEST_F(SyncServiceTest, RangeEdgeDayOutsideRequestIsNotUpserted) {
     transport.reply_encrypted(empty_page());
     transport.reply_encrypted(steps_page_at(1790613000, 25200, 226));  // chunk 29..30
     transport.reply_encrypted(empty_page());
-    const long full = runs.create("2026-09-22", "2026-09-30", {"daily_activity"});
+    const long full = runs.create(kAccount, "2026-09-22", "2026-09-30", {"daily_activity"});
     service().run(full, "2026-09-22", "2026-09-30", {"daily_activity"});
 
     // Incremental run from the next day: the same evening minute of the 28th
@@ -134,7 +137,7 @@ TEST_F(SyncServiceTest, RangeEdgeDayOutsideRequestIsNotUpserted) {
     transport.reply_login();
     transport.reply_encrypted(steps_page_at(1790613000, 25200, 226));
     transport.reply_encrypted(empty_page());
-    const long tail = runs.create("2026-09-29", "2026-09-30", {"daily_activity"});
+    const long tail = runs.create(kAccount, "2026-09-29", "2026-09-30", {"daily_activity"});
     service().run(tail, "2026-09-29", "2026-09-30", {"daily_activity"});
 
     const long steps = Database::get().execute_read([](auto& txn) {
@@ -150,14 +153,14 @@ TEST_F(SyncServiceTest, FinishedRunCannotBeRestarted) {
     transport.reply_login();
     transport.reply_encrypted(steps_page(100));
     transport.reply_encrypted(empty_page());
-    const long id = runs.create("2026-09-22", "2026-09-22", {"daily_activity"});
+    const long id = runs.create(kAccount, "2026-09-22", "2026-09-22", {"daily_activity"});
     service().run(id, "2026-09-22", "2026-09-22", {"daily_activity"});
 
     // The fake's queue is empty: the repeated attempt must finish before any network call.
     const auto second = service().run(id, "2026-09-22", "2026-09-22", {"daily_activity"});
 
     EXPECT_TRUE(second.contains("skipped_reason"));
-    const auto row = runs.get(id);
+    const auto row = runs.get(id, kAccount);
     ASSERT_TRUE(row.has_value());
     EXPECT_EQ((*row)["status"], "succeeded");
 }
@@ -168,19 +171,20 @@ TEST_F(SyncServiceTest, StaleRunningRunIsInterruptedAndReleasesTheMutex) {
     Repositories::SyncRunRepository runs;
     Database::get().execute_write([](auto& txn) {
         txn.exec(
-            "INSERT INTO sync_runs (status, started_at, requested_start, requested_end, data_types) "
-            "VALUES ('running', now() - interval '6 hours', '2026-09-01', '2026-09-02', '{daily_activity}')");
+            "INSERT INTO sync_runs (status, started_at, requested_start, requested_end, data_types, xiaomi_user_id) "
+            "VALUES ('running', now() - interval '6 hours', '2026-09-01', '2026-09-02', '{daily_activity}', "
+            "'1234567890')");
         return true;
     });
 
     transport.reply_login();
     transport.reply_encrypted(steps_page(100));
     transport.reply_encrypted(empty_page());
-    const long id = runs.create("2026-09-22", "2026-09-22", {"daily_activity"});
+    const long id = runs.create(kAccount, "2026-09-22", "2026-09-22", {"daily_activity"});
     const auto result = service().run(id, "2026-09-22", "2026-09-22", {"daily_activity"});
 
     EXPECT_FALSE(result.contains("skipped_reason"));
-    const auto row = runs.get(id);
+    const auto row = runs.get(id, kAccount);
     ASSERT_TRUE(row.has_value());
     EXPECT_EQ((*row)["status"], "succeeded");
     const std::string stale = Database::get().execute_read([](auto& txn) {
@@ -199,7 +203,7 @@ TEST_F(SyncServiceTest, SleepReportWindowHasOneDayMargin) {
     transport.reply_encrypted(sleep_page(1790172000, 1790204400));
     transport.reply_encrypted(empty_page());  // reports: empty
 
-    const long id = runs.create("2026-09-22", "2026-09-28", {"sleep"});
+    const long id = runs.create(kAccount, "2026-09-22", "2026-09-28", {"sleep"});
     service().run(id, "2026-09-22", "2026-09-28", {"sleep"});
 
     // The reports request is the fourth one (two logins, sleep fetch, reports).
@@ -221,10 +225,10 @@ TEST_F(SyncServiceTest, AuthFailureOnLoginStopsFurtherLoginAttempts) {
     Repositories::SyncRunRepository runs;
     transport.reply({401, "", {}});
 
-    const long id = runs.create("2026-09-22", "2026-09-22", {"daily_activity", "sleep"});
+    const long id = runs.create(kAccount, "2026-09-22", "2026-09-22", {"daily_activity", "sleep"});
     service().run(id, "2026-09-22", "2026-09-22", {"daily_activity", "sleep"});
 
-    const auto row = runs.get(id);
+    const auto row = runs.get(id, kAccount);
     ASSERT_TRUE(row.has_value());
     EXPECT_EQ((*row)["status"], "failed");
     EXPECT_EQ((*row)["result"]["daily_activity"]["error"], "auth");
@@ -239,9 +243,9 @@ TEST_F(SyncServiceTest, RepeatRunGivesAddedThenUpdated) {
     transport.reply_login();
     transport.reply_encrypted(steps_page(100));  // steps
     transport.reply_encrypted(empty_page());     // calories
-    const long first = runs.create("2026-09-22", "2026-09-22", {"daily_activity"});
+    const long first = runs.create(kAccount, "2026-09-22", "2026-09-22", {"daily_activity"});
     service().run(first, "2026-09-22", "2026-09-22", {"daily_activity"});
-    auto row = runs.get(first);
+    auto row = runs.get(first, kAccount);
     ASSERT_TRUE(row.has_value());
     EXPECT_EQ((*row)["status"], "succeeded");
     EXPECT_EQ((*row)["result"]["daily_activity"]["added"], 1);
@@ -249,9 +253,9 @@ TEST_F(SyncServiceTest, RepeatRunGivesAddedThenUpdated) {
     transport.reply_login();
     transport.reply_encrypted(steps_page(100));
     transport.reply_encrypted(empty_page());
-    const long second = runs.create("2026-09-22", "2026-09-22", {"daily_activity"});
+    const long second = runs.create(kAccount, "2026-09-22", "2026-09-22", {"daily_activity"});
     service().run(second, "2026-09-22", "2026-09-22", {"daily_activity"});
-    row = runs.get(second);
+    row = runs.get(second, kAccount);
     EXPECT_EQ((*row)["result"]["daily_activity"]["added"], 0);
     EXPECT_EQ((*row)["result"]["daily_activity"]["updated"], 1);
 }
@@ -264,10 +268,10 @@ TEST_F(SyncServiceTest, FailedTypeDoesNotStopTheRest) {
     transport.reply({400, "boom", {}});        // sleep: protocol error
     transport.reply_encrypted(weight_page());  // body_measurements works
 
-    const long id = runs.create("2026-09-22", "2026-09-22", {"sleep", "body_measurements"});
+    const long id = runs.create(kAccount, "2026-09-22", "2026-09-22", {"sleep", "body_measurements"});
     service().run(id, "2026-09-22", "2026-09-22", {"sleep", "body_measurements"});
 
-    const auto row = runs.get(id);
+    const auto row = runs.get(id, kAccount);
     ASSERT_TRUE(row.has_value());
     EXPECT_EQ((*row)["status"], "failed");
     EXPECT_EQ((*row)["result"]["sleep"]["error"], "protocol");
@@ -282,10 +286,10 @@ TEST_F(SyncServiceTest, AuthCodeIsClassifiedAsAuth) {
     transport.reply_encrypted(R"({"code":-10001,"message":"expired"})");
     transport.reply_encrypted(weight_page());
 
-    const long id = runs.create("2026-09-22", "2026-09-22", {"daily_activity", "body_measurements"});
+    const long id = runs.create(kAccount, "2026-09-22", "2026-09-22", {"daily_activity", "body_measurements"});
     service().run(id, "2026-09-22", "2026-09-22", {"daily_activity", "body_measurements"});
 
-    const auto row = runs.get(id);
+    const auto row = runs.get(id, kAccount);
     EXPECT_EQ((*row)["result"]["daily_activity"]["error"], "auth");
     EXPECT_EQ((*row)["result"]["body_measurements"]["added"], 1);
 }
@@ -296,15 +300,15 @@ TEST_F(SyncServiceTest, ConcurrentRunIsSkipped) {
     Repositories::SyncRunRepository runs;
     Database::get().execute_write([](auto& txn) {
         txn.exec(
-            "INSERT INTO sync_runs (status, requested_start, requested_end) "
-            "VALUES ('running', '2026-09-01', '2026-09-07')");
+            "INSERT INTO sync_runs (status, requested_start, requested_end, xiaomi_user_id) "
+            "VALUES ('running', '2026-09-01', '2026-09-07', '1234567890')");
         return true;
     });
 
-    const long id = runs.create("2026-09-22", "2026-09-22", {"daily_activity"});
+    const long id = runs.create(kAccount, "2026-09-22", "2026-09-22", {"daily_activity"});
     service().run(id, "2026-09-22", "2026-09-22", {"daily_activity"});
 
-    const auto row = runs.get(id);
+    const auto row = runs.get(id, kAccount);
     EXPECT_EQ((*row)["status"], "skipped");
     EXPECT_TRUE(transport.requests().empty()) << "must not reach the cloud";
 }
@@ -315,14 +319,65 @@ TEST_F(SyncServiceTest, SyncStateIsUpdatedPerType) {
     transport.reply_encrypted(steps_page(100));
     transport.reply_encrypted(empty_page());
 
-    const long id = runs.create("2026-09-22", "2026-09-22", {"daily_activity"});
+    const long id = runs.create(kAccount, "2026-09-22", "2026-09-22", {"daily_activity"});
     service().run(id, "2026-09-22", "2026-09-22", {"daily_activity"});
 
     const bool has_state = Database::get().execute_read([](auto& txn) {
         auto r = txn.exec(
             "SELECT last_sync_at IS NOT NULL AND records_count = 1 FROM sync_state "
-            "WHERE data_type = 'daily_activity'");
+            "WHERE data_type = 'daily_activity' AND xiaomi_user_id = '1234567890'");
         return !r.empty() && r[0][0].template as<bool>();
     });
     EXPECT_TRUE(has_state);
+}
+
+// Accounts sync independently: a live run of another account neither skips
+// this one nor is touched by it, however old it is.
+TEST_F(SyncServiceTest, RunOfAnotherAccountDoesNotBlockOrGetInterrupted) {
+    Repositories::SyncRunRepository runs;
+    Database::get().execute_write([](auto& txn) {
+        txn.exec(
+            "INSERT INTO sync_runs (status, started_at, requested_start, requested_end, xiaomi_user_id) "
+            "VALUES ('running', now() - interval '6 hours', '2026-09-01', '2026-09-07', '5555555555')");
+        return true;
+    });
+
+    transport.reply_login();
+    transport.reply_encrypted(steps_page(100));
+    transport.reply_encrypted(empty_page());
+    const long id = runs.create(kAccount, "2026-09-22", "2026-09-22", {"daily_activity"});
+    const auto result = service().run(id, "2026-09-22", "2026-09-22", {"daily_activity"});
+
+    EXPECT_FALSE(result.contains("skipped_reason"));
+    EXPECT_EQ((*runs.get(id, kAccount))["status"], "succeeded");
+    const std::string other = Database::get().execute_read([](auto& txn) {
+        return txn.exec("SELECT status FROM sync_runs WHERE xiaomi_user_id = '5555555555'")[0][0]
+            .template as<std::string>();
+    });
+    EXPECT_EQ(other, "running") << "a stale run of another account is that account's to take over";
+    EXPECT_TRUE(runs.any_running("5555555555"));
+    EXPECT_FALSE(runs.any_running(kAccount));
+    // The run is invisible under another account's id.
+    EXPECT_FALSE(runs.get(id, "5555555555").has_value());
+}
+
+TEST_F(SyncServiceTest, LoginOutcomeIsReported) {
+    Repositories::SyncRunRepository runs;
+    auto accepted = service();
+    transport.reply_login();
+    transport.reply_encrypted(steps_page(100));
+    transport.reply_encrypted(empty_page());
+    accepted.run(runs.create(kAccount, "2026-09-22", "2026-09-22", {"daily_activity"}),
+                 "2026-09-22",
+                 "2026-09-22",
+                 {"daily_activity"});
+    EXPECT_EQ(accepted.login_outcome(), Sync::SyncService::Login::Accepted);
+
+    auto refused = service();
+    transport.reply({200, "no start prefix at all", {}});
+    refused.run(runs.create(kAccount, "2026-09-22", "2026-09-22", {"daily_activity"}),
+                "2026-09-22",
+                "2026-09-22",
+                {"daily_activity"});
+    EXPECT_EQ(refused.login_outcome(), Sync::SyncService::Login::Refused);
 }

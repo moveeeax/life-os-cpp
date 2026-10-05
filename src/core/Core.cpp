@@ -621,7 +621,7 @@ void Application::register_fitness_sync_schedule_(Config::AppConfig& cfg) {
         if (!Database::is_initialized() || !Jobs::is_initialized())
             return;
         try {
-            Jobs::FitnessSync::enqueue_recent(window, static_cast<long long>(::time(nullptr)));
+            Jobs::FitnessSync::enqueue_recent_for_all(window, static_cast<long long>(::time(nullptr)));
         } catch (const std::exception& e) {
             // Database or queue is down: the tick is skipped, the next one retries.
             spdlog::warn("fitness sync schedule tick failed: {}", e.what());

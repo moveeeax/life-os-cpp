@@ -121,18 +121,26 @@ Sync of Mi Fitness (Xiaomi cloud) data into Postgres, ported from
 
 | Route | Permission | What it does |
 |---|---|---|
-| `GET probe` | fitness:sync | live check of the Xiaomi credentials and cloud connectivity |
-| `POST sync`, `GET sync/{id}` | fitness:sync | enqueue a sync run, read its journal entry |
-| `GET daily-activity`, `sleep`, `heart-rate`, `stress`, `spo2`, `body`, `workouts`, `abnormal-heart-beat` | fitness:read | rows for a date range |
-| `GET summary`, `coverage`, `export` | fitness:read | per-day summary, per-type coverage, json or csv export |
+| `GET account`, `POST account/link`, `GET account/link/{id}`, `PATCH account`, `POST account/detect-region`, `DELETE account` | fitness:sync | link your Mi account by QR sign-in, see the link status, set or detect the region, unlink |
+| `GET probe` | fitness:sync | live check of your Xiaomi credentials and cloud connectivity |
+| `POST sync`, `GET sync/{id}` | fitness:sync | enqueue a sync run of your account, read its journal entry |
+| `GET daily-activity`, `sleep`, `heart-rate`, `stress`, `spo2`, `body`, `workouts`, `abnormal-heart-beat` | fitness:read | your rows for a date range |
+| `GET summary`, `coverage`, `export` | fitness:read | per-day summary, per-type coverage, json or csv export of your data |
 
-The permissions are the bits `kFitnessRead` (0x04) and `kFitnessSync` (0x08)
-in `src/domain/Role.hpp`; migration `015_fitness_roles.sql` seeds the roles
-"Fitness Reader" (0x05) and "Fitness Operator" (0x0D). An API key inherits the
-permissions of its user's role, so an agent needs a user with the Reader role
-and a key from `POST /api/v1/account/api-keys`. Sync runs as a job
+Fitness data belongs to the user whose Mi account it came from. Each user
+links their own Xiaomi account (table `mi_accounts`, one account per user);
+every route above works on the caller's account, an administrator included,
+and a user without a link reads empty lists. The permissions are the bits
+`kFitnessRead` (0x04) and `kFitnessSync` (0x08) in `src/domain/Role.hpp` and
+mean "own data" and "own sync". The default role `User` has both (migration
+`021_fitness_per_account.sql`); `015_fitness_roles.sql` seeds the roles
+"Fitness Reader" (0x05) and "Fitness Operator" (0x0D) for API-key users. An
+API key inherits the permissions of its user's role and reads that user's
+data: an agent needs a key of the user whose data it reads, from
+`POST /api/v1/account/api-keys`. Sync runs as a job per account
 (`src/jobs/FitnessSyncHandler.hpp`) on the worker; an optional timer in the
-API pod enqueues it every `MI_FITNESS_SYNC_SCHEDULE_HOURS`. The port design
+API pod enqueues one for every linked account every
+`MI_FITNESS_SYNC_SCHEDULE_HOURS`. The port design
 note is in `docs/fitness/`.
 
 ## Repo layout

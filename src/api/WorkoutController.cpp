@@ -645,7 +645,7 @@ void WorkoutController::readiness(const HttpRequestPtr& req, Callback&& callback
     WORKOUT_GUARD(req, callback, owner);
 
     with_repo_errors(callback, "workout.readiness", [&] {
-        callback(Response::ok(json{{"data", Repositories::SessionRepository().readiness()}}));
+        callback(Response::ok(json{{"data", Repositories::SessionRepository().readiness(owner)}}));
     });
 }
 
@@ -675,7 +675,7 @@ void WorkoutController::reconcile(const HttpRequestPtr& req, Callback&& callback
     }
 
     with_repo_errors(callback, "workout.reconcile", [&] {
-        const long n = Repositories::SessionRepository().reconcile_range(from, to);
+        const long n = Repositories::SessionRepository().reconcile_range(owner, from, to);
         callback(Response::ok(json{{"data", {{"reconciled", n}}}}));
     });
 }
