@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 
 import {
   useActivity,
@@ -12,7 +12,9 @@ import {
   useSummary,
   useWorkouts,
 } from '@/hooks/useHealth';
+import { LinkMiNotice } from '@/components/LinkMiNotice';
 import { useMe } from '@/hooks/useMe';
+import { useMiAccount } from '@/hooks/useMiAccount';
 import { Permission, userCan } from '@/lib/auth/permissions';
 import {
   MAX_RANGE_DAYS,
@@ -34,6 +36,7 @@ import {
   type DateRange,
   type DayStat,
 } from '@/lib/health';
+import { needsLink } from '@/lib/mi';
 import { cn } from '@/lib/utils';
 
 import { ChartCard, cardClass } from './health/ChartCard';
@@ -576,8 +579,11 @@ function PeriodPicker() {
 export function HealthPage() {
   const user = useMe().data ?? null;
   const [params] = useSearchParams();
+  const canRead = userCan(user, Permission.FitnessRead);
+  // The link status needs fitness:sync; without it the page shows what there is.
+  const mi = useMiAccount(canRead && userCan(user, Permission.FitnessSync));
 
-  if (!userCan(user, Permission.FitnessRead)) {
+  if (!canRead) {
     return (
       <div className={cardClass} role="alert">
         <div className="flex items-start gap-3">
@@ -596,6 +602,16 @@ export function HealthPage() {
     );
   }
 
+  // Nothing is linked: there is no data to chart, only the way to get some.
+  if (needsLink(mi.data)) {
+    return (
+      <div className="flex flex-col gap-4 md:gap-6">
+        <h1 className="text-title-sm font-semibold text-gray-800 dark:text-white/90">Health</h1>
+        <LinkMiNotice purpose="to see your steps, sleep, heart rate and weight here" />
+      </div>
+    );
+  }
+
   const { from, to } = parseRange(params, today());
   const range = { from, to };
 
@@ -605,6 +621,20 @@ export function HealthPage() {
         <h1 className="text-title-sm font-semibold text-gray-800 dark:text-white/90">Health</h1>
         <PeriodPicker />
       </div>
+      {mi.data?.status === 'reauth_required' && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-3 rounded-2xl border border-warning-500 bg-warning-50 px-5 py-3 text-theme-sm text-gray-800 dark:bg-warning-500/10 dark:text-white/90"
+        >
+          <span className="min-w-0 flex-1">
+            Xiaomi asks you to sign in again. Syncing is paused; the data below is what was synced
+            before.
+          </span>
+          <Link to="/account" className="font-medium text-brand-500 hover:underline">
+            Link again in profile
+          </Link>
+        </div>
+      )}
       <Tiles range={range} />
       <Charts range={range} />
       <Tables range={range} />

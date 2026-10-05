@@ -23,6 +23,11 @@ export const qk = {
     coverage: () => ['health', 'coverage'] as const,
     syncRun: (id: number) => ['health-sync-run', id] as const,
   },
+  /** The caller's Mi account link. */
+  mi: {
+    account: () => ['mi', 'account'] as const,
+    link: (id: string) => ['mi', 'link', id] as const,
+  },
   /** Workout section. Lists are keyed under a prefix so one write invalidates every variant. */
   workout: {
     exercises: (filter?: Record<string, string>) =>

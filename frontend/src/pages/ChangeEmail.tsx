@@ -33,8 +33,8 @@ export function ChangeEmailPage() {
         <CardHeader>
           <CardTitle>Change your email</CardTitle>
           <CardDescription>
-            We'll send a confirmation link to the new address. Your current email stays active
-            until you click it.
+            We'll send a confirmation link to the new address. Your current email stays active until
+            you click it.
           </CardDescription>
         </CardHeader>
         <CardContent>

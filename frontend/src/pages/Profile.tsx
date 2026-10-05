@@ -1,8 +1,10 @@
 import { Link } from 'react-router';
 
+import { MiAccountCard } from '@/components/MiAccountCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMe } from '@/hooks/useMe';
+import { Permission, userCan } from '@/lib/auth/permissions';
 
 export function ProfilePage() {
   const user = useMe().data ?? null;
@@ -29,6 +31,7 @@ export function ProfilePage() {
           </div>
         </CardContent>
       </Card>
+      {userCan(user, Permission.FitnessSync) && <MiAccountCard />}
       <div className="grid gap-3 sm:grid-cols-3">
         <Button variant="outline" asChild>
           <Link to="/account/change-password">Change password</Link>
