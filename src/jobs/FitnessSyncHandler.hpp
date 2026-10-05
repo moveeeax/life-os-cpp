@@ -2,9 +2,10 @@
  * @file FitnessSyncHandler.hpp
  * @brief fitness_sync job handler: a full SyncService run in the worker.
  *
- * Payload: {run_id, from, to, data_types}. Credentials are read from the
- * database with the key from config; their absence is not a queue failure but
- * an honest not_configured status in the run journal: retrying without a token is pointless.
+ * Payload: {run_id, from, to, data_types}. Credentials are those of the linked
+ * Mi account, read from the database with the key from config; no linked
+ * account is not a queue failure but an honest not_linked status in the run
+ * journal: retrying without a token is pointless.
  */
 
 #pragma once
@@ -23,7 +24,7 @@
 #include "fitness/sync/SyncService.hpp"
 #include "fitness/xiaomi/Service.hpp"
 #include "jobs/Jobs.hpp"
-#include "repositories/fitness/CredentialsRepository.hpp"
+#include "repositories/fitness/MiAccountRepository.hpp"
 #include "repositories/fitness/SyncRunRepository.hpp"
 #include "repositories/workout/SessionRepository.hpp"
 #include "utils/Config.hpp"
@@ -45,10 +46,8 @@ inline long enqueue_recent(int window_days, long long now_epoch) {
     if (window_days < 1) {
         window_days = 1;
     }
-    std::string region;
-    if (Config::is_initialized()) {
-        region = Config::get().get<std::string>("fitness.xiaomi.region", "MI_FITNESS_REGION", "");
-    }
+    // Day bounds follow the region of the account that will be synced.
+    const std::string region = Repositories::MiAccountRepository("").first_region().value_or("cn");
     const long long offset = (region.empty() || region == "cn") ? 8 * 3600 : 0;
 
     const auto day = [](long long epoch) {
@@ -99,20 +98,34 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
                     nlohmann::json{{"error", "not_configured"}, {"detail", "MI_FITNESS_TOKEN_KEY is not set"}});
         return {{"run_id", run_id}, {"status", "failed"}};
     }
-    Repositories::CredentialsRepository credentials_repo(token_key);
-    const auto credentials = credentials_repo.load();
-    if (!credentials.has_value()) {
-        runs.finish(run_id,
-                    "failed",
-                    nlohmann::json{{"error", "not_configured"}, {"detail", "Xiaomi credentials are not seeded"}});
+    // One sync per system for now: the oldest linked account.
+    Repositories::MiAccountRepository accounts(token_key);
+    const auto account = accounts.load_first();
+    if (!account.has_value()) {
+        runs.finish(
+            run_id, "failed", nlohmann::json{{"error", "not_linked"}, {"detail", "no Mi account is linked"}});
         return {{"run_id", run_id}, {"status", "failed"}};
     }
+    const std::string& owner_id = account->first;
+    runs.set_account(run_id, account->second.user_id);
 
     Sync::SyncService service(
-        Xiaomi::Service::transport(), *credentials, [&credentials_repo](const Xiaomi::Credentials& rotated) {
-            credentials_repo.store(rotated);
+        Xiaomi::Service::transport(), account->second, [&accounts, &owner_id](const Xiaomi::Credentials& rotated) {
+            accounts.store_rotated(owner_id, rotated);
         });
     const auto result = service.run(run_id, from, to, data_types);
+
+    // The link status follows what Xiaomi said to the stored token. A run that
+    // never reached Xiaomi says nothing about it.
+    try {
+        if (service.login_outcome() == Sync::SyncService::Login::Accepted) {
+            accounts.mark_ok(owner_id);
+        } else if (service.login_outcome() == Sync::SyncService::Login::Refused) {
+            accounts.mark_reauth_required(owner_id, "upstream_auth");
+        }
+    } catch (const std::exception& e) {
+        spdlog::warn("fitness sync {}: failed to record the link status: {}", run_id, e.what());
+    }
 
     // Fresh band data may belong to a logged workout session. A failure here
     // must not fail the sync that has already been stored.

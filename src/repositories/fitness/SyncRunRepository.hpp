@@ -61,6 +61,15 @@ public:
         });
     }
 
+    /// Record which Xiaomi account a run syncs: the link status of a user
+    /// shows the last run of their account.
+    void set_account(long id, const std::string& xiaomi_user_id) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params("UPDATE sync_runs SET xiaomi_user_id = $2 WHERE id = $1", id, xiaomi_user_id);
+            return true;
+        });
+    }
+
     /// Mark skipped only a run that is still queued. A redelivered job of a
     /// finished run must not overwrite its journal (Important 4 of the final
     /// review: the same hole from the skip side).

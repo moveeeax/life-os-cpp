@@ -157,6 +157,7 @@ nlohmann::json SyncService::run(long run_id,
     }
 
     Xiaomi::CloudClient client(transport_, credentials_, on_rotate_);
+    login_outcome_ = Login::NotAttempted;
     bool logged_in = false;
     bool auth_dead = false;
     bool any_failed = false;
@@ -177,6 +178,7 @@ nlohmann::json SyncService::run(long run_id,
             if (!logged_in) {
                 client.login();
                 logged_in = true;
+                login_outcome_ = Login::Accepted;
             }
             Repositories::UpsertCounts counts;
             long skipped = 0;
@@ -309,6 +311,9 @@ nlohmann::json SyncService::run(long run_id,
         } catch (const Xiaomi::MiFitnessAuthError& e) {
             any_failed = true;
             auth_dead = !logged_in;
+            if (auth_dead) {
+                login_outcome_ = Login::Refused;
+            }
             entry["error"] = "auth";
             spdlog::warn("sync {}: auth failure: {}", data_type, e.what());
         } catch (const Xiaomi::MiFitnessProtocolError& e) {
