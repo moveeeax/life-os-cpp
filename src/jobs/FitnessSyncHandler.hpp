@@ -102,8 +102,7 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     Repositories::MiAccountRepository accounts(token_key);
     const auto account = accounts.load_first();
     if (!account.has_value()) {
-        runs.finish(
-            run_id, "failed", nlohmann::json{{"error", "not_linked"}, {"detail", "no Mi account is linked"}});
+        runs.finish(run_id, "failed", nlohmann::json{{"error", "not_linked"}, {"detail", "no Mi account is linked"}});
         return {{"run_id", run_id}, {"status", "failed"}};
     }
     const std::string& owner_id = account->first;

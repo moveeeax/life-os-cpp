@@ -116,8 +116,8 @@ TEST(XiaomiQrLogin, StartFailsWhenXiaomiIssuesNoQr) {
     {
         FakeHttpTransport transport;
         transport.reply({200, service_login(), {}});
-        transport.reply({200, issued("https://account.xiaomi.com/qr", "https://account.xiaomi.com/lp", R"("timeout":0)"),
-                         {}});
+        transport.reply(
+            {200, issued("https://account.xiaomi.com/qr", "https://account.xiaomi.com/lp", R"("timeout":0)"), {}});
         EXPECT_THROW(Xiaomi::QrLogin::start(transport), Xiaomi::MiFitnessProtocolError);
     }
     {
