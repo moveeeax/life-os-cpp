@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <optional>
+#include <regex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -23,6 +24,7 @@
 #include "domain/Role.hpp"
 #include "repositories/workout/ExerciseRepository.hpp"
 #include "repositories/workout/RoutineRepository.hpp"
+#include "repositories/workout/SessionRepository.hpp"
 #include "utils/ErrorResponse.hpp"
 
 namespace Api {
@@ -39,6 +41,15 @@ constexpr std::size_t kNoteMax = 2000;
 constexpr std::size_t kListMax = 30;
 constexpr std::size_t kListItemMax = 1000;
 constexpr std::size_t kRoutineExercisesMax = 100;
+
+constexpr int kHistoryDefaultLimit = 20;
+constexpr int kHistoryMaxLimit = 100;
+
+const std::vector<std::string> kSetKinds = {"work", "warmup"};
+
+/// An ISO 8601 instant with an explicit zone; the database checks the calendar.
+const std::regex kTimestampRe(R"(^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$)");
+const std::regex kDateRe(R"(^\d{4}-\d{2}-\d{2}$)");
 
 const std::vector<std::string> kTrackingModes = {"weight_reps", "bodyweight_reps", "duration", "distance_duration"};
 
@@ -93,6 +104,45 @@ void item_int(
 /// Copy an optional integer field into the normalized item, keeping null.
 void copy_int(json& out, const json& item, const char* field) {
     out[field] = item.contains(field) && item[field].is_number_integer() ? item[field] : json();
+}
+
+/// Optional timestamp field; null is "unset".
+void timestamp(Validation::Errors& errs, const json& body, const std::string& field) {
+    if (!body.contains(field) || body[field].is_null()) {
+        return;
+    }
+    if (!body[field].is_string() || !std::regex_match(body[field].get<std::string>(), kTimestampRe)) {
+        errs.add(field, "invalid", "must be an ISO 8601 date and time with a zone, e.g. 2026-10-05T09:30:00Z");
+    }
+}
+
+/// Optional number within [lo, hi]; null is "unset".
+void number_range(Validation::Errors& errs, const json& body, const std::string& field, double lo, double hi) {
+    if (!body.contains(field) || body[field].is_null()) {
+        return;
+    }
+    if (!body[field].is_number()) {
+        errs.add(field, "not_number", "must be a number");
+        return;
+    }
+    const double v = body[field].get<double>();
+    if (!(v >= lo && v <= hi)) {
+        errs.add(field, "out_of_range", "must be in " + json(lo).dump() + ".." + json(hi).dump());
+    }
+}
+
+std::optional<double> opt_number(const json& body, const std::string& field) {
+    if (body.contains(field) && body[field].is_number()) {
+        return body[field].get<double>();
+    }
+    return std::nullopt;
+}
+
+std::optional<int> opt_int(const json& body, const std::string& field) {
+    if (body.contains(field) && body[field].is_number_integer()) {
+        return body[field].get<int>();
+    }
+    return std::nullopt;
 }
 
 }  // namespace
@@ -363,6 +413,270 @@ void WorkoutController::deleteRoutine(const HttpRequestPtr& req, Callback&& call
     with_repo_errors(callback, "workout.deleteRoutine", [&] {
         Repositories::RoutineRepository().remove(owner, id);
         callback(Response::ok(json{{"message", "Routine deleted"}}));
+    });
+}
+
+// ── sessions ─────────────────────────────────────────────────────────────────
+
+void WorkoutController::startSession(const HttpRequestPtr& req, Callback&& callback) {
+    WORKOUT_GUARD(req, callback, owner);
+
+    // The body is optional: no body starts an empty session.
+    json body = json::object();
+    if (!req->body().empty() && !Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    if (body.contains("routine_id") && !body["routine_id"].is_null()) {
+        Validation::uuid(errs, body, "routine_id");
+    }
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    const auto routine_id = Validation::opt_string(body, "routine_id");
+
+    with_repo_errors(callback, "workout.startSession", [&] {
+        callback(Response::created(json{{"data", Repositories::SessionRepository().start(owner, routine_id)}}));
+    });
+}
+
+void WorkoutController::listSessions(const HttpRequestPtr& req, Callback&& callback) {
+    WORKOUT_GUARD(req, callback, owner);
+    const auto page = parse_page_params(req, kHistoryDefaultLimit, kHistoryMaxLimit);
+
+    with_repo_errors(callback, "workout.listSessions", [&] {
+        const auto result = Repositories::SessionRepository().list(owner, page.limit, page.offset);
+        callback(Response::ok(json{{"data", result.rows}, {"count", result.rows.size()}, {"total", result.total}}));
+    });
+}
+
+void WorkoutController::activeSession(const HttpRequestPtr& req, Callback&& callback) {
+    WORKOUT_GUARD(req, callback, owner);
+
+    with_repo_errors(callback, "workout.activeSession", [&] {
+        // No active session is a normal state, not an error: data is null.
+        const auto found = Repositories::SessionRepository().active(owner);
+        callback(Response::ok(json{{"data", found ? *found : json()}}));
+    });
+}
+
+void WorkoutController::getSession(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    WORKOUT_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+
+    with_repo_errors(callback, "workout.getSession", [&] {
+        const auto found = Repositories::SessionRepository().find(owner, id);
+        if (!found) {
+            throw Repositories::SessionNotFound();
+        }
+        callback(Response::ok(json{{"data", *found}}));
+    });
+}
+
+void WorkoutController::patchSession(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    WORKOUT_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    if (body.contains("name")) {
+        Validation::string_length(errs, body, "name", 0, kNameMax);
+    }
+    if (body.contains("note")) {
+        Validation::string_length(errs, body, "note", 0, kNoteMax);
+    }
+    timestamp(errs, body, "started_at");
+    timestamp(errs, body, "finished_at");
+    if (body.contains("finish")) {
+        Validation::boolean(errs, body, "finish");
+    }
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+
+    Repositories::SessionRepository::Patch patch;
+    patch.name = Validation::opt_string(body, "name");
+    patch.note = Validation::opt_string(body, "note");
+    patch.started_at = Validation::opt_string(body, "started_at");
+    patch.finished_at = Validation::opt_string(body, "finished_at");
+    patch.finish = body.contains("finish") && body["finish"].is_boolean() && body["finish"].get<bool>();
+
+    with_repo_errors(callback, "workout.patchSession", [&] {
+        callback(Response::ok(json{{"data", Repositories::SessionRepository().patch(owner, id, patch)}}));
+    });
+}
+
+void WorkoutController::deleteSession(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    WORKOUT_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+
+    with_repo_errors(callback, "workout.deleteSession", [&] {
+        Repositories::SessionRepository().remove(owner, id);
+        callback(Response::ok(json{{"message", "Session deleted"}}));
+    });
+}
+
+void WorkoutController::addSessionExercise(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    WORKOUT_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    Validation::require_string(errs, body, "exercise_id");
+    Validation::string_length(errs, body, "exercise_id", 1, kNameMax);
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    const std::string exercise_id = body["exercise_id"].get<std::string>();
+
+    with_repo_errors(callback, "workout.addSessionExercise", [&] {
+        callback(
+            Response::created(json{{"data", Repositories::SessionRepository().add_exercise(owner, id, exercise_id)}}));
+    });
+}
+
+void WorkoutController::removeSessionExercise(const HttpRequestPtr& req,
+                                              Callback&& callback,
+                                              const std::string& id,
+                                              const std::string& eid) {
+    WORKOUT_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback) || !require_valid_uuid(eid, callback)) {
+        return;
+    }
+
+    with_repo_errors(callback, "workout.removeSessionExercise", [&] {
+        callback(Response::ok(json{{"data", Repositories::SessionRepository().remove_exercise(owner, id, eid)}}));
+    });
+}
+
+void WorkoutController::sessionHeartRate(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    WORKOUT_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+
+    with_repo_errors(callback, "workout.sessionHeartRate", [&] {
+        callback(Response::ok(json{{"data", Repositories::SessionRepository().heart_rate(owner, id)}}));
+    });
+}
+
+// ── sets ─────────────────────────────────────────────────────────────────────
+
+void WorkoutController::putSet(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    WORKOUT_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    // Ranges mirror the CHECKs of workout_sets (migration 019).
+    Validation::Errors errs;
+    if (Validation::require_string(errs, body, "session_exercise_id")) {
+        Validation::uuid(errs, body, "session_exercise_id");
+    }
+    if (Validation::require(errs, body, "position")) {
+        Validation::int_range(errs, body, "position", 1, 1000);
+    }
+    if (body.contains("kind")) {
+        Validation::one_of(errs, body, "kind", kSetKinds);
+    }
+    number_range(errs, body, "weight_kg", 0, 2000);
+    Validation::int_range(errs, body, "reps", 0, 10000);
+    Validation::int_range(errs, body, "duration_seconds", 0, 86400);
+    number_range(errs, body, "distance_m", 0, 1000000);
+    number_range(errs, body, "rpe", 1, 10);
+    timestamp(errs, body, "completed_at");
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+
+    Repositories::SessionRepository::SetInput set;
+    set.session_exercise_id = body["session_exercise_id"].get<std::string>();
+    set.position = body["position"].get<int>();
+    set.kind = Validation::opt_string(body, "kind").value_or("work");
+    set.weight_kg = opt_number(body, "weight_kg");
+    set.reps = opt_int(body, "reps");
+    set.duration_seconds = opt_int(body, "duration_seconds");
+    set.distance_m = opt_number(body, "distance_m");
+    set.rpe = opt_number(body, "rpe");
+    set.completed_at = Validation::opt_string(body, "completed_at");
+
+    with_repo_errors(callback, "workout.putSet", [&] {
+        callback(Response::ok(json{{"data", Repositories::SessionRepository().put_set(owner, id, set)}}));
+    });
+}
+
+void WorkoutController::deleteSet(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    WORKOUT_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+
+    with_repo_errors(callback, "workout.deleteSet", [&] {
+        Repositories::SessionRepository().remove_set(owner, id);
+        callback(Response::ok(json{{"message", "Set deleted"}}));
+    });
+}
+
+// ── health links ─────────────────────────────────────────────────────────────
+
+void WorkoutController::readiness(const HttpRequestPtr& req, Callback&& callback) {
+    WORKOUT_GUARD(req, callback, owner);
+
+    with_repo_errors(callback, "workout.readiness", [&] {
+        callback(Response::ok(json{{"data", Repositories::SessionRepository().readiness()}}));
+    });
+}
+
+void WorkoutController::reconcile(const HttpRequestPtr& req, Callback&& callback) {
+    WORKOUT_GUARD(req, callback, owner);
+    API_REQUIRE_PERMISSION(req, callback, Domain::Permission::kFitnessSync);
+
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    for (const char* field : {"from", "to"}) {
+        if (Validation::require_string(errs, body, field)) {
+            Validation::regex_match(errs, body, field, kDateRe, "YYYY-MM-DD");
+        }
+    }
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    const std::string from = body["from"].get<std::string>();
+    const std::string to = body["to"].get<std::string>();
+    if (from > to) {
+        callback(ErrorResponse::bad_request("invalid_range", "from must not be after to"));
+        return;
+    }
+
+    with_repo_errors(callback, "workout.reconcile", [&] {
+        const long n = Repositories::SessionRepository().reconcile_range(from, to);
+        callback(Response::ok(json{{"data", {{"reconciled", n}}}}));
     });
 }
 

@@ -1,6 +1,7 @@
 /**
  * @file WorkoutController.hpp
- * @brief Workout module routes: the exercise library and routines.
+ * @brief Workout module routes: the exercise library, routines, logged
+ *        sessions with their sets, and the links to Mi Fitness data.
  *
  * Every route needs the module switch (Core::workout_enabled()), the
  * fitness:read permission and a user account: rows belong to the caller.
@@ -34,6 +35,19 @@ public:
     ADD_METHOD_TO(WorkoutController::getRoutine, "/api/v1/workout/routines/{id}", Get);
     ADD_METHOD_TO(WorkoutController::putRoutine, "/api/v1/workout/routines/{id}", Put);
     ADD_METHOD_TO(WorkoutController::deleteRoutine, "/api/v1/workout/routines/{id}", Delete);
+    ADD_METHOD_TO(WorkoutController::startSession, "/api/v1/workout/sessions", Post);
+    ADD_METHOD_TO(WorkoutController::listSessions, "/api/v1/workout/sessions", Get);
+    ADD_METHOD_TO(WorkoutController::activeSession, "/api/v1/workout/sessions/active", Get);
+    ADD_METHOD_TO(WorkoutController::getSession, "/api/v1/workout/sessions/{id}", Get);
+    ADD_METHOD_TO(WorkoutController::patchSession, "/api/v1/workout/sessions/{id}", Patch);
+    ADD_METHOD_TO(WorkoutController::deleteSession, "/api/v1/workout/sessions/{id}", Delete);
+    ADD_METHOD_TO(WorkoutController::addSessionExercise, "/api/v1/workout/sessions/{id}/exercises", Post);
+    ADD_METHOD_TO(WorkoutController::removeSessionExercise, "/api/v1/workout/sessions/{id}/exercises/{eid}", Delete);
+    ADD_METHOD_TO(WorkoutController::sessionHeartRate, "/api/v1/workout/sessions/{id}/heart-rate", Get);
+    ADD_METHOD_TO(WorkoutController::putSet, "/api/v1/workout/sets/{id}", Put);
+    ADD_METHOD_TO(WorkoutController::deleteSet, "/api/v1/workout/sets/{id}", Delete);
+    ADD_METHOD_TO(WorkoutController::readiness, "/api/v1/workout/readiness", Get);
+    ADD_METHOD_TO(WorkoutController::reconcile, "/api/v1/workout/reconcile", Post);
     METHOD_LIST_END
 
     using Callback = std::function<void(const HttpResponsePtr&)>;
@@ -47,6 +61,26 @@ public:
     void getRoutine(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void putRoutine(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void deleteRoutine(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+
+    void startSession(const HttpRequestPtr& req, Callback&& callback);
+    void listSessions(const HttpRequestPtr& req, Callback&& callback);
+    void activeSession(const HttpRequestPtr& req, Callback&& callback);
+    void getSession(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void patchSession(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void deleteSession(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void addSessionExercise(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void removeSessionExercise(const HttpRequestPtr& req,
+                               Callback&& callback,
+                               const std::string& id,
+                               const std::string& eid);
+    void sessionHeartRate(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+
+    void putSet(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void deleteSet(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+
+    void readiness(const HttpRequestPtr& req, Callback&& callback);
+    /// Needs fitness:sync on top of the common guards.
+    void reconcile(const HttpRequestPtr& req, Callback&& callback);
 
 private:
     /// 404 while the module is off; the routes stay registered.

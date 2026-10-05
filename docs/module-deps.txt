@@ -80,6 +80,7 @@ jobs -> fitness/sync
 jobs -> fitness/xiaomi
 jobs -> observability
 jobs -> repositories/fitness
+jobs -> repositories/workout
 jobs -> utils
 jobs -> webhooks
 observability -> utils

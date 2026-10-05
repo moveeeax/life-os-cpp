@@ -11,8 +11,11 @@
 
 #include <chrono>
 #include <cstdio>
+#include <exception>
 #include <string>
 #include <vector>
+
+#include <spdlog/spdlog.h>
 
 #include <nlohmann/json.hpp>
 
@@ -22,6 +25,7 @@
 #include "jobs/Jobs.hpp"
 #include "repositories/fitness/CredentialsRepository.hpp"
 #include "repositories/fitness/SyncRunRepository.hpp"
+#include "repositories/workout/SessionRepository.hpp"
 #include "utils/Config.hpp"
 
 namespace Jobs::FitnessSync {
@@ -109,6 +113,19 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
             credentials_repo.store(rotated);
         });
     const auto result = service.run(run_id, from, to, data_types);
+
+    // Fresh band data may belong to a logged workout session. A failure here
+    // must not fail the sync that has already been stored.
+    if (Core::workout_enabled()) {
+        try {
+            const int window =
+                Config::get().get<int>("fitness.xiaomi.sync_window_days", "MI_FITNESS_SYNC_WINDOW_DAYS", 2);
+            const long n = Repositories::SessionRepository().reconcile_recent(window + 1);
+            spdlog::info("workout reconcile after fitness sync {}: {} sessions", run_id, n);
+        } catch (const std::exception& e) {
+            spdlog::warn("workout reconcile after fitness sync {} failed: {}", run_id, e.what());
+        }
+    }
     return {{"run_id", run_id}, {"result", result}};
 }
 
