@@ -34,11 +34,12 @@ protected:
             txn.exec("TRUNCATE TABLE mi_accounts, sync_runs, sync_state, heart_rate_samples, body_measurements");
             txn.exec("TRUNCATE TABLE workout_sessions CASCADE");
             for (const char* id : {kAnna, kBoris}) {
-                txn.exec_params("INSERT INTO users (id, email, confirmed, role_id) "
-                                "VALUES ($1::uuid, $2, TRUE, (SELECT id FROM roles ORDER BY id LIMIT 1)) "
-                                "ON CONFLICT DO NOTHING",
-                                std::string(id),
-                                std::string(id) + "@example.test");
+                txn.exec_params(
+                    "INSERT INTO users (id, email, confirmed, role_id) "
+                    "VALUES ($1::uuid, $2, TRUE, (SELECT id FROM roles ORDER BY id LIMIT 1)) "
+                    "ON CONFLICT DO NOTHING",
+                    std::string(id),
+                    std::string(id) + "@example.test");
             }
             return true;
         });
@@ -86,8 +87,9 @@ TEST_F(MiAccountRepositoryTest, LinkRoundTripsAndSealsTheToken) {
     ASSERT_TRUE(first.has_value());
     EXPECT_EQ(first->first, kAnna);
 
-    const std::string stored = Database::get().execute_read(
-        [](auto& txn) { return txn.exec("SELECT pass_token_sealed FROM mi_accounts")[0][0].template as<std::string>(); });
+    const std::string stored = Database::get().execute_read([](auto& txn) {
+        return txn.exec("SELECT pass_token_sealed FROM mi_accounts")[0][0].template as<std::string>();
+    });
     EXPECT_EQ(stored.find(std::string(20, 'S')), std::string::npos);
 
     const auto status = repo.status(kAnna);
@@ -175,11 +177,12 @@ TEST_F(MiAccountRepositoryTest, RegionIsSetOnlyToAKnownCandidate) {
 TEST_F(MiAccountRepositoryTest, StatusShowsTheLastFinishedSyncOfTheAccount) {
     Repositories::MiAccountRepository repo(kTestKeyB64);
     repo.link(kAnna, creds("1111111111"), true);
-    exec("INSERT INTO sync_runs (status, finished_at, xiaomi_user_id) VALUES "
-         "('succeeded', now() - interval '2 hours', '1111111111'), "
-         "('failed', now() - interval '1 hour', '1111111111'), "
-         "('running', NULL, '1111111111'), "
-         "('succeeded', now(), '2222222222')");
+    exec(
+        "INSERT INTO sync_runs (status, finished_at, xiaomi_user_id) VALUES "
+        "('succeeded', now() - interval '2 hours', '1111111111'), "
+        "('failed', now() - interval '1 hour', '1111111111'), "
+        "('running', NULL, '1111111111'), "
+        "('succeeded', now(), '2222222222')");
     const auto status = *repo.status(kAnna);
     ASSERT_FALSE(status["last_sync"].is_null());
     EXPECT_EQ(status["last_sync"]["status"], "failed");
@@ -188,7 +191,9 @@ TEST_F(MiAccountRepositoryTest, StatusShowsTheLastFinishedSyncOfTheAccount) {
 TEST_F(MiAccountRepositoryTest, UnlinkKeepsDataByDefault) {
     Repositories::MiAccountRepository repo(kTestKeyB64);
     repo.link(kAnna, creds("1111111111"), true);
-    exec("INSERT INTO heart_rate_samples (user_id, timestamp, bpm, sample_type) VALUES ('1111111111', now(), 60, 'passive')");
+    exec(
+        "INSERT INTO heart_rate_samples (user_id, timestamp, bpm, sample_type) VALUES ('1111111111', now(), 60, "
+        "'passive')");
 
     EXPECT_TRUE(repo.unlink(kAnna, false));
     EXPECT_FALSE(repo.load(kAnna).has_value());
@@ -199,12 +204,15 @@ TEST_F(MiAccountRepositoryTest, UnlinkWithDataRemovesOnlyThisAccountsRows) {
     Repositories::MiAccountRepository repo(kTestKeyB64);
     repo.link(kAnna, creds("1111111111"), true);
     repo.link(kBoris, creds("2222222222"), true);
-    exec("INSERT INTO heart_rate_samples (user_id, timestamp, bpm, sample_type) VALUES "
-         "('1111111111', now(), 60, 'passive'), ('2222222222', now(), 70, 'passive')");
+    exec(
+        "INSERT INTO heart_rate_samples (user_id, timestamp, bpm, sample_type) VALUES "
+        "('1111111111', now(), 60, 'passive'), ('2222222222', now(), 70, 'passive')");
     exec("INSERT INTO body_measurements (user_id, timestamp, weight_kg) VALUES ('1111111111', now(), 80)");
-    exec("INSERT INTO sync_runs (status, finished_at, xiaomi_user_id) VALUES "
-         "('succeeded', now(), '1111111111'), ('succeeded', now(), '2222222222')");
-    exec(std::string("INSERT INTO workout_sessions (owner_id, started_at, finished_at, health_status, hr_avg, hr_samples) VALUES ('") +
+    exec(
+        "INSERT INTO sync_runs (status, finished_at, xiaomi_user_id) VALUES "
+        "('succeeded', now(), '1111111111'), ('succeeded', now(), '2222222222')");
+    exec(std::string("INSERT INTO workout_sessions (owner_id, started_at, finished_at, health_status, hr_avg, "
+                     "hr_samples) VALUES ('") +
          kAnna + "', now() - interval '1 hour', now(), 'matched', 120, 6), ('" + kBoris +
          "', now() - interval '1 hour', now(), 'matched', 130, 6)");
 

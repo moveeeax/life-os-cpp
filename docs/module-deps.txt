@@ -65,7 +65,9 @@ email -> jobs
 email -> repositories
 email -> security
 email -> utils
+fitness -> cache
 fitness -> fitness/xiaomi
+fitness -> repositories/fitness
 fitness/sync -> database
 fitness/sync -> fitness/xiaomi
 fitness/sync -> repositories/fitness
@@ -90,7 +92,7 @@ repositories -> utils
 repositories/fitness -> database
 repositories/fitness -> domain/fitness
 repositories/fitness -> fitness/xiaomi
-repositories/fitness -> utils
+repositories/fitness -> repositories
 repositories/workout -> database
 repositories/workout -> repositories
 root -> api
@@ -102,7 +104,6 @@ root -> email
 root -> jobs
 root -> observability
 root -> repositories
-root -> repositories/fitness
 root -> security
 root -> utils
 security -> cache

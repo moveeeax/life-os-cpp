@@ -2819,6 +2819,152 @@
       }
      }
     }
+   },
+   "MiAccountStatus": {
+    "type": "object",
+    "required": [
+     "status"
+    ],
+    "description": "The caller's Mi account link. Only `status` is present when it is `none`.",
+    "properties": {
+     "status": {
+      "type": "string",
+      "enum": [
+       "none",
+       "ok",
+       "reauth_required"
+      ],
+      "description": "reauth_required: Xiaomi refused the stored token, link again"
+     },
+     "account": {
+      "type": "string",
+      "description": "Masked Xiaomi account id"
+     },
+     "region": {
+      "type": "string",
+      "enum": [
+       "ru",
+       "cn",
+       "de",
+       "i2",
+       "sg",
+       "us"
+      ]
+     },
+     "region_detected": {
+      "type": "boolean",
+      "description": "false while no region returned data for the account"
+     },
+     "linked_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "last_ok_at": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time",
+      "description": "Last login Xiaomi accepted"
+     },
+     "last_error": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "last_sync": {
+      "type": [
+       "object",
+       "null"
+      ],
+      "required": [
+       "id",
+       "status",
+       "finished_at"
+      ],
+      "properties": {
+       "id": {
+        "type": "integer"
+       },
+       "status": {
+        "type": "string"
+       },
+       "finished_at": {
+        "type": "string",
+        "format": "date-time"
+       }
+      }
+     }
+    }
+   },
+   "MiAccountStatusResponse": {
+    "type": "object",
+    "required": [
+     "data"
+    ],
+    "properties": {
+     "data": {
+      "$ref": "#/components/schemas/MiAccountStatus"
+     }
+    }
+   },
+   "MiLinkStart": {
+    "type": "object",
+    "required": [
+     "link_id",
+     "qr_png_base64",
+     "confirm_url",
+     "expires_in_seconds",
+     "expires_at"
+    ],
+    "properties": {
+     "link_id": {
+      "type": "string",
+      "description": "Id of the attempt, valid only for the user who started it"
+     },
+     "qr_png_base64": {
+      "type": "string",
+      "description": "PNG of the QR code to scan in a Xiaomi app"
+     },
+     "confirm_url": {
+      "type": "string",
+      "description": "Xiaomi page that confirms the sign-in, for a phone"
+     },
+     "expires_in_seconds": {
+      "type": "integer"
+     },
+     "expires_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "MiLinkStep": {
+    "type": "object",
+    "required": [
+     "state"
+    ],
+    "properties": {
+     "state": {
+      "type": "string",
+      "enum": [
+       "pending",
+       "linked",
+       "failed"
+      ]
+     },
+     "error": {
+      "type": "string",
+      "enum": [
+       "account_linked_elsewhere",
+       "different_account",
+       "xiaomi_refused",
+       "xiaomi_unavailable"
+      ],
+      "description": "Present when state is failed"
+     }
+    }
    }
   }
  },
@@ -5327,6 +5473,482 @@
     }
    }
   },
+  "/api/v1/fitness/account": {
+   "get": {
+    "summary": "Link status of the caller's Mi account",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The link, or status none",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MiAccountStatusResponse"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Missing fitness:sync, or the principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Fitness module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "summary": "Set the cloud region of the caller's Mi account",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "region"
+        ],
+        "properties": {
+         "region": {
+          "type": "string",
+          "enum": [
+           "ru",
+           "cn",
+           "de",
+           "i2",
+           "sg",
+           "us"
+          ]
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The link with the new region",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MiAccountStatusResponse"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Body without a region, or an unknown region (unknown_region)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Missing fitness:sync, or the principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Fitness module disabled, or no Mi account is linked",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "summary": "Unlink the caller's Mi account",
+    "description": "Without delete_data the account's rows stay and show again when the same\nXiaomi account is linked. With it the rows, the sync journal of the account\nand the band data of the caller's workouts are deleted.\n",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": false,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "delete_data": {
+          "type": "boolean",
+          "default": false
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Unlinked",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "message"
+         ],
+         "properties": {
+          "message": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "delete_data is not a boolean",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Missing fitness:sync, or the principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Fitness module disabled, or no Mi account is linked",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "A sync run is in progress (sync_in_progress)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/account/link": {
+   "post": {
+    "summary": "Start linking a Mi account by QR sign-in",
+    "description": "Asks Xiaomi for a QR sign-in of the Mi Fitness service. The user scans the\nQR in a Xiaomi app or opens confirm_url on the phone; the page then polls\nGET /api/v1/fitness/account/link/{link_id}. At most 5 starts per user per\n10 minutes.\n",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "The attempt",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MiLinkStart"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Missing fitness:sync, or the principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Fitness module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too many attempts",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "MI_FITNESS_TOKEN_KEY is not set (not_configured), or Xiaomi did not issue a sign-in (upstream_unavailable)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/account/link/{link_id}": {
+   "parameters": [
+    {
+     "name": "link_id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "get": {
+    "summary": "One step of waiting for the QR confirmation",
+    "description": "Polls Xiaomi once (about 3 seconds). On the confirmation the new token is\nverified with a login, the account's region is detected and the link is\nstored; a first sync is enqueued.\n",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "pending, linked or failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MiLinkStep"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Missing fitness:sync, or the principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Fitness module disabled, or the attempt is unknown, expired or another user's",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/account/detect-region": {
+   "post": {
+    "summary": "Find the cloud region that holds the caller's data",
+    "description": "Logs in and asks each candidate region for recent step records. The region\nthat returns data is stored; when none does, the region stays and\nregion_detected is false.\n",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The link after detection",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MiAccountStatusResponse"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Missing fitness:sync, or the principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Fitness module disabled, or no Mi account is linked",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "A sync run is in progress (sync_in_progress)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "not_configured, upstream_auth (link again) or upstream_protocol",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/fitness/probe": {
    "get": {
     "summary": "Probe the Mi Fitness cloud — login, fetch one data key, count records",
@@ -5425,7 +6047,7 @@
       }
      },
      "409": {
-      "description": "A sync run is in progress — probe would rotate the token under it",
+      "description": "A sync run is in progress (sync_in_progress), or no Mi account is linked (not_linked)",
       "content": {
        "application/json": {
         "schema": {
@@ -7862,7 +8484,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 125313,
-  "source_fnv1a64": "d2f10108299c5322"
+  "source_bytes": 136309,
+  "source_fnv1a64": "fa5452a84d03bc40"
  }
 }

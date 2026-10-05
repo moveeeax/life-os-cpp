@@ -60,8 +60,9 @@ public:
     std::optional<std::pair<std::string, Xiaomi::Credentials>> load_first() {
         return Database::get().execute_read(
             [&](auto& txn) -> std::optional<std::pair<std::string, Xiaomi::Credentials>> {
-                auto r = txn.exec("SELECT owner_id::text AS owner_id, xiaomi_user_id, pass_token_sealed, nonce, region "
-                                  "FROM mi_accounts ORDER BY linked_at, owner_id LIMIT 1");
+                auto r = txn.exec(
+                    "SELECT owner_id::text AS owner_id, xiaomi_user_id, pass_token_sealed, nonce, region "
+                    "FROM mi_accounts ORDER BY linked_at, owner_id LIMIT 1");
                 if (r.empty()) {
                     return std::nullopt;
                 }
@@ -115,8 +116,8 @@ public:
             if (!taken.empty()) {
                 throw AccountLinkedElsewhere();
             }
-            auto own = txn.exec_params(
-                "SELECT xiaomi_user_id FROM mi_accounts WHERE owner_id = $1::uuid FOR UPDATE", owner_id);
+            auto own = txn.exec_params("SELECT xiaomi_user_id FROM mi_accounts WHERE owner_id = $1::uuid FOR UPDATE",
+                                       owner_id);
             if (!own.empty() && own[0][0].template as<std::string>() != credentials.user_id) {
                 throw DifferentAccount();
             }
@@ -134,6 +135,27 @@ public:
                 nonce_b64,
                 credentials.region,
                 region_detected);
+            return true;
+        });
+    }
+
+    /**
+     * @brief The checks of link() without the write, for refusing a sign-in
+     *        before any request is made with its token.
+     * @throws AccountLinkedElsewhere, DifferentAccount.
+     */
+    void ensure_linkable(const std::string& owner_id, const std::string& xiaomi_user_id) {
+        Database::get().execute_read([&](auto& txn) {
+            auto taken = txn.exec_params("SELECT 1 FROM mi_accounts WHERE xiaomi_user_id = $1 AND owner_id <> $2::uuid",
+                                         xiaomi_user_id,
+                                         owner_id);
+            if (!taken.empty()) {
+                throw AccountLinkedElsewhere();
+            }
+            auto own = txn.exec_params("SELECT xiaomi_user_id FROM mi_accounts WHERE owner_id = $1::uuid", owner_id);
+            if (!own.empty() && own[0][0].template as<std::string>() != xiaomi_user_id) {
+                throw DifferentAccount();
+            }
             return true;
         });
     }
@@ -232,8 +254,8 @@ public:
      */
     bool unlink(const std::string& owner_id, bool delete_data) {
         return Database::get().execute_write([&](auto& txn) {
-            auto r = txn.exec_params(
-                "DELETE FROM mi_accounts WHERE owner_id = $1::uuid RETURNING xiaomi_user_id", owner_id);
+            auto r =
+                txn.exec_params("DELETE FROM mi_accounts WHERE owner_id = $1::uuid RETURNING xiaomi_user_id", owner_id);
             if (r.empty()) {
                 return false;
             }

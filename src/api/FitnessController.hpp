@@ -31,6 +31,12 @@ using namespace drogon;
 class FitnessController : public HttpController<FitnessController> {
 public:
     METHOD_LIST_BEGIN
+    ADD_METHOD_TO(FitnessController::accountStatus, "/api/v1/fitness/account", Get);
+    ADD_METHOD_TO(FitnessController::accountPatch, "/api/v1/fitness/account", Patch);
+    ADD_METHOD_TO(FitnessController::accountUnlink, "/api/v1/fitness/account", Delete);
+    ADD_METHOD_TO(FitnessController::accountLinkStart, "/api/v1/fitness/account/link", Post);
+    ADD_METHOD_TO(FitnessController::accountLinkStep, "/api/v1/fitness/account/link/{link_id}", Get);
+    ADD_METHOD_TO(FitnessController::accountDetectRegion, "/api/v1/fitness/account/detect-region", Post);
     ADD_METHOD_TO(FitnessController::probe, "/api/v1/fitness/probe", Get);
     ADD_METHOD_TO(FitnessController::syncEnqueue, "/api/v1/fitness/sync", Post);
     ADD_METHOD_TO(FitnessController::syncStatus, "/api/v1/fitness/sync/{id}", Get);
@@ -46,6 +52,16 @@ public:
     ADD_METHOD_TO(FitnessController::coverage, "/api/v1/fitness/coverage", Get);
     ADD_METHOD_TO(FitnessController::exportData, "/api/v1/fitness/export", Get);
     METHOD_LIST_END
+
+    // The caller's Mi account: link status, QR linking, region, unlink.
+    void accountStatus(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
+    void accountPatch(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
+    void accountUnlink(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
+    void accountLinkStart(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
+    void accountLinkStep(const HttpRequestPtr& req,
+                         std::function<void(const HttpResponsePtr&)>&& callback,
+                         const std::string& link_id);
+    void accountDetectRegion(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
 
     void probe(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
     void syncEnqueue(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);

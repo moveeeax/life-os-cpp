@@ -17,8 +17,9 @@
 #include <string>
 #include <string_view>
 
-#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+
+#include <nlohmann/json.hpp>
 
 #include "fitness/xiaomi/CloudClient.hpp"
 #include "fitness/xiaomi/Errors.hpp"

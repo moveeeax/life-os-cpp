@@ -85,10 +85,11 @@ protected:
         Xiaomi::Service::install_for_testing(&transport);
         Database::get().execute_write([](auto& txn) {
             txn.exec("TRUNCATE TABLE mi_accounts");
-            txn.exec_params("INSERT INTO users (id, email, confirmed, role_id) "
-                            "VALUES ($1::uuid, 'fitness-test@example.test', TRUE, (SELECT id FROM roles ORDER BY id LIMIT 1)) "
-                            "ON CONFLICT DO NOTHING",
-                            std::string(kTestUserId));
+            txn.exec_params(
+                "INSERT INTO users (id, email, confirmed, role_id) "
+                "VALUES ($1::uuid, 'fitness-test@example.test', TRUE, (SELECT id FROM roles ORDER BY id LIMIT 1)) "
+                "ON CONFLICT DO NOTHING",
+                std::string(kTestUserId));
             return true;
         });
     }
@@ -99,7 +100,8 @@ protected:
     }
 
     void seed_credentials() {
-        Repositories::MiAccountRepository(kTestKeyB64).link(kTestUserId, {"1234567890", std::string(347, 'S'), "cn"}, true);
+        Repositories::MiAccountRepository(kTestKeyB64)
+            .link(kTestUserId, {"1234567890", std::string(347, 'S'), "cn"}, true);
     }
 
     HttpResponsePtr probe(const std::string& key, const std::string& from, const std::string& to) {

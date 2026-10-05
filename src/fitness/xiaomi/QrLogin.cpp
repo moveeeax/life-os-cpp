@@ -60,9 +60,8 @@ std::string unescape_ampersands(std::string value) {
 }
 
 std::string lowercase(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::transform(
+        value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return value;
 }
 
@@ -152,9 +151,9 @@ Attempt start(HttpTransport& transport) {
     }
 
     // Step 2: the QR sign-in itself.
-    const auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                            std::chrono::system_clock::now().time_since_epoch())
-                            .count();
+    const auto now_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+            .count();
     const std::string query = "?_qrsize=480&qs=" + url_encode(url_encode("?sid=miothealth&_json=true")) +
                               "&callback=" + url_encode(callback) + "&_hasLogo=false&sid=miothealth" +
                               "&serviceParam=&_locale=en_GB&_dc=" + std::to_string(now_ms);
