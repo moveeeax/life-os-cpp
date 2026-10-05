@@ -61,7 +61,8 @@ HttpResponse CurlTransport::send(const HttpRequest& request) {
     ::curl_easy_setopt(handle.get(), CURLOPT_WRITEDATA, &response.body);
     ::curl_easy_setopt(handle.get(), CURLOPT_HEADERFUNCTION, append_header);
     ::curl_easy_setopt(handle.get(), CURLOPT_HEADERDATA, &response.headers);
-    ::curl_easy_setopt(handle.get(), CURLOPT_TIMEOUT, timeout_seconds_);
+    ::curl_easy_setopt(
+        handle.get(), CURLOPT_TIMEOUT, request.timeout_seconds > 0 ? request.timeout_seconds : timeout_seconds_);
     ::curl_easy_setopt(handle.get(), CURLOPT_NOSIGNAL, 1L);
     // Do not follow redirects: the client validates the target, otherwise the
     // session cookies would go wherever the response points.
@@ -76,6 +77,9 @@ HttpResponse CurlTransport::send(const HttpRequest& request) {
     }
 
     const CURLcode rc = ::curl_easy_perform(handle.get());
+    if (rc == CURLE_OPERATION_TIMEDOUT) {
+        throw MiFitnessTimeoutError("Xiaomi request timed out");
+    }
     if (rc != CURLE_OK) {
         // The curl text is safe: the URL does not appear in it, and the URL may
         // carry a query string with credentials.
