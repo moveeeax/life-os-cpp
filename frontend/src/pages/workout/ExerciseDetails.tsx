@@ -1,7 +1,10 @@
 import { X } from 'lucide-react';
 
-import { capitalize, trackingLabel } from '@/lib/workout';
-import type { Exercise } from '@/lib/workout/types';
+import { useMe } from '@/hooks/useMe';
+import { useSetTrackingMode } from '@/hooks/useWorkout';
+import { userIsAdmin } from '@/lib/auth/permissions';
+import { TRACKING_MODES, capitalize, trackingLabel } from '@/lib/workout';
+import type { Exercise, TrackingMode } from '@/lib/workout/types';
 
 import { ExercisePhoto } from './ExercisePhoto';
 import { iconButton, modalPanel } from './styles';
@@ -24,6 +27,11 @@ export function ExerciseDetails({
   onClose: () => void;
 }) {
   const list = (items: string[]) => (items.length ? items.map(capitalize).join(', ') : '–');
+  // The mode decides which fields a set has; the library's guess can be wrong.
+  const user = useMe().data ?? null;
+  const editable = exercise.source === 'custom' || userIsAdmin(user);
+  const setMode = useSetTrackingMode(exercise.id);
+  const mode = setMode.data?.tracking_mode ?? exercise.tracking_mode;
   return (
     <div className={modalPanel}>
       <div className="flex items-start justify-between gap-3">
@@ -53,9 +61,43 @@ export function ExerciseDetails({
         <Fact label="Secondary muscles" value={list(exercise.secondary_muscles)} />
         <Fact label="Equipment" value={exercise.equipment ? capitalize(exercise.equipment) : '–'} />
         <Fact label="Category" value={capitalize(exercise.category)} />
-        <Fact label="A set records" value={trackingLabel(exercise.tracking_mode)} />
+        {editable ? (
+          <div>
+            <dt>
+              <label
+                htmlFor="exercise-mode"
+                className="text-theme-xs text-gray-500 dark:text-gray-400"
+              >
+                A set records
+              </label>
+            </dt>
+            <dd>
+              <select
+                id="exercise-mode"
+                value={mode}
+                disabled={setMode.isPending}
+                onChange={(e) => setMode.mutate(e.target.value as TrackingMode)}
+                className="mt-0.5 h-9 w-full rounded-lg border border-gray-300 bg-transparent px-2 text-theme-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+              >
+                {TRACKING_MODES.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </dd>
+          </div>
+        ) : (
+          <Fact label="A set records" value={trackingLabel(mode)} />
+        )}
         <Fact label="Source" value={exercise.source === 'custom' ? 'My own' : 'Library'} />
       </dl>
+
+      {setMode.error && (
+        <p role="alert" className="mt-2 text-theme-sm text-error-500">
+          {setMode.error}
+        </p>
+      )}
 
       {exercise.instructions.length > 0 && (
         <ol className="mt-4 list-decimal space-y-2 ps-5 text-theme-sm text-gray-700 dark:text-gray-300">

@@ -10,6 +10,7 @@ import type {
   Routine,
   RoutineInput,
   RoutineSummary,
+  TrackingMode,
 } from '@/lib/workout/types';
 
 // Paths with an id go through the client's untyped overload (it does not fill
@@ -50,6 +51,23 @@ export function useCreateExercise(onSuccess: (exercise: Exercise) => void) {
     async (body: ExerciseInput) =>
       (await api.postJson<{ data: Exercise }>(`${BASE}/exercises`, { body })).data,
     { invalidate: [qk.workout.exercises()], onSuccess },
+  );
+}
+
+/**
+ * Change what a set of an exercise records. Own exercises are the owner's to
+ * edit; a library exercise is shared, and only an administrator may change it.
+ */
+export function useSetTrackingMode(id: string) {
+  return useApiMutation(
+    async (mode: TrackingMode) =>
+      (
+        await api.patchJson<{ data: Exercise }>(`${BASE}/exercises/${encodeURIComponent(id)}`, {
+          body: { tracking_mode: mode },
+        })
+      ).data,
+    // Routines and sessions carry the mode of their exercises too.
+    { invalidate: [['workout']] },
   );
 }
 
