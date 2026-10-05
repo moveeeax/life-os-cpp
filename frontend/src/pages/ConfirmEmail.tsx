@@ -32,12 +32,16 @@ export function ConfirmEmailPage() {
       <Card>
         <CardHeader>
           <CardTitle>Confirm your account</CardTitle>
-          <CardDescription>Click the button below to activate your account.</CardDescription>
+          <CardDescription>
+            Click the button below to activate your account.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {confirm.isSuccess && (
             <Alert variant="success">
-              <AlertDescription>Your account is confirmed. You can log in now.</AlertDescription>
+              <AlertDescription>
+                Your account is confirmed. You can log in now.
+              </AlertDescription>
             </Alert>
           )}
           {confirm.isError && (

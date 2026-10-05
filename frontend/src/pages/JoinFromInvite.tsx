@@ -66,7 +66,9 @@ export function JoinFromInvitePage() {
         <CardContent>
           {done ? (
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">Account ready. You can log in now.</p>
+              <p className="text-sm text-muted-foreground">
+                Account ready. You can log in now.
+              </p>
               <Button asChild className="w-full">
                 <Link to="/login">Continue to log in</Link>
               </Button>
