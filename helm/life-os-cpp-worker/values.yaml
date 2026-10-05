@@ -273,7 +273,7 @@ affinity: {}
 # Extra envFrom sources for the app AND the migrate init container:
 # DATABASE_PASSWORD rides in the same app Secret, and migrations need it
 # too. The escape hatch for app-specific secrets the chart does not know
-# about — e.g. the Xiaomi credential seed (MI_FITNESS_*). Rendered verbatim.
+# about — e.g. the fitness token key and sync knobs (MI_FITNESS_*). Rendered verbatim.
 # ---------------------------------------------------------------
 extraEnvFrom: []
 #  - secretRef:

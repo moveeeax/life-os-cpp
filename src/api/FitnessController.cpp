@@ -29,7 +29,7 @@
 #include "fitness/xiaomi/Service.hpp"
 #include "jobs/FitnessSyncHandler.hpp"
 #include "jobs/Jobs.hpp"
-#include "repositories/fitness/CredentialsRepository.hpp"
+#include "repositories/fitness/MiAccountRepository.hpp"
 #include "repositories/fitness/SyncRunRepository.hpp"
 #include "utils/Config.hpp"
 #include "utils/ErrorResponse.hpp"
@@ -44,12 +44,24 @@ constexpr long kDefaultLimit = 1000;
 constexpr long kMaxLimit = 10000;
 
 /// Region day offset: cn is UTC+8, others UTC (same rule as sync range bounds).
+/// The region is the one of the linked account.
 long long region_offset_seconds() {
-    std::string region;
-    if (Config::is_initialized()) {
-        region = Config::get().get<std::string>("fitness.xiaomi.region", "MI_FITNESS_REGION", "");
+    std::string region = "cn";
+    try {
+        region = Repositories::MiAccountRepository("").first_region().value_or("cn");
+    } catch (const std::exception&) {
+        // An unreachable database is reported by the query that follows.
     }
     return (region.empty() || region == "cn") ? 8 * 3600 : 0;
+}
+
+/// Rows belong to an app user; a static-bearer principal has no user id.
+bool require_user(const std::string& owner, const std::function<void(const HttpResponsePtr&)>& callback) {
+    if (is_valid_uuid(owner)) {
+        return true;
+    }
+    callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
+    return false;
 }
 
 }  // namespace
@@ -126,6 +138,10 @@ void FitnessController::respond_page(const std::function<Repositories::HealthRea
 
 void FitnessController::probe(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
     FITNESS_GUARD(req, callback, Domain::Permission::kFitnessSync);
+    API_REQUIRE_OWNER(req, callback, owner);
+    if (!require_user(owner, callback)) {
+        return;
+    }
     // Sync and probe cannot run together: both log in, and every login
     // rotates the passToken. A live run in the journal means probe refuses
     // before going to the cloud.
@@ -163,18 +179,20 @@ void FitnessController::probe(const HttpRequestPtr& req, std::function<void(cons
         return;
     }
 
+    Repositories::MiAccountRepository accounts(token_key);
     try {
-        Repositories::CredentialsRepository repository(token_key);
-        const auto credentials = repository.load();
+        const auto credentials = accounts.load(owner);
         if (!credentials.has_value()) {
-            callback(ErrorResponse::service_unavailable("not_configured", "Xiaomi credentials are not seeded yet"));
+            callback(ErrorResponse::conflict("not_linked", "no Mi account is linked"));
             return;
         }
 
-        Xiaomi::CloudClient client(Xiaomi::Service::transport(),
-                                   *credentials,
-                                   [&repository](const Xiaomi::Credentials& rotated) { repository.store(rotated); });
+        Xiaomi::CloudClient client(
+            Xiaomi::Service::transport(), *credentials, [&accounts, &owner](const Xiaomi::Credentials& rotated) {
+                accounts.store_rotated(owner, rotated);
+            });
         client.login();
+        accounts.mark_ok(owner);
         const auto items = client.fetch_key(key, from, to, std::nullopt);
 
         callback(Response::ok(json{{"data",
@@ -186,6 +204,11 @@ void FitnessController::probe(const HttpRequestPtr& req, std::function<void(cons
         // Only a fresh token fixes this, so the code is distinct from other
         // failures. MiFitness*Error messages contain no values by construction.
         spdlog::warn("fitness probe auth failure: {}", e.what());
+        try {
+            accounts.mark_reauth_required(owner, "upstream_auth");
+        } catch (const std::exception& mark_error) {
+            spdlog::warn("fitness probe: failed to record the link status: {}", mark_error.what());
+        }
         callback(ErrorResponse::service_unavailable("upstream_auth", "Xiaomi refused the stored credentials"));
     } catch (const Xiaomi::MiFitnessProtocolError& e) {
         spdlog::warn("fitness probe protocol failure: {}", e.what());

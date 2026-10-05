@@ -45,10 +45,17 @@ public:
                        const std::string& to,
                        const std::vector<std::string>& data_types);
 
+    /// Outcome of the login of the last run(): accepted, refused by Xiaomi
+    /// (only a new link fixes that), or not attempted (skipped run, network
+    /// failure before an answer).
+    enum class Login { NotAttempted, Accepted, Refused };
+    Login login_outcome() const { return login_outcome_; }
+
 private:
     Xiaomi::HttpTransport& transport_;
     Xiaomi::Credentials credentials_;
     std::function<void(const Xiaomi::Credentials&)> on_rotate_;
+    Login login_outcome_ = Login::NotAttempted;
 };
 
 }  // namespace Sync

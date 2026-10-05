@@ -21,7 +21,7 @@
 #include "fitness/xiaomi/Service.hpp"
 #include "jobs/Jobs.hpp"
 #include "repositories/fitness/ActivityRepository.hpp"
-#include "repositories/fitness/CredentialsRepository.hpp"
+#include "repositories/fitness/MiAccountRepository.hpp"
 #include "repositories/fitness/SamplesRepository.hpp"
 #include "repositories/fitness/SleepRepository.hpp"
 #include "repositories/fitness/SyncRunRepository.hpp"
@@ -33,10 +33,12 @@ using namespace drogon;
 namespace {
 
 constexpr const char* kTestKeyB64 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+// The principal of the tests is a user row: a Mi account links to a user.
+constexpr const char* kTestUserId = "77777777-7777-4777-8777-777777777777";
 
 Security::Auth::AuthPrincipal principal_with(std::uint32_t permissions) {
     Security::Auth::AuthPrincipal p;
-    p.subject = "fitness-test-user";
+    p.subject = kTestUserId;
     p.raw_claims = json{{"sub", p.subject}, {"permissions", permissions}};
     return p;
 }
@@ -82,7 +84,11 @@ protected:
             return;
         Xiaomi::Service::install_for_testing(&transport);
         Database::get().execute_write([](auto& txn) {
-            txn.exec("TRUNCATE TABLE xiaomi_credentials");
+            txn.exec("TRUNCATE TABLE mi_accounts");
+            txn.exec_params("INSERT INTO users (id, email, confirmed, role_id) "
+                            "VALUES ($1::uuid, 'fitness-test@example.test', TRUE, (SELECT id FROM roles ORDER BY id LIMIT 1)) "
+                            "ON CONFLICT DO NOTHING",
+                            std::string(kTestUserId));
             return true;
         });
     }
@@ -93,7 +99,7 @@ protected:
     }
 
     void seed_credentials() {
-        Repositories::CredentialsRepository(kTestKeyB64).store({"1234567890", std::string(347, 'S'), "cn"});
+        Repositories::MiAccountRepository(kTestKeyB64).link(kTestUserId, {"1234567890", std::string(347, 'S'), "cn"}, true);
     }
 
     HttpResponsePtr probe(const std::string& key, const std::string& from, const std::string& to) {
@@ -154,13 +160,13 @@ TEST_F(XiaomiProbeTest, RejectsMalformedDate) {
     EXPECT_EQ(resp->statusCode(), k400BadRequest);
 }
 
-// Credentials not seeded yet: a configuration state, not a client error and
-// not a cloud error.
-TEST_F(XiaomiProbeTest, WithoutCredentialsReportsNotConfigured) {
+// No linked account: the caller's state, not a configuration or cloud error.
+TEST_F(XiaomiProbeTest, WithoutALinkedAccountReportsNotLinked) {
     auto resp = probe("steps", "2026-09-22", "2026-09-22");
     ASSERT_NE(resp, nullptr);
-    EXPECT_EQ(resp->statusCode(), k503ServiceUnavailable);
-    EXPECT_EQ(json::parse(std::string(resp->body()))["error"], "not_configured");
+    EXPECT_EQ(resp->statusCode(), k409Conflict);
+    EXPECT_EQ(json::parse(std::string(resp->body()))["error"], "not_linked");
+    EXPECT_TRUE(transport.requests().empty()) << "must not reach the cloud";
 }
 
 // The cloud rejected the stored token: the upstream_auth code is distinct from
@@ -174,6 +180,16 @@ TEST_F(XiaomiProbeTest, UpstreamAuthFailureIsReported) {
     ASSERT_NE(resp, nullptr);
     EXPECT_EQ(resp->statusCode(), k503ServiceUnavailable);
     EXPECT_EQ(json::parse(std::string(resp->body()))["error"], "upstream_auth");
+    // The link now asks to be made again, and the next accepted login clears that.
+    Repositories::MiAccountRepository accounts(kTestKeyB64);
+    EXPECT_EQ((*accounts.status(kTestUserId))["status"], "reauth_required");
+    EXPECT_EQ((*accounts.status(kTestUserId))["last_error"], "upstream_auth");
+
+    transport.reply_login();
+    transport.reply_encrypted(R"({"code":0,"result":{"data_list":[],"has_more":false}})");
+    ASSERT_EQ(probe("steps", "2026-09-22", "2026-09-22")->statusCode(), k200OK);
+    EXPECT_EQ((*accounts.status(kTestUserId))["status"], "ok");
+    EXPECT_TRUE((*accounts.status(kTestUserId))["last_error"].is_null());
 }
 
 // Phase 3 Global Constraint: probe and sync never run at the same time, both

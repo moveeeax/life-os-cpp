@@ -30,7 +30,6 @@
 #include "domain/User.hpp"
 #include "repositories/RoleRepository.hpp"
 #include "repositories/UserRepository.hpp"
-#include "repositories/fitness/CredentialsRepository.hpp"
 #include "security/Password.hpp"
 #include "utils/Config.hpp"
 #include "utils/ErrorResponse.hpp"
@@ -255,11 +254,6 @@ int run_seed_fake(const std::string& config_file, const std::string& count_arg) 
 // Boot the HTTP server and block until a shutdown signal drains it.
 int run_server(const std::string& config_file) {
     Core::initialize(config_file);
-    // The first pod in the cluster seeds Xiaomi credentials from the Secret;
-    // this call does not overwrite a rotated token in the database. Only when the module is enabled.
-    if (Core::fitness_enabled()) {
-        Repositories::seed_xiaomi_credentials_if_missing();
-    }
     auto& config = Config::get();
 
     std::string host = config.get<std::string>("server.host", "SERVER_HOST", "0.0.0.0");
