@@ -2288,6 +2288,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
     patch:
       summary: Edit a custom exercise, or the tracking mode and archived flag of a library one
+      description: A library exercise is shared by every user. Only an administrator can change it, and only its tracking mode and archived flag.
       tags: [workout]
       security: [{ BearerAuth: [] }]
       requestBody:
@@ -2302,7 +2303,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ExerciseResponse' }
         '400':
-          description: Validation failed, or a content field of a library exercise (library_exercise_read_only)
+          description: Validation failed, or a library exercise changed by a non-administrator or in a content field (library_exercise_read_only)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

@@ -40,6 +40,10 @@ Security::Auth::AuthPrincipal owner() {
     return principal(kOwner, Domain::Permission::kGeneral | Domain::Permission::kFitnessRead);
 }
 
+Security::Auth::AuthPrincipal admin() {
+    return principal(kOwner, Domain::Permission::kAdminister);
+}
+
 Security::Auth::AuthPrincipal stranger() {
     return principal(kStranger, Domain::Permission::kGeneral | Domain::Permission::kFitnessRead);
 }
@@ -89,7 +93,8 @@ protected:
 
     HttpResponsePtr get_exercise(const Security::Auth::AuthPrincipal& p, const std::string& id) {
         HttpResponsePtr captured;
-        controller.getExercise(TestHelpers::authed(p, Get), [&](const HttpResponsePtr& r) { captured = r; }, id);
+        controller.getExercise(
+            TestHelpers::authed(p, Get), [&](const HttpResponsePtr& r) { captured = r; }, id);
         return captured;
     }
 
@@ -109,7 +114,8 @@ protected:
 
     HttpResponsePtr get_routine(const Security::Auth::AuthPrincipal& p, const std::string& id) {
         HttpResponsePtr captured;
-        controller.getRoutine(TestHelpers::authed(p, Get), [&](const HttpResponsePtr& r) { captured = r; }, id);
+        controller.getRoutine(
+            TestHelpers::authed(p, Get), [&](const HttpResponsePtr& r) { captured = r; }, id);
         return captured;
     }
 
@@ -121,7 +127,8 @@ protected:
 
     HttpResponsePtr delete_routine(const Security::Auth::AuthPrincipal& p, const std::string& id) {
         HttpResponsePtr captured;
-        controller.deleteRoutine(TestHelpers::authed(p, Delete), [&](const HttpResponsePtr& r) { captured = r; }, id);
+        controller.deleteRoutine(
+            TestHelpers::authed(p, Delete), [&](const HttpResponsePtr& r) { captured = r; }, id);
         return captured;
     }
 
@@ -232,19 +239,28 @@ TEST_F(WorkoutApiTest, CreateValidatesNameAndMode) {
     EXPECT_EQ(bad_list->statusCode(), k400BadRequest);
 }
 
-TEST_F(WorkoutApiTest, LibraryExerciseAcceptsModeAndArchiveButNotContent) {
-    const auto mode = patch_exercise(owner(), "Barbell_Squat", json{{"tracking_mode", "bodyweight_reps"}});
+TEST_F(WorkoutApiTest, LibraryExerciseIsReadOnlyForANonAdmin) {
+    // The library is shared by every user: fitness:read alone must not change it.
+    const auto resp = patch_exercise(owner(), "Barbell_Squat", json{{"tracking_mode", "bodyweight_reps"}});
+    ASSERT_TRUE(resp);
+    EXPECT_EQ(resp->statusCode(), k400BadRequest);
+    EXPECT_EQ(body_of(resp)["error"], "library_exercise_read_only");
+    EXPECT_EQ(body_of(get_exercise(owner(), "Barbell_Squat"))["data"]["tracking_mode"], "weight_reps");
+}
+
+TEST_F(WorkoutApiTest, AdminChangesModeAndArchiveOfALibraryExerciseButNotContent) {
+    const auto mode = patch_exercise(admin(), "Barbell_Squat", json{{"tracking_mode", "bodyweight_reps"}});
     ASSERT_TRUE(mode);
     ASSERT_EQ(mode->statusCode(), k200OK) << mode->body();
     EXPECT_EQ(body_of(mode)["data"]["tracking_mode"], "bodyweight_reps");
 
-    const auto rename = patch_exercise(owner(), "Barbell_Squat", json{{"name", "My squat"}});
+    const auto rename = patch_exercise(admin(), "Barbell_Squat", json{{"name", "My squat"}});
     ASSERT_TRUE(rename);
     EXPECT_EQ(rename->statusCode(), k400BadRequest);
     EXPECT_EQ(body_of(rename)["error"], "library_exercise_read_only");
 
     // Archived exercises drop out of the default list and come back on request.
-    ASSERT_EQ(patch_exercise(owner(), "Barbell_Squat", json{{"archived", true}})->statusCode(), k200OK);
+    ASSERT_EQ(patch_exercise(admin(), "Barbell_Squat", json{{"archived", true}})->statusCode(), k200OK);
     EXPECT_EQ(body_of(list_exercises(owner(), {{"q", "Barbell Squat"}, {"equipment", "barbell"}}))["total"],
               body_of(list_exercises(owner(),
                                      {{"q", "Barbell Squat"}, {"equipment", "barbell"}, {"archived", "true"}}))["total"]
