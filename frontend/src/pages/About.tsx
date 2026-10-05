@@ -12,8 +12,7 @@ export function AboutPage() {
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
           <p>
-            Backend: Drogon, libpqxx, redis-plus-plus, libsodium argon2id, JWT in HttpOnly
-            cookies.
+            Backend: Drogon, libpqxx, redis-plus-plus, libsodium argon2id, JWT in HttpOnly cookies.
           </p>
           <p>
             Frontend: Vite + React 19 + TanStack Query + react-hook-form + zod + Tailwind +

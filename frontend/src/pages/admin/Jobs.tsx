@@ -41,7 +41,8 @@ function resolveTraceUiTemplate(): string | null {
   const configured =
     (typeof window !== 'undefined' ? window.__TRACE_UI__ : undefined) ||
     import.meta.env.VITE_TRACE_UI_URL;
-  if (configured) return configured.includes('{traceId}') ? configured : `${configured}/trace/{traceId}`;
+  if (configured)
+    return configured.includes('{traceId}') ? configured : `${configured}/trace/{traceId}`;
   if (typeof window !== 'undefined') {
     const { hostname } = window.location;
     // Local dev: the compose stack ships Jaeger on 16686.
@@ -199,11 +200,7 @@ function JobDetailCard({ job, onClose }: { job: Job; onClose: () => void }) {
         <div className="flex gap-2">
           {traceLink(job.trace_id) && (
             <Button asChild size="sm" variant="outline">
-              <a
-                href={traceLink(job.trace_id)!}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <a href={traceLink(job.trace_id)!} target="_blank" rel="noopener noreferrer">
                 Open trace
               </a>
             </Button>

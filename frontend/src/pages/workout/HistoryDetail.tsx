@@ -4,7 +4,9 @@ import { Link, useNavigate, useParams } from 'react-router';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { isFinalStatus, useStartSync, useSyncRun } from '@/hooks/useHealth';
+import { LinkMiNotice } from '@/components/LinkMiNotice';
 import { useMe } from '@/hooks/useMe';
+import { useMiAccount } from '@/hooks/useMiAccount';
 import {
   useDeleteSession,
   usePatchSession,
@@ -17,6 +19,7 @@ import { qk } from '@/lib/api/queryKeys';
 import { Permission, userCan } from '@/lib/auth/permissions';
 import { rangeForDays, today } from '@/lib/health';
 import { SYNC_DATA_TYPES } from '@/lib/health/types';
+import { needsLink } from '@/lib/mi';
 import { formatDay, formatDuration, formatTime, formatVolume } from '@/lib/workout/format';
 import {
   describeSet,
@@ -51,6 +54,8 @@ const muted = 'text-theme-sm text-gray-500 dark:text-gray-400';
 function HealthBlock({ session }: { session: WorkoutSession & { finished_at: string } }) {
   const qc = useQueryClient();
   const user = useMe().data ?? null;
+  const canSync = userCan(user, Permission.FitnessSync);
+  const unlinked = needsLink(useMiAccount(canSync).data);
   const hr = useSessionHeartRate(session.id, true);
   const startSync = useStartSync();
   const [runId, setRunId] = useState<number | null>(null);
@@ -106,7 +111,13 @@ function HealthBlock({ session }: { session: WorkoutSession & { finished_at: str
         </div>
       )}
 
-      {session.health_status === 'pending' && (
+      {session.health_status === 'pending' && unlinked && (
+        // No band data can arrive without an account to take it from.
+        <div className="mt-3">
+          <LinkMiNotice purpose="to attach heart rate from your band to workouts" compact />
+        </div>
+      )}
+      {session.health_status === 'pending' && !unlinked && (
         <p className={cn(muted, 'mt-2')}>
           The band has not synced past the end of this workout yet.{' '}
           {latest
@@ -145,7 +156,7 @@ function HealthBlock({ session }: { session: WorkoutSession & { finished_at: str
         </p>
       )}
 
-      {session.health_status === 'pending' && userCan(user, Permission.FitnessSync) && (
+      {session.health_status === 'pending' && canSync && !unlinked && (
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             type="button"

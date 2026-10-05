@@ -32,8 +32,8 @@ export function UnconfirmedPage() {
         <CardHeader>
           <CardTitle>Confirm your email</CardTitle>
           <CardDescription>
-            We sent a confirmation link to {user?.email ?? 'your email address'}. Click it to
-            unlock the rest of the app.
+            We sent a confirmation link to {user?.email ?? 'your email address'}. Click it to unlock
+            the rest of the app.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

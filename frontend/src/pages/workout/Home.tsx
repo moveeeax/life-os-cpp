@@ -1,6 +1,9 @@
 import { Play } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
 
+import { LinkMiNotice } from '@/components/LinkMiNotice';
+import { useMe } from '@/hooks/useMe';
+import { useMiAccount } from '@/hooks/useMiAccount';
 import { useRoutines } from '@/hooks/useWorkout';
 import {
   useActiveSession,
@@ -9,7 +12,9 @@ import {
   useStartSession,
 } from '@/hooks/useWorkoutSession';
 import { apiErrorMessage } from '@/lib/api/client';
+import { Permission, userCan } from '@/lib/auth/permissions';
 import { formatMinutes } from '@/lib/health';
+import { needsLink } from '@/lib/mi';
 import { weekdayLabel } from '@/lib/workout';
 import { formatDay, formatDuration, formatTime, formatVolume } from '@/lib/workout/format';
 import { durationMinutes, weekdayOf, workSetCount } from '@/lib/workout/session';
@@ -25,6 +30,8 @@ const muted = 'text-theme-sm text-gray-500 dark:text-gray-400';
 
 /** Numbers to look at before training; no score and no advice. */
 function Readiness() {
+  const user = useMe().data ?? null;
+  const mi = useMiAccount(userCan(user, Permission.FitnessSync));
   const q = useReadiness();
   const r = q.data;
   const versus = (mean: number | null | undefined, format: (n: number) => string) =>
@@ -33,7 +40,15 @@ function Readiness() {
   return (
     <section className={cardClass} aria-label="Readiness">
       <h2 className={heading}>Before the workout</h2>
-      {q.isPending ? (
+      {needsLink(mi.data) ? (
+        // These numbers come from the band; logging a workout does not need it.
+        <div className="mt-4">
+          <LinkMiNotice
+            purpose="to see last night's sleep, resting heart rate and stress"
+            compact
+          />
+        </div>
+      ) : q.isPending ? (
         <div className="mt-4 h-16 animate-pulse rounded-xl bg-gray-100 dark:bg-white/5" />
       ) : q.error || !r ? (
         <p className="mt-2 text-theme-sm text-error-500" role="alert">
