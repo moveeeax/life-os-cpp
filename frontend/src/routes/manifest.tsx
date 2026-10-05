@@ -27,6 +27,15 @@ import { BillingCancelPage } from '@/pages/BillingCancel';
 // barrel files.)
 // The Health section pulls in the chart library; keep it out of the sign-in bundle.
 const HealthPage = lazy(() => import('@/pages/Health').then((m) => ({ default: m.HealthPage })));
+const WorkoutExercisesPage = lazy(() =>
+  import('@/pages/workout/Exercises').then((m) => ({ default: m.WorkoutExercisesPage })),
+);
+const WorkoutRoutinesPage = lazy(() =>
+  import('@/pages/workout/Routines').then((m) => ({ default: m.WorkoutRoutinesPage })),
+);
+const WorkoutRoutineEditorPage = lazy(() =>
+  import('@/pages/workout/RoutineEditor').then((m) => ({ default: m.WorkoutRoutineEditorPage })),
+);
 const AdminDashboardPage = lazy(() =>
   import('@/pages/admin/Dashboard').then((m) => ({ default: m.AdminDashboardPage })),
 );
@@ -149,6 +158,25 @@ export const routes: RouteEntry[] = [
   // a "no access" card: the guards' permission fallback is `/`, which would
   // bounce a signed-in user straight back here.
   { path: '/health', element: <HealthPage />, guard: 'confirmed', layout: 'shell' },
+  {
+    path: '/workout/exercises',
+    element: <WorkoutExercisesPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
+  {
+    path: '/workout/routines',
+    element: <WorkoutRoutinesPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
+  // `new` is a reserved id: the editor makes a fresh one and creates on save.
+  {
+    path: '/workout/routines/:id',
+    element: <WorkoutRoutineEditorPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
 
   // ── Admin — gated by Permission.Administer (0x40000000 sentinel) ────────
   {
