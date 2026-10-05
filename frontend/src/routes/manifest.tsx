@@ -27,6 +27,18 @@ import { BillingCancelPage } from '@/pages/BillingCancel';
 // barrel files.)
 // The Health section pulls in the chart library; keep it out of the sign-in bundle.
 const HealthPage = lazy(() => import('@/pages/Health').then((m) => ({ default: m.HealthPage })));
+const WorkoutHomePage = lazy(() =>
+  import('@/pages/workout/Home').then((m) => ({ default: m.WorkoutHomePage })),
+);
+const WorkoutSessionPage = lazy(() =>
+  import('@/pages/workout/Session').then((m) => ({ default: m.WorkoutSessionPage })),
+);
+const WorkoutHistoryPage = lazy(() =>
+  import('@/pages/workout/History').then((m) => ({ default: m.WorkoutHistoryPage })),
+);
+const WorkoutHistoryDetailPage = lazy(() =>
+  import('@/pages/workout/HistoryDetail').then((m) => ({ default: m.WorkoutHistoryDetailPage })),
+);
 const WorkoutExercisesPage = lazy(() =>
   import('@/pages/workout/Exercises').then((m) => ({ default: m.WorkoutExercisesPage })),
 );
@@ -158,6 +170,25 @@ export const routes: RouteEntry[] = [
   // a "no access" card: the guards' permission fallback is `/`, which would
   // bounce a signed-in user straight back here.
   { path: '/health', element: <HealthPage />, guard: 'confirmed', layout: 'shell' },
+  { path: '/workout', element: <WorkoutHomePage />, guard: 'confirmed', layout: 'shell' },
+  {
+    path: '/workout/session',
+    element: <WorkoutSessionPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
+  {
+    path: '/workout/history',
+    element: <WorkoutHistoryPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
+  {
+    path: '/workout/history/:id',
+    element: <WorkoutHistoryDetailPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
   {
     path: '/workout/exercises',
     element: <WorkoutExercisesPage />,

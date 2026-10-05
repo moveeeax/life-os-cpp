@@ -46,7 +46,13 @@ export const sections: Section[] = [
   { key: 'goals', label: 'Goals', icon: Target },
   { key: 'journal', label: 'Journal', icon: NotebookPen },
   { key: 'learning', label: 'Learning', icon: GraduationCap },
-  { key: 'workout', label: 'Workout', icon: Dumbbell },
+  {
+    key: 'workout',
+    label: 'Workout',
+    icon: Dumbbell,
+    path: '/workout',
+    permission: Permission.FitnessRead,
+  },
   { key: 'travel', label: 'Travel', icon: Plane },
   { key: 'work', label: 'Work', icon: Briefcase },
   { key: 'freelance', label: 'Freelance', icon: Handshake },
@@ -54,11 +60,18 @@ export const sections: Section[] = [
   { key: 'oss', label: 'OSS', icon: GitBranch },
 ];
 
-/** Sections this user sees: built ones they may open, plus every inactive one. */
-export function visibleSections(user: PermissionUser | null | undefined): Section[] {
-  return sections.filter(
-    (s) => !s.path || s.permission === undefined || userCan(user, s.permission),
-  );
+/**
+ * Sections this user sees: built ones they may open, plus every inactive one.
+ * A section whose key is in `off` (its backend module is switched off) is
+ * shown as not built yet.
+ */
+export function visibleSections(
+  user: PermissionUser | null | undefined,
+  off: ReadonlySet<string> = new Set(),
+): Section[] {
+  return sections
+    .map((s) => (off.has(s.key) ? { ...s, path: undefined, permission: undefined } : s))
+    .filter((s) => !s.path || s.permission === undefined || userCan(user, s.permission));
 }
 
 /** Where a visitor of `/` lands. */

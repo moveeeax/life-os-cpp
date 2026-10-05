@@ -31,6 +31,14 @@ export const qk = {
         : (['workout', 'exercises', JSON.stringify(filter)] as const),
     routines: () => ['workout', 'routines'] as const,
     routine: (id: string) => ['workout', 'routine', id] as const,
+    exercise: (id: string) => ['workout', 'exercise', id] as const,
+    active: () => ['workout', 'active'] as const,
+    sessions: () => ['workout', 'sessions'] as const,
+    session: (id: string) => ['workout', 'session', id] as const,
+    heartRate: (id: string) => ['workout', 'heart-rate', id] as const,
+    readiness: () => ['workout', 'readiness'] as const,
+    /** Whether the module answers at all (it is 404 while switched off). */
+    enabled: () => ['workout-enabled'] as const,
   },
   admin: {
     users: (page?: number) =>
