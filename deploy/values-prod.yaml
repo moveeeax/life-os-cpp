@@ -4,7 +4,7 @@
 
 image:
   repository: ghcr.io/moveeeax/life-os-cpp
-  tag: "1.8.0"
+  tag: "1.9.0"
 
 replicaCount: 1
 
@@ -59,6 +59,10 @@ jobs:
   enabled: true
 
 fitness:
+  enabled: true
+
+# Workout section: routines, the workout log and its links to the fitness data.
+workout:
   enabled: true
 
 mail:

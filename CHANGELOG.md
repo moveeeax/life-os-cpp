@@ -6,6 +6,40 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-05
+
+### Added
+- Workout module, first part (off by default, `WORKOUT_ENABLED`): an exercise
+  library of 876 exercises seeded from the public-domain free-exercise-db,
+  custom exercises, and routines with per-exercise targets, under
+  `/api/v1/workout/exercises` and `/api/v1/workout/routines`. Access needs
+  `fitness:read`.
+- Workout module, second part: logged sessions under
+  `/api/v1/workout/sessions` (start empty or from a routine, sets with
+  client-generated ids so a resend replaces itself, history with volume),
+  `/api/v1/workout/readiness`, and matching of finished sessions with Mi Fitness
+  heart-rate samples and band workouts. The match runs when a session is
+  finished or moved, after every fitness sync, and on
+  `POST /api/v1/workout/reconcile` (`fitness:sync`).
+- Workout pages in the dashboard, first part: `/workout/exercises` (search and
+  filters over the exercise library, photos, own exercises) and
+  `/workout/routines` with an editor (weekday, exercises from the library,
+  target sets, rep range or duration, rest). The frontend image now carries the
+  exercise photos of free-exercise-db under `/exercise-media/` (about 100 MB).
+- Workout section in the dashboard sidebar (`/workout`, needs `fitness:read`;
+  the item stays inactive while the module is off): start a workout from a
+  routine or empty, the active session screen for a phone (sets pre-filled from
+  the previous session, rest timer with a sound, add or remove exercises), sets
+  that are kept on the device and resent when the connection drops, history
+  with volume, and per workout a Health block with heart rate from the band, a
+  band workout's calories and a "Sync now" button while the data is awaited.
+
+### Changed
+- Prod: the API release no longer has an ingress. The frontend release is the
+  only public entry point of `life-os.tarassov.me` and proxies `/api/` to the API
+  Service; `/`, `/ready`, `/health` and `/metrics` of the API are reachable only
+  inside the cluster.
+
 ## [1.8.0] - 2026-10-05
 
 ### Added
