@@ -861,6 +861,202 @@ components:
               rest_seconds: { type: [integer, 'null'], minimum: 0, maximum: 3600 }
               note: { type: string, maxLength: 2000 }
 
+    WorkoutSet:
+      type: object
+      required: [id, position, kind, weight_kg, reps, duration_seconds, distance_m, rpe, completed_at]
+      properties:
+        id: { type: string, format: uuid }
+        session_exercise_id: { type: string, format: uuid, description: "Present in the answer of PUT sets/{id}" }
+        position: { type: integer }
+        kind: { type: string, enum: [work, warmup] }
+        weight_kg: { type: [number, 'null'], description: "Load; for a bodyweight exercise the extra load" }
+        reps: { type: [integer, 'null'] }
+        duration_seconds: { type: [integer, 'null'] }
+        distance_m: { type: [number, 'null'] }
+        rpe: { type: [number, 'null'] }
+        completed_at: { type: string, format: date-time }
+
+    WorkoutPreviousSet:
+      type: object
+      required: [position, kind, weight_kg, reps, duration_seconds, distance_m, rpe]
+      properties:
+        position: { type: integer }
+        kind: { type: string, enum: [work, warmup] }
+        weight_kg: { type: [number, 'null'] }
+        reps: { type: [integer, 'null'] }
+        duration_seconds: { type: [integer, 'null'] }
+        distance_m: { type: [number, 'null'] }
+        rpe: { type: [number, 'null'] }
+
+    WorkoutSessionExercise:
+      type: object
+      required: [id, exercise_id, position, rest_seconds, note, exercise_name, tracking_mode, images, primary_muscles, sets, previous_sets]
+      properties:
+        id: { type: string, format: uuid }
+        exercise_id: { type: string }
+        position: { type: integer }
+        target_sets: { type: [integer, 'null'] }
+        target_reps_min: { type: [integer, 'null'] }
+        target_reps_max: { type: [integer, 'null'] }
+        target_duration_seconds: { type: [integer, 'null'] }
+        rest_seconds: { type: integer }
+        note: { type: string }
+        exercise_name: { type: string }
+        tracking_mode: { $ref: '#/components/schemas/ExerciseTrackingMode' }
+        images: { type: array, items: { type: string } }
+        primary_muscles: { type: array, items: { type: string } }
+        sets: { type: array, items: { $ref: '#/components/schemas/WorkoutSet' } }
+        previous_sets:
+          type: array
+          description: Sets of the latest earlier finished session that logged this exercise
+          items: { $ref: '#/components/schemas/WorkoutPreviousSet' }
+
+    WorkoutHealthStatus:
+      type: [string, 'null']
+      enum: [pending, matched, no_data, null]
+      description: >-
+        Result of matching the session with Mi Fitness data: null before the
+        session is finished, pending while the band has not synced past the
+        session's end, matched with heart-rate samples or a band workout,
+        no_data when newer samples exist and none fall inside the session.
+
+    WorkoutSession:
+      type: object
+      required: [id, routine_id, name, started_at, finished_at, note, bodyweight_kg, health_status, hr_avg, hr_max, hr_samples, band_workout_id, band_calories_kcal, reconciled_at, exercises]
+      properties:
+        id: { type: string, format: uuid }
+        routine_id: { type: [string, 'null'], format: uuid }
+        name: { type: string }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
+        note: { type: string }
+        bodyweight_kg: { type: [number, 'null'], description: "Latest body weight when the session started" }
+        health_status: { $ref: '#/components/schemas/WorkoutHealthStatus' }
+        hr_avg: { type: [integer, 'null'] }
+        hr_max: { type: [integer, 'null'] }
+        hr_samples: { type: integer }
+        band_workout_id: { type: [string, 'null'] }
+        band_calories_kcal: { type: [number, 'null'] }
+        reconciled_at: { type: [string, 'null'], format: date-time }
+        exercises: { type: array, items: { $ref: '#/components/schemas/WorkoutSessionExercise' } }
+
+    WorkoutSessionSummary:
+      type: object
+      required: [id, name, routine_id, started_at, finished_at, health_status, hr_avg, hr_max, band_calories_kcal, exercise_count, set_count, volume_kg]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        routine_id: { type: [string, 'null'], format: uuid }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+        health_status: { $ref: '#/components/schemas/WorkoutHealthStatus' }
+        hr_avg: { type: [integer, 'null'] }
+        hr_max: { type: [integer, 'null'] }
+        band_calories_kcal: { type: [number, 'null'] }
+        exercise_count: { type: integer }
+        set_count: { type: integer, description: "Work sets only" }
+        volume_kg: { type: number, description: "Reps times load over work sets; bodyweight exercises add the session's body weight" }
+
+    WorkoutSessionResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/WorkoutSession' }
+
+    WorkoutActiveSessionResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkoutSession' }
+            - { type: 'null' }
+
+    WorkoutSessionListResponse:
+      type: object
+      required: [data, count, total]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/WorkoutSessionSummary' } }
+        count: { type: integer }
+        total: { type: integer }
+
+    WorkoutSessionPatch:
+      type: object
+      properties:
+        name: { type: string, maxLength: 120 }
+        note: { type: string, maxLength: 2000 }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+        finish: { type: boolean, description: "Finish now when the session has no finished_at yet" }
+
+    WorkoutSetInput:
+      type: object
+      required: [session_exercise_id, position]
+      properties:
+        session_exercise_id: { type: string, format: uuid }
+        position: { type: integer, minimum: 1, maximum: 1000 }
+        kind: { type: string, enum: [work, warmup], default: work }
+        weight_kg: { type: [number, 'null'], minimum: 0, maximum: 2000 }
+        reps: { type: [integer, 'null'], minimum: 0, maximum: 10000 }
+        duration_seconds: { type: [integer, 'null'], minimum: 0, maximum: 86400 }
+        distance_m: { type: [number, 'null'], minimum: 0, maximum: 1000000 }
+        rpe: { type: [number, 'null'], minimum: 1, maximum: 10 }
+        completed_at: { type: string, format: date-time, description: "Defaults to now" }
+
+    WorkoutSetResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/WorkoutSet' }
+
+    WorkoutHeartRateResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [samples, latest_sample_at]
+          properties:
+            samples:
+              type: array
+              items:
+                type: object
+                required: [timestamp, bpm]
+                properties:
+                  timestamp: { type: string, format: date-time }
+                  bpm: { type: integer }
+            latest_sample_at:
+              type: [string, 'null']
+              format: date-time
+              description: Newest heart-rate sample in the database, to tell "not synced yet" from "no data"
+
+    WorkoutReadinessResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [sleep_minutes, sleep_score, sleep_minutes_avg_30d, resting_bpm, resting_bpm_avg_30d, stress, stress_avg_30d, bodyweight_kg]
+          properties:
+            sleep_minutes: { type: [integer, 'null'], description: "Longest non-nap sleep that ended in the last 18 hours" }
+            sleep_score: { type: [integer, 'null'] }
+            sleep_minutes_avg_30d: { type: [integer, 'null'] }
+            resting_bpm: { type: [integer, 'null'], description: "Latest resting sample of the last 24 hours" }
+            resting_bpm_avg_30d: { type: [integer, 'null'] }
+            stress: { type: [integer, 'null'], description: "Mean stress of the last 12 hours" }
+            stress_avg_30d: { type: [integer, 'null'] }
+            bodyweight_kg: { type: [number, 'null'] }
+
+    WorkoutReconcileResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [reconciled]
+          properties:
+            reconciled: { type: integer, description: "Sessions written" }
+
 paths:
   /:
     get:
@@ -2179,7 +2375,7 @@ paths:
         '403': { description: Not an admin }
         '404': { description: Billing module disabled }
 
-  # ── Workout module (exercise library, routines; require workout.enabled) ──
+  # ── Workout module (exercise library, routines, sessions; require workout.enabled) ──
   /api/v1/workout/exercises:
     get:
       summary: Search the exercise library and own exercises
@@ -2442,6 +2638,455 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '403':
           description: Missing fitness:read, or the principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Workout module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/workout/sessions:
+    post:
+      summary: Start a session, empty or from a routine
+      tags: [workout]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: 
+              type: object
+              properties:
+                routine_id: { type: [string, 'null'], format: uuid }
+      responses:
+        '201':
+          description: The started session; the routine's exercises and targets are copied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkoutSessionResponse' }
+        '400':
+          description: routine_id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Missing fitness:read, or the principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Workout module disabled, or the routine is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: A session is already active (session_active)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    get:
+      summary: History of finished sessions, newest first
+      tags: [workout]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200':
+          description: A page of sessions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkoutSessionListResponse' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Missing fitness:read, or the principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Workout module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/workout/sessions/active:
+    get:
+      summary: The unfinished session, or null
+      tags: [workout]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The active session with sets and previous sets; data is null without one
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkoutActiveSessionResponse' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Missing fitness:read, or the principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Workout module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/workout/sessions/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Read one session with its exercises and sets
+      tags: [workout]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkoutSessionResponse' }
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Missing fitness:read, or the principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Workout module disabled, or no such session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    patch:
+      summary: Finish, rename, annotate or move a session
+      tags: [workout]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorkoutSessionPatch' }
+      responses:
+        '200':
+          description: The session; a change of its times re-runs the match with Mi Fitness data
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkoutSessionResponse' }
+        '400':
+          description: Validation failed, a timestamp does not exist (invalid_timestamp), or finished_at is before started_at (invalid_times)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Missing fitness:read, or the principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Workout module disabled, or no such session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a session with its sets
+      tags: [workout]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string }
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Missing fitness:read, or the principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Workout module disabled, or no such session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/workout/sessions/{id}/exercises:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Add an exercise to a session
+      tags: [workout]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: 
+              type: object
+              required: [exercise_id]
+              properties:
+                exercise_id: { type: string, minLength: 1, maxLength: 120 }
+      responses:
+        '201':
+          description: The session with the exercise appended
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkoutSessionResponse' }
+        '400':
+          description: Validation failed or id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Missing fitness:read, or the principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Workout module disabled, no such session, or no such exercise
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/workout/sessions/{id}/exercises/{eid}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: eid, in: path, required: true, schema: { type: string, format: uuid }, description: "Id of the session exercise, not of the library exercise" }
+    delete:
+      summary: Drop an exercise and its sets from a session
+      tags: [workout]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The session without the exercise
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkoutSessionResponse' }
+        '400':
+          description: id or eid is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Missing fitness:read, or the principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Workout module disabled, or no such exercise in the session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/workout/sessions/{id}/heart-rate:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Heart-rate samples inside a session
+      tags: [workout]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Samples between started_at and finished_at (until now for an active session)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkoutHeartRateResponse' }
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Missing fitness:read, or the principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Workout module disabled, or no such session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/workout/sets/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      summary: Create the set with this client-generated id, or replace it
+      tags: [workout]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorkoutSetInput' }
+      responses:
+        '200':
+          description: The stored set; sending the same set twice replaces it
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkoutSetResponse' }
+        '400':
+          description: Validation failed, id is not a UUID, or completed_at does not exist (invalid_timestamp)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Missing fitness:read, or the principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Workout module disabled, or the session exercise is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a set
+      tags: [workout]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string }
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Missing fitness:read, or the principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Workout module disabled, or no such set
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/workout/readiness:
+    get:
+      summary: Numbers to look at before a workout
+      tags: [workout]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Last night's sleep, resting heart rate and recent stress, each next to its 30-day mean; a value without data is null
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkoutReadinessResponse' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Missing fitness:read, or the principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Workout module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/workout/reconcile:
+    post:
+      summary: Re-attach Mi Fitness data to the sessions that finished in a date range
+      tags: [workout]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: 
+              type: object
+              required: [from, to]
+              properties:
+                from: { type: string, format: date }
+                to: { type: string, format: date, description: "Inclusive, UTC dates of finished_at" }
+      responses:
+        '200':
+          description: How many sessions were written
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkoutReconcileResponse' }
+        '400':
+          description: from and to must be YYYY-MM-DD dates that exist, and from must not be after to
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Missing fitness:read or fitness:sync, or the principal is not a user account (no_user_account)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
