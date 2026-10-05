@@ -22,6 +22,8 @@ struct HttpRequest {
     std::string url;
     std::string body;
     Headers headers;
+    /// Time limit of this request in seconds; 0 means the transport's own.
+    long timeout_seconds = 0;
 };
 
 struct HttpResponse {

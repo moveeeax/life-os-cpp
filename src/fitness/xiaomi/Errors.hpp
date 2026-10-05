@@ -28,4 +28,10 @@ struct MiFitnessProtocolError : std::runtime_error {
     explicit MiFitnessProtocolError(const std::string& what) : std::runtime_error(what) {}
 };
 
+/// The request got no answer within its time limit. A protocol error for
+/// everyone who does not care; the QR long poll reads it as "not yet".
+struct MiFitnessTimeoutError : MiFitnessProtocolError {
+    explicit MiFitnessTimeoutError(const std::string& what) : MiFitnessProtocolError(what) {}
+};
+
 }  // namespace Xiaomi

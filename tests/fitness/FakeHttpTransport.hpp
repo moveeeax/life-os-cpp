@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "fitness/xiaomi/Crypto.hpp"
+#include "fitness/xiaomi/Errors.hpp"
 #include "fitness/xiaomi/HttpTransport.hpp"
 
 class FakeHttpTransport : public Xiaomi::HttpTransport {
@@ -42,6 +43,13 @@ public:
         queued_.push_back(std::move(item));
     }
 
+    /// The request runs into its time limit, as CurlTransport reports it.
+    void reply_timeout() {
+        Queued item;
+        item.timeout = true;
+        queued_.push_back(std::move(item));
+    }
+
     /// Encrypted data response. Encrypted at request time: signed_nonce depends
     /// on the _nonce the client puts in the body, which the fake does not know
     /// until the request arrives. The same crypto functions as in the client are
@@ -58,6 +66,9 @@ public:
         }
         Queued item = queued_.front();
         queued_.erase(queued_.begin());
+        if (item.timeout) {
+            throw Xiaomi::MiFitnessTimeoutError("Xiaomi request timed out");
+        }
         if (!item.throw_message.empty()) {
             throw Xiaomi::MiFitnessProtocolError("Xiaomi request failed: " + item.throw_message);
         }
@@ -111,6 +122,7 @@ private:
         bool encrypt = false;
         std::string plaintext;
         std::string throw_message;
+        bool timeout = false;
     };
 
     std::vector<Xiaomi::HttpRequest> requests_;
