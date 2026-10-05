@@ -216,6 +216,9 @@
       "sync_window_days": "${MI_FITNESS_SYNC_WINDOW_DAYS:-2}"
     }
   },
+  "workout": {
+    "enabled": "${WORKOUT_ENABLED:-false}"
+  },
   "worker": {
     "id": "worker-1",
     "types": [

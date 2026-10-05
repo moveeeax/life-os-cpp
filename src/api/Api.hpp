@@ -36,6 +36,7 @@
 #include "api/HealthController.hpp"
 #include "api/JobsController.hpp"
 #include "api/Middleware.hpp"
+#include "api/WorkoutController.hpp"
 
 namespace Api {
 

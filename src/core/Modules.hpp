@@ -53,4 +53,13 @@ inline bool fitness_enabled() {
     return Config::get().get<bool>("fitness.enabled", "FITNESS_ENABLED", false);
 }
 
+/// Workout module master switch; same pattern (and same
+/// Config::is_initialized() guard) as fitness_enabled() above: routes are statically registered, handlers consult this
+/// per-request and 404 while the module is off.
+inline bool workout_enabled() {
+    if (!Config::is_initialized())
+        return false;
+    return Config::get().get<bool>("workout.enabled", "WORKOUT_ENABLED", false);
+}
+
 }  // namespace Core

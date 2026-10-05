@@ -206,6 +206,9 @@ spec:
             # fitness module — master switch; MI_FITNESS_* arrive via extraEnvFrom
             - name: FITNESS_ENABLED
               value: {{ .Values.fitness.enabled | quote }}
+            # workout module — master switch
+            - name: WORKOUT_ENABLED
+              value: {{ .Values.workout.enabled | quote }}
             {{- if .Values.billing.enabled }}
             - name: PAYPAL_ENV
               value: {{ .Values.billing.paypal.environment | quote }}

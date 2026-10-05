@@ -39,6 +39,7 @@ api -> jobs
 api -> observability
 api -> repositories
 api -> repositories/fitness
+api -> repositories/workout
 api -> security
 api -> utils
 billing -> database
@@ -89,6 +90,8 @@ repositories/fitness -> database
 repositories/fitness -> domain/fitness
 repositories/fitness -> fitness/xiaomi
 repositories/fitness -> utils
+repositories/workout -> database
+repositories/workout -> repositories
 root -> api
 root -> cache
 root -> core
