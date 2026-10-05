@@ -115,7 +115,9 @@ TEST_F(SyncScheduleTest, TickEnqueuesOneJobPerAccountWithAnAcceptedToken) {
 
     // Boris has to link again: a sync of his account could only fail.
     std::vector<std::string> owners;
-    for (int i = 0; i < 3; ++i) {
+    // Exactly as many picks as jobs: a pick on an empty queue blocks past the
+    // Redis socket timeout of the test config.
+    for (int i = 0; i < 2; ++i) {
         auto job = Jobs::get().pick({"fitness_sync"}, 1);
         if (job.has_value()) {
             owners.push_back(job->payload.value("owner_id", std::string()));
