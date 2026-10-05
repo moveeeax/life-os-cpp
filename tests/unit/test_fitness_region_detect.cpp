@@ -16,7 +16,7 @@
 namespace {
 
 const char* const kEmpty = R"({"code":0,"result":{"data_list":[],"has_more":false}})";
-const char* const kWithData = R"({"code":0,"result":{"data_list":[{"a":1}],"has_more":true})";
+const char* const kWithData = R"({"code":0,"result":{"data_list":[{"a":1}],"has_more":true}})";
 
 Xiaomi::CloudClient logged_in(FakeHttpTransport& transport) {
     transport.reply_login();
