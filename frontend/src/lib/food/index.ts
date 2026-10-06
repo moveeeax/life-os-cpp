@@ -4,7 +4,6 @@ import type {
   FoodItem,
   FoodMeal,
   FoodParseJob,
-  FoodParseLine,
   FoodWeek,
 } from './types';
 
@@ -118,35 +117,81 @@ export function parseNumber(value: string): number | null {
 
 // ── the parse draft ────────────────────────────────────────────────────────
 
-export interface ParseDraftLine extends FoodParseLine {
+export const DRAFT_NUMBERS = ['grams', 'kcal', 'protein_g', 'fat_g', 'carbs_g'] as const;
+export type DraftNumber = (typeof DRAFT_NUMBERS)[number];
+
+/**
+ * One editable line of the parse result. The numbers are the field texts, so
+ * a half-typed "12." or an emptied field survives a keystroke; they are
+ * parsed when the lines become entries.
+ */
+export interface ParseDraftLine {
   key: string;
   selected: boolean;
+  name: string;
+  note: string;
+  item_id: string | null;
+  estimated: boolean;
+  grams: string;
+  kcal: string;
+  protein_g: string;
+  fat_g: string;
+  carbs_g: string;
 }
 
 /** The job's lines as the editable draft: every line selected. */
 export const draftFromJob = (job: FoodParseJob): ParseDraftLine[] =>
-  (job.result ?? []).map((l, i) => ({ ...l, key: `${job.id}:${i}`, selected: true }));
+  (job.result ?? []).map((l, i) => ({
+    key: `${job.id}:${i}`,
+    selected: true,
+    name: l.name,
+    note: l.note,
+    item_id: l.item_id,
+    estimated: l.estimated,
+    grams: String(l.grams),
+    kcal: String(l.kcal),
+    protein_g: String(l.protein_g),
+    fat_g: String(l.fat_g),
+    carbs_g: String(l.carbs_g),
+  }));
 
-/** The selected lines as entries of the batch route. */
+/** The first thing wrong with the selected lines, or null when they can be added. */
+export function draftProblem(lines: ParseDraftLine[]): string | null {
+  for (const l of lines.filter((x) => x.selected)) {
+    const who = l.name.trim() || 'a line';
+    if (!l.name.trim()) return 'Every line needs a name.';
+    const grams = parseNumber(l.grams);
+    if (grams === null || grams <= 0) return `${who}: grams must be above 0.`;
+    for (const key of DRAFT_NUMBERS.slice(1)) {
+      const n = parseNumber(l[key]);
+      if (n === null || n < 0)
+        return `${who}: ${key === 'kcal' ? 'kcal' : key.replace('_g', '')} must be 0 or more.`;
+    }
+  }
+  return null;
+}
+
+/** The selected lines as entries of the batch route; call draftProblem first. */
 export function linesToEntries(
   lines: ParseDraftLine[],
   date: string,
   meal: FoodMeal,
 ): FoodEntryInput[] {
+  const n = (v: string) => parseNumber(v) ?? 0;
   return lines
     .filter((l) => l.selected)
     .map((l) =>
       l.item_id
-        ? { date, meal, item_id: l.item_id, grams: l.grams, note: l.note }
+        ? { date, meal, item_id: l.item_id, name: l.name.trim(), grams: n(l.grams), note: l.note }
         : {
             date,
             meal,
-            name: l.name,
-            grams: l.grams,
-            kcal: l.kcal,
-            protein_g: l.protein_g,
-            fat_g: l.fat_g,
-            carbs_g: l.carbs_g,
+            name: l.name.trim(),
+            grams: n(l.grams),
+            kcal: n(l.kcal),
+            protein_g: n(l.protein_g),
+            fat_g: n(l.fat_g),
+            carbs_g: n(l.carbs_g),
             note: l.note,
           },
     );
@@ -163,6 +208,7 @@ export function parseErrorText(error: string | null | undefined): string {
   if (code === 'not_configured') return 'Text parsing is not configured on the server.';
   if (code === 'food_disabled') return 'The food module is switched off on the server.';
   if (code === 'provider_refused') return 'The language model provider refused the request.';
+  if (code === 'parse_timeout') return 'The parse is taking too long. Try again in a minute.';
   const status = /^provider_error_(\d+)$/.exec(code);
   if (status) return `The language model provider answered with an error (${status[1]}).`;
   return detail || code;

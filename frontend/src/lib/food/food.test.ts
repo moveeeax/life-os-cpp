@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   draftFromJob,
+  draftProblem,
   formatGrams,
   formatKcal,
   linesToEntries,
@@ -108,30 +109,50 @@ const job = (result: FoodParseLine[] | null): FoodParseJob => ({
 });
 
 describe('draftFromJob', () => {
-  it('selects every line and gives each a key', () => {
+  it('selects every line, gives each a key and keeps the numbers as text', () => {
     const draft = draftFromJob(job([line(), line({ name: 'Eggs' })]));
     expect(draft).toHaveLength(2);
     expect(draft.every((l) => l.selected)).toBe(true);
     expect(new Set(draft.map((l) => l.key)).size).toBe(2);
+    expect(draft[0]).toMatchObject({ grams: '150', kcal: '195', fat_g: '0.5' });
   });
   it('is empty without a result', () => {
     expect(draftFromJob(job(null))).toEqual([]);
   });
 });
 
+const draft: ParseDraftLine[] = [
+  {
+    ...draftFromJob(job([line({ item_id: '11111111-1111-4111-8111-111111111111' })]))[0],
+    key: 'a',
+  },
+  { ...draftFromJob(job([line({ name: 'Eggs', kcal: 140 })]))[0], key: 'b' },
+  { ...draftFromJob(job([line({ name: 'Skipped' })]))[0], key: 'c', selected: false },
+];
+
+describe('draftProblem', () => {
+  it('is null for the example draft', () => {
+    expect(draftProblem(draft)).toBeNull();
+  });
+  it('names the first problem of a selected line and ignores unselected ones', () => {
+    expect(draftProblem([{ ...draft[1], grams: '0' }])).toBe('Eggs: grams must be above 0.');
+    expect(draftProblem([{ ...draft[1], kcal: '12.' }])).toBeNull();
+    expect(draftProblem([{ ...draft[1], kcal: '' }])).toBe('Eggs: kcal must be 0 or more.');
+    expect(draftProblem([{ ...draft[1], fat_g: '-1' }])).toBe('Eggs: fat must be 0 or more.');
+    expect(draftProblem([{ ...draft[1], name: ' ' }])).toBe('Every line needs a name.');
+    expect(draftProblem([{ ...draft[2], grams: '' }])).toBeNull();
+  });
+});
+
 describe('linesToEntries', () => {
-  const draft: ParseDraftLine[] = [
-    { ...line({ item_id: '11111111-1111-4111-8111-111111111111' }), key: 'a', selected: true },
-    { ...line({ name: 'Eggs', kcal: 140 }), key: 'b', selected: true },
-    { ...line({ name: 'Skipped' }), key: 'c', selected: false },
-  ];
-  it('sends item lines by id and grams, estimated lines by numbers', () => {
+  it('sends item lines by id, name and grams, estimated lines by numbers', () => {
     const entries = linesToEntries(draft, '2026-10-05', 'lunch');
     expect(entries).toEqual([
       {
         date: '2026-10-05',
         meal: 'lunch',
         item_id: '11111111-1111-4111-8111-111111111111',
+        name: 'Rice',
         grams: 150,
         note: '',
       },
@@ -148,6 +169,11 @@ describe('linesToEntries', () => {
       },
     ]);
   });
+  it('parses a comma decimal', () => {
+    expect(linesToEntries([{ ...draft[1], grams: '12,5' }], '2026-10-05', 'lunch')[0].grams).toBe(
+      12.5,
+    );
+  });
 });
 
 describe('parseErrorText', () => {
@@ -160,6 +186,9 @@ describe('parseErrorText', () => {
       'The language model provider answered with an error (502).',
     );
     expect(parseErrorText('something_else: detail')).toBe('detail');
+    expect(parseErrorText('parse_timeout')).toBe(
+      'The parse is taking too long. Try again in a minute.',
+    );
     expect(parseErrorText(null)).toBe('The parse failed.');
   });
 });

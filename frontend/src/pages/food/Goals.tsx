@@ -53,41 +53,53 @@ const draftOf = (p: FoodGoalsProfile): Draft => ({
   carbs_override_g: str(p.carbs_override_g),
 });
 
-const optional = (v: string): number | null => (v.trim() === '' ? null : parseNumber(v));
-
-/** The draft as the API body, or the first problem. */
+/** The same limits as the server's PUT /food/goals, so a problem is named before the round trip. */
 function toBody(d: Draft): { body: FoodGoalsProfile } | { problem: string } {
-  const fields: [keyof Draft, string][] = [
-    ['height_cm', 'Height'],
-    ['target_weight_kg', 'Target weight'],
-    ['manual_weight_kg', 'Weight'],
-    ['kcal_override', 'kcal override'],
-    ['protein_override_g', 'Protein override'],
-    ['fat_override_g', 'Fat override'],
-    ['carbs_override_g', 'Carbs override'],
-  ];
-  for (const [key, label] of fields) {
-    const v = d[key] as string;
-    if (v.trim() !== '' && (parseNumber(v) === null || (parseNumber(v) as number) <= 0))
-      return { problem: `${label} must be a number above 0.` };
-  }
-  const pace = parseNumber(d.pace_kg_per_week);
-  if (pace === null || pace < 0 || pace > 1.5)
-    return { problem: 'Pace must be between 0 and 1.5 kg a week.' };
+  const num = (
+    v: string,
+    label: string,
+    min: number,
+    max: number,
+    integer: boolean,
+  ): number | null | { problem: string } => {
+    if (v.trim() === '') return null;
+    const n = parseNumber(v);
+    if (n === null || n < min || n > max)
+      return { problem: `${label} must be between ${min} and ${max}.` };
+    if (integer && !Number.isInteger(n)) return { problem: `${label} must be a whole number.` };
+    return n;
+  };
+  const bad = (x: unknown): x is { problem: string } => typeof x === 'object' && x !== null;
+  const height = num(d.height_cm, 'Height', 100, 250, true);
+  if (bad(height)) return height;
+  const target = num(d.target_weight_kg, 'Target weight', 30, 300, false);
+  if (bad(target)) return target;
+  const manual = num(d.manual_weight_kg, 'Weight', 30, 300, false);
+  if (bad(manual)) return manual;
+  const pace = num(d.pace_kg_per_week || '0', 'Pace', -1, 1.5, false);
+  if (bad(pace)) return pace;
+  const kcal = num(d.kcal_override, 'kcal override', 500, 10000, true);
+  if (bad(kcal)) return kcal;
+  const protein = num(d.protein_override_g, 'Protein override', 0, 1000, true);
+  if (bad(protein)) return protein;
+  const fat = num(d.fat_override_g, 'Fat override', 0, 1000, true);
+  if (bad(fat)) return fat;
+  const carbs = num(d.carbs_override_g, 'Carbs override', 0, 2000, true);
+  if (bad(carbs)) return carbs;
   return {
     body: {
-      height_cm: optional(d.height_cm),
+      height_cm: height,
       birth_date: d.birth_date || null,
       sex: d.sex || null,
       activity: d.activity,
-      target_weight_kg: optional(d.target_weight_kg),
-      pace_kg_per_week: pace,
-      manual_weight_kg: optional(d.manual_weight_kg),
+      target_weight_kg: target,
+      pace_kg_per_week: pace ?? 0,
+      manual_weight_kg: manual,
       profile_note: d.profile_note,
-      kcal_override: optional(d.kcal_override),
-      protein_override_g: optional(d.protein_override_g),
-      fat_override_g: optional(d.fat_override_g),
-      carbs_override_g: optional(d.carbs_override_g),
+      kcal_override: kcal,
+      protein_override_g: protein,
+      fat_override_g: fat,
+      carbs_override_g: carbs,
     },
   };
 }
@@ -96,6 +108,7 @@ const MISSING: Record<string, string> = {
   height_cm: 'height',
   birth_date: 'birth date',
   sex: 'sex',
+  target_weight_kg: 'target weight',
   weight: 'weight (link a scale on the Health page or type it below)',
 };
 
@@ -258,7 +271,7 @@ function GoalsForm({ goals }: { goals: FoodGoals }) {
             </select>
           </div>
           {field('target_weight_kg', 'Target weight, kg')}
-          {field('pace_kg_per_week', 'Pace, kg a week')}
+          {field('pace_kg_per_week', 'Pace, kg a week (0 keeps, below 0 gains)')}
           {goals.weight.source !== 'scale' && field('manual_weight_kg', 'Current weight, kg')}
           <div className="sm:col-span-2">
             <label htmlFor="goals-profile_note" className={labelClass}>

@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
 
+// Open traps, outermost first: a confirm over a modal must not close both on Escape.
+const stack: object[] = [];
+
 const FOCUSABLE =
   'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
@@ -16,7 +19,11 @@ export function useFocusTrap<T extends HTMLElement>(onClose: () => void) {
     const focusables = () => Array.from(node?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
     (focusables()[0] ?? node)?.focus();
 
+    const me = {};
+    stack.push(me);
+
     const onKey = (e: KeyboardEvent) => {
+      if (stack[stack.length - 1] !== me) return;
       if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -37,6 +44,7 @@ export function useFocusTrap<T extends HTMLElement>(onClose: () => void) {
     };
     document.addEventListener('keydown', onKey);
     return () => {
+      stack.splice(stack.indexOf(me), 1);
       document.removeEventListener('keydown', onKey);
       previouslyFocused?.focus?.();
     };
