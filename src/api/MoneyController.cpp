@@ -1,6 +1,6 @@
 /**
  * @file MoneyController.cpp
- * @brief Handlers of /api/v1/money/*. Validation names the field and mirrors
+ * @brief Handlers of the /api/v1/money routes. Validation names the field and mirrors
  *        the table CHECKs; the repositories' Invariant is the second line
  *        of defence and answers 400 too.
  */
