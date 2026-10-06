@@ -213,7 +213,9 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
             body = detail::complete(transport, *settings, request, error_code);
         }
     } catch (const detail::Retryable& e) {
-        if (attempt >= Jobs::get().default_max_retries()) {
+        // Without a live queue (tests, a direct call) the default applies.
+        const int max_attempts = Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries;
+        if (attempt >= max_attempts) {
             // The queue would dead-letter this run: the row must not stay
             // queued for a page that polls it.
             return failed("provider_unavailable", e.what());

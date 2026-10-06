@@ -41,11 +41,14 @@ namespace Jobs {
  *     index ZADDs inside submit are best-effort: they swallow Redis errors
  *     (observability must not take the queue down with it).
  */
+/// Runs a job gets before the queue dead-letters it (the initialize() default).
+inline constexpr int kDefaultMaxRetries = 3;
+
 class JobQueue {
 private:
     bool initialized_ = false;
     long result_ttl_ = 86400;  // seconds
-    int default_max_retries_ = 3;
+    int default_max_retries_ = kDefaultMaxRetries;
     // Retry backoff (opt-in). 0 = legacy behaviour: fail() requeues immediately.
     // >0 = a failed job is parked in jobs:delayed for an exponentially growing
     // delay (base * 2^(retry_count-1), capped at max), promoted back by
@@ -67,7 +70,7 @@ private:
     std::shared_ptr<sw::redis::Redis> blocking_client_;  // for BRPOP (long socket_timeout)
 
 public:
-    void initialize(long result_ttl = 86400, int max_retries = 3);
+    void initialize(long result_ttl = 86400, int max_retries = kDefaultMaxRetries);
 
     /**
      * @brief Enable exponential retry backoff. base_ms=0 disables it (legacy
@@ -324,7 +327,7 @@ private:
 // functions are its only doorway — mirrors Billing::'s singleton shape in
 // src/billing/PayPalClient.cpp.
 
-void initialize(long result_ttl = 86400, int max_retries = 3);
+void initialize(long result_ttl = 86400, int max_retries = kDefaultMaxRetries);
 
 JobQueue& get();
 
