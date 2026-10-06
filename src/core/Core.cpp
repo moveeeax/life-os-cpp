@@ -32,6 +32,7 @@
 #include "email/Mailer.hpp"
 #include "jobs/FitnessSyncHandler.hpp"
 #include "jobs/Jobs.hpp"
+#include "jobs/MoneyRatesHandler.hpp"
 #include "jobs/Outbox.hpp"
 #include "messaging/Messaging.hpp"
 #include "observability/Observability.hpp"
@@ -602,6 +603,7 @@ void Application::init_jobs_(Config::AppConfig& cfg) {
     register_queue_depth_metric_(cfg);
     register_outbox_drain_(cfg);
     register_fitness_sync_schedule_(cfg);
+    register_money_rates_schedule_(cfg);
 }
 
 void Application::register_fitness_sync_schedule_(Config::AppConfig& cfg) {
@@ -625,6 +627,29 @@ void Application::register_fitness_sync_schedule_(Config::AppConfig& cfg) {
         } catch (const std::exception& e) {
             // Database or queue is down: the tick is skipped, the next one retries.
             spdlog::warn("fitness sync schedule tick failed: {}", e.what());
+        }
+    });
+}
+
+void Application::register_money_rates_schedule_(Config::AppConfig& cfg) {
+    // Same shape as the fitness sync: the timer lives in the API pod, the job
+    // runs in the worker. The source publishes once a day; a few ticks a day
+    // cover a missed one.
+    if (!Tasks::is_initialized() || !Database::is_initialized() || !Jobs::is_initialized())
+        return;
+    if (!money_enabled())
+        return;
+    const int hours = cfg.get<int>("money.rates_schedule_hours", "MONEY_RATES_SCHEDULE_HOURS", 0);
+    if (hours <= 0)
+        return;
+    spdlog::info("money rates schedule enabled: every {}h", hours);
+    Tasks::schedule_recurring("money_rates_schedule", std::chrono::hours(hours), [] {
+        if (!Database::is_initialized() || !Jobs::is_initialized())
+            return;
+        try {
+            Jobs::get().submit(Jobs::MoneyRates::kJobType, nlohmann::json{{"date", "latest"}});
+        } catch (const std::exception& e) {
+            spdlog::warn("money rates schedule tick failed: {}", e.what());
         }
     });
 }

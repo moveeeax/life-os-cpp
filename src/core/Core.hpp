@@ -141,6 +141,8 @@ private:
     // hours enqueues a window of the last sync_window_days days. 0 disables it,
     // so does a disabled module.
     static void register_fitness_sync_schedule_(Config::AppConfig& cfg);
+    // The daily rates of the money module: every money.rates_schedule_hours, a money_rates job.
+    static void register_money_rates_schedule_(Config::AppConfig& cfg);
 
     // Registers db_pool_active_connections + db_pool_size gauges, labeled by
     // pool (primary/replica). Saturation = active / size → 1.0 means acquire()
