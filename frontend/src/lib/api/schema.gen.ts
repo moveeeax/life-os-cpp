@@ -5464,6 +5464,1108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/food/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Goals profile, the weight it uses and the computed daily targets */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The goals */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodGoalsResponse"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        /** Replace the goals profile */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FoodGoalsProfile"];
+                };
+            };
+            responses: {
+                /** @description The goals after the write */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodGoalsResponse"];
+                    };
+                };
+                /** @description Validation failed (a future birth date, an out-of-range value) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search own products */
+        get: {
+            parameters: {
+                query?: {
+                    q?: string;
+                    /** @description Include archived products */
+                    archived?: "true";
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A page of products */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodItemListResponse"];
+                    };
+                };
+                /** @description q is too long */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a product */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FoodItemInput"];
+                };
+            };
+            responses: {
+                /** @description The product */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodItemResponse"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/items/from-off": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy an Open Food Facts product by barcode into own products */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        code: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The product existed already */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodItemResponse"];
+                    };
+                };
+                /** @description The product was copied now */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodItemResponse"];
+                    };
+                };
+                /** @description code is not 1..20 digits */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled, or Open Food Facts has no such product (off_product) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Open Food Facts is not available (upstream_unavailable) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/items/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a product, or archive one the diary uses */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted or archived (outcome) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                            /** @enum {string} */
+                            outcome: "deleted" | "archived";
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled, or no such product */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Edit a product */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FoodItemInput"];
+                };
+            };
+            responses: {
+                /** @description The product */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodItemResponse"];
+                    };
+                };
+                /** @description Validation failed or id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled, or no such product */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/food/recent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Products used recently in the diary, each once */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Up to 30 products */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodItemListResponse"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/off/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Open Food Facts
+         * @description Data from Open Food Facts (https://world.openfoodfacts.org), Open Database License.
+         */
+        get: {
+            parameters: {
+                query: {
+                    q: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Up to 20 products with a kcal value; cached for an hour per query */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["OffProduct"][];
+                            count: number;
+                            cached: boolean;
+                        };
+                    };
+                };
+                /** @description q must be 1..80 characters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Open Food Facts is not available (upstream_unavailable) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One day of the diary with totals, active kcal and the targets */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Defaults to today (UTC) */
+                    date?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The day */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FoodDay"];
+                        };
+                    };
+                };
+                /** @description date is not YYYY-MM-DD or not a calendar day (invalid_date) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/week": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Seven days of totals from a date against the targets */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The week */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FoodWeek"];
+                        };
+                    };
+                };
+                /** @description from is not YYYY-MM-DD or not a calendar day (invalid_date) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a diary entry */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FoodEntryInput"];
+                };
+            };
+            responses: {
+                /** @description The entry */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodEntryResponse"];
+                    };
+                };
+                /** @description Validation failed, or the date does not exist (invalid_date) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled, or item_id is not the caller's product */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/entries/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add several diary entries in one transaction */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        entries: components["schemas"]["FoodEntryInput"][];
+                    };
+                };
+            };
+            responses: {
+                /** @description The entries */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FoodEntry"][];
+                            count: number;
+                        };
+                    };
+                };
+                /** @description Validation failed on any entry (errors name the index); nothing is written */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled, or an item_id is not the caller's product */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/entries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a diary entry */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled, or no such entry */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Edit a diary entry */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FoodEntryPatch"];
+                };
+            };
+            responses: {
+                /** @description The entry */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodEntryResponse"];
+                    };
+                };
+                /** @description Validation failed, id is not a UUID, or the date does not exist */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled, or no such entry */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6330,6 +7432,238 @@ export interface components {
              * @enum {string}
              */
             error?: "account_linked_elsewhere" | "different_account" | "xiaomi_refused" | "xiaomi_unavailable";
+        };
+        FoodItem: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            source: "custom" | "off" | "ai";
+            /** @description Open Food Facts barcode of a copied product */
+            off_code: string | null;
+            name: string;
+            brand: string;
+            /**
+             * @description What the nutrient fields refer to
+             * @enum {string}
+             */
+            per: "100g" | "100ml";
+            kcal: number;
+            protein_g: number;
+            fat_g: number;
+            carbs_g: number;
+            fiber_g: number | null;
+            sugar_g: number | null;
+            salt_g: number | null;
+            servings: components["schemas"]["FoodServing"][];
+            archived: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        FoodServing: {
+            label: string;
+            grams: number;
+        };
+        FoodItemInput: {
+            name?: string;
+            brand?: string;
+            /**
+             * @default 100g
+             * @enum {string}
+             */
+            per: "100g" | "100ml";
+            kcal?: number;
+            protein_g?: number;
+            fat_g?: number;
+            carbs_g?: number;
+            fiber_g?: number | null;
+            sugar_g?: number | null;
+            salt_g?: number | null;
+            servings?: components["schemas"]["FoodServing"][];
+            /** @description PATCH only */
+            archived?: boolean;
+        };
+        FoodItemResponse: {
+            data: components["schemas"]["FoodItem"];
+        };
+        FoodItemListResponse: {
+            data: components["schemas"]["FoodItem"][];
+            count: number;
+            total: number;
+        };
+        /** @description An Open Food Facts product mapped to the item shape; nutrients per 100 g or 100 ml. */
+        OffProduct: {
+            code: string;
+            name: string;
+            brand: string;
+            /** @enum {string} */
+            per: "100g" | "100ml";
+            kcal: number;
+            protein_g: number;
+            fat_g: number;
+            carbs_g: number;
+            fiber_g: number | null;
+            sugar_g: number | null;
+            salt_g: number | null;
+            serving_grams: number | null;
+            serving_label: string;
+        };
+        FoodEntry: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            date: string;
+            meal: components["schemas"]["FoodMeal"];
+            /** Format: uuid */
+            item_id: string | null;
+            name: string;
+            grams: number | null;
+            kcal: number;
+            protein_g: number;
+            fat_g: number;
+            carbs_g: number;
+            fiber_g: number | null;
+            sugar_g: number | null;
+            salt_g: number | null;
+            /** @description A quick entry or an estimate, not a product's numbers */
+            estimated: boolean;
+            note: string;
+            position: number;
+            /** Format: date-time */
+            logged_at: string;
+        };
+        /** @enum {string} */
+        FoodMeal: "breakfast" | "lunch" | "dinner" | "snack";
+        /** @description With item_id the numbers come from the item and grams; without, name and kcal are required and the entry is estimated. */
+        FoodEntryInput: {
+            /** Format: date */
+            date: string;
+            meal: components["schemas"]["FoodMeal"];
+            /** Format: uuid */
+            item_id?: string | null;
+            grams?: number | null;
+            name?: string;
+            kcal?: number;
+            protein_g?: number;
+            fat_g?: number;
+            carbs_g?: number;
+            fiber_g?: number | null;
+            sugar_g?: number | null;
+            salt_g?: number | null;
+            note?: string;
+        };
+        FoodEntryPatch: {
+            /** Format: date */
+            date?: string;
+            meal?: components["schemas"]["FoodMeal"];
+            /** @description Recomputes the numbers when the entry still has its item */
+            grams?: number;
+            note?: string;
+        };
+        FoodEntryResponse: {
+            data: components["schemas"]["FoodEntry"];
+        };
+        FoodTotals: {
+            kcal: number;
+            protein_g: number;
+            fat_g: number;
+            carbs_g: number;
+            fiber_g: number | null;
+            sugar_g: number | null;
+            salt_g: number | null;
+            entries: number;
+        };
+        /** @description The daily goals after the overrides; null until the profile is complete. */
+        FoodTargets: {
+            kcal: number;
+            protein_g: number;
+            fat_g: number;
+            carbs_g: number;
+        } | null;
+        FoodDay: {
+            /** Format: date */
+            date: string;
+            totals: components["schemas"]["FoodTotals"];
+            meals: {
+                breakfast: components["schemas"]["FoodEntry"][];
+                lunch: components["schemas"]["FoodEntry"][];
+                dinner: components["schemas"]["FoodEntry"][];
+                snack: components["schemas"]["FoodEntry"][];
+            };
+            /** @description Active kcal the band counted that day, when a Mi account is linked */
+            active_kcal: number | null;
+            targets: components["schemas"]["FoodTargets"];
+        };
+        FoodWeek: {
+            /** Format: date */
+            from: string;
+            days: {
+                /** Format: date */
+                date: string;
+                kcal: number;
+                protein_g: number;
+                fat_g: number;
+                carbs_g: number;
+                entries: number;
+            }[];
+            targets: components["schemas"]["FoodTargets"];
+        };
+        FoodGoalsProfile: {
+            height_cm?: number | null;
+            /** Format: date */
+            birth_date?: string | null;
+            /** @enum {string|null} */
+            sex?: "male" | "female" | null;
+            /**
+             * @default light
+             * @enum {string}
+             */
+            activity: "sedentary" | "light" | "moderate" | "active" | "very_active";
+            target_weight_kg?: number | null;
+            /** @description Positive loses weight, 0 maintains, negative gains */
+            pace_kg_per_week?: number;
+            /** @description Used only without a weigh-in from the Mi scale */
+            manual_weight_kg?: number | null;
+            /** @description Eating habits, handed to the LLM parse */
+            profile_note?: string;
+            kcal_override?: number | null;
+            protein_override_g?: number | null;
+            fat_override_g?: number | null;
+            carbs_override_g?: number | null;
+            /**
+             * Format: date-time
+             * @description Response only
+             */
+            updated_at?: string | null;
+        };
+        FoodGoals: {
+            profile: components["schemas"]["FoodGoalsProfile"];
+            weight: {
+                kg: number | null;
+                /** @enum {string} */
+                source: "scale" | "manual" | "none";
+            };
+            /** @description Profile fields still needed for the computed goal */
+            missing: string[];
+            /** @description Mifflin-St Jeor BMR, maintenance, the deficit from the pace, and the default macros. */
+            computed: {
+                age_years?: number;
+                bmr?: number;
+                maintenance?: number;
+                deficit?: number;
+                kcal?: number;
+                /** @description The goal was raised to the 1200 kcal floor */
+                floored?: boolean;
+                below_bmr?: boolean;
+                protein_g?: number;
+                fat_g?: number;
+                carbs_g?: number;
+            } | null;
+            targets: components["schemas"]["FoodTargets"];
+        };
+        FoodGoalsResponse: {
+            data: components["schemas"]["FoodGoals"];
         };
     };
     responses: never;
