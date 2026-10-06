@@ -23,6 +23,8 @@
 #include <string>
 #include <string_view>
 
+#include "utils/Date.hpp"
+
 namespace Food::Goals {
 
 /// Lowest calorie goal the arithmetic produces; below it the page should warn.
@@ -86,28 +88,7 @@ inline int round_half_up(double v) {
     return static_cast<int>(std::floor(v + 0.5));
 }
 
-inline std::chrono::year_month_day parse_ymd(std::string_view text) {
-    if (text.size() != 10 || text[4] != '-' || text[7] != '-') {
-        throw std::invalid_argument("date must be YYYY-MM-DD");
-    }
-    const auto num = [&](std::size_t at, std::size_t len) {
-        int v = 0;
-        for (std::size_t i = at; i < at + len; ++i) {
-            if (text[i] < '0' || text[i] > '9') {
-                throw std::invalid_argument("date must be YYYY-MM-DD");
-            }
-            v = v * 10 + (text[i] - '0');
-        }
-        return v;
-    };
-    const std::chrono::year_month_day ymd{std::chrono::year(num(0, 4)),
-                                          std::chrono::month(static_cast<unsigned>(num(5, 2))),
-                                          std::chrono::day(static_cast<unsigned>(num(8, 2)))};
-    if (!ymd.ok()) {
-        throw std::invalid_argument("date is not a calendar day");
-    }
-    return ymd;
-}
+using Utils::Date::parse_ymd;
 
 }  // namespace detail
 
