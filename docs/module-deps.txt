@@ -68,6 +68,7 @@ email -> repositories
 email -> security
 email -> utils
 food -> utils
+money -> utils
 fitness -> cache
 fitness -> fitness/xiaomi
 fitness -> repositories/fitness
@@ -100,6 +101,9 @@ repositories/fitness -> fitness/xiaomi
 repositories/fitness -> repositories
 repositories/food -> database
 repositories/food -> repositories
+repositories/money -> database
+repositories/money -> money
+repositories/money -> repositories
 repositories/workout -> database
 repositories/workout -> repositories
 root -> api
