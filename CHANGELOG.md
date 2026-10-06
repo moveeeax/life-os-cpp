@@ -6,6 +6,31 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-10-06
+
+### Added
+- Food module, first part (off by default, `FOOD_ENABLED`): own products, a
+  diary of meals per day with copied numbers, daily goals computed from the
+  profile and the weight of the Mi scale (Mifflin-St Jeor, activity factor,
+  deficit from the weekly pace, overridable per number), day and week views
+  with the active kcal of the band, and a proxy to Open Food Facts search and
+  product lookup, under `/api/v1/food/`. Every confirmed user has it.
+- Food section in the dashboard, for every confirmed user: the day with its
+  four meals against the goals (ring and macro bars, the balance with the
+  band's active calories), an add form with own and recent products, Open
+  Food Facts search, a text description parsed by the LLM job (shown only
+  when the server has it configured) and a quick entry; the week with a
+  chart and a table; own products with servings and archive; the goals
+  profile with the computed numbers and per-target overrides. The sidebar
+  item hides while the food module is off.
+- Food module, second part: a text description of a meal is parsed by an LLM
+  into diary lines. The worker job `food_parse` speaks the OpenAI-compatible
+  chat completions API to whatever `FOOD_LLM_BASE_URL`, `FOOD_LLM_API_KEY`,
+  `FOOD_LLM_MODEL` and `FOOD_LLM_PROMPT` name; the answer is checked against a
+  schema (an item id must be the user's own) and waits in the job for the
+  user's confirmation. `POST /api/v1/food/parse`, `GET /api/v1/food/parse/{id}`;
+  `GET /api/v1/food/goals` reports `llm_available`.
+
 ## [1.10.0] - 2026-10-06
 
 ### Added

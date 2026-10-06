@@ -4,7 +4,7 @@
 
 image:
   repository: ghcr.io/moveeeax/life-os-cpp
-  tag: "1.10.0"
+  tag: "1.11.0"
 
 replicaCount: 1
 
@@ -70,6 +70,10 @@ fitness:
 
 # Workout section: routines, the workout log and its links to the fitness data.
 workout:
+  enabled: true
+
+# Food section: diary, products, goals, Open Food Facts, the LLM parse.
+food:
   enabled: true
 
 mail:
