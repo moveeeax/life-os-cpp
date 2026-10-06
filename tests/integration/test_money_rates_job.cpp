@@ -119,8 +119,8 @@ TEST_F(MoneyRatesJobTest, AQuoteTheSourceLacksIsReported) {
     source.replies.push_back({200, R"({"date":"2026-10-03","usd":{"kzt":450,"eur":0.9}})"});
     const json result = Jobs::MoneyRates::process_job(json{{"date", "latest"}});
     EXPECT_EQ(result["status"], "done");
-    EXPECT_EQ(result["stored"], 3) << "KZT, EUR and USD (always 1)";
-    EXPECT_EQ(result["missing"].size(), 8u);
+    EXPECT_EQ(result["stored"], 2) << "KZT and EUR; USD reads as 1 without a stored row";
+    EXPECT_EQ(result["missing"].size(), 8u) << "the other eight of the ten, USD among them";
 }
 
 TEST_F(MoneyRatesJobTest, MissingSnapshotFinishesAndOutagesThrow) {
