@@ -168,6 +168,12 @@ public:
                     }
                     if (p.account_id.has_value()) {
                         check_account(txn, owner, account);
+                        if (AccountRepository::currency_in(txn, owner, account) !=
+                            (*row)["currency"].get<std::string>()) {
+                            throw Invariant(
+                                "the amount is in the account's currency: move only to an account in "
+                                "the same currency");
+                        }
                         if (!(*row)["adjustments"].empty()) {
                             throw Invariant("a row with adjustments stays on its account");
                         }
@@ -212,7 +218,8 @@ public:
                         p.trip,
                         p.note);
                     const auto updated = *find_in(txn, owner, id);
-                    if (updated["status"] == "posted") {
+                    // A new merchant or category is something to learn; a note edit is not a visit.
+                    if (updated["status"] == "posted" && (p.merchant.has_value() || p.category_id.has_value())) {
                         remember_in(txn, owner, updated);
                     }
                     return updated;
@@ -238,7 +245,7 @@ public:
         return Database::get().execute_write([&](auto& txn) {
             auto r = txn.exec_params(
                 "UPDATE money_transactions SET status = 'posted', updated_at = now() "
-                "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
+                "WHERE owner_id = $1::uuid AND id = $2::uuid AND status = 'pending' RETURNING id\",
                 owner,
                 id);
             if (r.empty()) {

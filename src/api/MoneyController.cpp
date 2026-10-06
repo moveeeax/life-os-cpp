@@ -8,6 +8,7 @@
 #include "api/MoneyController.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <map>
 #include <optional>
 #include <regex>
@@ -76,20 +77,34 @@ const std::vector<std::string> kPeriodKinds = {"week", "month", "quarter", "cust
 const std::regex kCodeRe(R"(^[A-Z]{3}$)");
 const std::regex kLast4Re(R"(^[0-9]{0,4}$)");
 
+/// The owner's ten currencies for a user who has none yet. A failure here is not
+/// the request's answer: the write that follows reports what is missing.
+void seed_currencies(const std::string& owner) {
+    try {
+        Repo::CurrencyRepository().seed_defaults(owner);
+    } catch (const std::exception& e) {
+        spdlog::warn("money: seeding currencies failed: {}", e.what());
+    }
+}
+
+/// The JSON body, which must be an object: an array or a scalar answers 400, not 500.
+bool parse_object(const HttpRequestPtr& req, json& body, const MoneyController::Callback& callback) {
+    if (!Validation::parse_body(req, body, callback)) {
+        return false;
+    }
+    if (!body.is_object()) {
+        callback(ErrorResponse::bad_request("invalid_body", "the body must be a JSON object"));
+        return false;
+    }
+    return true;
+}
+
 /// Rows belong to an app user; a static-bearer principal has no user id.
 bool require_user(const std::string& owner, const MoneyController::Callback& callback) {
     if (is_valid_uuid(owner)) {
         return true;
     }
     callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
-    return false;
-}
-
-bool require_valid_uuid(const std::string& id, const MoneyController::Callback& callback) {
-    if (is_valid_uuid(id)) {
-        return true;
-    }
-    callback(ErrorResponse::bad_request("invalid_id", "id must be a UUID"));
     return false;
 }
 
@@ -177,7 +192,7 @@ bool transaction_input(const json& body,
         }
         return false;
     }
-    out.type = body.value("type", "expense");
+    out.type = Validation::opt_string(body, "type").value_or("expense");
     out.date = body["date"].get<std::string>();
     out.time = Validation::opt_string(body, "time");
     out.account_id = body["account_id"].get<std::string>();
@@ -191,8 +206,8 @@ bool transaction_input(const json& body,
     out.adjusts_id = Validation::opt_string(body, "adjusts_id");
     out.trip = Validation::opt_string(body, "trip").value_or("");
     out.note = Validation::opt_string(body, "note").value_or("");
-    out.source = body.value("source", "manual");
-    out.status = body.value("status", "posted");
+    out.source = Validation::opt_string(body, "source").value_or("manual");
+    out.status = Validation::opt_string(body, "status").value_or("posted");
     out.external_id = Validation::opt_string(body, "external_id");
     return true;
 }
@@ -360,8 +375,9 @@ void MoneyController::listCurrencies(const HttpRequestPtr& req, Callback&& callb
 
 void MoneyController::upsertCurrency(const HttpRequestPtr& req, Callback&& callback) {
     MONEY_GUARD(req, callback, owner);
+    seed_currencies(owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -381,7 +397,7 @@ void MoneyController::upsertCurrency(const HttpRequestPtr& req, Callback&& callb
     in.name = Validation::opt_string(body, "name").value_or("");
     in.role = Validation::opt_string(body, "role");
     in.decimals = opt_int(body, "decimals").value_or(2);
-    in.archived = body.value("archived", false);
+    in.archived = body.contains("archived") && body["archived"].is_boolean() && body["archived"].get<bool>();
     with_repo_errors(callback, "money.upsertCurrency", [&] {
         callback(Response::ok(json{{"data", Repo::CurrencyRepository().upsert(owner, body["code"], in)}}));
     });
@@ -390,7 +406,7 @@ void MoneyController::upsertCurrency(const HttpRequestPtr& req, Callback&& callb
 void MoneyController::patchCurrency(const HttpRequestPtr& req, Callback&& callback, const std::string& code) {
     MONEY_GUARD(req, callback, owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -450,8 +466,9 @@ void MoneyController::listAccounts(const HttpRequestPtr& req, Callback&& callbac
 
 void MoneyController::createAccount(const HttpRequestPtr& req, Callback&& callback) {
     MONEY_GUARD(req, callback, owner);
+    seed_currencies(owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -465,7 +482,7 @@ void MoneyController::createAccount(const HttpRequestPtr& req, Callback&& callba
     Repo::AccountRepository::Input in;
     in.name = body["name"];
     in.bank = Validation::opt_string(body, "bank").value_or("");
-    in.kind = body.value("kind", "card");
+    in.kind = Validation::opt_string(body, "kind").value_or("card");
     in.currency = body["currency"];
     in.last4 = Validation::opt_string(body, "last4").value_or("");
     in.opening_balance = opt_number(body, "opening_balance").value_or(0);
@@ -497,7 +514,7 @@ void MoneyController::updateAccount(const HttpRequestPtr& req, Callback&& callba
         return;
     }
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -573,8 +590,9 @@ void MoneyController::listCategories(const HttpRequestPtr& req, Callback&& callb
 
 void MoneyController::createCategory(const HttpRequestPtr& req, Callback&& callback) {
     MONEY_GUARD(req, callback, owner);
+    seed_currencies(owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -586,8 +604,8 @@ void MoneyController::createCategory(const HttpRequestPtr& req, Callback&& callb
     }
     Repo::CategoryRepository::Input in;
     in.name = body["name"];
-    in.kind = body.value("kind", "expense");
-    in.flexibility = body.value("flexibility", "variable");
+    in.kind = Validation::opt_string(body, "kind").value_or("expense");
+    in.flexibility = Validation::opt_string(body, "flexibility").value_or("variable");
     in.budget_max = opt_number(body, "budget_max");
     in.budget_currency = Validation::opt_string(body, "budget_currency");
     in.position = opt_int(body, "position").value_or(0);
@@ -617,7 +635,7 @@ void MoneyController::updateCategory(const HttpRequestPtr& req, Callback&& callb
         return;
     }
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -672,7 +690,7 @@ void MoneyController::listTransactions(const HttpRequestPtr& req, Callback&& cal
 void MoneyController::createTransaction(const HttpRequestPtr& req, Callback&& callback) {
     MONEY_GUARD(req, callback, owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -689,7 +707,7 @@ void MoneyController::createTransaction(const HttpRequestPtr& req, Callback&& ca
 void MoneyController::createTransactions(const HttpRequestPtr& req, Callback&& callback) {
     MONEY_GUARD(req, callback, owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     if (!body.contains("transactions") || !body["transactions"].is_array() || body["transactions"].empty() ||
@@ -736,7 +754,7 @@ void MoneyController::updateTransaction(const HttpRequestPtr& req, Callback&& ca
         return;
     }
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -754,6 +772,10 @@ void MoneyController::updateTransaction(const HttpRequestPtr& req, Callback&& ca
     text_length(errs, body, "fx_note", 0, 200);
     text_length(errs, body, "trip", 0, 60);
     text_length(errs, body, "note", 0, kNoteMax);
+    if (body.contains("receipt_amount") != body.contains("receipt_currency") ||
+        (body.contains("receipt_amount") && body["receipt_amount"].is_null() != body["receipt_currency"].is_null())) {
+        errs.add("receipt_currency", "invariant", "the receipt's amount and currency go together");
+    }
     for (const char* fixed : {"type", "adjusts_id", "status", "source"}) {
         if (body.contains(fixed)) {
             errs.add(fixed, "invariant", "cannot change on an existing row");
@@ -860,7 +882,7 @@ void transfer_fields(Validation::Errors& errs, const json& body) {
 void MoneyController::createTransfer(const HttpRequestPtr& req, Callback&& callback) {
     MONEY_GUARD(req, callback, owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -909,7 +931,7 @@ void MoneyController::updateTransfer(const HttpRequestPtr& req, Callback&& callb
         return;
     }
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -966,7 +988,7 @@ void MoneyController::merchants(const HttpRequestPtr& req, Callback&& callback) 
 void MoneyController::patchMerchant(const HttpRequestPtr& req, Callback&& callback, const std::string& key) {
     MONEY_GUARD(req, callback, owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -1020,7 +1042,12 @@ void MoneyController::convert(const HttpRequestPtr& req, Callback&& callback) {
     const std::string to = req->getParameter("to");
     double amount = 0;
     try {
-        amount = std::stod(req->getParameter("amount"));
+        const std::string text = req->getParameter("amount");
+        std::size_t used = 0;
+        amount = std::stod(text, &used);
+        if (used != text.size() || !std::isfinite(amount)) {
+            throw std::invalid_argument("not a number");
+        }
     } catch (const std::exception&) {
         callback(ErrorResponse::bad_request("invalid_query", "amount must be a number"));
         return;
@@ -1192,8 +1219,9 @@ void MoneyController::getSettings(const HttpRequestPtr& req, Callback&& callback
 
 void MoneyController::putSettings(const HttpRequestPtr& req, Callback&& callback) {
     MONEY_GUARD(req, callback, owner);
+    seed_currencies(owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -1219,7 +1247,8 @@ void MoneyController::putSettings(const HttpRequestPtr& req, Callback&& callback
     }
     Repo::SettingsRepository::Input in;
     in.view_currency = Validation::opt_string(body, "view_currency");
-    in.advisor_enabled = body.value("advisor_enabled", false);
+    in.advisor_enabled =
+        body.contains("advisor_enabled") && body["advisor_enabled"].is_boolean() && body["advisor_enabled"].get<bool>();
     in.advisor_weekday = opt_int(body, "advisor_weekday").value_or(1);
     if (body.contains("advisor_currencies") && body["advisor_currencies"].is_array()) {
         for (const auto& c : body["advisor_currencies"]) {

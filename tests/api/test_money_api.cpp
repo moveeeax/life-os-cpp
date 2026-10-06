@@ -466,6 +466,81 @@ TEST_F(MoneyApiTest, SettingsRoundTripAndValidation) {
         body_of(call(&Api::MoneyController::getSettings, user(kBoris), Get))["data"]["view_currency"].is_null());
 }
 
+TEST_F(MoneyApiTest, ReviewFindingsAnswer4xxNot500) {
+    const json kaspi = account(kAnna, "Kaspi", "KZT");
+    const json cash = account(kAnna, "Cash THB", "THB");
+    const json food = category(kAnna, json{{"name", "Food"}});
+    const json row{{"date", "2026-10-05"},
+                   {"account_id", kaspi["id"]},
+                   {"amount", 10},
+                   {"category_id", food["id"]},
+                   {"name", "x"},
+                   {"external_id", "notion-1"}};
+    // Explicit nulls read as "unset", not as a crash.
+    json nulls = row;
+    nulls["type"] = nullptr;
+    nulls["status"] = nullptr;
+    nulls["source"] = nullptr;
+    nulls["external_id"] = nullptr;
+    EXPECT_EQ(call_json(&Api::MoneyController::createTransaction, user(kAnna), nulls)->statusCode(), k201Created);
+    EXPECT_EQ(call_json(&Api::MoneyController::createAccount,
+                        user(kAnna),
+                        json{{"name", "y"}, {"currency", "KZT"}, {"kind", nullptr}})
+                  ->statusCode(),
+              k201Created);
+    EXPECT_EQ(call_json(&Api::MoneyController::putSettings, user(kAnna), json::array(), Put)->statusCode(),
+              k400BadRequest);
+    EXPECT_EQ(call_json(&Api::MoneyController::putSettings, user(kAnna), json{{"advisor_enabled", nullptr}}, Put)
+                  ->statusCode(),
+              k200OK);
+
+    // A repeated external_id is a conflict, not a server error.
+    EXPECT_EQ(call_json(&Api::MoneyController::createTransaction, user(kAnna), row)->statusCode(), k201Created);
+    const auto again = call_json(&Api::MoneyController::createTransaction, user(kAnna), row);
+    EXPECT_EQ(again->statusCode(), k409Conflict) << again->body();
+
+    // A category in use keeps its kind.
+    EXPECT_EQ(call_id(&Api::MoneyController::updateCategory, user(kAnna), Patch, food["id"], json{{"kind", "income"}})
+                  ->statusCode(),
+              k400BadRequest);
+
+    // A row moves only to an account in its currency.
+    const json t = body_of(call_json(&Api::MoneyController::createTransaction, user(kAnna), [&] {
+        json b = row;
+        b.erase("external_id");
+        return b;
+    }()))["data"];
+    EXPECT_EQ(
+        call_id(&Api::MoneyController::updateTransaction, user(kAnna), Patch, t["id"], json{{"account_id", cash["id"]}})
+            ->statusCode(),
+        k400BadRequest);
+    EXPECT_EQ(
+        call_id(&Api::MoneyController::updateTransaction, user(kAnna), Patch, t["id"], json{{"receipt_amount", 5}})
+            ->statusCode(),
+        k400BadRequest)
+        << "the receipt's amount without its currency";
+
+    // Confirming a posted row is not a second visit.
+    EXPECT_EQ(call_id(&Api::MoneyController::confirmTransaction, user(kAnna), Post, t["id"])->statusCode(),
+              k404NotFound);
+    EXPECT_EQ(
+        call(&Api::MoneyController::convert, user(kAnna), Get, {{"amount", "nan"}, {"from", "THB"}, {"to", "KZT"}})
+            ->statusCode(),
+        k400BadRequest);
+    EXPECT_EQ(
+        call(&Api::MoneyController::convert, user(kAnna), Get, {{"amount", "12abc"}, {"from", "THB"}, {"to", "KZT"}})
+            ->statusCode(),
+        k400BadRequest);
+}
+
+TEST_F(MoneyApiTest, AnAccountCreatedBeforeAnyListSeedsTheCurrencies) {
+    Database::get().execute_write([](auto& txn) {
+        txn.exec("TRUNCATE TABLE money_accounts, money_currencies CASCADE");
+        return true;
+    });
+    EXPECT_EQ(account(kAnna, "Kaspi", "KZT")["currency"], "KZT");
+}
+
 TEST_F(MoneyApiTest, BadIdsAndOtherOwnersRows) {
     EXPECT_EQ(call_id(&Api::MoneyController::getTransaction, user(kAnna), Get, "nope")->statusCode(), k400BadRequest);
     EXPECT_EQ(call_id(&Api::MoneyController::getTransaction, user(kAnna), Get, kMissingId)->statusCode(), k404NotFound);

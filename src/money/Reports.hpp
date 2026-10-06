@@ -147,7 +147,8 @@ inline Report build(const Period::Range& period,
     // days after it. A period that is over projects nothing.
     const int total_days = Period::days(period);
     const int including_today = Period::days_left(period, today);
-    const int left = including_today > 0 ? including_today - 1 : 0;
+    const bool not_started = Period::detail::day_of(today) < Period::detail::day_of(period.from);
+    const int left = not_started ? 0 : (including_today > 0 ? including_today - 1 : 0);
     const int elapsed = std::max(1, total_days - left);
 
     for (const auto& currency : currencies) {

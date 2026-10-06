@@ -370,6 +370,8 @@ TEST_F(MoneyRepositoriesTest, InboxFlagsDuplicatesAndConfirmTeachesTheMerchant) 
     EXPECT_EQ(learned[0]["category_id"], food["id"]);
     EXPECT_EQ(merchants.suggest(kAnna, "big", 10)[0]["times"], 1);
     EXPECT_THROW(transactions.confirm(kBoris, p1["id"]), NotFound);
+    EXPECT_THROW(transactions.confirm(kAnna, p2["id"]), NotFound) << "a posted row is not confirmed twice";
+    EXPECT_EQ(merchants.suggest(kAnna, "new", 10)[0]["times"], 1);
     EXPECT_TRUE(transactions.inbox(kBoris).empty());
 
     merchants.set_category(kAnna, "new place", rent["id"]);

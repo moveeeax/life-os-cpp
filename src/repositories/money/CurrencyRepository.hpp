@@ -128,7 +128,7 @@ public:
             for (const auto& d : kDefaults) {
                 txn.exec_params(
                     "INSERT INTO money_currencies (owner_id, code, name, role, decimals) VALUES ($1::uuid, $2, $3, $4, "
-                    "$5)",
+                    "$5) ON CONFLICT DO NOTHING",
                     owner,
                     std::string(d.code),
                     std::string(d.name),

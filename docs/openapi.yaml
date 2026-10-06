@@ -1667,7 +1667,7 @@ components:
         expense: { type: number }
         net: { type: number }
         partial: { type: boolean, description: True when a currency had no rate on or before the day }
-        unconverted: { type: integer }
+        unconverted: { type: integer, description: Currency blocks without a rate on or before the day }
         rates: { type: object }
         source: { type: string }
     MoneyReport:
@@ -5155,6 +5155,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: A row with this external_id already exists (duplicate)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '401':
           description: Not authenticated
           content:
@@ -5189,6 +5194,11 @@ paths:
               schema: { type: object, required: [data, count], properties: { data: { type: array, items: { $ref: '#/components/schemas/MoneyTransaction' } }, count: { type: integer } } }
         '400':
           description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: A row with this external_id already exists (duplicate)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -5419,6 +5429,11 @@ paths:
               schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyTransfer' } } }
         '400':
           description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: A row with this external_id already exists (duplicate)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

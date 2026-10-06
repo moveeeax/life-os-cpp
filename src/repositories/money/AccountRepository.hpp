@@ -129,8 +129,6 @@ public:
                                 id);
                 return "archived";
             }
-            txn.exec_params(
-                "DELETE FROM money_merchants WHERE owner_id = $1::uuid AND account_id = $2::uuid", owner, id);
             txn.exec_params("DELETE FROM money_accounts WHERE id = $1::uuid", id);
             return "deleted";
         });

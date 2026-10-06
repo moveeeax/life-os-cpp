@@ -31,7 +31,10 @@ Day fetch(Net::Http::Transport& transport, const std::string& date_or_latest) {
         throw Unavailable("rates source answered something that is not the usd table");
     }
     Day day;
-    day.date = body.value("date", date_or_latest);
+    if (!body.contains("date") || !body["date"].is_string() || body["date"].get<std::string>().size() != 10) {
+        throw Unavailable("rates source answered without the day it is for");
+    }
+    day.date = body["date"].get<std::string>();
     for (const auto& [code, value] : body["usd"].items()) {
         // Only three-letter codes: the table also lists crypto and metals by longer names.
         if (code.size() != 3 || !value.is_number() || value.get<double>() <= 0) {
