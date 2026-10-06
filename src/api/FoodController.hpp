@@ -39,6 +39,8 @@ public:
     ADD_METHOD_TO(FoodController::createEntries, "/api/v1/food/entries/batch", Post);
     ADD_METHOD_TO(FoodController::updateEntry, "/api/v1/food/entries/{id}", Patch);
     ADD_METHOD_TO(FoodController::deleteEntry, "/api/v1/food/entries/{id}", Delete);
+    ADD_METHOD_TO(FoodController::parseStart, "/api/v1/food/parse", Post);
+    ADD_METHOD_TO(FoodController::parseStatus, "/api/v1/food/parse/{id}", Get);
     METHOD_LIST_END
 
     using Callback = std::function<void(const HttpResponsePtr&)>;
@@ -60,6 +62,10 @@ public:
     void createEntries(const HttpRequestPtr& req, Callback&& callback);
     void updateEntry(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void deleteEntry(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+
+    // A text description to the LLM, through the food_parse worker job.
+    void parseStart(const HttpRequestPtr& req, Callback&& callback);
+    void parseStatus(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
 
 private:
     /// 404 while the module is off; the routes stay registered.

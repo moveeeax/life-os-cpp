@@ -3804,7 +3804,8 @@
      "weight",
      "missing",
      "computed",
-     "targets"
+     "targets",
+     "llm_available"
     ],
     "properties": {
      "profile": {
@@ -3882,6 +3883,10 @@
      },
      "targets": {
       "$ref": "#/components/schemas/FoodTargets"
+     },
+     "llm_available": {
+      "type": "boolean",
+      "description": "Whether the text parse is set up on this server"
      }
     }
    },
@@ -3893,6 +3898,142 @@
     "properties": {
      "data": {
       "$ref": "#/components/schemas/FoodGoals"
+     }
+    }
+   },
+   "FoodParseJob": {
+    "type": "object",
+    "required": [
+     "id",
+     "status",
+     "text",
+     "meal",
+     "date",
+     "result",
+     "error",
+     "model",
+     "prompt_tokens",
+     "completion_tokens",
+     "created_at",
+     "finished_at"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "queued",
+       "running",
+       "done",
+       "failed"
+      ]
+     },
+     "text": {
+      "type": "string"
+     },
+     "meal": {
+      "$ref": "#/components/schemas/FoodMeal"
+     },
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "result": {
+      "type": [
+       "array",
+       "null"
+      ],
+      "description": "The parsed lines when done; confirm them with POST /api/v1/food/entries/batch",
+      "items": {
+       "$ref": "#/components/schemas/FoodParseLine"
+      }
+     },
+     "error": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "code and message when failed; codes: not_configured, food_disabled, provider_refused, provider_error_<status>, invalid_answer, items_unavailable"
+     },
+     "model": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "prompt_tokens": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "completion_tokens": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "finished_at": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time"
+     }
+    }
+   },
+   "FoodParseLine": {
+    "type": "object",
+    "required": [
+     "name",
+     "grams",
+     "kcal",
+     "protein_g",
+     "fat_g",
+     "carbs_g",
+     "item_id",
+     "estimated",
+     "note"
+    ],
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "grams": {
+      "type": "number"
+     },
+     "kcal": {
+      "type": "number"
+     },
+     "protein_g": {
+      "type": "number"
+     },
+     "fat_g": {
+      "type": "number"
+     },
+     "carbs_g": {
+      "type": "number"
+     },
+     "item_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "One of the user's own products when the model matched one"
+     },
+     "estimated": {
+      "type": "boolean"
+     },
+     "note": {
+      "type": "string"
      }
     }
    }
@@ -10659,12 +10800,225 @@
      }
     }
    }
+  },
+  "/api/v1/food/parse": {
+   "post": {
+    "summary": "Send a text description to the LLM parse job",
+    "description": "Creates a food_parse_jobs row and puts a food_parse job on the queue; poll\nGET /api/v1/food/parse/{id}. Nothing reaches the diary until the lines are\nconfirmed with POST /api/v1/food/entries/batch. 503 not_configured while the\nworker's FOOD_LLM_* settings are absent (GET goals reports llm_available).\n",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "text",
+         "meal",
+         "date"
+        ],
+        "properties": {
+         "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+         },
+         "meal": {
+          "$ref": "#/components/schemas/FoodMeal"
+         },
+         "date": {
+          "type": "string",
+          "format": "date"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Queued",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "id",
+            "status"
+           ],
+           "properties": {
+            "id": {
+             "type": "string",
+             "format": "uuid"
+            },
+            "status": {
+             "type": "string",
+             "enum": [
+              "queued"
+             ]
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "not_configured, or the queue is down (queue_unavailable)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/food/parse/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "get": {
+    "summary": "Read a parse job and its lines",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The job",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/FoodParseJob"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "id is not a UUID",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled, or the job is not the caller's",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
   }
  },
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 166954,
-  "source_fnv1a64": "7962f1fdbbd09bbe"
+  "source_bytes": 172279,
+  "source_fnv1a64": "72232f70cba0c999"
  }
 }

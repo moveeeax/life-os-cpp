@@ -29,10 +29,14 @@
 #include "core/Modules.hpp"
 #include "food/Goals.hpp"
 #include "food/Http.hpp"
+#include "food/Llm.hpp"
 #include "food/OpenFoodFacts.hpp"
+#include "jobs/FoodParseHandler.hpp"
+#include "jobs/Jobs.hpp"
 #include "repositories/food/EntryRepository.hpp"
 #include "repositories/food/GoalsRepository.hpp"
 #include "repositories/food/ItemRepository.hpp"
+#include "repositories/food/ParseJobRepository.hpp"
 #include "utils/ErrorResponse.hpp"
 
 namespace Api {
@@ -47,6 +51,7 @@ constexpr int kRecentLimit = 30;
 constexpr std::size_t kNameMax = 200;
 constexpr std::size_t kNoteMax = 500;
 constexpr std::size_t kProfileNoteMax = 1000;
+constexpr std::size_t kParseTextMax = 2000;
 constexpr std::size_t kBatchMax = 50;
 constexpr std::size_t kServingsMax = 20;
 constexpr double kKcalMax = 10000;
@@ -240,8 +245,13 @@ json goals_body(const std::string& owner) {
                    {"fat_g", profile["fat_override_g"]},
                    {"carbs_g", profile["carbs_override_g"]}};
     }
-    return json{
-        {"profile", profile}, {"weight", weight}, {"missing", missing}, {"computed", computed}, {"targets", targets}};
+    return json{{"profile", profile},
+                {"weight", weight},
+                {"missing", missing},
+                {"computed", computed},
+                {"targets", targets},
+                // Whether the add form may offer the text parse.
+                {"llm_available", Food::Llm::settings().has_value()}};
 }
 
 /// Validates one entry body; fills @p out. Returns false after adding errors.
@@ -743,6 +753,59 @@ void FoodController::deleteEntry(const HttpRequestPtr& req, Callback&& callback,
     with_repo_errors(callback, "food.deleteEntry", [&] {
         Repositories::EntryRepository().remove(owner, id);
         callback(Response::ok(json{{"message", "Entry deleted"}}));
+    });
+}
+
+// ── parse ────────────────────────────────────────────────────────────────────
+
+void FoodController::parseStart(const HttpRequestPtr& req, Callback&& callback) {
+    FOOD_GUARD(req, callback, owner);
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    Validation::require_string(errs, body, "text");
+    Validation::string_length(errs, body, "text", 1, kParseTextMax);
+    Validation::require_string(errs, body, "meal");
+    Validation::one_of(errs, body, "meal", kMeals);
+    Validation::require_string(errs, body, "date");
+    date_field(errs, body, "date");
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    // The API checks only that the worker's settings exist; the worker talks to the provider.
+    if (!Food::Llm::settings().has_value()) {
+        callback(ErrorResponse::service_unavailable("not_configured", "the text parse is not set up on this server"));
+        return;
+    }
+    try {
+        const json job = Repositories::ParseJobRepository().create(
+            owner, body["text"].get<std::string>(), body["meal"].get<std::string>(), body["date"].get<std::string>());
+        const std::string id = job["id"].get<std::string>();
+        Jobs::get().submit(Jobs::FoodParse::kJobType, json{{"job_id", id}, {"owner_id", owner}});
+        auto resp = Response::ok(json{{"data", {{"id", id}, {"status", "queued"}}}});
+        resp->setStatusCode(k202Accepted);
+        callback(resp);
+    } catch (const std::exception& e) {
+        spdlog::warn("food parse enqueue unavailable: {}", e.what());
+        callback(ErrorResponse::service_unavailable("queue_unavailable"));
+    }
+}
+
+void FoodController::parseStatus(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    FOOD_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "food.parseStatus", [&] {
+        const auto job = Repositories::ParseJobRepository().get(owner, id);
+        if (!job.has_value()) {
+            callback(ErrorResponse::not_found("parse_job"));
+            return;
+        }
+        callback(Response::ok(json{{"data", *job}}));
     });
 }
 

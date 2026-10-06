@@ -21,6 +21,7 @@
 #include "database/Database.hpp"
 #include "domain/Role.hpp"
 #include "food/Http.hpp"
+#include "jobs/Jobs.hpp"
 #include "test_helpers.hpp"
 
 using json = nlohmann::json;
@@ -528,4 +529,83 @@ TEST_F(FoodDisabledTest, EveryRouteIs404WhileTheModuleIsOff) {
     controller.day(TestHelpers::authed(user(kAnna), Get), [&](const HttpResponsePtr& r) { resp = r; });
     ASSERT_TRUE(resp);
     EXPECT_EQ(resp->statusCode(), k404NotFound);
+}
+
+// ── parse ────────────────────────────────────────────────────────────────────
+
+TEST_F(FoodApiTest, ParseIsNotConfiguredWithoutLlmSettings) {
+    EXPECT_EQ(body_of(call(&Api::FoodController::getGoals, user(kAnna), Get))["data"]["llm_available"], false);
+    const auto resp = call_json(&Api::FoodController::parseStart,
+                                user(kAnna),
+                                json{{"text", "tea"}, {"meal", "snack"}, {"date", "2026-10-06"}});
+    EXPECT_EQ(resp->statusCode(), k503ServiceUnavailable);
+    EXPECT_EQ(body_of(resp)["error"], "not_configured");
+}
+
+namespace {
+
+class FoodParseApiTest : public FoodApiTest {
+protected:
+    std::string config_file_name() const override { return "food_parse_api_test_config.json"; }
+
+    void config_overrides(nlohmann::json& cfg) override {
+        FoodApiTest::config_overrides(cfg);
+        cfg["jobs"]["enabled"] = true;
+        cfg["jobs"]["result_ttl"] = 3600;
+        cfg["food"]["llm"]["base_url"] = "https://llm.example/v1";
+        cfg["food"]["llm"]["api_key"] = "sk-test";
+        cfg["food"]["llm"]["model"] = "m";
+        cfg["food"]["llm"]["prompt"] = "p";
+    }
+
+    void SetUp() override {
+        FoodApiTest::SetUp();
+        if (::testing::Test::IsSkipped())
+            return;
+        Database::get().execute_write([](auto& txn) {
+            txn.exec("TRUNCATE TABLE food_parse_jobs");
+            return true;
+        });
+    }
+};
+
+}  // namespace
+
+TEST_F(FoodParseApiTest, EnqueuesAJobForTheCallerAndShowsItOnlyToThem) {
+    EXPECT_EQ(body_of(call(&Api::FoodController::getGoals, user(kAnna), Get))["data"]["llm_available"], true);
+
+    const auto started =
+        call_json(&Api::FoodController::parseStart,
+                  user(kAnna),
+                  json{{"text", "sukiya tonkatsu curry S"}, {"meal", "lunch"}, {"date", "2026-10-06"}});
+    ASSERT_EQ(started->statusCode(), k202Accepted) << started->body();
+    const std::string id = body_of(started)["data"]["id"].get<std::string>();
+    EXPECT_EQ(body_of(started)["data"]["status"], "queued");
+
+    auto job = Jobs::get().pick({"food_parse"}, 1);
+    ASSERT_TRUE(job.has_value());
+    EXPECT_EQ(job->payload["job_id"], id);
+    EXPECT_EQ(job->payload["owner_id"], kAnna);
+
+    const auto status = call_id(&Api::FoodController::parseStatus, user(kAnna), Get, id);
+    ASSERT_EQ(status->statusCode(), k200OK) << status->body();
+    const json row = body_of(status)["data"];
+    EXPECT_EQ(row["status"], "queued");
+    EXPECT_EQ(row["text"], "sukiya tonkatsu curry S");
+    EXPECT_EQ(row["meal"], "lunch");
+    EXPECT_TRUE(row["result"].is_null());
+
+    EXPECT_EQ(call_id(&Api::FoodController::parseStatus, user(kBoris), Get, id)->statusCode(), k404NotFound);
+    EXPECT_EQ(call_id(&Api::FoodController::parseStatus, user(kAnna), Get, kMissingId)->statusCode(), k404NotFound);
+    EXPECT_EQ(call_id(&Api::FoodController::parseStatus, user(kAnna), Get, "nope")->statusCode(), k400BadRequest);
+}
+
+TEST_F(FoodParseApiTest, ParseInputIsValidated) {
+    const auto post = [&](const json& b) {
+        return call_json(&Api::FoodController::parseStart, user(kAnna), b)->statusCode();
+    };
+    EXPECT_EQ(post(json{{"meal", "lunch"}, {"date", "2026-10-06"}}), k400BadRequest);
+    EXPECT_EQ(post(json{{"text", std::string(2001, 'x')}, {"meal", "lunch"}, {"date", "2026-10-06"}}), k400BadRequest);
+    EXPECT_EQ(post(json{{"text", "tea"}, {"meal", "brunch"}, {"date", "2026-10-06"}}), k400BadRequest);
+    EXPECT_EQ(post(json{{"text", "tea"}, {"meal", "lunch"}, {"date", "today"}}), k400BadRequest);
 }
