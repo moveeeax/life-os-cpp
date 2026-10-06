@@ -66,7 +66,7 @@ TEST(FoodGoals, GainHasNegativeDeficitAndMaintainHasNone) {
 
 TEST(FoodGoals, CarbsNeverGoNegative) {
     // A tiny goal with a heavy protein target: the remainder is clamped.
-    Food::Goals::Inputs in{45.0, 150, 80, "female", "sedentary", 120.0, 1.5};
+    Food::Goals::Inputs in{45.0, 150, 80, "female", "sedentary", 300.0, 1.5};
     EXPECT_EQ(Food::Goals::compute(in).carbs_g, 0);
 }
 
