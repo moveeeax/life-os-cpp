@@ -57,16 +57,32 @@ public:
         });
     }
 
-    /// queued -> running. False when the job is not queued (taken or closed).
-    /// queued -> running and one more attempt. Returns the attempt number
-    /// (1 for the first run), or 0 when the row was not queued.
+    /// A `running` row older than this is one a crashed worker left behind:
+    /// the provider call is capped at FOOD_LLM_TIMEOUT_SECONDS (60 by default).
+    static constexpr const char* kStaleRunning = "10 minutes";
+
+    /// queued -> running and one more attempt; a stale `running` row (see
+    /// kStaleRunning) is claimed the same way. Returns the attempt number
+    /// (1 for the first run), or 0 when the row is not claimable.
     int start(const std::string& id) {
         return Database::get().execute_write([&](auto& txn) {
             auto r = txn.exec_params(
-                "UPDATE food_parse_jobs SET status = 'running', attempts = attempts + 1 "
-                "WHERE id = $1::uuid AND status = 'queued' RETURNING attempts",
-                id);
+                "UPDATE food_parse_jobs SET status = 'running', attempts = attempts + 1, started_at = now() "
+                "WHERE id = $1::uuid AND (status = 'queued' OR (status = 'running' AND "
+                " COALESCE(started_at, created_at) < now() - $2::interval)) RETURNING attempts",
+                id,
+                kStaleRunning);
             return r.empty() ? 0 : r[0][0].template as<int>();
+        });
+    }
+
+    /// Jobs of the owner that are queued or running.
+    long open_count(const std::string& owner) {
+        return Database::get().execute_read([&](auto& txn) {
+            auto r = txn.exec_params(
+                "SELECT count(*) FROM food_parse_jobs WHERE owner_id = $1::uuid AND status IN ('queued', 'running')",
+                owner);
+            return r[0][0].template as<long>();
         });
     }
 

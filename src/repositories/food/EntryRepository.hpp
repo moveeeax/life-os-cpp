@@ -147,10 +147,18 @@ public:
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
+                    // A move to another day or meal lands at the end of that meal,
+                    // not in the middle by an old position.
                     auto r = txn.exec_params(
-                        "UPDATE food_entries SET date = COALESCE($3::date, date), meal = COALESCE($4, meal), "
-                        " grams = COALESCE($5, grams), note = COALESCE($6, note) "
-                        "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING item_id::text, grams",
+                        "UPDATE food_entries e SET date = COALESCE($3::date, e.date), meal = COALESCE($4, e.meal), "
+                        " grams = COALESCE($5, e.grams), note = COALESCE($6, e.note), "
+                        " position = CASE WHEN ($3::date IS NOT NULL AND $3::date <> e.date) "
+                        "   OR ($4 IS NOT NULL AND $4 <> e.meal) THEN "
+                        "   (SELECT COALESCE(MAX(position), -1) + 1 FROM food_entries o WHERE o.owner_id = e.owner_id "
+                        "    AND o.date = COALESCE($3::date, e.date) AND o.meal = COALESCE($4, e.meal) AND o.id <> "
+                        "e.id) "
+                        "   ELSE e.position END "
+                        "WHERE e.owner_id = $1::uuid AND e.id = $2::uuid RETURNING e.item_id::text, e.grams",
                         owner,
                         id,
                         p.date,

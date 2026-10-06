@@ -20,6 +20,21 @@
 
 namespace Repositories {
 
+namespace detail {
+/// `%`, `_` and the escape itself quoted for an ILIKE ... ESCAPE '\\' pattern.
+inline std::string escape_like(const std::string& text) {
+    std::string out;
+    out.reserve(text.size());
+    for (const char c : text) {
+        if (c == '%' || c == '_' || c == '\\') {
+            out.push_back('\\');
+        }
+        out.push_back(c);
+    }
+    return out;
+}
+}  // namespace detail
+
 struct FoodItemNotFound : NotFoundError {
     FoodItemNotFound() : NotFoundError("food_item") {}
 };
@@ -68,13 +83,14 @@ public:
         Page out;
         Database::get().execute_read([&](auto& txn) {
             const std::string where =
-                "owner_id = $1::uuid AND ($2 = '' OR name ILIKE '%' || $2 || '%' OR brand ILIKE '%' || $2 || '%') "
+                "owner_id = $1::uuid AND ($2 = '' OR name ILIKE '%' || $2 || '%' ESCAPE '\\' "
+                " OR brand ILIKE '%' || $2 || '%' ESCAPE '\\') "
                 "AND ($3::boolean OR NOT archived)";
             auto rows = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + kColumns +
                                             " FROM food_items WHERE " + where +
                                             " ORDER BY lower(name), id LIMIT $4 OFFSET $5) t",
                                         owner,
-                                        q,
+                                        detail::escape_like(q),
                                         include_archived,
                                         limit,
                                         offset);
@@ -150,15 +166,13 @@ public:
      */
     std::pair<nlohmann::json, bool> upsert_off(const std::string& owner, const Input& in) {
         return Database::get().execute_write([&](auto& txn) -> std::pair<nlohmann::json, bool> {
-            auto existing = txn.exec_params(
-                "SELECT id::text FROM food_items WHERE owner_id = $1::uuid AND off_code = $2", owner, in.off_code);
-            if (!existing.empty()) {
-                return {*find_in(txn, owner, existing[0][0].template as<std::string>()), false};
-            }
+            // Two parallel copies of one barcode: the unique index decides, and
+            // the loser reads the winner's row instead of answering 500.
             auto r = txn.exec_params(
                 "INSERT INTO food_items (owner_id, source, off_code, name, brand, per, kcal, protein_g, fat_g, "
                 " carbs_g, fiber_g, sugar_g, salt_g, servings) "
                 "VALUES ($1::uuid, 'off', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb) "
+                "ON CONFLICT (owner_id, off_code) WHERE off_code IS NOT NULL DO NOTHING "
                 "RETURNING id::text",
                 owner,
                 in.off_code,
@@ -173,7 +187,26 @@ public:
                 in.sugar_g,
                 in.salt_g,
                 in.servings_json);
-            return {*find_in(txn, owner, r[0][0].template as<std::string>()), true};
+            if (!r.empty()) {
+                return {*find_in(txn, owner, r[0][0].template as<std::string>()), true};
+            }
+            auto existing = txn.exec_params(
+                "SELECT id::text FROM food_items WHERE owner_id = $1::uuid AND off_code = $2", owner, in.off_code);
+            return {*find_in(txn, owner, existing[0][0].template as<std::string>()), false};
+        });
+    }
+
+    /// The items the parse prompt gets: the ones touched last, so a user with
+    /// many products still has the current ones in front of the model.
+    nlohmann::json for_prompt(const std::string& owner, long limit) {
+        return Database::get().execute_read([&](auto& txn) {
+            auto rows = txn.exec_params(
+                "SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT id::text AS id, name, brand, per, kcal, "
+                " protein_g, fat_g, carbs_g FROM food_items WHERE owner_id = $1::uuid AND NOT archived "
+                " ORDER BY updated_at DESC, id LIMIT $2) t",
+                owner,
+                limit);
+            return nlohmann::json::parse(rows[0][0].template as<std::string>());
         });
     }
 

@@ -283,6 +283,72 @@ TEST_F(FoodParseJobTest, TheLastAttemptOfTheQueueMarksTheJobFailed) {
     EXPECT_EQ(provider.calls.size(), static_cast<std::size_t>(attempts));
 }
 
+TEST_F(FoodParseJobTest, AStaleRunningRowIsClaimedAgain) {
+    const std::string id = queued();
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params(
+            "UPDATE food_parse_jobs SET status = 'running', started_at = now() - interval '11 minutes' "
+            "WHERE id = $1::uuid",
+            id);
+        return true;
+    });
+    provider.replies.push_back({200, completion(kGoodLines)});
+    EXPECT_EQ(run(id)["status"], "done") << "a worker died with the row; the retry takes it";
+
+    const std::string fresh = queued();
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE food_parse_jobs SET status = 'running', started_at = now() WHERE id = $1::uuid", fresh);
+        return true;
+    });
+    EXPECT_EQ(run(fresh)["status"], "running") << "a row another worker holds is left alone";
+    EXPECT_EQ(provider.calls.size(), 1u);
+}
+
+TEST_F(FoodParseJobTest, TheRetryLimitComesWithTheJob) {
+    const std::string id = queued();
+    provider.fail = true;
+    // Submitted by an API whose queue retries once: the first run is the last.
+    const json result = Jobs::FoodParse::process_job(json{{"job_id", id}, {"owner_id", kAnna}, {"max_attempts", 1}});
+    EXPECT_EQ(result["error"], "provider_unavailable");
+    EXPECT_EQ((*jobs.get(kAnna, id))["status"], "failed");
+}
+
+TEST_F(FoodParseJobTest, ANullModelInTheAnswerIsTolerated) {
+    const std::string id = queued();
+    provider.replies.push_back(
+        {200,
+         json{{"model", nullptr}, {"choices", json::array({json{{"message", json{{"content", kGoodLines}}}}})}}
+             .dump()});
+    EXPECT_EQ(run(id)["status"], "done");
+    EXPECT_EQ((*jobs.get(kAnna, id))["model"], "gpt-6-luna") << "the configured model stands in";
+}
+
+TEST_F(FoodParseJobTest, AnUnexpectedErrorAfterTheClaimRequeuesAndTheLastAttemptFails) {
+    // Anything that is not the provider's own retryable failure: a database
+    // error, a bug. The row must not stay `running` for a page that polls it.
+    struct ThrowingProvider : Food::Http::Transport {
+        Food::Http::Response get(const std::string&, const std::vector<std::pair<std::string, std::string>>&) override {
+            throw std::logic_error("unexpected");
+        }
+        Food::Http::Response post_json(const std::string&,
+                                       const std::string&,
+                                       const std::vector<std::pair<std::string, std::string>>&,
+                                       long) override {
+            throw std::logic_error("unexpected");
+        }
+    } throwing;
+    Food::Http::install_for_testing(&throwing);
+    const std::string id = queued();
+    const json payload{{"job_id", id}, {"owner_id", kAnna}, {"max_attempts", 2}};
+    EXPECT_THROW(Jobs::FoodParse::process_job(payload), std::runtime_error);
+    EXPECT_EQ((*jobs.get(kAnna, id))["status"], "queued") << "the queue's retry can claim it";
+    EXPECT_EQ(Jobs::FoodParse::process_job(payload)["error"], "internal_error");
+    const json row = *jobs.get(kAnna, id);
+    EXPECT_EQ(row["status"], "failed");
+    EXPECT_EQ(row["error"].get<std::string>().rfind("internal_error: ", 0), 0u);
+    Food::Http::install_for_testing(&provider);
+}
+
 TEST_F(FoodParseJobTest, RedeliveryOfAFinishedJobDoesNothing) {
     const std::string id = queued();
     provider.replies.push_back({200, completion(kGoodLines)});

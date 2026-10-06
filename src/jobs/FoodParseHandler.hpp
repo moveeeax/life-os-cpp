@@ -20,6 +20,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 
@@ -165,89 +166,91 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         return {{"job_id", job_id}, {"status", job->value("status", "unknown")}};
     }
     const std::string owner = job->value("owner_id", std::string());
-
-    // The user's items, so the model prefers them over guesses.
-    nlohmann::json items = nlohmann::json::array();
-    std::set<std::string> own_ids;
-    try {
-        for (const auto& item : Repositories::ItemRepository().list(owner, "", false, kItemsInPrompt, 0).rows) {
-            own_ids.insert(item["id"].get<std::string>());
-            items.push_back({{"id", item["id"]},
-                             {"name", item["name"]},
-                             {"brand", item["brand"]},
-                             {"per", item["per"]},
-                             {"kcal", item["kcal"]},
-                             {"protein_g", item["protein_g"]},
-                             {"fat_g", item["fat_g"]},
-                             {"carbs_g", item["carbs_g"]}});
-        }
-    } catch (const std::exception& e) {
-        return failed("items_unavailable", e.what());
-    }
-    std::string profile_note;
-    if (const auto profile = Repositories::GoalsRepository().load(owner)) {
-        profile_note = profile->value("profile_note", std::string());
-    }
-
-    const nlohmann::json user_message{{"text", job->value("text", std::string())},
-                                      {"meal", job->value("meal", std::string())},
-                                      {"date", job->value("date", std::string())},
-                                      {"profile_note", profile_note},
-                                      {"items", items}};
-    nlohmann::json request{
-        {"model", settings->model},
-        {"messages",
-         {{{"role", "system"}, {"content", settings->prompt}}, {{"role", "user"}, {"content", user_message.dump()}}}},
-        {"max_tokens", settings->max_tokens},
-        {"temperature", 0},
-        {"response_format", {{"type", "json_object"}}}};
-
-    auto& transport = Food::Http::transport();
-    nlohmann::json body;
-    std::string error_code;
-    try {
-        body = detail::complete(transport, *settings, request, error_code);
-        // Three optional parameters, so at most three adapted retries.
-        for (int round = 0; round < 3 && error_code == "provider_error_400" && detail::adapt_request(request, body);
-             ++round) {
-            body = detail::complete(transport, *settings, request, error_code);
-        }
-    } catch (const detail::Retryable& e) {
-        // Without a live queue (tests, a direct call) the default applies.
-        const int max_attempts = Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries;
+    // The job carries the retry limit it was submitted with; the worker's own
+    // setting is the fallback for a job enqueued by an older API.
+    const int max_attempts = payload.value(
+        "max_attempts", Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries);
+    // A row that is `running` must end this call as done, failed or queued
+    // again: the page polls it, and a redelivery cannot claim it.
+    const auto give_up_or_retry = [&](const char* code, const std::string& what) -> nlohmann::json {
         if (attempt >= max_attempts) {
-            // The queue would dead-letter this run: the row must not stay
-            // queued for a page that polls it.
-            return failed("provider_unavailable", e.what());
+            return failed(code, what);
         }
-        // Back to queued: the queue's retry runs this job again.
         jobs.requeue(job_id);
-        throw std::runtime_error(std::string("food_parse: ") + e.what());
-    }
-    if (!error_code.empty()) {
-        return failed(error_code, detail::provider_message(body));
-    }
+        throw std::runtime_error(std::string("food_parse: ") + what);
+    };
 
-    std::string content;
-    if (body.contains("choices") && body["choices"].is_array() && !body["choices"].empty() &&
-        body["choices"][0].is_object() && body["choices"][0].contains("message") &&
-        body["choices"][0]["message"].is_object() && body["choices"][0]["message"].contains("content") &&
-        body["choices"][0]["message"]["content"].is_string()) {
-        content = body["choices"][0]["message"]["content"].get<std::string>();
-    }
-    if (content.empty()) {
-        return failed("invalid_answer", "no message content");
-    }
     try {
-        const auto lines = Food::Parse::parse_answer(content, own_ids);
+        // The user's items, so the model prefers them over guesses.
+        nlohmann::json items = nlohmann::json::array();
+        std::set<std::string> own_ids;
+        for (const auto& item : Repositories::ItemRepository().for_prompt(owner, kItemsInPrompt)) {
+            own_ids.insert(item["id"].get<std::string>());
+            items.push_back(item);
+        }
+        std::string profile_note;
+        if (const auto profile = Repositories::GoalsRepository().load(owner)) {
+            profile_note = profile->value("profile_note", std::string());
+        }
+
+        const nlohmann::json user_message{{"text", job->value("text", std::string())},
+                                          {"meal", job->value("meal", std::string())},
+                                          {"date", job->value("date", std::string())},
+                                          {"profile_note", profile_note},
+                                          {"items", items}};
+        nlohmann::json request{{"model", settings->model},
+                               {"messages",
+                                {{{"role", "system"}, {"content", settings->prompt}},
+                                 {{"role", "user"}, {"content", user_message.dump()}}}},
+                               {"max_tokens", settings->max_tokens},
+                               {"temperature", 0},
+                               {"response_format", {{"type", "json_object"}}}};
+
+        auto& transport = Food::Http::transport();
+        nlohmann::json body;
+        std::string error_code;
+        try {
+            body = detail::complete(transport, *settings, request, error_code);
+            // Three optional parameters, so at most three adapted retries.
+            for (int round = 0; round < 3 && error_code == "provider_error_400" && detail::adapt_request(request, body);
+                 ++round) {
+                body = detail::complete(transport, *settings, request, error_code);
+            }
+        } catch (const detail::Retryable& e) {
+            return give_up_or_retry("provider_unavailable", e.what());
+        }
+        if (!error_code.empty()) {
+            return failed(error_code, detail::provider_message(body));
+        }
+
+        std::string content;
+        if (body.contains("choices") && body["choices"].is_array() && !body["choices"].empty() &&
+            body["choices"][0].is_object() && body["choices"][0].contains("message") &&
+            body["choices"][0]["message"].is_object() && body["choices"][0]["message"].contains("content") &&
+            body["choices"][0]["message"]["content"].is_string()) {
+            content = body["choices"][0]["message"]["content"].get<std::string>();
+        }
+        if (content.empty()) {
+            return failed("invalid_answer", "no message content");
+        }
+        std::vector<Food::Parse::Line> lines;
+        try {
+            lines = Food::Parse::parse_answer(content, own_ids);
+        } catch (const Food::Parse::Invalid& e) {
+            return failed("invalid_answer", e.what());
+        }
+        const std::string model =
+            body.contains("model") && body["model"].is_string() ? body["model"].get<std::string>() : settings->model;
         jobs.finish(job_id,
                     Food::Parse::to_json(lines),
-                    body.value("model", settings->model),
+                    model,
                     detail::usage(body, "prompt_tokens"),
                     detail::usage(body, "completion_tokens"));
         return {{"job_id", job_id}, {"status", "done"}, {"lines", lines.size()}};
-    } catch (const Food::Parse::Invalid& e) {
-        return failed("invalid_answer", e.what());
+    } catch (const std::exception& e) {
+        // A database error or an unexpected shape: the row is still `running`
+        // and must not stay so.
+        return give_up_or_retry("internal_error", e.what());
     }
 }
 

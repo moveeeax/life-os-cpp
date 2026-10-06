@@ -38,6 +38,7 @@
 #include "repositories/food/ItemRepository.hpp"
 #include "repositories/food/ParseJobRepository.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Api {
 
@@ -53,6 +54,9 @@ constexpr std::size_t kNoteMax = 500;
 constexpr std::size_t kProfileNoteMax = 1000;
 constexpr std::size_t kParseTextMax = 2000;
 constexpr std::size_t kBatchMax = 50;
+constexpr long kParseOpenMax = 3;
+constexpr std::size_t kServingLabelMax = 60;
+constexpr double kServingGramsMax = 5000;
 constexpr std::size_t kServingsMax = 20;
 constexpr double kKcalMax = 10000;
 constexpr double kGramsMax = 10000;
@@ -64,6 +68,24 @@ const std::vector<std::string> kPer = {"100g", "100ml"};
 const std::vector<std::string> kSexes = {"male", "female"};
 const std::vector<std::string> kActivities = {"sedentary", "light", "moderate", "active", "very_active"};
 const std::regex kDateRe(R"(^\d{4}-\d{2}-\d{2}$)");
+
+/// Like Validation::string_length, but in characters: the table CHECKs count
+/// characters too, and a Cyrillic name must not get half the room.
+void text_length(Validation::Errors& errs, const json& body, const std::string& field, std::size_t lo, std::size_t hi) {
+    if (!body.contains(field) || body[field].is_null()) {
+        return;
+    }
+    if (!body[field].is_string()) {
+        errs.add(field, "invalid", "must be a string");
+        return;
+    }
+    const std::size_t n = Utils::Utf8::length(body[field].get<std::string>());
+    if (n < lo) {
+        errs.add(field, "too_short", "min length " + std::to_string(lo));
+    } else if (n > hi) {
+        errs.add(field, "too_long", "max length " + std::to_string(hi));
+    }
+}
 
 /// Rows belong to an app user; a static-bearer principal has no user id.
 bool require_user(const std::string& owner, const FoodController::Callback& callback) {
@@ -115,12 +137,26 @@ std::optional<int> opt_int(const json& body, const std::string& field) {
     return std::nullopt;
 }
 
+/// A real calendar day between 1900 and 2100: the regex alone lets "2026-02-30" through.
+bool is_calendar_date(const std::string& text) {
+    if (!std::regex_match(text, kDateRe)) {
+        return false;
+    }
+    try {
+        const auto ymd = Food::Goals::detail::parse_ymd(text);
+        const int year = static_cast<int>(ymd.year());
+        return year >= 1900 && year <= 2100;
+    } catch (const std::invalid_argument&) {
+        return false;
+    }
+}
+
 void date_field(Validation::Errors& errs, const json& body, const std::string& field) {
     if (!body.contains(field) || body[field].is_null()) {
         return;
     }
-    if (!body[field].is_string() || !std::regex_match(body[field].get<std::string>(), kDateRe)) {
-        errs.add(field, "bad_format", "expected format: YYYY-MM-DD");
+    if (!body[field].is_string() || !is_calendar_date(body[field].get<std::string>())) {
+        errs.add(field, "bad_format", "expected a calendar day as YYYY-MM-DD");
     }
 }
 
@@ -136,10 +172,10 @@ std::optional<std::string> servings_json(Validation::Errors& errs, const json& b
     }
     json clean = json::array();
     for (const auto& s : list) {
-        const bool ok = s.is_object() && s.contains("label") && s["label"].is_string() &&
-                        !s["label"].get<std::string>().empty() && s["label"].get<std::string>().size() <= 60 &&
-                        s.contains("grams") && s["grams"].is_number() && s["grams"].get<double>() > 0 &&
-                        s["grams"].get<double>() <= 5000;
+        const bool ok =
+            s.is_object() && s.contains("label") && s["label"].is_string() && !s["label"].get<std::string>().empty() &&
+            s["label"].get<std::string>().size() <= kServingLabelMax && s.contains("grams") && s["grams"].is_number() &&
+            s["grams"].get<double>() > 0 && s["grams"].get<double>() <= kServingGramsMax;
         if (!ok) {
             errs.add("servings", "invalid", "each serving needs a label (1..60) and grams (0..5000)");
             return std::nullopt;
@@ -275,21 +311,23 @@ bool entry_input(Validation::Errors& errs,
     }
     number_range(local, body, "grams", 0.01, kGramsMax);
     if (body.contains("name")) {
-        Validation::string_length(local, body, "name", 1, kNameMax);
+        text_length(local, body, "name", 1, kNameMax);
     }
     if (body.contains("note")) {
-        Validation::string_length(local, body, "note", 0, kNoteMax);
+        text_length(local, body, "note", 0, kNoteMax);
     }
     nutrient_fields(local, body);
     const bool has_item = body.contains("item_id") && body["item_id"].is_string();
-    if (has_item && !body.contains("grams")) {
-        local.add("grams", "required", "grams are required with an item");
-    }
-    if (!has_item && !body.contains("name")) {
-        local.add("name", "required", "a quick entry needs a name");
-    }
-    if (!has_item && !body.contains("kcal")) {
-        local.add("kcal", "required", "a quick entry needs kcal");
+    // require() rejects a missing or null value; the type is checked by the
+    // range and length validators above.
+    if (has_item) {
+        Validation::require(local, body, "grams");
+    } else {
+        Validation::require_string(local, body, "name");
+        Validation::require(local, body, "kcal");
+        if (body.contains("kcal") && !body["kcal"].is_number()) {
+            local.add("kcal", "invalid", "must be a number");
+        }
     }
     if (local.any()) {
         for (const auto& e : local.errors_json()) {
@@ -376,7 +414,7 @@ void FoodController::putGoals(const HttpRequestPtr& req, Callback&& callback) {
     number_range(errs, body, "pace_kg_per_week", -1, 1.5);
     number_range(errs, body, "manual_weight_kg", 30, 300);
     if (body.contains("profile_note")) {
-        Validation::string_length(errs, body, "profile_note", 0, kProfileNoteMax);
+        text_length(errs, body, "profile_note", 0, kProfileNoteMax);
     }
     Validation::int_range(errs, body, "kcal_override", 500, 10000);
     Validation::int_range(errs, body, "protein_override_g", 0, 1000);
@@ -439,9 +477,9 @@ void FoodController::createItem(const HttpRequestPtr& req, Callback&& callback) 
     }
     Validation::Errors errs;
     Validation::require_string(errs, body, "name");
-    Validation::string_length(errs, body, "name", 1, kNameMax);
+    text_length(errs, body, "name", 1, kNameMax);
     if (body.contains("brand")) {
-        Validation::string_length(errs, body, "brand", 0, kNameMax);
+        text_length(errs, body, "brand", 0, kNameMax);
     }
     if (body.contains("per")) {
         Validation::one_of(errs, body, "per", kPer);
@@ -481,10 +519,10 @@ void FoodController::updateItem(const HttpRequestPtr& req, Callback&& callback, 
     }
     Validation::Errors errs;
     if (body.contains("name")) {
-        Validation::string_length(errs, body, "name", 1, kNameMax);
+        text_length(errs, body, "name", 1, kNameMax);
     }
     if (body.contains("brand")) {
-        Validation::string_length(errs, body, "brand", 0, kNameMax);
+        text_length(errs, body, "brand", 0, kNameMax);
     }
     if (body.contains("per")) {
         Validation::one_of(errs, body, "per", kPer);
@@ -610,21 +648,22 @@ void FoodController::itemFromOff(const HttpRequestPtr& req, Callback&& callback)
     Repositories::ItemRepository::Input in;
     in.source = "off";
     in.off_code = product->code.empty() ? code : product->code;
-    in.name = product->name;
-    in.brand = product->brand;
+    // The copy obeys the limits of POST /items: Open Food Facts data is user-contributed.
+    in.name = Utils::Utf8::cut(product->name, kNameMax);
+    in.brand = Utils::Utf8::cut(product->brand, kNameMax);
     in.per = product->per;
-    in.kcal = product->kcal;
+    in.kcal = std::min(product->kcal, kKcalMax);
     in.protein_g = product->protein_g;
     in.fat_g = product->fat_g;
     in.carbs_g = product->carbs_g;
     in.fiber_g = product->fiber_g;
     in.sugar_g = product->sugar_g;
     in.salt_g = product->salt_g;
-    if (product->serving_grams.has_value()) {
-        in.servings_json =
-            json::array({json{{"label", product->serving_label.empty() ? "1 serving" : product->serving_label},
-                              {"grams", *product->serving_grams}}})
-                .dump();
+    if (product->serving_grams.has_value() && *product->serving_grams > 0 &&
+        *product->serving_grams <= kServingGramsMax) {
+        const std::string label = Utils::Utf8::cut(
+            product->serving_label.empty() ? std::string("1 serving") : product->serving_label, kServingLabelMax);
+        in.servings_json = json::array({json{{"label", label}, {"grams", *product->serving_grams}}}).dump();
     }
     with_repo_errors(callback, "food.itemFromOff", [&] {
         const auto [item, created] = Repositories::ItemRepository().upsert_off(owner, in);
@@ -637,8 +676,8 @@ void FoodController::itemFromOff(const HttpRequestPtr& req, Callback&& callback)
 void FoodController::day(const HttpRequestPtr& req, Callback&& callback) {
     FOOD_GUARD(req, callback, owner);
     const std::string date = req->getParameter("date").empty() ? today_utc() : req->getParameter("date");
-    if (!std::regex_match(date, kDateRe)) {
-        callback(ErrorResponse::bad_request("invalid_date", "date must be YYYY-MM-DD"));
+    if (!is_calendar_date(date)) {
+        callback(ErrorResponse::bad_request("invalid_date", "date must be a calendar day as YYYY-MM-DD"));
         return;
     }
     with_repo_errors(callback, "food.day", [&] {
@@ -653,8 +692,8 @@ void FoodController::day(const HttpRequestPtr& req, Callback&& callback) {
 void FoodController::week(const HttpRequestPtr& req, Callback&& callback) {
     FOOD_GUARD(req, callback, owner);
     const std::string from = req->getParameter("from");
-    if (!std::regex_match(from, kDateRe)) {
-        callback(ErrorResponse::bad_request("invalid_date", "from must be YYYY-MM-DD"));
+    if (!is_calendar_date(from)) {
+        callback(ErrorResponse::bad_request("invalid_date", "from must be a calendar day as YYYY-MM-DD"));
         return;
     }
     with_repo_errors(callback, "food.week", [&] {
@@ -729,7 +768,7 @@ void FoodController::updateEntry(const HttpRequestPtr& req, Callback&& callback,
     }
     number_range(errs, body, "grams", 0.01, kGramsMax);
     if (body.contains("note")) {
-        Validation::string_length(errs, body, "note", 0, kNoteMax);
+        text_length(errs, body, "note", 0, kNoteMax);
     }
     if (errs.any()) {
         callback(Validation::response_400(errs));
@@ -766,7 +805,7 @@ void FoodController::parseStart(const HttpRequestPtr& req, Callback&& callback) 
     }
     Validation::Errors errs;
     Validation::require_string(errs, body, "text");
-    Validation::string_length(errs, body, "text", 1, kParseTextMax);
+    text_length(errs, body, "text", 1, kParseTextMax);
     Validation::require_string(errs, body, "meal");
     Validation::one_of(errs, body, "meal", kMeals);
     Validation::require_string(errs, body, "date");
@@ -780,18 +819,44 @@ void FoodController::parseStart(const HttpRequestPtr& req, Callback&& callback) 
         callback(ErrorResponse::service_unavailable("not_configured", "the text parse is not set up on this server"));
         return;
     }
+    Repositories::ParseJobRepository repo;
+    std::string id;
     try {
-        const json job = Repositories::ParseJobRepository().create(
+        // Each parse costs provider tokens: a few in flight per user is plenty.
+        if (repo.open_count(owner) >= kParseOpenMax) {
+            callback(ErrorResponse::make({drogon::k429TooManyRequests,
+                                          "too_many_parses",
+                                          "wait for your running parses to finish",
+                                          json{{"retry_after_sec", 30}}}));
+            return;
+        }
+        const json job = repo.create(
             owner, body["text"].get<std::string>(), body["meal"].get<std::string>(), body["date"].get<std::string>());
-        const std::string id = job["id"].get<std::string>();
-        Jobs::get().submit(Jobs::FoodParse::kJobType, json{{"job_id", id}, {"owner_id", owner}});
-        auto resp = Response::ok(json{{"data", {{"id", id}, {"status", "queued"}}}});
-        resp->setStatusCode(k202Accepted);
-        callback(resp);
+        id = job["id"].get<std::string>();
+    } catch (const std::exception& e) {
+        spdlog::warn("food parse create failed: {}", e.what());
+        callback(ErrorResponse::service_unavailable("storage_unavailable"));
+        return;
+    }
+    try {
+        // The worker may run with another retry limit; the job carries the one it was submitted with.
+        Jobs::get().submit(
+            Jobs::FoodParse::kJobType,
+            json{{"job_id", id}, {"owner_id", owner}, {"max_attempts", Jobs::get().default_max_retries()}});
     } catch (const std::exception& e) {
         spdlog::warn("food parse enqueue unavailable: {}", e.what());
+        // Nothing will ever run it: the row must not look queued to the page.
+        try {
+            repo.fail(id, "queue_unavailable", "the job queue did not take the job");
+        } catch (const std::exception& inner) {
+            spdlog::warn("food parse {}: could not mark failed: {}", id, inner.what());
+        }
         callback(ErrorResponse::service_unavailable("queue_unavailable"));
+        return;
     }
+    auto resp = Response::ok(json{{"data", {{"id", id}, {"status", "queued"}}}});
+    resp->setStatusCode(k202Accepted);
+    callback(resp);
 }
 
 void FoodController::parseStatus(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
