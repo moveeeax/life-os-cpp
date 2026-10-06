@@ -268,7 +268,7 @@ TEST_F(FoodParseJobTest, OutagesThrowForTheQueueAndRequeueTheJob) {
 
 TEST_F(FoodParseJobTest, TheLastAttemptOfTheQueueMarksTheJobFailed) {
     const std::string id = queued();
-    const int attempts = Jobs::get().default_max_retries();
+    const int attempts = Jobs::kDefaultMaxRetries;
     ASSERT_GE(attempts, 2);
     provider.fail = true;
     for (int i = 1; i < attempts; ++i) {
