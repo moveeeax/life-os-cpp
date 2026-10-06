@@ -69,6 +69,16 @@ public domain under the Unlicense. The frontend image carries the dataset's
 exercise photos from the same commit under `/exercise-media/`
 (`frontend/Dockerfile`).
 
+## Data — Open Food Facts
+
+The food module searches products in **[Open Food Facts](https://world.openfoodfacts.org)**
+and copies the products a user picks into their own list (`food_items` with
+`source = off`). Open Food Facts data is made available under the
+[Open Database License (ODbL)](https://opendatacommons.org/licenses/odbl/1-0/).
+The add form shows the attribution "Data from Open Food Facts, Open Database
+License". The service identifies itself with the User-Agent
+`LifeOS/<version> (https://life-os.tarassov.me)`.
+
 ## Derived work — TailAdmin
 
 The dashboard shell and the sign-in page of the frontend are adapted from

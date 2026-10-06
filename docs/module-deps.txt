@@ -35,10 +35,12 @@ api -> email
 api -> fitness
 api -> fitness/sync
 api -> fitness/xiaomi
+api -> food
 api -> jobs
 api -> observability
 api -> repositories
 api -> repositories/fitness
+api -> repositories/food
 api -> repositories/workout
 api -> security
 api -> utils

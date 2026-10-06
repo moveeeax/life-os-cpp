@@ -2965,6 +2965,936 @@
       "description": "Present when state is failed"
      }
     }
+   },
+   "FoodItem": {
+    "type": "object",
+    "required": [
+     "id",
+     "source",
+     "off_code",
+     "name",
+     "brand",
+     "per",
+     "kcal",
+     "protein_g",
+     "fat_g",
+     "carbs_g",
+     "fiber_g",
+     "sugar_g",
+     "salt_g",
+     "servings",
+     "archived",
+     "created_at",
+     "updated_at"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "custom",
+       false,
+       "ai"
+      ]
+     },
+     "off_code": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Open Food Facts barcode of a copied product"
+     },
+     "name": {
+      "type": "string"
+     },
+     "brand": {
+      "type": "string"
+     },
+     "per": {
+      "type": "string",
+      "enum": [
+       "100g",
+       "100ml"
+      ],
+      "description": "What the nutrient fields refer to"
+     },
+     "kcal": {
+      "type": "number"
+     },
+     "protein_g": {
+      "type": "number"
+     },
+     "fat_g": {
+      "type": "number"
+     },
+     "carbs_g": {
+      "type": "number"
+     },
+     "fiber_g": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "sugar_g": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "salt_g": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "servings": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/FoodServing"
+      }
+     },
+     "archived": {
+      "type": "boolean"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "FoodServing": {
+    "type": "object",
+    "required": [
+     "label",
+     "grams"
+    ],
+    "properties": {
+     "label": {
+      "type": "string",
+      "maxLength": 60
+     },
+     "grams": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 5000
+     }
+    }
+   },
+   "FoodItemInput": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+     },
+     "brand": {
+      "type": "string",
+      "maxLength": 200
+     },
+     "per": {
+      "type": "string",
+      "enum": [
+       "100g",
+       "100ml"
+      ],
+      "default": "100g"
+     },
+     "kcal": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10000
+     },
+     "protein_g": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+     },
+     "fat_g": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+     },
+     "carbs_g": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+     },
+     "fiber_g": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "minimum": 0,
+      "maximum": 1000
+     },
+     "sugar_g": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "minimum": 0,
+      "maximum": 1000
+     },
+     "salt_g": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "minimum": 0,
+      "maximum": 1000
+     },
+     "servings": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+       "$ref": "#/components/schemas/FoodServing"
+      }
+     },
+     "archived": {
+      "type": "boolean",
+      "description": "PATCH only"
+     }
+    }
+   },
+   "FoodItemResponse": {
+    "type": "object",
+    "required": [
+     "data"
+    ],
+    "properties": {
+     "data": {
+      "$ref": "#/components/schemas/FoodItem"
+     }
+    }
+   },
+   "FoodItemListResponse": {
+    "type": "object",
+    "required": [
+     "data",
+     "count",
+     "total"
+    ],
+    "properties": {
+     "data": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/FoodItem"
+      }
+     },
+     "count": {
+      "type": "integer"
+     },
+     "total": {
+      "type": "integer"
+     }
+    }
+   },
+   "OffProduct": {
+    "type": "object",
+    "required": [
+     "code",
+     "name",
+     "brand",
+     "per",
+     "kcal",
+     "protein_g",
+     "fat_g",
+     "carbs_g",
+     "fiber_g",
+     "sugar_g",
+     "salt_g",
+     "serving_grams",
+     "serving_label"
+    ],
+    "description": "An Open Food Facts product mapped to the item shape; nutrients per 100 g or 100 ml.",
+    "properties": {
+     "code": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "brand": {
+      "type": "string"
+     },
+     "per": {
+      "type": "string",
+      "enum": [
+       "100g",
+       "100ml"
+      ]
+     },
+     "kcal": {
+      "type": "number"
+     },
+     "protein_g": {
+      "type": "number"
+     },
+     "fat_g": {
+      "type": "number"
+     },
+     "carbs_g": {
+      "type": "number"
+     },
+     "fiber_g": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "sugar_g": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "salt_g": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "serving_grams": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "serving_label": {
+      "type": "string"
+     }
+    }
+   },
+   "FoodEntry": {
+    "type": "object",
+    "required": [
+     "id",
+     "date",
+     "meal",
+     "item_id",
+     "name",
+     "grams",
+     "kcal",
+     "protein_g",
+     "fat_g",
+     "carbs_g",
+     "fiber_g",
+     "sugar_g",
+     "salt_g",
+     "estimated",
+     "note",
+     "position",
+     "logged_at"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "meal": {
+      "$ref": "#/components/schemas/FoodMeal"
+     },
+     "item_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid"
+     },
+     "name": {
+      "type": "string"
+     },
+     "grams": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "kcal": {
+      "type": "number"
+     },
+     "protein_g": {
+      "type": "number"
+     },
+     "fat_g": {
+      "type": "number"
+     },
+     "carbs_g": {
+      "type": "number"
+     },
+     "fiber_g": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "sugar_g": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "salt_g": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "estimated": {
+      "type": "boolean",
+      "description": "A quick entry or an estimate, not a product's numbers"
+     },
+     "note": {
+      "type": "string"
+     },
+     "position": {
+      "type": "integer"
+     },
+     "logged_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "FoodMeal": {
+    "type": "string",
+    "enum": [
+     "breakfast",
+     "lunch",
+     "dinner",
+     "snack"
+    ]
+   },
+   "FoodEntryInput": {
+    "type": "object",
+    "required": [
+     "date",
+     "meal"
+    ],
+    "description": "With item_id the numbers come from the item and grams; without, name and kcal are required and the entry is estimated.",
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "meal": {
+      "$ref": "#/components/schemas/FoodMeal"
+     },
+     "item_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid"
+     },
+     "grams": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "minimum": 0,
+      "maximum": 10000
+     },
+     "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+     },
+     "kcal": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10000
+     },
+     "protein_g": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+     },
+     "fat_g": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+     },
+     "carbs_g": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+     },
+     "fiber_g": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "minimum": 0,
+      "maximum": 1000
+     },
+     "sugar_g": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "minimum": 0,
+      "maximum": 1000
+     },
+     "salt_g": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "minimum": 0,
+      "maximum": 1000
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 500
+     }
+    }
+   },
+   "FoodEntryPatch": {
+    "type": "object",
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "meal": {
+      "$ref": "#/components/schemas/FoodMeal"
+     },
+     "grams": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10000,
+      "description": "Recomputes the numbers when the entry still has its item"
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 500
+     }
+    }
+   },
+   "FoodEntryResponse": {
+    "type": "object",
+    "required": [
+     "data"
+    ],
+    "properties": {
+     "data": {
+      "$ref": "#/components/schemas/FoodEntry"
+     }
+    }
+   },
+   "FoodTotals": {
+    "type": "object",
+    "required": [
+     "kcal",
+     "protein_g",
+     "fat_g",
+     "carbs_g",
+     "fiber_g",
+     "sugar_g",
+     "salt_g",
+     "entries"
+    ],
+    "properties": {
+     "kcal": {
+      "type": "number"
+     },
+     "protein_g": {
+      "type": "number"
+     },
+     "fat_g": {
+      "type": "number"
+     },
+     "carbs_g": {
+      "type": "number"
+     },
+     "fiber_g": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "sugar_g": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "salt_g": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "entries": {
+      "type": "integer"
+     }
+    }
+   },
+   "FoodTargets": {
+    "type": [
+     "object",
+     "null"
+    ],
+    "required": [
+     "kcal",
+     "protein_g",
+     "fat_g",
+     "carbs_g"
+    ],
+    "description": "The daily goals after the overrides; null until the profile is complete.",
+    "properties": {
+     "kcal": {
+      "type": "integer"
+     },
+     "protein_g": {
+      "type": "integer"
+     },
+     "fat_g": {
+      "type": "integer"
+     },
+     "carbs_g": {
+      "type": "integer"
+     }
+    }
+   },
+   "FoodDay": {
+    "type": "object",
+    "required": [
+     "date",
+     "totals",
+     "meals",
+     "active_kcal",
+     "targets"
+    ],
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "totals": {
+      "$ref": "#/components/schemas/FoodTotals"
+     },
+     "meals": {
+      "type": "object",
+      "required": [
+       "breakfast",
+       "lunch",
+       "dinner",
+       "snack"
+      ],
+      "properties": {
+       "breakfast": {
+        "type": "array",
+        "items": {
+         "$ref": "#/components/schemas/FoodEntry"
+        }
+       },
+       "lunch": {
+        "type": "array",
+        "items": {
+         "$ref": "#/components/schemas/FoodEntry"
+        }
+       },
+       "dinner": {
+        "type": "array",
+        "items": {
+         "$ref": "#/components/schemas/FoodEntry"
+        }
+       },
+       "snack": {
+        "type": "array",
+        "items": {
+         "$ref": "#/components/schemas/FoodEntry"
+        }
+       }
+      }
+     },
+     "active_kcal": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "description": "Active kcal the band counted that day, when a Mi account is linked"
+     },
+     "targets": {
+      "$ref": "#/components/schemas/FoodTargets"
+     }
+    }
+   },
+   "FoodWeek": {
+    "type": "object",
+    "required": [
+     "from",
+     "days",
+     "targets"
+    ],
+    "properties": {
+     "from": {
+      "type": "string",
+      "format": "date"
+     },
+     "days": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "required": [
+        "date",
+        "kcal",
+        "protein_g",
+        "fat_g",
+        "carbs_g",
+        "entries"
+       ],
+       "properties": {
+        "date": {
+         "type": "string",
+         "format": "date"
+        },
+        "kcal": {
+         "type": "number"
+        },
+        "protein_g": {
+         "type": "number"
+        },
+        "fat_g": {
+         "type": "number"
+        },
+        "carbs_g": {
+         "type": "number"
+        },
+        "entries": {
+         "type": "integer"
+        }
+       }
+      }
+     },
+     "targets": {
+      "$ref": "#/components/schemas/FoodTargets"
+     }
+    }
+   },
+   "FoodGoalsProfile": {
+    "type": "object",
+    "properties": {
+     "height_cm": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 100,
+      "maximum": 250
+     },
+     "birth_date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date"
+     },
+     "sex": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "male",
+       "female",
+       null
+      ]
+     },
+     "activity": {
+      "type": "string",
+      "enum": [
+       "sedentary",
+       "light",
+       "moderate",
+       "active",
+       "very_active"
+      ],
+      "default": "light"
+     },
+     "target_weight_kg": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "minimum": 30,
+      "maximum": 300
+     },
+     "pace_kg_per_week": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1.5,
+      "description": "Positive loses weight, 0 maintains, negative gains"
+     },
+     "manual_weight_kg": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "minimum": 30,
+      "maximum": 300,
+      "description": "Used only without a weigh-in from the Mi scale"
+     },
+     "profile_note": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Eating habits, handed to the LLM parse"
+     },
+     "kcal_override": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 500,
+      "maximum": 10000
+     },
+     "protein_override_g": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 0,
+      "maximum": 1000
+     },
+     "fat_override_g": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 0,
+      "maximum": 1000
+     },
+     "carbs_override_g": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 0,
+      "maximum": 2000
+     },
+     "updated_at": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time",
+      "description": "Response only"
+     }
+    }
+   },
+   "FoodGoals": {
+    "type": "object",
+    "required": [
+     "profile",
+     "weight",
+     "missing",
+     "computed",
+     "targets"
+    ],
+    "properties": {
+     "profile": {
+      "$ref": "#/components/schemas/FoodGoalsProfile"
+     },
+     "weight": {
+      "type": "object",
+      "required": [
+       "kg",
+       "source"
+      ],
+      "properties": {
+       "kg": {
+        "type": [
+         "number",
+         "null"
+        ]
+       },
+       "source": {
+        "type": "string",
+        "enum": [
+         "scale",
+         "manual",
+         "none"
+        ]
+       }
+      }
+     },
+     "missing": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Profile fields still needed for the computed goal"
+     },
+     "computed": {
+      "type": [
+       "object",
+       "null"
+      ],
+      "description": "Mifflin-St Jeor BMR, maintenance, the deficit from the pace, and the default macros.",
+      "properties": {
+       "age_years": {
+        "type": "integer"
+       },
+       "bmr": {
+        "type": "integer"
+       },
+       "maintenance": {
+        "type": "integer"
+       },
+       "deficit": {
+        "type": "integer"
+       },
+       "kcal": {
+        "type": "integer"
+       },
+       "floored": {
+        "type": "boolean",
+        "description": "The goal was raised to the 1200 kcal floor"
+       },
+       "below_bmr": {
+        "type": "boolean"
+       },
+       "protein_g": {
+        "type": "integer"
+       },
+       "fat_g": {
+        "type": "integer"
+       },
+       "carbs_g": {
+        "type": "integer"
+       }
+      }
+     },
+     "targets": {
+      "$ref": "#/components/schemas/FoodTargets"
+     }
+    }
+   },
+   "FoodGoalsResponse": {
+    "type": "object",
+    "required": [
+     "data"
+    ],
+    "properties": {
+     "data": {
+      "$ref": "#/components/schemas/FoodGoals"
+     }
+    }
    }
   }
  },
@@ -8489,12 +9419,1252 @@
      }
     }
    }
+  },
+  "/api/v1/food/goals": {
+   "get": {
+    "summary": "Goals profile, the weight it uses and the computed daily targets",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The goals",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FoodGoalsResponse"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "summary": "Replace the goals profile",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FoodGoalsProfile"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The goals after the write",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FoodGoalsResponse"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed (a future birth date, an out-of-range value)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/food/items": {
+   "get": {
+    "summary": "Search own products",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "q",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "maxLength": 200
+      }
+     },
+     {
+      "name": "archived",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "true"
+       ]
+      },
+      "description": "Include archived products"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "A page of products",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FoodItemListResponse"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "q is too long",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "summary": "Create a product",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FoodItemInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "The product",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FoodItemResponse"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/food/items/from-off": {
+   "post": {
+    "summary": "Copy an Open Food Facts product by barcode into own products",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "code"
+        ],
+        "properties": {
+         "code": {
+          "type": "string",
+          "pattern": "^[0-9]{1,20}$"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The product existed already",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FoodItemResponse"
+        }
+       }
+      }
+     },
+     "201": {
+      "description": "The product was copied now",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FoodItemResponse"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "code is not 1..20 digits",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled, or Open Food Facts has no such product (off_product)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Open Food Facts is not available (upstream_unavailable)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/food/items/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "patch": {
+    "summary": "Edit a product",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FoodItemInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The product",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FoodItemResponse"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed or id is not a UUID",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled, or no such product",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a product, or archive one the diary uses",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Deleted or archived (outcome)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "message",
+          "outcome"
+         ],
+         "properties": {
+          "message": {
+           "type": "string"
+          },
+          "outcome": {
+           "type": "string",
+           "enum": [
+            "deleted",
+            "archived"
+           ]
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "id is not a UUID",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled, or no such product",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/food/recent": {
+   "get": {
+    "summary": "Products used recently in the diary, each once",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Up to 30 products",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FoodItemListResponse"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/food/off/search": {
+   "get": {
+    "summary": "Search Open Food Facts",
+    "description": "Data from Open Food Facts (https://world.openfoodfacts.org), Open Database License.",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "q",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 80
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Up to 20 products with a kcal value; cached for an hour per query",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data",
+          "count",
+          "cached"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/OffProduct"
+           }
+          },
+          "count": {
+           "type": "integer"
+          },
+          "cached": {
+           "type": "boolean"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "q must be 1..80 characters",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Open Food Facts is not available (upstream_unavailable)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/food/day": {
+   "get": {
+    "summary": "One day of the diary with totals, active kcal and the targets",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "date",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "Defaults to today (UTC)"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The day",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/FoodDay"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "date is not YYYY-MM-DD or not a calendar day (invalid_date)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/food/week": {
+   "get": {
+    "summary": "Seven days of totals from a date against the targets",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The week",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/FoodWeek"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "from is not YYYY-MM-DD or not a calendar day (invalid_date)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/food/entries": {
+   "post": {
+    "summary": "Add a diary entry",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FoodEntryInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "The entry",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FoodEntryResponse"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed, or the date does not exist (invalid_date)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled, or item_id is not the caller's product",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/food/entries/batch": {
+   "post": {
+    "summary": "Add several diary entries in one transaction",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "entries"
+        ],
+        "properties": {
+         "entries": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
+          "items": {
+           "$ref": "#/components/schemas/FoodEntryInput"
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "The entries",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data",
+          "count"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/FoodEntry"
+           }
+          },
+          "count": {
+           "type": "integer"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed on any entry (errors name the index); nothing is written",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled, or an item_id is not the caller's product",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/food/entries/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "patch": {
+    "summary": "Edit a diary entry",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FoodEntryPatch"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The entry",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FoodEntryResponse"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed, id is not a UUID, or the date does not exist",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled, or no such entry",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a diary entry",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Deleted",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "message"
+         ],
+         "properties": {
+          "message": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "id is not a UUID",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled, or no such entry",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
   }
  },
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 136576,
-  "source_fnv1a64": "cec73b5989667424"
+  "source_bytes": 166954,
+  "source_fnv1a64": "7962f1fdbbd09bbe"
  }
 }
