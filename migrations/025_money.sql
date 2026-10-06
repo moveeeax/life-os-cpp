@@ -72,8 +72,10 @@ CREATE TABLE IF NOT EXISTS money_transactions (
     time              time,
     -- Invariant 2: one account. The type says whether the money left or entered it.
     account_id        uuid        NOT NULL REFERENCES money_accounts (id) ON DELETE RESTRICT,
-    -- Invariant 1: positive, in the account's currency (the account's currency is read on the way out).
-    amount            numeric(18,4) NOT NULL CHECK (amount > 0),
+    -- Invariant 1: positive, in the account's currency (the account's currency is
+    -- read on the way out). The one signed type is the adjustment: plus when
+    -- the bank took more, minus when it returned (invariant 4).
+    amount            numeric(18,4) NOT NULL CHECK (amount <> 0 AND (type = 'fx_adjustment' OR amount > 0)),
     category_id       uuid        REFERENCES money_categories (id) ON DELETE RESTRICT,
     merchant          text        NOT NULL DEFAULT '' CHECK (length(merchant) <= 200),
     merchant_key      text        NOT NULL DEFAULT '' CHECK (length(merchant_key) <= 200),
