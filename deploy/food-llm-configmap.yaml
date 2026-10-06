@@ -16,9 +16,10 @@ metadata:
   namespace: life-os
 data:
   FOOD_LLM_BASE_URL: "https://api.openai.com/v1"
-  # A small, cheap model is enough for portion estimates; pick what the
-  # account has access to.
-  FOOD_LLM_MODEL: "gpt-4o-mini"
+  # The cheapest of the current flagship models (0.10 $ in, 0.50 $ out per
+  # million tokens on the owner's price list of 2026-10-06); a parse costs
+  # well under a cent.
+  FOOD_LLM_MODEL: "gpt-6-luna"
   FOOD_LLM_TIMEOUT_SECONDS: "60"
   FOOD_LLM_MAX_TOKENS: "1500"
   FOOD_LLM_PROMPT: |
