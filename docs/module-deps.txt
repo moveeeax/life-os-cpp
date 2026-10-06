@@ -37,6 +37,8 @@ api -> fitness/sync
 api -> fitness/xiaomi
 api -> food
 api -> jobs
+api -> money
+api -> repositories/money
 api -> observability
 api -> repositories
 api -> repositories/fitness
@@ -68,7 +70,10 @@ email -> repositories
 email -> security
 email -> utils
 food -> utils
+food -> net
+money -> net
 money -> utils
+net -> utils
 fitness -> cache
 fitness -> fitness/xiaomi
 fitness -> repositories/fitness
@@ -85,9 +90,12 @@ jobs -> email
 jobs -> fitness/sync
 jobs -> fitness/xiaomi
 jobs -> food
+jobs -> money
+jobs -> net
 jobs -> observability
 jobs -> repositories/fitness
 jobs -> repositories/food
+jobs -> repositories/money
 jobs -> repositories/workout
 jobs -> utils
 jobs -> webhooks

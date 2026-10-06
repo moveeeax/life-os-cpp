@@ -18,6 +18,7 @@
 #include "jobs/Dispatcher.hpp"
 #include "jobs/FitnessSyncHandler.hpp"
 #include "jobs/FoodParseHandler.hpp"
+#include "jobs/MoneyRatesHandler.hpp"
 #include "webhooks/Webhooks.hpp"
 
 namespace Jobs {
@@ -38,6 +39,7 @@ void register_builtin_handlers() {
     // Food: a text description to the LLM; a bad answer closes the job, a
     // provider outage throws for a retry.
     d.register_handler(FoodParse::kJobType, [](const json& payload) { return FoodParse::process_job(payload); });
+    d.register_handler(MoneyRates::kJobType, [](const json& payload) { return MoneyRates::process_job(payload); });
     // Demo handlers used by examples/tests.
     d.register_handler("echo", [](const json& payload) { return payload; });
     d.register_handler("slow", [](const json& payload) -> json {

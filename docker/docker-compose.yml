@@ -213,7 +213,7 @@ services:
       # manual testing — opt them in explicitly when you want them, e.g.:
       #   WORKER_TYPES=default,account_email,echo,slow,fail
       # (The API job tests drain Redis directly and do NOT rely on this list.)
-      WORKER_TYPES: ${WORKER_TYPES:-default,account_email,fitness_sync,food_parse}
+      WORKER_TYPES: ${WORKER_TYPES:-default,account_email,fitness_sync,food_parse,money_rates}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
       WORKER_HEALTH_PORT: ${WORKER_HEALTH_PORT:-9091}
       WORKER_BRPOP_TIMEOUT: ${WORKER_BRPOP_TIMEOUT:-5}

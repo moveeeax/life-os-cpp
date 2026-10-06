@@ -40,7 +40,7 @@ externalRedis:
 worker:
   # The worker pulls only the listed queues: without fitness_sync, sync jobs
   # would pile up in Redis silently. Mail is off, its queues are not subscribed.
-  types: "fitness_sync,food_parse"
+  types: "fitness_sync,food_parse,money_rates"
   # One sync per system by construction.
   concurrency: 1
 

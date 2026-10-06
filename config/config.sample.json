@@ -227,7 +227,8 @@
     }
   },
   "money": {
-    "enabled": "${MONEY_ENABLED:-false}"
+    "enabled": "${MONEY_ENABLED:-false}",
+    "rates_schedule_hours": "${MONEY_RATES_SCHEDULE_HOURS:-0}"
   },
   "worker": {
     "id": "worker-1",

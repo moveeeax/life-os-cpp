@@ -15,4 +15,6 @@ data:
   # Scheduled sync: every 4 hours, a window of the last 2 days. The timer lives
   # in the API pod, so the configmap is attached to both the API and the worker.
   MI_FITNESS_SYNC_SCHEDULE_HOURS: "4"
+  # The money module: the day's rates four times a day (the source updates once a day).
+  MONEY_RATES_SCHEDULE_HOURS: "6"
   MI_FITNESS_SYNC_WINDOW_DAYS: "2"
