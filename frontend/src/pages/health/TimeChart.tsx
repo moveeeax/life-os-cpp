@@ -28,6 +28,8 @@ interface TimeChartProps {
   connect?: boolean;
   /** Formats a value in the tooltip. */
   format?: (value: number, seriesIndex: number) => string;
+  /** Label of a day on the x axis (category axis only); default "MM-DD". */
+  xLabel?: (day: string) => string;
   height?: number;
 }
 
@@ -40,6 +42,7 @@ export function TimeChart({
   yBounds,
   connect,
   format,
+  xLabel,
   height = 300,
 }: TimeChartProps) {
   const dark = useIsDark();
@@ -103,7 +106,8 @@ export function TimeChart({
             hideOverlappingLabels: true,
             style: { colors: muted },
             // 2026-10-05 -> 10-05
-            formatter: (v: string) => (typeof v === 'string' ? v.slice(5) : ''),
+            formatter: (v: string) =>
+              typeof v === 'string' ? (xLabel ? xLabel(v) : v.slice(5)) : '',
           },
           tooltip: { enabled: false },
         },
