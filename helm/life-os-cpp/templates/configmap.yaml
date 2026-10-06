@@ -71,6 +71,9 @@ data:
       "workout": {
         "enabled": {{ .Values.workout.enabled }}
       },
+      "food": {
+        "enabled": {{ .Values.food.enabled }}
+      },
       "billing": {
         "enabled": {{ .Values.billing.enabled }},
         "provider": {{ .Values.billing.provider | quote }},

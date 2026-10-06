@@ -215,6 +215,9 @@
   "workout": {
     "enabled": "${WORKOUT_ENABLED:-false}"
   },
+  "food": {
+    "enabled": "${FOOD_ENABLED:-false}"
+  },
   "worker": {
     "id": "worker-1",
     "types": ["default"],

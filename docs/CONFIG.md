@@ -245,6 +245,12 @@ outage can never affect the money path.
 |---|---|---|---|---|
 | `WORKOUT_ENABLED` | `workout.enabled` | bool | `false` | Master switch for the workout module (`Core::workout_enabled()`): exercise library, routines, workout log. Same on/off pattern as `FITNESS_ENABLED`; routes stay registered, handlers 404 while off. The links to Mi Fitness data need the fitness module as well. |
 
+## Food module
+
+| Env | JSON key | Type | Default | Notes |
+|---|---|---|---|---|
+| `FOOD_ENABLED` | `food.enabled` | bool | `false` | Master switch for the food module (`Core::food_enabled()`): products, the diary, goals, Open Food Facts search, the LLM parse job. Routes stay registered, handlers 404 while off. Needs no fitness permission; the weight for the goals and the active kcal of a day come from the user's Mi account when one is linked. |
+
 ## Mail (SMTP)
 
 | Env | JSON key | Type | Default | Notes |
