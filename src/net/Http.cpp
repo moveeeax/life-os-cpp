@@ -3,7 +3,7 @@
  * @brief Bodies for src/food/Http.hpp.
  */
 
-#include "food/Http.hpp"
+#include "net/Http.hpp"
 
 #include <cstddef>
 #include <memory>
@@ -13,7 +13,7 @@
 
 #include "utils/CurlInit.hpp"
 
-namespace Food::Http {
+namespace Net::Http {
 
 namespace {
 
@@ -102,4 +102,4 @@ void install_for_testing(Transport* transport) {
     override_slot() = transport;
 }
 
-}  // namespace Food::Http
+}  // namespace Net::Http

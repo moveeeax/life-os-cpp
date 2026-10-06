@@ -375,6 +375,8 @@ TEST_F(MoneyRepositoriesTest, InboxFlagsDuplicatesAndConfirmTeachesTheMerchant) 
     merchants.set_category(kAnna, "new place", rent["id"]);
     EXPECT_EQ(merchants.suggest(kAnna, "new", 10)[0]["category_id"], rent["id"]);
     EXPECT_THROW(merchants.set_category(kBoris, "new place", std::nullopt), NotFound);
+    EXPECT_THROW(merchants.set_category(kAnna, "new place", boris_food["id"].get<std::string>()), Invariant)
+        << "another user's category is not a category here";
     EXPECT_EQ(merchants.top(kAnna, 10).size(), 2u);
 }
 

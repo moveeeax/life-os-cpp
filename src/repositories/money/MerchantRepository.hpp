@@ -14,6 +14,7 @@
 
 #include "database/Database.hpp"
 #include "money/Merchant.hpp"
+#include "repositories/money/CategoryRepository.hpp"
 #include "repositories/money/Errors.hpp"
 
 namespace Repositories::Money {
@@ -48,6 +49,10 @@ public:
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
+                    // The category must be the owner's: another user's id is not a category here.
+                    if (category_id.has_value() && !CategoryRepository::kind_in(txn, owner, *category_id).has_value()) {
+                        throw Invariant("the category is not yours");
+                    }
                     auto r = txn.exec_params(
                         "UPDATE money_merchants SET category_id = $3::uuid WHERE owner_id = $1::uuid AND merchant_key "
                         "= $2 "
