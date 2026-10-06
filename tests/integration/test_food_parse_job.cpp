@@ -179,6 +179,43 @@ TEST_F(FoodParseJobTest, ResponseFormatRefusalIsRetriedOnceWithoutIt) {
     EXPECT_FALSE(provider.calls[1].body.contains("response_format"));
 }
 
+// What OpenAI's reasoning models answer (seen with gpt-6-luna on 2026-10-06):
+// max_tokens must be max_completion_tokens, and temperature may only be 1.
+TEST_F(FoodParseJobTest, UnsupportedParametersAreRenamedOrDroppedOneAtATime) {
+    const std::string id = queued();
+    provider.replies.push_back(
+        {400,
+         R"({"error":{"message":"Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.","type":"invalid_request_error","param":"max_tokens","code":"unsupported_parameter"}})"});
+    provider.replies.push_back(
+        {400,
+         R"({"error":{"message":"Unsupported value: 'temperature' does not support 0 with this model. Only the default (1) value is supported.","type":"invalid_request_error","param":"temperature","code":"unsupported_value"}})"});
+    provider.replies.push_back({200, completion(kGoodLines)});
+    EXPECT_EQ(run(id)["status"], "done");
+    ASSERT_EQ(provider.calls.size(), 3u);
+    EXPECT_TRUE(provider.calls[0].body.contains("max_tokens"));
+    EXPECT_FALSE(provider.calls[1].body.contains("max_tokens"));
+    EXPECT_EQ(provider.calls[1].body["max_completion_tokens"], provider.calls[0].body["max_tokens"]);
+    EXPECT_TRUE(provider.calls[1].body.contains("temperature"));
+    EXPECT_FALSE(provider.calls[2].body.contains("temperature"));
+    EXPECT_TRUE(provider.calls[2].body.contains("response_format"));
+    EXPECT_EQ(provider.calls[2].body["max_completion_tokens"], provider.calls[0].body["max_tokens"]);
+}
+
+TEST_F(FoodParseJobTest, AProviderThatKeepsRejectingGivesUpAfterTheKnownParameters) {
+    const std::string id = queued();
+    // Four 400s naming our parameters: three adaptations, then the job fails.
+    for (int i = 0; i < 4; ++i) {
+        provider.replies.push_back(
+            {400, R"({"error":{"message":"max_tokens, temperature and response_format are all unsupported"}})"});
+    }
+    EXPECT_EQ(run(id)["error"], "provider_error_400");
+    EXPECT_EQ(provider.calls.size(), 4u);
+    const json row = *jobs.get(kAnna, id);
+    EXPECT_EQ(row["status"], "failed");
+    // The provider's message travels with the code so the page can show it.
+    EXPECT_NE(row["error"].get<std::string>().find("unsupported"), std::string::npos);
+}
+
 TEST_F(FoodParseJobTest, OtherProviderErrorsAndRefusalsFailWithoutRetry) {
     const std::string a = queued();
     provider.replies.push_back({400, R"({"error":{"message":"model not found"}})"});

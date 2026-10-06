@@ -183,6 +183,9 @@ describe('parseErrorText', () => {
     );
     expect(parseErrorText('not_configured')).toBe('Text parsing is not configured on the server.');
     expect(parseErrorText('provider_error_502: upstream')).toBe(
+      'The language model provider answered with an error (502): upstream',
+    );
+    expect(parseErrorText('provider_error_502')).toBe(
       'The language model provider answered with an error (502).',
     );
     expect(parseErrorText('something_else: detail')).toBe('detail');
