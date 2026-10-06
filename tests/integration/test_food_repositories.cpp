@@ -262,7 +262,7 @@ TEST_F(FoodRepositoriesTest, UpdateGramsRecomputesFromTheItemButNotForAQuickEntr
     EXPECT_THROW(entries.update(kAnna, q["id"], bad), Repositories::ValidationError);
     EXPECT_THROW(entries.remove(kBoris, e["id"]), Repositories::FoodEntryNotFound);
     entries.remove(kAnna, e["id"]);
-    EXPECT_EQ(entries.day(kAnna, "2026-10-07")["totals"]["entries"], 0);
+    EXPECT_EQ(entries.day(kAnna, "2026-10-07")["totals"]["entries"], 2) << "the two dinner entries stay";
 }
 
 TEST_F(FoodRepositoriesTest, BatchWritesAllOrNothing) {

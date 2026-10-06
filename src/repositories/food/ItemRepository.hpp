@@ -95,7 +95,8 @@ public:
                                         limit,
                                         offset);
             out.rows = nlohmann::json::parse(rows[0][0].template as<std::string>());
-            auto total = txn.exec_params("SELECT COUNT(*) FROM food_items WHERE " + where, owner, q, include_archived);
+            auto total = txn.exec_params(
+                "SELECT COUNT(*) FROM food_items WHERE " + where, owner, detail::escape_like(q), include_archived);
             out.total = total[0][0].template as<long>();
             return 0;
         });
