@@ -45,6 +45,23 @@ export const qk = {
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['workout-enabled'] as const,
   },
+  /** Food section. Diary keys share the 'food' prefix so an entry write invalidates day and week. */
+  food: {
+    day: (date: string) => ['food', 'day', date] as const,
+    week: (from: string) => ['food', 'week', from] as const,
+    diary: () => ['food', 'day'] as const,
+    weeks: () => ['food', 'week'] as const,
+    goals: () => ['food', 'goals'] as const,
+    items: (q?: string, archived?: boolean) =>
+      q === undefined
+        ? (['food', 'items'] as const)
+        : (['food', 'items', q, archived ? 'all' : 'active'] as const),
+    recent: () => ['food', 'recent'] as const,
+    offSearch: (q: string) => ['food', 'off', q] as const,
+    parse: (id: string) => ['food', 'parse', id] as const,
+    /** Whether the module answers at all (it is 404 while switched off). */
+    enabled: () => ['food-enabled'] as const,
+  },
   admin: {
     users: (page?: number) =>
       page === undefined ? (['admin', 'users'] as const) : (['admin', 'users', page] as const),
