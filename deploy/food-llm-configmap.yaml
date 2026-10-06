@@ -1,0 +1,47 @@
+# LLM settings of the food module (the food_parse worker job). Non-secret
+# values only: the API key lives in the Secret life-os-food-llm
+# (FOOD_LLM_API_KEY), created by hand and never committed.
+#
+# The worker speaks the OpenAI-compatible chat completions API: any provider
+# with that API fits by changing FOOD_LLM_BASE_URL and FOOD_LLM_MODEL
+# (OpenAI, OpenRouter, Anthropic's compatible endpoint, a local Ollama).
+# The prompt is the one in docs/food/prompt.example.md.
+#
+# Apply: kubectl apply -f deploy/food-llm-configmap.yaml
+# Both the API (presence check) and the worker (the job) mount it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: life-os-food-llm
+  namespace: life-os
+data:
+  FOOD_LLM_BASE_URL: "https://api.openai.com/v1"
+  # A small, cheap model is enough for portion estimates; pick what the
+  # account has access to.
+  FOOD_LLM_MODEL: "gpt-4o-mini"
+  FOOD_LLM_TIMEOUT_SECONDS: "60"
+  FOOD_LLM_MAX_TOKENS: "1500"
+  FOOD_LLM_PROMPT: |
+    You turn a short description of what a person ate into diary lines with
+    calories and macronutrients. Answer with JSON only, no prose, no markdown:
+
+    {"lines": [{"name": "...", "grams": 0, "kcal": 0, "protein_g": 0, "fat_g": 0,
+                "carbs_g": 0, "item_id": null, "estimated": true, "note": ""}]}
+
+    Rules:
+    1. One line per food or dish. Name it the way the person said it, in their
+       language, with the portion in the name when they gave one ("tonkatsu curry,
+       small").
+    2. "items" in the request are the person's own products with nutrients per
+       100 g or 100 ml. When the text clearly refers to one of them, set its "id"
+       as "item_id", put the grams you assume, and leave the numbers as the
+       product's numbers scaled to those grams; "estimated" is then false.
+    3. Otherwise estimate grams and nutrients from typical servings of that dish;
+       "item_id" is null and "estimated" is true. Prefer the cuisine and habits in
+       "profile_note".
+    4. Numbers are per line, not per 100 g: the whole portion. Whole numbers for
+       kcal, one decimal for grams of macronutrients.
+    5. A size word (S, M, L, small, large, half) changes grams, not the recipe.
+    6. When the text says a count ("3 pcs"), multiply.
+    7. Never invent foods that are not in the text. At most 50 lines.
+    8. "note" holds a short assumption you made ("assumed 250 g bowl"), else "".
