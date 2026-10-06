@@ -32,12 +32,22 @@ public:
 
     /// @throws TransportError when no response arrived.
     virtual Response get(const std::string& url, const std::vector<std::pair<std::string, std::string>>& headers) = 0;
+
+    /// POST a JSON body. @throws TransportError when no response arrived.
+    virtual Response post_json(const std::string& url,
+                               const std::string& body,
+                               const std::vector<std::pair<std::string, std::string>>& headers,
+                               long timeout_seconds) = 0;
 };
 
 class CurlTransport : public Transport {
 public:
     explicit CurlTransport(long timeout_seconds = 10) : timeout_seconds_(timeout_seconds) {}
     Response get(const std::string& url, const std::vector<std::pair<std::string, std::string>>& headers) override;
+    Response post_json(const std::string& url,
+                       const std::string& body,
+                       const std::vector<std::pair<std::string, std::string>>& headers,
+                       long timeout_seconds) override;
 
 private:
     long timeout_seconds_;

@@ -216,7 +216,15 @@
     "enabled": "${WORKOUT_ENABLED:-false}"
   },
   "food": {
-    "enabled": "${FOOD_ENABLED:-false}"
+    "enabled": "${FOOD_ENABLED:-false}",
+    "llm": {
+      "base_url": "${FOOD_LLM_BASE_URL:-}",
+      "api_key": "${FOOD_LLM_API_KEY:-}",
+      "model": "${FOOD_LLM_MODEL:-}",
+      "prompt": "${FOOD_LLM_PROMPT:-}",
+      "timeout_seconds": "${FOOD_LLM_TIMEOUT_SECONDS:-60}",
+      "max_tokens": "${FOOD_LLM_MAX_TOKENS:-1500}"
+    }
   },
   "worker": {
     "id": "worker-1",
