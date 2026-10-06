@@ -1,11 +1,5 @@
 // Pure logic of the Food pages: dates, scaling, the parse draft, formats.
-import type {
-  FoodEntryInput,
-  FoodItem,
-  FoodMeal,
-  FoodParseJob,
-  FoodWeek,
-} from './types';
+import type { FoodEntryInput, FoodItem, FoodMeal, FoodParseJob, FoodWeek } from './types';
 
 export * from './types';
 
@@ -210,7 +204,8 @@ export function parseErrorText(error: string | null | undefined): string {
   if (code === 'provider_refused') return 'The language model provider refused the request.';
   if (code === 'parse_timeout') return 'The parse is taking too long. Try again in a minute.';
   const status = /^provider_error_(\d+)$/.exec(code);
-  if (status) return `The language model provider answered with an error (${status[1]}).`;
+  if (status)
+    return `The language model provider answered with an error (${status[1]})${detail ? `: ${detail}` : '.'}`;
   return detail || code;
 }
 

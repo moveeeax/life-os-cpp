@@ -81,8 +81,47 @@ inline nlohmann::json complete(Food::Http::Transport& transport,
     return body;
 }
 
-inline bool mentions_response_format(const nlohmann::json& body) {
-    return body.is_object() && body.dump().find("response_format") != std::string::npos;
+/// The provider's error text (OpenAI puts it in error.message), cut for the job row.
+inline std::string provider_message(const nlohmann::json& body) {
+    std::string text;
+    if (body.is_object() && body.contains("error")) {
+        const auto& e = body["error"];
+        if (e.is_object() && e.contains("message") && e["message"].is_string()) {
+            text = e["message"].get<std::string>();
+        } else if (e.is_string()) {
+            text = e.get<std::string>();
+        }
+    }
+    if (text.size() > 300) {
+        text.resize(300);
+    }
+    return text;
+}
+
+/**
+ * A 400 that names one of the optional parameters of the request: adapt the
+ * request and say so. Providers differ here (OpenAI's reasoning models want
+ * max_completion_tokens and refuse a temperature; some servers do not know
+ * response_format), and the worker must not care which one is behind the URL.
+ * One parameter per round so the provider's message decides, not a guess.
+ */
+inline bool adapt_request(nlohmann::json& request, const nlohmann::json& body) {
+    const std::string text = body.is_object() ? body.dump() : std::string();
+    const auto names = [&](const char* param) { return text.find(param) != std::string::npos; };
+    if (request.contains("max_tokens") && names("max_tokens")) {
+        request["max_completion_tokens"] = request["max_tokens"];
+        request.erase("max_tokens");
+        return true;
+    }
+    if (request.contains("temperature") && names("temperature")) {
+        request.erase("temperature");
+        return true;
+    }
+    if (request.contains("response_format") && names("response_format")) {
+        request.erase("response_format");
+        return true;
+    }
+    return false;
 }
 
 inline std::optional<int> usage(const nlohmann::json& body, const char* key) {
@@ -166,9 +205,9 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     std::string error_code;
     try {
         body = detail::complete(transport, *settings, request, error_code);
-        if (error_code.rfind("provider_error_", 0) == 0 && detail::mentions_response_format(body)) {
-            // The provider does not know response_format: once more without it.
-            request.erase("response_format");
+        // Three optional parameters, so at most three adapted retries.
+        for (int round = 0; round < 3 && error_code == "provider_error_400" && detail::adapt_request(request, body);
+             ++round) {
             body = detail::complete(transport, *settings, request, error_code);
         }
     } catch (const detail::Retryable& e) {
@@ -177,7 +216,7 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         throw std::runtime_error(std::string("food_parse: ") + e.what());
     }
     if (!error_code.empty()) {
-        return failed(error_code, "");
+        return failed(error_code, detail::provider_message(body));
     }
 
     std::string content;
