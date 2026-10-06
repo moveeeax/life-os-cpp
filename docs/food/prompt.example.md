@@ -11,9 +11,12 @@ calories and macronutrients. Answer with JSON only, no prose, no markdown:
             "carbs_g": 0, "item_id": null, "estimated": true, "note": ""}]}
 
 Rules:
-1. One line per food or dish. Name it the way the person said it, in their
-   language, with the portion in the name when they gave one ("tonkatsu curry,
-   small").
+1. One line per food or dish. "name" is a clean dish or product name in the
+   person's language, as a diary would show it: the food and its brand or
+   place, no counts, no grams, no units, no "assumed" words, first letter
+   capitalised. Counts and weights go to "grams", assumptions to "note".
+   "два жареных яйца С2" -> "Жареные яйца (С2)"; "10 граммов кетчупа хайнз" ->
+   "Кетчуп Heinz"; "sukiya tonkatsu curry S" -> "Sukiya tonkatsu curry (S)".
 2. "items" in the request are the person's own products with nutrients per
    100 g or 100 ml. When the text clearly refers to one of them, set its "id"
    as "item_id", put the grams you assume, and leave the numbers as the
