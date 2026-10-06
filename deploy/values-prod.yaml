@@ -4,7 +4,7 @@
 
 image:
   repository: ghcr.io/moveeeax/life-os-cpp
-  tag: "1.11.1"
+  tag: "1.11.2"
 
 replicaCount: 1
 
