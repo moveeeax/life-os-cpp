@@ -266,6 +266,23 @@ TEST_F(FoodParseJobTest, OutagesThrowForTheQueueAndRequeueTheJob) {
     EXPECT_EQ(run(id)["status"], "done");
 }
 
+TEST_F(FoodParseJobTest, TheLastAttemptOfTheQueueMarksTheJobFailed) {
+    const std::string id = queued();
+    const int attempts = Jobs::get().default_max_retries();
+    ASSERT_GE(attempts, 2);
+    provider.fail = true;
+    for (int i = 1; i < attempts; ++i) {
+        EXPECT_THROW(run(id), std::runtime_error) << "attempt " << i;
+        EXPECT_EQ((*jobs.get(kAnna, id))["status"], "queued");
+    }
+    // The queue has no retry left after this one: the row ends here.
+    EXPECT_EQ(run(id)["error"], "provider_unavailable");
+    const json row = *jobs.get(kAnna, id);
+    EXPECT_EQ(row["status"], "failed");
+    EXPECT_EQ(row["error"].get<std::string>().rfind("provider_unavailable: ", 0), 0u);
+    EXPECT_EQ(provider.calls.size(), static_cast<std::size_t>(attempts));
+}
+
 TEST_F(FoodParseJobTest, RedeliveryOfAFinishedJobDoesNothing) {
     const std::string id = queued();
     provider.replies.push_back({200, completion(kGoodLines)});

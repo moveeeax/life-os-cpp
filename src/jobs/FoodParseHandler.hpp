@@ -29,6 +29,7 @@
 #include "food/Http.hpp"
 #include "food/Llm.hpp"
 #include "food/ParseAnswer.hpp"
+#include "jobs/Jobs.hpp"
 #include "repositories/food/GoalsRepository.hpp"
 #include "repositories/food/ItemRepository.hpp"
 #include "repositories/food/ParseJobRepository.hpp"
@@ -158,7 +159,8 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         // Nothing to update: the row is gone.
         return {{"job_id", job_id}, {"status", "missing"}};
     }
-    if (!jobs.start(job_id)) {
+    const int attempt = jobs.start(job_id);
+    if (attempt == 0) {
         // A redelivery of a job that already ran: its journal stays as it is.
         return {{"job_id", job_id}, {"status", job->value("status", "unknown")}};
     }
@@ -211,6 +213,11 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
             body = detail::complete(transport, *settings, request, error_code);
         }
     } catch (const detail::Retryable& e) {
+        if (attempt >= Jobs::get().default_max_retries()) {
+            // The queue would dead-letter this run: the row must not stay
+            // queued for a page that polls it.
+            return failed("provider_unavailable", e.what());
+        }
         // Back to queued: the queue's retry runs this job again.
         jobs.requeue(job_id);
         throw std::runtime_error(std::string("food_parse: ") + e.what());

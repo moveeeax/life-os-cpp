@@ -189,6 +189,9 @@ describe('parseErrorText', () => {
       'The language model provider answered with an error (502).',
     );
     expect(parseErrorText('something_else: detail')).toBe('detail');
+    expect(parseErrorText('provider_unavailable: timed out')).toBe(
+      'The language model provider did not answer after several tries. Try again later.',
+    );
     expect(parseErrorText('parse_timeout')).toBe(
       'The parse is taking too long. Try again in a minute.',
     );

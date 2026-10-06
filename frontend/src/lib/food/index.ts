@@ -202,6 +202,8 @@ export function parseErrorText(error: string | null | undefined): string {
   if (code === 'not_configured') return 'Text parsing is not configured on the server.';
   if (code === 'food_disabled') return 'The food module is switched off on the server.';
   if (code === 'provider_refused') return 'The language model provider refused the request.';
+  if (code === 'provider_unavailable')
+    return 'The language model provider did not answer after several tries. Try again later.';
   if (code === 'parse_timeout') return 'The parse is taking too long. Try again in a minute.';
   const status = /^provider_error_(\d+)$/.exec(code);
   if (status)
