@@ -6566,6 +6566,187 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/v1/food/parse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a text description to the LLM parse job
+         * @description Creates a food_parse_jobs row and puts a food_parse job on the queue; poll
+         *     GET /api/v1/food/parse/{id}. Nothing reaches the diary until the lines are
+         *     confirmed with POST /api/v1/food/entries/batch. 503 not_configured while the
+         *     worker's FOOD_LLM_* settings are absent (GET goals reports llm_available).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        text: string;
+                        meal: components["schemas"]["FoodMeal"];
+                        /** Format: date */
+                        date: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Queued */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                status: "queued";
+                            };
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description not_configured, or the queue is down (queue_unavailable) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/parse/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Read a parse job and its lines */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The job */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FoodParseJob"];
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled, or the job is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7661,9 +7842,47 @@ export interface components {
                 carbs_g?: number;
             } | null;
             targets: components["schemas"]["FoodTargets"];
+            /** @description Whether the text parse is set up on this server */
+            llm_available: boolean;
         };
         FoodGoalsResponse: {
             data: components["schemas"]["FoodGoals"];
+        };
+        FoodParseJob: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            status: "queued" | "running" | "done" | "failed";
+            text: string;
+            meal: components["schemas"]["FoodMeal"];
+            /** Format: date */
+            date: string;
+            /** @description The parsed lines when done; confirm them with POST /api/v1/food/entries/batch */
+            result: components["schemas"]["FoodParseLine"][] | null;
+            /** @description code and message when failed; codes: not_configured, food_disabled, provider_refused, provider_error_<status>, invalid_answer, items_unavailable */
+            error: string | null;
+            model: string | null;
+            prompt_tokens: number | null;
+            completion_tokens: number | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            finished_at: string | null;
+        };
+        FoodParseLine: {
+            name: string;
+            grams: number;
+            kcal: number;
+            protein_g: number;
+            fat_g: number;
+            carbs_g: number;
+            /**
+             * Format: uuid
+             * @description One of the user's own products when the model matched one
+             */
+            item_id: string | null;
+            estimated: boolean;
+            note: string;
         };
     };
     responses: never;

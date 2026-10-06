@@ -120,6 +120,8 @@ inline const std::vector<EndpointInfo>& get_endpoints() {
         {"POST", "/api/v1/food/entries/batch", "Food: add several diary entries at once"},
         {"PATCH", "/api/v1/food/entries/{id}", "Food: edit a diary entry"},
         {"DELETE", "/api/v1/food/entries/{id}", "Food: delete a diary entry"},
+        {"POST", "/api/v1/food/parse", "Food: send a text description to the LLM parse job"},
+        {"GET", "/api/v1/food/parse/{id}", "Food: read a parse job and its lines"},
         {"GET", "/api/v1/billing/packages", "List active top-up packages"},
         {"GET", "/api/v1/billing/wallet", "Get your own wallet balance + ledger history"},
         {"POST", "/api/v1/billing/topup", "Start a PayPal top-up (package or custom amount)"},

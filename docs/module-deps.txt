@@ -83,8 +83,10 @@ jobs -> database
 jobs -> email
 jobs -> fitness/sync
 jobs -> fitness/xiaomi
+jobs -> food
 jobs -> observability
 jobs -> repositories/fitness
+jobs -> repositories/food
 jobs -> repositories/workout
 jobs -> utils
 jobs -> webhooks
