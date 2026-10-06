@@ -88,7 +88,7 @@ void seed_currencies(const std::string& owner) {
 }
 
 /// The JSON body, which must be an object: an array or a scalar answers 400, not 500.
-bool parse_object(const HttpRequestPtr& req, json& body, const MoneyController::Callback& callback) {
+bool parse_object(const HttpRequestPtr& req, json& body, MoneyController::Callback& callback) {
     if (!Validation::parse_body(req, body, callback)) {
         return false;
     }
