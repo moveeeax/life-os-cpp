@@ -6,6 +6,16 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-10-06
+
+### Fixed
+- The `food_parse` job adapts its request to the provider: a 400 that names
+  `max_tokens` (OpenAI's reasoning models want `max_completion_tokens`),
+  `temperature` (only the default is allowed there) or `response_format` is
+  answered by renaming or dropping that parameter and trying again, one
+  parameter per round. The provider's message is stored with the error code
+  and shown on the page.
+
 ## [1.11.0] - 2026-10-06
 
 ### Added
