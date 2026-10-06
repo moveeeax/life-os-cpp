@@ -13,6 +13,13 @@ extraEnvFrom:
   - configMapRef:
       name: life-os-sync-tuning
       optional: true
+  # LLM settings of the food module (food_parse job); the key is in the Secret life-os-food-llm.
+  - configMapRef:
+      name: life-os-food-llm
+      optional: true
+  - secretRef:
+      name: life-os-food-llm
+      optional: true
 
 externalDatabase:
   host: postgresql-rw.db.svc.cluster.local
