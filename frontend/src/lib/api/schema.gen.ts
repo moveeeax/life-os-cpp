@@ -7780,6 +7780,15 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
+                /** @description A row with this external_id already exists (duplicate) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
             };
         };
         delete?: never;
@@ -7854,6 +7863,15 @@ export interface paths {
                 };
                 /** @description Money module disabled */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A row with this external_id already exists (duplicate) */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -8339,6 +8357,15 @@ export interface paths {
                 };
                 /** @description Money module disabled */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A row with this external_id already exists (duplicate) */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -10695,6 +10722,7 @@ export interface components {
             net: number;
             /** @description True when a currency had no rate on or before the day */
             partial: boolean;
+            /** @description Currency blocks without a rate on or before the day */
             unconverted: number;
             rates: Record<string, never>;
             source: string;

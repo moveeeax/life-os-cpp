@@ -5246,7 +5246,8 @@
       "description": "True when a currency had no rate on or before the day"
      },
      "unconverted": {
-      "type": "integer"
+      "type": "integer",
+      "description": "Currency blocks without a rate on or before the day"
      },
      "rates": {
       "type": "object"
@@ -13742,6 +13743,16 @@
        }
       }
      },
+     "409": {
+      "description": "A row with this external_id already exists (duplicate)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
      "401": {
       "description": "Not authenticated",
       "content": {
@@ -13837,6 +13848,16 @@
      },
      "400": {
       "description": "Validation failed, or a rule of the model (code invariant)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "A row with this external_id already exists (duplicate)",
       "content": {
        "application/json": {
         "schema": {
@@ -14418,6 +14439,16 @@
      },
      "400": {
       "description": "Validation failed, or a rule of the model (code invariant)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "A row with this external_id already exists (duplicate)",
       "content": {
        "application/json": {
         "schema": {
@@ -15518,7 +15549,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 233956,
-  "source_fnv1a64": "7947fc3dbe19deea"
+  "source_bytes": 234631,
+  "source_fnv1a64": "15075fed4df57baf"
  }
 }

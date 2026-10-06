@@ -72,6 +72,8 @@ TEST(MoneyRatesSource, OutagesAndBadBodiesAreUnavailable) {
     EXPECT_THROW(Money::RatesSource::fetch(t, "latest"), Money::RatesSource::Unavailable);
     t.replies.push_back({200, R"({"date":"2026-10-03","usd":{}})"});
     EXPECT_THROW(Money::RatesSource::fetch(t, "latest"), Money::RatesSource::Unavailable);
+    t.replies.push_back({200, R"({"usd":{"kzt":450}})"});
+    EXPECT_THROW(Money::RatesSource::fetch(t, "latest"), Money::RatesSource::Unavailable) << "no day in the answer";
     t.fail = true;
     EXPECT_THROW(Money::RatesSource::fetch(t, "latest"), Money::RatesSource::Unavailable);
 }

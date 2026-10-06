@@ -80,6 +80,19 @@ public:
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
+                    if (p.kind.has_value()) {
+                        // An expense category with expense rows cannot become an income one:
+                        // the rows would stand in a category of the other kind.
+                        auto used = txn.exec_params(
+                            "SELECT 1 FROM money_transactions WHERE owner_id = $1::uuid AND category_id = $2::uuid "
+                            " AND type <> 'fx_adjustment' AND type <> $3 LIMIT 1",
+                            owner,
+                            id,
+                            *p.kind);
+                        if (!used.empty()) {
+                            throw Invariant("the category has rows of its current kind; its kind stays");
+                        }
+                    }
                     const bool budget_given = p.budget_max.has_value() || p.budget_currency.has_value();
                     auto r = txn.exec_params(
                         "UPDATE money_categories SET name = COALESCE($3, name), kind = COALESCE($4, kind), "

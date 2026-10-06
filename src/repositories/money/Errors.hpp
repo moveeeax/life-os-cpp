@@ -24,6 +24,10 @@ struct Invariant : ValidationError {
     explicit Invariant(std::string message) : ValidationError("invariant", std::move(message)) {}
 };
 
+struct Duplicate : ConflictError {
+    Duplicate() : ConflictError("duplicate", "a row with this external_id already exists") {}
+};
+
 struct InvalidDate : ValidationError {
     InvalidDate() : ValidationError("invalid_date", "not a valid date") {}
 };
@@ -41,6 +45,9 @@ inline void translate(std::string_view sqlstate) {
     }
     if (sqlstate == "23503") {  // foreign_key_violation
         throw Invariant("the row refers to an account, category or currency that is not there");
+    }
+    if (sqlstate == "23505") {  // unique_violation: only external_id is unique among user-written columns
+        throw Duplicate();
     }
     if (sqlstate == "22008" || sqlstate == "22007") {  // datetime_field_overflow, invalid_datetime_format
         throw InvalidDate();

@@ -99,6 +99,13 @@ TEST(MoneyReports, RecurringNeedsMonthlyGapsAndBreaksOnAShortOne) {
     EXPECT_TRUE(r.new_merchants.empty());
 }
 
+TEST(MoneyReports, APeriodNotStartedProjectsOnlyWhatIsInIt) {
+    const auto r =
+        Money::Reports::build(kOctober, {expense("2026-10-01", "KZT", "rent", 300000)}, {}, {}, {}, "2026-09-20");
+    ASSERT_EQ(r.blocks.size(), 1u);
+    EXPECT_DOUBLE_EQ(r.blocks[0].projection, 300000);
+}
+
 TEST(MoneyReports, EmptyPeriodGivesNoBlocks) {
     const auto r = Money::Reports::build(kOctober, {}, {}, {}, {}, "2026-10-10");
     EXPECT_TRUE(r.blocks.empty());
