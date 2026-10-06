@@ -3083,7 +3083,7 @@
      },
      "grams": {
       "type": "number",
-      "minimum": 0,
+      "exclusiveMinimum": 0,
       "maximum": 5000
      }
     }
@@ -3405,7 +3405,7 @@
        "number",
        "null"
       ],
-      "minimum": 0,
+      "minimum": 0.01,
       "maximum": 10000
      },
      "name": {
@@ -3475,7 +3475,7 @@
      },
      "grams": {
       "type": "number",
-      "minimum": 0,
+      "minimum": 0.01,
       "maximum": 10000,
       "description": "Recomputes the numbers when the entry still has its item"
      },
@@ -3956,7 +3956,7 @@
        "string",
        "null"
       ],
-      "description": "code and message when failed; codes: not_configured, food_disabled, provider_refused, provider_error_<status>, invalid_answer, items_unavailable"
+      "description": "code and message when failed; codes: not_configured, food_disabled, provider_refused, provider_error_<status>, provider_unavailable, invalid_answer, internal_error, queue_unavailable"
      },
      "model": {
       "type": [
@@ -10907,6 +10907,16 @@
        }
       }
      },
+     "429": {
+      "description": "Three parses of this user are still queued or running (too_many_parses)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
      "404": {
       "description": "Food module disabled",
       "content": {
@@ -11018,7 +11028,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 172279,
-  "source_fnv1a64": "72232f70cba0c999"
+  "source_bytes": 172552,
+  "source_fnv1a64": "131076795d90a474"
  }
 }
