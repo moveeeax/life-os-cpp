@@ -139,6 +139,9 @@ spec:
             # food module
             - name: FOOD_ENABLED
               value: {{ .Values.food.enabled | quote }}
+            # money module
+            - name: MONEY_ENABLED
+              value: {{ .Values.money.enabled | quote }}
             # Worker
             - name: WORKER_ID
               value: {{ .Values.worker.id | quote }}

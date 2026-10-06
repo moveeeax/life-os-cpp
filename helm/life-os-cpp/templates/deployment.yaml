@@ -212,6 +212,9 @@ spec:
             # food module — master switch
             - name: FOOD_ENABLED
               value: {{ .Values.food.enabled | quote }}
+            # money module — master switch
+            - name: MONEY_ENABLED
+              value: {{ .Values.money.enabled | quote }}
             {{- if .Values.billing.enabled }}
             - name: PAYPAL_ENV
               value: {{ .Values.billing.paypal.environment | quote }}
