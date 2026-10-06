@@ -21,6 +21,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "api/FieldChecks.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
 #include "api/RequestUtils.hpp"
@@ -67,25 +68,14 @@ const std::vector<std::string> kMeals = {"breakfast", "lunch", "dinner", "snack"
 const std::vector<std::string> kPer = {"100g", "100ml"};
 const std::vector<std::string> kSexes = {"male", "female"};
 const std::vector<std::string> kActivities = {"sedentary", "light", "moderate", "active", "very_active"};
-const std::regex kDateRe(R"(^\d{4}-\d{2}-\d{2}$)");
 
-/// Like Validation::string_length, but in characters: the table CHECKs count
-/// characters too, and a Cyrillic name must not get half the room.
-void text_length(Validation::Errors& errs, const json& body, const std::string& field, std::size_t lo, std::size_t hi) {
-    if (!body.contains(field) || body[field].is_null()) {
-        return;
-    }
-    if (!body[field].is_string()) {
-        errs.add(field, "invalid", "must be a string");
-        return;
-    }
-    const std::size_t n = Utils::Utf8::length(body[field].get<std::string>());
-    if (n < lo) {
-        errs.add(field, "too_short", "min length " + std::to_string(lo));
-    } else if (n > hi) {
-        errs.add(field, "too_long", "max length " + std::to_string(hi));
-    }
-}
+using Api::Fields::date_field;
+using Api::Fields::is_calendar_date;
+using Api::Fields::number_range;
+using Api::Fields::opt_int;
+using Api::Fields::opt_number;
+using Api::Fields::text_length;
+using Api::Fields::today_utc;
 
 /// Rows belong to an app user; a static-bearer principal has no user id.
 bool require_user(const std::string& owner, const FoodController::Callback& callback) {
@@ -94,70 +84,6 @@ bool require_user(const std::string& owner, const FoodController::Callback& call
     }
     callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
     return false;
-}
-
-std::string today_utc() {
-    const std::chrono::year_month_day ymd{std::chrono::floor<std::chrono::days>(std::chrono::system_clock::now())};
-    char out[16];
-    std::snprintf(out,
-                  sizeof(out),
-                  "%04d-%02u-%02u",
-                  static_cast<int>(ymd.year()),
-                  static_cast<unsigned>(ymd.month()),
-                  static_cast<unsigned>(ymd.day()));
-    return out;
-}
-
-/// Optional number within [lo, hi]; null is "unset".
-void number_range(Validation::Errors& errs, const json& body, const std::string& field, double lo, double hi) {
-    if (!body.contains(field) || body[field].is_null()) {
-        return;
-    }
-    if (!body[field].is_number()) {
-        errs.add(field, "not_number", "must be a number");
-        return;
-    }
-    const double v = body[field].get<double>();
-    if (!(v >= lo && v <= hi)) {
-        errs.add(field, "out_of_range", "must be in " + json(lo).dump() + ".." + json(hi).dump());
-    }
-}
-
-std::optional<double> opt_number(const json& body, const std::string& field) {
-    if (body.contains(field) && body[field].is_number()) {
-        return body[field].get<double>();
-    }
-    return std::nullopt;
-}
-
-std::optional<int> opt_int(const json& body, const std::string& field) {
-    if (body.contains(field) && body[field].is_number_integer()) {
-        return body[field].get<int>();
-    }
-    return std::nullopt;
-}
-
-/// A real calendar day between 1900 and 2100: the regex alone lets "2026-02-30" through.
-bool is_calendar_date(const std::string& text) {
-    if (!std::regex_match(text, kDateRe)) {
-        return false;
-    }
-    try {
-        const auto ymd = Food::Goals::detail::parse_ymd(text);
-        const int year = static_cast<int>(ymd.year());
-        return year >= 1900 && year <= 2100;
-    } catch (const std::invalid_argument&) {
-        return false;
-    }
-}
-
-void date_field(Validation::Errors& errs, const json& body, const std::string& field) {
-    if (!body.contains(field) || body[field].is_null()) {
-        return;
-    }
-    if (!body[field].is_string() || !is_calendar_date(body[field].get<std::string>())) {
-        errs.add(field, "bad_format", "expected a calendar day as YYYY-MM-DD");
-    }
 }
 
 /// `[{label, grams}]`, at most kServingsMax entries; returns the normalized JSON text.
