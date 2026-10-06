@@ -341,6 +341,15 @@ TEST_F(FoodApiTest, EntryInputIsValidated) {
     EXPECT_EQ(post(json{{"date", "2026-10-06"}, {"meal", "lunch"}, {"item_id", kMissingId}, {"grams", 10}}),
               k404NotFound);
     EXPECT_EQ(post(json{{"date", "2026-10-06"}, {"meal", "lunch"}, {"name", "x"}, {"kcal", -5}}), k400BadRequest);
+    EXPECT_EQ(post(json{{"date", "2026-02-30"}, {"meal", "lunch"}, {"name", "x"}, {"kcal", 1}}), k400BadRequest)
+        << "a calendar day, not just the shape";
+    EXPECT_EQ(post(json{{"date", "1800-01-01"}, {"meal", "lunch"}, {"name", "x"}, {"kcal", 1}}), k400BadRequest);
+    EXPECT_EQ(post(json{{"date", "2026-10-06"}, {"meal", "lunch"}, {"name", nullptr}, {"kcal", 1}}), k400BadRequest)
+        << "null is not a name";
+    EXPECT_EQ(post(json{{"date", "2026-10-06"}, {"meal", "lunch"}, {"name", "x"}, {"kcal", nullptr}}), k400BadRequest);
+    EXPECT_EQ(post(json{{"date", "2026-10-06"}, {"meal", "lunch"}, {"name", "x"}, {"kcal", "5"}}), k400BadRequest);
+    EXPECT_EQ(post(json{{"date", "2026-10-06"}, {"meal", "lunch"}, {"item_id", kMissingId}, {"grams", nullptr}}),
+              k400BadRequest);
     EXPECT_EQ(call(&Api::FoodController::day, user(kAnna), Get, {{"date", "junk"}})->statusCode(), k400BadRequest);
     EXPECT_EQ(call(&Api::FoodController::day, user(kAnna), Get, {{"date", "2026-02-30"}})->statusCode(),
               k400BadRequest);
@@ -608,4 +617,26 @@ TEST_F(FoodParseApiTest, ParseInputIsValidated) {
     EXPECT_EQ(post(json{{"text", std::string(2001, 'x')}, {"meal", "lunch"}, {"date", "2026-10-06"}}), k400BadRequest);
     EXPECT_EQ(post(json{{"text", "tea"}, {"meal", "brunch"}, {"date", "2026-10-06"}}), k400BadRequest);
     EXPECT_EQ(post(json{{"text", "tea"}, {"meal", "lunch"}, {"date", "today"}}), k400BadRequest);
+    EXPECT_EQ(post(json{{"text", "tea"}, {"meal", "lunch"}, {"date", "2026-02-30"}}), k400BadRequest)
+        << "not a calendar day: 400, not a database error";
+}
+
+TEST_F(FoodParseApiTest, AFewOpenParsesPerUserAreEnough) {
+    const json body{{"text", "tea"}, {"meal", "lunch"}, {"date", "2026-10-06"}};
+    for (int i = 0; i < 3; ++i) {
+        ASSERT_EQ(call_json(&Api::FoodController::parseStart, user(kAnna), body)->statusCode(), k202Accepted);
+    }
+    const auto fourth = call_json(&Api::FoodController::parseStart, user(kAnna), body);
+    EXPECT_EQ(fourth->statusCode(), k429TooManyRequests);
+    EXPECT_EQ(body_of(fourth)["error"], "too_many_parses");
+    // Another user has their own allowance; a finished job frees a slot.
+    EXPECT_EQ(call_json(&Api::FoodController::parseStart, user(kBoris), body)->statusCode(), k202Accepted);
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE food_parse_jobs SET status = 'failed' WHERE owner_id = $1::uuid", std::string(kAnna));
+        return true;
+    });
+    EXPECT_EQ(call_json(&Api::FoodController::parseStart, user(kAnna), body)->statusCode(), k202Accepted);
+    const auto job = Jobs::get().pick({"food_parse"}, 1);
+    ASSERT_TRUE(job.has_value());
+    EXPECT_EQ(job->payload["max_attempts"], Jobs::get().default_max_retries());
 }

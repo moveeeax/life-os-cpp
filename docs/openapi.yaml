@@ -1130,7 +1130,7 @@ components:
       required: [label, grams]
       properties:
         label: { type: string, maxLength: 60 }
-        grams: { type: number, minimum: 0, maximum: 5000 }
+        grams: { type: number, exclusiveMinimum: 0, maximum: 5000 }
 
     FoodItemInput:
       type: object
@@ -1215,7 +1215,7 @@ components:
         date: { type: string, format: date }
         meal: { $ref: '#/components/schemas/FoodMeal' }
         item_id: { type: [string, 'null'], format: uuid }
-        grams: { type: [number, 'null'], minimum: 0, maximum: 10000 }
+        grams: { type: [number, 'null'], minimum: 0.01, maximum: 10000 }
         name: { type: string, minLength: 1, maxLength: 200 }
         kcal: { type: number, minimum: 0, maximum: 10000 }
         protein_g: { type: number, minimum: 0, maximum: 1000 }
@@ -1231,7 +1231,7 @@ components:
       properties:
         date: { type: string, format: date }
         meal: { $ref: '#/components/schemas/FoodMeal' }
-        grams: { type: number, minimum: 0, maximum: 10000, description: "Recomputes the numbers when the entry still has its item" }
+        grams: { type: number, minimum: 0.01, maximum: 10000, description: "Recomputes the numbers when the entry still has its item" }
         note: { type: string, maxLength: 500 }
 
     FoodEntryResponse:
@@ -1364,7 +1364,7 @@ components:
           type: [array, 'null']
           description: The parsed lines when done; confirm them with POST /api/v1/food/entries/batch
           items: { $ref: '#/components/schemas/FoodParseLine' }
-        error: { type: [string, 'null'], description: "code and message when failed; codes: not_configured, food_disabled, provider_refused, provider_error_<status>, invalid_answer, items_unavailable" }
+        error: { type: [string, 'null'], description: "code and message when failed; codes: not_configured, food_disabled, provider_refused, provider_error_<status>, provider_unavailable, invalid_answer, internal_error, queue_unavailable" }
         model: { type: [string, 'null'] }
         prompt_tokens: { type: [integer, 'null'] }
         completion_tokens: { type: [integer, 'null'] }
@@ -4267,6 +4267,11 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '403':
           description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: Three parses of this user are still queued or running (too_many_parses)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

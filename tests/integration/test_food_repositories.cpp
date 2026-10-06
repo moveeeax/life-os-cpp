@@ -109,9 +109,11 @@ protected:
         return in;
     }
 
-    static Repositories::EntryRepository::Input quick(const std::string& meal, double kcal) {
+    static Repositories::EntryRepository::Input quick(const std::string& meal,
+                                                      double kcal,
+                                                      const std::string& date = "2026-10-06") {
         Repositories::EntryRepository::Input in;
-        in.date = "2026-10-06";
+        in.date = date;
         in.meal = meal;
         in.name = "Street food";
         in.kcal = kcal;
@@ -135,6 +137,35 @@ TEST_F(FoodRepositoriesTest, ItemsAreScopedByOwnerAndSearchedByNameAndBrand) {
     EXPECT_FALSE(items.find(kBoris, anna_item).has_value());
     EXPECT_THROW(items.remove(kBoris, anna_item), Repositories::FoodItemNotFound);
     EXPECT_THROW(items.update(kBoris, anna_item, {}), Repositories::FoodItemNotFound);
+}
+
+TEST_F(FoodRepositoriesTest, SearchTreatsPercentAndUnderscoreAsText) {
+    auto fifty = egg();
+    fifty.name = "Yogurt 50% less sugar";
+    items.create(kAnna, fifty);
+    items.create(kAnna, nutella());
+    EXPECT_EQ(items.list(kAnna, "50%", false, 50, 0).total, 1);
+    EXPECT_EQ(items.list(kAnna, "%", false, 50, 0).total, 1) << "a bare % matches the % product, not everything";
+    EXPECT_EQ(items.list(kAnna, "_", false, 50, 0).total, 0);
+}
+
+TEST_F(FoodRepositoriesTest, PromptItemsComeNewestFirstWithoutArchived) {
+    const auto old = items.create(kAnna, egg());
+    items.create(kAnna, nutella());
+    Repositories::ItemRepository::Patch touch;
+    touch.brand = "Fresh";
+    items.update(kAnna, old["id"], touch);
+    auto archived = egg();
+    archived.name = "Gone";
+    const auto gone = items.create(kAnna, archived);
+    Repositories::ItemRepository::Patch hide;
+    hide.archived = true;
+    items.update(kAnna, gone["id"], hide);
+
+    const auto rows = items.for_prompt(kAnna, 10);
+    ASSERT_EQ(rows.size(), 2u);
+    EXPECT_EQ(rows[0]["id"], old["id"]) << "the item touched last comes first";
+    EXPECT_EQ(items.for_prompt(kAnna, 1).size(), 1u);
 }
 
 TEST_F(FoodRepositoriesTest, UpsertOffReturnsTheExistingCopy) {
@@ -216,9 +247,15 @@ TEST_F(FoodRepositoriesTest, UpdateGramsRecomputesFromTheItemButNotForAQuickEntr
     Repositories::EntryRepository::Patch move;
     move.meal = "dinner";
     move.date = "2026-10-07";
+    // The target meal already has two entries: the moved one lands after them.
+    entries.create(kAnna, quick("dinner", 100, "2026-10-07"));
+    entries.create(kAnna, quick("dinner", 200, "2026-10-07"));
     const auto moved = entries.update(kAnna, e["id"], move);
     EXPECT_EQ(moved["meal"], "dinner");
     EXPECT_EQ(moved["date"], "2026-10-07");
+    const auto dinner = entries.day(kAnna, "2026-10-07")["meals"]["dinner"];
+    ASSERT_EQ(dinner.size(), 3u);
+    EXPECT_EQ(dinner[2]["id"], e["id"]) << "a moved entry goes to the end of its new meal";
     EXPECT_THROW(entries.update(kBoris, e["id"], grams), Repositories::FoodEntryNotFound);
     Repositories::EntryRepository::Patch bad;
     bad.date = "2026-13-40";

@@ -19,6 +19,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "utils/Utf8.hpp"
+
 namespace Food::Parse {
 
 struct Line {
@@ -131,9 +133,11 @@ inline std::vector<Line> parse_answer(std::string_view content, const std::set<s
         if (!l.contains("name") || !l["name"].is_string()) {
             throw Invalid("a line has no name");
         }
-        line.name = l["name"].get<std::string>();
-        if (line.name.empty() || line.name.size() > kNameMax) {
-            throw Invalid("a name is empty or too long");
+        // The model writes in the person's language: the limit counts characters,
+        // and an overlong name is cut rather than failing the whole answer.
+        line.name = Utils::Utf8::cut(l["name"].get<std::string>(), kNameMax);
+        if (line.name.empty()) {
+            throw Invalid("a name is empty");
         }
         line.grams = detail::number(l, "grams", 0.01, kGramsMax, true, 0);
         line.kcal = detail::number(l, "kcal", 0, kKcalMax, true, 0);
@@ -152,7 +156,7 @@ inline std::vector<Line> parse_answer(std::string_view content, const std::set<s
         }
         line.estimated = !l.contains("estimated") || !l["estimated"].is_boolean() || l["estimated"].get<bool>();
         if (l.contains("note") && l["note"].is_string()) {
-            line.note = l["note"].get<std::string>().substr(0, kNoteMax);
+            line.note = Utils::Utf8::cut(l["note"].get<std::string>(), kNoteMax);
         }
         out.push_back(std::move(line));
     }

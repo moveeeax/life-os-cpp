@@ -94,3 +94,21 @@ TEST(FoodParseAnswer, RejectsTooManyLinesAndCutsTheNote) {
     EXPECT_EQ(lines[0].note.size(), Food::Parse::kNoteMax);
     EXPECT_EQ(lines[0].name.size(), 1u);
 }
+
+TEST(FoodParseAnswer, NamesAndNotesAreCutByCharactersNotBytes) {
+    // 130 Cyrillic letters: 260 bytes, more than kNameMax characters.
+    std::string name;
+    for (int i = 0; i < 130; ++i) {
+        name += "\xD0\xB0";  // "а"
+    }
+    std::string note;
+    for (int i = 0; i < 600; ++i) {
+        note += "\xD1\x8F";  // "я"
+    }
+    const nlohmann::json answer{{"lines", {{{"name", name}, {"grams", 100}, {"kcal", 10}, {"note", note}}}}};
+    const auto lines = Food::Parse::parse_answer(answer.dump(), {});
+    ASSERT_EQ(lines.size(), 1u);
+    EXPECT_EQ(lines[0].name.size(), Food::Parse::kNameMax * 2) << "cut, not rejected, on a character boundary";
+    EXPECT_EQ(lines[0].note.size(), Food::Parse::kNoteMax * 2);
+    EXPECT_NO_THROW(Food::Parse::to_json(lines).dump()) << "valid UTF-8 after the cut";
+}

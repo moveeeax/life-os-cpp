@@ -6652,6 +6652,15 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
+                /** @description Three parses of this user are still queued or running (too_many_parses) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
                 /** @description not_configured, or the queue is down (queue_unavailable) */
                 503: {
                     headers: {
@@ -7859,7 +7868,7 @@ export interface components {
             date: string;
             /** @description The parsed lines when done; confirm them with POST /api/v1/food/entries/batch */
             result: components["schemas"]["FoodParseLine"][] | null;
-            /** @description code and message when failed; codes: not_configured, food_disabled, provider_refused, provider_error_<status>, invalid_answer, items_unavailable */
+            /** @description code and message when failed; codes: not_configured, food_disabled, provider_refused, provider_error_<status>, provider_unavailable, invalid_answer, internal_error, queue_unavailable */
             error: string | null;
             model: string | null;
             prompt_tokens: number | null;
