@@ -1,6 +1,6 @@
 /**
  * @file MoneyController.hpp
- * @brief /api/v1/money/*: currencies, accounts, categories, the ledger,
+ * @brief The /api/v1/money routes: currencies, accounts, categories, the ledger,
  *        transfers, the inbox, merchant memory, rates, reports and settings
  *        of the money module. Every handler checks the module switch, then
  *        the caller's user id; rows belong to that user only. The seven
