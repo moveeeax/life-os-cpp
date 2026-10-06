@@ -1371,6 +1371,346 @@ components:
         created_at: { type: string, format: date-time }
         finished_at: { type: [string, 'null'], format: date-time }
 
+    MoneyTransactionType:
+      type: string
+      enum: [income, expense, fx_adjustment]
+    MoneyCurrency:
+      type: object
+      required: [code, name, role, decimals, archived]
+      properties:
+        code: { type: string, pattern: '^[A-Z]{3}$' }
+        name: { type: string }
+        role: { type: [string, 'null'], enum: [primary, local, null] }
+        decimals: { type: integer, minimum: 0, maximum: 4 }
+        archived: { type: boolean }
+    MoneyCurrencyInput:
+      type: object
+      required: [code]
+      properties:
+        code: { type: string, pattern: '^[A-Z]{3}$' }
+        name: { type: string, maxLength: 60 }
+        role: { type: [string, 'null'], enum: [primary, local, null] }
+        decimals: { type: integer, minimum: 0, maximum: 4, default: 2 }
+        archived: { type: boolean, default: false }
+    MoneyCurrencyPatch:
+      type: object
+      properties:
+        name: { type: string, maxLength: 60 }
+        role: { type: [string, 'null'], enum: [primary, local, null] }
+        decimals: { type: integer, minimum: 0, maximum: 4 }
+        archived: { type: boolean }
+    MoneyAccount:
+      type: object
+      required: [id, name, bank, kind, currency, last4, opening_balance, opening_date, archived, position, balance, last_activity, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        bank: { type: string }
+        kind: { type: string, enum: [card, cash, deposit, other] }
+        currency: { type: string }
+        last4: { type: string }
+        opening_balance: { type: number }
+        opening_date: { type: [string, 'null'], format: date }
+        archived: { type: boolean }
+        position: { type: integer }
+        balance: { type: number, description: "Computed: opening + income − expense ± adjustments + transfers in − transfers out, posted rows only" }
+        last_activity: { type: [string, 'null'], format: date }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    MoneyAccountInput:
+      type: object
+      required: [name, currency]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        bank: { type: string, maxLength: 60 }
+        kind: { type: string, enum: [card, cash, deposit, other], default: card }
+        currency: { type: string, pattern: '^[A-Z]{3}$', description: One of the user's currencies }
+        last4: { type: string, pattern: '^[0-9]{0,4}$' }
+        opening_balance: { type: number, default: 0 }
+        opening_date: { type: [string, 'null'], format: date }
+        position: { type: integer, minimum: 0, default: 0 }
+    MoneyAccountPatch:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        bank: { type: string, maxLength: 60 }
+        kind: { type: string, enum: [card, cash, deposit, other] }
+        last4: { type: string, pattern: '^[0-9]{0,4}$' }
+        opening_balance: { type: number }
+        opening_date: { type: [string, 'null'], format: date }
+        archived: { type: boolean }
+        position: { type: integer, minimum: 0 }
+    MoneyCategory:
+      type: object
+      required: [id, name, kind, flexibility, budget_max, budget_currency, archived, position, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        kind: { type: string, enum: [expense, income] }
+        flexibility: { type: string, enum: [fixed, variable] }
+        budget_max: { type: [number, 'null'] }
+        budget_currency: { type: [string, 'null'] }
+        archived: { type: boolean }
+        position: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    MoneyCategoryInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 60 }
+        kind: { type: string, enum: [expense, income], default: expense }
+        flexibility: { type: string, enum: [fixed, variable], default: variable }
+        budget_max: { type: [number, 'null'], exclusiveMinimum: 0, description: With budget_currency, or neither }
+        budget_currency: { type: [string, 'null'], pattern: '^[A-Z]{3}$' }
+        position: { type: integer, minimum: 0, default: 0 }
+    MoneyCategoryPatch:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 60 }
+        kind: { type: string, enum: [expense, income] }
+        flexibility: { type: string, enum: [fixed, variable] }
+        budget_max: { type: [number, 'null'], exclusiveMinimum: 0 }
+        budget_currency: { type: [string, 'null'], pattern: '^[A-Z]{3}$' }
+        archived: { type: boolean }
+        position: { type: integer, minimum: 0 }
+    MoneyAdjustment:
+      type: object
+      required: [id, date, amount, note]
+      properties:
+        id: { type: string, format: uuid }
+        date: { type: string, format: date }
+        amount: { type: number, description: Plus when the bank took more, minus when it returned }
+        note: { type: string }
+    MoneyTransaction:
+      type: object
+      required: [id, type, date, time, account_id, currency, amount, category_id, merchant, merchant_key, name, receipt_amount, receipt_currency, fx_note, adjusts_id, trip, note, source, status, external_id, final_amount, adjustments, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        type: { $ref: '#/components/schemas/MoneyTransactionType' }
+        date: { type: string, format: date }
+        time: { type: [string, 'null'], description: "HH:MM" }
+        account_id: { type: string, format: uuid }
+        currency: { type: string, description: The account's currency }
+        amount: { type: number, description: In the account's currency; positive, except an adjustment which carries its sign }
+        category_id: { type: [string, 'null'], format: uuid }
+        merchant: { type: string }
+        merchant_key: { type: string }
+        name: { type: string }
+        receipt_amount: { type: [number, 'null'] }
+        receipt_currency: { type: [string, 'null'] }
+        fx_note: { type: string }
+        adjusts_id: { type: [string, 'null'], format: uuid }
+        trip: { type: string }
+        note: { type: string }
+        source: { type: string, enum: [manual, text, receipt, api, import] }
+        status: { type: string, enum: [posted, pending] }
+        external_id: { type: [string, 'null'] }
+        final_amount: { type: number, description: amount plus its adjustments }
+        adjustments: { type: array, items: { $ref: '#/components/schemas/MoneyAdjustment' } }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    MoneyInboxRow:
+      allOf:
+        - { $ref: '#/components/schemas/MoneyTransaction' }
+        - type: object
+          required: [possible_duplicate]
+          properties:
+            possible_duplicate: { type: boolean, description: A posted row of the same account, type and amount within a day }
+    MoneyTransactionInput:
+      type: object
+      required: [date, account_id, amount, name]
+      description: An income or expense needs a category of its kind; an fx_adjustment needs adjusts_id on the same account and may be negative
+      properties:
+        type: { $ref: '#/components/schemas/MoneyTransactionType' }
+        date: { type: string, format: date }
+        time: { type: [string, 'null'], pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$' }
+        account_id: { type: string, format: uuid }
+        amount: { type: number }
+        category_id: { type: [string, 'null'], format: uuid }
+        merchant: { type: string, maxLength: 200 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        receipt_amount: { type: [number, 'null'], exclusiveMinimum: 0 }
+        receipt_currency: { type: [string, 'null'], pattern: '^[A-Z]{3}$' }
+        fx_note: { type: string, maxLength: 200 }
+        adjusts_id: { type: [string, 'null'], format: uuid }
+        trip: { type: string, maxLength: 60 }
+        note: { type: string, maxLength: 2000 }
+        source: { type: string, enum: [manual, text, receipt, api, import], default: manual }
+        status: { type: string, enum: [posted, pending], default: posted }
+        external_id: { type: [string, 'null'], maxLength: 120 }
+    MoneyTransactionPatch:
+      type: object
+      description: type, adjusts_id, status and source do not change; an adjustment accepts amount and note only
+      properties:
+        date: { type: string, format: date }
+        time: { type: [string, 'null'] }
+        account_id: { type: string, format: uuid }
+        amount: { type: number }
+        category_id: { type: string, format: uuid }
+        merchant: { type: string, maxLength: 200 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        receipt_amount: { type: [number, 'null'], exclusiveMinimum: 0 }
+        receipt_currency: { type: [string, 'null'], pattern: '^[A-Z]{3}$' }
+        fx_note: { type: string, maxLength: 200 }
+        trip: { type: string, maxLength: 60 }
+        note: { type: string, maxLength: 2000 }
+    MoneyTransfer:
+      type: object
+      required: [id, date, from_account_id, to_account_id, from_currency, to_currency, amount_sent, amount_received, fee, cost_rate, name, note, external_id, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        date: { type: string, format: date }
+        from_account_id: { type: string, format: uuid }
+        to_account_id: { type: string, format: uuid }
+        from_currency: { type: string }
+        to_currency: { type: string }
+        amount_sent: { type: number }
+        amount_received: { type: [number, 'null'], description: Null when both accounts share a currency }
+        fee: { type: [number, 'null'], description: In the source currency }
+        cost_rate: { type: [number, 'null'], description: amount_sent / amount_received }
+        name: { type: string }
+        note: { type: string }
+        external_id: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    MoneyTransferInput:
+      type: object
+      required: [date, from_account_id, to_account_id, amount_sent]
+      properties:
+        date: { type: string, format: date }
+        from_account_id: { type: string, format: uuid }
+        to_account_id: { type: string, format: uuid }
+        amount_sent: { type: number, exclusiveMinimum: 0 }
+        amount_received: { type: [number, 'null'], exclusiveMinimum: 0, description: Required across currencies, forbidden within one }
+        fee: { type: [number, 'null'], minimum: 0 }
+        name: { type: string, maxLength: 200 }
+        note: { type: string, maxLength: 2000 }
+        external_id: { type: [string, 'null'], maxLength: 120 }
+    MoneyTransferPatch:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        amount_sent: { type: number, exclusiveMinimum: 0 }
+        amount_received: { type: [number, 'null'], exclusiveMinimum: 0 }
+        fee: { type: [number, 'null'], minimum: 0 }
+        name: { type: string, maxLength: 200 }
+        note: { type: string, maxLength: 2000 }
+    MoneyMerchant:
+      type: object
+      required: [merchant_key, display_name, category_id, account_id, times, last_seen]
+      properties:
+        merchant_key: { type: string }
+        display_name: { type: string }
+        category_id: { type: [string, 'null'], format: uuid }
+        account_id: { type: [string, 'null'], format: uuid }
+        times: { type: integer }
+        last_seen: { type: string, format: date }
+    MoneyRate:
+      type: object
+      required: [quote, per_usd, rate_date, source]
+      properties:
+        quote: { type: string }
+        per_usd: { type: number, description: Units of the quote per 1 USD }
+        rate_date: { type: string, format: date, description: The day the quote is from, on or before the day asked }
+        source: { type: string }
+    MoneyConversion:
+      type: object
+      required: [amount, from, to, rate_date, rates]
+      properties:
+        amount: { type: number }
+        from: { type: string }
+        to: { type: string }
+        rate_date: { type: string, format: date }
+        rates: { type: object, additionalProperties: { $ref: '#/components/schemas/MoneyRate' } }
+    MoneyCategoryTotal:
+      type: object
+      required: [category_id, spent, budget, budget_share]
+      properties:
+        category_id: { type: string }
+        spent: { type: number }
+        budget: { type: [number, 'null'], description: Only when the budget is in this currency }
+        budget_share: { type: [number, 'null'] }
+    MoneyCurrencyBlock:
+      type: object
+      required: [currency, income, expense, net, fixed_expense, fixed_share, avg_daily, projection, prev_expense, median3_expense, categories]
+      properties:
+        currency: { type: string }
+        income: { type: number }
+        expense: { type: number, description: Expenses plus signed adjustments }
+        net: { type: number }
+        fixed_expense: { type: number }
+        fixed_share: { type: number }
+        avg_daily: { type: number, description: expense over the days elapsed, today included }
+        projection: { type: number, description: expense + avg_daily × days after today in the period }
+        prev_expense: { type: [number, 'null'] }
+        median3_expense: { type: [number, 'null'], description: Median of the three periods before }
+        categories: { type: array, items: { $ref: '#/components/schemas/MoneyCategoryTotal' } }
+    MoneyRecurring:
+      type: object
+      required: [merchant_key, currency, amount, times, last_date, next_expected]
+      properties:
+        merchant_key: { type: string }
+        currency: { type: string }
+        amount: { type: number }
+        times: { type: integer }
+        last_date: { type: string, format: date }
+        next_expected: { type: string, format: date }
+    MoneyAsIf:
+      type: object
+      required: [currency, blocks, income, expense, net, partial, unconverted, rates, source]
+      description: Informational only; every number carries the rate's date
+      properties:
+        currency: { type: string }
+        blocks: { type: array, items: { type: object } }
+        income: { type: number }
+        expense: { type: number }
+        net: { type: number }
+        partial: { type: boolean, description: True when a currency had no rate on or before the day }
+        unconverted: { type: integer }
+        rates: { type: object }
+        source: { type: string }
+    MoneyReport:
+      type: object
+      required: [period, blocks, recurring, new_merchants]
+      properties:
+        period:
+          type: object
+          required: [kind, from, to]
+          properties:
+            kind: { type: string, enum: [week, month, quarter, custom] }
+            from: { type: string, format: date }
+            to: { type: string, format: date }
+        blocks: { type: array, items: { $ref: '#/components/schemas/MoneyCurrencyBlock' } }
+        recurring: { type: array, items: { $ref: '#/components/schemas/MoneyRecurring' } }
+        new_merchants: { type: array, items: { type: string } }
+        as_if: { $ref: '#/components/schemas/MoneyAsIf' }
+    MoneyBalanceGroup:
+      type: object
+      required: [currency, total, accounts]
+      properties:
+        currency: { type: string }
+        total: { type: number }
+        accounts: { type: array, items: { $ref: '#/components/schemas/MoneyAccount' } }
+    MoneySettings:
+      type: object
+      required: [view_currency, advisor_enabled, advisor_weekday, advisor_currencies, advisor_note, updated_at]
+      properties:
+        view_currency: { type: [string, 'null'] }
+        advisor_enabled: { type: boolean }
+        advisor_weekday: { type: integer, minimum: 1, maximum: 7, description: 1 = Monday }
+        advisor_currencies: { type: array, items: { type: string } }
+        advisor_note: { type: string }
+        updated_at: { type: [string, 'null'], format: date-time }
+    MoneySettingsInput:
+      type: object
+      properties:
+        view_currency: { type: [string, 'null'], pattern: '^[A-Z]{3}$' }
+        advisor_enabled: { type: boolean, default: false }
+        advisor_weekday: { type: integer, minimum: 1, maximum: 7, default: 1 }
+        advisor_currencies: { type: array, maxItems: 20, items: { type: string, pattern: '^[A-Z]{3}$' } }
+        advisor_note: { type: string, maxLength: 2000 }
+
     FoodParseLine:
       type: object
       required: [name, grams, kcal, protein_g, fat_g, carbs_g, item_id, estimated, note]
@@ -4319,6 +4659,1179 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '404':
           description: Food module disabled, or the job is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/currencies:
+    get:
+      summary: The user's currencies (seeded with the owner's ten on first read)
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: archived, in: query, schema: { type: string, enum: ['true'] }, description: Include archived rows }
+      responses:
+        '200':
+          description: The list
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/MoneyCurrency' } } } }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Add or replace a currency by code
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoneyCurrencyInput' }
+      responses:
+        '200':
+          description: The currency
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyCurrency' } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/currencies/{code}:
+    parameters:
+      - { name: code, in: path, required: true, schema: { type: string, pattern: '^[A-Z]{3}$' } }
+    patch:
+      summary: Change a currency
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoneyCurrencyPatch' }
+      responses:
+        '200':
+          description: The currency
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyCurrency' } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/accounts:
+    get:
+      summary: Accounts with their computed balances
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: archived, in: query, schema: { type: string, enum: ['true'] }, description: Include archived rows }
+      responses:
+        '200':
+          description: The list
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/MoneyAccount' } } } }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Create an account
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoneyAccountInput' }
+      responses:
+        '201':
+          description: The account
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyAccount' } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/accounts/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: One account with its balance
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The account
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyAccount' } } }
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    patch:
+      summary: Change an account; its currency never changes
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoneyAccountPatch' }
+      responses:
+        '200':
+          description: The account
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyAccount' } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete an unused account, or archive one with rows
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Deleted or archived (outcome)
+          content:
+            application/json:
+              schema: { type: object, required: [message, outcome], properties: { message: { type: string }, outcome: { type: string, enum: [deleted, archived] } } }
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/categories:
+    get:
+      summary: Categories with their budgets
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: archived, in: query, schema: { type: string, enum: ['true'] }, description: Include archived rows }
+      responses:
+        '200':
+          description: The list
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/MoneyCategory' } } } }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Create a category
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoneyCategoryInput' }
+      responses:
+        '201':
+          description: The category
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyCategory' } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/categories/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: One category
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The category
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyCategory' } } }
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    patch:
+      summary: Change a category or its budget (amount and currency together)
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoneyCategoryPatch' }
+      responses:
+        '200':
+          description: The category
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyCategory' } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete an unused category, or archive one with rows
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Deleted or archived (outcome)
+          content:
+            application/json:
+              schema: { type: object, required: [message, outcome], properties: { message: { type: string }, outcome: { type: string, enum: [deleted, archived] } } }
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/transactions:
+    get:
+      summary: The ledger, newest first
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: account, in: query, schema: { type: string, format: uuid } }
+        - { name: category, in: query, schema: { type: string, format: uuid } }
+        - { name: currency, in: query, schema: { type: string, pattern: '^[A-Z]{3}$' } }
+        - { name: type, in: query, schema: { $ref: '#/components/schemas/MoneyTransactionType' } }
+        - { name: status, in: query, schema: { type: string, enum: [posted, pending] } }
+        - { name: trip, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string }, description: Over name and merchant }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200':
+          description: A page
+          content:
+            application/json:
+              schema: { type: object, required: [data, total, limit, offset], properties: { data: { type: array, items: { $ref: '#/components/schemas/MoneyTransaction' } }, total: { type: integer }, limit: { type: integer }, offset: { type: integer } } }
+        '400':
+          description: A bad filter
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Add an income, an expense or an fx_adjustment
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoneyTransactionInput' }
+      responses:
+        '201':
+          description: The row
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyTransaction' } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/transactions/batch:
+    post:
+      summary: Add up to 100 rows in one database transaction (all or nothing)
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [transactions], properties: { transactions: { type: array, minItems: 1, maxItems: 100, items: { $ref: '#/components/schemas/MoneyTransactionInput' } } } }
+      responses:
+        '201':
+          description: The rows
+          content:
+            application/json:
+              schema: { type: object, required: [data, count], properties: { data: { type: array, items: { $ref: '#/components/schemas/MoneyTransaction' } }, count: { type: integer } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/transactions/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: One row with its adjustments and final amount
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The row
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyTransaction' } } }
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    patch:
+      summary: Change a row; an adjustment changes amount and note only
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoneyTransactionPatch' }
+      responses:
+        '200':
+          description: The row
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyTransaction' } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a row and, with it, its adjustments
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/transactions/{id}/confirm:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Post a pending row; the merchant memory learns from it
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The row
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyTransaction' } } }
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/inbox:
+    get:
+      summary: Pending rows with the possible_duplicate flag
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The rows
+          content:
+            application/json:
+              schema: { type: object, required: [data, count], properties: { data: { type: array, items: { $ref: '#/components/schemas/MoneyInboxRow' } }, count: { type: integer } } }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/transfers:
+    get:
+      summary: Transfers and exchanges, newest first
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: account, in: query, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200':
+          description: The rows
+          content:
+            application/json:
+              schema: { type: object, required: [data, count], properties: { data: { type: array, items: { $ref: '#/components/schemas/MoneyTransfer' } }, count: { type: integer } } }
+        '400':
+          description: A bad filter
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Add a transfer or an exchange (one row, sent and received)
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoneyTransferInput' }
+      responses:
+        '201':
+          description: The transfer
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyTransfer' } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/transfers/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: One transfer
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The transfer
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyTransfer' } } }
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    patch:
+      summary: Change a transfer's amounts, fee, date, name or note
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoneyTransferPatch' }
+      responses:
+        '200':
+          description: The transfer
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyTransfer' } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a transfer
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/merchants:
+    get:
+      summary: Merchant suggestions, most used first, with the remembered category
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 300, default: 20 } }
+      responses:
+        '200':
+          description: The rows
+          content:
+            application/json:
+              schema: { type: object, required: [data, count], properties: { data: { type: array, items: { $ref: '#/components/schemas/MoneyMerchant' } }, count: { type: integer } } }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/merchants/{key}:
+    parameters:
+      - { name: key, in: path, required: true, schema: { type: string } }
+    patch:
+      summary: Change what a merchant means from now on
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [category_id], properties: { category_id: { type: [string, 'null'], format: uuid } } }
+      responses:
+        '200':
+          description: The merchant
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyMerchant' } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/rates:
+    get:
+      summary: A quote against the US dollar on the day or the nearest earlier one
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: date, in: query, schema: { type: string, format: date }, description: Defaults to today (UTC) }
+        - { name: quote, in: query, required: true, schema: { type: string, pattern: '^[A-Z]{3}$' } }
+      responses:
+        '200':
+          description: The rate
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyRate' } } }
+        '400':
+          description: A bad query
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or no rate on or before the day (no_rate)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/rates/convert:
+    get:
+      summary: An informational conversion with the rate and its date; nothing is stored
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: amount, in: query, required: true, schema: { type: number } }
+        - { name: from, in: query, required: true, schema: { type: string, pattern: '^[A-Z]{3}$' } }
+        - { name: to, in: query, required: true, schema: { type: string, pattern: '^[A-Z]{3}$' } }
+        - { name: date, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: The number
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyConversion' } } }
+        '400':
+          description: A bad query
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled, or no rate (no_rate)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/rates/refresh:
+    post:
+      summary: Enqueue today's rates fetch (money_rates job)
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { type: object, required: [job_id, status], properties: { job_id: { type: string }, status: { type: string, enum: [queued] } } } } }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: The job queue is not available (queue_unavailable)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/reports/period:
+    get:
+      summary: A period's numbers per currency, never summed across; as_if adds a converted block with its rates
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: kind, in: query, schema: { type: string, enum: [week, month, quarter, custom], default: month } }
+        - { name: date, in: query, schema: { type: string, format: date }, description: A day of the period (week, month, quarter); defaults to today }
+        - { name: from, in: query, schema: { type: string, format: date }, description: Custom period start }
+        - { name: to, in: query, schema: { type: string, format: date }, description: Custom period end }
+        - { name: as_if, in: query, schema: { type: string, pattern: '^[A-Z]{3}$' }, description: Defaults to the settings' view_currency }
+      responses:
+        '200':
+          description: The report
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneyReport' } } }
+        '400':
+          description: A bad period or currency
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/reports/balances:
+    get:
+      summary: Accounts and balances grouped by currency
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: archived, in: query, schema: { type: string, enum: ['true'] }, description: Include archived rows }
+      responses:
+        '200':
+          description: The groups
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/MoneyBalanceGroup' } } } }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/money/settings:
+    get:
+      summary: The view currency and the advisor settings
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The settings
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneySettings' } } }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    put:
+      summary: Replace the settings
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoneySettingsInput' }
+      responses:
+        '200':
+          description: The settings
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/MoneySettings' } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

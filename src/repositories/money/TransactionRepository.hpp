@@ -289,7 +289,8 @@ public:
                 " COALESCE(c.flexibility, 'variable') AS flexibility, t.merchant_key, t.amount "
                 " FROM money_transactions t JOIN money_accounts a ON a.id = t.account_id "
                 " LEFT JOIN money_categories c ON c.id = t.category_id "
-                " WHERE t.owner_id = $1::uuid AND t.status = 'posted' AND t.date BETWEEN $2::date AND $3::date) t",
+                " WHERE t.owner_id = $1::uuid AND t.status = 'posted' AND t.date BETWEEN $2::date AND $3::date "
+                " ORDER BY t.date, t.created_at, t.id) t",
                 owner,
                 from,
                 to);

@@ -1,0 +1,1235 @@
+/**
+ * @file MoneyController.cpp
+ * @brief Handlers of /api/v1/money/*. Validation names the field and mirrors
+ *        the table CHECKs; the repositories' Invariant is the second line
+ *        of defence and answers 400 too.
+ */
+
+#include "api/MoneyController.hpp"
+
+#include <algorithm>
+#include <map>
+#include <optional>
+#include <regex>
+#include <set>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+#include <drogon/drogon.h>
+#include <spdlog/spdlog.h>
+
+#include <nlohmann/json.hpp>
+
+#include "api/FieldChecks.hpp"
+#include "api/Guards.hpp"
+#include "api/HandlerSupport.hpp"
+#include "api/RequestUtils.hpp"
+#include "api/Validation.hpp"
+#include "core/Modules.hpp"
+#include "jobs/Jobs.hpp"
+#include "jobs/MoneyRatesHandler.hpp"
+#include "money/Period.hpp"
+#include "money/Rates.hpp"
+#include "money/Reports.hpp"
+#include "repositories/money/AccountRepository.hpp"
+#include "repositories/money/CategoryRepository.hpp"
+#include "repositories/money/CurrencyRepository.hpp"
+#include "repositories/money/Errors.hpp"
+#include "repositories/money/FxRateRepository.hpp"
+#include "repositories/money/MerchantRepository.hpp"
+#include "repositories/money/SettingsRepository.hpp"
+#include "repositories/money/TransactionRepository.hpp"
+#include "repositories/money/TransferRepository.hpp"
+#include "utils/ErrorResponse.hpp"
+
+namespace Api {
+
+namespace {
+
+using json = nlohmann::json;
+namespace Repo = Repositories::Money;
+
+using Api::Fields::date_field;
+using Api::Fields::is_calendar_date;
+using Api::Fields::number_range;
+using Api::Fields::opt_int;
+using Api::Fields::opt_number;
+using Api::Fields::text_length;
+using Api::Fields::today_utc;
+
+constexpr int kDefaultLimit = 50;
+constexpr int kMaxLimit = 200;
+constexpr std::size_t kBatchMax = 100;
+constexpr double kAmountMax = 1e12;
+constexpr std::size_t kNameMax = 200;
+constexpr std::size_t kNoteMax = 2000;
+
+const std::vector<std::string> kTypes = {"income", "expense", "fx_adjustment"};
+const std::vector<std::string> kKinds = {"expense", "income"};
+const std::vector<std::string> kFlex = {"fixed", "variable"};
+const std::vector<std::string> kAccountKinds = {"card", "cash", "deposit", "other"};
+const std::vector<std::string> kRoles = {"primary", "local"};
+const std::vector<std::string> kSources = {"manual", "text", "receipt", "api", "import"};
+const std::vector<std::string> kStatuses = {"posted", "pending"};
+const std::vector<std::string> kPeriodKinds = {"week", "month", "quarter", "custom"};
+const std::regex kCodeRe(R"(^[A-Z]{3}$)");
+const std::regex kLast4Re(R"(^[0-9]{0,4}$)");
+
+/// Rows belong to an app user; a static-bearer principal has no user id.
+bool require_user(const std::string& owner, const MoneyController::Callback& callback) {
+    if (is_valid_uuid(owner)) {
+        return true;
+    }
+    callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
+    return false;
+}
+
+bool require_valid_uuid(const std::string& id, const MoneyController::Callback& callback) {
+    if (is_valid_uuid(id)) {
+        return true;
+    }
+    callback(ErrorResponse::bad_request("invalid_id", "id must be a UUID"));
+    return false;
+}
+
+std::optional<std::string> query_param(const HttpRequestPtr& req, const char* name) {
+    const std::string v = req->getParameter(name);
+    if (v.empty()) {
+        return std::nullopt;
+    }
+    return v;
+}
+
+void code_field(Validation::Errors& errs, const json& body, const std::string& field) {
+    if (!body.contains(field) || body[field].is_null()) {
+        return;
+    }
+    if (!body[field].is_string() || !std::regex_match(body[field].get<std::string>(), kCodeRe)) {
+        errs.add(field, "bad_format", "expected an ISO code like KZT");
+    }
+}
+
+void uuid_field(Validation::Errors& errs, const json& body, const std::string& field) {
+    if (body.contains(field) && !body[field].is_null()) {
+        Validation::uuid(errs, body, field);
+    }
+}
+
+/// Reads the owner's settings for the "as if" currency the pages remember.
+std::optional<std::string> view_currency(const std::string& owner) {
+    const json s = Repo::SettingsRepository().load(owner);
+    if (s["view_currency"].is_string()) {
+        return s["view_currency"].get<std::string>();
+    }
+    return std::nullopt;
+}
+
+// ── transactions ────────────────────────────────────────────────────────────
+
+/// The body as a repository Input; false with the errors recorded.
+bool transaction_input(const json& body,
+                       const std::string& prefix,
+                       Validation::Errors& errs,
+                       Repo::TransactionRepository::Input& out) {
+    const auto at = [&](const char* f) { return prefix + f; };
+    if (!body.is_object()) {
+        errs.add(prefix.empty() ? "body" : prefix, "invalid", "must be an object");
+        return false;
+    }
+    Validation::Errors local;
+    if (body.contains("type")) {
+        Validation::one_of(local, body, "type", kTypes);
+    }
+    Validation::require_string(local, body, "date");
+    date_field(local, body, "date");
+    if (body.contains("time") && !body["time"].is_null()) {
+        Validation::regex_match(local, body, "time", std::regex(R"(^([01]\d|2[0-3]):[0-5]\d$)"), "expected HH:MM");
+    }
+    Validation::require_string(local, body, "account_id");
+    Validation::uuid(local, body, "account_id");
+    Validation::require(local, body, "amount");
+    number_range(local, body, "amount", -kAmountMax, kAmountMax);
+    uuid_field(local, body, "category_id");
+    uuid_field(local, body, "adjusts_id");
+    text_length(local, body, "merchant", 0, kNameMax);
+    Validation::require_string(local, body, "name");
+    text_length(local, body, "name", 1, kNameMax);
+    number_range(local, body, "receipt_amount", 0.0001, kAmountMax);
+    code_field(local, body, "receipt_currency");
+    if ((body.contains("receipt_amount") && !body["receipt_amount"].is_null()) !=
+        (body.contains("receipt_currency") && !body["receipt_currency"].is_null())) {
+        local.add("receipt_currency", "invariant", "the receipt's amount and currency go together");
+    }
+    text_length(local, body, "fx_note", 0, 200);
+    text_length(local, body, "trip", 0, 60);
+    text_length(local, body, "note", 0, kNoteMax);
+    if (body.contains("source")) {
+        Validation::one_of(local, body, "source", kSources);
+    }
+    if (body.contains("status")) {
+        Validation::one_of(local, body, "status", kStatuses);
+    }
+    text_length(local, body, "external_id", 1, 120);
+    if (local.any()) {
+        for (const auto& e : local.errors_json()) {
+            errs.add(at(e.value("field", "").c_str()), e.value("code", ""), e.value("message", ""));
+        }
+        return false;
+    }
+    out.type = body.value("type", "expense");
+    out.date = body["date"].get<std::string>();
+    out.time = Validation::opt_string(body, "time");
+    out.account_id = body["account_id"].get<std::string>();
+    out.amount = body["amount"].get<double>();
+    out.category_id = Validation::opt_string(body, "category_id");
+    out.merchant = Validation::opt_string(body, "merchant").value_or("");
+    out.name = body["name"].get<std::string>();
+    out.receipt_amount = opt_number(body, "receipt_amount");
+    out.receipt_currency = Validation::opt_string(body, "receipt_currency");
+    out.fx_note = Validation::opt_string(body, "fx_note").value_or("");
+    out.adjusts_id = Validation::opt_string(body, "adjusts_id");
+    out.trip = Validation::opt_string(body, "trip").value_or("");
+    out.note = Validation::opt_string(body, "note").value_or("");
+    out.source = body.value("source", "manual");
+    out.status = body.value("status", "posted");
+    out.external_id = Validation::opt_string(body, "external_id");
+    return true;
+}
+
+Repo::TransactionRepository::Filter transaction_filter(const HttpRequestPtr& req) {
+    Repo::TransactionRepository::Filter f;
+    f.from = query_param(req, "from");
+    f.to = query_param(req, "to");
+    f.account_id = query_param(req, "account");
+    f.category_id = query_param(req, "category");
+    f.currency = query_param(req, "currency");
+    f.type = query_param(req, "type");
+    f.status = query_param(req, "status");
+    f.trip = query_param(req, "trip");
+    f.q = req->getParameter("q");
+    const auto page = parse_page_params(req, kDefaultLimit, kMaxLimit);
+    f.limit = page.limit;
+    f.offset = page.offset;
+    return f;
+}
+
+std::optional<HttpResponsePtr> filter_problem(const Repo::TransactionRepository::Filter& f) {
+    if ((f.from && !is_calendar_date(*f.from)) || (f.to && !is_calendar_date(*f.to))) {
+        return ErrorResponse::bad_request("invalid_date", "from and to must be calendar days as YYYY-MM-DD");
+    }
+    if ((f.account_id && !is_valid_uuid(*f.account_id)) || (f.category_id && !is_valid_uuid(*f.category_id))) {
+        return ErrorResponse::bad_request("invalid_id", "account and category must be UUIDs");
+    }
+    if (f.currency && !std::regex_match(*f.currency, kCodeRe)) {
+        return ErrorResponse::bad_request("invalid_currency", "currency must be an ISO code");
+    }
+    if (f.type && std::find(kTypes.begin(), kTypes.end(), *f.type) == kTypes.end()) {
+        return ErrorResponse::bad_request("invalid_type", "type must be income, expense or fx_adjustment");
+    }
+    if (f.status && std::find(kStatuses.begin(), kStatuses.end(), *f.status) == kStatuses.end()) {
+        return ErrorResponse::bad_request("invalid_status", "status must be posted or pending");
+    }
+    return std::nullopt;
+}
+
+// ── reports ─────────────────────────────────────────────────────────────────
+
+Money::Reports::Row report_row(const json& r) {
+    Money::Reports::Row row;
+    row.date = r.value("date", "");
+    row.currency = r.value("currency", "");
+    row.type = r.value("type", "");
+    row.category_id = r["category_id"].is_string() ? r["category_id"].get<std::string>() : "";
+    row.category_kind = r.value("category_kind", "");
+    row.flexibility = r.value("flexibility", "variable");
+    row.merchant_key = r.value("merchant_key", "");
+    row.amount = r.value("amount", 0.0);
+    return row;
+}
+
+std::vector<Money::Reports::Row> rows_of(Repo::TransactionRepository& repo,
+                                         const std::string& owner,
+                                         const Money::Period::Range& range) {
+    std::vector<Money::Reports::Row> out;
+    for (const auto& r : repo.report_rows(owner, range.from, range.to)) {
+        out.push_back(report_row(r));
+    }
+    return out;
+}
+
+json block_json(const Money::Reports::CurrencyBlock& b) {
+    json categories = json::array();
+    for (const auto& c : b.categories) {
+        categories.push_back({{"category_id", c.category_id},
+                              {"spent", c.spent},
+                              {"budget", c.budget ? json(*c.budget) : json()},
+                              {"budget_share", c.budget_share ? json(*c.budget_share) : json()}});
+    }
+    return {{"currency", b.currency},
+            {"income", b.income},
+            {"expense", b.expense},
+            {"net", b.net},
+            {"fixed_expense", b.fixed_expense},
+            {"fixed_share", b.fixed_share},
+            {"avg_daily", b.avg_daily},
+            {"projection", b.projection},
+            {"prev_expense", b.prev_expense ? json(*b.prev_expense) : json()},
+            {"median3_expense", b.median3_expense ? json(*b.median3_expense) : json()},
+            {"categories", categories}};
+}
+
+/// The blocks "as if" in one currency, with the rates used and what could not be converted.
+json as_if_json(const Money::Reports::Report& report, const std::string& target, const std::string& on_date) {
+    Repo::FxRateRepository rates;
+    const auto to = rates.nearest(on_date, target);
+    json blocks = json::array();
+    json used = json::object();
+    int unconverted = 0;
+    double income = 0, expense = 0;
+    for (const auto& b : report.blocks) {
+        const auto from = rates.nearest(on_date, b.currency);
+        if (!to || !from) {
+            ++unconverted;
+            continue;
+        }
+        const Money::Rates::Rate f{from->date, from->quote, from->per_usd};
+        const Money::Rates::Rate t{to->date, to->quote, to->per_usd};
+        const auto inc = Money::Rates::convert(b.income, &f, &t);
+        const auto exp = Money::Rates::convert(b.expense, &f, &t);
+        if (!inc || !exp) {
+            ++unconverted;
+            continue;
+        }
+        income += inc->amount;
+        expense += exp->amount;
+        json categories = json::array();
+        for (const auto& c : b.categories) {
+            categories.push_back(
+                {{"category_id", c.category_id}, {"spent", Money::Rates::convert(c.spent, &f, &t)->amount}});
+        }
+        blocks.push_back({{"currency", b.currency},
+                          {"income", inc->amount},
+                          {"expense", exp->amount},
+                          {"net", inc->amount - exp->amount},
+                          {"rate_date", inc->rate_date},
+                          {"categories", categories}});
+        used[b.currency] = {{"per_usd", from->per_usd}, {"date", from->date}};
+    }
+    if (to) {
+        used[target] = {{"per_usd", to->per_usd}, {"date", to->date}};
+    }
+    return {{"currency", target},
+            {"blocks", blocks},
+            {"income", income},
+            {"expense", expense},
+            {"net", income - expense},
+            {"partial", unconverted > 0 || !to},
+            {"unconverted", unconverted},
+            {"rates", used},
+            {"source", "fawazahmed0/currency-api (CC0)"}};
+}
+
+}  // namespace
+
+#define MONEY_GUARD(req, callback, owner)    \
+    if (!require_enabled(callback))          \
+        return;                              \
+    API_REQUIRE_OWNER(req, callback, owner); \
+    if (!require_user(owner, callback))      \
+    return
+
+bool MoneyController::require_enabled(const Callback& callback) {
+    if (Core::money_enabled()) {
+        return true;
+    }
+    callback(ErrorResponse::not_found("money"));
+    return false;
+}
+
+// ── currencies ──────────────────────────────────────────────────────────────
+
+void MoneyController::listCurrencies(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    with_repo_errors(callback, "money.listCurrencies", [&] {
+        Repo::CurrencyRepository repo;
+        repo.seed_defaults(owner);
+        callback(Response::ok(json{{"data", repo.list(owner, req->getParameter("archived") == "true")}}));
+    });
+}
+
+void MoneyController::upsertCurrency(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    Validation::require_string(errs, body, "code");
+    code_field(errs, body, "code");
+    text_length(errs, body, "name", 0, 60);
+    if (body.contains("role") && !body["role"].is_null()) {
+        Validation::one_of(errs, body, "role", kRoles);
+    }
+    Validation::int_range(errs, body, "decimals", 0, 4);
+    Validation::boolean(errs, body, "archived");
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    Repo::CurrencyRepository::Input in;
+    in.name = Validation::opt_string(body, "name").value_or("");
+    in.role = Validation::opt_string(body, "role");
+    in.decimals = opt_int(body, "decimals").value_or(2);
+    in.archived = body.value("archived", false);
+    with_repo_errors(callback, "money.upsertCurrency", [&] {
+        callback(Response::ok(json{{"data", Repo::CurrencyRepository().upsert(owner, body["code"], in)}}));
+    });
+}
+
+void MoneyController::patchCurrency(const HttpRequestPtr& req, Callback&& callback, const std::string& code) {
+    MONEY_GUARD(req, callback, owner);
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    text_length(errs, body, "name", 0, 60);
+    if (body.contains("role") && !body["role"].is_null()) {
+        Validation::one_of(errs, body, "role", kRoles);
+    }
+    Validation::int_range(errs, body, "decimals", 0, 4);
+    Validation::boolean(errs, body, "archived");
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    Repo::CurrencyRepository::Patch p;
+    p.name = Validation::opt_string(body, "name");
+    if (body.contains("role")) {
+        p.role = Validation::opt_string(body, "role");
+    }
+    p.decimals = opt_int(body, "decimals");
+    if (body.contains("archived") && body["archived"].is_boolean()) {
+        p.archived = body["archived"].get<bool>();
+    }
+    with_repo_errors(callback, "money.patchCurrency", [&] {
+        callback(Response::ok(json{{"data", Repo::CurrencyRepository().patch(owner, code, p)}}));
+    });
+}
+
+// ── accounts ────────────────────────────────────────────────────────────────
+
+namespace {
+
+void account_fields(Validation::Errors& errs, const json& body) {
+    text_length(errs, body, "name", 1, 120);
+    text_length(errs, body, "bank", 0, 60);
+    if (body.contains("kind")) {
+        Validation::one_of(errs, body, "kind", kAccountKinds);
+    }
+    code_field(errs, body, "currency");
+    if (body.contains("last4") && !body["last4"].is_null()) {
+        Validation::regex_match(errs, body, "last4", kLast4Re, "up to four digits");
+    }
+    number_range(errs, body, "opening_balance", -kAmountMax, kAmountMax);
+    date_field(errs, body, "opening_date");
+    Validation::int_range(errs, body, "position", 0, 10000);
+    Validation::boolean(errs, body, "archived");
+}
+
+}  // namespace
+
+void MoneyController::listAccounts(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    with_repo_errors(callback, "money.listAccounts", [&] {
+        callback(Response::ok(
+            json{{"data", Repo::AccountRepository().list(owner, req->getParameter("archived") == "true")}}));
+    });
+}
+
+void MoneyController::createAccount(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    Validation::require_string(errs, body, "name");
+    Validation::require_string(errs, body, "currency");
+    account_fields(errs, body);
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    Repo::AccountRepository::Input in;
+    in.name = body["name"];
+    in.bank = Validation::opt_string(body, "bank").value_or("");
+    in.kind = body.value("kind", "card");
+    in.currency = body["currency"];
+    in.last4 = Validation::opt_string(body, "last4").value_or("");
+    in.opening_balance = opt_number(body, "opening_balance").value_or(0);
+    in.opening_date = Validation::opt_string(body, "opening_date");
+    in.position = opt_int(body, "position").value_or(0);
+    with_repo_errors(callback, "money.createAccount", [&] {
+        callback(Response::created(json{{"data", Repo::AccountRepository().create(owner, in)}}));
+    });
+}
+
+void MoneyController::getAccount(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MONEY_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "money.getAccount", [&] {
+        const auto row = Repo::AccountRepository().find(owner, id);
+        if (!row) {
+            callback(ErrorResponse::not_found("money_account"));
+            return;
+        }
+        callback(Response::ok(json{{"data", *row}}));
+    });
+}
+
+void MoneyController::updateAccount(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MONEY_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    account_fields(errs, body);
+    if (body.contains("currency")) {
+        errs.add("currency", "invariant", "the currency of an account does not change: its rows are in it");
+    }
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    Repo::AccountRepository::Patch p;
+    p.name = Validation::opt_string(body, "name");
+    p.bank = Validation::opt_string(body, "bank");
+    p.kind = Validation::opt_string(body, "kind");
+    p.last4 = Validation::opt_string(body, "last4");
+    p.opening_balance = opt_number(body, "opening_balance");
+    if (body.contains("opening_date")) {
+        p.opening_date = Validation::opt_string(body, "opening_date");
+    }
+    if (body.contains("archived") && body["archived"].is_boolean()) {
+        p.archived = body["archived"].get<bool>();
+    }
+    p.position = opt_int(body, "position");
+    with_repo_errors(callback, "money.updateAccount", [&] {
+        callback(Response::ok(json{{"data", Repo::AccountRepository().update(owner, id, p)}}));
+    });
+}
+
+void MoneyController::deleteAccount(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MONEY_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "money.deleteAccount", [&] {
+        const std::string outcome = Repo::AccountRepository().remove(owner, id);
+        callback(Response::ok(json{{"message", outcome}, {"outcome", outcome}}));
+    });
+}
+
+// ── categories ──────────────────────────────────────────────────────────────
+
+namespace {
+
+void category_fields(Validation::Errors& errs, const json& body) {
+    text_length(errs, body, "name", 1, 60);
+    if (body.contains("kind")) {
+        Validation::one_of(errs, body, "kind", kKinds);
+    }
+    if (body.contains("flexibility")) {
+        Validation::one_of(errs, body, "flexibility", kFlex);
+    }
+    number_range(errs, body, "budget_max", 0.0001, kAmountMax);
+    code_field(errs, body, "budget_currency");
+    const bool has_max = body.contains("budget_max") && !body["budget_max"].is_null();
+    const bool has_cur = body.contains("budget_currency") && !body["budget_currency"].is_null();
+    if (has_max != has_cur) {
+        errs.add("budget_currency", "invariant", "a budget is an amount and a currency together");
+    }
+    Validation::int_range(errs, body, "position", 0, 10000);
+    Validation::boolean(errs, body, "archived");
+}
+
+}  // namespace
+
+void MoneyController::listCategories(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    with_repo_errors(callback, "money.listCategories", [&] {
+        callback(Response::ok(
+            json{{"data", Repo::CategoryRepository().list(owner, req->getParameter("archived") == "true")}}));
+    });
+}
+
+void MoneyController::createCategory(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    Validation::require_string(errs, body, "name");
+    category_fields(errs, body);
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    Repo::CategoryRepository::Input in;
+    in.name = body["name"];
+    in.kind = body.value("kind", "expense");
+    in.flexibility = body.value("flexibility", "variable");
+    in.budget_max = opt_number(body, "budget_max");
+    in.budget_currency = Validation::opt_string(body, "budget_currency");
+    in.position = opt_int(body, "position").value_or(0);
+    with_repo_errors(callback, "money.createCategory", [&] {
+        callback(Response::created(json{{"data", Repo::CategoryRepository().create(owner, in)}}));
+    });
+}
+
+void MoneyController::getCategory(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MONEY_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "money.getCategory", [&] {
+        const auto row = Repo::CategoryRepository().find(owner, id);
+        if (!row) {
+            callback(ErrorResponse::not_found("money_category"));
+            return;
+        }
+        callback(Response::ok(json{{"data", *row}}));
+    });
+}
+
+void MoneyController::updateCategory(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MONEY_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    category_fields(errs, body);
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    Repo::CategoryRepository::Patch p;
+    p.name = Validation::opt_string(body, "name");
+    p.kind = Validation::opt_string(body, "kind");
+    p.flexibility = Validation::opt_string(body, "flexibility");
+    if (body.contains("budget_max") || body.contains("budget_currency")) {
+        p.budget_max = opt_number(body, "budget_max");
+        p.budget_currency = Validation::opt_string(body, "budget_currency");
+    }
+    if (body.contains("archived") && body["archived"].is_boolean()) {
+        p.archived = body["archived"].get<bool>();
+    }
+    p.position = opt_int(body, "position");
+    with_repo_errors(callback, "money.updateCategory", [&] {
+        callback(Response::ok(json{{"data", Repo::CategoryRepository().update(owner, id, p)}}));
+    });
+}
+
+void MoneyController::deleteCategory(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MONEY_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "money.deleteCategory", [&] {
+        const std::string outcome = Repo::CategoryRepository().remove(owner, id);
+        callback(Response::ok(json{{"message", outcome}, {"outcome", outcome}}));
+    });
+}
+
+// ── transactions ────────────────────────────────────────────────────────────
+
+void MoneyController::listTransactions(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    const auto f = transaction_filter(req);
+    if (const auto problem = filter_problem(f)) {
+        callback(*problem);
+        return;
+    }
+    with_repo_errors(callback, "money.listTransactions", [&] {
+        const auto page = Repo::TransactionRepository().list(owner, f);
+        callback(Response::paginated(page.rows, page.total, static_cast<int>(f.limit), static_cast<int>(f.offset)));
+    });
+}
+
+void MoneyController::createTransaction(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    Repo::TransactionRepository::Input in;
+    if (!transaction_input(body, "", errs, in)) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    with_repo_errors(callback, "money.createTransaction", [&] {
+        callback(Response::created(json{{"data", Repo::TransactionRepository().create(owner, in)}}));
+    });
+}
+
+void MoneyController::createTransactions(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    if (!body.contains("transactions") || !body["transactions"].is_array() || body["transactions"].empty() ||
+        body["transactions"].size() > kBatchMax) {
+        callback(ErrorResponse::bad_request("invalid_batch", "transactions must hold 1..100 rows"));
+        return;
+    }
+    Validation::Errors errs;
+    std::vector<Repo::TransactionRepository::Input> inputs;
+    for (std::size_t i = 0; i < body["transactions"].size(); ++i) {
+        Repo::TransactionRepository::Input in;
+        if (transaction_input(body["transactions"][i], "transactions[" + std::to_string(i) + "].", errs, in)) {
+            inputs.push_back(in);
+        }
+    }
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    with_repo_errors(callback, "money.createTransactions", [&] {
+        const json rows = Repo::TransactionRepository().create_many(owner, inputs);
+        callback(Response::created(json{{"data", rows}, {"count", rows.size()}}));
+    });
+}
+
+void MoneyController::getTransaction(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MONEY_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "money.getTransaction", [&] {
+        const auto row = Repo::TransactionRepository().find(owner, id);
+        if (!row) {
+            callback(ErrorResponse::not_found("money_transaction"));
+            return;
+        }
+        callback(Response::ok(json{{"data", *row}}));
+    });
+}
+
+void MoneyController::updateTransaction(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MONEY_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    date_field(errs, body, "date");
+    if (body.contains("time") && !body["time"].is_null()) {
+        Validation::regex_match(errs, body, "time", std::regex(R"(^([01]\d|2[0-3]):[0-5]\d$)"), "expected HH:MM");
+    }
+    uuid_field(errs, body, "account_id");
+    number_range(errs, body, "amount", -kAmountMax, kAmountMax);
+    uuid_field(errs, body, "category_id");
+    text_length(errs, body, "merchant", 0, kNameMax);
+    text_length(errs, body, "name", 1, kNameMax);
+    number_range(errs, body, "receipt_amount", 0.0001, kAmountMax);
+    code_field(errs, body, "receipt_currency");
+    text_length(errs, body, "fx_note", 0, 200);
+    text_length(errs, body, "trip", 0, 60);
+    text_length(errs, body, "note", 0, kNoteMax);
+    for (const char* fixed : {"type", "adjusts_id", "status", "source"}) {
+        if (body.contains(fixed)) {
+            errs.add(fixed, "invariant", "cannot change on an existing row");
+        }
+    }
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    Repo::TransactionRepository::Patch p;
+    p.date = Validation::opt_string(body, "date");
+    if (body.contains("time")) {
+        p.time = Validation::opt_string(body, "time");
+    }
+    p.account_id = Validation::opt_string(body, "account_id");
+    p.amount = opt_number(body, "amount");
+    p.category_id = Validation::opt_string(body, "category_id");
+    p.merchant = Validation::opt_string(body, "merchant");
+    p.name = Validation::opt_string(body, "name");
+    if (body.contains("receipt_amount") || body.contains("receipt_currency")) {
+        p.receipt_amount = opt_number(body, "receipt_amount");
+        p.receipt_currency = Validation::opt_string(body, "receipt_currency");
+    }
+    p.fx_note = Validation::opt_string(body, "fx_note");
+    p.trip = Validation::opt_string(body, "trip");
+    p.note = Validation::opt_string(body, "note");
+    with_repo_errors(callback, "money.updateTransaction", [&] {
+        callback(Response::ok(json{{"data", Repo::TransactionRepository().update(owner, id, p)}}));
+    });
+}
+
+void MoneyController::deleteTransaction(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MONEY_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "money.deleteTransaction", [&] {
+        Repo::TransactionRepository().remove(owner, id);
+        auto resp = HttpResponse::newHttpResponse();
+        resp->setStatusCode(k204NoContent);
+        callback(resp);
+    });
+}
+
+void MoneyController::confirmTransaction(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MONEY_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "money.confirmTransaction", [&] {
+        callback(Response::ok(json{{"data", Repo::TransactionRepository().confirm(owner, id)}}));
+    });
+}
+
+void MoneyController::inbox(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    with_repo_errors(callback, "money.inbox", [&] {
+        const json rows = Repo::TransactionRepository().inbox(owner);
+        callback(Response::ok(json{{"data", rows}, {"count", rows.size()}}));
+    });
+}
+
+// ── transfers ───────────────────────────────────────────────────────────────
+
+void MoneyController::listTransfers(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    Repo::TransferRepository::Filter f;
+    f.from = query_param(req, "from");
+    f.to = query_param(req, "to");
+    f.account_id = query_param(req, "account");
+    const auto page = parse_page_params(req, kDefaultLimit, kMaxLimit);
+    f.limit = page.limit;
+    f.offset = page.offset;
+    if ((f.from && !is_calendar_date(*f.from)) || (f.to && !is_calendar_date(*f.to))) {
+        callback(ErrorResponse::bad_request("invalid_date", "from and to must be calendar days as YYYY-MM-DD"));
+        return;
+    }
+    if (f.account_id && !is_valid_uuid(*f.account_id)) {
+        callback(ErrorResponse::bad_request("invalid_id", "account must be a UUID"));
+        return;
+    }
+    with_repo_errors(callback, "money.listTransfers", [&] {
+        const json rows = Repo::TransferRepository().list(owner, f);
+        callback(Response::ok(json{{"data", rows}, {"count", rows.size()}}));
+    });
+}
+
+namespace {
+
+void transfer_fields(Validation::Errors& errs, const json& body) {
+    date_field(errs, body, "date");
+    uuid_field(errs, body, "from_account_id");
+    uuid_field(errs, body, "to_account_id");
+    number_range(errs, body, "amount_sent", 0.0001, kAmountMax);
+    number_range(errs, body, "amount_received", 0.0001, kAmountMax);
+    number_range(errs, body, "fee", 0, kAmountMax);
+    text_length(errs, body, "name", 0, kNameMax);
+    text_length(errs, body, "note", 0, kNoteMax);
+    text_length(errs, body, "external_id", 1, 120);
+}
+
+}  // namespace
+
+void MoneyController::createTransfer(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    Validation::require_string(errs, body, "date");
+    Validation::require_string(errs, body, "from_account_id");
+    Validation::require_string(errs, body, "to_account_id");
+    Validation::require(errs, body, "amount_sent");
+    transfer_fields(errs, body);
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    Repo::TransferRepository::Input in;
+    in.date = body["date"];
+    in.from_account_id = body["from_account_id"];
+    in.to_account_id = body["to_account_id"];
+    in.amount_sent = body["amount_sent"].get<double>();
+    in.amount_received = opt_number(body, "amount_received");
+    in.fee = opt_number(body, "fee");
+    in.name = Validation::opt_string(body, "name").value_or("");
+    in.note = Validation::opt_string(body, "note").value_or("");
+    in.external_id = Validation::opt_string(body, "external_id");
+    with_repo_errors(callback, "money.createTransfer", [&] {
+        callback(Response::created(json{{"data", Repo::TransferRepository().create(owner, in)}}));
+    });
+}
+
+void MoneyController::getTransfer(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MONEY_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "money.getTransfer", [&] {
+        const auto row = Repo::TransferRepository().find(owner, id);
+        if (!row) {
+            callback(ErrorResponse::not_found("money_transfer"));
+            return;
+        }
+        callback(Response::ok(json{{"data", *row}}));
+    });
+}
+
+void MoneyController::updateTransfer(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MONEY_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    transfer_fields(errs, body);
+    for (const char* fixed : {"from_account_id", "to_account_id"}) {
+        if (body.contains(fixed)) {
+            errs.add(fixed, "invariant", "the accounts of a transfer do not change: make a new one");
+        }
+    }
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    Repo::TransferRepository::Patch p;
+    p.date = Validation::opt_string(body, "date");
+    p.amount_sent = opt_number(body, "amount_sent");
+    if (body.contains("amount_received")) {
+        p.amount_received = opt_number(body, "amount_received");
+    }
+    if (body.contains("fee")) {
+        p.fee = opt_number(body, "fee");
+    }
+    p.name = Validation::opt_string(body, "name");
+    p.note = Validation::opt_string(body, "note");
+    with_repo_errors(callback, "money.updateTransfer", [&] {
+        callback(Response::ok(json{{"data", Repo::TransferRepository().update(owner, id, p)}}));
+    });
+}
+
+void MoneyController::deleteTransfer(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MONEY_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "money.deleteTransfer", [&] {
+        Repo::TransferRepository().remove(owner, id);
+        auto resp = HttpResponse::newHttpResponse();
+        resp->setStatusCode(k204NoContent);
+        callback(resp);
+    });
+}
+
+// ── merchants ───────────────────────────────────────────────────────────────
+
+void MoneyController::merchants(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    const int limit = clamp_int(req->getParameter("limit"), 20, 1, 300);
+    with_repo_errors(callback, "money.merchants", [&] {
+        const json rows = Repo::MerchantRepository().suggest(owner, req->getParameter("q"), limit);
+        callback(Response::ok(json{{"data", rows}, {"count", rows.size()}}));
+    });
+}
+
+void MoneyController::patchMerchant(const HttpRequestPtr& req, Callback&& callback, const std::string& key) {
+    MONEY_GUARD(req, callback, owner);
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    uuid_field(errs, body, "category_id");
+    if (!body.contains("category_id")) {
+        errs.add("category_id", "missing", "category_id (or null) is required");
+    }
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    with_repo_errors(callback, "money.patchMerchant", [&] {
+        callback(Response::ok(
+            json{{"data",
+                  Repo::MerchantRepository().set_category(owner, key, Validation::opt_string(body, "category_id"))}}));
+    });
+}
+
+// ── rates ───────────────────────────────────────────────────────────────────
+
+namespace {
+
+json rate_json(const Repo::FxRateRepository::Rate& r) {
+    return {{"quote", r.quote}, {"per_usd", r.per_usd}, {"rate_date", r.date}, {"source", "fawazahmed0/currency-api"}};
+}
+
+}  // namespace
+
+void MoneyController::rate(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    const std::string date = req->getParameter("date").empty() ? today_utc() : req->getParameter("date");
+    const std::string quote = req->getParameter("quote");
+    if (!is_calendar_date(date) || !std::regex_match(quote, kCodeRe)) {
+        callback(ErrorResponse::bad_request("invalid_query", "date must be a calendar day and quote an ISO code"));
+        return;
+    }
+    with_repo_errors(callback, "money.rate", [&] {
+        const auto r = Repo::FxRateRepository().nearest(date, quote);
+        if (!r) {
+            callback(ErrorResponse::not_found("no_rate"));
+            return;
+        }
+        callback(Response::ok(json{{"data", rate_json(*r)}}));
+    });
+}
+
+void MoneyController::convert(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    const std::string date = req->getParameter("date").empty() ? today_utc() : req->getParameter("date");
+    const std::string from = req->getParameter("from");
+    const std::string to = req->getParameter("to");
+    double amount = 0;
+    try {
+        amount = std::stod(req->getParameter("amount"));
+    } catch (const std::exception&) {
+        callback(ErrorResponse::bad_request("invalid_query", "amount must be a number"));
+        return;
+    }
+    if (!is_calendar_date(date) || !std::regex_match(from, kCodeRe) || !std::regex_match(to, kCodeRe)) {
+        callback(ErrorResponse::bad_request("invalid_query", "date must be a calendar day, from and to ISO codes"));
+        return;
+    }
+    with_repo_errors(callback, "money.convert", [&] {
+        Repo::FxRateRepository rates;
+        const auto f = rates.nearest(date, from);
+        const auto t = rates.nearest(date, to);
+        if (!f || !t) {
+            callback(ErrorResponse::not_found("no_rate"));
+            return;
+        }
+        const Money::Rates::Rate rf{f->date, f->quote, f->per_usd};
+        const Money::Rates::Rate rt{t->date, t->quote, t->per_usd};
+        const auto c = Money::Rates::convert(amount, &rf, &rt);
+        if (!c) {
+            callback(ErrorResponse::not_found("no_rate"));
+            return;
+        }
+        callback(Response::ok(json{{"data",
+                                    {{"amount", c->amount},
+                                     {"from", from},
+                                     {"to", to},
+                                     {"rate_date", c->rate_date},
+                                     {"rates", json{{from, rate_json(*f)}, {to, rate_json(*t)}}}}}}));
+    });
+}
+
+void MoneyController::refreshRates(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    if (!Jobs::is_initialized()) {
+        callback(ErrorResponse::service_unavailable("queue_unavailable"));
+        return;
+    }
+    try {
+        const auto job = Jobs::get().submit(Jobs::MoneyRates::kJobType, json{{"date", "latest"}});
+        auto resp = Response::ok(json{{"data", {{"job_id", job.id}, {"status", "queued"}}}});
+        resp->setStatusCode(k202Accepted);
+        callback(resp);
+    } catch (const std::exception& e) {
+        spdlog::warn("money rates refresh enqueue failed: {}", e.what());
+        callback(ErrorResponse::service_unavailable("queue_unavailable"));
+    }
+}
+
+// ── reports ─────────────────────────────────────────────────────────────────
+
+void MoneyController::periodReport(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    const std::string kind_text = req->getParameter("kind").empty() ? "month" : req->getParameter("kind");
+    if (std::find(kPeriodKinds.begin(), kPeriodKinds.end(), kind_text) == kPeriodKinds.end()) {
+        callback(ErrorResponse::bad_request("invalid_kind", "kind must be week, month, quarter or custom"));
+        return;
+    }
+    const std::string today = today_utc();
+    const std::string anchor = req->getParameter("date").empty() ? today : req->getParameter("date");
+    const std::string from = req->getParameter("from");
+    const std::string to = req->getParameter("to");
+    const std::string as_if = req->getParameter("as_if");
+    Money::Period::Kind kind = Money::Period::Kind::month;
+    if (kind_text == "week") {
+        kind = Money::Period::Kind::week;
+    } else if (kind_text == "quarter") {
+        kind = Money::Period::Kind::quarter;
+    } else if (kind_text == "custom") {
+        kind = Money::Period::Kind::custom;
+    }
+    Money::Period::Range range;
+    try {
+        if (kind == Money::Period::Kind::custom) {
+            if (!is_calendar_date(from) || !is_calendar_date(to)) {
+                callback(ErrorResponse::bad_request("invalid_date", "a custom period needs from and to"));
+                return;
+            }
+            range = Money::Period::custom(from, to);
+        } else {
+            if (!is_calendar_date(anchor)) {
+                callback(ErrorResponse::bad_request("invalid_date", "date must be a calendar day as YYYY-MM-DD"));
+                return;
+            }
+            range = Money::Period::of(kind, anchor);
+        }
+    } catch (const std::invalid_argument& e) {
+        callback(ErrorResponse::bad_request("invalid_period", e.what()));
+        return;
+    }
+    if (!as_if.empty() && !std::regex_match(as_if, kCodeRe)) {
+        callback(ErrorResponse::bad_request("invalid_currency", "as_if must be an ISO code"));
+        return;
+    }
+    with_repo_errors(callback, "money.periodReport", [&] {
+        Repo::TransactionRepository repo;
+        const auto rows = rows_of(repo, owner, range);
+        std::vector<std::vector<Money::Reports::Row>> previous;
+        Money::Period::Range cursor = range;
+        for (int i = 0; i < 3; ++i) {
+            cursor = Money::Period::previous(kind, cursor);
+            previous.push_back(rows_of(repo, owner, cursor));
+        }
+        std::map<std::string, Money::Reports::Budget> budgets;
+        for (const auto& c : Repo::CategoryRepository().list(owner, true)) {
+            if (c["budget_max"].is_number() && c["budget_currency"].is_string()) {
+                budgets[c["id"].get<std::string>()] = {c["budget_max"].get<double>(), c["budget_currency"]};
+            }
+        }
+        const auto before = repo.merchants_before(owner, range.from);
+        const std::set<std::string> seen(before.begin(), before.end());
+        const auto report = Money::Reports::build(range, rows, previous, budgets, seen, today);
+
+        json blocks = json::array();
+        for (const auto& b : report.blocks) {
+            blocks.push_back(block_json(b));
+        }
+        json recurring = json::array();
+        for (const auto& r : report.recurring) {
+            recurring.push_back({{"merchant_key", r.merchant_key},
+                                 {"currency", r.currency},
+                                 {"amount", r.amount},
+                                 {"times", r.times},
+                                 {"last_date", r.last_date},
+                                 {"next_expected", r.next_expected}});
+        }
+        json out{{"period", {{"kind", kind_text}, {"from", range.from}, {"to", range.to}}},
+                 {"blocks", blocks},
+                 {"recurring", recurring},
+                 {"new_merchants", report.new_merchants}};
+        const std::string target = as_if.empty() ? view_currency(owner).value_or("") : as_if;
+        if (!target.empty()) {
+            const std::string on = std::min(range.to, today);
+            out["as_if"] = as_if_json(report, target, on);
+        }
+        callback(Response::ok(json{{"data", out}}));
+    });
+}
+
+void MoneyController::balances(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    with_repo_errors(callback, "money.balances", [&] {
+        const json accounts = Repo::AccountRepository().list(owner, req->getParameter("archived") == "true");
+        std::map<std::string, json> groups;
+        for (const auto& a : accounts) {
+            const std::string c = a["currency"];
+            if (!groups.count(c)) {
+                groups[c] = json{{"currency", c}, {"total", 0.0}, {"accounts", json::array()}};
+            }
+            groups[c]["total"] = groups[c]["total"].get<double>() + a["balance"].get<double>();
+            groups[c]["accounts"].push_back(a);
+        }
+        json out = json::array();
+        for (const auto& [c, g] : groups) {
+            out.push_back(g);
+        }
+        callback(Response::ok(json{{"data", out}}));
+    });
+}
+
+// ── settings ────────────────────────────────────────────────────────────────
+
+void MoneyController::getSettings(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    with_repo_errors(callback, "money.getSettings", [&] {
+        callback(Response::ok(json{{"data", Repo::SettingsRepository().load(owner)}}));
+    });
+}
+
+void MoneyController::putSettings(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    code_field(errs, body, "view_currency");
+    Validation::boolean(errs, body, "advisor_enabled");
+    Validation::int_range(errs, body, "advisor_weekday", 1, 7);
+    if (body.contains("advisor_currencies")) {
+        if (!body["advisor_currencies"].is_array() || body["advisor_currencies"].size() > 20) {
+            errs.add("advisor_currencies", "invalid", "must be an array of up to 20 ISO codes");
+        } else {
+            for (const auto& c : body["advisor_currencies"]) {
+                if (!c.is_string() || !std::regex_match(c.get<std::string>(), kCodeRe)) {
+                    errs.add("advisor_currencies", "invalid", "each must be an ISO code like KZT");
+                    break;
+                }
+            }
+        }
+    }
+    text_length(errs, body, "advisor_note", 0, 2000);
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    Repo::SettingsRepository::Input in;
+    in.view_currency = Validation::opt_string(body, "view_currency");
+    in.advisor_enabled = body.value("advisor_enabled", false);
+    in.advisor_weekday = opt_int(body, "advisor_weekday").value_or(1);
+    if (body.contains("advisor_currencies") && body["advisor_currencies"].is_array()) {
+        for (const auto& c : body["advisor_currencies"]) {
+            in.advisor_currencies.push_back(c.get<std::string>());
+        }
+    }
+    in.advisor_note = Validation::opt_string(body, "advisor_note").value_or("");
+    with_repo_errors(callback, "money.putSettings", [&] {
+        callback(Response::ok(json{{"data", Repo::SettingsRepository().put(owner, in)}}));
+    });
+}
+
+}  // namespace Api
