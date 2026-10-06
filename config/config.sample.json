@@ -226,6 +226,9 @@
       "max_tokens": "${FOOD_LLM_MAX_TOKENS:-1500}"
     }
   },
+  "money": {
+    "enabled": "${MONEY_ENABLED:-false}"
+  },
   "worker": {
     "id": "worker-1",
     "types": [
