@@ -250,6 +250,12 @@ outage can never affect the money path.
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
 | `FOOD_ENABLED` | `food.enabled` | bool | `false` | Master switch for the food module (`Core::food_enabled()`): products, the diary, goals, Open Food Facts search, the LLM parse job. Routes stay registered, handlers 404 while off. Needs no fitness permission; the weight for the goals and the active kcal of a day come from the user's Mi account when one is linked. |
+| `FOOD_LLM_BASE_URL` | `food.llm.base_url` | string | `""` | Base URL of an OpenAI-compatible chat completions API for the `food_parse` job, e.g. `https://api.openai.com/v1`. The worker calls `{base_url}/chat/completions`. With any of the four `FOOD_LLM_*` settings below empty the parse is `not_configured` and the add form hides it. Prod: ConfigMap `life-os-food-llm` |
+| `FOOD_LLM_API_KEY` | `food.llm.api_key` | string | `""` | Bearer token of the provider. Prod: Secret `life-os-food-llm`. Never log or commit |
+| `FOOD_LLM_MODEL` | `food.llm.model` | string | `""` | Model name as the provider expects it |
+| `FOOD_LLM_PROMPT` | `food.llm.prompt` | string | `""` | The system prompt of the parse, whole; `docs/food/prompt.example.md` has the one prod uses |
+| `FOOD_LLM_TIMEOUT_SECONDS` | `food.llm.timeout_seconds` | int | `60` | Limit of one request to the provider |
+| `FOOD_LLM_MAX_TOKENS` | `food.llm.max_tokens` | int | `1500` | `max_tokens` of the request; 50 lines of the answer schema fit |
 
 ## Mail (SMTP)
 

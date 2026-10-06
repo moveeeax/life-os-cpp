@@ -62,6 +62,13 @@ public:
         replies.erase(replies.begin());
         return r;
     }
+
+    Food::Http::Response post_json(const std::string& url,
+                                   const std::string&,
+                                   const std::vector<std::pair<std::string, std::string>>& h,
+                                   long) override {
+        return get(url, h);
+    }
 };
 
 const char* const kProductAnswer =
