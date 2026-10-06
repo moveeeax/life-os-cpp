@@ -58,12 +58,15 @@ public:
     }
 
     /// queued -> running. False when the job is not queued (taken or closed).
-    bool start(const std::string& id) {
+    /// queued -> running and one more attempt. Returns the attempt number
+    /// (1 for the first run), or 0 when the row was not queued.
+    int start(const std::string& id) {
         return Database::get().execute_write([&](auto& txn) {
             auto r = txn.exec_params(
-                "UPDATE food_parse_jobs SET status = 'running' WHERE id = $1::uuid AND status = 'queued' RETURNING id",
+                "UPDATE food_parse_jobs SET status = 'running', attempts = attempts + 1 "
+                "WHERE id = $1::uuid AND status = 'queued' RETURNING attempts",
                 id);
-            return !r.empty();
+            return r.empty() ? 0 : r[0][0].template as<int>();
         });
     }
 
