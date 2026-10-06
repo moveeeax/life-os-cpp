@@ -73,6 +73,7 @@ services:
       BILLING_ENABLED: ${BILLING_ENABLED:-false}
       FITNESS_ENABLED: ${FITNESS_ENABLED:-false}
       WORKOUT_ENABLED: ${WORKOUT_ENABLED:-false}
+      FOOD_ENABLED: ${FOOD_ENABLED:-false}
       PAYPAL_ENV: ${PAYPAL_ENV:-sandbox}
       PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
       PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-}
@@ -201,6 +202,8 @@ services:
       FITNESS_ENABLED: ${FITNESS_ENABLED:-false}
       # workout module: the worker runs workout_reconcile jobs.
       WORKOUT_ENABLED: ${WORKOUT_ENABLED:-false}
+      # food module: the worker runs food_parse jobs.
+      FOOD_ENABLED: ${FOOD_ENABLED:-false}
       WORKER_ID: ${WORKER_ID:-worker-1}
       # Production-shaped default: only the real job types the app enqueues.
       # The demo handlers `echo`/`slow`/`fail` live in src/worker_main.cpp for

@@ -209,6 +209,9 @@ spec:
             # workout module — master switch
             - name: WORKOUT_ENABLED
               value: {{ .Values.workout.enabled | quote }}
+            # food module — master switch
+            - name: FOOD_ENABLED
+              value: {{ .Values.food.enabled | quote }}
             {{- if .Values.billing.enabled }}
             - name: PAYPAL_ENV
               value: {{ .Values.billing.paypal.environment | quote }}

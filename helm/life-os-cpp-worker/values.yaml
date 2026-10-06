@@ -168,6 +168,12 @@ fitness:
 workout:
   enabled: false
 
+# ---------------------------------------------------------------
+# food module — keep in sync with the life-os-cpp chart. Env var set: FOOD_ENABLED
+# ---------------------------------------------------------------
+food:
+  enabled: false
+
 
 # ---------------------------------------------------------------
 # External PostgreSQL connection

@@ -62,4 +62,11 @@ inline bool workout_enabled() {
     return Config::get().get<bool>("workout.enabled", "WORKOUT_ENABLED", false);
 }
 
+/// Food module master switch; same pattern as workout_enabled().
+inline bool food_enabled() {
+    if (!Config::is_initialized())
+        return false;
+    return Config::get().get<bool>("food.enabled", "FOOD_ENABLED", false);
+}
+
 }  // namespace Core

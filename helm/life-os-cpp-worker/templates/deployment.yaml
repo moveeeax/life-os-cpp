@@ -136,6 +136,9 @@ spec:
             # workout module
             - name: WORKOUT_ENABLED
               value: {{ .Values.workout.enabled | quote }}
+            # food module
+            - name: FOOD_ENABLED
+              value: {{ .Values.food.enabled | quote }}
             # Worker
             - name: WORKER_ID
               value: {{ .Values.worker.id | quote }}

@@ -66,6 +66,9 @@ data:
       "workout": {
         "enabled": {{ .Values.workout.enabled }}
       },
+      "food": {
+        "enabled": {{ .Values.food.enabled }}
+      },
       "worker": {
         "id": {{ .Values.worker.id | quote }},
         "types": [{{- range $i, $t := splitList "," .Values.worker.types }}{{- if gt $i 0 }}, {{ end }}{{ $t | quote }}{{- end }}],
