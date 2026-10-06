@@ -85,95 +85,97 @@ export function EntryEditor({ entry, onClose }: { entry: FoodEntry; onClose: () 
   };
 
   return (
-    <form onSubmit={submit} className={modalPanel} aria-labelledby="entry-editor-title">
-      <h2 id="entry-editor-title" className="truncate text-lg font-semibold">
-        {entry.name}
-      </h2>
-      <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">
-        {formatKcal(entry.kcal)} kcal · P {formatGrams(entry.protein_g)} · F{' '}
-        {formatGrams(entry.fat_g)} · C {formatGrams(entry.carbs_g)}
-        {entry.item_id === null && ' · the numbers of this entry are fixed'}
-      </p>
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="entry-grams" className={labelClass}>
-            Grams
-          </label>
-          <input
-            id="entry-grams"
-            inputMode="decimal"
-            value={grams}
-            onChange={(e) => setGrams(e.target.value)}
-            disabled={entry.grams === null}
-            aria-invalid={gramsBad || undefined}
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label htmlFor="entry-meal" className={labelClass}>
-            Meal
-          </label>
-          <select
-            id="entry-meal"
-            value={meal}
-            onChange={(e) => setMeal(e.target.value as FoodMeal)}
-            className={inputClass}
-          >
-            {MEALS.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="entry-date" className={labelClass}>
-            Date
-          </label>
-          <input
-            id="entry-date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            aria-invalid={dateBad || undefined}
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label htmlFor="entry-note" className={labelClass}>
-            Note
-          </label>
-          <input
-            id="entry-note"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            maxLength={500}
-            className={inputClass}
-          />
-        </div>
-      </div>
-      {(update.error || remove.error) && (
-        <p role="alert" className="mt-3 text-theme-sm text-error-500">
-          {update.error ?? remove.error}
+    <>
+      <form onSubmit={submit} className={modalPanel} aria-labelledby="entry-editor-title">
+        <h2 id="entry-editor-title" className="truncate text-lg font-semibold">
+          {entry.name}
+        </h2>
+        <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">
+          {formatKcal(entry.kcal)} kcal · P {formatGrams(entry.protein_g)} · F{' '}
+          {formatGrams(entry.fat_g)} · C {formatGrams(entry.carbs_g)}
+          {entry.item_id === null && ' · the numbers of this entry are fixed'}
         </p>
-      )}
-      <div className="mt-5 flex flex-wrap justify-between gap-3">
-        <button type="button" onClick={() => setConfirm(true)} className={dangerButton}>
-          Delete
-        </button>
-        <div className="flex gap-3">
-          <button type="button" onClick={onClose} className={secondaryButton}>
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={update.isPending || gramsBad || dateBad}
-            className={primaryButton}
-          >
-            {update.isPending ? 'Saving…' : 'Save'}
-          </button>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="entry-grams" className={labelClass}>
+              Grams
+            </label>
+            <input
+              id="entry-grams"
+              inputMode="decimal"
+              value={grams}
+              onChange={(e) => setGrams(e.target.value)}
+              disabled={entry.grams === null}
+              aria-invalid={gramsBad || undefined}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="entry-meal" className={labelClass}>
+              Meal
+            </label>
+            <select
+              id="entry-meal"
+              value={meal}
+              onChange={(e) => setMeal(e.target.value as FoodMeal)}
+              className={inputClass}
+            >
+              {MEALS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="entry-date" className={labelClass}>
+              Date
+            </label>
+            <input
+              id="entry-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              aria-invalid={dateBad || undefined}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="entry-note" className={labelClass}>
+              Note
+            </label>
+            <input
+              id="entry-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              maxLength={500}
+              className={inputClass}
+            />
+          </div>
         </div>
-      </div>
+        {(update.error || remove.error) && (
+          <p role="alert" className="mt-3 text-theme-sm text-error-500">
+            {update.error ?? remove.error}
+          </p>
+        )}
+        <div className="mt-5 flex flex-wrap justify-between gap-3">
+          <button type="button" onClick={() => setConfirm(true)} className={dangerButton}>
+            Delete
+          </button>
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose} className={secondaryButton}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={update.isPending || gramsBad || dateBad}
+              className={primaryButton}
+            >
+              {update.isPending ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </form>
       {confirm && (
         <ConfirmDialog
           title="Delete this entry?"
@@ -185,6 +187,6 @@ export function EntryEditor({ entry, onClose }: { entry: FoodEntry; onClose: () 
           onClose={() => setConfirm(false)}
         />
       )}
-    </form>
+    </>
   );
 }

@@ -13,6 +13,7 @@ import {
 } from '@/hooks/useFood';
 import {
   draftFromJob,
+  draftProblem,
   formatGrams,
   formatKcal,
   linesToEntries,
@@ -388,16 +389,8 @@ function DescribeTab({ date, meal, onDone }: TabProps) {
   const edit = (key: string, patch: Partial<ParseDraftLine>) =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
-  const field = (
-    key: string,
-    name: 'grams' | 'kcal' | 'protein_g' | 'fat_g' | 'carbs_g',
-    value: string,
-  ) => {
-    const n = parseNumber(value);
-    if (n !== null && n >= 0) edit(key, { [name]: n });
-  };
-
   const selected = lines.filter((l) => l.selected);
+  const problem = draftProblem(lines);
 
   if (parse.state === 'starting' || parse.state === 'running') {
     return (
@@ -458,8 +451,8 @@ function DescribeTab({ date, meal, onDone }: TabProps) {
                     {short}
                     <input
                       inputMode="decimal"
-                      value={String(l[name])}
-                      onChange={(e) => field(l.key, name, e.target.value)}
+                      value={l[name]}
+                      onChange={(e) => edit(l.key, { [name]: e.target.value })}
                       disabled={l.item_id !== null && name !== 'grams'}
                       aria-label={`${l.name} ${short}`}
                       className={cn(inputClass, 'mt-0.5 h-9 px-2')}
@@ -470,9 +463,9 @@ function DescribeTab({ date, meal, onDone }: TabProps) {
             </li>
           ))}
         </ul>
-        {add.error && (
+        {(add.error || problem) && (
           <p role="alert" className="text-theme-sm text-error-500">
-            {add.error}
+            {add.error ?? problem}
           </p>
         )}
         <div className="flex flex-wrap justify-end gap-3">
@@ -481,9 +474,7 @@ function DescribeTab({ date, meal, onDone }: TabProps) {
           </button>
           <button
             type="button"
-            disabled={
-              add.isPending || selected.length === 0 || selected.some((l) => !l.name.trim())
-            }
+            disabled={add.isPending || selected.length === 0 || problem !== null}
             onClick={() => add.mutate(linesToEntries(lines, date, meal))}
             className={primaryButton}
           >

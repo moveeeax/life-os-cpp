@@ -26,6 +26,12 @@ const BASE = '/api/v1/food';
 
 /** How often the add form asks whether the parse job has finished. */
 export const PARSE_POLL_MS = 2000;
+/**
+ * How long the form waits for the worker. The provider call is capped at
+ * FOOD_LLM_TIMEOUT_SECONDS (60 by default) and the queue retries a few times;
+ * a job still unfinished after this is stuck (no worker, dead-lettered).
+ */
+export const PARSE_DEADLINE_MS = 3 * 60 * 1000;
 
 // ── reads ──────────────────────────────────────────────────────────────────
 
@@ -161,9 +167,8 @@ export function useCreateItem(onSuccess?: (item: FoodItem) => void) {
 export function useUpdateItem(id: string, onSuccess?: (item: FoodItem) => void) {
   return useApiMutation(
     async (body: FoodItemInput) =>
-      (await api.putJson<{ data: FoodItem }>(`${BASE}/items/${id}`, { body })).data,
-    // Entries carry the item's name: the diary follows a rename.
-    { invalidate: [...ITEMS, ...DIARY], onSuccess },
+      (await api.patchJson<{ data: FoodItem }>(`${BASE}/items/${id}`, { body })).data,
+    { invalidate: ITEMS, onSuccess },
   );
 }
 
@@ -249,6 +254,7 @@ export function useParseJob() {
 
   const cancel = useCallback(() => {
     generation.current++;
+    starting.current = false;
     setState('idle');
     setJob(null);
     setError(null);
@@ -259,11 +265,17 @@ export function useParseJob() {
   useEffect(() => {
     if (!jobId) return;
     const mine = generation.current;
+    const deadline = Date.now() + PARSE_DEADLINE_MS;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const controller = new AbortController();
 
     const tick = async () => {
       if (generation.current !== mine) return;
+      if (Date.now() > deadline) {
+        setError('parse_timeout');
+        setState('failed');
+        return;
+      }
       try {
         const { data } = await api.getJson<{ data: FoodParseJob }>(`${BASE}/parse/${jobId}`, {
           signal: controller.signal,

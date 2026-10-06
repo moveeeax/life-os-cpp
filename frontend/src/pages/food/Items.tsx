@@ -191,135 +191,137 @@ function ItemForm({ item, onClose }: { item: FoodItem | null; onClose: () => voi
   }
 
   return (
-    <form onSubmit={submit} className={modalPanel} aria-labelledby="item-form-title">
-      <h2 id="item-form-title" className="text-lg font-semibold">
-        {item ? 'Edit product' : 'New product'}
-      </h2>
-      {item?.source === 'off' && (
-        <p className="mt-1 text-theme-xs text-gray-500">
-          Copied from Open Food Facts (barcode {item.off_code}); your edits stay yours.
-        </p>
-      )}
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <label htmlFor="item-name" className={labelClass}>
-            Name
-          </label>
-          <input
-            id="item-name"
-            value={d.name}
-            onChange={(e) => set({ name: e.target.value })}
-            maxLength={200}
-            required
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label htmlFor="item-brand" className={labelClass}>
-            Brand
-          </label>
-          <input
-            id="item-brand"
-            value={d.brand}
-            onChange={(e) => set({ brand: e.target.value })}
-            maxLength={200}
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label htmlFor="item-per" className={labelClass}>
-            Nutrients per
-          </label>
-          <select
-            id="item-per"
-            value={d.per}
-            onChange={(e) => set({ per: e.target.value as Draft['per'] })}
-            className={inputClass}
-          >
-            <option value="100g">100 g</option>
-            <option value="100ml">100 ml</option>
-          </select>
-        </div>
-        {num('kcal', 'kcal', true)}
-        {num('protein_g', 'Protein, g')}
-        {num('fat_g', 'Fat, g')}
-        {num('carbs_g', 'Carbs, g')}
-        {num('fiber_g', 'Fiber, g')}
-        {num('sugar_g', 'Sugar, g')}
-        {num('salt_g', 'Salt, g')}
-      </div>
-      <fieldset className="mt-4">
-        <legend className={labelClass}>Servings</legend>
-        <ul className="flex flex-col gap-2">
-          {d.servings.map((s, i) => (
-            <li key={i} className="flex items-center gap-2">
-              <input
-                value={s.label}
-                onChange={(e) => setServing(i, { label: e.target.value })}
-                placeholder="Label"
-                aria-label={`Serving ${i + 1} label`}
-                className={cn(inputClass, 'h-10')}
-              />
-              <input
-                inputMode="decimal"
-                value={s.grams}
-                onChange={(e) => setServing(i, { grams: e.target.value })}
-                placeholder="g"
-                aria-label={`Serving ${i + 1} grams`}
-                className={cn(inputClass, 'h-10 w-24')}
-              />
-              <button
-                type="button"
-                onClick={() => set({ servings: d.servings.filter((_, j) => j !== i) })}
-                className={iconButton}
-                aria-label={`Remove serving ${i + 1}`}
-              >
-                <Trash2 className="size-4" aria-hidden="true" />
-              </button>
-            </li>
-          ))}
-        </ul>
-        <button
-          type="button"
-          onClick={() => set({ servings: [...d.servings, { label: '', grams: '' }] })}
-          className={cn(secondaryButton, 'mt-2 px-3 py-2')}
-        >
-          <Plus className="size-4" aria-hidden="true" />
-          Add serving
-        </button>
-      </fieldset>
-      {item && (
-        <label className="mt-4 flex items-center gap-2 text-theme-sm">
-          <input
-            type="checkbox"
-            checked={d.archived}
-            onChange={(e) => set({ archived: e.target.checked })}
-          />
-          Archived (hidden from search)
-        </label>
-      )}
-      {(problem || create.error || update.error || remove.error) && (
-        <p role="alert" className="mt-3 text-theme-sm text-error-500">
-          {problem ?? create.error ?? update.error ?? remove.error}
-        </p>
-      )}
-      <div className="mt-5 flex flex-wrap justify-between gap-3">
-        {item ? (
-          <button type="button" onClick={() => setConfirm(true)} className={dangerButton}>
-            Delete
-          </button>
-        ) : (
-          <span />
+    <>
+      <form onSubmit={submit} className={modalPanel} aria-labelledby="item-form-title">
+        <h2 id="item-form-title" className="text-lg font-semibold">
+          {item ? 'Edit product' : 'New product'}
+        </h2>
+        {item?.source === 'off' && (
+          <p className="mt-1 text-theme-xs text-gray-500">
+            Copied from Open Food Facts (barcode {item.off_code}); your edits stay yours.
+          </p>
         )}
-        <div className="flex gap-3">
-          <button type="button" onClick={onClose} className={secondaryButton}>
-            Cancel
-          </button>
-          <button type="submit" disabled={busy} className={primaryButton}>
-            {busy ? 'Saving…' : item ? 'Save' : 'Create'}
-          </button>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label htmlFor="item-name" className={labelClass}>
+              Name
+            </label>
+            <input
+              id="item-name"
+              value={d.name}
+              onChange={(e) => set({ name: e.target.value })}
+              maxLength={200}
+              required
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="item-brand" className={labelClass}>
+              Brand
+            </label>
+            <input
+              id="item-brand"
+              value={d.brand}
+              onChange={(e) => set({ brand: e.target.value })}
+              maxLength={200}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="item-per" className={labelClass}>
+              Nutrients per
+            </label>
+            <select
+              id="item-per"
+              value={d.per}
+              onChange={(e) => set({ per: e.target.value as Draft['per'] })}
+              className={inputClass}
+            >
+              <option value="100g">100 g</option>
+              <option value="100ml">100 ml</option>
+            </select>
+          </div>
+          {num('kcal', 'kcal', true)}
+          {num('protein_g', 'Protein, g')}
+          {num('fat_g', 'Fat, g')}
+          {num('carbs_g', 'Carbs, g')}
+          {num('fiber_g', 'Fiber, g')}
+          {num('sugar_g', 'Sugar, g')}
+          {num('salt_g', 'Salt, g')}
         </div>
-      </div>
+        <fieldset className="mt-4">
+          <legend className={labelClass}>Servings</legend>
+          <ul className="flex flex-col gap-2">
+            {d.servings.map((s, i) => (
+              <li key={i} className="flex items-center gap-2">
+                <input
+                  value={s.label}
+                  onChange={(e) => setServing(i, { label: e.target.value })}
+                  placeholder="Label"
+                  aria-label={`Serving ${i + 1} label`}
+                  className={cn(inputClass, 'h-10')}
+                />
+                <input
+                  inputMode="decimal"
+                  value={s.grams}
+                  onChange={(e) => setServing(i, { grams: e.target.value })}
+                  placeholder="g"
+                  aria-label={`Serving ${i + 1} grams`}
+                  className={cn(inputClass, 'h-10 w-24')}
+                />
+                <button
+                  type="button"
+                  onClick={() => set({ servings: d.servings.filter((_, j) => j !== i) })}
+                  className={iconButton}
+                  aria-label={`Remove serving ${i + 1}`}
+                >
+                  <Trash2 className="size-4" aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={() => set({ servings: [...d.servings, { label: '', grams: '' }] })}
+            className={cn(secondaryButton, 'mt-2 px-3 py-2')}
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            Add serving
+          </button>
+        </fieldset>
+        {item && (
+          <label className="mt-4 flex items-center gap-2 text-theme-sm">
+            <input
+              type="checkbox"
+              checked={d.archived}
+              onChange={(e) => set({ archived: e.target.checked })}
+            />
+            Archived (hidden from search)
+          </label>
+        )}
+        {(problem || create.error || update.error || remove.error) && (
+          <p role="alert" className="mt-3 text-theme-sm text-error-500">
+            {problem ?? create.error ?? update.error ?? remove.error}
+          </p>
+        )}
+        <div className="mt-5 flex flex-wrap justify-between gap-3">
+          {item ? (
+            <button type="button" onClick={() => setConfirm(true)} className={dangerButton}>
+              Delete
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose} className={secondaryButton}>
+              Cancel
+            </button>
+            <button type="submit" disabled={busy} className={primaryButton}>
+              {busy ? 'Saving…' : item ? 'Save' : 'Create'}
+            </button>
+          </div>
+        </div>
+      </form>
       {confirm && item && (
         <ConfirmDialog
           title="Delete this product?"
@@ -331,7 +333,7 @@ function ItemForm({ item, onClose }: { item: FoodItem | null; onClose: () => voi
           onClose={() => setConfirm(false)}
         />
       )}
-    </form>
+    </>
   );
 }
 

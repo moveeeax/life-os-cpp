@@ -53,10 +53,11 @@ export function ConfirmDialog({
             )}
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={onClose} disabled={busy}>
+            <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
               Cancel
             </Button>
             <Button
+              type="button"
               variant={destructive ? 'destructive' : 'default'}
               onClick={onConfirm}
               disabled={busy}
