@@ -171,6 +171,7 @@ export function FoodWeekPage() {
             yTitles={['kcal']}
             yBounds={[{ min: 0 }]}
             format={(v) => `${formatKcal(v)} kcal`}
+            xLabel={weekdayOf}
             height={260}
           />
         )}
