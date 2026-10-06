@@ -245,7 +245,7 @@ public:
         return Database::get().execute_write([&](auto& txn) {
             auto r = txn.exec_params(
                 "UPDATE money_transactions SET status = 'posted', updated_at = now() "
-                "WHERE owner_id = $1::uuid AND id = $2::uuid AND status = 'pending' RETURNING id\",
+                "WHERE owner_id = $1::uuid AND id = $2::uuid AND status = 'pending' RETURNING id",
                 owner,
                 id);
             if (r.empty()) {
