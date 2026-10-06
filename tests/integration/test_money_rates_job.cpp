@@ -78,7 +78,7 @@ protected:
             return;
         Net::Http::install_for_testing(&source);
         Database::get().execute_write([](auto& txn) {
-            txn.exec("TRUNCATE TABLE money_fx_rates, money_currencies");
+            txn.exec("TRUNCATE TABLE money_fx_rates, money_currencies CASCADE");
             txn.exec_params(
                 "INSERT INTO users (id, email, confirmed, role_id) "
                 "VALUES ($1::uuid, $2, TRUE, (SELECT id FROM roles ORDER BY id LIMIT 1)) ON CONFLICT DO NOTHING",
