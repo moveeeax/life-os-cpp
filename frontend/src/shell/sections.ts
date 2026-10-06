@@ -11,6 +11,7 @@ import {
   Plane,
   Sun,
   Target,
+  Utensils,
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
@@ -41,6 +42,8 @@ export const sections: Section[] = [
     permission: Permission.FitnessRead,
   },
   { key: 'day', label: 'Day', icon: Sun },
+  /** Every confirmed user may keep a diary; the module switch is the only gate. */
+  { key: 'food', label: 'Food', icon: Utensils, path: '/food' },
   { key: 'money', label: 'Money', icon: Wallet },
   { key: 'tasks', label: 'Tasks', icon: ListTodo },
   { key: 'goals', label: 'Goals', icon: Target },
@@ -71,7 +74,10 @@ export function visibleSections(
 ): Section[] {
   return sections
     .map((s) => (off.has(s.key) ? { ...s, path: undefined, permission: undefined } : s))
-    .filter((s) => !s.path || s.permission === undefined || userCan(user, s.permission));
+    .filter(
+      (s) =>
+        !s.path || (user != null && (s.permission === undefined || userCan(user, s.permission))),
+    );
 }
 
 /** Where a visitor of `/` lands. */

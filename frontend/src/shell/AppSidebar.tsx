@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router';
 import { Ellipsis, Shield, X } from 'lucide-react';
 
+import { useFoodEnabled } from '@/hooks/useFood';
 import { useMe } from '@/hooks/useMe';
 import { useWorkoutEnabled } from '@/hooks/useWorkoutSession';
 import { Permission, userCan, userIsAdmin } from '@/lib/auth/permissions';
@@ -21,7 +22,8 @@ export function AppSidebar() {
   const wide = isExpanded || isHovered || isMobileOpen;
   // A section whose backend module is switched off stays a "soon" item.
   const workoutOn = useWorkoutEnabled(userCan(user, Permission.FitnessRead));
-  const off = workoutOn ? undefined : new Set(['workout']);
+  const foodOn = useFoodEnabled(user !== null);
+  const off = new Set([...(workoutOn ? [] : ['workout']), ...(foodOn ? [] : ['food'])]);
 
   // Close the drawer after a navigation on small screens.
   useEffect(() => {

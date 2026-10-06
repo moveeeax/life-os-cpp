@@ -12,6 +12,7 @@ describe('visibleSections', () => {
     const list = visibleSections(user(Permission.General | Permission.FitnessRead));
     expect(list[0]).toMatchObject({ key: 'health', path: '/health' });
     expect(list.find((s) => s.key === 'workout')).toMatchObject({ path: '/workout' });
+    expect(list.find((s) => s.key === 'food')).toMatchObject({ path: '/food' });
     expect(list.filter((s) => !s.path).map((s) => s.label)).toEqual([
       'Day',
       'Money',
@@ -46,6 +47,16 @@ describe('visibleSections', () => {
     expect(list.find((s) => s.key === 'health')).toBeUndefined();
     expect(list.find((s) => s.key === 'workout')).toBeUndefined();
     expect(list).toHaveLength(sections.length - 2);
+  });
+
+  it('shows Food to any user and as not built yet while its module is off', () => {
+    expect(visibleSections(user(Permission.General)).find((s) => s.key === 'food')).toMatchObject({
+      path: '/food',
+    });
+    expect(
+      visibleSections(user(Permission.General), new Set(['food'])).find((s) => s.key === 'food')
+        ?.path,
+    ).toBeUndefined();
   });
 
   it('shows Health to an administrator through the sentinel bit', () => {

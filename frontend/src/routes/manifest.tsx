@@ -48,6 +48,18 @@ const WorkoutRoutinesPage = lazy(() =>
 const WorkoutRoutineEditorPage = lazy(() =>
   import('@/pages/workout/RoutineEditor').then((m) => ({ default: m.WorkoutRoutineEditorPage })),
 );
+const FoodDayPage = lazy(() =>
+  import('@/pages/food/Day').then((m) => ({ default: m.FoodDayPage })),
+);
+const FoodWeekPage = lazy(() =>
+  import('@/pages/food/Week').then((m) => ({ default: m.FoodWeekPage })),
+);
+const FoodItemsPage = lazy(() =>
+  import('@/pages/food/Items').then((m) => ({ default: m.FoodItemsPage })),
+);
+const FoodGoalsPage = lazy(() =>
+  import('@/pages/food/Goals').then((m) => ({ default: m.FoodGoalsPage })),
+);
 const AdminDashboardPage = lazy(() =>
   import('@/pages/admin/Dashboard').then((m) => ({ default: m.AdminDashboardPage })),
 );
@@ -208,6 +220,12 @@ export const routes: RouteEntry[] = [
     guard: 'confirmed',
     layout: 'shell',
   },
+
+  // ── Food — any confirmed user; the module switch is the only gate ────────
+  { path: '/food', element: <FoodDayPage />, guard: 'confirmed', layout: 'shell' },
+  { path: '/food/week', element: <FoodWeekPage />, guard: 'confirmed', layout: 'shell' },
+  { path: '/food/items', element: <FoodItemsPage />, guard: 'confirmed', layout: 'shell' },
+  { path: '/food/goals', element: <FoodGoalsPage />, guard: 'confirmed', layout: 'shell' },
 
   // ── Admin — gated by Permission.Administer (0x40000000 sentinel) ────────
   {
