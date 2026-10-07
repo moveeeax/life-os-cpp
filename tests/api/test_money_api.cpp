@@ -467,7 +467,7 @@ TEST_F(MoneyApiTest, ReportIsPerCurrencyWithBudgetsAndTheAsIfBlock) {
                                 {{"kind", "month"}, {"date", "2026-10-15"}, {"as_if", "KZT"}}))["data"]["as_if"];
     EXPECT_EQ(a["currency"], "KZT");
     EXPECT_FALSE(a["partial"]);
-    EXPECT_NEAR(a["expense"].get<double>(), 215000 + 955.75 * 450 / 33.5, 1e-6);
+    EXPECT_NEAR(a["expense"].get<double>(), 215500 + 955.75 * 450 / 33.5, 1e-6) << "the two adjustments above are in";
     EXPECT_EQ(a["blocks"][1]["rate_date"], "2026-10-03");
 
     // A currency without a rate makes the block partial instead of guessing.
