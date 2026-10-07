@@ -3,6 +3,6 @@ name: life-os-cpp-worker
 description: A Helm chart for deploying the C++ background job worker
 type: application
 version: 0.1.0
-appVersion: "1.12.1"
+appVersion: "1.13.0"
 maintainers:
   - name: life-os-cpp-team
