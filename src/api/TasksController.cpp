@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -22,12 +23,16 @@
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "core/Modules.hpp"
+#include "jobs/Jobs.hpp"
+#include "jobs/TasksParseHandler.hpp"
 #include "repositories/tasks/Errors.hpp"
 #include "repositories/tasks/NoteRepository.hpp"
+#include "repositories/tasks/ParseJobRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
 #include "tasks/Agenda.hpp"
 #include "tasks/Fields.hpp"
 #include "tasks/Llm.hpp"
+#include "tasks/ParseAnswer.hpp"
 #include "utils/ErrorResponse.hpp"
 
 namespace Api {
@@ -45,6 +50,7 @@ constexpr int kDefaultLimit = 50;
 constexpr int kMaxLimit = 200;
 constexpr std::size_t kSourceRefMax = 2000;
 constexpr std::size_t kExternalIdMax = 100;
+constexpr long kParseOpenMax = 3;
 const std::vector<std::string> kStatuses = {"open", "done"};
 const std::vector<std::string> kNoteStatuses = {"inbox", "archived"};
 const std::vector<std::string> kSourceKinds = {"url", "money_transaction"};
@@ -402,19 +408,144 @@ void TasksController::deleteNote(const HttpRequestPtr& req, Callback&& callback,
 
 void TasksController::parse(const HttpRequestPtr& req, Callback&& callback) {
     TASKS_GUARD(req, callback, owner);
-    callback(ErrorResponse::service_unavailable("not_configured", "the tasks parse is not set up on this server"));
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    Validation::require_string(errs, body, "text");
+    text_length(errs, body, "text", 1, ::Tasks::Fields::kPhraseMax);
+    date_field(errs, body, "hint_date");
+    if (body.contains("note_id") && !body["note_id"].is_null()) {
+        Validation::uuid(errs, body, "note_id");
+    }
+    if (!errs.any() && body["text"].get<std::string>().find('\0') != std::string::npos) {
+        errs.add("text", "invalid", "must not contain a NUL character");
+    }
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    if (!::Tasks::Llm::parse_settings().has_value()) {
+        callback(ErrorResponse::service_unavailable("not_configured", "the tasks parse is not set up on this server"));
+        return;
+    }
+    const std::string text = body["text"].get<std::string>();
+    const std::string hint = Validation::opt_string(body, "hint_date").value_or(today_utc());
+    const auto note_id = Validation::opt_string(body, "note_id");
+    Repo::ParseJobRepository repo;
+    std::string id;
+    try {
+        if (repo.open_count(owner) >= kParseOpenMax) {
+            callback(ErrorResponse::make({k429TooManyRequests,
+                                          "too_many_parses",
+                                          "wait for your running parses to finish",
+                                          json{{"retry_after_sec", 30}}}));
+            return;
+        }
+        id = repo.create(owner, text, hint, note_id)["id"].get<std::string>();
+    } catch (const Repositories::NotFoundError&) {
+        callback(ErrorResponse::not_found("task_note"));
+        return;
+    } catch (const Repositories::ValidationError& e) {
+        callback(ErrorResponse::bad_request(e.code(), e.message()));
+        return;
+    } catch (const std::exception&) {
+        // The server's DETAIL would quote the phrase: no message.
+        spdlog::warn("tasks parse create failed");
+        callback(ErrorResponse::service_unavailable("storage_unavailable"));
+        return;
+    }
+    try {
+        if (!Jobs::is_initialized()) {
+            throw std::runtime_error("the job queue is not initialized");
+        }
+        Jobs::get().submit(
+            Jobs::TasksParse::kJobType,
+            json{{"job_id", id}, {"owner_id", owner}, {"max_attempts", Jobs::get().default_max_retries()}});
+    } catch (const std::exception& e) {
+        spdlog::warn("tasks parse enqueue unavailable: {}", e.what());
+        try {
+            repo.fail(id, "queue_unavailable", "the job queue did not take the job");
+        } catch (const std::exception& inner) {
+            spdlog::warn("tasks parse {}: could not mark failed: {}", id, inner.what());
+        }
+        callback(ErrorResponse::service_unavailable("queue_unavailable"));
+        return;
+    }
+    auto resp = Response::ok(json{{"data", {{"id", id}, {"status", "queued"}}}});
+    resp->setStatusCode(k202Accepted);
+    callback(resp);
 }
 
 void TasksController::parseStatus(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     TASKS_GUARD(req, callback, owner);
-    (void)id;
-    callback(ErrorResponse::not_found("task_parse"));
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "tasks.parseStatus", [&] {
+        const auto row = Repo::ParseJobRepository().get(owner, id);
+        if (!row) {
+            callback(ErrorResponse::not_found("task_parse"));
+            return;
+        }
+        callback(Response::ok(json{{"data", *row}}));
+    });
 }
 
 void TasksController::parseAccept(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     TASKS_GUARD(req, callback, owner);
-    (void)id;
-    callback(ErrorResponse::not_found("task_parse"));
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    if (!body.contains("lines") || !body["lines"].is_array() || body["lines"].empty() ||
+        body["lines"].size() > static_cast<std::size_t>(::Tasks::Parse::kMaxLines)) {
+        callback(ErrorResponse::bad_request("invalid_lines", "lines must hold 1..20 tasks"));
+        return;
+    }
+    std::optional<json> job;
+    if (!with_repo_errors(
+            callback, "tasks.parseAccept.load", [&] { job = Repo::ParseJobRepository().get(owner, id); })) {
+        return;
+    }
+    if (!job) {
+        callback(ErrorResponse::not_found("task_parse"));
+        return;
+    }
+    Validation::Errors errs;
+    std::vector<Repo::TaskRepository::Input> inputs;
+    for (std::size_t i = 0; i < body["lines"].size(); ++i) {
+        json line = body["lines"][i];
+        const std::string prefix = "lines[" + std::to_string(i) + "].";
+        if (!line.is_object()) {
+            errs.add(prefix, "invalid", "a line is an object");
+            continue;
+        }
+        // A draft becomes an open task; its origin is the phrase, not a source.
+        for (const char* key : {"status", "source_kind", "source_ref", "external_id"}) {
+            line.erase(std::string(key));
+        }
+        Validation::Errors local;
+        task_fields(local, line, true);
+        for (const auto& e : local.items()) {
+            errs.add(prefix + e.field, e.code, e.message);
+        }
+        if (!local.any()) {
+            inputs.push_back(task_input(line));
+        }
+    }
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    with_repo_errors(callback, "tasks.parseAccept", [&] {
+        const json rows = Repo::ParseJobRepository().accept(owner, id, inputs);
+        callback(Response::created(json{{"data", rows}, {"count", rows.size()}}));
+    });
 }
 
 }  // namespace Api
