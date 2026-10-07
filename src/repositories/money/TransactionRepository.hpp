@@ -20,6 +20,7 @@
 #include "money/Merchant.hpp"
 #include "repositories/money/AccountRepository.hpp"
 #include "repositories/money/CategoryRepository.hpp"
+#include "repositories/money/CurrencyRepository.hpp"
 #include "repositories/money/Errors.hpp"
 #include "repositories/money/ParseJobRepository.hpp"
 
@@ -206,6 +207,20 @@ public:
                     }
                     if (p.amount.has_value() && type == "fx_adjustment" && *p.amount == 0) {
                         throw Invariant("an adjustment of 0 says nothing");
+                    }
+                    if (p.amount.has_value()) {
+                        CurrencyRepository::check_scale_in(
+                            txn, owner, (*row)["currency"].get<std::string>(), *p.amount, "amount");
+                    }
+                    if (p.receipt_amount.has_value() && *p.receipt_amount) {
+                        const auto code = p.receipt_currency.has_value()
+                                              ? *p.receipt_currency
+                                              : ((*row)["receipt_currency"].is_null()
+                                                     ? std::optional<std::string>()
+                                                     : (*row)["receipt_currency"].get<std::string>());
+                        if (code) {
+                            CurrencyRepository::check_scale_in(txn, owner, *code, **p.receipt_amount, "receipt_amount");
+                        }
                     }
                     const std::string merchant = p.merchant.value_or((*row)["merchant"].get<std::string>());
                     txn.exec_params(
@@ -403,6 +418,11 @@ private:
     template <typename Txn>
     static std::string insert_in(Txn& txn, const std::string& owner, const Input& in) {
         check_account(txn, owner, in.account_id);
+        CurrencyRepository::check_scale_in(
+            txn, owner, *AccountRepository::currency_in(txn, owner, in.account_id), in.amount, "amount");
+        if (in.receipt_amount && in.receipt_currency) {
+            CurrencyRepository::check_scale_in(txn, owner, *in.receipt_currency, *in.receipt_amount, "receipt_amount");
+        }
         if (in.type == "fx_adjustment") {
             if (!in.adjusts_id.has_value()) {
                 throw Invariant("an adjustment needs the row it adjusts");

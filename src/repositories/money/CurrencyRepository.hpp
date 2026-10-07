@@ -13,6 +13,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "money/Currencies.hpp"
 #include "repositories/money/Errors.hpp"
 
 namespace Repositories::Money {
@@ -23,6 +24,7 @@ public:
         std::string name;
         std::optional<std::string> role;  // "primary" | "local" | nullopt
         int decimals = 2;
+        std::string minor_unit;
         bool archived = false;
     };
 
@@ -30,6 +32,7 @@ public:
         std::optional<std::string> name;
         std::optional<std::optional<std::string>> role;  // outer: given; inner: null clears
         std::optional<int> decimals;
+        std::optional<std::string> minor_unit;
         std::optional<bool> archived;
     };
 
@@ -76,15 +79,17 @@ public:
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
                     txn.exec_params(
-                        "INSERT INTO money_currencies (owner_id, code, name, role, decimals, archived) "
-                        "VALUES ($1::uuid, $2, $3, $4, $5, $6) "
+                        "INSERT INTO money_currencies (owner_id, code, name, role, decimals, minor_unit, archived) "
+                        "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7) "
                         "ON CONFLICT (owner_id, code) DO UPDATE SET name = EXCLUDED.name, role = EXCLUDED.role, "
-                        " decimals = EXCLUDED.decimals, archived = EXCLUDED.archived",
+                        " decimals = EXCLUDED.decimals, minor_unit = EXCLUDED.minor_unit, "
+                        " archived = EXCLUDED.archived",
                         owner,
                         code,
                         in.name,
                         in.role,
                         in.decimals,
+                        in.minor_unit,
                         in.archived);
                     return *find_in(txn, owner, code);
                 });
@@ -100,7 +105,8 @@ public:
                     auto r = txn.exec_params(
                         "UPDATE money_currencies SET name = COALESCE($3, name), "
                         " role = CASE WHEN $4::boolean THEN $5 ELSE role END, "
-                        " decimals = COALESCE($6, decimals), archived = COALESCE($7, archived) "
+                        " decimals = COALESCE($6, decimals), archived = COALESCE($7, archived), "
+                        " minor_unit = COALESCE($8, minor_unit) "
                         "WHERE owner_id = $1::uuid AND code = $2 RETURNING code",
                         owner,
                         code,
@@ -108,7 +114,8 @@ public:
                         p.role.has_value(),
                         p.role.has_value() ? *p.role : std::optional<std::string>(),
                         p.decimals,
-                        p.archived);
+                        p.archived,
+                        p.minor_unit);
                     if (r.empty()) {
                         throw NotFound("money_currency");
                     }
@@ -127,19 +134,39 @@ public:
             }
             for (const auto& d : kDefaults) {
                 txn.exec_params(
-                    "INSERT INTO money_currencies (owner_id, code, name, role, decimals) VALUES ($1::uuid, $2, $3, $4, "
-                    "$5) ON CONFLICT DO NOTHING",
+                    "INSERT INTO money_currencies (owner_id, code, name, role, decimals, minor_unit) "
+                    "VALUES ($1::uuid, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING",
                     owner,
                     std::string(d.code),
                     std::string(d.name),
                     d.role ? std::optional<std::string>(d.role) : std::optional<std::string>(),
-                    d.decimals);
+                    d.decimals,
+                    std::string(::Money::Currencies::known(d.code)->unit));
             }
             return true;
         });
     }
 
-    static constexpr const char* kColumnsRaw = "code, name, role, decimals, archived";
+    static constexpr const char* kColumnsRaw = "code, name, role, decimals, minor_unit, archived";
+
+    /// An amount in @p code must be a whole number of that currency's smallest
+    /// unit: 1.234 KZT is refused, 0.00000001 BTC is one satoshi. A code the
+    /// owner does not keep is left to the foreign keys. @throws Invariant.
+    template <typename Txn>
+    static void check_scale_in(
+        Txn& txn, const std::string& owner, const std::string& code, double amount, const char* field) {
+        auto r = txn.exec_params(
+            "SELECT decimals, minor_unit FROM money_currencies WHERE owner_id = $1::uuid AND code = $2", owner, code);
+        if (r.empty()) {
+            return;
+        }
+        const int decimals = r[0][0].template as<int>();
+        if (!::Money::Currencies::fits(amount, decimals)) {
+            const std::string unit = r[0][1].template as<std::string>();
+            throw Invariant(std::string(field) + ": " + code + " has " + std::to_string(decimals) +
+                            " decimal(s); the smallest amount is one " + (unit.empty() ? code : unit));
+        }
+    }
 
 private:
     inline static const std::string kColumns = kColumnsRaw;

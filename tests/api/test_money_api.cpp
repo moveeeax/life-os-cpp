@@ -563,11 +563,32 @@ protected:
 // ── eight decimals ──────────────────────────────────────────────────────────
 
 TEST_F(MoneyApiTest, ACryptoWalletKeepsEightDecimals) {
-    ASSERT_EQ(call_json(&Api::MoneyController::upsertCurrency,
-                        user(kAnna),
-                        json{{"code", "BTC"}, {"name", "Bitcoin"}, {"decimals", 8}})
+    // A known code takes its smallest unit from the table; it cannot be told otherwise.
+    const auto btc =
+        call_json(&Api::MoneyController::upsertCurrency, user(kAnna), json{{"code", "BTC"}, {"name", "Bitcoin"}});
+    ASSERT_EQ(btc->statusCode(), k200OK) << btc->body();
+    EXPECT_EQ(body_of(btc)["data"]["decimals"], 8);
+    EXPECT_EQ(body_of(btc)["data"]["minor_unit"], "satoshi");
+    EXPECT_EQ(call_json(&Api::MoneyController::upsertCurrency, user(kAnna), json{{"code", "JPY"}, {"decimals", 2}})
                   ->statusCode(),
-              k200OK);
+              k400BadRequest);
+    EXPECT_EQ(
+        call_id(&Api::MoneyController::patchCurrency, user(kAnna), Patch, "KZT", json{{"decimals", 3}})->statusCode(),
+        k400BadRequest);
+    // An unknown code names its own.
+    EXPECT_EQ(call_json(&Api::MoneyController::upsertCurrency, user(kAnna), json{{"code", "XAU"}})->statusCode(),
+              k400BadRequest);
+    const auto xau = call_json(&Api::MoneyController::upsertCurrency,
+                               user(kAnna),
+                               json{{"code", "XAU"}, {"decimals", 3}, {"minor_unit", "milli-ounce"}});
+    ASSERT_EQ(xau->statusCode(), k200OK) << xau->body();
+    EXPECT_EQ(body_of(xau)["data"]["minor_unit"], "milli-ounce");
+    const json boris_currencies = body_of(call(&Api::MoneyController::listCurrencies, user(kBoris), Get))["data"];
+    for (const auto& c : boris_currencies) {
+        if (c["code"] == "RUB") {
+            EXPECT_EQ(c["minor_unit"], "kopeck") << "seeded with its unit";
+        }
+    }
     EXPECT_EQ(call_json(&Api::MoneyController::upsertCurrency, user(kAnna), json{{"code", "XAU"}, {"decimals", 9}})
                   ->statusCode(),
               k400BadRequest);
@@ -591,6 +612,31 @@ TEST_F(MoneyApiTest, ACryptoWalletKeepsEightDecimals) {
                  {"name", "Network fee (BTC)"}});
     EXPECT_NEAR(balance_of(wallet), 0.0057635 - 0.00001234, 1e-9);
     EXPECT_NEAR(balance_of(kaspi), 300000 - 230000, 0.005);
+    // Finer than the smallest unit is refused: a tiyn is 0.01 KZT.
+    const auto fine = call_json(&Api::MoneyController::createTransaction,
+                                user(kAnna),
+                                json{{"date", "2026-09-26"},
+                                     {"account_id", kaspi["id"]},
+                                     {"amount", 1.234},
+                                     {"category_id", fees["id"]},
+                                     {"name", "Too fine"}});
+    EXPECT_EQ(fine->statusCode(), k400BadRequest);
+    EXPECT_NE(std::string(fine->body()).find("tiyn"), std::string::npos) << fine->body();
+    EXPECT_EQ(call_json(&Api::MoneyController::createTransfer,
+                        user(kAnna),
+                        json{{"date", "2026-09-26"},
+                             {"from_account_id", kaspi["id"]},
+                             {"to_account_id", wallet["id"]},
+                             {"amount_sent", 100},
+                             {"amount_received", 0.000000001}})
+                  ->statusCode(),
+              k400BadRequest)
+        << "below one satoshi";
+    EXPECT_EQ(
+        call_id(
+            &Api::MoneyController::updateAccount, user(kAnna), Patch, kaspi["id"], json{{"opening_balance", 10.005}})
+            ->statusCode(),
+        k400BadRequest);
 }
 
 TEST_F(MoneyApiTest, RatesBackfillChecksTheRangeBeforeTheQueue) {

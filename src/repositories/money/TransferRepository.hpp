@@ -15,6 +15,7 @@
 
 #include "database/Database.hpp"
 #include "repositories/money/AccountRepository.hpp"
+#include "repositories/money/CurrencyRepository.hpp"
 #include "repositories/money/Errors.hpp"
 
 namespace Repositories::Money {
@@ -53,6 +54,8 @@ public:
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
                     check_pair(txn, owner, in.from_account_id, in.to_account_id, in.amount_received);
+                    check_scales(
+                        txn, owner, in.from_account_id, in.to_account_id, in.amount_sent, in.amount_received, in.fee);
                     if (in.amount_sent <= 0 || (in.amount_received && *in.amount_received <= 0) ||
                         (in.fee && *in.fee < 0)) {
                         throw Invariant("amounts must be above 0 and the fee 0 or more");
@@ -123,6 +126,15 @@ public:
                         (p.fee.has_value() && *p.fee && **p.fee < 0)) {
                         throw Invariant("amounts must be above 0 and the fee 0 or more");
                     }
+                    check_scales(txn,
+                                 owner,
+                                 (*row)["from_account_id"].get<std::string>(),
+                                 (*row)["to_account_id"].get<std::string>(),
+                                 p.amount_sent.value_or((*row)["amount_sent"].get<double>()),
+                                 received,
+                                 p.fee.has_value() ? *p.fee
+                                                   : ((*row)["fee"].is_null() ? std::optional<double>()
+                                                                              : (*row)["fee"].get<double>()));
                     txn.exec_params(
                         "UPDATE money_transfers SET date = COALESCE($3::date, date), "
                         " amount_sent = COALESCE($4, amount_sent), "
@@ -180,6 +192,28 @@ private:
             return std::nullopt;
         }
         return nlohmann::json::parse(r[0][0].template as<std::string>());
+    }
+
+    /// Sent and the fee in whole units of the source currency, received in the target's.
+    template <typename Txn>
+    static void check_scales(Txn& txn,
+                             const std::string& owner,
+                             const std::string& from,
+                             const std::string& to,
+                             double sent,
+                             const std::optional<double>& received,
+                             const std::optional<double>& fee) {
+        const auto from_cur = AccountRepository::currency_in(txn, owner, from);
+        const auto to_cur = AccountRepository::currency_in(txn, owner, to);
+        if (from_cur) {
+            CurrencyRepository::check_scale_in(txn, owner, *from_cur, sent, "amount_sent");
+            if (fee) {
+                CurrencyRepository::check_scale_in(txn, owner, *from_cur, *fee, "fee");
+            }
+        }
+        if (to_cur && received) {
+            CurrencyRepository::check_scale_in(txn, owner, *to_cur, *received, "amount_received");
+        }
     }
 
     /// Both accounts the owner's and different; received given iff the currencies differ.
