@@ -153,7 +153,7 @@ TEST_F(MoneyRepositoriesTest, SeedsCurrenciesOncePerUserAndScopesThem) {
     EXPECT_EQ(list[0]["role"], "primary");
     EXPECT_EQ(list[9]["code"], "SGD") << "no role sorts last";
     EXPECT_THROW(currencies.upsert(kAnna, "kzt", {}), Invariant);
-    currencies.upsert(kAnna, "JPY", {"Yen", std::nullopt, 0, false});
+    currencies.upsert(kAnna, "JPY", {"Yen", std::nullopt, 0, false, "yen"});
     EXPECT_EQ(currencies.list(kAnna, false).size(), 11u);
     EXPECT_EQ(currencies.list(kBoris, false).size(), 10u);
     CurrencyRepository::Patch hide;
