@@ -193,6 +193,7 @@ TEST_F(MoneyAdvisorJobTest, ProviderRulesAndRetries) {
     EXPECT_EQ(run(row["id"])["status"], "done");
     EXPECT_FALSE(provider.bodies[1].contains("temperature"));
 
+    expense("2026-09-10", 100);  // a period with rows: the provider is asked
     const auto [other, q2] = reports.create_or_get(kAnna, "month", "2026-09-01", "2026-09-30");
     provider.fail = true;
     EXPECT_THROW(run(other["id"]), std::runtime_error);
