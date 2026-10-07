@@ -30,6 +30,7 @@
 #include "api/Validation.hpp"
 #include "core/Modules.hpp"
 #include "jobs/Jobs.hpp"
+#include "jobs/MoneyAdvisorHandler.hpp"
 #include "jobs/MoneyParseHandler.hpp"
 #include "jobs/MoneyRatesHandler.hpp"
 #include "money/Llm.hpp"
@@ -37,12 +38,14 @@
 #include "money/Rates.hpp"
 #include "money/Reports.hpp"
 #include "repositories/money/AccountRepository.hpp"
+#include "repositories/money/AdvisorReportRepository.hpp"
 #include "repositories/money/CategoryRepository.hpp"
 #include "repositories/money/CurrencyRepository.hpp"
 #include "repositories/money/Errors.hpp"
 #include "repositories/money/FxRateRepository.hpp"
 #include "repositories/money/MerchantRepository.hpp"
 #include "repositories/money/ParseJobRepository.hpp"
+#include "repositories/money/ReportBuilder.hpp"
 #include "repositories/money/SettingsRepository.hpp"
 #include "repositories/money/TransactionRepository.hpp"
 #include "repositories/money/TransferRepository.hpp"
@@ -253,103 +256,6 @@ std::optional<HttpResponsePtr> filter_problem(const Repo::TransactionRepository:
         return ErrorResponse::bad_request("invalid_status", "status must be posted or pending");
     }
     return std::nullopt;
-}
-
-// ── reports ─────────────────────────────────────────────────────────────────
-
-Money::Reports::Row report_row(const json& r) {
-    Money::Reports::Row row;
-    row.date = r.value("date", "");
-    row.currency = r.value("currency", "");
-    row.type = r.value("type", "");
-    row.category_id = r["category_id"].is_string() ? r["category_id"].get<std::string>() : "";
-    row.category_kind = r.value("category_kind", "");
-    row.flexibility = r.value("flexibility", "variable");
-    row.merchant_key = r.value("merchant_key", "");
-    row.amount = r.value("amount", 0.0);
-    return row;
-}
-
-std::vector<Money::Reports::Row> rows_of(Repo::TransactionRepository& repo,
-                                         const std::string& owner,
-                                         const Money::Period::Range& range) {
-    std::vector<Money::Reports::Row> out;
-    for (const auto& r : repo.report_rows(owner, range.from, range.to)) {
-        out.push_back(report_row(r));
-    }
-    return out;
-}
-
-json block_json(const Money::Reports::CurrencyBlock& b) {
-    json categories = json::array();
-    for (const auto& c : b.categories) {
-        categories.push_back({{"category_id", c.category_id},
-                              {"spent", c.spent},
-                              {"budget", c.budget ? json(*c.budget) : json()},
-                              {"budget_share", c.budget_share ? json(*c.budget_share) : json()}});
-    }
-    return {{"currency", b.currency},
-            {"income", b.income},
-            {"expense", b.expense},
-            {"net", b.net},
-            {"fixed_expense", b.fixed_expense},
-            {"fixed_share", b.fixed_share},
-            {"avg_daily", b.avg_daily},
-            {"projection", b.projection},
-            {"prev_expense", b.prev_expense ? json(*b.prev_expense) : json()},
-            {"median3_expense", b.median3_expense ? json(*b.median3_expense) : json()},
-            {"categories", categories}};
-}
-
-/// The blocks "as if" in one currency, with the rates used and what could not be converted.
-json as_if_json(const Money::Reports::Report& report, const std::string& target, const std::string& on_date) {
-    Repo::FxRateRepository rates;
-    const auto to = rates.nearest(on_date, target);
-    json blocks = json::array();
-    json used = json::object();
-    int unconverted = 0;
-    double income = 0, expense = 0;
-    for (const auto& b : report.blocks) {
-        const auto from = rates.nearest(on_date, b.currency);
-        if (!to || !from) {
-            ++unconverted;
-            continue;
-        }
-        const Money::Rates::Rate f{from->date, from->quote, from->per_usd};
-        const Money::Rates::Rate t{to->date, to->quote, to->per_usd};
-        const auto inc = Money::Rates::convert(b.income, &f, &t);
-        const auto exp = Money::Rates::convert(b.expense, &f, &t);
-        if (!inc || !exp) {
-            ++unconverted;
-            continue;
-        }
-        income += inc->amount;
-        expense += exp->amount;
-        json categories = json::array();
-        for (const auto& c : b.categories) {
-            categories.push_back(
-                {{"category_id", c.category_id}, {"spent", Money::Rates::convert(c.spent, &f, &t)->amount}});
-        }
-        blocks.push_back({{"currency", b.currency},
-                          {"income", inc->amount},
-                          {"expense", exp->amount},
-                          {"net", inc->amount - exp->amount},
-                          {"rate_date", inc->rate_date},
-                          {"categories", categories}});
-        used[b.currency] = {{"per_usd", from->per_usd}, {"date", from->date}};
-    }
-    if (to) {
-        used[target] = {{"per_usd", to->per_usd}, {"date", to->date}};
-    }
-    return {{"currency", target},
-            {"blocks", blocks},
-            {"income", income},
-            {"expense", expense},
-            {"net", income - expense},
-            {"partial", unconverted > 0 || !to},
-            {"unconverted", unconverted},
-            {"rates", used},
-            {"source", "fawazahmed0/currency-api (CC0)"}};
 }
 
 }  // namespace
@@ -1150,46 +1056,8 @@ void MoneyController::periodReport(const HttpRequestPtr& req, Callback&& callbac
         return;
     }
     with_repo_errors(callback, "money.periodReport", [&] {
-        Repo::TransactionRepository repo;
-        const auto rows = rows_of(repo, owner, range);
-        std::vector<std::vector<Money::Reports::Row>> previous;
-        Money::Period::Range cursor = range;
-        for (int i = 0; i < 3; ++i) {
-            cursor = Money::Period::previous(kind, cursor);
-            previous.push_back(rows_of(repo, owner, cursor));
-        }
-        std::map<std::string, Money::Reports::Budget> budgets;
-        for (const auto& c : Repo::CategoryRepository().list(owner, true)) {
-            if (c["budget_max"].is_number() && c["budget_currency"].is_string()) {
-                budgets[c["id"].get<std::string>()] = {c["budget_max"].get<double>(), c["budget_currency"]};
-            }
-        }
-        const auto before = repo.merchants_before(owner, range.from);
-        const std::set<std::string> seen(before.begin(), before.end());
-        const auto report = Money::Reports::build(range, rows, previous, budgets, seen, today);
-
-        json blocks = json::array();
-        for (const auto& b : report.blocks) {
-            blocks.push_back(block_json(b));
-        }
-        json recurring = json::array();
-        for (const auto& r : report.recurring) {
-            recurring.push_back({{"merchant_key", r.merchant_key},
-                                 {"currency", r.currency},
-                                 {"amount", r.amount},
-                                 {"times", r.times},
-                                 {"last_date", r.last_date},
-                                 {"next_expected", r.next_expected}});
-        }
-        json out{{"period", {{"kind", kind_text}, {"from", range.from}, {"to", range.to}}},
-                 {"blocks", blocks},
-                 {"recurring", recurring},
-                 {"new_merchants", report.new_merchants}};
         const std::string target = as_if.empty() ? view_currency(owner).value_or("") : as_if;
-        if (!target.empty()) {
-            const std::string on = std::min(range.to, today);
-            out["as_if"] = as_if_json(report, target, on);
-        }
+        const json out = Repo::ReportBuilder::build(owner, kind, kind_text, range, today, target);
         callback(Response::ok(json{{"data", out}}));
     });
 }
@@ -1443,6 +1311,75 @@ void MoneyController::parseAccept(const HttpRequestPtr& req, Callback&& callback
     with_repo_errors(callback, "money.parseAccept", [&] {
         const json rows = Repo::TransactionRepository().accept_parse(owner, id, inputs);
         callback(Response::created(json{{"data", rows}, {"count", rows.size()}}));
+    });
+}
+
+// ── advisor ─────────────────────────────────────────────────────────────────
+
+void MoneyController::advisorReports(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    const int limit = clamp_int(req->getParameter("limit"), 20, 1, 100);
+    with_repo_errors(callback, "money.advisorReports", [&] {
+        const json rows = Repo::AdvisorReportRepository().list(owner, limit);
+        callback(Response::ok(json{{"data", rows}, {"count", rows.size()}}));
+    });
+}
+
+void MoneyController::advisorReport(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MONEY_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "money.advisorReport", [&] {
+        const auto row = Repo::AdvisorReportRepository().get(owner, id);
+        if (!row) {
+            callback(ErrorResponse::not_found("money_advisor_report"));
+            return;
+        }
+        callback(Response::ok(json{{"data", *row}}));
+    });
+}
+
+void MoneyController::advisorRun(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    if (body.contains("period")) {
+        Validation::one_of(errs, body, "period", {"week", "month", "quarter"});
+    }
+    date_field(errs, body, "date");
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    if (!Money::Llm::advisor_settings().has_value()) {
+        callback(ErrorResponse::service_unavailable("not_configured", "the advisor is not set up on this server"));
+        return;
+    }
+    if (!Jobs::is_initialized()) {
+        callback(ErrorResponse::service_unavailable("queue_unavailable"));
+        return;
+    }
+    const std::string period = Validation::opt_string(body, "period").value_or("week");
+    const std::string date = Validation::opt_string(body, "date").value_or(today_utc());
+    const auto kind = period == "week"      ? Money::Period::Kind::week
+                      : period == "quarter" ? Money::Period::Kind::quarter
+                                            : Money::Period::Kind::month;
+    const auto range = Money::Period::of(kind, date);
+    with_repo_errors(callback, "money.advisorRun", [&] {
+        const auto [row, queued] = Repo::AdvisorReportRepository().create_or_get(owner, period, range.from, range.to);
+        if (queued) {
+            Jobs::get().submit(Jobs::MoneyAdvisor::kJobType,
+                               json{{"report_id", row["id"]},
+                                    {"owner_id", owner},
+                                    {"max_attempts", Jobs::get().default_max_retries()}});
+        }
+        auto resp = Response::ok(json{{"data", row}, {"queued", queued}});
+        resp->setStatusCode(queued ? k202Accepted : k200OK);
+        callback(resp);
     });
 }
 

@@ -34,3 +34,5 @@ export type TransactionType = S['MoneyTransactionType'];
 export type Transfer = S['MoneyTransfer'];
 export type TransferInput = S['MoneyTransferInput'];
 export type TransferPatch = S['MoneyTransferPatch'];
+export type AdvisorReport = S['MoneyAdvisorReport'];
+export type AdvisorReportSummary = S['MoneyAdvisorReportSummary'];

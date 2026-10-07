@@ -43,3 +43,4 @@ triple money.llm.model MONEY_LLM_MODEL
 triple money.llm.prompt_parse MONEY_LLM_PROMPT_PARSE
 triple money.llm.timeout_seconds MONEY_LLM_TIMEOUT_SECONDS
 triple money.llm.max_tokens MONEY_LLM_MAX_TOKENS
+triple money.llm.prompt_advisor MONEY_LLM_PROMPT_ADVISOR

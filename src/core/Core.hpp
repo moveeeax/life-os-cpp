@@ -143,6 +143,8 @@ private:
     static void register_fitness_sync_schedule_(Config::AppConfig& cfg);
     // The daily rates of the money module: every money.rates_schedule_hours, a money_rates job.
     static void register_money_rates_schedule_(Config::AppConfig& cfg);
+    // The weekly money review: an hourly tick that queues each user's week at MONEY_ADVISOR_HOUR_UTC.
+    static void register_money_advisor_schedule_(Config::AppConfig& cfg);
 
     // Registers db_pool_active_connections + db_pool_size gauges, labeled by
     // pool (primary/replica). Saturation = active / size → 1.0 means acquire()

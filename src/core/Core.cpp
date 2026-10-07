@@ -32,6 +32,7 @@
 #include "email/Mailer.hpp"
 #include "jobs/FitnessSyncHandler.hpp"
 #include "jobs/Jobs.hpp"
+#include "jobs/MoneyAdvisorHandler.hpp"
 #include "jobs/MoneyRatesHandler.hpp"
 #include "jobs/Outbox.hpp"
 #include "messaging/Messaging.hpp"
@@ -604,6 +605,7 @@ void Application::init_jobs_(Config::AppConfig& cfg) {
     register_outbox_drain_(cfg);
     register_fitness_sync_schedule_(cfg);
     register_money_rates_schedule_(cfg);
+    register_money_advisor_schedule_(cfg);
 }
 
 void Application::register_fitness_sync_schedule_(Config::AppConfig& cfg) {
@@ -650,6 +652,35 @@ void Application::register_money_rates_schedule_(Config::AppConfig& cfg) {
             Jobs::get().submit(Jobs::MoneyRates::kJobType, nlohmann::json{{"date", "latest"}});
         } catch (const std::exception& e) {
             spdlog::warn("money rates schedule tick failed: {}", e.what());
+        }
+    });
+}
+
+void Application::register_money_advisor_schedule_(Config::AppConfig& cfg) {
+    // An hourly tick in the API pod; at the configured hour it queues the week
+    // that just ended for every user whose advisor runs today. The unique key
+    // of money_advisor_reports makes a repeated tick (or a second pod) a no-op.
+    if (!Tasks::is_initialized() || !Database::is_initialized() || !Jobs::is_initialized())
+        return;
+    if (!money_enabled())
+        return;
+    const int hour = cfg.get<int>("money.advisor_hour_utc", "MONEY_ADVISOR_HOUR_UTC", 7);
+    if (hour < 0 || hour > 23)
+        return;
+    spdlog::info("money advisor schedule enabled: weekly at {:02d}:00 UTC on each user's weekday", hour);
+    Tasks::schedule_recurring("money_advisor_schedule", std::chrono::hours(1), [hour] {
+        if (!Database::is_initialized() || !Jobs::is_initialized())
+            return;
+        const auto now = std::chrono::system_clock::now();
+        const auto day = std::chrono::floor<std::chrono::days>(now);
+        const auto h = std::chrono::duration_cast<std::chrono::hours>(now - day).count();
+        if (h != hour)
+            return;
+        const unsigned weekday = std::chrono::weekday(day).iso_encoding();  // 1 = Monday
+        try {
+            Jobs::MoneyAdvisor::enqueue_weekly(static_cast<int>(weekday), Money::Period::detail::text_of(day));
+        } catch (const std::exception& e) {
+            spdlog::warn("money advisor schedule tick failed: {}", e.what());
         }
     });
 }

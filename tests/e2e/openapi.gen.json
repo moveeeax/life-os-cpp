@@ -4172,6 +4172,120 @@
      }
     }
    },
+   "MoneyAdvisorReportSummary": {
+    "type": "object",
+    "required": [
+     "id",
+     "period",
+     "period_start",
+     "period_end",
+     "status",
+     "error",
+     "model",
+     "created_at",
+     "finished_at"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "period": {
+      "type": "string",
+      "enum": [
+       "week",
+       "month",
+       "quarter"
+      ]
+     },
+     "period_start": {
+      "type": "string",
+      "format": "date"
+     },
+     "period_end": {
+      "type": "string",
+      "format": "date"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "queued",
+       "running",
+       "done",
+       "failed"
+      ]
+     },
+     "error": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "model": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "finished_at": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time"
+     }
+    }
+   },
+   "MoneyAdvisorReport": {
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/MoneyAdvisorReportSummary"
+     },
+     {
+      "type": "object",
+      "required": [
+       "facts",
+       "content",
+       "prompt_tokens",
+       "completion_tokens"
+      ],
+      "properties": {
+       "facts": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "description": "The numbers the review was built on (the period report",
+        "balances": null,
+        "the note)": null
+       },
+       "content": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "The review as markdown"
+       },
+       "prompt_tokens": {
+        "type": [
+         "integer",
+         "null"
+        ]
+       },
+       "completion_tokens": {
+        "type": [
+         "integer",
+         "null"
+        ]
+       }
+      }
+     }
+    ]
+   },
    "MoneyTransactionType": {
     "type": "string",
     "enum": [
@@ -16062,6 +16176,307 @@
     }
    }
   },
+  "/api/v1/money/advisor/reports": {
+   "get": {
+    "summary": "The advisor's reviews, newest period first (without their facts)",
+    "tags": [
+     "money"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 100,
+       "default": 20
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The reviews",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data",
+          "count"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/MoneyAdvisorReportSummary"
+           }
+          },
+          "count": {
+           "type": "integer"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Money module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/money/advisor/reports/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "get": {
+    "summary": "One review with the facts it was built on",
+    "tags": [
+     "money"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The review",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MoneyAdvisorReport"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "id is not a UUID",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Money module disabled, or the review is not the caller's",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/money/advisor/run": {
+   "post": {
+    "summary": "Ask for a review of the week, month or quarter containing a day (once per period; a failed one is queued again)",
+    "tags": [
+     "money"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "period": {
+          "type": "string",
+          "enum": [
+           "week",
+           "month",
+           "quarter"
+          ],
+          "default": "week"
+         },
+         "date": {
+          "type": "string",
+          "format": "date",
+          "description": "A day of the period; defaults to today (UTC)"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Queued",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data",
+          "queued"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MoneyAdvisorReport"
+          },
+          "queued": {
+           "type": "boolean"
+          }
+         }
+        }
+       }
+      }
+     },
+     "200": {
+      "description": "Already there, not queued again",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data",
+          "queued"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MoneyAdvisorReport"
+          },
+          "queued": {
+           "type": "boolean"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Money module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "not_configured or queue_unavailable",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/money/settings": {
    "get": {
     "summary": "The view currency and the advisor settings",
@@ -16210,7 +16625,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 243685,
-  "source_fnv1a64": "4b1270d9fe705ad0"
+  "source_bytes": 249283,
+  "source_fnv1a64": "36029d67a8adddfe"
  }
 }

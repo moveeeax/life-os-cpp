@@ -58,6 +58,9 @@ public:
     ADD_METHOD_TO(MoneyController::parseReceipt, "/api/v1/money/parse/receipt", Post);
     ADD_METHOD_TO(MoneyController::parseStatus, "/api/v1/money/parse/{id}", Get);
     ADD_METHOD_TO(MoneyController::parseAccept, "/api/v1/money/parse/{id}/accept", Post);
+    ADD_METHOD_TO(MoneyController::advisorReports, "/api/v1/money/advisor/reports", Get);
+    ADD_METHOD_TO(MoneyController::advisorReport, "/api/v1/money/advisor/reports/{id}", Get);
+    ADD_METHOD_TO(MoneyController::advisorRun, "/api/v1/money/advisor/run", Post);
     ADD_METHOD_TO(MoneyController::getSettings, "/api/v1/money/settings", Get);
     ADD_METHOD_TO(MoneyController::putSettings, "/api/v1/money/settings", Put);
     METHOD_LIST_END
@@ -101,6 +104,9 @@ public:
     void parseReceipt(const HttpRequestPtr& req, Callback&& callback);
     void parseStatus(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void parseAccept(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void advisorReports(const HttpRequestPtr& req, Callback&& callback);
+    void advisorReport(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void advisorRun(const HttpRequestPtr& req, Callback&& callback);
     void getSettings(const HttpRequestPtr& req, Callback&& callback);
     void putSettings(const HttpRequestPtr& req, Callback&& callback);
 

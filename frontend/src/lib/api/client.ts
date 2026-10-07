@@ -128,8 +128,9 @@ type PathsWith<M extends HttpMethod> = {
 }[keyof paths];
 
 /** The operation object for (path, method). */
-type Op<P extends keyof paths, M extends HttpMethod> =
-  M extends keyof paths[P] ? paths[P][M] : never;
+type Op<P extends keyof paths, M extends HttpMethod> = M extends keyof paths[P]
+  ? paths[P][M]
+  : never;
 
 /** Pluck the application/json content from a `{ content: {...} }` wrapper. */
 type JsonContent<T> = T extends { content: { 'application/json': infer J } } ? J : never;

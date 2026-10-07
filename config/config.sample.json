@@ -229,12 +229,14 @@
   "money": {
     "enabled": "${MONEY_ENABLED:-false}",
     "rates_schedule_hours": "${MONEY_RATES_SCHEDULE_HOURS:-0}",
+    "advisor_hour_utc": "${MONEY_ADVISOR_HOUR_UTC:-7}",
     "llm": {
       "base_url": "${MONEY_LLM_BASE_URL:-}",
       "api_key": "${MONEY_LLM_API_KEY:-}",
       "model": "${MONEY_LLM_MODEL:-}",
       "model_vision": "${MONEY_LLM_MODEL_VISION:-}",
       "prompt_parse": "${MONEY_LLM_PROMPT_PARSE:-}",
+      "prompt_advisor": "${MONEY_LLM_PROMPT_ADVISOR:-}",
       "timeout_seconds": "${MONEY_LLM_TIMEOUT_SECONDS:-60}",
       "max_tokens": "${MONEY_LLM_MAX_TOKENS:-2500}"
     }

@@ -78,6 +78,10 @@ export const qk = {
     report: (kind: string, date: string, asIf: string) =>
       ['money', 'report', kind, date, asIf] as const,
     settings: () => ['money', 'settings'] as const,
+    advisorReports: () => ['money', 'advisor', 'reports'] as const,
+    /** Keyed by status too: a review that turns done is read again. */
+    advisorReport: (id: string, status: string) =>
+      ['money', 'advisor', 'report', id, status] as const,
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['money-enabled'] as const,
   },
