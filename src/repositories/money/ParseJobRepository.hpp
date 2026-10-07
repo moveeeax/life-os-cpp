@@ -70,7 +70,8 @@ public:
         return Database::get().execute_read([&](auto& txn) -> std::optional<nlohmann::json> {
             auto r = txn.exec_params(
                 "SELECT json_build_object('owner_id', owner_id, 'kind', kind, 'text', text, "
-                " 'image', encode(image, 'base64'), 'image_type', image_type, 'hint_date', hint_date::text, "
+                " 'image', translate(encode(image, 'base64'), E'\\n', ''), 'image_type', image_type, 'hint_date', "
+                "hint_date::text, "
                 " 'status', status) FROM money_parse_jobs WHERE id = $1::uuid",
                 id);
             if (r.empty()) {

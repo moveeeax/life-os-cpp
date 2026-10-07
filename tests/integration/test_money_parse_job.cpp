@@ -192,6 +192,13 @@ TEST_F(MoneyParseJobTest, AReceiptSendsThePhotoAndClearsIt) {
     EXPECT_EQ(content[1]["image_url"]["url"], "data:image/png;base64,aGVsbG8=");
     EXPECT_FALSE(jobs.has_image(id)) << "the photo goes when the job ends";
 
+    // A real photo is longer than one base64 line: the URL must carry no line breaks.
+    provider.replies.push_back({200, completion(good_lines())});
+    const std::string big(400, 'A');  // 300 bytes of zeros
+    const std::string long_id = jobs.create_receipt(kAnna, big, "image/jpeg", "2026-10-07")["id"].get<std::string>();
+    EXPECT_EQ(run(long_id)["status"], "done");
+    EXPECT_EQ(provider.bodies.back()["messages"][1]["content"][1]["image_url"]["url"], "data:image/jpeg;base64," + big);
+
     // A failed receipt clears it too.
     provider.replies.push_back({200, completion(json{{"lines", json::array()}})});
     const std::string bad = jobs.create_receipt(kAnna, "aGVsbG8=", "image/png", "2026-10-07")["id"].get<std::string>();
@@ -259,4 +266,24 @@ TEST_F(MoneyParseUnconfiguredTest, AJobWithoutSettingsFailsWithoutCallingAnyone)
     EXPECT_EQ(run(id)["error"], "not_configured");
     EXPECT_EQ((*jobs.get(kAnna, id))["status"], "failed");
     EXPECT_TRUE(provider.bodies.empty());
+}
+
+namespace {
+
+class MoneyParseOffTest : public MoneyParseJobTest {
+protected:
+    std::string config_file_name() const override { return "money_parse_off_test_config.json"; }
+    void config_overrides(nlohmann::json& cfg) override {
+        MoneyParseJobTest::config_overrides(cfg);
+        cfg["money"]["enabled"] = false;
+    }
+};
+
+}  // namespace
+
+TEST_F(MoneyParseOffTest, AJobOnAWorkerWithTheModuleOffFails) {
+    const std::string id = text_job();
+    EXPECT_EQ(run(id)["error"], "money_disabled");
+    EXPECT_TRUE(provider.bodies.empty());
+    EXPECT_THROW(Jobs::MoneyParse::process_job(json::object()), std::invalid_argument);
 }

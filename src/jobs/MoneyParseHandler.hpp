@@ -43,7 +43,10 @@ inline constexpr const char* kJobType = "money_parse";
 inline constexpr long kMerchantsInPrompt = 300;
 
 inline nlohmann::json process_job(const nlohmann::json& payload) {
-    const std::string job_id = payload.value("job_id", std::string());
+    if (!payload.contains("job_id") || !payload["job_id"].is_string() || payload["job_id"].get<std::string>().empty()) {
+        throw std::invalid_argument("money_parse: payload has no job_id");
+    }
+    const std::string job_id = payload["job_id"].get<std::string>();
     Repositories::Money::ParseJobRepository jobs;
     const auto failed = [&](const std::string& code, const std::string& message) {
         jobs.fail(job_id, code, message);
@@ -153,7 +156,7 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         }
         jobs.finish(job_id,
                     Money::Parse::to_json(lines),
-                    Chat::model_of(body, *settings),
+                    body.contains("model") && body["model"].is_string() ? body["model"].get<std::string>() : model,
                     Chat::usage(body, "prompt_tokens"),
                     Chat::usage(body, "completion_tokens"));
         return {{"job_id", job_id}, {"status", "done"}, {"lines", lines.size()}};
