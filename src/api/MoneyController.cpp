@@ -927,13 +927,17 @@ void MoneyController::merchants(const HttpRequestPtr& req, Callback&& callback) 
     });
 }
 
-void MoneyController::patchMerchant(const HttpRequestPtr& req, Callback&& callback, const std::string& key) {
+void MoneyController::patchMerchant(const HttpRequestPtr& req, Callback&& callback) {
     MONEY_GUARD(req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
     }
+    // The key travels in the body: it holds spaces, `&`, `'` and any script,
+    // which a path segment would have to escape.
     Validation::Errors errs;
+    Validation::require_string(errs, body, "merchant_key");
+    text_length(errs, body, "merchant_key", 1, 200);
     uuid_field(errs, body, "category_id");
     if (!body.contains("category_id")) {
         errs.add("category_id", "missing", "category_id (or null) is required");
@@ -942,6 +946,8 @@ void MoneyController::patchMerchant(const HttpRequestPtr& req, Callback&& callba
         callback(Validation::response_400(errs));
         return;
     }
+    // A display name ("Big C") and its key ("big c") name the same merchant.
+    const std::string key = Repo::MerchantRepository::key(body["merchant_key"].get<std::string>());
     with_repo_errors(callback, "money.patchMerchant", [&] {
         callback(Response::ok(
             json{{"data",
@@ -1024,7 +1030,8 @@ void MoneyController::convert(const HttpRequestPtr& req, Callback&& callback) {
 
 void MoneyController::refreshRates(const HttpRequestPtr& req, Callback&& callback) {
     MONEY_GUARD(req, callback, owner);
-    // No body or {}: today's rates. {from, to}: one job per day of the range that has none yet.
+    // No body or {}: today's rates. {from, to}: one job per day of the range that has none yet,
+    // refused while an earlier backfill still waits in the queue (its days would be queued twice).
     std::optional<std::string> from;
     std::string to = today_utc();
     json body = json::object();
@@ -1056,7 +1063,14 @@ void MoneyController::refreshRates(const HttpRequestPtr& req, Callback&& callbac
     }
     try {
         if (from.has_value()) {
-            const int queued = Jobs::MoneyRates::enqueue_backfill(*from, to);
+            const auto days = Jobs::MoneyRates::missing_days(*from, to);
+            if (const long waiting = days.empty() ? 0 : Jobs::MoneyRates::waiting(); waiting > 0) {
+                callback(ErrorResponse::conflict(
+                    "backfill_running",
+                    std::to_string(waiting) + " rate job(s) still wait in the queue; retry when they finish"));
+                return;
+            }
+            const int queued = Jobs::MoneyRates::enqueue_days(days);
             auto resp = Response::ok(json{{"data", {{"queued", queued}, {"from", *from}, {"to", to}}}});
             resp->setStatusCode(k202Accepted);
             callback(resp);

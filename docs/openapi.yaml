@@ -5643,19 +5643,24 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-
-  /api/v1/money/merchants/{key}:
-    parameters:
-      - { name: key, in: path, required: true, schema: { type: string } }
     patch:
-      summary: Change what a merchant means from now on
+      summary: Move a merchant to another category from now on
+      description: >-
+        The key travels in the body because it holds spaces, `&`, `'` and any script.
+        A display name works too: "Big  C!" and "big c" name the same merchant.
+        Past rows keep their category; the next suggestion for the merchant uses the new one.
       tags: [money]
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [category_id], properties: { category_id: { type: [string, 'null'], format: uuid } } }
+            schema:
+              type: object
+              required: [merchant_key, category_id]
+              properties:
+                merchant_key: { type: string, minLength: 1, maxLength: 200 }
+                category_id: { type: [string, 'null'], format: uuid }
       responses:
         '200':
           description: The merchant
@@ -5798,6 +5803,11 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '404':
           description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: A range with missing days while an earlier backfill still waits in the queue (backfill_running)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

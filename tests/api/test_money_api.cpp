@@ -360,16 +360,23 @@ TEST_F(MoneyApiTest, InboxAndMerchantMemory) {
     ASSERT_EQ(m.size(), 1u);
     EXPECT_EQ(m[0]["times"], 2);
     EXPECT_EQ(m[0]["category_id"], food["id"]);
-    EXPECT_EQ(
-        call_id(
-            &Api::MoneyController::patchMerchant, user(kAnna), Patch, "big c", json{{"category_id", boris_food["id"]}})
-            ->statusCode(),
-        k400BadRequest)
+    const auto move = [&](const std::string& who, const json& body) {
+        return call_json(&Api::MoneyController::patchMerchant, user(who), body, Patch);
+    };
+    EXPECT_EQ(move(kAnna, json{{"merchant_key", "big c"}, {"category_id", boris_food["id"]}})->statusCode(),
+              k400BadRequest)
         << "another user's category";
-    EXPECT_EQ(
-        call_id(&Api::MoneyController::patchMerchant, user(kBoris), Patch, "big c", json{{"category_id", nullptr}})
-            ->statusCode(),
-        k404NotFound);
+    EXPECT_EQ(move(kBoris, json{{"merchant_key", "big c"}, {"category_id", nullptr}})->statusCode(), k404NotFound);
+    EXPECT_EQ(move(kAnna, json{{"category_id", nullptr}})->statusCode(), k400BadRequest) << "no key";
+    EXPECT_EQ(move(kAnna, json{{"merchant_key", "big c"}})->statusCode(), k400BadRequest) << "no category_id";
+    const json other = category(kAnna, json{{"name", "Household"}});
+    const auto moved = move(kAnna, json{{"merchant_key", "Big  C!"}, {"category_id", other["id"]}});
+    ASSERT_EQ(moved->statusCode(), k200OK) << "a display name finds its key: " << moved->body();
+    EXPECT_EQ(body_of(moved)["data"]["merchant_key"], "big c");
+    EXPECT_EQ(body_of(moved)["data"]["category_id"], other["id"]);
+    const auto cleared = move(kAnna, json{{"merchant_key", "big c"}, {"category_id", nullptr}});
+    ASSERT_EQ(cleared->statusCode(), k200OK);
+    EXPECT_TRUE(body_of(cleared)["data"]["category_id"].is_null());
 }
 
 TEST_F(MoneyApiTest, ReportIsPerCurrencyWithBudgetsAndTheAsIfBlock) {
@@ -807,6 +814,33 @@ TEST_F(MoneyParseApiTest, AFewOpenParsesPerUser) {
               k202Accepted);
     for (int i = 0; i < 4; ++i) {  // exactly what was queued: three of Anna's, one of Boris's
         auto job = Jobs::get().pick({"money_parse"}, 1);
+        ASSERT_TRUE(job.has_value());
+        Jobs::get().complete(job->id, json::object());
+    }
+}
+
+TEST_F(MoneyParseApiTest, ASecondBackfillWaitsForTheFirst) {
+    const auto post = [&](const json& b) { return call_json(&Api::MoneyController::refreshRates, user(kAnna), b); };
+    const auto first = post(json{{"from", "2024-04-01"}, {"to", "2024-04-02"}});
+    ASSERT_EQ(first->statusCode(), k202Accepted) << first->body();
+    EXPECT_EQ(body_of(first)["data"]["queued"], 2);
+    const auto again = post(json{{"from", "2024-04-01"}, {"to", "2024-04-02"}});
+    EXPECT_EQ(again->statusCode(), k409Conflict) << "the same days would be queued twice";
+    EXPECT_EQ(body_of(again)["error"], "backfill_running");
+    // A range with nothing missing queues nothing, so it is not refused.
+    Repositories::Money::FxRateRepository().put_day("2024-05-01", {{"KZT", 450}});
+    const auto stored = post(json{{"from", "2024-05-01"}, {"to", "2024-05-01"}});
+    ASSERT_EQ(stored->statusCode(), k202Accepted) << stored->body();
+    EXPECT_EQ(body_of(stored)["data"]["queued"], 0);
+    for (int i = 0; i < 2; ++i) {
+        auto job = Jobs::get().pick({"money_rates"}, 1);
+        ASSERT_TRUE(job.has_value());
+        Jobs::get().complete(job->id, json::object());
+    }
+    EXPECT_EQ(post(json{{"from", "2024-04-01"}, {"to", "2024-04-02"}})->statusCode(), k202Accepted)
+        << "the queue is empty again; the days still have no rates";
+    for (int i = 0; i < 2; ++i) {
+        auto job = Jobs::get().pick({"money_rates"}, 1);
         ASSERT_TRUE(job.has_value());
         Jobs::get().complete(job->id, json::object());
     }
