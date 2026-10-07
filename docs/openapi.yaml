@@ -52,6 +52,111 @@ components:
         pattern: '^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$'
 
   schemas:
+    TaskArea:
+      type: string
+      enum: [finance, health, travel, growth, relationships, projects]
+    TaskEffort:
+      type: [string, 'null']
+      enum: ['5min', '30min', deep, null]
+    Task:
+      type: object
+      required: [id, title, area, effort, due, next_step, note, status, completed_at, source_kind, source_ref, external_id, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        area: { $ref: '#/components/schemas/TaskArea' }
+        effort: { $ref: '#/components/schemas/TaskEffort' }
+        due: { type: [string, 'null'], format: date }
+        next_step: { type: string }
+        note: { type: string }
+        status: { type: string, enum: [open, done] }
+        completed_at: { type: [string, 'null'], format: date-time }
+        source_kind: { type: [string, 'null'], enum: [url, money_transaction, null] }
+        source_ref: { type: [string, 'null'], description: The link, or the id of a money ledger row of the same user }
+        external_id: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    TaskInput:
+      type: object
+      required: [title, area]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        area: { $ref: '#/components/schemas/TaskArea' }
+        effort: { $ref: '#/components/schemas/TaskEffort' }
+        due: { type: [string, 'null'], format: date }
+        next_step: { type: string, maxLength: 300 }
+        note: { type: string, maxLength: 2000 }
+        status: { type: string, enum: [open, done] }
+        source_kind: { type: [string, 'null'], enum: [url, money_transaction, null] }
+        source_ref: { type: [string, 'null'], maxLength: 2000 }
+        external_id: { type: string, minLength: 1, maxLength: 100 }
+    TaskPatch:
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        area: { $ref: '#/components/schemas/TaskArea' }
+        effort: { $ref: '#/components/schemas/TaskEffort' }
+        due: { type: [string, 'null'], format: date }
+        next_step: { type: string, maxLength: 300 }
+        note: { type: string, maxLength: 2000 }
+        status: { type: string, enum: [open, done] }
+        source_kind: { type: [string, 'null'], enum: [url, money_transaction, null] }
+        source_ref: { type: [string, 'null'], maxLength: 2000 }
+    TaskAgenda:
+      type: object
+      required: [date, tz, late, soon, dated, someday, done_today, review]
+      properties:
+        date: { type: string, format: date }
+        tz: { type: string }
+        late: { type: array, items: { $ref: '#/components/schemas/Task' } }
+        soon: { type: array, items: { $ref: '#/components/schemas/Task' } }
+        dated: { type: array, items: { $ref: '#/components/schemas/Task' } }
+        someday: { type: array, items: { $ref: '#/components/schemas/Task' } }
+        done_today: { type: array, items: { $ref: '#/components/schemas/Task' } }
+        review:
+          type: object
+          required: [no_next_step, stale]
+          properties:
+            no_next_step: { type: array, items: { $ref: '#/components/schemas/Task' } }
+            stale: { type: array, items: { $ref: '#/components/schemas/Task' } }
+    TaskNote:
+      type: object
+      required: [id, text, status, task_id, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        text: { type: string }
+        status: { type: string, enum: [inbox, archived] }
+        task_id: { type: [string, 'null'], format: uuid, description: The task the note became }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    TaskParseLine:
+      type: object
+      required: [title, area]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        area: { $ref: '#/components/schemas/TaskArea' }
+        effort: { $ref: '#/components/schemas/TaskEffort' }
+        due: { type: [string, 'null'], format: date }
+        next_step: { type: string, maxLength: 300 }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        possible_duplicate: { type: boolean, description: An open task of the last 30 days has the same title }
+    TaskParseJob:
+      type: object
+      required: [id, status, text, hint_date, note_id, result, error, model, prompt_tokens, completion_tokens, accepted_at, created_at, finished_at]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [queued, running, done, failed] }
+        text: { type: string }
+        hint_date: { type: string, format: date }
+        note_id: { type: [string, 'null'], format: uuid }
+        result: { type: [array, 'null'], items: { $ref: '#/components/schemas/TaskParseLine' } }
+        error: { type: [string, 'null'] }
+        model: { type: [string, 'null'] }
+        prompt_tokens: { type: [integer, 'null'] }
+        completion_tokens: { type: [integer, 'null'] }
+        accepted_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
     # Mirrors ErrorResponse::make in src/utils/ErrorResponse.cpp — every
     # error body carries `error` AND the numeric `status` (message/extras
     # optional). The schema used to omit `status`; the e2e schema validation
@@ -6218,6 +6323,502 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '404':
           description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/tasks/status:
+    get:
+      summary: Whether the tasks module answers and the phrase parse is set up
+      tags: [tasks]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { type: object, required: [llm_available], properties: { llm_available: { type: boolean } } } } }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Tasks module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/tasks/items:
+    get:
+      summary: The caller's tasks, newest first
+      tags: [tasks]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [open, done] } }
+        - { name: area, in: query, schema: { $ref: '#/components/schemas/TaskArea' } }
+        - { name: q, in: query, schema: { type: string }, description: Over the title and the next step }
+        - { name: due_to, in: query, schema: { type: string, format: date } }
+        - { name: done_since, in: query, schema: { type: string, format: date } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200':
+          description: A page of tasks
+          content:
+            application/json:
+              schema: { type: object, required: [data, total, limit, offset], properties: { data: { type: array, items: { $ref: '#/components/schemas/Task' } }, total: { type: integer }, limit: { type: integer }, offset: { type: integer } } }
+        '400':
+          description: A filter is not a known value or day (invalid_query)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Tasks module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Create a task
+      tags: [tasks]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskInput' }
+      responses:
+        '201':
+          description: The task
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/Task' } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: A task with this external_id exists (duplicate)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Tasks module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/tasks/items/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: One task
+      tags: [tasks]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The task
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/Task' } } }
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Tasks module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    patch:
+      summary: Change a task
+      description: >-
+        Closing (status done) sets completed_at, reopening clears it; a completed_at in the body is ignored. Null clears effort, due and the source.
+      tags: [tasks]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskPatch' }
+      responses:
+        '200':
+          description: The task
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/Task' } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Tasks module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a task
+      tags: [tasks]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Tasks module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/tasks/agenda:
+    get:
+      summary: The agenda of one local day
+      description: >-
+        late: open, due before the date. soon: open, due from the date to two days after. dated: open, due later. someday: open, no due. done_today: completed_at read in tz falls on the date. review: open tasks without a next step older than seven days, and open tasks untouched for fourteen days.
+      tags: [tasks]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: date, in: query, schema: { type: string, format: date }, description: The person's local day; defaults to today in UTC }
+        - { name: tz, in: query, schema: { type: string }, description: 'IANA zone such as Asia/Bangkok; defaults to UTC' }
+      responses:
+        '200':
+          description: The agenda
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/TaskAgenda' } } }
+        '400':
+          description: date is not a calendar day or tz not an IANA zone (invalid_query)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Tasks module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/tasks/notes:
+    get:
+      summary: The inbox, or the archived notes
+      tags: [tasks]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [inbox, archived], default: inbox } }
+      responses:
+        '200':
+          description: Notes, newest first
+          content:
+            application/json:
+              schema: { type: object, required: [data, count], properties: { data: { type: array, items: { $ref: '#/components/schemas/TaskNote' } }, count: { type: integer } } }
+        '400':
+          description: status is not inbox or archived (invalid_query)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Tasks module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Add a note to the inbox
+      tags: [tasks]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 1000 } } }
+      responses:
+        '201':
+          description: The note
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/TaskNote' } } }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Tasks module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/tasks/notes/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Change or archive a note
+      tags: [tasks]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { text: { type: string, minLength: 1, maxLength: 1000 }, status: { type: string, enum: [inbox, archived] } } }
+      responses:
+        '200':
+          description: The note
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/TaskNote' } } }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Tasks module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a note
+      tags: [tasks]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Tasks module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/tasks/parse:
+    post:
+      summary: Queue one phrase for the tasks_parse job
+      tags: [tasks]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 2000 }, hint_date: { type: string, format: date }, note_id: { type: string, format: uuid } } }
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { type: object, required: [id, status], properties: { id: { type: string, format: uuid }, status: { type: string } } } } }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Tasks module disabled, or the note is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: Three parses of the caller are still open (too_many_parses)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: The parse is not set up (not_configured), or the queue or storage is down
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/tasks/parse/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: A parse job and its draft lines
+      tags: [tasks]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The job
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/TaskParseJob' } } }
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Tasks module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/tasks/parse/{id}/accept:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Create the edited draft lines as tasks
+      description: >-
+        One transaction: the tasks are created, the note the phrase came from (if any) is archived and linked to the first task, and the job is marked accepted.
+      tags: [tasks]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [lines], properties: { lines: { type: array, minItems: 1, maxItems: 20, items: { $ref: '#/components/schemas/TaskParseLine' } } } }
+      responses:
+        '201':
+          description: The tasks
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/Task' } } } }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Tasks module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: The parse is not finished or was accepted already (already_accepted)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
