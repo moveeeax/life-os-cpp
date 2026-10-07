@@ -7,6 +7,7 @@ import {
   formatMoney,
   groupByDay,
   linesToAccept,
+  orderWithAdjustments,
   parseErrorText,
   periodFromSearch,
   periodRange,
@@ -176,6 +177,39 @@ describe('the parse draft', () => {
         note: '',
       },
     ]);
+  });
+});
+
+describe('adjustments', () => {
+  it('sit right after their original and on its day', () => {
+    const orig = tx({ id: 'o', date: '2026-10-03' });
+    const adj = tx({
+      id: 'a',
+      type: 'fx_adjustment',
+      adjusts_id: 'o',
+      date: '2026-10-07',
+      amount: 120,
+    });
+    const other = tx({ id: 'x', date: '2026-10-05' });
+    const days = groupByDay([adj, other, orig]);
+    expect(days.map((d) => d.date)).toEqual(['2026-10-05', '2026-10-03']);
+    expect(days[1].rows.map((r) => r.id)).toEqual(['o', 'a']);
+    expect(orderWithAdjustments([adj, other]).map((r) => r.id)).toEqual(['a', 'x']);
+  });
+});
+
+describe('the draft drops a category of the other kind', () => {
+  it('keeps a matching one', () => {
+    const kinds = new Map([
+      ['cat', 'expense'],
+      ['inc', 'income'],
+    ]);
+    const d = draftFromJob(job([line, { ...line, category_id: 'inc' }]), kinds);
+    expect(d[0].category_id).toBe('cat');
+    expect(d[1].category_id).toBeNull();
+    d[1].category_id = 'cat';
+    d[1].receipt_amount = '0';
+    expect(draftProblem(d)).toBe('Line 2: the receipt needs an amount and a currency code.');
   });
 });
 
