@@ -53,7 +53,6 @@ export function CurrencyTotals({
     <div className="flex flex-wrap gap-x-5 gap-y-1 text-theme-xs text-gray-500 dark:text-gray-400">
       {totals.map((t) => (
         <span key={t.currency} className="tabular-nums whitespace-nowrap">
-          <span className="font-medium text-gray-700 dark:text-gray-300">{t.currency}</span>{' '}
           {t.expense > 0 && (
             <>−{formatMoney(t.expense, t.currency, decimalsOf(currencies, t.currency))}</>
           )}
