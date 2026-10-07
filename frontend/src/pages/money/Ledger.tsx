@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Plus } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 
@@ -11,12 +11,16 @@ import {
   useCurrencies,
   useDeleteTransaction,
   useInbox,
+  useReport,
   useTransactions,
   useUpdateTransaction,
 } from '@/hooks/useMoney';
 import {
+  decimalsOf,
   formatDay,
+  formatMoney,
   groupByDay,
+  isDay,
   periodFromSearch,
   periodRange,
   todayLocal,
@@ -42,6 +46,7 @@ import {
 import { AddForm } from './AddForm';
 import { Amount, CurrencyTotals, PeriodRow } from './bits';
 import { LoadError, MoneyFrame, Placeholder } from './frame';
+import { TransfersList } from './Transfers';
 
 function TransactionEditor({
   row,
@@ -65,7 +70,10 @@ function TransactionEditor({
   const update = useUpdateTransaction(row.id, onClose);
   const remove = useDeleteTransaction(onClose);
   const a = Number(amount.replace(',', '.'));
-  const amountBad = !Number.isFinite(a) || (adjustment ? a === 0 : a <= 0);
+  const amountBad =
+    !Number.isFinite(a) ||
+    (adjustment ? a === 0 : a <= 0) ||
+    (!adjustment && (name.trim() === '' || !isDay(date)));
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -268,7 +276,13 @@ function Row({
           <Amount row={row} currencies={currencies} className="block text-theme-sm font-medium" />
           {row.receipt_amount !== null && (
             <span className="block text-theme-xs text-gray-500 tabular-nums">
-              {row.receipt_amount} {row.receipt_currency}
+              {row.receipt_currency
+                ? formatMoney(
+                    row.receipt_amount,
+                    row.receipt_currency,
+                    decimalsOf(currencies, row.receipt_currency),
+                  )
+                : row.receipt_amount}
             </span>
           )}
         </span>
@@ -314,7 +328,12 @@ function Inbox({
         <p className="text-theme-sm text-gray-500">
           Rows a parse or an agent proposed. They count once you post them.
         </p>
-        <button type="button" onClick={() => post(rows)} className={cn(primaryButton, 'px-3 py-2')}>
+        <button
+          type="button"
+          onClick={() => post(rows)}
+          disabled={confirm.isPending}
+          className={cn(primaryButton, 'px-3 py-2')}
+        >
           Post all {rows.length}
         </button>
       </div>
@@ -338,6 +357,7 @@ function Inbox({
               <button
                 type="button"
                 onClick={() => post([r])}
+                disabled={confirm.isPending}
                 className={cn(secondaryButton, 'px-3 py-2')}
               >
                 Post
@@ -345,6 +365,7 @@ function Inbox({
               <button
                 type="button"
                 onClick={() => remove.mutate(r.id)}
+                disabled={remove.isPending}
                 className={cn(secondaryButton, 'px-3 py-2')}
               >
                 Discard
@@ -383,7 +404,12 @@ export function MoneyLedgerPage() {
     params.get('view') === 'inbox' ? 'inbox' : 'ledger',
   );
   const [account, setAccount] = useState(params.get('account') ?? '');
+  const [text, setText] = useState('');
   const [q, setQ] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setQ(text.trim()), 300);
+    return () => clearTimeout(t);
+  }, [text]);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
 
@@ -399,6 +425,15 @@ export function MoneyLedgerPage() {
   });
   const rows = useMemo(() => list.data?.pages.flatMap((p) => p.data) ?? [], [list.data]);
   const days = useMemo(() => groupByDay(rows), [rows]);
+  const report = useReport(kind, date);
+  const filtered = account !== '' || q !== '';
+  const periodTotals = filtered
+    ? totalsByCurrency(rows)
+    : (report.data?.blocks ?? []).map((b) => ({
+        currency: b.currency,
+        income: b.income,
+        expense: b.expense,
+      }));
 
   const setPeriod = (k: PeriodKind, d: string) => {
     const p = new URLSearchParams(params);
@@ -478,8 +513,8 @@ export function MoneyLedgerPage() {
             </select>
             <input
               type="search"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
               placeholder="Search name or merchant"
               aria-label="Search"
               className={cn(inputClass, 'h-10 max-w-xs')}
@@ -490,17 +525,28 @@ export function MoneyLedgerPage() {
           ) : list.isError ? (
             <LoadError error={list.error} onRetry={() => void list.refetch()} />
           ) : days.length === 0 ? (
-            <p className={cn(cardClass, 'text-center text-theme-sm text-gray-500')}>
-              Nothing in this period.
-            </p>
+            <>
+              <p className={cn(cardClass, 'text-center text-theme-sm text-gray-500')}>
+                Nothing in this period.
+              </p>
+              <TransfersList
+                from={range.from}
+                to={range.to}
+                account={account}
+                accounts={accounts}
+                currencies={currencies}
+              />
+            </>
           ) : (
             <>
               <div className={cardClass}>
                 <p className="text-theme-xs font-medium text-gray-500 uppercase">
-                  Period, per currency
+                  {filtered
+                    ? `Shown rows, per currency${list.hasNextPage ? ' (more to load)' : ''}`
+                    : 'Period, per currency'}
                 </p>
                 <div className="mt-1">
-                  <CurrencyTotals totals={totalsByCurrency(rows)} currencies={currencies} />
+                  <CurrencyTotals totals={periodTotals} currencies={currencies} />
                 </div>
               </div>
               {days.map((d) => (
@@ -525,6 +571,13 @@ export function MoneyLedgerPage() {
                   </ul>
                 </section>
               ))}
+              <TransfersList
+                from={range.from}
+                to={range.to}
+                account={account}
+                accounts={accounts}
+                currencies={currencies}
+              />
               {list.hasNextPage && (
                 <button
                   type="button"

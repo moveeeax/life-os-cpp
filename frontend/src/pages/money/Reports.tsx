@@ -183,9 +183,13 @@ export function MoneyReportsPage() {
               </dl>
               <p className="mt-2 text-theme-xs text-gray-500">
                 {Object.entries(r.as_if.rates as Record<string, { per_usd: number; date: string }>)
-                  .map(([code, v]) => `${code} ${v.per_usd} per USD (${v.date})`)
+                  .map(
+                    ([code, v]) =>
+                      `${code} ${Number(v.per_usd.toPrecision(6))} per USD (${v.date})`,
+                  )
                   .join(' · ')}
-                {r.as_if.partial && ` · partial: ${r.as_if.unconverted} currency without a rate`}
+                {r.as_if.partial &&
+                  ` · partial: ${r.as_if.unconverted > 0 ? `${r.as_if.unconverted} of the currencies have` : `${r.as_if.currency} has`} no rate on or before the period's end`}
               </p>
               <p className="mt-1 text-theme-xs text-gray-500">
                 Rates: fawazahmed0/currency-api. Stored amounts do not change.

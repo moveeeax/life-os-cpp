@@ -18,6 +18,7 @@ import {
   linesToAccept,
   parseErrorText,
   scaleImage,
+  isDay,
   todayLocal,
   transferNeedsReceived,
   type Account,
@@ -145,7 +146,10 @@ function ManualTab({
 }) {
   const [type, setType] = useState<'expense' | 'income'>('expense');
   const [amount, setAmount] = useState('');
-  const [account, setAccount] = useState(() => readLast());
+  const [account, setAccount] = useState(() => {
+    const last = readLast();
+    return accounts.some((a) => a.id === last) ? last : '';
+  });
   const [merchant, setMerchant] = useState('');
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
@@ -176,7 +180,8 @@ function ManualTab({
     a > 0 &&
     !!category &&
     (name.trim() || merchant.trim()) &&
-    !receiptBad;
+    !receiptBad &&
+    isDay(date);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -467,8 +472,9 @@ function ParseTab({
 
   const doneId = parse.state === 'done' ? parse.job?.id : undefined;
   useEffect(() => {
-    if (doneId && parse.job) setLines(draftFromJob(parse.job));
-  }, [doneId, parse.job]);
+    if (doneId && parse.job)
+      setLines(draftFromJob(parse.job, new Map(categories.map((c) => [c.id, c.kind]))));
+  }, [doneId, parse.job, categories]);
 
   const problem = draftProblem(lines);
   const selected = lines.filter((l) => l.selected);
@@ -552,7 +558,10 @@ function ParseTab({
           type="file"
           accept="image/*"
           capture="environment"
-          onChange={(e) => void onPhoto(e.target.files?.[0])}
+          onChange={(e) => {
+            void onPhoto(e.target.files?.[0]);
+            e.target.value = '';
+          }}
           className="text-theme-sm text-gray-700 dark:text-gray-300"
         />
         <p className="text-theme-xs text-gray-500">Scaled in the browser before it is sent.</p>
@@ -622,7 +631,8 @@ function TransferTab({ onDone, accounts }: { onDone: () => void; accounts: Accou
     s !== null &&
     s > 0 &&
     (!needsReceived || (r !== null && r > 0)) &&
-    (fee.trim() === '' || (f !== null && f >= 0));
+    (fee.trim() === '' || (f !== null && f >= 0)) &&
+    isDay(date);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -647,7 +657,10 @@ function TransferTab({ onDone, accounts }: { onDone: () => void; accounts: Accou
         <AccountSelect
           id="t-from"
           value={from}
-          onChange={setFrom}
+          onChange={(v) => {
+            setFrom(v);
+            if (v === to) setTo('');
+          }}
           accounts={accounts}
           label="From"
         />
@@ -744,7 +757,8 @@ function TransferTab({ onDone, accounts }: { onDone: () => void; accounts: Accou
 
 /** Add a row: by hand, from a text, from a receipt photo, or a transfer. */
 export function AddForm({ onClose }: { onClose: () => void }) {
-  const accounts = useAccounts().data ?? [];
+  const accountsQuery = useAccounts();
+  const accounts = accountsQuery.data ?? [];
   const categories = useCategories().data ?? [];
   const llm = useMoneySettings().data?.llm_available ?? false;
   const [tab, setTab] = useState<Tab>('manual');
@@ -766,7 +780,9 @@ export function AddForm({ onClose }: { onClose: () => void }) {
       <h2 id="money-add-title" className="text-lg font-semibold">
         Add
       </h2>
-      {accounts.length === 0 ? (
+      {accountsQuery.isPending ? (
+        <p className="mt-3 text-theme-sm text-gray-500">Loading…</p>
+      ) : accounts.length === 0 ? (
         <p className="mt-3 text-theme-sm text-gray-500">
           Create an account first, on the Accounts page.
         </p>

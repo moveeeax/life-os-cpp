@@ -119,11 +119,33 @@ export interface Day {
   totals: CurrencyTotal[];
 }
 
-/** Rows by day, newest day first; adjustments stay with their day. */
-export function groupByDay(rows: Transaction[]): Day[] {
-  const map = new Map<string, Transaction[]>();
+/**
+ * Rows in display order: each bank recalculation right after its original
+ * when the original is among them; otherwise in place.
+ */
+export function orderWithAdjustments(rows: Transaction[]): Transaction[] {
+  const ids = new Set(rows.map((r) => r.id));
+  const children = new Map<string, Transaction[]>();
   for (const r of rows) {
-    map.set(r.date, [...(map.get(r.date) ?? []), r]);
+    if (r.adjusts_id && ids.has(r.adjusts_id)) {
+      children.set(r.adjusts_id, [...(children.get(r.adjusts_id) ?? []), r]);
+    }
+  }
+  const out: Transaction[] = [];
+  for (const r of rows) {
+    if (r.adjusts_id && ids.has(r.adjusts_id)) continue;
+    out.push(r, ...(children.get(r.id) ?? []));
+  }
+  return out;
+}
+
+/** Rows by day, newest day first; a recalculation sits under its original's day. */
+export function groupByDay(rows: Transaction[]): Day[] {
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const map = new Map<string, Transaction[]>();
+  for (const r of orderWithAdjustments(rows)) {
+    const day = (r.adjusts_id && byId.get(r.adjusts_id)?.date) || r.date;
+    map.set(day, [...(map.get(day) ?? []), r]);
   }
   return [...map.entries()]
     .sort((a, b) => b[0].localeCompare(a[0]))
@@ -150,7 +172,7 @@ export interface DraftLine {
   note: string;
 }
 
-export function draftFromJob(job: ParseJob): DraftLine[] {
+export function draftFromJob(job: ParseJob, categoryKinds?: Map<string, string>): DraftLine[] {
   return (job.result ?? []).map((l: ParseLine, i) => ({
     key: `${job.id}:${i}`,
     selected: true,
@@ -161,7 +183,10 @@ export function draftFromJob(job: ParseJob): DraftLine[] {
     amount: String(l.amount),
     merchant: l.merchant,
     name: l.name,
-    category_id: l.category_id,
+    category_id:
+      l.category_id && categoryKinds && categoryKinds.get(l.category_id) !== l.type
+        ? null
+        : l.category_id,
     receipt_amount: l.receipt_amount === null ? '' : String(l.receipt_amount),
     receipt_currency: l.receipt_currency ?? '',
     fx_note: l.fx_note,
@@ -186,11 +211,12 @@ export function draftProblem(lines: DraftLine[]): string | null {
     const a = num(l.amount);
     if (a === null || a <= 0) return `${at}: the amount must be above 0.`;
     if (!l.name.trim()) return `${at}: a name is needed.`;
+    if (!parse(l.date)) return `${at}: the date is not a calendar day.`;
     if (!l.category_id) return `${at}: pick a category.`;
     const hasReceipt = l.receipt_amount.trim() !== '' || l.receipt_currency.trim() !== '';
     if (
       hasReceipt &&
-      (num(l.receipt_amount) === null || !/^[A-Z]{3}$/.test(l.receipt_currency.trim()))
+      ((num(l.receipt_amount) ?? 0) <= 0 || !/^[A-Z]{3}$/.test(l.receipt_currency.trim()))
     )
       return `${at}: the receipt needs an amount and a currency code.`;
   }
@@ -287,3 +313,6 @@ export async function scaleImage(
 
 /** The maximum the server takes, decoded. */
 export const RECEIPT_MAX_BYTES = 4 * 1024 * 1024;
+
+/** A calendar day as YYYY-MM-DD, for the forms' date fields. */
+export const isDay = (date: string): boolean => parse(date) !== null;
