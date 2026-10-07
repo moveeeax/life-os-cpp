@@ -5,6 +5,7 @@ import {
   useCreateTask,
   useTasksParse,
   useTasksStatus,
+  useUpdateNote,
 } from '@/hooks/useTasks';
 import { areaOf, dueLabel, EFFORT_LABEL, localToday, type TaskParseLine } from '@/lib/tasks';
 
@@ -48,7 +49,12 @@ export function Capture({
     parse.cancel();
     onDone?.();
   };
-  const create = useCreateTask(finish);
+  const archive = useUpdateNote();
+  // A note saved as typed leaves the inbox too (the parse accept does this on the server).
+  const create = useCreateTask(() => {
+    if (noteId) archive.mutate({ id: noteId, status: 'archived' });
+    finish();
+  });
   const accept = useAcceptTasksParse(parse.job?.id, finish);
   const plain = status?.llm_available === false;
 
