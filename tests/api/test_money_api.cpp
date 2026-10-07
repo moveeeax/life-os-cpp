@@ -18,7 +18,9 @@
 #include "api/MoneyController.hpp"
 #include "database/Database.hpp"
 #include "domain/Role.hpp"
+#include "jobs/Jobs.hpp"
 #include "repositories/money/FxRateRepository.hpp"
+#include "repositories/money/ParseJobRepository.hpp"
 #include "test_helpers.hpp"
 
 using json = nlohmann::json;
@@ -563,4 +565,143 @@ TEST_F(MoneyOffTest, EveryRouteIs404WhileTheModuleIsOff) {
     EXPECT_EQ(call(&Api::MoneyController::periodReport, user(kAnna), Get)->statusCode(), k404NotFound);
     EXPECT_EQ(call_json(&Api::MoneyController::createTransaction, user(kAnna), json::object())->statusCode(),
               k404NotFound);
+}
+
+// ── parse ───────────────────────────────────────────────────────────────────
+
+namespace {
+
+class MoneyParseApiTest : public MoneyApiTest {
+protected:
+    std::string config_file_name() const override { return "money_parse_api_test_config.json"; }
+    void config_overrides(nlohmann::json& cfg) override {
+        MoneyApiTest::config_overrides(cfg);
+        cfg["jobs"]["enabled"] = true;
+        cfg["jobs"]["result_ttl"] = 3600;
+        cfg["money"]["llm"]["base_url"] = "https://llm.example/v1";
+        cfg["money"]["llm"]["api_key"] = "sk-test";
+        cfg["money"]["llm"]["model"] = "gpt-6-luna";
+        cfg["money"]["llm"]["prompt_parse"] = "Answer with JSON.";
+    }
+
+    void SetUp() override {
+        MoneyApiTest::SetUp();
+        if (::testing::Test::IsSkipped())
+            return;
+        Database::get().execute_write([](auto& txn) {
+            txn.exec("TRUNCATE TABLE money_parse_jobs");
+            return true;
+        });
+    }
+
+    /// A finished parse job of Anna with one proposed line.
+    std::string done_job(const json& account, const json& category) {
+        Repositories::Money::ParseJobRepository jobs;
+        const std::string id = jobs.create_text(kAnna, "Kaspi *8880 13275.61 KZT", "2026-10-07")["id"];
+        jobs.finish(id,
+                    json::array({json{{"date", "2026-10-05"},
+                                      {"account_id", account["id"]},
+                                      {"amount", 13275.61},
+                                      {"name", "Groceries"},
+                                      {"category_id", category["id"]}}}),
+                    "gpt-6-luna",
+                    1,
+                    1);
+        return id;
+    }
+};
+
+std::string png_data_url(std::size_t payload_chars) {
+    return "data:image/png;base64," + std::string(payload_chars, 'A');
+}
+
+}  // namespace
+
+TEST_F(MoneyParseApiTest, TextAndReceiptAreQueuedForTheCaller) {
+    EXPECT_EQ(body_of(call(&Api::MoneyController::getSettings, user(kAnna), Get))["data"]["llm_available"], true);
+    const auto text = call_json(&Api::MoneyController::parseText, user(kAnna), json{{"text", "Kaspi *8880 100 KZT"}});
+    ASSERT_EQ(text->statusCode(), k202Accepted) << text->body();
+    const std::string id = body_of(text)["data"]["id"];
+    auto job = Jobs::get().pick({"money_parse"}, 1);
+    ASSERT_TRUE(job.has_value());
+    EXPECT_EQ(job->payload["job_id"], id);
+    EXPECT_EQ(job->payload["owner_id"], kAnna);
+    Jobs::get().complete(job->id, json::object());
+
+    const auto receipt = call_json(&Api::MoneyController::parseReceipt, user(kAnna), json{{"image", png_data_url(16)}});
+    ASSERT_EQ(receipt->statusCode(), k202Accepted) << receipt->body();
+    const json row =
+        body_of(call_id(&Api::MoneyController::parseStatus, user(kAnna), Get, body_of(receipt)["data"]["id"]))["data"];
+    EXPECT_EQ(row["kind"], "receipt");
+    EXPECT_FALSE(row.contains("image")) << "the photo never leaves";
+    EXPECT_EQ(call_id(&Api::MoneyController::parseStatus, user(kBoris), Get, id)->statusCode(), k404NotFound);
+    auto second = Jobs::get().pick({"money_parse"}, 1);
+    ASSERT_TRUE(second.has_value());
+    Jobs::get().complete(second->id, json::object());
+}
+
+TEST_F(MoneyParseApiTest, BadImagesAreRefusedBeforeAnythingIsQueued) {
+    const auto post = [&](const std::string& image) {
+        return call_json(&Api::MoneyController::parseReceipt, user(kAnna), json{{"image", image}})->statusCode();
+    };
+    EXPECT_EQ(post("aGVsbG8="), k400BadRequest) << "not a data URL";
+    EXPECT_EQ(post("data:image/gif;base64,aGVsbG8="), k400BadRequest);
+    EXPECT_EQ(post("data:image/png,aGVsbG8="), k400BadRequest) << "not base64";
+    EXPECT_EQ(post("data:image/png;base64,aGVs*G8="), k400BadRequest);
+    EXPECT_EQ(post("data:image/png;base64,aGVsbG8"), k400BadRequest) << "length not a multiple of 4";
+    EXPECT_EQ(post(png_data_url(4 * 1024 * 1024 / 3 * 4 + 8)), k400BadRequest) << "over 4 MB decoded";
+    EXPECT_EQ(call_json(&Api::MoneyController::parseText, user(kAnna), json{{"text", ""}})->statusCode(),
+              k400BadRequest);
+    EXPECT_EQ(call_json(&Api::MoneyController::parseText, user(kAnna), json{{"text", "x"}, {"hint_date", "2026-02-30"}})
+                  ->statusCode(),
+              k400BadRequest);
+    EXPECT_FALSE(Jobs::get().pick({"money_parse"}, 1).has_value()) << "nothing was queued";
+}
+
+TEST_F(MoneyParseApiTest, AcceptPutsTheEditedLinesInTheInboxOnce) {
+    const json kaspi = account(kAnna, "Kaspi", "KZT");
+    const json food = category(kAnna, json{{"name", "Food"}});
+    const std::string id = done_job(kaspi, food);
+    const json line{{"date", "2026-10-05"},
+                    {"account_id", kaspi["id"]},
+                    {"amount", 13275.61},
+                    {"name", "Groceries (store)"},
+                    {"category_id", food["id"]},
+                    {"status", "posted"}};
+
+    json no_account = line;
+    no_account.erase("account_id");
+    EXPECT_EQ(
+        call_id(&Api::MoneyController::parseAccept, user(kAnna), Post, id, json{{"lines", {no_account}}})->statusCode(),
+        k400BadRequest)
+        << "a line without an account cannot be accepted";
+    EXPECT_EQ(
+        call_id(&Api::MoneyController::parseAccept, user(kBoris), Post, id, json{{"lines", {line}}})->statusCode(),
+        k404NotFound);
+
+    const auto ok = call_id(&Api::MoneyController::parseAccept, user(kAnna), Post, id, json{{"lines", {line}}});
+    ASSERT_EQ(ok->statusCode(), k201Created) << ok->body();
+    const json rows = body_of(ok)["data"];
+    ASSERT_EQ(rows.size(), 1u);
+    EXPECT_EQ(rows[0]["status"], "pending") << "a parse never posts";
+    EXPECT_EQ(rows[0]["source"], "text");
+    EXPECT_EQ(body_of(call(&Api::MoneyController::inbox, user(kAnna), Get))["count"], 1);
+
+    EXPECT_EQ(call_id(&Api::MoneyController::parseAccept, user(kAnna), Post, id, json{{"lines", {line}}})->statusCode(),
+              k409Conflict);
+    EXPECT_EQ(body_of(call(&Api::MoneyController::inbox, user(kAnna), Get))["count"], 1) << "nothing written twice";
+}
+
+TEST_F(MoneyParseApiTest, AFewOpenParsesPerUser) {
+    for (int i = 0; i < 3; ++i) {
+        ASSERT_EQ(call_json(&Api::MoneyController::parseText, user(kAnna), json{{"text", "x"}})->statusCode(),
+                  k202Accepted);
+    }
+    EXPECT_EQ(call_json(&Api::MoneyController::parseText, user(kAnna), json{{"text", "x"}})->statusCode(),
+              k429TooManyRequests);
+    EXPECT_EQ(call_json(&Api::MoneyController::parseText, user(kBoris), json{{"text", "x"}})->statusCode(),
+              k202Accepted);
+    while (auto job = Jobs::get().pick({"money_parse"}, 1)) {
+        Jobs::get().complete(job->id, json::object());
+    }
 }

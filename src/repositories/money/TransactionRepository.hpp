@@ -21,6 +21,7 @@
 #include "repositories/money/AccountRepository.hpp"
 #include "repositories/money/CategoryRepository.hpp"
 #include "repositories/money/Errors.hpp"
+#include "repositories/money/ParseJobRepository.hpp"
 
 namespace Repositories::Money {
 
@@ -87,6 +88,25 @@ public:
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
+                    nlohmann::json out = nlohmann::json::array();
+                    for (const auto& in : inputs) {
+                        out.push_back(*find_in(txn, owner, insert_in(txn, owner, in)));
+                    }
+                    return out;
+                });
+            },
+            &detail::translate);
+    }
+
+    /// The edited lines of a finished parse as pending rows, and the job marked
+    /// accepted, in one database transaction. @throws AlreadyAccepted, Invariant.
+    nlohmann::json accept_parse(const std::string& owner, const std::string& job_id, const std::vector<Input>& inputs) {
+        return detail::translate_sql(
+            [&] {
+                return Database::get().execute_write([&](auto& txn) {
+                    if (!ParseJobRepository::mark_accepted_in(txn, owner, job_id)) {
+                        throw AlreadyAccepted();
+                    }
                     nlohmann::json out = nlohmann::json::array();
                     for (const auto& in : inputs) {
                         out.push_back(*find_in(txn, owner, insert_in(txn, owner, in)));
