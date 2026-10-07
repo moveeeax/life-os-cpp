@@ -48,7 +48,7 @@ public:
     ADD_METHOD_TO(MoneyController::updateTransfer, "/api/v1/money/transfers/{id}", Patch);
     ADD_METHOD_TO(MoneyController::deleteTransfer, "/api/v1/money/transfers/{id}", Delete);
     ADD_METHOD_TO(MoneyController::merchants, "/api/v1/money/merchants", Get);
-    ADD_METHOD_TO(MoneyController::patchMerchant, "/api/v1/money/merchants/{key}", Patch);
+    ADD_METHOD_TO(MoneyController::patchMerchant, "/api/v1/money/merchants", Patch);
     ADD_METHOD_TO(MoneyController::rate, "/api/v1/money/rates", Get);
     ADD_METHOD_TO(MoneyController::convert, "/api/v1/money/rates/convert", Get);
     ADD_METHOD_TO(MoneyController::refreshRates, "/api/v1/money/rates/refresh", Post);
@@ -94,7 +94,7 @@ public:
     void updateTransfer(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void deleteTransfer(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void merchants(const HttpRequestPtr& req, Callback&& callback);
-    void patchMerchant(const HttpRequestPtr& req, Callback&& callback, const std::string& key);
+    void patchMerchant(const HttpRequestPtr& req, Callback&& callback);
     void rate(const HttpRequestPtr& req, Callback&& callback);
     void convert(const HttpRequestPtr& req, Callback&& callback);
     void refreshRates(const HttpRequestPtr& req, Callback&& callback);

@@ -16,6 +16,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 
@@ -68,20 +69,33 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     return out;
 }
 
-/// One job per day in [from, to] that has no rates yet. Returns how many were enqueued.
-inline int enqueue_backfill(const std::string& from, const std::string& to) {
+/// The days in [from, to] that have no rates yet, oldest first.
+inline std::vector<std::string> missing_days(const std::string& from, const std::string& to) {
     using namespace Money::Period::detail;
     Repositories::Money::FxRateRepository rates;
-    int n = 0;
+    std::vector<std::string> out;
     for (sys_days d = day_of(from); d <= day_of(to); d += std::chrono::days{1}) {
-        const std::string date = text_of(d);
-        if (rates.has_day(date)) {
-            continue;
+        std::string date = text_of(d);
+        if (!rates.has_day(date)) {
+            out.push_back(std::move(date));
         }
-        Jobs::get().submit(kJobType, nlohmann::json{{"date", date}});
-        ++n;
     }
-    return n;
+    return out;
+}
+
+/// Rate jobs still waiting in the queue (a running one is not counted).
+inline long waiting() {
+    const auto depth = Jobs::get().queue_depth_by_type();
+    const auto it = depth.find(kJobType);
+    return it == depth.end() ? 0 : it->second;
+}
+
+/// One job per day. Returns how many were enqueued.
+inline int enqueue_days(const std::vector<std::string>& days) {
+    for (const auto& date : days) {
+        Jobs::get().submit(kJobType, nlohmann::json{{"date", date}});
+    }
+    return static_cast<int>(days.size());
 }
 
 }  // namespace Jobs::MoneyRates

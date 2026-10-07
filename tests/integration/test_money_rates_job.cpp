@@ -134,13 +134,18 @@ TEST_F(MoneyRatesJobTest, MissingSnapshotFinishesAndOutagesThrow) {
 
 TEST_F(MoneyRatesJobTest, BackfillEnqueuesOnlyTheMissingDays) {
     rates.put_day("2026-10-02", {{"KZT", 450}});
-    EXPECT_EQ(Jobs::MoneyRates::enqueue_backfill("2026-10-01", "2026-10-03"), 2);
+    const auto days = Jobs::MoneyRates::missing_days("2026-10-01", "2026-10-03");
+    EXPECT_EQ(days, (std::vector<std::string>{"2026-10-01", "2026-10-03"}));
+    EXPECT_EQ(Jobs::MoneyRates::waiting(), 0);
+    EXPECT_EQ(Jobs::MoneyRates::enqueue_days(days), 2);
+    EXPECT_EQ(Jobs::MoneyRates::waiting(), 2);
     auto first = Jobs::get().pick({"money_rates"}, 1);
     ASSERT_TRUE(first.has_value());
     EXPECT_EQ(first->payload["date"], "2026-10-01");
     auto second = Jobs::get().pick({"money_rates"}, 1);
     ASSERT_TRUE(second.has_value());
     EXPECT_EQ(second->payload["date"], "2026-10-03");
+    EXPECT_EQ(Jobs::MoneyRates::waiting(), 0) << "picked jobs are running, not waiting";
     Jobs::get().complete(first->id, json::object());
     Jobs::get().complete(second->id, json::object());
 }

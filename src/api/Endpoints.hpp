@@ -149,7 +149,7 @@ inline const std::vector<EndpointInfo>& get_endpoints() {
         {"PATCH", "/api/v1/money/transfers/{id}", "Money: change a transfer's amounts"},
         {"DELETE", "/api/v1/money/transfers/{id}", "Money: delete a transfer"},
         {"GET", "/api/v1/money/merchants", "Money: merchant suggestions with the remembered category"},
-        {"PATCH", "/api/v1/money/merchants/{key}", "Money: change what a merchant means from now on"},
+        {"PATCH", "/api/v1/money/merchants", "Money: move a merchant to another category from now on"},
         {"GET", "/api/v1/money/rates", "Money: a quote against USD on or before a day"},
         {"GET", "/api/v1/money/rates/convert", "Money: an informational conversion with the rate and its date"},
         {"POST", "/api/v1/money/rates/refresh", "Money: enqueue today's rates fetch, or a backfill of a range"},
