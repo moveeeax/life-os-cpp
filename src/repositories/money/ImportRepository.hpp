@@ -38,7 +38,7 @@ public:
     /// the rejected rows: {section, external_id, reason}.
     nlohmann::json run(const std::string& owner, const nlohmann::json& doc) {
         return Database::get().execute_write([&](auto& txn) {
-            Run<std::remove_reference_t<decltype(txn)>> r{txn, owner};
+            Run<std::remove_reference_t<decltype(txn)>> r(txn, owner);
             r.currencies(section(doc, "currencies"));
             r.accounts(section(doc, "accounts"));
             r.categories(section(doc, "categories"));
@@ -111,6 +111,8 @@ private:
         nlohmann::json counts = nlohmann::json::object();
         nlohmann::json rejected = nlohmann::json::array();
         std::map<std::string, std::string> account_ids, category_ids, transaction_ids;
+
+        Run(Txn& t, const std::string& o) : txn(t), owner(o) {}
 
         /// One row in its own savepoint: a failure undoes that row only.
         template <typename F>
