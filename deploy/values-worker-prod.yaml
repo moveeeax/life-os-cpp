@@ -3,7 +3,7 @@
 
 image:
   repository: ghcr.io/moveeeax/life-os-cpp-worker
-  tag: "1.12.0"
+  tag: "1.12.1"
 
 replicaCount: 1
 
