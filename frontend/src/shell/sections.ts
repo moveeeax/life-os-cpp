@@ -46,7 +46,8 @@ export const sections: Section[] = [
   { key: 'food', label: 'Food', icon: Utensils, path: '/food' },
   /** Every confirmed user keeps their own money; the module switch is the only gate. */
   { key: 'money', label: 'Money', icon: Wallet, path: '/money' },
-  { key: 'tasks', label: 'Tasks', icon: ListTodo },
+  /** Every confirmed user keeps their own tasks; the module switch is the only gate. */
+  { key: 'tasks', label: 'Tasks', icon: ListTodo, path: '/tasks' },
   { key: 'goals', label: 'Goals', icon: Target },
   { key: 'journal', label: 'Journal', icon: NotebookPen },
   { key: 'learning', label: 'Learning', icon: GraduationCap },

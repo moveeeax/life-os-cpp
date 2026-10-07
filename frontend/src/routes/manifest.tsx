@@ -78,6 +78,15 @@ const MoneyReportsPage = lazy(() =>
 const MoneyAdvisorPage = lazy(() =>
   import('@/pages/money/Advisor').then((m) => ({ default: m.MoneyAdvisorPage })),
 );
+const TasksTodayPage = lazy(() =>
+  import('@/pages/tasks/Today').then((m) => ({ default: m.TasksTodayPage })),
+);
+const TasksLaterPage = lazy(() =>
+  import('@/pages/tasks/Later').then((m) => ({ default: m.TasksLaterPage })),
+);
+const TasksInboxPage = lazy(() =>
+  import('@/pages/tasks/Inbox').then((m) => ({ default: m.TasksInboxPage })),
+);
 const AdminDashboardPage = lazy(() =>
   import('@/pages/admin/Dashboard').then((m) => ({ default: m.AdminDashboardPage })),
 );
@@ -262,6 +271,11 @@ export const routes: RouteEntry[] = [
   },
   { path: '/money/reports', element: <MoneyReportsPage />, guard: 'confirmed', layout: 'shell' },
   { path: '/money/advisor', element: <MoneyAdvisorPage />, guard: 'confirmed', layout: 'shell' },
+
+  // ── Tasks — any confirmed user; the module switch is the only gate ───────
+  { path: '/tasks', element: <TasksTodayPage />, guard: 'confirmed', layout: 'shell' },
+  { path: '/tasks/later', element: <TasksLaterPage />, guard: 'confirmed', layout: 'shell' },
+  { path: '/tasks/inbox', element: <TasksInboxPage />, guard: 'confirmed', layout: 'shell' },
 
   // ── Admin — gated by Permission.Administer (0x40000000 sentinel) ────────
   {
