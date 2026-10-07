@@ -5,6 +5,7 @@
  *        block, rates, settings, the module switch.
  */
 
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -559,6 +560,182 @@ protected:
 };
 
 }  // namespace
+
+// ── import ──────────────────────────────────────────────────────────────────
+
+namespace {
+
+/// What scripts/notion-money-export.py writes, cut to one of each kind of row
+/// plus two rows the model refuses.
+json notion_export() {
+    return json{
+        {"currencies", json::array({json{{"code", "BTC"}, {"name", "Bitcoin"}, {"decimals", 8}}})},
+        {"accounts",
+         json::array(
+             {json{{"external_id", "acc-freedom"},
+                   {"name", "Freedom Deposit Visa KZT •8977"},
+                   {"bank", "Freedom Bank"},
+                   {"kind", "card"},
+                   {"currency", "KZT"},
+                   {"last4", "8977"},
+                   {"opening_balance", 423769.47}},
+              json{{"external_id", "acc-btc"}, {"name", "Telegram Wallet BTC"}, {"kind", "cash"}, {"currency", "BTC"}},
+              json{{"external_id", "acc-cash"}, {"name", "Cash KZT"}, {"kind", "cash"}, {"currency", "KZT"}}})},
+        {"categories",
+         json::array(
+             {json{{"external_id", "cat-groceries"}, {"name", "Groceries"}, {"kind", "expense"}},
+              json{{"external_id", "cat-salary"}, {"name", "Salary"}, {"kind", "income"}, {"flexibility", "fixed"}}})},
+        {"transactions",
+         json::array({json{{"external_id", "tx-adj"},
+                           {"type", "fx_adjustment"},
+                           {"date", "2026-09-29"},
+                           {"account", "acc-freedom"},
+                           {"amount", 53.25},
+                           {"name", "FX adjustment"},
+                           {"adjusts", "tx-groceries"}},
+                      json{{"external_id", "tx-groceries"},
+                           {"type", "expense"},
+                           {"date", "2026-09-28"},
+                           {"time", "22:07"},
+                           {"account", "acc-freedom"},
+                           {"amount", 8231.76},
+                           {"category", "cat-groceries"},
+                           {"merchant", "7-Eleven Choengthale Soi 14"},
+                           {"name", "Groceries (7-Eleven Choengthale Soi 14, THB)"},
+                           {"receipt_amount", 605.75},
+                           {"receipt_currency", "THB"},
+                           {"fx_note", "THB -> USD -> KZT"}},
+                      json{{"external_id", "tx-salary"},
+                           {"type", "income"},
+                           {"date", "2026-10-06"},
+                           {"account", "acc-freedom"},
+                           {"amount", 1934018},
+                           {"category", "cat-salary"},
+                           {"name", "Salary"}},
+                      json{{"external_id", "tx-wrong-kind"},
+                           {"type", "income"},
+                           {"date", "2026-10-06"},
+                           {"account", "acc-freedom"},
+                           {"amount", 1},
+                           {"category", "cat-groceries"},
+                           {"name", "An income in an expense category"}},
+                      json{{"external_id", "tx-orphan"},
+                           {"type", "fx_adjustment"},
+                           {"date", "2026-10-06"},
+                           {"account", "acc-freedom"},
+                           {"amount", 1},
+                           {"name", "Adjusts nothing we know"},
+                           {"adjusts", "tx-missing"}}})},
+        {"transfers",
+         json::array({json{{"external_id", "tr-btc"},
+                           {"date", "2026-09-25"},
+                           {"from_account", "acc-freedom"},
+                           {"to_account", "acc-btc"},
+                           {"amount_sent", 230000},
+                           {"amount_received", 0.0057635},
+                           {"name", "Freedom → Telegram Wallet BTC"}},
+                      json{{"external_id", "tr-cash"},
+                           {"date", "2026-09-26"},
+                           {"from_account", "acc-freedom"},
+                           {"to_account", "acc-cash"},
+                           {"amount_sent", 5000}}})},
+        {"notes", json::array({"ignored by the server"})}};
+}
+
+}  // namespace
+
+TEST_F(MoneyApiTest, ImportLoadsEverySectionListsRefusedRowsAndASecondRunUpdates) {
+    const auto first = call_json(&Api::MoneyController::importNotion, user(kAnna), notion_export());
+    ASSERT_EQ(first->statusCode(), k200OK) << first->body();
+    const json report = body_of(first)["data"];
+    EXPECT_EQ(report["currencies"]["created"], 1);
+    EXPECT_EQ(report["accounts"]["created"], 3);
+    EXPECT_EQ(report["categories"]["created"], 2);
+    EXPECT_EQ(report["transactions"]["created"], 3) << "the adjustment goes in after its original";
+    EXPECT_EQ(report["transfers"]["created"], 2);
+    ASSERT_EQ(report["rejected"].size(), 2u) << report.dump();
+    std::set<std::string> refused;
+    for (const auto& r : report["rejected"]) {
+        EXPECT_EQ(r["section"], "transactions");
+        EXPECT_FALSE(r["reason"].get<std::string>().empty());
+        refused.insert(r["external_id"].get<std::string>());
+    }
+    EXPECT_EQ(refused, (std::set<std::string>{"tx-wrong-kind", "tx-orphan"}));
+
+    json accounts = body_of(call(&Api::MoneyController::listAccounts, user(kAnna), Get))["data"];
+    const auto by_name = [&](const std::string& name) {
+        for (const auto& a : accounts) {
+            if (a["name"] == name) {
+                return a;
+            }
+        }
+        ADD_FAILURE() << "no account " << name;
+        return json::object();
+    };
+    const json freedom = by_name("Freedom Deposit Visa KZT •8977");
+    EXPECT_NEAR(balance_of(freedom), 423769.47 - 8231.76 - 53.25 + 1934018 - 230000 - 5000, 0.005);
+    EXPECT_NEAR(balance_of(by_name("Telegram Wallet BTC")), 0.0057635, 1e-9) << "eight decimals survive";
+    EXPECT_NEAR(balance_of(by_name("Cash KZT")), 5000, 0.005);
+
+    // The second run: one amount changed in the source, nothing added twice.
+    json again = notion_export();
+    again["transactions"][1]["amount"] = 8000;
+    const auto second = call_json(&Api::MoneyController::importNotion, user(kAnna), again);
+    ASSERT_EQ(second->statusCode(), k200OK) << second->body();
+    const json report2 = body_of(second)["data"];
+    EXPECT_EQ(report2["accounts"]["created"], 0);
+    EXPECT_EQ(report2["accounts"]["updated"], 3);
+    EXPECT_EQ(report2["transactions"]["created"], 0);
+    EXPECT_EQ(report2["transactions"]["updated"], 3);
+    EXPECT_EQ(report2["transfers"]["updated"], 2);
+    accounts = body_of(call(&Api::MoneyController::listAccounts, user(kAnna), Get))["data"];
+    EXPECT_EQ(accounts.size(), 3u);
+    EXPECT_NEAR(balance_of(by_name("Freedom Deposit Visa KZT •8977")),
+                423769.47 - 8000 - 53.25 + 1934018 - 230000 - 5000,
+                0.005);
+
+    // The same external ids under another user are that user's own rows.
+    const auto boris = call_json(&Api::MoneyController::importNotion, user(kBoris), notion_export());
+    ASSERT_EQ(boris->statusCode(), k200OK) << boris->body();
+    EXPECT_EQ(body_of(boris)["data"]["accounts"]["created"], 3);
+    EXPECT_EQ(body_of(call(&Api::MoneyController::listAccounts, user(kAnna), Get))["data"].size(), 3u);
+}
+
+TEST_F(MoneyApiTest, ImportRefusesAnEmptyOrMalformedBody) {
+    const auto post = [&](const json& b) {
+        return call_json(&Api::MoneyController::importNotion, user(kAnna), b)->statusCode();
+    };
+    EXPECT_EQ(post(json::object()), k400BadRequest);
+    EXPECT_EQ(post(json{{"accounts", json::array()}}), k400BadRequest) << "nothing to import";
+    EXPECT_EQ(post(json{{"accounts", "Kaspi"}}), k400BadRequest);
+    // A row of the wrong shape is refused alone, not the request.
+    const auto resp = call_json(&Api::MoneyController::importNotion,
+                                user(kAnna),
+                                json{{"accounts", json::array({42, json{{"external_id", "a"}, {"name", 7}}})}});
+    ASSERT_EQ(resp->statusCode(), k200OK) << resp->body();
+    EXPECT_EQ(body_of(resp)["data"]["rejected"].size(), 2u);
+}
+
+TEST_F(MoneyApiTest, RatesBackfillChecksTheRangeBeforeTheQueue) {
+    const auto post = [&](const json& b) {
+        return call_json(&Api::MoneyController::refreshRates, user(kAnna), b)->statusCode();
+    };
+    EXPECT_EQ(post(json{{"from", "2024-01-01"}}), k400BadRequest) << "the source starts on 2024-03-02";
+    EXPECT_EQ(post(json{{"from", "2026-10-05"}, {"to", "2026-10-01"}}), k400BadRequest);
+    EXPECT_EQ(post(json{{"from", "2026-02-30"}}), k400BadRequest);
+    EXPECT_EQ(post(json{{"to", "2026-10-01"}}), k400BadRequest) << "from is required with a body";
+    // Both days stored already: whether a queue runs in this binary or not,
+    // a valid range passes the checks and nothing new is queued.
+    Repositories::Money::FxRateRepository().put_day("2026-10-01", {{"KZT", 450}});
+    Repositories::Money::FxRateRepository().put_day("2026-10-02", {{"KZT", 450}});
+    const auto ok =
+        call_json(&Api::MoneyController::refreshRates, user(kAnna), json{{"from", "2026-10-01"}, {"to", "2026-10-02"}});
+    if (ok->statusCode() == k202Accepted) {
+        EXPECT_EQ(body_of(ok)["data"]["queued"], 0);
+    } else {
+        EXPECT_EQ(ok->statusCode(), k503ServiceUnavailable) << ok->body();
+    }
+}
 
 TEST_F(MoneyOffTest, EveryRouteIs404WhileTheModuleIsOff) {
     EXPECT_EQ(call(&Api::MoneyController::listAccounts, user(kAnna), Get)->statusCode(), k404NotFound);
