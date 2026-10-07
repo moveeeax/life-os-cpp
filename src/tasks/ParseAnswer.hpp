@@ -58,11 +58,34 @@ inline std::string unfenced(std::string_view content) {
     return std::string(body);
 }
 
-/// Lower case for ASCII; other bytes kept, as the merchant key does.
+/// Lower case for ASCII and Russian Cyrillic (А-Я, Ё), matching what the
+/// database's lower() gives the open titles; other bytes are kept.
 inline std::string folded(std::string_view s) {
-    std::string out(s);
-    std::transform(
-        out.begin(), out.end(), out.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::string out;
+    out.reserve(s.size());
+    for (std::size_t i = 0; i < s.size(); ++i) {
+        const auto c = static_cast<unsigned char>(s[i]);
+        if (c < 0x80) {
+            out.push_back(static_cast<char>(std::tolower(c)));
+            continue;
+        }
+        const auto next = i + 1 < s.size() ? static_cast<unsigned char>(s[i + 1]) : 0;
+        if (c == 0xD0 && next >= 0x90 && next <= 0x9F) {  // А..П -> а..п
+            out.push_back(static_cast<char>(0xD0));
+            out.push_back(static_cast<char>(next + 0x20));
+            ++i;
+        } else if (c == 0xD0 && next >= 0xA0 && next <= 0xAF) {  // Р..Я -> р..я
+            out.push_back(static_cast<char>(0xD1));
+            out.push_back(static_cast<char>(next - 0x20));
+            ++i;
+        } else if (c == 0xD0 && next == 0x81) {  // Ё -> ё
+            out.push_back(static_cast<char>(0xD1));
+            out.push_back(static_cast<char>(0x91));
+            ++i;
+        } else {
+            out.push_back(static_cast<char>(c));
+        }
+    }
     return out;
 }
 
