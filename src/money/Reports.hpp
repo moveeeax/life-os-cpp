@@ -25,8 +25,8 @@ namespace Money::Reports {
 struct Row {
     std::string date;
     std::string currency;
-    std::string type;  // income | expense | fx_adjustment
-    std::string category_id;
+    std::string type;         // income | expense | fx_adjustment
+    std::string category_id;  // of an adjustment: its expense row's category, or ""
     std::string category_kind;
     std::string flexibility;  // fixed | variable
     std::string merchant_key;
@@ -88,9 +88,10 @@ inline std::map<std::string, Sums> sums_of(const std::vector<Row>& rows) {
         if (r.type == "income") {
             s.income += r.amount;
         } else {
-            // An expense, or an adjustment: plus when the bank took more.
+            // An expense, or an adjustment: plus when the bank took more. An
+            // adjustment of a categorized expense moves that category too.
             s.expense += r.amount;
-            if (r.type == "expense") {
+            if (r.type == "expense" || !r.category_id.empty()) {
                 s.by_category[r.category_id] += r.amount;
                 if (r.flexibility == "fixed") {
                     s.fixed += r.amount;
@@ -118,13 +119,18 @@ inline int day_gap(const std::string& from, const std::string& to) {
  * @param budgets         Category id -> budget, for the budget columns.
  * @param merchants_before Merchant keys seen before the period.
  * @param today           For the projection: days elapsed and left.
+ * @param recurring_rows  Rows to look for monthly charges in; null means the
+ *                        period and the three before it. A week's four weeks
+ *                        hold one monthly charge at most, so the caller passes
+ *                        a longer window.
  */
 inline Report build(const Period::Range& period,
                     const std::vector<Row>& period_rows,
                     const std::vector<std::vector<Row>>& previous_three,
                     const std::map<std::string, Budget>& budgets,
                     const std::set<std::string>& merchants_before,
-                    std::string_view today) {
+                    std::string_view today,
+                    const std::vector<Row>* recurring_rows = nullptr) {
     using namespace detail;
     Report out;
     const auto now = sums_of(period_rows);
@@ -186,7 +192,7 @@ inline Report build(const Period::Range& period,
     }
 
     // Recurring: a merchant charged in one currency at least twice, with
-    // every gap between 28 and 32 days, over the period and the three before.
+    // every gap between 28 and 32 days, over the window.
     std::map<std::pair<std::string, std::string>, std::vector<std::pair<std::string, double>>> charges;
     const auto collect = [&](const std::vector<Row>& rows) {
         for (const auto& r : rows) {
@@ -195,9 +201,13 @@ inline Report build(const Period::Range& period,
             }
         }
     };
-    collect(period_rows);
-    for (const auto& rows : previous_three) {
-        collect(rows);
+    if (recurring_rows != nullptr) {
+        collect(*recurring_rows);
+    } else {
+        collect(period_rows);
+        for (const auto& rows : previous_three) {
+            collect(rows);
+        }
     }
     for (auto& [key, list] : charges) {
         if (list.size() < 2) {

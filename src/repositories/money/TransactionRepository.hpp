@@ -326,11 +326,14 @@ public:
     nlohmann::json report_rows(const std::string& owner, const std::string& from, const std::string& to) {
         return Database::get().execute_read([&](auto& txn) {
             auto r = txn.exec_params(
+                // An adjustment counts in the category of the expense it adjusts.
                 "SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT to_char(t.date, 'YYYY-MM-DD') AS date, "
-                " a.currency, t.type, t.category_id::text AS category_id, COALESCE(c.kind, '') AS category_kind, "
+                " a.currency, t.type, c.id::text AS category_id, COALESCE(c.kind, '') AS category_kind, "
                 " COALESCE(c.flexibility, 'variable') AS flexibility, t.merchant_key, t.amount "
                 " FROM money_transactions t JOIN money_accounts a ON a.id = t.account_id "
-                " LEFT JOIN money_categories c ON c.id = t.category_id "
+                " LEFT JOIN money_transactions o ON o.id = t.adjusts_id "
+                " LEFT JOIN money_categories c ON c.id = CASE WHEN t.type <> 'fx_adjustment' THEN t.category_id "
+                "   WHEN o.type = 'expense' THEN o.category_id END "
                 " WHERE t.owner_id = $1::uuid AND t.status = 'posted' AND t.date BETWEEN $2::date AND $3::date "
                 " ORDER BY t.date, t.created_at, t.id) t",
                 owner,
@@ -358,16 +361,19 @@ public:
 
 private:
     // The row as the API shows it: with the account's currency, the final
-    // amount (itself plus its adjustments) and the adjustments.
+    // amount and the adjustments. A posted row's final amount takes only its
+    // posted adjustments (a pending one waits in the inbox, as the balance
+    // does); a pending row's takes all of them.
     inline static const std::string kColumns =
         "t.id, t.type, to_char(t.date, 'YYYY-MM-DD') AS date, to_char(t.time, 'HH24:MI') AS time, "
         " t.account_id, a.currency, t.amount, t.category_id, t.merchant, t.merchant_key, t.name, "
         " t.receipt_amount, t.receipt_currency, t.fx_note, t.adjusts_id, t.trip, t.note, t.source, t.status, "
         " t.external_id, "
-        " t.amount + COALESCE((SELECT SUM(j.amount) FROM money_transactions j WHERE j.adjusts_id = t.id), 0) "
+        " t.amount + COALESCE((SELECT SUM(j.amount) FROM money_transactions j WHERE j.adjusts_id = t.id "
+        "   AND (j.status = 'posted' OR t.status = 'pending')), 0) "
         "   AS final_amount, "
         " COALESCE((SELECT json_agg(json_build_object('id', j.id, 'date', to_char(j.date, 'YYYY-MM-DD'), "
-        "   'amount', j.amount, 'note', j.note) ORDER BY j.date, j.created_at) "
+        "   'amount', j.amount, 'note', j.note, 'status', j.status) ORDER BY j.date, j.created_at) "
         "   FROM money_transactions j WHERE j.adjusts_id = t.id), '[]'::json) AS adjustments, "
         " to_char(t.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
         " to_char(t.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";

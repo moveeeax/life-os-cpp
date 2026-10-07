@@ -28,6 +28,8 @@ namespace Repositories::Money::ReportBuilder {
 
 using json = nlohmann::json;
 
+inline constexpr int kRecurringDays = 120;
+
 namespace detail {
 
 inline ::Money::Reports::Row report_row(const json& r) {
@@ -154,7 +156,13 @@ inline json build(const std::string& owner,
     }
     const auto before = repo.merchants_before(owner, range.from);
     const std::set<std::string> seen(before.begin(), before.end());
-    const auto report = ::Money::Reports::build(range, rows, previous, budgets, seen, today);
+    // Monthly charges are looked for over at least the 120 days up to the
+    // period's end, whatever the period: four charges of a subscription.
+    using namespace ::Money::Period::detail;
+    const std::string window_from =
+        std::min(range.from, text_of(day_of(range.to) - std::chrono::days{kRecurringDays - 1}));
+    const auto window = rows_of(repo, owner, {window_from, range.to});
+    const auto report = ::Money::Reports::build(range, rows, previous, budgets, seen, today, &window);
 
     json blocks = json::array();
     for (const auto& b : report.blocks) {

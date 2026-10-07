@@ -1540,12 +1540,13 @@ components:
         position: { type: integer, minimum: 0 }
     MoneyAdjustment:
       type: object
-      required: [id, date, amount, note]
+      required: [id, date, amount, note, status]
       properties:
         id: { type: string, format: uuid }
         date: { type: string, format: date }
         amount: { type: number, description: Plus when the bank took more, minus when it returned }
         note: { type: string }
+        status: { type: string, enum: [posted, pending], description: A pending adjustment waits in the inbox and is not in the posted row's final_amount }
     MoneyTransaction:
       type: object
       required: [id, type, date, time, account_id, currency, amount, category_id, merchant, merchant_key, name, receipt_amount, receipt_currency, fx_note, adjusts_id, trip, note, source, status, external_id, final_amount, adjustments, created_at, updated_at]
@@ -1570,7 +1571,7 @@ components:
         source: { type: string, enum: [manual, text, receipt, api, import] }
         status: { type: string, enum: [posted, pending] }
         external_id: { type: [string, 'null'] }
-        final_amount: { type: number, description: amount plus its adjustments }
+        final_amount: { type: number, description: 'amount plus its adjustments: the posted ones for a posted row, all of them for a pending row' }
         adjustments: { type: array, items: { $ref: '#/components/schemas/MoneyAdjustment' } }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }

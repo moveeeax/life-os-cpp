@@ -11243,6 +11243,11 @@ export interface components {
             /** @description Plus when the bank took more */
             amount: number;
             note: string;
+            /**
+             * @description A pending adjustment waits in the inbox and is not in the posted row's final_amount
+             * @enum {string}
+             */
+            status: "posted" | "pending";
         };
         MoneyTransaction: {
             /** Format: uuid */
@@ -11275,7 +11280,7 @@ export interface components {
             /** @enum {string} */
             status: "posted" | "pending";
             external_id: string | null;
-            /** @description amount plus its adjustments */
+            /** @description amount plus its adjustments: the posted ones for a posted row, all of them for a pending row */
             final_amount: number;
             adjustments: components["schemas"]["MoneyAdjustment"][];
             /** Format: date-time */
