@@ -11,6 +11,7 @@ const TABS = [
   { to: '/money/accounts', label: 'Accounts', end: false },
   { to: '/money/categories', label: 'Categories', end: false },
   { to: '/money/reports', label: 'Reports', end: false },
+  { to: '/money/advisor', label: 'Advisor', end: false },
 ];
 
 interface MoneyFrameProps {

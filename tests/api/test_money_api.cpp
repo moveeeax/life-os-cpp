@@ -711,3 +711,55 @@ TEST_F(MoneyParseApiTest, AFewOpenParsesPerUser) {
         Jobs::get().complete(job->id, json::object());
     }
 }
+
+// ── advisor ─────────────────────────────────────────────────────────────────
+
+namespace {
+
+class MoneyAdvisorApiTest : public MoneyApiTest {
+protected:
+    std::string config_file_name() const override { return "money_advisor_api_test_config.json"; }
+    void config_overrides(nlohmann::json& cfg) override {
+        MoneyApiTest::config_overrides(cfg);
+        cfg["jobs"]["enabled"] = true;
+        cfg["jobs"]["result_ttl"] = 3600;
+        cfg["money"]["llm"]["base_url"] = "https://llm.example/v1";
+        cfg["money"]["llm"]["api_key"] = "sk-test";
+        cfg["money"]["llm"]["model"] = "gpt-6-luna";
+        cfg["money"]["llm"]["prompt_advisor"] = "Write a review.";
+    }
+    void SetUp() override {
+        MoneyApiTest::SetUp();
+        if (::testing::Test::IsSkipped())
+            return;
+        Database::get().execute_write([](auto& txn) {
+            txn.exec("TRUNCATE TABLE money_advisor_reports");
+            return true;
+        });
+    }
+};
+
+}  // namespace
+
+TEST_F(MoneyAdvisorApiTest, RunQueuesOnceAndTheReportsStayWithTheirOwner) {
+    const auto run = [&](const json& body) { return call_json(&Api::MoneyController::advisorRun, user(kAnna), body); };
+    const auto first = run(json{{"period", "month"}, {"date", "2026-10-07"}});
+    ASSERT_EQ(first->statusCode(), k202Accepted) << first->body();
+    const json row = body_of(first)["data"];
+    EXPECT_EQ(row["period_start"], "2026-10-01");
+    EXPECT_EQ(row["period_end"], "2026-10-31");
+    const auto again = run(json{{"period", "month"}, {"date", "2026-10-20"}});
+    EXPECT_EQ(again->statusCode(), k200OK) << "the same month is not queued twice";
+    EXPECT_EQ(body_of(again)["queued"], false);
+    auto job = Jobs::get().pick({"money_advisor"}, 1);
+    ASSERT_TRUE(job.has_value());
+    EXPECT_EQ(job->payload["report_id"], row["id"]);
+    Jobs::get().complete(job->id, json::object());
+
+    EXPECT_EQ(body_of(call(&Api::MoneyController::advisorReports, user(kAnna), Get))["count"], 1);
+    EXPECT_EQ(body_of(call(&Api::MoneyController::advisorReports, user(kBoris), Get))["count"], 0);
+    EXPECT_EQ(call_id(&Api::MoneyController::advisorReport, user(kBoris), Get, row["id"])->statusCode(), k404NotFound);
+    EXPECT_EQ(call_id(&Api::MoneyController::advisorReport, user(kAnna), Get, row["id"])->statusCode(), k200OK);
+    EXPECT_EQ(run(json{{"period", "year"}})->statusCode(), k400BadRequest);
+    EXPECT_EQ(run(json{{"date", "2026-02-30"}})->statusCode(), k400BadRequest);
+}

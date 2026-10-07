@@ -6,6 +6,8 @@ import { ApiClientError, api, apiErrorMessage } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import type { AcceptLine } from '@/lib/ledger';
 import type {
+  AdvisorReport,
+  AdvisorReportSummary,
   Account,
   AccountInput,
   AccountPatch,
@@ -383,5 +385,43 @@ export function useAcceptParse(jobId: string | undefined, onSuccess?: () => void
         })
       ).data,
     { invalidate: ALL, onSuccess },
+  );
+}
+
+// ── the advisor ────────────────────────────────────────────────────────────
+
+/** The reviews; refreshes while one is queued or running. */
+export function useAdvisorReports() {
+  return useQuery({
+    queryKey: qk.money.advisorReports(),
+    queryFn: async ({ signal }) =>
+      (await api.getJson<{ data: AdvisorReportSummary[] }>(`${BASE}/advisor/reports`, { signal }))
+        .data,
+    refetchInterval: (q) =>
+      q.state.data?.some((r) => r.status === 'queued' || r.status === 'running') ? 3000 : false,
+  });
+}
+
+export function useAdvisorReport(id: string | undefined, status?: string) {
+  return useQuery({
+    queryKey: qk.money.advisorReport(id ?? '', status ?? ''),
+    enabled: !!id,
+    queryFn: async ({ signal }) =>
+      (await api.getJson<{ data: AdvisorReport }>(`${BASE}/advisor/reports/${id}`, { signal }))
+        .data,
+    // A finished review does not change; the status in the key reads it again when it turns done.
+    staleTime: Infinity,
+  });
+}
+
+export function useRunAdvisor(onSuccess?: () => void) {
+  return useApiMutation(
+    async (body: { period: 'week' | 'month' | 'quarter'; date?: string }) =>
+      (
+        await api.postJson<{ data: AdvisorReport; queued: boolean }>(`${BASE}/advisor/run`, {
+          body,
+        })
+      ).data,
+    { invalidate: [qk.money.advisorReports()], onSuccess },
   );
 }

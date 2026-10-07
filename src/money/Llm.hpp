@@ -20,6 +20,11 @@ inline std::optional<Chat::Settings> parse_settings() {
     return Chat::read_settings("money.llm", "MONEY_LLM", "prompt_parse", "MONEY_LLM_PROMPT_PARSE", 2500);
 }
 
+/// The advisor settings: the same provider, its own prompt.
+inline std::optional<Chat::Settings> advisor_settings() {
+    return Chat::read_settings("money.llm", "MONEY_LLM", "prompt_advisor", "MONEY_LLM_PROMPT_ADVISOR", 2500);
+}
+
 /// The model for receipt photos: MONEY_LLM_MODEL_VISION when set, else the main model.
 inline std::string vision_model(const Chat::Settings& s) {
     if (!Config::is_initialized()) {

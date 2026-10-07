@@ -72,6 +72,9 @@ const MoneyCategoriesPage = lazy(() =>
 const MoneyReportsPage = lazy(() =>
   import('@/pages/money/Reports').then((m) => ({ default: m.MoneyReportsPage })),
 );
+const MoneyAdvisorPage = lazy(() =>
+  import('@/pages/money/Advisor').then((m) => ({ default: m.MoneyAdvisorPage })),
+);
 const AdminDashboardPage = lazy(() =>
   import('@/pages/admin/Dashboard').then((m) => ({ default: m.AdminDashboardPage })),
 );
@@ -249,6 +252,7 @@ export const routes: RouteEntry[] = [
     layout: 'shell',
   },
   { path: '/money/reports', element: <MoneyReportsPage />, guard: 'confirmed', layout: 'shell' },
+  { path: '/money/advisor', element: <MoneyAdvisorPage />, guard: 'confirmed', layout: 'shell' },
 
   // ── Admin — gated by Permission.Administer (0x40000000 sentinel) ────────
   {

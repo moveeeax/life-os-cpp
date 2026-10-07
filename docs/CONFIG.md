@@ -257,6 +257,8 @@ outage can never affect the money path.
 | `MONEY_LLM_MODEL` | `money.llm.model` | string | `""` | Model of the money jobs |
 | `MONEY_LLM_MODEL_VISION` | `money.llm.model_vision` | string | `""` | Model for receipt photos; empty uses `MONEY_LLM_MODEL` |
 | `MONEY_LLM_PROMPT_PARSE` | `money.llm.prompt_parse` | string | `""` | System prompt of the parse job; example in `docs/money/prompt-parse.example.md` |
+| `MONEY_LLM_PROMPT_ADVISOR` | `money.llm.prompt_advisor` | string | `""` | System prompt of the weekly advisor (`money_advisor` job); example in `docs/money/prompt-advisor.example.md`. Empty: the advisor is not configured |
+| `MONEY_ADVISOR_HOUR_UTC` | `money.advisor_hour_utc` | int | `7` | Hour (UTC) the API pod enqueues each user's weekly review on their weekday; `-1` switches the schedule off ("Run now" still works) |
 | `MONEY_LLM_TIMEOUT_SECONDS` | `money.llm.timeout_seconds` | int | `60` | Provider timeout per call (at least 5) |
 | `MONEY_LLM_MAX_TOKENS` | `money.llm.max_tokens` | int | `2500` | Token cap of an answer (at least 100) |
 | `FOOD_LLM_BASE_URL` | `food.llm.base_url` | string | `""` | Base URL of an OpenAI-compatible chat completions API for the `food_parse` job, e.g. `https://api.openai.com/v1`. The worker calls `{base_url}/chat/completions`. With any of the four `FOOD_LLM_*` settings below empty the parse is `not_configured` and the add form hides it. Prod: ConfigMap `life-os-food-llm` |
