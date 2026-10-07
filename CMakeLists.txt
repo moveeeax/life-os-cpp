@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(life_os_cpp VERSION 1.11.3 LANGUAGES CXX)
+project(life_os_cpp VERSION 1.12.0 LANGUAGES CXX)
 
 # Release builds stamp the git tag in instead of the baked value above:
 # docker/Dockerfile declares ARG APP_VERSION and forwards it as

@@ -6,7 +6,7 @@
 
 image:
   repository: ghcr.io/moveeeax/life-os-cpp-frontend
-  tag: "1.11.3"
+  tag: "1.12.0"
 
 replicaCount: 1
 

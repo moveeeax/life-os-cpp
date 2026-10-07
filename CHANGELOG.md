@@ -6,6 +6,42 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-10-07
+
+### Added
+- Money module, first part (off by default, `MONEY_ENABLED`): currencies,
+  accounts with computed balances, categories with a budget in one currency,
+  the ledger of incomes, expenses and the bank's signed fx adjustments,
+  transfers and exchanges as one row with the amounts sent and received,
+  an inbox of pending rows with a duplicate flag, merchant memory, period
+  reports per currency (never summed across) with the previous period, the
+  median of three, the fixed share, the projection, recurring charges and
+  new merchants, and an optional "as if" block converted at a stored daily
+  rate. Rates come from fawazahmed0/currency-api through the `money_rates`
+  worker job (`MONEY_RATES_SCHEDULE_HOURS`). Every page action is a route
+  under `/api/v1/money/`, so an agent with an API key can do the same.
+- Money section in the dashboard, for every confirmed user: the ledger of a
+  week, month or quarter with per-currency totals (never one sum), the inbox
+  of proposed rows with a check for possible duplicates, and an add form by
+  hand (merchant memory fills the category), from a bank mail or a list
+  through the LLM, from a receipt photo (scaled in the browser before upload),
+  or as a transfer (the received amount only across currencies); accounts
+  grouped by currency with computed balances; categories with budgets against
+  this month's spend in the budget's currency; reports per currency with the
+  previous period, the median of three, the projection, recurring charges and
+  new merchants, and an optional "as if" currency with the rates and dates.
+  The sidebar item hides while the money module is off.
+- Money module, second part: a bank mail, an SMS, a list of purchases or a
+  receipt photo becomes proposed ledger lines through the `money_parse` worker
+  job. The job sends the user's accounts (with the card's last four digits),
+  categories and remembered merchants to the OpenAI-compatible API named by
+  `MONEY_LLM_*` (its own ConfigMap and Secret `life-os-money-llm`); an account
+  or category the model names that is not the user's is dropped with a note.
+  `POST /api/v1/money/parse`, `POST /api/v1/money/parse/receipt` (a data URL,
+  4 MB), `GET /api/v1/money/parse/{id}`, and `POST .../accept`, which puts the
+  edited lines into the inbox as pending rows, once. The LLM call is shared
+  with the food parse (`src/llm/Chat.hpp`).
+
 ## [1.11.3] - 2026-10-06
 
 ### Fixed
