@@ -40,6 +40,17 @@ export function dueLabel(
   return { text, tone: 'plain' };
 }
 
+/** A source link the page may put in an href: http(s) only, never javascript: or data:. */
+export function safeLink(ref: string | null | undefined): string | null {
+  if (!ref) return null;
+  try {
+    const u = new URL(ref);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+
 export function localToday(): string {
   const n = new Date();
   const p = (x: number) => String(x).padStart(2, '0');

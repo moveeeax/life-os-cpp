@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 
 import { Modal } from '@/components/Modal';
 import { useUpdateTask } from '@/hooks/useTasks';
-import { areaOf, dueLabel, EFFORT_LABEL, type Task } from '@/lib/tasks';
+import { areaOf, dueLabel, EFFORT_LABEL, safeLink, type Task } from '@/lib/tasks';
 import { cn } from '@/lib/utils';
 
 import { TaskForm } from './TaskForm';
@@ -28,6 +28,7 @@ export function TaskRow({
   // A closed task's deadline no longer asks for anything.
   const due = done ? null : dueLabel(task.due, today);
   const area = areaOf(task.area);
+  const link = task.source_kind === 'url' ? safeLink(task.source_ref) : null;
   return (
     <li>
       <div className="grid grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-3.5 py-2.5">
@@ -74,11 +75,11 @@ export function TaskRow({
           <p>
             {area.label}
             {task.effort && ` · ${EFFORT_LABEL[task.effort]}`}
-            {task.source_kind === 'url' && task.source_ref && (
+            {link && (
               <>
                 {' · '}
                 <a
-                  href={task.source_ref}
+                  href={link}
                   target="_blank"
                   rel="noreferrer"
                   className="text-brand-500 hover:underline"
