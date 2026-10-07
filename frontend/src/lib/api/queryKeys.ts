@@ -75,6 +75,10 @@ export const qk = {
     transfers: (from?: string, to?: string, account?: string) =>
       ['money', 'transfers', from ?? '', to ?? '', account ?? ''] as const,
     merchants: (q: string) => ['money', 'merchants', q] as const,
+    /** Every remembered merchant, for the categories page. */
+    merchantMemory: () => ['money', 'merchant-memory'] as const,
+    /** Posted rows of one account within a day of a date: the manual form's duplicate notice. */
+    nearby: (account: string, date: string) => ['money', 'nearby', account, date] as const,
     report: (kind: string, date: string, asIf: string) =>
       ['money', 'report', kind, date, asIf] as const,
     settings: () => ['money', 'settings'] as const,

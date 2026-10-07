@@ -9,7 +9,11 @@ import {
   linesToAccept,
   orderWithAdjustments,
   parseErrorText,
+  customRangeFromSearch,
+  merchantsByCategory,
+  nearbyDuplicate,
   periodFromSearch,
+  shiftDay,
   periodRange,
   shiftPeriod,
   signedAmount,
@@ -77,6 +81,25 @@ describe('periods', () => {
       kind: 'month',
       date: '2026-10-07',
     });
+  });
+  it('reads a custom range and falls back to the last 30 days', () => {
+    expect(
+      customRangeFromSearch(
+        new URLSearchParams('kind=custom&from=2026-09-01&to=2026-09-15'),
+        '2026-10-07',
+      ),
+    ).toEqual({ from: '2026-09-01', to: '2026-09-15' });
+    expect(
+      customRangeFromSearch(
+        new URLSearchParams('kind=custom&from=2026-09-15&to=2026-09-01'),
+        '2026-10-07',
+      ),
+    ).toEqual({ from: '2026-09-08', to: '2026-10-07' });
+    expect(customRangeFromSearch(new URLSearchParams('kind=month'), '2026-10-07')).toBeNull();
+  });
+  it('shifts a day across months', () => {
+    expect(shiftDay('2026-03-01', -1)).toBe('2026-02-28');
+    expect(shiftDay('2026-12-31', 1)).toBe('2027-01-01');
   });
   it('mirrors the server ranges', () => {
     expect(periodRange('week', '2026-10-01')).toEqual({ from: '2026-09-28', to: '2026-10-04' });
@@ -236,5 +259,47 @@ describe('small rules', () => {
     expect(budgetState(70, 100)).toBe('ok');
     expect(budgetState(85, 100)).toBe('near');
     expect(budgetState(100, 100)).toBe('over');
+  });
+});
+
+describe('nearbyDuplicate', () => {
+  const rows = [
+    tx({ id: 'x', account_id: 'a', amount: 4363.45, date: '2026-10-06', name: 'Groceries' }),
+    tx({ id: 'p', account_id: 'a', amount: 500, date: '2026-10-06', status: 'pending' }),
+  ];
+  it('finds a posted row of the same account and amount within a day', () => {
+    expect(
+      nearbyDuplicate(rows, {
+        account_id: 'a',
+        type: 'expense',
+        amount: 4363.45,
+        date: '2026-10-07',
+      })?.id,
+    ).toBe('x');
+  });
+  it('ignores other accounts, types, amounts, days and pending rows', () => {
+    const d = { account_id: 'a', type: 'expense', amount: 4363.45, date: '2026-10-07' };
+    expect(nearbyDuplicate(rows, { ...d, account_id: 'b' })).toBeUndefined();
+    expect(nearbyDuplicate(rows, { ...d, type: 'income' })).toBeUndefined();
+    expect(nearbyDuplicate(rows, { ...d, amount: 4363.4 })).toBeUndefined();
+    expect(nearbyDuplicate(rows, { ...d, date: '2026-10-08' })).toBeUndefined();
+    expect(nearbyDuplicate(rows, { ...d, amount: 500 })).toBeUndefined();
+    expect(nearbyDuplicate(rows, { ...d, amount: null })).toBeUndefined();
+  });
+});
+
+describe('merchantsByCategory', () => {
+  it('groups by category, most used first, without the uncategorised', () => {
+    const m = (key: string, category_id: string | null, times: number) => ({
+      merchant_key: key,
+      display_name: key,
+      category_id,
+      account_id: null,
+      times,
+      last_seen: '2026-10-01',
+    });
+    const out = merchantsByCategory([m('grab', 'c1', 2), m('bolt', 'c1', 5), m('x', null, 9)]);
+    expect([...out.keys()]).toEqual(['c1']);
+    expect(out.get('c1')!.map((x) => x.merchant_key)).toEqual(['bolt', 'grab']);
   });
 });

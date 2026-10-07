@@ -1,6 +1,13 @@
 // Pure logic of the Money pages: formats, periods, per-currency totals, the
 // parse draft, small rules. Amounts of different currencies are never added.
-import type { Currency, ParseJob, ParseLine, Transaction, TransactionInput } from './types';
+import type {
+  Currency,
+  Merchant,
+  ParseJob,
+  ParseLine,
+  Transaction,
+  TransactionInput,
+} from './types';
 
 export * from './types';
 
@@ -56,6 +63,66 @@ export function periodFromSearch(
     kind: kind === 'week' || kind === 'quarter' || kind === 'month' ? kind : 'month',
     date: date && parse(date) ? date : today,
   };
+}
+
+/** The day `by` days from `date` (YYYY-MM-DD in, YYYY-MM-DD out). */
+export function shiftDay(date: string, by: number): string {
+  const d = parse(date) ?? new Date();
+  d.setDate(d.getDate() + by);
+  return text(d);
+}
+
+/**
+ * A posted row the draft may repeat: the same account, type and amount within
+ * a day, the rule the inbox uses for its "possible duplicate" mark.
+ */
+export function nearbyDuplicate(
+  rows: Transaction[] | undefined,
+  draft: { account_id: string; type: string; amount: number | null; date: string },
+): Transaction | undefined {
+  if (!rows || draft.amount === null || !(draft.amount > 0)) return undefined;
+  const lo = shiftDay(draft.date, -1);
+  const hi = shiftDay(draft.date, 1);
+  return rows.find(
+    (r) =>
+      r.status === 'posted' &&
+      r.account_id === draft.account_id &&
+      r.type === draft.type &&
+      Math.abs(r.amount - (draft.amount as number)) < 0.00005 &&
+      r.date >= lo &&
+      r.date <= hi,
+  );
+}
+
+/** Remembered merchants per category id, most used first; merchants without a category are left out. */
+export function merchantsByCategory(merchants: Merchant[] | undefined): Map<string, Merchant[]> {
+  const out = new Map<string, Merchant[]>();
+  for (const m of merchants ?? []) {
+    if (!m.category_id) continue;
+    const list = out.get(m.category_id) ?? [];
+    list.push(m);
+    out.set(m.category_id, list);
+  }
+  for (const list of out.values()) list.sort((a, b) => b.times - a.times);
+  return out;
+}
+
+/**
+ * `?kind=custom&from=&to=` as a range, or null when the search names no
+ * custom period. Bad or reversed dates fall back to the 30 days up to today.
+ */
+export function customRangeFromSearch(
+  search: URLSearchParams,
+  today: string,
+): { from: string; to: string } | null {
+  if (search.get('kind') !== 'custom') return null;
+  const from = search.get('from') ?? '';
+  const to = search.get('to') ?? '';
+  if (parse(from) && parse(to) && from <= to) return { from, to };
+  const end = parse(today) ?? new Date();
+  const start = new Date(end);
+  start.setDate(end.getDate() - 29);
+  return { from: text(start), to: text(end) };
 }
 
 /** The same ranges the server builds: week Monday..Sunday, month, quarter. */

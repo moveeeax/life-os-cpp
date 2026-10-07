@@ -10,6 +10,7 @@ import {
   useMerchants,
   useMoneyParse,
   useMoneySettings,
+  useNearbyRows,
 } from '@/hooks/useMoney';
 import {
   RECEIPT_MAX_BYTES,
@@ -19,6 +20,7 @@ import {
   parseErrorText,
   scaleImage,
   isDay,
+  nearbyDuplicate,
   todayLocal,
   transferNeedsReceived,
   type Account,
@@ -174,6 +176,8 @@ function ManualTab({
   const receiptBad =
     (receiptAmount.trim() !== '' || receiptCurrency.trim() !== '') &&
     (ra === null || ra <= 0 || !/^[A-Z]{3}$/.test(receiptCurrency.trim()));
+  const nearby = useNearbyRows(account, date);
+  const duplicate = nearbyDuplicate(nearby.data, { account_id: account, type, amount: a, date });
   const ok =
     !!account &&
     a !== null &&
@@ -347,6 +351,12 @@ function ManualTab({
           />
         </div>
       </div>
+      {duplicate && (
+        <p role="status" className="text-theme-sm text-warning-600">
+          Possible duplicate: “{duplicate.name}” on {duplicate.date} has the same account and
+          amount. Add it anyway if this is a second payment.
+        </p>
+      )}
       {(create.error || receiptBad) && (
         <p role="alert" className="text-theme-sm text-error-500">
           {create.error ?? 'The receipt needs both an amount and a three-letter currency code.'}
@@ -354,7 +364,7 @@ function ManualTab({
       )}
       <div className="flex justify-end">
         <button type="submit" disabled={create.isPending || !ok} className={primaryButton}>
-          {create.isPending ? 'Saving…' : 'Add'}
+          {create.isPending ? 'Saving…' : duplicate ? 'Add anyway' : 'Add'}
         </button>
       </div>
     </form>

@@ -4,7 +4,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { ApiClientError, api, apiErrorMessage } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
-import type { AcceptLine } from '@/lib/ledger';
+import { isDay, shiftDay, type AcceptLine } from '@/lib/ledger';
 import type {
   AdvisorReport,
   AdvisorReportSummary,
@@ -126,13 +126,58 @@ export function useMerchants(q: string) {
   });
 }
 
-export function useReport(kind: string, date: string, asIf?: string) {
+/** Every remembered merchant (most used first), grouped by the caller. */
+export function useMerchantMemory() {
   return useQuery({
-    queryKey: qk.money.report(kind, date, asIf ?? ''),
+    queryKey: qk.money.merchantMemory(),
+    staleTime: 60_000,
+    queryFn: async ({ signal }) =>
+      (
+        await api.getJson<{ data: Merchant[] }>(`${BASE}/merchants`, {
+          query: { limit: 300 },
+          signal,
+        })
+      ).data,
+  });
+}
+
+/** Posted rows of `account` from the day before `date` to the day after. */
+export function useNearbyRows(account: string, date: string) {
+  return useQuery({
+    queryKey: qk.money.nearby(account, date),
+    enabled: account !== '' && isDay(date),
+    queryFn: async ({ signal }) =>
+      (
+        await api.getJson<{ data: Transaction[] }>(`${BASE}/transactions`, {
+          query: {
+            account,
+            from: shiftDay(date, -1),
+            to: shiftDay(date, 1),
+            status: 'posted',
+            limit: 200,
+          },
+          signal,
+        })
+      ).data,
+  });
+}
+
+/** A week, month or quarter around `date`, or with kind 'custom' the days `range.from`..`range.to`. */
+export function useReport(
+  kind: string,
+  date: string,
+  asIf?: string,
+  range?: { from: string; to: string },
+) {
+  const custom = kind === 'custom' && range !== undefined;
+  return useQuery({
+    queryKey: qk.money.report(kind, custom ? `${range.from}..${range.to}` : date, asIf ?? ''),
     queryFn: async ({ signal }) =>
       (
         await api.getJson<{ data: Report }>(`${BASE}/reports/period`, {
-          query: { kind, date, as_if: asIf || undefined },
+          query: custom
+            ? { kind, from: range.from, to: range.to, as_if: asIf || undefined }
+            : { kind, date, as_if: asIf || undefined },
           signal,
         })
       ).data,
