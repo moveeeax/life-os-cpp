@@ -11,6 +11,7 @@
 #include <cmath>
 #include <map>
 #include <optional>
+#include <pqxx/pqxx>
 #include <regex>
 #include <set>
 #include <stdexcept>
@@ -1290,8 +1291,16 @@ void start_parse(const std::string& owner, MoneyController::Callback& callback, 
             return;
         }
         id = create(repo)["id"].template get<std::string>();
-    } catch (const std::exception& e) {
-        spdlog::warn("money parse create failed: {}", e.what());
+    } catch (const Repositories::ValidationError& e) {
+        callback(ErrorResponse::bad_request(e.code(), e.message()));
+        return;
+    } catch (const pqxx::sql_error& e) {
+        // The server's DETAIL would quote the row (the bank text, the photo): the state only.
+        spdlog::warn("money parse create failed: SQLSTATE {}", e.sqlstate());
+        callback(ErrorResponse::service_unavailable("storage_unavailable"));
+        return;
+    } catch (const std::exception&) {
+        spdlog::warn("money parse create failed");
         callback(ErrorResponse::service_unavailable("storage_unavailable"));
         return;
     }
@@ -1334,6 +1343,11 @@ void MoneyController::parseText(const HttpRequestPtr& req, Callback&& callback) 
         return;
     }
     const std::string text = body["text"].get<std::string>();
+    if (text.find('\0') != std::string::npos) {
+        errs.add("text", "invalid", "must not contain a NUL character");
+        callback(Validation::response_400(errs));
+        return;
+    }
     const std::string hint = Validation::opt_string(body, "hint_date").value_or(today_utc());
     start_parse(owner, callback, [&](Repo::ParseJobRepository& repo) { return repo.create_text(owner, text, hint); });
 }
