@@ -43,6 +43,7 @@
 #include "repositories/money/CurrencyRepository.hpp"
 #include "repositories/money/Errors.hpp"
 #include "repositories/money/FxRateRepository.hpp"
+#include "repositories/money/ImportRepository.hpp"
 #include "repositories/money/MerchantRepository.hpp"
 #include "repositories/money/ParseJobRepository.hpp"
 #include "repositories/money/ReportBuilder.hpp"
@@ -75,6 +76,9 @@ constexpr std::size_t kNoteMax = 2000;
 constexpr std::size_t kParseTextMax = 8000;
 constexpr long kParseOpenMax = 3;
 constexpr std::size_t kImageMaxBytes = 4 * 1024 * 1024;
+constexpr std::size_t kImportSectionMax = 5000;
+// The first day the rates source has a snapshot for (checked 2026-10-07).
+constexpr const char* kRatesHistoryStart = "2024-03-02";
 
 const std::vector<std::string> kTypes = {"income", "expense", "fx_adjustment"};
 const std::vector<std::string> kKinds = {"expense", "income"};
@@ -300,7 +304,7 @@ void MoneyController::upsertCurrency(const HttpRequestPtr& req, Callback&& callb
     if (body.contains("role") && !body["role"].is_null()) {
         Validation::one_of(errs, body, "role", kRoles);
     }
-    Validation::int_range(errs, body, "decimals", 0, 4);
+    Validation::int_range(errs, body, "decimals", 0, 8);
     Validation::boolean(errs, body, "archived");
     if (errs.any()) {
         callback(Validation::response_400(errs));
@@ -327,7 +331,7 @@ void MoneyController::patchCurrency(const HttpRequestPtr& req, Callback&& callba
     if (body.contains("role") && !body["role"].is_null()) {
         Validation::one_of(errs, body, "role", kRoles);
     }
-    Validation::int_range(errs, body, "decimals", 0, 4);
+    Validation::int_range(errs, body, "decimals", 0, 8);
     Validation::boolean(errs, body, "archived");
     if (errs.any()) {
         callback(Validation::response_400(errs));
@@ -995,11 +999,44 @@ void MoneyController::convert(const HttpRequestPtr& req, Callback&& callback) {
 
 void MoneyController::refreshRates(const HttpRequestPtr& req, Callback&& callback) {
     MONEY_GUARD(req, callback, owner);
+    // No body: today's rates. {from, to}: one job per day of the range that has none yet.
+    std::optional<std::string> from;
+    std::string to = today_utc();
+    if (!req->body().empty()) {
+        json body;
+        if (!parse_object(req, body, callback)) {
+            return;
+        }
+        Validation::Errors errs;
+        Validation::require_string(errs, body, "from");
+        date_field(errs, body, "from");
+        date_field(errs, body, "to");
+        if (errs.any()) {
+            callback(Validation::response_400(errs));
+            return;
+        }
+        from = body["from"].get<std::string>();
+        if (body.contains("to") && body["to"].is_string()) {
+            to = body["to"].get<std::string>();
+        }
+        if (*from < kRatesHistoryStart || *from > to || to > today_utc()) {
+            callback(ErrorResponse::bad_request(
+                "invalid_range", std::string("from..to must lie between ") + kRatesHistoryStart + " and today"));
+            return;
+        }
+    }
     if (!Jobs::is_initialized()) {
         callback(ErrorResponse::service_unavailable("queue_unavailable"));
         return;
     }
     try {
+        if (from.has_value()) {
+            const int queued = Jobs::MoneyRates::enqueue_backfill(*from, to);
+            auto resp = Response::ok(json{{"data", {{"queued", queued}, {"from", *from}, {"to", to}}}});
+            resp->setStatusCode(k202Accepted);
+            callback(resp);
+            return;
+        }
         const auto job = Jobs::get().submit(Jobs::MoneyRates::kJobType, json{{"date", "latest"}});
         auto resp = Response::ok(json{{"data", {{"job_id", job.id}, {"status", "queued"}}}});
         resp->setStatusCode(k202Accepted);
@@ -1008,6 +1045,36 @@ void MoneyController::refreshRates(const HttpRequestPtr& req, Callback&& callbac
         spdlog::warn("money rates refresh enqueue failed: {}", e.what());
         callback(ErrorResponse::service_unavailable("queue_unavailable"));
     }
+}
+
+// ── import ──────────────────────────────────────────────────────────────────
+
+void MoneyController::importNotion(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    seed_currencies(owner);
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    std::size_t rows = 0;
+    for (const char* name : Repo::ImportRepository::kSections) {
+        if (!body.contains(name) || body[name].is_null()) {
+            continue;
+        }
+        if (!body[name].is_array() || body[name].size() > kImportSectionMax) {
+            callback(ErrorResponse::bad_request("invalid_import",
+                                                std::string(name) + " must be a list of at most 5000 rows"));
+            return;
+        }
+        rows += body[name].size();
+    }
+    if (rows == 0) {
+        callback(ErrorResponse::bad_request("invalid_import", "nothing to import"));
+        return;
+    }
+    with_repo_errors(callback, "money.importNotion", [&] {
+        callback(Response::ok(json{{"data", Repo::ImportRepository().run(owner, body)}}));
+    });
 }
 
 // ── reports ─────────────────────────────────────────────────────────────────
