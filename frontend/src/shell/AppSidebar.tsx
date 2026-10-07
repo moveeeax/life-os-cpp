@@ -4,6 +4,7 @@ import { Ellipsis, Shield, X } from 'lucide-react';
 
 import { useFoodEnabled } from '@/hooks/useFood';
 import { useMe } from '@/hooks/useMe';
+import { useMoneyEnabled } from '@/hooks/useMoney';
 import { useWorkoutEnabled } from '@/hooks/useWorkoutSession';
 import { Permission, userCan, userIsAdmin } from '@/lib/auth/permissions';
 import { BRAND } from '@/lib/brand';
@@ -23,7 +24,12 @@ export function AppSidebar() {
   // A section whose backend module is switched off stays a "soon" item.
   const workoutOn = useWorkoutEnabled(userCan(user, Permission.FitnessRead));
   const foodOn = useFoodEnabled(user !== null);
-  const off = new Set([...(workoutOn ? [] : ['workout']), ...(foodOn ? [] : ['food'])]);
+  const moneyOn = useMoneyEnabled(user !== null);
+  const off = new Set([
+    ...(workoutOn ? [] : ['workout']),
+    ...(foodOn ? [] : ['food']),
+    ...(moneyOn ? [] : ['money']),
+  ]);
 
   // Close the drawer after a navigation on small screens.
   useEffect(() => {

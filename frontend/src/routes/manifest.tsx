@@ -60,6 +60,18 @@ const FoodItemsPage = lazy(() =>
 const FoodGoalsPage = lazy(() =>
   import('@/pages/food/Goals').then((m) => ({ default: m.FoodGoalsPage })),
 );
+const MoneyLedgerPage = lazy(() =>
+  import('@/pages/money/Ledger').then((m) => ({ default: m.MoneyLedgerPage })),
+);
+const MoneyAccountsPage = lazy(() =>
+  import('@/pages/money/Accounts').then((m) => ({ default: m.MoneyAccountsPage })),
+);
+const MoneyCategoriesPage = lazy(() =>
+  import('@/pages/money/Categories').then((m) => ({ default: m.MoneyCategoriesPage })),
+);
+const MoneyReportsPage = lazy(() =>
+  import('@/pages/money/Reports').then((m) => ({ default: m.MoneyReportsPage })),
+);
 const AdminDashboardPage = lazy(() =>
   import('@/pages/admin/Dashboard').then((m) => ({ default: m.AdminDashboardPage })),
 );
@@ -226,6 +238,17 @@ export const routes: RouteEntry[] = [
   { path: '/food/week', element: <FoodWeekPage />, guard: 'confirmed', layout: 'shell' },
   { path: '/food/items', element: <FoodItemsPage />, guard: 'confirmed', layout: 'shell' },
   { path: '/food/goals', element: <FoodGoalsPage />, guard: 'confirmed', layout: 'shell' },
+
+  // ── Money — any confirmed user; the module switch is the only gate ───────
+  { path: '/money', element: <MoneyLedgerPage />, guard: 'confirmed', layout: 'shell' },
+  { path: '/money/accounts', element: <MoneyAccountsPage />, guard: 'confirmed', layout: 'shell' },
+  {
+    path: '/money/categories',
+    element: <MoneyCategoriesPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
+  { path: '/money/reports', element: <MoneyReportsPage />, guard: 'confirmed', layout: 'shell' },
 
   // ── Admin — gated by Permission.Administer (0x40000000 sentinel) ────────
   {

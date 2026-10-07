@@ -44,7 +44,8 @@ export const sections: Section[] = [
   { key: 'day', label: 'Day', icon: Sun },
   /** Every confirmed user may keep a diary; the module switch is the only gate. */
   { key: 'food', label: 'Food', icon: Utensils, path: '/food' },
-  { key: 'money', label: 'Money', icon: Wallet },
+  /** Every confirmed user keeps their own money; the module switch is the only gate. */
+  { key: 'money', label: 'Money', icon: Wallet, path: '/money' },
   { key: 'tasks', label: 'Tasks', icon: ListTodo },
   { key: 'goals', label: 'Goals', icon: Target },
   { key: 'journal', label: 'Journal', icon: NotebookPen },
