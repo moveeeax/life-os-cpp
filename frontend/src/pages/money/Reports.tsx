@@ -8,8 +8,10 @@ import {
   useSaveSettings,
 } from '@/hooks/useMoney';
 import {
+  customRangeFromSearch,
   formatMoney,
   periodFromSearch,
+  periodRange,
   todayLocal,
   type PeriodKind,
   type Report,
@@ -98,12 +100,13 @@ function CurrencyCard({
 export function MoneyReportsPage() {
   const [params, setParams] = useSearchParams();
   const { kind, date } = periodFromSearch(params, todayLocal());
+  const custom = customRangeFromSearch(params, todayLocal());
   const currencies = useCurrencies().data;
   const categories = useCategories(true).data ?? [];
   const settings = useMoneySettings().data;
   const saveSettings = useSaveSettings();
   const asIf = settings?.view_currency ?? '';
-  const report = useReport(kind, date, asIf || undefined);
+  const report = useReport(custom ? 'custom' : kind, date, asIf || undefined, custom ?? undefined);
   const fmtIn = (currency: string) => (n: number) =>
     formatMoney(n, currency, decimalsOf(currencies, currency));
   const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? 'Unknown';
@@ -112,6 +115,15 @@ export function MoneyReportsPage() {
     const p = new URLSearchParams(params);
     p.set('kind', k);
     p.set('date', d);
+    p.delete('from');
+    p.delete('to');
+    setParams(p, { replace: true });
+  };
+  const setCustom = (from: string, to: string) => {
+    const p = new URLSearchParams(params);
+    p.set('kind', 'custom');
+    p.set('from', from);
+    p.set('to', to);
     setParams(p, { replace: true });
   };
   const setAsIf = (code: string) => {
@@ -145,7 +157,60 @@ export function MoneyReportsPage() {
         </select>
       }
     >
-      <PeriodRow kind={kind} date={date} onChange={setPeriod} />
+      <div className="flex flex-wrap items-center gap-3">
+        <div role="radiogroup" aria-label="Period type" className="flex gap-1">
+          {(['calendar', 'custom'] as const).map((m) => {
+            const on = (m === 'custom') === (custom !== null);
+            return (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => {
+                  if (m === 'custom') {
+                    const r = periodRange(kind, date);
+                    setCustom(r.from, r.to);
+                  } else {
+                    setPeriod(kind, custom?.to ?? date);
+                  }
+                }}
+                className={cn(
+                  'rounded-lg px-3 py-2 text-theme-sm font-medium transition',
+                  on
+                    ? 'bg-brand-50 text-brand-500 dark:bg-brand-500/12 dark:text-brand-400'
+                    : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5',
+                )}
+              >
+                {m === 'calendar' ? 'Calendar' : 'Custom'}
+              </button>
+            );
+          })}
+        </div>
+        {custom ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="date"
+              value={custom.from}
+              max={custom.to}
+              onChange={(e) => e.target.value && setCustom(e.target.value, custom.to)}
+              aria-label="From"
+              className={cn(inputClass, 'h-10 w-auto')}
+            />
+            <span className="text-theme-sm text-gray-500">to</span>
+            <input
+              type="date"
+              value={custom.to}
+              min={custom.from}
+              onChange={(e) => e.target.value && setCustom(custom.from, e.target.value)}
+              aria-label="To"
+              className={cn(inputClass, 'h-10 w-auto')}
+            />
+          </div>
+        ) : (
+          <PeriodRow kind={kind} date={date} onChange={setPeriod} />
+        )}
+      </div>
       {report.isPending ? (
         <Placeholder className="h-64" />
       ) : report.isError ? (

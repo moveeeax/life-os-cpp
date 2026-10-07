@@ -404,6 +404,8 @@ export function MoneyLedgerPage() {
     params.get('view') === 'inbox' ? 'inbox' : 'ledger',
   );
   const [account, setAccount] = useState(params.get('account') ?? '');
+  const [category, setCategory] = useState(params.get('category') ?? '');
+  const [type, setType] = useState(params.get('type') ?? '');
   const [text, setText] = useState('');
   const [q, setQ] = useState('');
   useEffect(() => {
@@ -421,12 +423,14 @@ export function MoneyLedgerPage() {
     from: range.from,
     to: range.to,
     account: account || undefined,
+    category: category || undefined,
+    type: type || undefined,
     q: q || undefined,
   });
   const rows = useMemo(() => list.data?.pages.flatMap((p) => p.data) ?? [], [list.data]);
   const days = useMemo(() => groupByDay(rows), [rows]);
   const report = useReport(kind, date);
-  const filtered = account !== '' || q !== '';
+  const filtered = account !== '' || category !== '' || type !== '' || q !== '';
   const periodTotals = filtered
     ? totalsByCurrency(rows)
     : (report.data?.blocks ?? []).map((b) => ({
@@ -509,6 +513,37 @@ export function MoneyLedgerPage() {
                 <option key={a.id} value={a.id}>
                   {a.name}
                 </option>
+              ))}
+            </select>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              aria-label="Type"
+              className={cn(inputClass, 'h-10 w-auto max-w-full')}
+            >
+              <option value="">All types</option>
+              <option value="expense">Expenses</option>
+              <option value="income">Incomes</option>
+              <option value="fx_adjustment">Bank adjustments</option>
+            </select>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              aria-label="Category"
+              className={cn(inputClass, 'h-10 w-auto max-w-full')}
+            >
+              <option value="">All categories</option>
+              {(['expense', 'income'] as const).map((k) => (
+                <optgroup key={k} label={k === 'expense' ? 'Expense' : 'Income'}>
+                  {categories
+                    .filter((c) => c.kind === k)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                        {c.archived ? ' (archived)' : ''}
+                      </option>
+                    ))}
+                </optgroup>
               ))}
             </select>
             <input

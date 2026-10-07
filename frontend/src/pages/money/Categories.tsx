@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router';
 import { Plus } from 'lucide-react';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -7,10 +8,19 @@ import {
   useCategories,
   useCurrencies,
   useDeleteCategory,
+  useMerchantMemory,
   useReport,
   useSaveCategory,
 } from '@/hooks/useMoney';
-import { budgetState, formatMoney, todayLocal, type Category, type Report } from '@/lib/ledger';
+import {
+  budgetState,
+  formatMoney,
+  merchantsByCategory,
+  todayLocal,
+  type Category,
+  type Merchant,
+  type Report,
+} from '@/lib/ledger';
 import { decimalsOf } from '@/lib/ledger';
 import { cn } from '@/lib/utils';
 
@@ -25,7 +35,15 @@ import {
 } from '../workout/styles';
 import { LoadError, MoneyFrame, Placeholder } from './frame';
 
-function CategoryForm({ category, onClose }: { category: Category | null; onClose: () => void }) {
+function CategoryForm({
+  category,
+  merchants,
+  onClose,
+}: {
+  category: Category | null;
+  merchants: Merchant[];
+  onClose: () => void;
+}) {
   const currencies = useCurrencies().data ?? [];
   const [name, setName] = useState(category?.name ?? '');
   const [kind, setKind] = useState<'expense' | 'income'>(category?.kind ?? 'expense');
@@ -152,6 +170,34 @@ function CategoryForm({ category, onClose }: { category: Category | null; onClos
         <p className="mt-2 text-theme-xs text-gray-500">
           A budget is compared only with the spend in its own currency.
         </p>
+        {category && (
+          <section aria-label="Merchants" className="mt-4">
+            <p className={labelClass}>Merchants that land here</p>
+            {merchants.length === 0 ? (
+              <p className="text-theme-sm text-gray-500">
+                None yet: a posted row with a merchant teaches it its category.
+              </p>
+            ) : (
+              <ul className="flex flex-wrap gap-1.5">
+                {merchants.map((m) => (
+                  <li
+                    key={m.merchant_key}
+                    className="rounded-full bg-gray-100 px-2.5 py-1 text-theme-xs text-gray-700 dark:bg-white/5 dark:text-gray-300"
+                  >
+                    {m.display_name}
+                    <span className="ms-1 text-gray-500 tabular-nums">{m.times}×</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Link
+              to={`/money?category=${category.id}`}
+              className="mt-2 inline-block text-theme-sm text-brand-500 hover:underline"
+            >
+              Rows in this category
+            </Link>
+          </section>
+        )}
         {(save.error || remove.error) && (
           <p role="alert" className="mt-3 text-theme-sm text-error-500">
             {save.error ?? remove.error}
@@ -211,6 +257,7 @@ export function MoneyCategoriesPage() {
   const categories = useCategories();
   const currencies = useCurrencies().data;
   const report = useReport('month', todayLocal()).data;
+  const byCategory = merchantsByCategory(useMerchantMemory().data);
   const [open, setOpen] = useState<Category | 'new' | null>(null);
 
   return (
@@ -269,6 +316,17 @@ export function MoneyCategoriesPage() {
                             </span>
                           )}
                         </span>
+                        {(byCategory.get(c.id)?.length ?? 0) > 0 && (
+                          <span className="mt-0.5 block truncate text-theme-xs text-gray-500">
+                            {byCategory
+                              .get(c.id)!
+                              .slice(0, 3)
+                              .map((m) => m.display_name)
+                              .join(', ')}
+                            {byCategory.get(c.id)!.length > 3 &&
+                              ` +${byCategory.get(c.id)!.length - 3}`}
+                          </span>
+                        )}
                         {state && c.budget_max && (
                           <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
                             <span
@@ -287,7 +345,11 @@ export function MoneyCategoriesPage() {
       )}
       {open && (
         <Modal onClose={() => setOpen(null)} className="max-w-xl">
-          <CategoryForm category={open === 'new' ? null : open} onClose={() => setOpen(null)} />
+          <CategoryForm
+            category={open === 'new' ? null : open}
+            merchants={open === 'new' ? [] : (byCategory.get(open.id) ?? [])}
+            onClose={() => setOpen(null)}
+          />
         </Modal>
       )}
     </MoneyFrame>
