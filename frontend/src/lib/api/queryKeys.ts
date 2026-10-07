@@ -62,6 +62,25 @@ export const qk = {
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['food-enabled'] as const,
   },
+  /** Money section: every key starts with 'money' so one write refreshes balances, totals and reports. */
+  money: {
+    all: () => ['money'] as const,
+    currencies: () => ['money', 'currencies'] as const,
+    accounts: (archived = false) => ['money', 'accounts', archived] as const,
+    categories: (archived = false) => ['money', 'categories', archived] as const,
+    inbox: () => ['money', 'inbox'] as const,
+    balances: () => ['money', 'balances'] as const,
+    transactions: (filter: Record<string, unknown>) =>
+      ['money', 'transactions', JSON.stringify(filter)] as const,
+    transfers: (from?: string, to?: string, account?: string) =>
+      ['money', 'transfers', from ?? '', to ?? '', account ?? ''] as const,
+    merchants: (q: string) => ['money', 'merchants', q] as const,
+    report: (kind: string, date: string, asIf: string) =>
+      ['money', 'report', kind, date, asIf] as const,
+    settings: () => ['money', 'settings'] as const,
+    /** Whether the module answers at all (it is 404 while switched off). */
+    enabled: () => ['money-enabled'] as const,
+  },
   admin: {
     users: (page?: number) =>
       page === undefined ? (['admin', 'users'] as const) : (['admin', 'users', page] as const),
