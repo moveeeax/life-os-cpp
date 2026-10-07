@@ -43,7 +43,6 @@
 #include "repositories/money/CurrencyRepository.hpp"
 #include "repositories/money/Errors.hpp"
 #include "repositories/money/FxRateRepository.hpp"
-#include "repositories/money/ImportRepository.hpp"
 #include "repositories/money/MerchantRepository.hpp"
 #include "repositories/money/ParseJobRepository.hpp"
 #include "repositories/money/ReportBuilder.hpp"
@@ -76,7 +75,6 @@ constexpr std::size_t kNoteMax = 2000;
 constexpr std::size_t kParseTextMax = 8000;
 constexpr long kParseOpenMax = 3;
 constexpr std::size_t kImageMaxBytes = 4 * 1024 * 1024;
-constexpr std::size_t kImportSectionMax = 5000;
 // The first day the rates source has a snapshot for (checked 2026-10-07).
 constexpr const char* kRatesHistoryStart = "2024-03-02";
 
@@ -1045,36 +1043,6 @@ void MoneyController::refreshRates(const HttpRequestPtr& req, Callback&& callbac
         spdlog::warn("money rates refresh enqueue failed: {}", e.what());
         callback(ErrorResponse::service_unavailable("queue_unavailable"));
     }
-}
-
-// ── import ──────────────────────────────────────────────────────────────────
-
-void MoneyController::importNotion(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
-    seed_currencies(owner);
-    json body;
-    if (!parse_object(req, body, callback)) {
-        return;
-    }
-    std::size_t rows = 0;
-    for (const char* name : Repo::ImportRepository::kSections) {
-        if (!body.contains(name) || body[name].is_null()) {
-            continue;
-        }
-        if (!body[name].is_array() || body[name].size() > kImportSectionMax) {
-            callback(ErrorResponse::bad_request("invalid_import",
-                                                std::string(name) + " must be a list of at most 5000 rows"));
-            return;
-        }
-        rows += body[name].size();
-    }
-    if (rows == 0) {
-        callback(ErrorResponse::bad_request("invalid_import", "nothing to import"));
-        return;
-    }
-    with_repo_errors(callback, "money.importNotion", [&] {
-        callback(Response::ok(json{{"data", Repo::ImportRepository().run(owner, body)}}));
-    });
 }
 
 // ── reports ─────────────────────────────────────────────────────────────────

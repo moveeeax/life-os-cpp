@@ -153,7 +153,6 @@ inline const std::vector<EndpointInfo>& get_endpoints() {
         {"GET", "/api/v1/money/rates", "Money: a quote against USD on or before a day"},
         {"GET", "/api/v1/money/rates/convert", "Money: an informational conversion with the rate and its date"},
         {"POST", "/api/v1/money/rates/refresh", "Money: enqueue today's rates fetch, or a backfill of a range"},
-        {"POST", "/api/v1/money/import/notion", "Money: load the export of the Notion money databases"},
         {"GET", "/api/v1/money/reports/period", "Money: a period's numbers per currency"},
         {"GET", "/api/v1/money/reports/balances", "Money: accounts and balances grouped by currency"},
         {"POST", "/api/v1/money/parse", "Money: send a bank mail or a list to the LLM parse job"},

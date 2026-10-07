@@ -400,8 +400,6 @@ private:
         }
     }
 
-public:
-    /// Validate and insert one row inside the caller's transaction; the import shares it.
     template <typename Txn>
     static std::string insert_in(Txn& txn, const std::string& owner, const Input& in) {
         check_account(txn, owner, in.account_id);

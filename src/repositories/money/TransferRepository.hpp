@@ -182,7 +182,6 @@ private:
         return nlohmann::json::parse(r[0][0].template as<std::string>());
     }
 
-public:
     /// Both accounts the owner's and different; received given iff the currencies differ.
     template <typename Txn>
     static void check_pair(Txn& txn,
