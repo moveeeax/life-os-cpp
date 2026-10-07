@@ -4755,7 +4755,8 @@
      "id",
      "date",
      "amount",
-     "note"
+     "note",
+     "status"
     ],
     "properties": {
      "id": {
@@ -4773,6 +4774,14 @@
      },
      "note": {
       "type": "string"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "posted",
+       "pending"
+      ],
+      "description": "A pending adjustment waits in the inbox and is not in the posted row's final_amount"
      }
     }
    },
@@ -4905,7 +4914,7 @@
      },
      "final_amount": {
       "type": "number",
-      "description": "amount plus its adjustments"
+      "description": "amount plus its adjustments: the posted ones for a posted row, all of them for a pending row"
      },
      "adjustments": {
       "type": "array",
@@ -16704,7 +16713,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 251491,
-  "source_fnv1a64": "b39600f99a7cbe85"
+  "source_bytes": 251722,
+  "source_fnv1a64": "22f3a24611acbdf9"
  }
 }

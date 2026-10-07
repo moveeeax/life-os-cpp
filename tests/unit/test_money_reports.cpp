@@ -111,3 +111,38 @@ TEST(MoneyReports, EmptyPeriodGivesNoBlocks) {
     EXPECT_TRUE(r.blocks.empty());
     EXPECT_TRUE(r.recurring.empty());
 }
+
+TEST(MoneyReports, AnAdjustmentMovesTheCategoryOfItsExpense) {
+    const std::vector<Row> rows{
+        expense("2026-10-02", "KZT", "food", 10000, "big c"),
+        expense("2026-10-03", "KZT", "rent", 200000, "landlord", "fixed"),
+        // The repository hands an adjustment its expense row's category.
+        Row{"2026-10-07", "KZT", "fx_adjustment", "food", "expense", "variable", "", 500},
+        Row{"2026-10-08", "KZT", "fx_adjustment", "rent", "expense", "fixed", "", -1000},
+        Row{"2026-10-09", "KZT", "fx_adjustment", "", "", "variable", "", 7},
+    };
+    const std::map<std::string, Budget> budgets{{"food", {20000, "KZT"}}};
+    const auto r = Money::Reports::build(kOctober, rows, {}, budgets, {}, "2026-10-10");
+    const auto& kzt = r.blocks.at(0);
+    EXPECT_DOUBLE_EQ(kzt.expense, 10000 + 200000 + 500 - 1000 + 7);
+    EXPECT_DOUBLE_EQ(kzt.fixed_expense, 199000);
+    ASSERT_EQ(kzt.categories.size(), 2u) << "an adjustment without a category joins none";
+    EXPECT_EQ(kzt.categories[1].category_id, "food");
+    EXPECT_DOUBLE_EQ(kzt.categories[1].spent, 10500);
+    EXPECT_DOUBLE_EQ(*kzt.categories[1].budget_share, 0.525);
+}
+
+TEST(MoneyReports, AWeekFindsMonthlyChargesInTheWindowItIsGiven) {
+    const Money::Period::Range week{"2026-10-05", "2026-10-11"};
+    const std::vector<Row> now{expense("2026-10-05", "USD", "subs", 9.99, "apple")};
+    const std::vector<std::vector<Row>> past{{}, {}, {}};
+    EXPECT_TRUE(Money::Reports::build(week, now, past, {}, {"apple"}, "2026-10-11").recurring.empty())
+        << "four weeks hold one charge";
+    const std::vector<Row> window{expense("2026-08-06", "USD", "subs", 9.99, "apple"),
+                                  expense("2026-09-05", "USD", "subs", 9.99, "apple"),
+                                  expense("2026-10-05", "USD", "subs", 9.99, "apple")};
+    const auto r = Money::Reports::build(week, now, past, {}, {"apple"}, "2026-10-11", &window);
+    ASSERT_EQ(r.recurring.size(), 1u);
+    EXPECT_EQ(r.recurring[0].times, 3);
+    EXPECT_EQ(r.recurring[0].next_expected, "2026-11-04");
+}

@@ -233,6 +233,25 @@ TEST_F(MoneyApiTest, TransactionsKeepTheInvariants) {
     const json row = body_of(call_id(&Api::MoneyController::getTransaction, user(kAnna), Get, t1["id"]))["data"];
     EXPECT_DOUBLE_EQ(row["final_amount"].get<double>(), 13255.61);
     EXPECT_EQ(row["adjustments"].size(), 1u);
+    EXPECT_EQ(row["adjustments"][0]["status"], "posted");
+
+    // A pending adjustment waits in the inbox: listed, not yet in the final amount.
+    json waiting = adj;
+    waiting["amount"] = 50;
+    waiting["status"] = "pending";
+    const auto queued = call_json(&Api::MoneyController::createTransaction, user(kAnna), waiting);
+    ASSERT_EQ(queued->statusCode(), k201Created) << queued->body();
+    const json listed = body_of(call_id(&Api::MoneyController::getTransaction, user(kAnna), Get, t1["id"]))["data"];
+    EXPECT_DOUBLE_EQ(listed["final_amount"].get<double>(), 13255.61) << "the pending +50 is not in yet";
+    ASSERT_EQ(listed["adjustments"].size(), 2u);
+    EXPECT_EQ(listed["adjustments"][1]["status"], "pending");
+    ASSERT_EQ(call_id(&Api::MoneyController::confirmTransaction, user(kAnna), Post, body_of(queued)["data"]["id"])
+                  ->statusCode(),
+              k200OK);
+    EXPECT_DOUBLE_EQ(
+        body_of(call_id(&Api::MoneyController::getTransaction, user(kAnna), Get, t1["id"]))["data"]["final_amount"]
+            .get<double>(),
+        13305.61);
     EXPECT_EQ(call_id(&Api::MoneyController::getTransaction, user(kBoris), Get, t1["id"])->statusCode(), k404NotFound);
     EXPECT_EQ(call_id(&Api::MoneyController::updateTransaction, user(kAnna), Patch, t1["id"], json{{"type", "income"}})
                   ->statusCode(),
@@ -409,6 +428,36 @@ TEST_F(MoneyApiTest, ReportIsPerCurrencyWithBudgetsAndTheAsIfBlock) {
     EXPECT_TRUE(r["blocks"][1]["categories"][0]["budget"].is_null()) << "the budget is in KZT";
     EXPECT_FALSE(r.contains("as_if"));
     EXPECT_EQ(r["new_merchants"], json::array({"landlord", "market"}));
+
+    // A bank recalculation of a Food row counts against the Food budget, and
+    // one of a fixed row in the fixed share.
+    const json food_row = body_of(call(&Api::MoneyController::listTransactions,
+                                       user(kAnna),
+                                       Get,
+                                       {{"from", "2026-10-05"}, {"to", "2026-10-05"}}))["data"][0];
+    const json rent_row = body_of(call(&Api::MoneyController::listTransactions,
+                                       user(kAnna),
+                                       Get,
+                                       {{"from", "2026-10-01"}, {"to", "2026-10-01"}}))["data"][0];
+    for (const auto& [orig, amount] : {std::pair{food_row, 1000.0}, std::pair{rent_row, -500.0}}) {
+        created(&Api::MoneyController::createTransaction,
+                kAnna,
+                json{{"type", "fx_adjustment"},
+                     {"date", "2026-10-08"},
+                     {"account_id", kaspi["id"]},
+                     {"amount", amount},
+                     {"adjusts_id", orig["id"]},
+                     {"name", "Bank recalculation"}});
+    }
+    const json adjusted = body_of(call(&Api::MoneyController::periodReport,
+                                       user(kAnna),
+                                       Get,
+                                       {{"kind", "month"}, {"date", "2026-10-15"}}))["data"]["blocks"][0];
+    EXPECT_DOUBLE_EQ(adjusted["expense"].get<double>(), 215500);
+    EXPECT_DOUBLE_EQ(adjusted["fixed_expense"].get<double>(), 199500);
+    EXPECT_EQ(adjusted["categories"][1]["category_id"], food["id"]);
+    EXPECT_DOUBLE_EQ(adjusted["categories"][1]["spent"].get<double>(), 16000);
+    EXPECT_DOUBLE_EQ(adjusted["categories"][1]["budget_share"].get<double>(), 0.8);
 
     // As if in KZT: THB converted with the stored rate on or before the period's end.
     Repositories::Money::FxRateRepository().put_day("2026-10-03", {{"KZT", 450}, {"THB", 33.5}});
