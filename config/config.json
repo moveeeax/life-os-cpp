@@ -241,6 +241,17 @@
       "max_tokens": "${MONEY_LLM_MAX_TOKENS:-2500}"
     }
   },
+  "tasks": {
+    "enabled": "${TASKS_ENABLED:-false}",
+    "llm": {
+      "base_url": "${TASKS_LLM_BASE_URL:-}",
+      "api_key": "${TASKS_LLM_API_KEY:-}",
+      "model": "${TASKS_LLM_MODEL:-}",
+      "prompt_parse": "${TASKS_LLM_PROMPT_PARSE:-}",
+      "timeout_seconds": "${TASKS_LLM_TIMEOUT_SECONDS:-60}",
+      "max_tokens": "${TASKS_LLM_MAX_TOKENS:-1500}"
+    }
+  },
   "worker": {
     "id": "worker-1",
     "types": ["default"],

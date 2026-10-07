@@ -180,6 +180,12 @@ food:
 money:
   enabled: false
 
+# ---------------------------------------------------------------
+# tasks module — keep in sync with the life-os-cpp chart. Env var set: TASKS_ENABLED
+# ---------------------------------------------------------------
+tasks:
+  enabled: false
+
 
 # ---------------------------------------------------------------
 # External PostgreSQL connection

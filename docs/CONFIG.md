@@ -261,6 +261,13 @@ outage can never affect the money path.
 | `MONEY_ADVISOR_HOUR_UTC` | `money.advisor_hour_utc` | int | `7` | Hour (UTC) the API pod enqueues each user's weekly review on their weekday; `-1` switches the schedule off ("Run now" still works) |
 | `MONEY_LLM_TIMEOUT_SECONDS` | `money.llm.timeout_seconds` | int | `60` | Provider timeout per call (at least 5) |
 | `MONEY_LLM_MAX_TOKENS` | `money.llm.max_tokens` | int | `2500` | Token cap of an answer (at least 100) |
+| `TASKS_ENABLED` | `tasks.enabled` | bool | `false` | Master switch for the tasks module (`Core::tasks_enabled()`): personal tasks, the day's agenda, the inbox, the one-phrase parse (`tasks_parse` job). Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
+| `TASKS_LLM_BASE_URL` | `tasks.llm.base_url` | string | `""` | Provider of the `tasks_parse` job. With base URL, key or model empty the job uses the money provider (`MONEY_LLM_BASE_URL`, `MONEY_LLM_API_KEY`, `MONEY_LLM_MODEL`) with the tasks prompt |
+| `TASKS_LLM_API_KEY` | `tasks.llm.api_key` | string | `""` | Bearer key of that provider; prod leaves it empty and shares the money key |
+| `TASKS_LLM_MODEL` | `tasks.llm.model` | string | `""` | Model of the tasks parse |
+| `TASKS_LLM_PROMPT_PARSE` | `tasks.llm.prompt_parse` | string | `""` | System prompt of the tasks parse; example in `docs/tasks/prompt-parse.example.md`. Empty: the parse is `not_configured` and the page saves tasks as typed. Prod: ConfigMap `life-os-tasks-llm` |
+| `TASKS_LLM_TIMEOUT_SECONDS` | `tasks.llm.timeout_seconds` | int | `60` | Provider timeout per call (at least 5) |
+| `TASKS_LLM_MAX_TOKENS` | `tasks.llm.max_tokens` | int | `1500` | Token cap of an answer (at least 100) |
 | `FOOD_LLM_BASE_URL` | `food.llm.base_url` | string | `""` | Base URL of an OpenAI-compatible chat completions API for the `food_parse` job, e.g. `https://api.openai.com/v1`. The worker calls `{base_url}/chat/completions`. With any of the four `FOOD_LLM_*` settings below empty the parse is `not_configured` and the add form hides it. Prod: ConfigMap `life-os-food-llm` |
 | `FOOD_LLM_API_KEY` | `food.llm.api_key` | string | `""` | Bearer token of the provider. Prod: Secret `life-os-food-llm`. Never log or commit |
 | `FOOD_LLM_MODEL` | `food.llm.model` | string | `""` | Model name as the provider expects it |
