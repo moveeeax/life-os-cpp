@@ -24,16 +24,16 @@ public:
         std::string name;
         std::optional<std::string> role;  // "primary" | "local" | nullopt
         int decimals = 2;
-        std::string minor_unit;
         bool archived = false;
+        std::string minor_unit;
     };
 
     struct Patch {
         std::optional<std::string> name;
         std::optional<std::optional<std::string>> role;  // outer: given; inner: null clears
         std::optional<int> decimals;
-        std::optional<std::string> minor_unit;
         std::optional<bool> archived;
+        std::optional<std::string> minor_unit;
     };
 
     /// The owner's ten, as in the Notion base; seeded once per user.
