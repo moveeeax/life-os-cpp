@@ -31,6 +31,7 @@
 #include "food/Llm.hpp"
 #include "food/ParseAnswer.hpp"
 #include "jobs/Jobs.hpp"
+#include "llm/Chat.hpp"
 #include "repositories/food/GoalsRepository.hpp"
 #include "repositories/food/ItemRepository.hpp"
 #include "repositories/food/ParseJobRepository.hpp"
@@ -42,98 +43,12 @@ inline constexpr const char* kJobType = "food_parse";
 inline constexpr long kItemsInPrompt = 200;
 
 namespace detail {
-
-/// The provider did not take the request; the queue retries.
-struct Retryable : std::runtime_error {
-    explicit Retryable(const std::string& what) : std::runtime_error(what) {}
-};
-
-/// One chat completion. Returns the response body as JSON.
-/// @throws Retryable on 429, 5xx, a timeout or a body that is not JSON.
-inline nlohmann::json complete(Food::Http::Transport& transport,
-                               const Food::Llm::Settings& s,
-                               const nlohmann::json& request,
-                               std::string& error_code) {
-    Food::Http::Response response;
-    try {
-        response = transport.post_json(s.base_url + "/chat/completions",
-                                       request.dump(),
-                                       {{"Authorization", "Bearer " + s.api_key}, {"Accept", "application/json"}},
-                                       s.timeout_seconds);
-    } catch (const Food::Http::TransportError& e) {
-        throw Retryable(e.what());
-    }
-    if (response.status == 429 || response.status >= 500) {
-        throw Retryable("provider answered HTTP " + std::to_string(response.status));
-    }
-    nlohmann::json body = nlohmann::json::parse(response.body, nullptr, /*allow_exceptions=*/false);
-    if (response.status == 401 || response.status == 403) {
-        error_code = "provider_refused";
-        return nlohmann::json();
-    }
-    if (response.status != 200) {
-        // A 400 may be the provider refusing response_format; the caller decides.
-        error_code = "provider_error_" + std::to_string(response.status);
-        return body.is_discarded() ? nlohmann::json() : body;
-    }
-    if (body.is_discarded() || !body.is_object()) {
-        throw Retryable("provider answered something that is not JSON");
-    }
-    error_code.clear();
-    return body;
-}
-
-/// The provider's error text (OpenAI puts it in error.message), cut for the job row.
-inline std::string provider_message(const nlohmann::json& body) {
-    std::string text;
-    if (body.is_object() && body.contains("error")) {
-        const auto& e = body["error"];
-        if (e.is_object() && e.contains("message") && e["message"].is_string()) {
-            text = e["message"].get<std::string>();
-        } else if (e.is_string()) {
-            text = e.get<std::string>();
-        }
-    }
-    if (text.size() > 300) {
-        text.resize(300);
-    }
-    return text;
-}
-
-/**
- * A 400 that names one of the optional parameters of the request: adapt the
- * request and say so. Providers differ here (OpenAI's reasoning models want
- * max_completion_tokens and refuse a temperature; some servers do not know
- * response_format), and the worker must not care which one is behind the URL.
- * One parameter per round so the provider's message decides, not a guess.
- */
-inline bool adapt_request(nlohmann::json& request, const nlohmann::json& body) {
-    const std::string text = body.is_object() ? body.dump() : std::string();
-    const auto names = [&](const char* param) { return text.find(param) != std::string::npos; };
-    if (request.contains("max_tokens") && names("max_tokens")) {
-        request["max_completion_tokens"] = request["max_tokens"];
-        request.erase("max_tokens");
-        return true;
-    }
-    if (request.contains("temperature") && names("temperature")) {
-        request.erase("temperature");
-        return true;
-    }
-    if (request.contains("response_format") && names("response_format")) {
-        request.erase("response_format");
-        return true;
-    }
-    return false;
-}
-
-inline std::optional<int> usage(const nlohmann::json& body, const char* key) {
-    if (body.contains("usage") && body["usage"].is_object() && body["usage"].contains(key) &&
-        body["usage"][key].is_number_integer()) {
-        return body["usage"][key].get<int>();
-    }
-    return std::nullopt;
-}
-
+// The shared chat call (llm/Chat.hpp), under the names this handler used before.
+using Chat::adapt_request;
+using Chat::complete;
+using Chat::provider_message;
+using Chat::Retryable;
+using Chat::usage;
 }  // namespace detail
 
 inline nlohmann::json process_job(const nlohmann::json& payload) {
