@@ -1,10 +1,14 @@
 // Pure logic of the Money pages: formats, periods, per-currency totals, the
 // parse draft, small rules. Amounts of different currencies are never added.
-import type { ParseJob, ParseLine, Transaction, TransactionInput } from './types';
+import type { Currency, ParseJob, ParseLine, Transaction, TransactionInput } from './types';
 
 export * from './types';
 
 // ── formats ────────────────────────────────────────────────────────────────
+
+/** Decimals of a currency from the user's list (2 when unknown). */
+export const decimalsOf = (currencies: Currency[] | undefined, code: string): number =>
+  currencies?.find((c) => c.code === code)?.decimals ?? 2;
 
 /** "₸13,275.61"-style text in the currency's own decimals. */
 export function formatMoney(amount: number, currency: string, decimals = 2): string {
