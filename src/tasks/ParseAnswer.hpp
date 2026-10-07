@@ -83,7 +83,7 @@ inline std::vector<Line> parse_answer(std::string_view content, const std::set<s
         throw Invalid("the answer has no lines array");
     }
     const auto& raw = doc["lines"];
-    if (raw.empty() || raw.size() > kMaxLines) {
+    if (raw.empty() || raw.size() > static_cast<std::size_t>(kMaxLines)) {
         throw Invalid("the answer must hold 1.." + std::to_string(kMaxLines) + " lines");
     }
     std::vector<Line> out;

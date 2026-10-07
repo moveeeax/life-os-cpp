@@ -57,8 +57,9 @@ protected:
             return;
         Database::get().execute_write([](auto& txn) {
             txn.exec(
-                "TRUNCATE TABLE task_parse_jobs, task_notes, task_items, money_transactions, money_accounts, "
-                "money_categories, money_currencies");
+                "TRUNCATE TABLE task_parse_jobs, task_notes, task_items, money_settings, money_fx_rates, "
+                "money_merchants, money_transfers, money_transactions, money_categories, money_accounts, "
+                "money_currencies");
             for (const char* id : {kAnna, kBoris}) {
                 txn.exec_params(
                     "INSERT INTO users (id, email, confirmed, role_id) "
