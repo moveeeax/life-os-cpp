@@ -619,6 +619,13 @@ json notion_export() {
                            {"amount", 1},
                            {"category", "cat-groceries"},
                            {"name", "An income in an expense category"}},
+                      json{{"external_id", "tx-btc-fee"},
+                           {"type", "expense"},
+                           {"date", "2026-09-26"},
+                           {"account", "acc-btc"},
+                           {"amount", 0.00001234},
+                           {"category", "cat-groceries"},
+                           {"name", "Network fee (BTC)"}},
                       json{{"external_id", "tx-orphan"},
                            {"type", "fx_adjustment"},
                            {"date", "2026-10-06"},
@@ -651,7 +658,7 @@ TEST_F(MoneyApiTest, ImportLoadsEverySectionListsRefusedRowsAndASecondRunUpdates
     EXPECT_EQ(report["currencies"]["created"], 1);
     EXPECT_EQ(report["accounts"]["created"], 3);
     EXPECT_EQ(report["categories"]["created"], 2);
-    EXPECT_EQ(report["transactions"]["created"], 3) << "the adjustment goes in after its original";
+    EXPECT_EQ(report["transactions"]["created"], 4) << "the adjustment goes in after its original";
     EXPECT_EQ(report["transfers"]["created"], 2);
     ASSERT_EQ(report["rejected"].size(), 2u) << report.dump();
     std::set<std::string> refused;
@@ -674,7 +681,8 @@ TEST_F(MoneyApiTest, ImportLoadsEverySectionListsRefusedRowsAndASecondRunUpdates
     };
     const json freedom = by_name("Freedom Deposit Visa KZT •8977");
     EXPECT_NEAR(balance_of(freedom), 423769.47 - 8231.76 - 53.25 + 1934018 - 230000 - 5000, 0.005);
-    EXPECT_NEAR(balance_of(by_name("Telegram Wallet BTC")), 0.0057635, 1e-9) << "eight decimals survive";
+    EXPECT_NEAR(balance_of(by_name("Telegram Wallet BTC")), 0.0057635 - 0.00001234, 1e-9)
+        << "eight decimals survive, in transfers and in the ledger";
     EXPECT_NEAR(balance_of(by_name("Cash KZT")), 5000, 0.005);
 
     // The second run: one amount changed in the source, nothing added twice.
@@ -686,7 +694,7 @@ TEST_F(MoneyApiTest, ImportLoadsEverySectionListsRefusedRowsAndASecondRunUpdates
     EXPECT_EQ(report2["accounts"]["created"], 0);
     EXPECT_EQ(report2["accounts"]["updated"], 3);
     EXPECT_EQ(report2["transactions"]["created"], 0);
-    EXPECT_EQ(report2["transactions"]["updated"], 3);
+    EXPECT_EQ(report2["transactions"]["updated"], 4);
     EXPECT_EQ(report2["transfers"]["updated"], 2);
     accounts = body_of(call(&Api::MoneyController::listAccounts, user(kAnna), Get))["data"];
     EXPECT_EQ(accounts.size(), 3u);
@@ -714,6 +722,21 @@ TEST_F(MoneyApiTest, ImportRefusesAnEmptyOrMalformedBody) {
                                 json{{"accounts", json::array({42, json{{"external_id", "a"}, {"name", 7}}})}});
     ASSERT_EQ(resp->statusCode(), k200OK) << resp->body();
     EXPECT_EQ(body_of(resp)["data"]["rejected"].size(), 2u);
+    // A type that is not text is that row's problem too, not a 500.
+    const auto typed = call_json(&Api::MoneyController::importNotion,
+                                 user(kAnna),
+                                 json{{"transactions", json::array({json{{"external_id", "t"}, {"type", 5}}})}});
+    ASSERT_EQ(typed->statusCode(), k200OK) << typed->body();
+    EXPECT_EQ(body_of(typed)["data"]["rejected"].size(), 1u);
+    // A currency row without a name or role keeps the seeded ones.
+    call_json(
+        &Api::MoneyController::importNotion, user(kAnna), json{{"currencies", json::array({json{{"code", "USD"}}})}});
+    for (const auto& c : body_of(call(&Api::MoneyController::listCurrencies, user(kAnna), Get))["data"]) {
+        if (c["code"] == "USD") {
+            EXPECT_FALSE(c["name"].get<std::string>().empty());
+            EXPECT_EQ(c["role"], "primary");
+        }
+    }
 }
 
 TEST_F(MoneyApiTest, RatesBackfillChecksTheRangeBeforeTheQueue) {

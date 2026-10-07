@@ -82,7 +82,8 @@ def plain_value(prop: dict):
     if kind == "date":
         if not value:
             return None
-        return {"start": value["start"], "is_datetime": "T" in value["start"]}
+        # With a time_zone the API answers local time without an offset.
+        return {"start": value["start"], "is_datetime": "T" in value["start"], "time_zone": value.get("time_zone")}
     return None  # formulas and rollups are not read: the import recomputes
 
 
@@ -139,7 +140,15 @@ def local_date_time(date: dict | None, offset: dt.timedelta) -> tuple[str | None
     start = date["start"]
     if not date.get("is_datetime"):
         return start[:10], None
-    moment = dt.datetime.fromisoformat(start.replace("Z", "+00:00")).astimezone(dt.timezone(offset))
+    moment = dt.datetime.fromisoformat(start.replace("Z", "+00:00"))
+    if moment.tzinfo is None:
+        # Local time in the zone Notion names; without one it is already where the owner was.
+        if not date.get("time_zone"):
+            return moment.date().isoformat(), moment.strftime("%H:%M")
+        from zoneinfo import ZoneInfo
+
+        moment = moment.replace(tzinfo=ZoneInfo(date["time_zone"]))
+    moment = moment.astimezone(dt.timezone(offset))
     return moment.date().isoformat(), moment.strftime("%H:%M")
 
 
@@ -252,18 +261,26 @@ def convert(rows: dict[str, list[dict]], offset: dt.timedelta) -> dict:
             row["receipt_amount"] = row["receipt_currency"] = None
         transactions.append(row)
 
+    currency_of = {a["external_id"]: a["currency"] for a in accounts}
     transfers = []
     for r in rows["transfers"]:
         p = r["props"]
         date, _ = local_date_time(p.get("Date"), offset)
+        source, target = first(p.get("From Account")), first(p.get("To Account"))
+        received = p.get("Amount Received")
+        if received is not None and currency_of.get(source) == currency_of.get(target):
+            # One currency on both sides: the model keeps the received amount empty.
+            if received != p.get("Amount Sent"):
+                notes.append(f"transfer {p.get('Transfer')}: received {received} dropped, both sides in one currency")
+            received = None
         transfers.append(
             {
                 "external_id": r["id"],
                 "date": date,
-                "from_account": first(p.get("From Account")),
-                "to_account": first(p.get("To Account")),
+                "from_account": source,
+                "to_account": target,
                 "amount_sent": p.get("Amount Sent"),
-                "amount_received": p.get("Amount Received"),
+                "amount_received": received,
                 "name": p.get("Transfer") or "",
                 "note": p.get("Notes") or "",
             }

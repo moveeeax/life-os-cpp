@@ -86,6 +86,11 @@ private:
         return v;
     }
 
+    static bool is_adjustment(const nlohmann::json& r) {
+        return r.is_object() && r.contains("type") && r["type"].is_string() &&
+               r["type"].get<std::string>() == "fx_adjustment";
+    }
+
     static std::optional<double> opt_number(const nlohmann::json& row, const char* key) {
         if (!row.contains(key) || row[key].is_null()) {
             return std::nullopt;
@@ -176,20 +181,31 @@ private:
             return q[0][0].template as<std::string>();
         }
 
+        /// A field left out keeps what the currency has (a seeded name, its role).
         void currencies(const nlohmann::json& rows) {
             each("currencies", rows, [&](const nlohmann::json& r) {
                 const std::string code = required_text(r, "code");
-                const auto decimals = opt_number(r, "decimals");
+                std::optional<int> decimals;
+                if (r.contains("decimals") && !r["decimals"].is_null()) {
+                    if (!r["decimals"].is_number_integer()) {
+                        throw Invariant("decimals must be a whole number");
+                    }
+                    decimals = r["decimals"].get<int>();
+                }
+                const bool role_given = r.contains("role");
                 auto q = txn.exec_params(
                     "INSERT INTO money_currencies (owner_id, code, name, role, decimals) "
-                    "VALUES ($1::uuid, $2, $3, $4, $5) ON CONFLICT (owner_id, code) DO UPDATE SET "
-                    " name = EXCLUDED.name, role = EXCLUDED.role, decimals = EXCLUDED.decimals "
+                    "VALUES ($1::uuid, $2, $3, $5, COALESCE($6, 2)) ON CONFLICT (owner_id, code) DO UPDATE SET "
+                    " name = CASE WHEN $3 = '' THEN money_currencies.name ELSE EXCLUDED.name END, "
+                    " role = CASE WHEN $4::boolean THEN EXCLUDED.role ELSE money_currencies.role END, "
+                    " decimals = COALESCE($6, money_currencies.decimals) "
                     "RETURNING (xmax = 0)",
                     owner,
                     code,
                     text(r, "name"),
+                    role_given,
                     opt_text(r, "role"),
-                    decimals.has_value() ? static_cast<int>(*decimals) : 2);
+                    decimals);
                 return q[0][0].template as<bool>();
             });
         }
@@ -284,12 +300,12 @@ private:
             // Originals first: an adjustment points at a row that must be in.
             nlohmann::json ordered = nlohmann::json::array();
             for (const auto& r : rows) {
-                if (!(r.is_object() && r.value("type", std::string()) == "fx_adjustment")) {
+                if (!(is_adjustment(r))) {
                     ordered.push_back(r);
                 }
             }
             for (const auto& r : rows) {
-                if (r.is_object() && r.value("type", std::string()) == "fx_adjustment") {
+                if (is_adjustment(r)) {
                     ordered.push_back(r);
                 }
             }
