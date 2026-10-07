@@ -6,6 +6,25 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-10-07
+
+### Added
+- Money pages: the ledger filters by type and category as well (and opens
+  filtered from `/money?category=…`); the Reports tab takes a custom range next
+  to the calendar week, month and quarter; each category lists the merchants the
+  memory sends to it, on the list and in the editor, with a link to its rows;
+  the manual form warns when a posted row of the same account and amount sits
+  within a day of the date, and its button turns into "Add anyway".
+- Money: every currency has its smallest unit. A code in the built-in table
+  (ISO 4217 minor units plus BTC) gets its decimals and the unit's name on
+  `POST /api/v1/money/currencies` (the tiyn of KZT, the kopeck of RUB, the
+  satoshi of BTC, 0 decimals for VND), and an amount finer than that unit is
+  refused with 400 on every write: transactions, receipts, transfers and fees,
+  opening balances, budgets. Another code gives its decimals (0..8) and may name
+  its unit. Migration 028 widens money amounts to eight decimals and adds
+  `minor_unit`; `POST /api/v1/money/rates/refresh` takes `{from, to}` and
+  queues one rates job per day without rates (the source starts on 2024-03-02).
+
 ## [1.13.0] - 2026-10-07
 
 ### Added
