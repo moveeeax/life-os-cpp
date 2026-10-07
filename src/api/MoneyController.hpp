@@ -52,7 +52,6 @@ public:
     ADD_METHOD_TO(MoneyController::rate, "/api/v1/money/rates", Get);
     ADD_METHOD_TO(MoneyController::convert, "/api/v1/money/rates/convert", Get);
     ADD_METHOD_TO(MoneyController::refreshRates, "/api/v1/money/rates/refresh", Post);
-    ADD_METHOD_TO(MoneyController::importNotion, "/api/v1/money/import/notion", Post);
     ADD_METHOD_TO(MoneyController::periodReport, "/api/v1/money/reports/period", Get);
     ADD_METHOD_TO(MoneyController::balances, "/api/v1/money/reports/balances", Get);
     ADD_METHOD_TO(MoneyController::parseText, "/api/v1/money/parse", Post);
@@ -99,7 +98,6 @@ public:
     void rate(const HttpRequestPtr& req, Callback&& callback);
     void convert(const HttpRequestPtr& req, Callback&& callback);
     void refreshRates(const HttpRequestPtr& req, Callback&& callback);
-    void importNotion(const HttpRequestPtr& req, Callback&& callback);
     void periodReport(const HttpRequestPtr& req, Callback&& callback);
     void balances(const HttpRequestPtr& req, Callback&& callback);
     void parseText(const HttpRequestPtr& req, Callback&& callback);
