@@ -1225,7 +1225,7 @@ struct DataUrl {
 };
 
 std::optional<DataUrl> data_url(const std::string& url, std::string& problem) {
-    static const std::vector<std::string> kTypes = {"image/jpeg", "image/png", "image/webp"};
+    static const std::vector<std::string> kImageTypes = {"image/jpeg", "image/png", "image/webp"};
     const std::string prefix = "data:";
     const auto comma = url.find(',');
     if (url.rfind(prefix, 0) != 0 || comma == std::string::npos) {
@@ -1239,7 +1239,7 @@ std::optional<DataUrl> data_url(const std::string& url, std::string& problem) {
         return std::nullopt;
     }
     DataUrl out{meta.substr(0, semi), url.substr(comma + 1)};
-    if (std::find(kTypes.begin(), kTypes.end(), out.type) == kTypes.end()) {
+    if (std::find(kImageTypes.begin(), kImageTypes.end(), out.type) == kImageTypes.end()) {
         problem = "the image must be jpeg, png or webp";
         return std::nullopt;
     }
