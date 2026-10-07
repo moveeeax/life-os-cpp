@@ -6,6 +6,33 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-10-07
+
+### Added
+- Money: a Currencies tab lists each currency with its smallest amount and the
+  unit's name (0.01 · kopeck, 0.00000001 · satoshi), adds a currency (a code
+  outside the ISO table names its decimals and unit) and edits the name, role
+  and archive flag. In a category's dialog a merchant chip opens a picker that
+  moves the merchant to another category: its next rows are suggested there,
+  posted rows keep their category.
+
+### Changed
+- Money: `PATCH /api/v1/money/merchants` takes `{merchant_key, category_id}` in
+  the body and replaces `PATCH /api/v1/money/merchants/{key}`, since keys hold
+  spaces, `&`, `'` and any script. A display name is normalized to its key.
+  `POST /api/v1/money/rates/refresh` with a range answers 409
+  `backfill_running` while earlier rate jobs still wait in the queue and the
+  range has days without rates, so no day is queued twice.
+
+### Fixed
+- Money reports: a bank recalculation now counts in the category of the expense
+  it adjusts, so it moves that category's budget share and, for a fixed
+  category, the fixed share. Week reports find monthly charges: recurring
+  charges are looked for over at least the 120 days up to the period's end.
+  A posted row's `final_amount` takes only posted adjustments (a pending one
+  waits in the inbox, like the balance); each adjustment now carries its
+  `status`.
+
 ## [1.14.0] - 2026-10-07
 
 ### Added
