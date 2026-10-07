@@ -208,7 +208,14 @@ export function useTasksParse() {
     };
   }, [jobId]);
 
-  useEffect(() => () => void generation.current++, []);
+  // Unmount drops the job; a remount (StrictMode does one in development) may start again.
+  useEffect(
+    () => () => {
+      generation.current++;
+      starting.current = false;
+    },
+    [],
+  );
 
   return { state, job, error, start, cancel };
 }
