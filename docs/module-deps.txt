@@ -70,7 +70,10 @@ email -> repositories
 email -> security
 email -> utils
 food -> utils
+food -> llm
 food -> net
+llm -> net
+llm -> utils
 money -> net
 money -> utils
 net -> utils
@@ -90,6 +93,7 @@ jobs -> email
 jobs -> fitness/sync
 jobs -> fitness/xiaomi
 jobs -> food
+jobs -> llm
 jobs -> money
 jobs -> net
 jobs -> observability

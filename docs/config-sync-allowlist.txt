@@ -25,3 +25,13 @@ triple jobs.queue_metric_refresh_sec JOBS_QUEUE_METRIC_REFRESH_SEC
 # constant into the json would recreate the api.public_paths full-override
 # footgun. Env-or-code-default only, on purpose.
 absent-json rate_limit.protected_paths
+
+# llm/Chat.hpp read_settings() builds the key and env names from a prefix,
+# one reader for every module that talks to an LLM; the call site passes
+# "food.llm" / "FOOD_LLM" (food/Llm.hpp).
+triple food.llm.base_url FOOD_LLM_BASE_URL
+triple food.llm.api_key FOOD_LLM_API_KEY
+triple food.llm.model FOOD_LLM_MODEL
+triple food.llm.prompt FOOD_LLM_PROMPT
+triple food.llm.timeout_seconds FOOD_LLM_TIMEOUT_SECONDS
+triple food.llm.max_tokens FOOD_LLM_MAX_TOKENS
