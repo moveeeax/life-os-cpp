@@ -8645,37 +8645,21 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/money/merchants/{key}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Change what a merchant means from now on */
+        /**
+         * Move a merchant to another category from now on
+         * @description The key travels in the body because it holds spaces, `&`, `'` and any script. A display name works too: "Big  C!" and "big c" name the same merchant. Past rows keep their category; the next suggestion for the merchant uses the new one.
+         */
         patch: {
             parameters: {
                 query?: never;
                 header?: never;
-                path: {
-                    key: string;
-                };
+                path?: never;
                 cookie?: never;
             };
             requestBody: {
                 content: {
                     "application/json": {
+                        merchant_key: string;
                         /** Format: uuid */
                         category_id: string | null;
                     };
@@ -8971,6 +8955,15 @@ export interface paths {
                 };
                 /** @description Money module disabled */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A range with missing days while an earlier backfill still waits in the queue (backfill_running) */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };

@@ -17,6 +17,7 @@ import {
   periodRange,
   shiftPeriod,
   signedAmount,
+  smallestUnit,
   targetSize,
   totalsByCurrency,
   transferNeedsReceived,
@@ -301,5 +302,14 @@ describe('merchantsByCategory', () => {
     const out = merchantsByCategory([m('grab', 'c1', 2), m('bolt', 'c1', 5), m('x', null, 9)]);
     expect([...out.keys()]).toEqual(['c1']);
     expect(out.get('c1')!.map((x) => x.merchant_key)).toEqual(['bolt', 'grab']);
+  });
+});
+
+describe('smallestUnit', () => {
+  it('writes the step of each exponent with the unit name', () => {
+    expect(smallestUnit({ decimals: 2, minor_unit: 'kopeck' })).toBe('0.01 · kopeck');
+    expect(smallestUnit({ decimals: 0, minor_unit: 'yen' })).toBe('1 · yen');
+    expect(smallestUnit({ decimals: 8, minor_unit: 'satoshi' })).toBe('0.00000001 · satoshi');
+    expect(smallestUnit({ decimals: 3, minor_unit: '' })).toBe('0.001');
   });
 });

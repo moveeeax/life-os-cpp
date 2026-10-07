@@ -69,6 +69,9 @@ const MoneyAccountsPage = lazy(() =>
 const MoneyCategoriesPage = lazy(() =>
   import('@/pages/money/Categories').then((m) => ({ default: m.MoneyCategoriesPage })),
 );
+const MoneyCurrenciesPage = lazy(() =>
+  import('@/pages/money/Currencies').then((m) => ({ default: m.MoneyCurrenciesPage })),
+);
 const MoneyReportsPage = lazy(() =>
   import('@/pages/money/Reports').then((m) => ({ default: m.MoneyReportsPage })),
 );
@@ -248,6 +251,12 @@ export const routes: RouteEntry[] = [
   {
     path: '/money/categories',
     element: <MoneyCategoriesPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
+  {
+    path: '/money/currencies',
+    element: <MoneyCurrenciesPage />,
     guard: 'confirmed',
     layout: 'shell',
   },
