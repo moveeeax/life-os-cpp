@@ -23,6 +23,13 @@ extraEnvFrom:
   - secretRef:
       name: life-os-food-llm
       optional: true
+  # LLM settings of the money module; the key is in the Secret life-os-money-llm.
+  - configMapRef:
+      name: life-os-money-llm
+      optional: true
+  - secretRef:
+      name: life-os-money-llm
+      optional: true
 
 externalDatabase:
   host: postgresql-rw.db.svc.cluster.local

@@ -74,6 +74,7 @@ food -> llm
 food -> net
 llm -> net
 llm -> utils
+money -> llm
 money -> net
 money -> utils
 net -> utils
