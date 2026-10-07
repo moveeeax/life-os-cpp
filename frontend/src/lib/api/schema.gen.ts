@@ -4,11534 +4,11513 @@
  */
 
 export interface paths {
-  '/': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Endpoint discovery — list every registered route */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              message?: string;
-              version?: string;
-              endpoints?: {
-                method: string;
-                path: string;
-                description: string;
-              }[];
+    "/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Endpoint discovery — list every registered route */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
             };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/healthz': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Liveness probe */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Process is alive */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @enum {string} */
-              status: 'alive';
-              /**
-               * Format: int64
-               * @description Epoch seconds
-               */
-              timestamp: number;
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message?: string;
+                            version?: string;
+                            endpoints?: {
+                                method: string;
+                                path: string;
+                                description: string;
+                            }[];
+                        };
+                    };
+                };
             };
-          };
         };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/ready': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Readiness probe */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Ready */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Draining or dependency unhealthy */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/health': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Detailed component health */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description All components healthy */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description One or more components unhealthy */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/auth/register': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Register a new user */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            /** Format: email */
-            email: string;
-            password: string;
-            first_name?: string;
-            last_name?: string;
-          };
-        };
-      };
-      responses: {
-        /** @description User created — confirmation email queued */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['RegisterResponse'];
-          };
-        };
-        /** @description Validation failed */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Email already registered */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Idempotency-Key conflict — same key, different body (idempotency middleware) */
-        422: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/auth/login': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Log in */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            /** Format: email */
-            email: string;
-            password: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Logged in — Set-Cookie access + refresh */
-        200: {
-          headers: {
-            'Set-Cookie'?: string;
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MeResponse'];
-          };
-        };
-        /** @description Invalid email or password */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Body content type is not application/json (content-type middleware — applies to every JSON API endpoint) */
-        415: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/auth/logout': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Log out (clears cookies + revokes refresh token) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Logged out */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MessageResponse'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/auth/refresh': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Rotate access + refresh tokens */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description New cookies issued */
-        200: {
-          headers: {
-            'Set-Cookie'?: string;
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MeResponse'];
-          };
-        };
-        /** @description Refresh token missing / expired / revoked */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/auth/me': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get the authenticated user */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Current user */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MeResponse'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/account/confirm-resend': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Resend the email-confirmation link to the current user */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Confirmation email queued */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/account/confirm/{token}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Confirm an account from an email link */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          token: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Account confirmed */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Invalid or expired token */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description User not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/account/reset-password-request': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Start a password reset (email-based) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            /** Format: email */
-            email: string;
-          };
-        };
-      };
-      responses: {
-        /** @description If the email is registered, a reset link is on its way */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/account/reset-password/{token}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Apply a password reset using an email-link token */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          token: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            new_password: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Password updated */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Invalid or expired token */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/account/change-email-request': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Start an email-change flow (verifies password, mails a link to new address) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            /** Format: email */
-            new_email: string;
-            password: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Confirmation email sent to the new address */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Wrong password or not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/account/change-email/{token}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Apply a pending email change from token */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          token: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Email updated */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Invalid or expired token */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Email already in use */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/account/join-from-invite/{token}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Set password and confirm account from an invite token */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          token: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            new_password: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Account ready — the invitee can now sign in */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Invalid or expired invitation token */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/account/change-password': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Change password while logged in (verifies old password) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            old_password: string;
-            new_password: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Password updated */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Wrong current password or not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/account/api-keys': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List your API keys (metadata only; never the secret) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Array of API key metadata under data[] */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    /** Create an API key — the secret is returned ONCE in this response */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            name: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Key created; `key` field holds the one-time secret */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/account/api-keys/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    /** Revoke one of your API keys */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Key revoked */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description No such key (or not yours) */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/users': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List users (admin) */
-    get: {
-      parameters: {
-        query?: {
-          limit?: number;
-          offset?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description User page */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['UserListResponse'];
-          };
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    /** Create a confirmed user (admin) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            /** Format: email */
-            email: string;
-            password: string;
-            first_name?: string;
-            last_name?: string;
-            role_id?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description Created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['UserDetailResponse'];
-          };
-        };
-        /** @description Validation failed */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Email already registered */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/invite': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Invite a user via email (admin) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            /** Format: email */
-            email: string;
-            first_name?: string;
-            last_name?: string;
-            role_id?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description Invited */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['InviteResponse'];
-          };
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Email already registered */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/users/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    /** User detail (admin) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description User row with role */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['UserDetailResponse'];
-          };
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description User not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    /** Delete user (admin) */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Deleted */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MessageResponse'];
-          };
-        };
-        /** @description Self-delete refused */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description User not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    /** Update user — email / role_id / first_name / last_name (admin) */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            /** Format: email */
-            email?: string;
-            role_id?: number;
-            first_name?: string;
-            last_name?: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Updated */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['UserDetailResponse'];
-          };
-        };
-        /** @description Self role-change refused or validation failed */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description User not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Email already taken */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/admin/roles': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List roles (admin) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Roles */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['RolesResponse'];
-          };
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    /** Create a role (admin) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            name: string;
-            /** @description Bitmask — see Domain::Permission::k* in src/domain/Role.hpp */
-            permissions: number;
-            /** @default false */
-            is_default?: boolean;
-          };
-        };
-      };
-      responses: {
-        /** @description Created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['RoleDetailResponse'];
-          };
-        };
-        /** @description Validation failed */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Role name already exists */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/roles/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: number;
-      };
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    /** Delete role (admin) */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: number;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Deleted */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MessageResponse'];
-          };
-        };
-        /** @description Default role cannot be deleted */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Role not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Role is referenced by users — reassign first */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    /** Update role (admin) — partial; pass any of name / permissions / is_default */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: number;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            name?: string;
-            permissions?: number;
-            is_default?: boolean;
-          };
-        };
-      };
-      responses: {
-        /** @description Updated */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['RoleDetailResponse'];
-          };
-        };
-        /** @description Empty patch or invalid id */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Role not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Role name already exists */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/admin/audit': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * List the audit trail (admin)
-     * @description Requires the audit-read permission bit (Domain::Permission::kAuditRead); full admins hold it.
-     */
-    get: {
-      parameters: {
-        query?: {
-          limit?: number;
-          offset?: number;
-          /** @description Exact action filter, e.g. user.create */
-          action?: string;
-          /** @description Filter by acting principal subject */
-          actor_id?: string;
-          /** @description Filter by target kind, e.g. user / role */
-          target_type?: string;
-          /** @description created_at lower bound */
-          from?: string;
-          /** @description created_at upper bound */
-          to?: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Audit page (newest first) */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['AuditListResponse'];
-          };
-        };
-        /** @description Missing the audit-read permission */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/jobs': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List jobs (admin; newest first, offset-paginated) */
-    get: {
-      parameters: {
-        query?: {
-          type?: string;
-          limit?: number;
-          offset?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Job page: { data, total, limit, offset } */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['JobListResponse'];
-          };
-        };
-        /** @description Not authenticated (auth middleware — the route is not in api.public_paths) */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    /** Submit a background job */
-    post: {
-      parameters: {
-        query?: never;
-        header?: {
-          /**
-           * @description Opaque client-generated key. First request with this key + body hash
-           *     is executed and its response cached; subsequent requests replay it.
-           *     Conflicting body with the same key returns 422.
-           */
-          'Idempotency-Key'?: components['parameters']['IdempotencyKey'];
-        };
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['JobCreate'];
-        };
-      };
-      responses: {
-        /** @description Submitted */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Validation failed */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/jobs/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    /** Get job status */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    /** Cancel a pending/processing job */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Cancelled */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found or already finished */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/jobs/dlq': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List dead-letter queue jobs */
-    get: {
-      parameters: {
-        query?: {
-          type?: string;
-          limit?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['DlqListResponse'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/jobs/dlq/{id}/requeue': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Requeue a DLQ job (resets retry_count, pushes to live queue) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Requeued */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found or not in DLQ */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/sync': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Enqueue a cloud sync run
-     * @description Creates a sync_runs journal row for the caller's Mi account and puts a fitness_sync job on the queue. The run executes in the worker; poll the journal by run_id. Without a linked account the answer is 409 not_linked.
-     */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            /** Format: date */
-            from: string;
-            /** Format: date */
-            to: string;
-            data_types?: string[];
-          };
-        };
-      };
-      responses: {
-        /** @description Run queued */
-        202: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: {
-                run_id: number;
-                status: string;
-              };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/healthz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Liveness probe */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
             };
-          };
-        };
-        /** @description Malformed range, unknown or duplicate data type */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description No Mi account is linked (not_linked) */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Job queue unavailable (queue_unavailable) */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/sync/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Read a sync run's journal entry */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: number;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Journal entry with per-type counters or error classes */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: Record<string, never>;
+            requestBody?: never;
+            responses: {
+                /** @description Process is alive */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            status: "alive";
+                            /**
+                             * Format: int64
+                             * @description Epoch seconds
+                             */
+                            timestamp: number;
+                        };
+                    };
+                };
             };
-          };
         };
-        /** @description Unknown run id */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Journal unavailable (journal_unavailable) */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/daily-activity': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Daily activity rows */
-    get: {
-      parameters: {
-        query: {
-          from: string;
-          to: string;
-          limit?: number;
-          offset?: number;
+    "/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Rows in the range, time-ordered */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['DailyActivityListResponse'];
-          };
-        };
-        /** @description Malformed range or pagination */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Database unavailable */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/sleep': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Sleep sessions */
-    get: {
-      parameters: {
-        query: {
-          from: string;
-          to: string;
-          limit?: number;
-          offset?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Rows in the range, time-ordered */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['SleepListResponse'];
-          };
-        };
-        /** @description Malformed range or pagination */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Database unavailable */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/heart-rate': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Heart rate samples */
-    get: {
-      parameters: {
-        query: {
-          from: string;
-          to: string;
-          limit?: number;
-          offset?: number;
-          type?: 'passive' | 'active' | 'resting' | 'manual';
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Rows in the range, time-ordered */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['HeartRateListResponse'];
-          };
-        };
-        /** @description Malformed range or pagination */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Database unavailable */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/stress': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Stress samples */
-    get: {
-      parameters: {
-        query: {
-          from: string;
-          to: string;
-          limit?: number;
-          offset?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Rows in the range, time-ordered */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['StressListResponse'];
-          };
-        };
-        /** @description Malformed range or pagination */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Database unavailable */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/spo2': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** SpO2 samples */
-    get: {
-      parameters: {
-        query: {
-          from: string;
-          to: string;
-          limit?: number;
-          offset?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Rows in the range, time-ordered */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Spo2ListResponse'];
-          };
-        };
-        /** @description Malformed range or pagination */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Database unavailable */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/body': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Body measurements */
-    get: {
-      parameters: {
-        query: {
-          from: string;
-          to: string;
-          limit?: number;
-          offset?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Rows in the range, time-ordered */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['BodyListResponse'];
-          };
-        };
-        /** @description Malformed range or pagination */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Database unavailable */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/workouts': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Workouts */
-    get: {
-      parameters: {
-        query: {
-          from: string;
-          to: string;
-          limit?: number;
-          offset?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Rows in the range, time-ordered */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['WorkoutListResponse'];
-          };
-        };
-        /** @description Malformed range or pagination */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Database unavailable */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/summary': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Per-day summary */
-    get: {
-      parameters: {
-        query: {
-          from: string;
-          to: string;
-          limit?: number;
-          offset?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Rows in the range, time-ordered */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['SummaryListResponse'];
-          };
-        };
-        /** @description Malformed range or pagination */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Database unavailable */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/abnormal-heart-beat': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Abnormal heart beat events */
-    get: {
-      parameters: {
-        query: {
-          from: string;
-          to: string;
-          limit?: number;
-          offset?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Events in the range, time-ordered */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['AbnormalListResponse'];
-          };
-        };
-        /** @description Malformed range or pagination */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Database unavailable */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/coverage': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Per-type coverage */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description First and last date, record count and last sync time per data type */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['CoverageResponse'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Database unavailable */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/export': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Export rows */
-    get: {
-      parameters: {
-        query: {
-          from: string;
-          to: string;
-          format?: 'json' | 'csv';
-          type?:
-            | 'daily_activity'
-            | 'sleep'
-            | 'heart_rate'
-            | 'stress'
-            | 'spo2'
-            | 'body_measurements'
-            | 'workouts'
-            | 'abnormal_heart_beat';
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description schema_version 1.0 envelope (json) or a flat table of one type (csv) */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ExportResponse'];
-            'text/csv': string;
-          };
-        };
-        /** @description Malformed range, a range wider than 366 days, unknown type, or csv without a type */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Database unavailable */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/account': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Link status of the caller's Mi account */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The link, or status none */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MiAccountStatusResponse'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:sync, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Fitness module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    /**
-     * Unlink the caller's Mi account
-     * @description Without delete_data the account's rows stay and show again when the same
-     *     Xiaomi account is linked. With it the rows, the sync journal of the account
-     *     and the band data of the caller's workouts are deleted.
-     */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            /** @default false */
-            delete_data?: boolean;
-          };
-        };
-      };
-      responses: {
-        /** @description Unlinked */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              message: string;
+        /** Readiness probe */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
             };
-          };
-        };
-        /** @description delete_data is not a boolean */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:sync, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Fitness module disabled, or no Mi account is linked */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description A sync run is in progress (sync_in_progress) */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    /** Set the cloud region of the caller's Mi account */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            /** @enum {string} */
-            region: 'ru' | 'cn' | 'de' | 'i2' | 'sg' | 'us';
-          };
-        };
-      };
-      responses: {
-        /** @description The link with the new region */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MiAccountStatusResponse'];
-          };
-        };
-        /** @description Body without a region, or an unknown region (unknown_region) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:sync, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Fitness module disabled, or no Mi account is linked */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/fitness/account/link': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Start linking a Mi account by QR sign-in
-     * @description Asks Xiaomi for a QR sign-in of the Mi Fitness service. The user scans the
-     *     QR in a Xiaomi app or opens confirm_url on the phone; the page then polls
-     *     GET /api/v1/fitness/account/link/{link_id}. At most 5 starts per user per
-     *     10 minutes.
-     */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The attempt */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MiLinkStart'];
+            requestBody?: never;
+            responses: {
+                /** @description Ready */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Draining or dependency unhealthy */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
             };
-          };
         };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:sync, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Fitness module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Too many attempts */
-        429: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description MI_FITNESS_TOKEN_KEY is not set (not_configured), or Xiaomi did not issue a sign-in (upstream_unavailable) */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/account/link/{link_id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        link_id: string;
-      };
-      cookie?: never;
-    };
-    /**
-     * One step of waiting for the QR confirmation
-     * @description Polls Xiaomi once (about 3 seconds). On the confirmation the new token is
-     *     verified with a login, the account's region is detected and the link is
-     *     stored; a first sync is enqueued.
-     */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          link_id: string;
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description pending, linked or failed */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MiLinkStep'];
+        /** Detailed component health */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
             };
-          };
+            requestBody?: never;
+            responses: {
+                /** @description All components healthy */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description One or more components unhealthy */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
         };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:sync, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Fitness module disabled, or the attempt is unknown, expired or another user's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/account/detect-region': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register a new user */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: email */
+                        email: string;
+                        password: string;
+                        first_name?: string;
+                        last_name?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description User created — confirmation email queued */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RegisterResponse"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Email already registered */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Idempotency-Key conflict — same key, different body (idempotency middleware) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Find the cloud region that holds the caller's data
-     * @description Logs in and asks each candidate region for recent step records. The region
-     *     that returns data is stored; when none does, the region stays and
-     *     region_detected is false.
-     */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The link after detection */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MiAccountStatusResponse'];
-          };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
+        get?: never;
+        put?: never;
+        /** Log in */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: email */
+                        email: string;
+                        password: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Logged in — Set-Cookie access + refresh */
+                200: {
+                    headers: {
+                        "Set-Cookie"?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MeResponse"];
+                    };
+                };
+                /** @description Invalid email or password */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Body content type is not application/json (content-type middleware — applies to every JSON API endpoint) */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
         };
-        /** @description Missing fitness:sync, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Fitness module disabled, or no Mi account is linked */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description A sync run is in progress (sync_in_progress) */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description not_configured, upstream_auth (link again) or upstream_protocol */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/fitness/probe': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Probe the Mi Fitness cloud — login, fetch one data key, count records
-     * @description Diagnostic route: performs a real two-step Xiaomi login and one signed
-     *     data fetch, returning only counts and a masked account id — never the
-     *     records themselves. The single place where the crypto port is verified
-     *     against the live cloud.
-     */
-    get: {
-      parameters: {
-        query: {
-          key:
-            | 'steps'
-            | 'calories'
-            | 'sleep'
-            | 'weight'
-            | 'heart_rate'
-            | 'spo2'
-            | 'stress'
-            | 'resting_heart_rate'
-            | 'abnormal_heart_beat';
-          from: string;
-          to: string;
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Cloud reachable, credentials valid */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: {
-                /** @description Masked account id */
-                account: string;
-                region: string;
+        get?: never;
+        put?: never;
+        /** Log out (clears cookies + revokes refresh token) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Logged out */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MessageResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate access + refresh tokens */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description New cookies issued */
+                200: {
+                    headers: {
+                        "Set-Cookie"?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MeResponse"];
+                    };
+                };
+                /** @description Refresh token missing / expired / revoked */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the authenticated user */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Current user */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MeResponse"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/confirm-resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resend the email-confirmation link to the current user */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Confirmation email queued */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/confirm/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm an account from an email link */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    token: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Account confirmed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Invalid or expired token */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description User not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/reset-password-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a password reset (email-based) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: email */
+                        email: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description If the email is registered, a reset link is on its way */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/reset-password/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply a password reset using an email-link token */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    token: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        new_password: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Password updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Invalid or expired token */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/change-email-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start an email-change flow (verifies password, mails a link to new address) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: email */
+                        new_email: string;
+                        password: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Confirmation email sent to the new address */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Wrong password or not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/change-email/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply a pending email change from token */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    token: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Email updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Invalid or expired token */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Email already in use */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/join-from-invite/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set password and confirm account from an invite token */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    token: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        new_password: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Account ready — the invitee can now sign in */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Invalid or expired invitation token */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change password while logged in (verifies old password) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        old_password: string;
+                        new_password: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Password updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Wrong current password or not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/api-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List your API keys (metadata only; never the secret) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Array of API key metadata under data[] */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Create an API key — the secret is returned ONCE in this response */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Key created; `key` field holds the one-time secret */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/api-keys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke one of your API keys */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Key revoked */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No such key (or not yours) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List users (admin) */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User page */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UserListResponse"];
+                    };
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a confirmed user (admin) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: email */
+                        email: string;
+                        password: string;
+                        first_name?: string;
+                        last_name?: string;
+                        role_id?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UserDetailResponse"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Email already registered */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Invite a user via email (admin) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: email */
+                        email: string;
+                        first_name?: string;
+                        last_name?: string;
+                        role_id?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Invited */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InviteResponse"];
+                    };
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Email already registered */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** User detail (admin) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User row with role */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UserDetailResponse"];
+                    };
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description User not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete user (admin) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MessageResponse"];
+                    };
+                };
+                /** @description Self-delete refused */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description User not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Update user — email / role_id / first_name / last_name (admin) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: email */
+                        email?: string;
+                        role_id?: number;
+                        first_name?: string;
+                        last_name?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UserDetailResponse"];
+                    };
+                };
+                /** @description Self role-change refused or validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description User not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Email already taken */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/admin/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List roles (admin) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Roles */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RolesResponse"];
+                    };
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Create a role (admin) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        /** @description Bitmask — see Domain::Permission::k* in src/domain/Role.hpp */
+                        permissions: number;
+                        /** @default false */
+                        is_default?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoleDetailResponse"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Role name already exists */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/roles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete role (admin) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MessageResponse"];
+                    };
+                };
+                /** @description Default role cannot be deleted */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Role not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Role is referenced by users — reassign first */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Update role (admin) — partial; pass any of name / permissions / is_default */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name?: string;
+                        permissions?: number;
+                        is_default?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoleDetailResponse"];
+                    };
+                };
+                /** @description Empty patch or invalid id */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Role not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Role name already exists */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/admin/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the audit trail (admin)
+         * @description Requires the audit-read permission bit (Domain::Permission::kAuditRead); full admins hold it.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    offset?: number;
+                    /** @description Exact action filter, e.g. user.create */
+                    action?: string;
+                    /** @description Filter by acting principal subject */
+                    actor_id?: string;
+                    /** @description Filter by target kind, e.g. user / role */
+                    target_type?: string;
+                    /** @description created_at lower bound */
+                    from?: string;
+                    /** @description created_at upper bound */
+                    to?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Audit page (newest first) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuditListResponse"];
+                    };
+                };
+                /** @description Missing the audit-read permission */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List jobs (admin; newest first, offset-paginated) */
+        get: {
+            parameters: {
+                query?: {
+                    type?: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Job page: { data, total, limit, offset } */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JobListResponse"];
+                    };
+                };
+                /** @description Not authenticated (auth middleware — the route is not in api.public_paths) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Submit a background job */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /**
+                     * @description Opaque client-generated key. First request with this key + body hash
+                     *     is executed and its response cached; subsequent requests replay it.
+                     *     Conflicting body with the same key returns 422.
+                     */
+                    "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["JobCreate"];
+                };
+            };
+            responses: {
+                /** @description Submitted */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Get job status */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Cancel a pending/processing job */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Cancelled */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found or already finished */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/dlq": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List dead-letter queue jobs */
+        get: {
+            parameters: {
+                query?: {
+                    type?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DlqListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/dlq/{id}/requeue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Requeue a DLQ job (resets retry_count, pushes to live queue) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Requeued */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found or not in DLQ */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enqueue a cloud sync run
+         * @description Creates a sync_runs journal row for the caller's Mi account and puts a fitness_sync job on the queue. The run executes in the worker; poll the journal by run_id. Without a linked account the answer is 409 not_linked.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        from: string;
+                        /** Format: date */
+                        to: string;
+                        data_types?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Run queued */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                run_id: number;
+                                status: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Malformed range, unknown or duplicate data type */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No Mi account is linked (not_linked) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Job queue unavailable (queue_unavailable) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/sync/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a sync run's journal entry */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Journal entry with per-type counters or error classes */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: Record<string, never>;
+                        };
+                    };
+                };
+                /** @description Unknown run id */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Journal unavailable (journal_unavailable) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/daily-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Daily activity rows */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rows in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DailyActivityListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/sleep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sleep sessions */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rows in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SleepListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/heart-rate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Heart rate samples */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                    type?: "passive" | "active" | "resting" | "manual";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rows in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HeartRateListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/stress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stress samples */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rows in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StressListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/spo2": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** SpO2 samples */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rows in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Spo2ListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/body": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Body measurements */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rows in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BodyListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/workouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Workouts */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rows in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkoutListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Per-day summary */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rows in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SummaryListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/abnormal-heart-beat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Abnormal heart beat events */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Events in the range, time-ordered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AbnormalListResponse"];
+                    };
+                };
+                /** @description Malformed range or pagination */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Per-type coverage */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description First and last date, record count and last sync time per data type */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CoverageResponse"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export rows */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    format?: "json" | "csv";
+                    type?: "daily_activity" | "sleep" | "heart_rate" | "stress" | "spo2" | "body_measurements" | "workouts" | "abnormal_heart_beat";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description schema_version 1.0 envelope (json) or a flat table of one type (csv) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ExportResponse"];
+                        "text/csv": string;
+                    };
+                };
+                /** @description Malformed range, a range wider than 366 days, unknown type, or csv without a type */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Link status of the caller's Mi account */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The link, or status none */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MiAccountStatusResponse"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:sync, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Fitness module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /**
+         * Unlink the caller's Mi account
+         * @description Without delete_data the account's rows stay and show again when the same
+         *     Xiaomi account is linked. With it the rows, the sync journal of the account
+         *     and the band data of the caller's workouts are deleted.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @default false */
+                        delete_data?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Unlinked */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+                /** @description delete_data is not a boolean */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:sync, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Fitness module disabled, or no Mi account is linked */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A sync run is in progress (sync_in_progress) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Set the cloud region of the caller's Mi account */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        region: "ru" | "cn" | "de" | "i2" | "sg" | "us";
+                    };
+                };
+            };
+            responses: {
+                /** @description The link with the new region */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MiAccountStatusResponse"];
+                    };
+                };
+                /** @description Body without a region, or an unknown region (unknown_region) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:sync, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Fitness module disabled, or no Mi account is linked */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/fitness/account/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start linking a Mi account by QR sign-in
+         * @description Asks Xiaomi for a QR sign-in of the Mi Fitness service. The user scans the
+         *     QR in a Xiaomi app or opens confirm_url on the phone; the page then polls
+         *     GET /api/v1/fitness/account/link/{link_id}. At most 5 starts per user per
+         *     10 minutes.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The attempt */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MiLinkStart"];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:sync, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Fitness module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Too many attempts */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description MI_FITNESS_TOKEN_KEY is not set (not_configured), or Xiaomi did not issue a sign-in (upstream_unavailable) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/account/link/{link_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One step of waiting for the QR confirmation
+         * @description Polls Xiaomi once (about 3 seconds). On the confirmation the new token is
+         *     verified with a login, the account's region is detected and the link is
+         *     stored; a first sync is enqueued.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    link_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description pending, linked or failed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MiLinkStep"];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:sync, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Fitness module disabled, or the attempt is unknown, expired or another user's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/account/detect-region": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Find the cloud region that holds the caller's data
+         * @description Logs in and asks each candidate region for recent step records. The region
+         *     that returns data is stored; when none does, the region stays and
+         *     region_detected is false.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The link after detection */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MiAccountStatusResponse"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:sync, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Fitness module disabled, or no Mi account is linked */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A sync run is in progress (sync_in_progress) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description not_configured, upstream_auth (link again) or upstream_protocol */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Probe the Mi Fitness cloud — login, fetch one data key, count records
+         * @description Diagnostic route: performs a real two-step Xiaomi login and one signed
+         *     data fetch, returning only counts and a masked account id — never the
+         *     records themselves. The single place where the crypto port is verified
+         *     against the live cloud.
+         */
+        get: {
+            parameters: {
+                query: {
+                    key: "steps" | "calories" | "sleep" | "weight" | "heart_rate" | "spo2" | "stress" | "resting_heart_rate" | "abnormal_heart_beat";
+                    from: string;
+                    to: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Cloud reachable, credentials valid */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** @description Masked account id */
+                                account: string;
+                                region: string;
+                                key: string;
+                                records: number;
+                            };
+                        };
+                    };
+                };
+                /** @description Unknown data key or malformed date range */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A sync run is in progress (sync_in_progress), or no Mi account is linked (not_linked) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not configured, upstream refused authentication, or protocol mismatch */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/packages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List active top-up packages
+         * @description Also returns the current per-unit rate (credits_per_unit) and the custom-amount bounds (min_amount_cents/max_amount_cents) alongside the package list — see BillingPackageListResponse.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Active packages (catalogue order) + the current rate/bounds */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingPackageListResponse"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Billing module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/wallet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get your own wallet balance + ledger history
+         * @description Always the authenticated caller's own wallet — no user-id parameter of any kind is accepted, by design (see BillingController::getWallet).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Balance + ledger page, newest first */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WalletResponse"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Billing module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/topup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start a PayPal top-up (package or custom amount)
+         * @description Provide exactly one of package_id or amount_cents. Credits are always computed server-side (package.credits, or amount_cents * billing.credits_per_unit / 100) — any "credits" field in the body is ignored entirely. The resulting amount_cents (a custom amount, OR a package's own price) is bounded by billing.min_amount_cents / billing.max_amount_cents in both cases.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * Format: uuid
+                         * @description Mutually exclusive with amount_cents
+                         */
+                        package_id?: string;
+                        /**
+                         * Format: int64
+                         * @description Mutually exclusive with package_id
+                         */
+                        amount_cents?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description PayPal order created — redirect the buyer to data.approve_url */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TopupResponse"];
+                    };
+                };
+                /** @description Neither/both of package_id+amount_cents given, the resulting amount out of [min,max] (amount_out_of_range or package_price_out_of_range), or malformed input */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Billing module disabled, or package_id does not name an active package */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description provider_order_id already recorded (PayPal order id collision) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/capture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Capture an approved PayPal order and credit your wallet
+         * @description order_id must belong to the authenticated caller — verified via PaymentRepository::find_owned before any capture is attempted, so one user can never capture (and collect credits for) another user's order. Idempotent: capturing an already-captured order returns credited=false with the unchanged balance instead of calling PayPal again. PayPal answers 2xx even for a PENDING or DECLINED capture — the wallet is only ever credited when PayPal's own capture status is COMPLETED; otherwise the payment is left uncaptured (for the webhook to resolve later) and the response reports credited=false with the real status.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description PayPal order id */
+                        order_id: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Captured, replayed idempotently, or still pending/declined on PayPal's side — see CaptureResponse.status/pending to tell them apart. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CaptureResponse"];
+                    };
+                };
+                /** @description order_id missing or not a string */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Billing module disabled, or no such order for this caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description This payment is failed/refunded and cannot be captured (payment_not_capturable), or PayPal reports the order hasn't been approved yet (order_not_approved) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/paypal/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * PayPal webhook — capture/refund notifications
+         * @description PayPal-to-server only, not a browser request: public (no session) and CSRF-exempt (PayPal never presents the session cookie the CSRF check keys off), but every request is verified against PayPal's own verify-webhook-signature API BEFORE the body is trusted, using the paypal-auth-algo / paypal-cert-url / paypal-transmission-id / paypal-transmission-sig / paypal-transmission-time headers PayPal sends. Response codes intentionally do NOT follow the usual REST mapping — PayPal retries any non-2xx delivery for days:
+         *       * PAYMENT.CAPTURE.COMPLETED credits the wallet (idempotent — a
+         *         capture already credited via POST .../capture, including one
+         *         that resolves a PENDING return-flow capture, is a 200 no-op).
+         *       * PAYMENT.CAPTURE.REFUNDED (merchant refund) and
+         *         PAYMENT.CAPTURE.REVERSED (PayPal claws back a capture —
+         *         chargeback/dispute/risk) both DEBIT the wallet via the same
+         *         Billing::refund_capture logic, keyed on the event's own id as
+         *         the idempotency marker — see BillingController::
+         *         handleCaptureRefunded's doc comment for why both event types
+         *         share one handler.
+         *       * Any other event type is acknowledged with 200 and NOT acted on.
+         *     200 is returned for every signature-valid event that was either applied or safely no-op'd; a signature-valid event this handler FAILED to process (a malformed body, or a refund/reversal it couldn't resolve/apply) answers 5xx so PayPal retries instead of the event being silently dropped.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Signature verified — event handled or deliberately acknowledged-not-acted-on (see WebhookAckResponse.data.handled) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WebhookAckResponse"];
+                    };
+                };
+                /** @description Signature verification failed (malformed body, missing paypal-* headers, or PayPal reported the signature invalid) — nothing credited/refunded */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Billing module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description PayPal's own verify-webhook-signature API was unreachable/non-2xx, OR a signature-valid event could not be processed (malformed shape, or a refund/reversal that couldn't be resolved/applied) — retry later; nothing was silently dropped */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/billing/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List payments (admin)
+         * @description Paged, newest first. Optional ?status= and ?user_id= filters (AND'd together when both are given).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    status?: "created" | "approved" | "captured" | "failed" | "refunded";
+                    user_id?: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Payment page */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminPaymentListResponse"];
+                    };
+                };
+                /** @description user_id filter is not a valid UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Billing module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/billing/packages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List every top-up package, active and inactive (admin) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Full package catalogue */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminPackageListResponse"];
+                    };
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Billing module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Create a top-up package (admin) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        title: string;
+                        /** Format: int64 */
+                        amount_cents: number;
+                        /** Format: int64 */
+                        credits: number;
+                        /** @default true */
+                        active?: boolean;
+                        /** @default 0 */
+                        sort?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminPackageResponse"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Billing module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/billing/packages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a top-up package (admin) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MessageResponse"];
+                    };
+                };
+                /** @description Invalid id */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Billing module disabled, or no such package */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Update a top-up package — partial; any of title/amount_cents/credits/active/sort (admin) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        title?: string;
+                        /** Format: int64 */
+                        amount_cents?: number;
+                        /** Format: int64 */
+                        credits?: number;
+                        active?: boolean;
+                        sort?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminPackageResponse"];
+                    };
+                };
+                /** @description Empty patch, invalid id, or validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Billing module disabled, or no such package */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/admin/billing/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the billing rate/bounds settings (admin) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Current settings */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingSettingsResponse"];
+                    };
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Billing module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Replace the billing rate/bounds settings (admin)
+         * @description A full replace — all three fields are required. Takes effect for the NEXT top-up computed after this call; an in-flight or already-created payment keeps the rate_snapshot/credits_expected it was created with (see Billing::credit_capture — unaffected by this endpoint).
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        credits_per_unit: number;
+                        /** Format: int64 */
+                        min_amount_cents: number;
+                        /** Format: int64 */
+                        max_amount_cents: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingSettingsResponse"];
+                    };
+                };
+                /** @description Missing/invalid field, or max_amount_cents < min_amount_cents */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Billing module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/billing/users/{id}/adjust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Manually adjust a user's wallet balance (admin)
+         * @description Routes through Billing::adjust — the only code allowed to write wallet_entries/wallet_balances. note is mandatory (non-empty); created_by on the resulting ledger row is always the authenticated admin's own id, never a client-supplied value. Writes an audit_log row. With notify=true, the target user receives a best-effort wallet-adjustment email (note is reused verbatim as the reason) after the adjustment and its audit row have both committed — email delivery never affects the money path or the response.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Target user id */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * Format: int64
+                         * @description Signed; positive credits, negative debits. Zero is refused (400).
+                         */
+                        delta_credits: number;
+                        note: string;
+                        /**
+                         * @description When true, sends the target user a best-effort wallet-adjustment email after the adjustment succeeds. Non-boolean values are silently ignored.
+                         * @default false
+                         */
+                        notify?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Adjusted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdjustResponse"];
+                    };
+                };
+                /** @description Empty/missing note, zero delta_credits, malformed user/admin id, or invalid id path param */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Billing module disabled, or no such user */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description A negative delta_credits would drive the balance below zero */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/billing/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Business metrics — revenue, conversion, refunds, outstanding liability, top lists (admin)
+         * @description revenue/count/avg and conversion are computed over a rolling window (now() - interval); refunds counts only billing_refunds rows with outcome='applied'; outstanding_credits/outstanding_value_cents are an all-time snapshot of wallet_balances, NOT windowed; series is calendar-bucketed (hourly for period=day, daily for week/month) with every bucket present (zero-filled, no gaps).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description day = last 24h (hourly buckets), week = last 7d (daily buckets), month = last 30d (daily buckets) */
+                    period?: "day" | "week" | "month";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Metrics snapshot */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingMetricsResponse"];
+                    };
+                };
+                /** @description period is not one of day, week, month */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Billing module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workout/exercises": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search the exercise library and own exercises */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Substring of the name, case-insensitive */
+                    q?: string;
+                    /** @description Primary or secondary muscle */
+                    muscle?: string;
+                    equipment?: string;
+                    category?: string;
+                    source?: "library" | "custom";
+                    /** @description Include archived exercises */
+                    archived?: boolean;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Page of exercises ordered by name */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ExerciseListResponse"];
+                    };
+                };
+                /** @description q too long or unknown source */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a custom exercise */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ExerciseInput"] & Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ExerciseResponse"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationError"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workout/exercises/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Read one exercise */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The exercise */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ExerciseResponse"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit a custom exercise, or the tracking mode and archived flag of a library one
+         * @description A library exercise is shared by every user. Only an administrator can change it, and only its tracking mode and archived flag.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ExerciseInput"];
+                };
+            };
+            responses: {
+                /** @description The updated exercise */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ExerciseResponse"];
+                    };
+                };
+                /** @description Validation failed, or a library exercise changed by a non-administrator or in a content field (library_exercise_read_only) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/workout/routines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List routines */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Routines ordered by weekday */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoutineListResponse"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workout/routines/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Read a routine with its exercises */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The routine */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoutineResponse"];
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        /** Create the routine with this id, or replace it and its exercises */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RoutineInput"];
+                };
+            };
+            responses: {
+                /** @description The stored routine */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoutineResponse"];
+                    };
+                };
+                /** @description Validation failed, id is not a UUID, or an exercise_id is unknown (unknown_exercise) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /** Delete a routine */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workout/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** History of finished sessions, newest first */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A page of sessions */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkoutSessionListResponse"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Start a session, empty or from a routine */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        routine_id?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description The started session; the routine's exercises and targets are copied */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkoutSessionResponse"];
+                    };
+                };
+                /** @description routine_id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled, or the routine is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A session is already active (session_active) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workout/sessions/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The unfinished session, or null */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The active session with sets and previous sets; data is null without one */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkoutActiveSessionResponse"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workout/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Read one session with its exercises and sets */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The session */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkoutSessionResponse"];
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled, or no such session */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete a session with its sets */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled, or no such session */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Finish, rename, annotate or move a session */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["WorkoutSessionPatch"];
+                };
+            };
+            responses: {
+                /** @description The session; a change of its times re-runs the match with Mi Fitness data */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkoutSessionResponse"];
+                    };
+                };
+                /** @description Validation failed, a timestamp does not exist (invalid_timestamp), or finished_at is before started_at (invalid_times) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled, or no such session */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/workout/sessions/{id}/exercises": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add an exercise to a session */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        exercise_id: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The session with the exercise appended */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkoutSessionResponse"];
+                    };
+                };
+                /** @description Validation failed or id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled, no such session, or no such exercise */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workout/sessions/{id}/exercises/{eid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                /** @description Id of the session exercise, not of the library exercise */
+                eid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Drop an exercise and its sets from a session */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    /** @description Id of the session exercise, not of the library exercise */
+                    eid: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The session without the exercise */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkoutSessionResponse"];
+                    };
+                };
+                /** @description id or eid is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled, or no such exercise in the session */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workout/sessions/{id}/heart-rate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Heart-rate samples inside a session */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Samples between started_at and finished_at (until now for an active session) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkoutHeartRateResponse"];
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled, or no such session */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workout/sets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Create the set with this client-generated id, or replace it */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["WorkoutSetInput"];
+                };
+            };
+            responses: {
+                /** @description The stored set; sending the same set twice replaces it */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkoutSetResponse"];
+                    };
+                };
+                /** @description Validation failed, id is not a UUID, or completed_at does not exist (invalid_timestamp) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled, or the session exercise is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /** Delete a set */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled, or no such set */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workout/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Numbers to look at before a workout */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Last night's sleep, resting heart rate and recent stress, each next to its 30-day mean; a value without data is null */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkoutReadinessResponse"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workout/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Re-attach Mi Fitness data to the sessions that finished in a date range */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        from: string;
+                        /**
+                         * Format: date
+                         * @description Inclusive, UTC dates of finished_at
+                         */
+                        to: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description How many sessions were written */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkoutReconcileResponse"];
+                    };
+                };
+                /** @description from and to must be YYYY-MM-DD dates that exist, and from must not be after to */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Missing fitness:read or fitness:sync, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Workout module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Goals profile, the weight it uses and the computed daily targets */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The goals */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodGoalsResponse"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        /** Replace the goals profile */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FoodGoalsProfile"];
+                };
+            };
+            responses: {
+                /** @description The goals after the write */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodGoalsResponse"];
+                    };
+                };
+                /** @description Validation failed (a future birth date, an out-of-range value) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search own products */
+        get: {
+            parameters: {
+                query?: {
+                    q?: string;
+                    /** @description Include archived products */
+                    archived?: "true";
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A page of products */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodItemListResponse"];
+                    };
+                };
+                /** @description q is too long */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a product */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FoodItemInput"];
+                };
+            };
+            responses: {
+                /** @description The product */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodItemResponse"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/items/from-off": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy an Open Food Facts product by barcode into own products */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        code: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The product existed already */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodItemResponse"];
+                    };
+                };
+                /** @description The product was copied now */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodItemResponse"];
+                    };
+                };
+                /** @description code is not 1..20 digits */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled, or Open Food Facts has no such product (off_product) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Open Food Facts is not available (upstream_unavailable) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/items/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a product, or archive one the diary uses */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted or archived (outcome) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                            /** @enum {string} */
+                            outcome: "deleted" | "archived";
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled, or no such product */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Edit a product */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FoodItemInput"];
+                };
+            };
+            responses: {
+                /** @description The product */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodItemResponse"];
+                    };
+                };
+                /** @description Validation failed or id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled, or no such product */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/food/recent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Products used recently in the diary, each once */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Up to 30 products */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodItemListResponse"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/off/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Open Food Facts
+         * @description Data from Open Food Facts (https://world.openfoodfacts.org), Open Database License.
+         */
+        get: {
+            parameters: {
+                query: {
+                    q: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Up to 20 products with a kcal value; cached for an hour per query */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["OffProduct"][];
+                            count: number;
+                            cached: boolean;
+                        };
+                    };
+                };
+                /** @description q must be 1..80 characters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Open Food Facts is not available (upstream_unavailable) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One day of the diary with totals, active kcal and the targets */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Defaults to today (UTC) */
+                    date?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The day */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FoodDay"];
+                        };
+                    };
+                };
+                /** @description date is not YYYY-MM-DD or not a calendar day (invalid_date) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/week": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Seven days of totals from a date against the targets */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The week */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FoodWeek"];
+                        };
+                    };
+                };
+                /** @description from is not YYYY-MM-DD or not a calendar day (invalid_date) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a diary entry */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FoodEntryInput"];
+                };
+            };
+            responses: {
+                /** @description The entry */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodEntryResponse"];
+                    };
+                };
+                /** @description Validation failed, or the date does not exist (invalid_date) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled, or item_id is not the caller's product */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/entries/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add several diary entries in one transaction */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        entries: components["schemas"]["FoodEntryInput"][];
+                    };
+                };
+            };
+            responses: {
+                /** @description The entries */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FoodEntry"][];
+                            count: number;
+                        };
+                    };
+                };
+                /** @description Validation failed on any entry (errors name the index); nothing is written */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled, or an item_id is not the caller's product */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/entries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a diary entry */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled, or no such entry */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Edit a diary entry */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FoodEntryPatch"];
+                };
+            };
+            responses: {
+                /** @description The entry */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodEntryResponse"];
+                    };
+                };
+                /** @description Validation failed, id is not a UUID, or the date does not exist */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled, or no such entry */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/food/parse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a text description to the LLM parse job
+         * @description Creates a food_parse_jobs row and puts a food_parse job on the queue; poll
+         *     GET /api/v1/food/parse/{id}. Nothing reaches the diary until the lines are
+         *     confirmed with POST /api/v1/food/entries/batch. 503 not_configured while the
+         *     worker's FOOD_LLM_* settings are absent (GET goals reports llm_available).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        text: string;
+                        meal: components["schemas"]["FoodMeal"];
+                        /** Format: date */
+                        date: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Queued */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                status: "queued";
+                            };
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Three parses of this user are still queued or running (too_many_parses) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description not_configured, or the queue is down (queue_unavailable) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/parse/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Read a parse job and its lines */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The job */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FoodParseJob"];
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled, or the job is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/currencies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The user's currencies (seeded with the owner's ten on first read) */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Include archived rows */
+                    archived?: "true";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyCurrency"][];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Add or replace a currency by code */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MoneyCurrencyInput"];
+                };
+            };
+            responses: {
+                /** @description The currency */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyCurrency"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or a rule of the model (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/currencies/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a currency */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    code: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MoneyCurrencyPatch"];
+                };
+            };
+            responses: {
+                /** @description The currency */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyCurrency"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or a rule of the model (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/money/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Accounts with their computed balances */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Include archived rows */
+                    archived?: "true";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyAccount"][];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create an account */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MoneyAccountInput"];
+                };
+            };
+            responses: {
+                /** @description The account */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyAccount"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or a rule of the model (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/accounts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** One account with its balance */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The account */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyAccount"];
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete an unused account, or archive one with rows */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted or archived (outcome) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                            /** @enum {string} */
+                            outcome: "deleted" | "archived";
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Change an account; its currency never changes */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MoneyAccountPatch"];
+                };
+            };
+            responses: {
+                /** @description The account */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyAccount"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or a rule of the model (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/money/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Categories with their budgets */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Include archived rows */
+                    archived?: "true";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyCategory"][];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a category */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MoneyCategoryInput"];
+                };
+            };
+            responses: {
+                /** @description The category */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyCategory"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or a rule of the model (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/categories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** One category */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The category */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyCategory"];
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete an unused category, or archive one with rows */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted or archived (outcome) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message: string;
+                            /** @enum {string} */
+                            outcome: "deleted" | "archived";
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Change a category or its budget (amount and currency together) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MoneyCategoryPatch"];
+                };
+            };
+            responses: {
+                /** @description The category */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyCategory"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or a rule of the model (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/money/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The ledger, newest first */
+        get: {
+            parameters: {
+                query?: {
+                    from?: string;
+                    to?: string;
+                    account?: string;
+                    category?: string;
+                    currency?: string;
+                    type?: components["schemas"]["MoneyTransactionType"];
+                    status?: "posted" | "pending";
+                    trip?: string;
+                    /** @description Over name and merchant */
+                    q?: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A page */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyTransaction"][];
+                            total: number;
+                            limit: number;
+                            offset: number;
+                        };
+                    };
+                };
+                /** @description A bad filter */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Add an income, an expense or an fx_adjustment */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MoneyTransactionInput"];
+                };
+            };
+            responses: {
+                /** @description The row */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyTransaction"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or a rule of the model (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A row with this external_id already exists (duplicate) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/transactions/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add up to 100 rows in one database transaction (all or nothing) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        transactions: components["schemas"]["MoneyTransactionInput"][];
+                    };
+                };
+            };
+            responses: {
+                /** @description The rows */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyTransaction"][];
+                            count: number;
+                        };
+                    };
+                };
+                /** @description Validation failed, or a rule of the model (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A row with this external_id already exists (duplicate) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/transactions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** One row with its adjustments and final amount */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The row */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyTransaction"];
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete a row and, with it, its adjustments */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Change a row; an adjustment changes amount and note only */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MoneyTransactionPatch"];
+                };
+            };
+            responses: {
+                /** @description The row */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyTransaction"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or a rule of the model (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/money/transactions/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post a pending row; the merchant memory learns from it */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The row */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyTransaction"];
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pending rows with the possible_duplicate flag */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The rows */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyInboxRow"][];
+                            count: number;
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Transfers and exchanges, newest first */
+        get: {
+            parameters: {
+                query?: {
+                    from?: string;
+                    to?: string;
+                    account?: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The rows */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyTransfer"][];
+                            count: number;
+                        };
+                    };
+                };
+                /** @description A bad filter */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Add a transfer or an exchange (one row, sent and received) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MoneyTransferInput"];
+                };
+            };
+            responses: {
+                /** @description The transfer */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyTransfer"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or a rule of the model (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A row with this external_id already exists (duplicate) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/transfers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** One transfer */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The transfer */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyTransfer"];
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete a transfer */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Change a transfer's amounts, fee, date, name or note */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MoneyTransferPatch"];
+                };
+            };
+            responses: {
+                /** @description The transfer */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyTransfer"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or a rule of the model (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/money/merchants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Merchant suggestions, most used first, with the remembered category */
+        get: {
+            parameters: {
+                query?: {
+                    q?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The rows */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyMerchant"][];
+                            count: number;
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/merchants/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
                 key: string;
-                records: number;
-              };
             };
-          };
+            cookie?: never;
         };
-        /** @description Unknown data key or malformed date range */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change what a merchant means from now on */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    key: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        category_id: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description The merchant */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyMerchant"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or a rule of the model (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
         };
-        /** @description A sync run is in progress (sync_in_progress), or no Mi account is linked (not_linked) */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not configured, upstream refused authentication, or protocol mismatch */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
+        trace?: never;
     };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/billing/packages': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/money/rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A quote against the US dollar on the day or the nearest earlier one */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Defaults to today (UTC) */
+                    date?: string;
+                    quote: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The rate */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyRate"];
+                        };
+                    };
+                };
+                /** @description A bad query */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or no rate on or before the day (no_rate) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * List active top-up packages
-     * @description Also returns the current per-unit rate (credits_per_unit) and the custom-amount bounds (min_amount_cents/max_amount_cents) alongside the package list — see BillingPackageListResponse.
-     */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Active packages (catalogue order) + the current rate/bounds */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['BillingPackageListResponse'];
-          };
+    "/api/v1/money/rates/convert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        /** An informational conversion with the rate and its date; nothing is stored */
+        get: {
+            parameters: {
+                query: {
+                    amount: number;
+                    from: string;
+                    to: string;
+                    date?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The number */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyConversion"];
+                        };
+                    };
+                };
+                /** @description A bad query */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or no rate (no_rate) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
         };
-        /** @description Billing module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/billing/wallet': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/money/rates/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enqueue today's rates fetch (money_rates job) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Queued */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                job_id: string;
+                                /** @enum {string} */
+                                status: "queued";
+                            };
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The job queue is not available (queue_unavailable) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Get your own wallet balance + ledger history
-     * @description Always the authenticated caller's own wallet — no user-id parameter of any kind is accepted, by design (see BillingController::getWallet).
-     */
-    get: {
-      parameters: {
-        query?: {
-          limit?: number;
-          offset?: number;
+    "/api/v1/money/reports/period": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Balance + ledger page, newest first */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['WalletResponse'];
-          };
+        /** A period's numbers per currency, never summed across; as_if adds a converted block with its rates */
+        get: {
+            parameters: {
+                query?: {
+                    kind?: "week" | "month" | "quarter" | "custom";
+                    /** @description A day of the period (week */
+                    date?: string;
+                    /** @description Custom period start */
+                    from?: string;
+                    /** @description Custom period end */
+                    to?: string;
+                    /** @description Defaults to the settings' view_currency */
+                    as_if?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The report */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyReport"];
+                        };
+                    };
+                };
+                /** @description A bad period or currency */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
         };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Billing module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/billing/topup': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/money/reports/balances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Accounts and balances grouped by currency */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Include archived rows */
+                    archived?: "true";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The groups */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyBalanceGroup"][];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Start a PayPal top-up (package or custom amount)
-     * @description Provide exactly one of package_id or amount_cents. Credits are always computed server-side (package.credits, or amount_cents * billing.credits_per_unit / 100) — any "credits" field in the body is ignored entirely. The resulting amount_cents (a custom amount, OR a package's own price) is bounded by billing.min_amount_cents / billing.max_amount_cents in both cases.
-     */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            /**
-             * Format: uuid
-             * @description Mutually exclusive with amount_cents
-             */
-            package_id?: string;
+    "/api/v1/money/parse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a bank mail, an SMS or a list of purchases to the LLM parse job */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        text: string;
+                        /**
+                         * Format: date
+                         * @description The date of a line without one; defaults to today (UTC)
+                         */
+                        hint_date?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Queued */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                status: "queued";
+                            };
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Three parses of this user are still open (too_many_parses) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description not_configured, storage_unavailable or queue_unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/parse/receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a receipt photo (a jpeg, png or webp data URL, at most 4 MB decoded) to the LLM parse job */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description data:image/jpeg;base64,... */
+                        image: string;
+                        /** Format: date */
+                        hint_date?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Queued */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                status: "queued";
+                            };
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Three parses of this user are still open (too_many_parses) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description not_configured, storage_unavailable or queue_unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/parse/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** A parse job and its proposed lines (never the photo) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The job */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyParseJob"];
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the job is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/parse/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The edited lines of a finished parse into the inbox as pending rows (once) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        lines: components["schemas"]["MoneyTransactionInput"][];
+                    };
+                };
+            };
+            responses: {
+                /** @description The pending rows */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyTransaction"][];
+                            count: number;
+                        };
+                    };
+                };
+                /** @description Validation failed (each line needs an account) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the job is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The job is not finished or its lines were accepted already (already_accepted) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/advisor/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The advisor's reviews, newest period first (without their facts) */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The reviews */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyAdvisorReportSummary"][];
+                            count: number;
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/advisor/reports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** One review with the facts it was built on */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The review */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyAdvisorReport"];
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled, or the review is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/advisor/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask for a review of the week, month or quarter containing a day (once per period; a failed one is queued again) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @default week
+                         * @enum {string}
+                         */
+                        period?: "week" | "month" | "quarter";
+                        /**
+                         * Format: date
+                         * @description A day of the period; defaults to today (UTC)
+                         */
+                        date?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Already there, not queued again */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyAdvisorReport"];
+                            queued: boolean;
+                        };
+                    };
+                };
+                /** @description Queued */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyAdvisorReport"];
+                            queued: boolean;
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description not_configured or queue_unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The view currency and the advisor settings */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The settings */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneySettings"];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        /** Replace the settings */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MoneySettingsInput"];
+                };
+            };
+            responses: {
+                /** @description The settings */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneySettings"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or a rule of the model (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+}
+export type webhooks = Record<string, never>;
+export interface components {
+    schemas: {
+        Error: {
+            error: string;
+            /** @description HTTP status code, duplicated into the body */
+            status: number;
+            message?: string;
+            code?: string;
+        };
+        ValidationError: {
+            /** @enum {string} */
+            error: "validation_failed";
+            status: number;
+            errors: {
+                field: string;
+                code: string;
+                message: string;
+            }[];
+        };
+        Job: {
+            /** Format: uuid */
+            id: string;
+            type: string;
+            payload?: {
+                [key: string]: unknown;
+            };
+            /** @enum {string} */
+            status: "pending" | "processing" | "completed" | "failed" | "dead";
+            result?: unknown;
+            error?: string;
+            worker_id?: string;
+            /** @description W3C trace id of the submitting request — deep-link into Jaeger */
+            trace_id?: string;
+            retry_count?: number;
+            max_retries?: number;
             /**
              * Format: int64
-             * @description Mutually exclusive with package_id
+             * @description Epoch seconds
              */
-            amount_cents?: number;
-          };
+            created_at: number;
+            /**
+             * Format: int64
+             * @description Epoch seconds
+             */
+            updated_at?: number;
         };
-      };
-      responses: {
-        /** @description PayPal order created — redirect the buyer to data.approve_url */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['TopupResponse'];
-          };
+        Role: {
+            id: number;
+            name: string;
+            /** @description Bitmask — Domain::Permission::k* */
+            permissions: number;
+            is_default: boolean;
         };
-        /** @description Neither/both of package_id+amount_cents given, the resulting amount out of [min,max] (amount_out_of_range or package_price_out_of_range), or malformed input */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        User: {
+            /** Format: uuid */
+            id: string;
+            /** Format: email */
+            email: string;
+            first_name?: string | null;
+            last_name?: string | null;
+            full_name: string;
+            confirmed: boolean;
+            role_id: number;
+            role?: components["schemas"]["Role"];
+            created_at: string;
+            updated_at: string;
         };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        UserListResponse: {
+            data: components["schemas"]["User"][];
+            total: number;
+            limit: number;
+            offset: number;
         };
-        /** @description Billing module disabled, or package_id does not name an active package */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        JobListResponse: {
+            data: components["schemas"]["Job"][];
+            total: number;
+            limit: number;
+            offset: number;
         };
-        /** @description provider_order_id already recorded (PayPal order id collision) */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        DlqListResponse: {
+            data: components["schemas"]["Job"][];
+            /** @description Number of jobs returned (after type filter + limit) */
+            count: number;
+            /** @description Total DLQ depth (unfiltered) */
+            depth: number;
         };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/billing/capture': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Capture an approved PayPal order and credit your wallet
-     * @description order_id must belong to the authenticated caller — verified via PaymentRepository::find_owned before any capture is attempted, so one user can never capture (and collect credits for) another user's order. Idempotent: capturing an already-captured order returns credited=false with the unchanged balance instead of calling PayPal again. PayPal answers 2xx even for a PENDING or DECLINED capture — the wallet is only ever credited when PayPal's own capture status is COMPLETED; otherwise the payment is left uncaptured (for the webhook to resolve later) and the response reports credited=false with the real status.
-     */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            /** @description PayPal order id */
-            order_id: string;
-          };
+        AuditEntry: {
+            /** Format: int64 */
+            id: number;
+            /** @description Acting principal subject (uuid) */
+            actor_id?: string | null;
+            /** @description Dotted verb, e.g. user.create */
+            action: string;
+            /** @description Affected entity kind, e.g. user / role */
+            target_type: string;
+            /** @description Affected entity id (uuid or int as text) */
+            target_id?: string | null;
+            /** @description Action-specific context */
+            details: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            created_at: string;
         };
-      };
-      responses: {
-        /** @description Captured, replayed idempotently, or still pending/declined on PayPal's side — see CaptureResponse.status/pending to tell them apart. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['CaptureResponse'];
-          };
+        AuditListResponse: {
+            data: components["schemas"]["AuditEntry"][];
+            total: number;
+            limit: number;
+            offset: number;
         };
-        /** @description order_id missing or not a string */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        JobCreate: {
+            type: string;
+            payload?: {
+                [key: string]: unknown;
+            };
+            max_retries?: number;
         };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        MeResponse: {
+            user: components["schemas"]["User"];
         };
-        /** @description Billing module disabled, or no such order for this caller */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        UserDetailResponse: {
+            data: components["schemas"]["User"];
         };
-        /** @description This payment is failed/refunded and cannot be captured (payment_not_capturable), or PayPal reports the order hasn't been approved yet (order_not_approved) */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        InviteResponse: {
+            data: components["schemas"]["User"];
+            message?: string;
         };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/billing/paypal/webhook': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * PayPal webhook — capture/refund notifications
-     * @description PayPal-to-server only, not a browser request: public (no session) and CSRF-exempt (PayPal never presents the session cookie the CSRF check keys off), but every request is verified against PayPal's own verify-webhook-signature API BEFORE the body is trusted, using the paypal-auth-algo / paypal-cert-url / paypal-transmission-id / paypal-transmission-sig / paypal-transmission-time headers PayPal sends. Response codes intentionally do NOT follow the usual REST mapping — PayPal retries any non-2xx delivery for days:
-     *       * PAYMENT.CAPTURE.COMPLETED credits the wallet (idempotent — a
-     *         capture already credited via POST .../capture, including one
-     *         that resolves a PENDING return-flow capture, is a 200 no-op).
-     *       * PAYMENT.CAPTURE.REFUNDED (merchant refund) and
-     *         PAYMENT.CAPTURE.REVERSED (PayPal claws back a capture —
-     *         chargeback/dispute/risk) both DEBIT the wallet via the same
-     *         Billing::refund_capture logic, keyed on the event's own id as
-     *         the idempotency marker — see BillingController::
-     *         handleCaptureRefunded's doc comment for why both event types
-     *         share one handler.
-     *       * Any other event type is acknowledged with 200 and NOT acted on.
-     *     200 is returned for every signature-valid event that was either applied or safely no-op'd; a signature-valid event this handler FAILED to process (a malformed body, or a refund/reversal it couldn't resolve/apply) answers 5xx so PayPal retries instead of the event being silently dropped.
-     */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': Record<string, never>;
+        RolesResponse: {
+            data: components["schemas"]["Role"][];
         };
-      };
-      responses: {
-        /** @description Signature verified — event handled or deliberately acknowledged-not-acted-on (see WebhookAckResponse.data.handled) */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['WebhookAckResponse'];
-          };
+        RoleDetailResponse: {
+            data: components["schemas"]["Role"];
         };
-        /** @description Signature verification failed (malformed body, missing paypal-* headers, or PayPal reported the signature invalid) — nothing credited/refunded */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        MessageResponse: {
+            message?: string;
         };
-        /** @description Billing module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        RegisterResponse: {
+            user: components["schemas"]["User"];
+            message: string;
         };
-        /** @description PayPal's own verify-webhook-signature API was unreachable/non-2xx, OR a signature-valid event could not be processed (malformed shape, or a refund/reversal that couldn't be resolved/applied) — retry later; nothing was silently dropped */
-        500: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/billing/payments': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * List payments (admin)
-     * @description Paged, newest first. Optional ?status= and ?user_id= filters (AND'd together when both are given).
-     */
-    get: {
-      parameters: {
-        query?: {
-          status?: 'created' | 'approved' | 'captured' | 'failed' | 'refunded';
-          user_id?: string;
-          limit?: number;
-          offset?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Payment page */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['AdminPaymentListResponse'];
-          };
-        };
-        /** @description user_id filter is not a valid UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Billing module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/billing/packages': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List every top-up package, active and inactive (admin) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Full package catalogue */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['AdminPackageListResponse'];
-          };
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Billing module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    /** Create a top-up package (admin) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
+        BillingPackage: {
+            /** Format: uuid */
+            id: string;
             title: string;
             /** Format: int64 */
             amount_cents: number;
             /** Format: int64 */
             credits: number;
-            /** @default true */
-            active?: boolean;
-            /** @default 0 */
-            sort?: number;
-          };
+            active: boolean;
+            sort: number;
+            created_at: string;
+            updated_at: string;
         };
-      };
-      responses: {
-        /** @description Created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['AdminPackageResponse'];
-          };
+        BillingPackageListResponse: {
+            data: components["schemas"]["BillingPackage"][];
+            /**
+             * Format: int64
+             * @description billing.credits_per_unit — credits per 100 cents
+             */
+            credits_per_unit: number;
+            /**
+             * Format: int64
+             * @description Minimum accepted amount_cents for a custom top-up
+             */
+            min_amount_cents: number;
+            /**
+             * Format: int64
+             * @description Maximum accepted amount_cents for a custom top-up
+             */
+            max_amount_cents: number;
         };
-        /** @description Validation failed */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Billing module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/billing/packages/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    /** Delete a top-up package (admin) */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Deleted */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['MessageResponse'];
-          };
-        };
-        /** @description Invalid id */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Billing module disabled, or no such package */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    /** Update a top-up package — partial; any of title/amount_cents/credits/active/sort (admin) */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            title?: string;
+        WalletEntry: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            user_id: string;
             /** Format: int64 */
-            amount_cents?: number;
+            delta_credits: number;
+            /** @enum {string} */
+            kind: "topup" | "spend" | "adjustment" | "refund";
+            reference: string;
+            note: string;
+            /** Format: uuid */
+            created_by?: string | null;
+            created_at: string;
+        };
+        PublicWalletEntry: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            user_id: string;
             /** Format: int64 */
-            credits?: number;
-            active?: boolean;
-            sort?: number;
-          };
+            delta_credits: number;
+            /** @enum {string} */
+            kind: "topup" | "spend" | "adjustment" | "refund";
+            reference: string;
+            note: string;
+            created_at: string;
         };
-      };
-      responses: {
-        /** @description Updated */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['AdminPackageResponse'];
-          };
+        WalletResponse: {
+            data: {
+                /** Format: int64 */
+                balance: number;
+                history: components["schemas"]["PublicWalletEntry"][];
+            };
+            limit: number;
+            offset: number;
         };
-        /** @description Empty patch, invalid id, or validation failed */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        TopupResponse: {
+            data: {
+                /** @description PayPal order id — pass back to POST .../capture */
+                order_id: string;
+                /**
+                 * Format: uri
+                 * @description Redirect the buyer here to approve the order on PayPal
+                 */
+                approve_url: string;
+            };
         };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        CaptureResponse: {
+            data: {
+                /** @description false on an idempotent replay, or when PayPal has not yet COMPLETED the capture */
+                credited: boolean;
+                /**
+                 * Format: int64
+                 * @description Wallet balance AFTER this call (unchanged if not credited)
+                 */
+                balance: number;
+                /** @description "captured" once this or an earlier call credited the wallet; otherwise PayPal's own capture status verbatim (e.g. "PENDING", "DECLINED") — PayPal answers 2xx for both, so this is how a caller tells a settled capture from one still in flight. */
+                status: string;
+                /** @description Present (true) only when PayPal's capture has not reached COMPLETED yet — the payment is left uncaptured for the webhook to resolve. */
+                pending?: boolean;
+            };
         };
-        /** @description Billing module disabled, or no such package */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        WebhookAckResponse: {
+            data: {
+                /** @description true if this event type drives real crediting/refund logic (whether or not it was a no-op replay); false for an ignored/unrecognized event type */
+                handled: boolean;
+            };
         };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/admin/billing/settings': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Read the billing rate/bounds settings (admin) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Current settings */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['BillingSettingsResponse'];
-          };
+        AdminPackageResponse: {
+            data: components["schemas"]["BillingPackage"];
         };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        AdminPackageListResponse: {
+            data: components["schemas"]["BillingPackage"][];
         };
-        /** @description Billing module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        AdminPaymentListResponse: {
+            data: components["schemas"]["Payment"][];
+            total: number;
+            limit: number;
+            offset: number;
         };
-      };
-    };
-    /**
-     * Replace the billing rate/bounds settings (admin)
-     * @description A full replace — all three fields are required. Takes effect for the NEXT top-up computed after this call; an in-flight or already-created payment keeps the rate_snapshot/credits_expected it was created with (see Billing::credit_capture — unaffected by this endpoint).
-     */
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
+        Payment: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            user_id: string;
+            provider: string;
+            provider_order_id: string;
+            provider_capture_id?: string | null;
             /** Format: int64 */
+            amount_cents: number;
+            currency: string;
+            /** Format: int64 */
+            credits_expected: number;
+            /** Format: int64 */
+            rate_snapshot: number;
+            /** Format: uuid */
+            package_id?: string | null;
+            /** @enum {string} */
+            status: "created" | "approved" | "captured" | "failed" | "refunded";
+            failure_reason?: string | null;
+            created_at: string;
+            updated_at: string;
+        };
+        BillingSettings: {
+            /**
+             * Format: int64
+             * @description Credits granted per 100 cents on a custom-amount top-up
+             */
             credits_per_unit: number;
             /** Format: int64 */
             min_amount_cents: number;
             /** Format: int64 */
             max_amount_cents: number;
-          };
+            updated_at: string;
         };
-      };
-      responses: {
-        /** @description Updated */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['BillingSettingsResponse'];
-          };
+        BillingSettingsResponse: {
+            data: components["schemas"]["BillingSettings"];
         };
-        /** @description Missing/invalid field, or max_amount_cents < min_amount_cents */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        AdjustResponse: {
+            data: {
+                /**
+                 * Format: int64
+                 * @description Wallet balance AFTER this adjustment
+                 */
+                balance: number;
+                /** @description false only if this exact adjustment somehow no-op'd (not expected in normal use — adjust() has no idempotency key) */
+                credited: boolean;
+            };
         };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        BillingMetricsResponse: {
+            data: {
+                /** @enum {string} */
+                period: "day" | "week" | "month";
+                /**
+                 * Format: int64
+                 * @description Sum of amount_cents over captured payments in-window
+                 */
+                revenue_cents: number;
+                /**
+                 * Format: int64
+                 * @description Count of captured payments in-window
+                 */
+                payments_count: number;
+                /**
+                 * Format: int64
+                 * @description revenue_cents / payments_count (integer division; 0 if payments_count is 0)
+                 */
+                avg_payment_cents: number;
+                conversion: {
+                    /**
+                     * Format: int64
+                     * @description Every payment (any status) created in-window
+                     */
+                    created: number;
+                    /**
+                     * Format: int64
+                     * @description Of those
+                     */
+                    captured: number;
+                    /**
+                     * Format: double
+                     * @description captured / created as a float ratio; 0 if created is 0
+                     */
+                    rate: number;
+                };
+                /**
+                 * Format: int64
+                 * @description Sum of billing_refunds.amount_cents in-window, outcome='applied' only
+                 */
+                refunds_cents: number;
+                /**
+                 * Format: int64
+                 * @description Count of billing_refunds rows in-window, outcome='applied' only
+                 */
+                refunds_count: number;
+                /**
+                 * Format: int64
+                 * @description SUM(wallet_balances.credits) — all-time liability, NOT windowed
+                 */
+                outstanding_credits: number;
+                /**
+                 * Format: int64
+                 * @description outstanding_credits * 100 / credits_per_unit (integer math, current billing_settings rate)
+                 */
+                outstanding_value_cents: number;
+                /** @description Calendar-bucketed (hourly for period=day, daily otherwise); every bucket in range is present, zero-filled if no captured payments landed in it */
+                series: {
+                    /** @description ISO-8601 UTC bucket start */
+                    bucket_start: string;
+                    /** Format: int64 */
+                    revenue_cents: number;
+                    /** Format: int64 */
+                    payments_count: number;
+                }[];
+                /** @description Top 5 packages by revenue among captured payments in-window */
+                top_packages: {
+                    /** Format: uuid */
+                    package_id: string;
+                    title: string;
+                    /** Format: int64 */
+                    revenue_cents: number;
+                    /** Format: int64 */
+                    payments_count: number;
+                }[];
+                /** @description Top 5 users by top-up credits among captured payments in-window */
+                top_users: {
+                    /** Format: uuid */
+                    user_id: string;
+                    /** Format: email */
+                    email: string;
+                    /** Format: int64 */
+                    topup_credits: number;
+                    /** Format: int64 */
+                    revenue_cents: number;
+                }[];
+            };
         };
-        /** @description Billing module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
+        DailyActivityListResponse: {
+            count: number;
+            /** @description Rows in the whole range, ignoring limit/offset */
+            total: number;
+            data: {
+                /** Format: date */
+                date?: string;
+                steps?: number;
+                distance_m?: number | null;
+                active_kcal?: number | null;
+                total_kcal?: number | null;
+                timezone?: string;
+            }[];
         };
-      };
-    };
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/billing/users/{id}/adjust': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Manually adjust a user's wallet balance (admin)
-     * @description Routes through Billing::adjust — the only code allowed to write wallet_entries/wallet_balances. note is mandatory (non-empty); created_by on the resulting ledger row is always the authenticated admin's own id, never a client-supplied value. Writes an audit_log row. With notify=true, the target user receives a best-effort wallet-adjustment email (note is reused verbatim as the reason) after the adjustment and its audit row have both committed — email delivery never affects the money path or the response.
-     */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          /** @description Target user id */
-          id: string;
+        SleepListResponse: {
+            count: number;
+            /** @description Rows in the whole range, ignoring limit/offset */
+            total: number;
+            data: {
+                sleep_id?: string;
+                start_at?: string;
+                end_at?: string;
+                duration_minutes?: number;
+                time_asleep_minutes?: number;
+                time_awake_minutes?: number;
+                sleep_score?: number | null;
+                sleep_score_source?: string | null;
+                is_nap?: boolean;
+                timezone?: string;
+                stages?: Record<string, never>[];
+            }[];
         };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            /**
-             * Format: int64
-             * @description Signed; positive credits, negative debits. Zero is refused (400).
-             */
-            delta_credits: number;
+        HeartRateListResponse: {
+            count: number;
+            /** @description Rows in the whole range, ignoring limit/offset */
+            total: number;
+            data: {
+                timestamp?: string;
+                bpm?: number;
+                sample_type?: string;
+            }[];
+        };
+        StressListResponse: {
+            count: number;
+            /** @description Rows in the whole range, ignoring limit/offset */
+            total: number;
+            data: {
+                timestamp?: string;
+                stress_score?: number;
+                level?: string;
+            }[];
+        };
+        Spo2ListResponse: {
+            count: number;
+            /** @description Rows in the whole range, ignoring limit/offset */
+            total: number;
+            data: {
+                timestamp?: string;
+                spo2_pct?: number;
+            }[];
+        };
+        BodyListResponse: {
+            count: number;
+            /** @description Rows in the whole range, ignoring limit/offset */
+            total: number;
+            data: {
+                timestamp?: string;
+                weight_kg?: number;
+                bmi?: number | null;
+                body_fat_pct?: number | null;
+                muscle_mass_kg?: number | null;
+                water_pct?: number | null;
+                bone_mass_kg?: number | null;
+                visceral_fat_score?: number | null;
+                basal_metabolism_kcal?: number | null;
+                metabolic_age?: number | null;
+            }[];
+        };
+        WorkoutListResponse: {
+            count: number;
+            /** @description Rows in the whole range, ignoring limit/offset */
+            total: number;
+            data: {
+                workout_id?: string;
+                activity_type?: string;
+                start_at?: string;
+                end_at?: string;
+                duration_minutes?: number;
+                distance_m?: number | null;
+                calories_kcal?: number | null;
+                avg_heart_rate_bpm?: number | null;
+                max_heart_rate_bpm?: number | null;
+                avg_pace_sec_per_km?: number | null;
+                max_pace_sec_per_km?: number | null;
+                total_steps?: number | null;
+            }[];
+        };
+        SummaryListResponse: {
+            count: number;
+            /** @description Rows in the whole range, ignoring limit/offset */
+            total: number;
+            data: {
+                /** Format: date */
+                date?: string;
+                steps?: number;
+                distance_m?: number | null;
+                active_kcal?: number | null;
+                sleep_duration_minutes?: number | null;
+                sleep_score?: number | null;
+                resting_bpm?: number | null;
+            }[];
+        };
+        AbnormalListResponse: {
+            count: number;
+            total: number;
+            data: {
+                event_id?: string;
+                start_at?: string;
+                end_at?: string;
+                duration_seconds?: number | null;
+            }[];
+        };
+        CoverageResponse: {
+            data: {
+                [key: string]: {
+                    /** Format: date */
+                    first_date?: string | null;
+                    /** Format: date */
+                    last_date?: string | null;
+                    records?: number;
+                    last_sync_at?: string | null;
+                };
+            };
+        };
+        ExportResponse: {
+            schema_version: string;
+            source: string;
+            generated_at: string;
+            filters: {
+                dataset?: string | null;
+                /** Format: date */
+                start_date?: string;
+                /** Format: date */
+                end_date?: string;
+            };
+            records: {
+                [key: string]: Record<string, never>[];
+            };
+        };
+        Exercise: {
+            /** @description Library id (e.g. Barbell_Squat) or custom_<hex> for own exercises */
+            id: string;
+            /** @enum {string} */
+            source: "library" | "custom";
+            name: string;
+            category: string;
+            equipment?: string | null;
+            level?: string | null;
+            force?: string | null;
+            mechanic?: string | null;
+            primary_muscles: string[];
+            secondary_muscles: string[];
+            instructions: string[];
+            /** @description Paths under /exercise-media/ */
+            images: string[];
+            tracking_mode: components["schemas"]["ExerciseTrackingMode"];
+            archived: boolean;
+        };
+        /**
+         * @description What a set of the exercise records.
+         * @enum {string}
+         */
+        ExerciseTrackingMode: "weight_reps" | "bodyweight_reps" | "duration" | "distance_duration";
+        ExerciseResponse: {
+            data: components["schemas"]["Exercise"];
+        };
+        ExerciseListResponse: {
+            data: components["schemas"]["Exercise"][];
+            count: number;
+            /** @description Rows matching the filters, ignoring limit/offset */
+            total: number;
+        };
+        ExerciseInput: {
+            name?: string;
+            category?: string;
+            equipment?: string;
+            primary_muscles?: string[];
+            secondary_muscles?: string[];
+            instructions?: string[];
+            tracking_mode?: components["schemas"]["ExerciseTrackingMode"];
+            archived?: boolean;
+        };
+        RoutineSummary: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description 1 = Monday … 7 = Sunday */
+            weekday: number | null;
+            position: number;
             note: string;
-            /**
-             * @description When true, sends the target user a best-effort wallet-adjustment email after the adjustment succeeds. Non-boolean values are silently ignored.
-             * @default false
-             */
-            notify?: boolean;
-          };
+            exercise_count: number;
         };
-      };
-      responses: {
-        /** @description Adjusted */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['AdjustResponse'];
-          };
-        };
-        /** @description Empty/missing note, zero delta_credits, malformed user/admin id, or invalid id path param */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Billing module disabled, or no such user */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description A negative delta_credits would drive the balance below zero */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/billing/metrics': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Business metrics — revenue, conversion, refunds, outstanding liability, top lists (admin)
-     * @description revenue/count/avg and conversion are computed over a rolling window (now() - interval); refunds counts only billing_refunds rows with outcome='applied'; outstanding_credits/outstanding_value_cents are an all-time snapshot of wallet_balances, NOT windowed; series is calendar-bucketed (hourly for period=day, daily for week/month) with every bucket present (zero-filled, no gaps).
-     */
-    get: {
-      parameters: {
-        query?: {
-          /** @description day = last 24h (hourly buckets), week = last 7d (daily buckets), month = last 30d (daily buckets) */
-          period?: 'day' | 'week' | 'month';
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Metrics snapshot */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['BillingMetricsResponse'];
-          };
-        };
-        /** @description period is not one of day, week, month */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not an admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Billing module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/workout/exercises': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Search the exercise library and own exercises */
-    get: {
-      parameters: {
-        query?: {
-          /** @description Substring of the name, case-insensitive */
-          q?: string;
-          /** @description Primary or secondary muscle */
-          muscle?: string;
-          equipment?: string;
-          category?: string;
-          source?: 'library' | 'custom';
-          /** @description Include archived exercises */
-          archived?: boolean;
-          limit?: number;
-          offset?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Page of exercises ordered by name */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ExerciseListResponse'];
-          };
-        };
-        /** @description q too long or unknown source */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    /** Create a custom exercise */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['ExerciseInput'] & Record<string, never>;
-        };
-      };
-      responses: {
-        /** @description Created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ExerciseResponse'];
-          };
-        };
-        /** @description Validation failed */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ValidationError'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/workout/exercises/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    /** Read one exercise */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The exercise */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ExerciseResponse'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /**
-     * Edit a custom exercise, or the tracking mode and archived flag of a library one
-     * @description A library exercise is shared by every user. Only an administrator can change it, and only its tracking mode and archived flag.
-     */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['ExerciseInput'];
-        };
-      };
-      responses: {
-        /** @description The updated exercise */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ExerciseResponse'];
-          };
-        };
-        /** @description Validation failed, or a library exercise changed by a non-administrator or in a content field (library_exercise_read_only) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/workout/routines': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List routines */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Routines ordered by weekday */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['RoutineListResponse'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/workout/routines/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    /** Read a routine with its exercises */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The routine */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['RoutineResponse'];
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    /** Create the routine with this id, or replace it and its exercises */
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['RoutineInput'];
-        };
-      };
-      responses: {
-        /** @description The stored routine */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['RoutineResponse'];
-          };
-        };
-        /** @description Validation failed, id is not a UUID, or an exercise_id is unknown (unknown_exercise) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    post?: never;
-    /** Delete a routine */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Deleted */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              message: string;
-            };
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/workout/sessions': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** History of finished sessions, newest first */
-    get: {
-      parameters: {
-        query?: {
-          limit?: number;
-          offset?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description A page of sessions */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['WorkoutSessionListResponse'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    /** Start a session, empty or from a routine */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
+        RoutineExercise: {
             /** Format: uuid */
-            routine_id?: string | null;
-          };
-        };
-      };
-      responses: {
-        /** @description The started session; the routine's exercises and targets are copied */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['WorkoutSessionResponse'];
-          };
-        };
-        /** @description routine_id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled, or the routine is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description A session is already active (session_active) */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/workout/sessions/active': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** The unfinished session, or null */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The active session with sets and previous sets; data is null without one */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['WorkoutActiveSessionResponse'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/workout/sessions/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    /** Read one session with its exercises and sets */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The session */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['WorkoutSessionResponse'];
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled, or no such session */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    /** Delete a session with its sets */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Deleted */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              message: string;
-            };
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled, or no such session */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    /** Finish, rename, annotate or move a session */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['WorkoutSessionPatch'];
-        };
-      };
-      responses: {
-        /** @description The session; a change of its times re-runs the match with Mi Fitness data */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['WorkoutSessionResponse'];
-          };
-        };
-        /** @description Validation failed, a timestamp does not exist (invalid_timestamp), or finished_at is before started_at (invalid_times) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled, or no such session */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/workout/sessions/{id}/exercises': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Add an exercise to a session */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
+            id: string;
             exercise_id: string;
-          };
-        };
-      };
-      responses: {
-        /** @description The session with the exercise appended */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['WorkoutSessionResponse'];
-          };
-        };
-        /** @description Validation failed or id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled, no such session, or no such exercise */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/workout/sessions/{id}/exercises/{eid}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-        /** @description Id of the session exercise, not of the library exercise */
-        eid: string;
-      };
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    /** Drop an exercise and its sets from a session */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-          /** @description Id of the session exercise, not of the library exercise */
-          eid: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The session without the exercise */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['WorkoutSessionResponse'];
-          };
-        };
-        /** @description id or eid is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled, or no such exercise in the session */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/workout/sessions/{id}/heart-rate': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    /** Heart-rate samples inside a session */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Samples between started_at and finished_at (until now for an active session) */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['WorkoutHeartRateResponse'];
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled, or no such session */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/workout/sets/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    get?: never;
-    /** Create the set with this client-generated id, or replace it */
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['WorkoutSetInput'];
-        };
-      };
-      responses: {
-        /** @description The stored set; sending the same set twice replaces it */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['WorkoutSetResponse'];
-          };
-        };
-        /** @description Validation failed, id is not a UUID, or completed_at does not exist (invalid_timestamp) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled, or the session exercise is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    post?: never;
-    /** Delete a set */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Deleted */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              message: string;
-            };
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled, or no such set */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/workout/readiness': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Numbers to look at before a workout */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Last night's sleep, resting heart rate and recent stress, each next to its 30-day mean; a value without data is null */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['WorkoutReadinessResponse'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/workout/reconcile': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Re-attach Mi Fitness data to the sessions that finished in a date range */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            /** Format: date */
-            from: string;
-            /**
-             * Format: date
-             * @description Inclusive, UTC dates of finished_at
-             */
-            to: string;
-          };
-        };
-      };
-      responses: {
-        /** @description How many sessions were written */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['WorkoutReconcileResponse'];
-          };
-        };
-        /** @description from and to must be YYYY-MM-DD dates that exist, and from must not be after to */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Missing fitness:read or fitness:sync, or the principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Workout module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/food/goals': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Goals profile, the weight it uses and the computed daily targets */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The goals */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['FoodGoalsResponse'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    /** Replace the goals profile */
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['FoodGoalsProfile'];
-        };
-      };
-      responses: {
-        /** @description The goals after the write */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['FoodGoalsResponse'];
-          };
-        };
-        /** @description Validation failed (a future birth date, an out-of-range value) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/food/items': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Search own products */
-    get: {
-      parameters: {
-        query?: {
-          q?: string;
-          /** @description Include archived products */
-          archived?: 'true';
-          limit?: number;
-          offset?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description A page of products */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['FoodItemListResponse'];
-          };
-        };
-        /** @description q is too long */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    /** Create a product */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['FoodItemInput'];
-        };
-      };
-      responses: {
-        /** @description The product */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['FoodItemResponse'];
-          };
-        };
-        /** @description Validation failed */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/food/items/from-off': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Copy an Open Food Facts product by barcode into own products */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            code: string;
-          };
-        };
-      };
-      responses: {
-        /** @description The product existed already */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['FoodItemResponse'];
-          };
-        };
-        /** @description The product was copied now */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['FoodItemResponse'];
-          };
-        };
-        /** @description code is not 1..20 digits */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled, or Open Food Facts has no such product (off_product) */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Open Food Facts is not available (upstream_unavailable) */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/food/items/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    /** Delete a product, or archive one the diary uses */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Deleted or archived (outcome) */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              message: string;
-              /** @enum {string} */
-              outcome: 'deleted' | 'archived';
-            };
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled, or no such product */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    /** Edit a product */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['FoodItemInput'];
-        };
-      };
-      responses: {
-        /** @description The product */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['FoodItemResponse'];
-          };
-        };
-        /** @description Validation failed or id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled, or no such product */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/food/recent': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Products used recently in the diary, each once */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Up to 30 products */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['FoodItemListResponse'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/food/off/search': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Search Open Food Facts
-     * @description Data from Open Food Facts (https://world.openfoodfacts.org), Open Database License.
-     */
-    get: {
-      parameters: {
-        query: {
-          q: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Up to 20 products with a kcal value; cached for an hour per query */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['OffProduct'][];
-              count: number;
-              cached: boolean;
-            };
-          };
-        };
-        /** @description q must be 1..80 characters */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Open Food Facts is not available (upstream_unavailable) */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/food/day': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** One day of the diary with totals, active kcal and the targets */
-    get: {
-      parameters: {
-        query?: {
-          /** @description Defaults to today (UTC) */
-          date?: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The day */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['FoodDay'];
-            };
-          };
-        };
-        /** @description date is not YYYY-MM-DD or not a calendar day (invalid_date) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/food/week': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Seven days of totals from a date against the targets */
-    get: {
-      parameters: {
-        query: {
-          from: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The week */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['FoodWeek'];
-            };
-          };
-        };
-        /** @description from is not YYYY-MM-DD or not a calendar day (invalid_date) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/food/entries': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Add a diary entry */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['FoodEntryInput'];
-        };
-      };
-      responses: {
-        /** @description The entry */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['FoodEntryResponse'];
-          };
-        };
-        /** @description Validation failed, or the date does not exist (invalid_date) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled, or item_id is not the caller's product */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/food/entries/batch': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Add several diary entries in one transaction */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            entries: components['schemas']['FoodEntryInput'][];
-          };
-        };
-      };
-      responses: {
-        /** @description The entries */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['FoodEntry'][];
-              count: number;
-            };
-          };
-        };
-        /** @description Validation failed on any entry (errors name the index); nothing is written */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled, or an item_id is not the caller's product */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/food/entries/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    /** Delete a diary entry */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Deleted */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              message: string;
-            };
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled, or no such entry */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    /** Edit a diary entry */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['FoodEntryPatch'];
-        };
-      };
-      responses: {
-        /** @description The entry */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['FoodEntryResponse'];
-          };
-        };
-        /** @description Validation failed, id is not a UUID, or the date does not exist */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled, or no such entry */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/food/parse': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Send a text description to the LLM parse job
-     * @description Creates a food_parse_jobs row and puts a food_parse job on the queue; poll
-     *     GET /api/v1/food/parse/{id}. Nothing reaches the diary until the lines are
-     *     confirmed with POST /api/v1/food/entries/batch. 503 not_configured while the
-     *     worker's FOOD_LLM_* settings are absent (GET goals reports llm_available).
-     */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            text: string;
-            meal: components['schemas']['FoodMeal'];
-            /** Format: date */
-            date: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Queued */
-        202: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: {
-                /** Format: uuid */
-                id: string;
-                /** @enum {string} */
-                status: 'queued';
-              };
-            };
-          };
-        };
-        /** @description Validation failed */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Three parses of this user are still queued or running (too_many_parses) */
-        429: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description not_configured, or the queue is down (queue_unavailable) */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/food/parse/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    /** Read a parse job and its lines */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The job */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['FoodParseJob'];
-            };
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Food module disabled, or the job is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/currencies': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** The user's currencies (seeded with the owner's ten on first read) */
-    get: {
-      parameters: {
-        query?: {
-          /** @description Include archived rows */
-          archived?: 'true';
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The list */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyCurrency'][];
-            };
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    /** Add or replace a currency by code */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['MoneyCurrencyInput'];
-        };
-      };
-      responses: {
-        /** @description The currency */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyCurrency'];
-            };
-          };
-        };
-        /** @description Validation failed, or a rule of the model (code invariant) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/currencies/{code}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        code: string;
-      };
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /** Change a currency */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          code: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['MoneyCurrencyPatch'];
-        };
-      };
-      responses: {
-        /** @description The currency */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyCurrency'];
-            };
-          };
-        };
-        /** @description Validation failed, or a rule of the model (code invariant) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the row is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/money/accounts': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Accounts with their computed balances */
-    get: {
-      parameters: {
-        query?: {
-          /** @description Include archived rows */
-          archived?: 'true';
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The list */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyAccount'][];
-            };
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    /** Create an account */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['MoneyAccountInput'];
-        };
-      };
-      responses: {
-        /** @description The account */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyAccount'];
-            };
-          };
-        };
-        /** @description Validation failed, or a rule of the model (code invariant) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/accounts/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    /** One account with its balance */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The account */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyAccount'];
-            };
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the row is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    /** Delete an unused account, or archive one with rows */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Deleted or archived (outcome) */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              message: string;
-              /** @enum {string} */
-              outcome: 'deleted' | 'archived';
-            };
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the row is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    /** Change an account; its currency never changes */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['MoneyAccountPatch'];
-        };
-      };
-      responses: {
-        /** @description The account */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyAccount'];
-            };
-          };
-        };
-        /** @description Validation failed, or a rule of the model (code invariant) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the row is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/money/categories': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Categories with their budgets */
-    get: {
-      parameters: {
-        query?: {
-          /** @description Include archived rows */
-          archived?: 'true';
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The list */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyCategory'][];
-            };
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    /** Create a category */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['MoneyCategoryInput'];
-        };
-      };
-      responses: {
-        /** @description The category */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyCategory'];
-            };
-          };
-        };
-        /** @description Validation failed, or a rule of the model (code invariant) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/categories/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    /** One category */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The category */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyCategory'];
-            };
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the row is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    /** Delete an unused category, or archive one with rows */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Deleted or archived (outcome) */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              message: string;
-              /** @enum {string} */
-              outcome: 'deleted' | 'archived';
-            };
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the row is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    /** Change a category or its budget (amount and currency together) */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['MoneyCategoryPatch'];
-        };
-      };
-      responses: {
-        /** @description The category */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyCategory'];
-            };
-          };
-        };
-        /** @description Validation failed, or a rule of the model (code invariant) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the row is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/money/transactions': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** The ledger, newest first */
-    get: {
-      parameters: {
-        query?: {
-          from?: string;
-          to?: string;
-          account?: string;
-          category?: string;
-          currency?: string;
-          type?: components['schemas']['MoneyTransactionType'];
-          status?: 'posted' | 'pending';
-          trip?: string;
-          /** @description Over name and merchant */
-          q?: string;
-          limit?: number;
-          offset?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description A page */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyTransaction'][];
-              total: number;
-              limit: number;
-              offset: number;
-            };
-          };
-        };
-        /** @description A bad filter */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    /** Add an income, an expense or an fx_adjustment */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['MoneyTransactionInput'];
-        };
-      };
-      responses: {
-        /** @description The row */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyTransaction'];
-            };
-          };
-        };
-        /** @description Validation failed, or a rule of the model (code invariant) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description A row with this external_id already exists (duplicate) */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/transactions/batch': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Add up to 100 rows in one database transaction (all or nothing) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            transactions: components['schemas']['MoneyTransactionInput'][];
-          };
-        };
-      };
-      responses: {
-        /** @description The rows */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyTransaction'][];
-              count: number;
-            };
-          };
-        };
-        /** @description Validation failed, or a rule of the model (code invariant) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description A row with this external_id already exists (duplicate) */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/transactions/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    /** One row with its adjustments and final amount */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The row */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyTransaction'];
-            };
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the row is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    /** Delete a row and, with it, its adjustments */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Deleted */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the row is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    /** Change a row; an adjustment changes amount and note only */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['MoneyTransactionPatch'];
-        };
-      };
-      responses: {
-        /** @description The row */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyTransaction'];
-            };
-          };
-        };
-        /** @description Validation failed, or a rule of the model (code invariant) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the row is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/money/transactions/{id}/confirm': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Post a pending row; the merchant memory learns from it */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The row */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyTransaction'];
-            };
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the row is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/inbox': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Pending rows with the possible_duplicate flag */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The rows */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyInboxRow'][];
-              count: number;
-            };
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/transfers': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Transfers and exchanges, newest first */
-    get: {
-      parameters: {
-        query?: {
-          from?: string;
-          to?: string;
-          account?: string;
-          limit?: number;
-          offset?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The rows */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyTransfer'][];
-              count: number;
-            };
-          };
-        };
-        /** @description A bad filter */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    /** Add a transfer or an exchange (one row, sent and received) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['MoneyTransferInput'];
-        };
-      };
-      responses: {
-        /** @description The transfer */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyTransfer'];
-            };
-          };
-        };
-        /** @description Validation failed, or a rule of the model (code invariant) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description A row with this external_id already exists (duplicate) */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/transfers/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    /** One transfer */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The transfer */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyTransfer'];
-            };
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the row is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    /** Delete a transfer */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Deleted */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the row is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    /** Change a transfer's amounts, fee, date, name or note */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['MoneyTransferPatch'];
-        };
-      };
-      responses: {
-        /** @description The transfer */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyTransfer'];
-            };
-          };
-        };
-        /** @description Validation failed, or a rule of the model (code invariant) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the row is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/money/merchants': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Merchant suggestions, most used first, with the remembered category */
-    get: {
-      parameters: {
-        query?: {
-          q?: string;
-          limit?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The rows */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyMerchant'][];
-              count: number;
-            };
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/merchants/{key}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        key: string;
-      };
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /** Change what a merchant means from now on */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          key: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
+            position: number;
+            target_sets: number;
+            target_reps_min?: number | null;
+            target_reps_max?: number | null;
+            target_duration_seconds?: number | null;
+            rest_seconds: number;
+            note: string;
+            exercise_name: string;
+            tracking_mode: components["schemas"]["ExerciseTrackingMode"];
+            images: string[];
+            primary_muscles: string[];
+        };
+        Routine: {
             /** Format: uuid */
-            category_id: string | null;
-          };
+            id: string;
+            name: string;
+            weekday: number | null;
+            position: number;
+            note: string;
+            exercises: components["schemas"]["RoutineExercise"][];
         };
-      };
-      responses: {
-        /** @description The merchant */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyMerchant'];
-            };
-          };
+        RoutineResponse: {
+            data: components["schemas"]["Routine"];
         };
-        /** @description Validation failed, or a rule of the model (code invariant) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
+        RoutineListResponse: {
+            data: components["schemas"]["RoutineSummary"][];
+            count: number;
+            total: number;
         };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
+        RoutineInput: {
+            name: string;
+            weekday?: number | null;
+            note?: string;
+            exercises: {
+                exercise_id: string;
+                target_sets?: number | null;
+                target_reps_min?: number | null;
+                target_reps_max?: number | null;
+                target_duration_seconds?: number | null;
+                rest_seconds?: number | null;
+                note?: string;
+            }[];
         };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the row is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/money/rates': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** A quote against the US dollar on the day or the nearest earlier one */
-    get: {
-      parameters: {
-        query: {
-          /** @description Defaults to today (UTC) */
-          date?: string;
-          quote: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The rate */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyRate'];
-            };
-          };
-        };
-        /** @description A bad query */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or no rate on or before the day (no_rate) */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/rates/convert': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** An informational conversion with the rate and its date; nothing is stored */
-    get: {
-      parameters: {
-        query: {
-          amount: number;
-          from: string;
-          to: string;
-          date?: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The number */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyConversion'];
-            };
-          };
-        };
-        /** @description A bad query */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or no rate (no_rate) */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/rates/refresh': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Enqueue today's rates fetch (money_rates job) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Queued */
-        202: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: {
-                job_id: string;
-                /** @enum {string} */
-                status: 'queued';
-              };
-            };
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The job queue is not available (queue_unavailable) */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/reports/period': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** A period's numbers per currency, never summed across; as_if adds a converted block with its rates */
-    get: {
-      parameters: {
-        query?: {
-          kind?: 'week' | 'month' | 'quarter' | 'custom';
-          /** @description A day of the period (week */
-          date?: string;
-          /** @description Custom period start */
-          from?: string;
-          /** @description Custom period end */
-          to?: string;
-          /** @description Defaults to the settings' view_currency */
-          as_if?: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The report */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyReport'];
-            };
-          };
-        };
-        /** @description A bad period or currency */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/reports/balances': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Accounts and balances grouped by currency */
-    get: {
-      parameters: {
-        query?: {
-          /** @description Include archived rows */
-          archived?: 'true';
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The groups */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyBalanceGroup'][];
-            };
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/parse': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Send a bank mail, an SMS or a list of purchases to the LLM parse job */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            text: string;
+        WorkoutSet: {
+            /** Format: uuid */
+            id: string;
             /**
-             * Format: date
-             * @description The date of a line without one; defaults to today (UTC)
+             * Format: uuid
+             * @description Present in the answer of PUT sets/{id}
              */
-            hint_date?: string;
-          };
+            session_exercise_id?: string;
+            position: number;
+            /** @enum {string} */
+            kind: "work" | "warmup";
+            /** @description Load; for a bodyweight exercise the extra load */
+            weight_kg: number | null;
+            reps: number | null;
+            duration_seconds: number | null;
+            distance_m: number | null;
+            rpe: number | null;
+            /** Format: date-time */
+            completed_at: string;
         };
-      };
-      responses: {
-        /** @description Queued */
-        202: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: {
-                /** Format: uuid */
-                id: string;
-                /** @enum {string} */
-                status: 'queued';
-              };
-            };
-          };
+        WorkoutPreviousSet: {
+            position: number;
+            /** @enum {string} */
+            kind: "work" | "warmup";
+            weight_kg: number | null;
+            reps: number | null;
+            duration_seconds: number | null;
+            distance_m: number | null;
+            rpe: number | null;
         };
-        /** @description Validation failed */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
+        WorkoutSessionExercise: {
+            /** Format: uuid */
+            id: string;
+            exercise_id: string;
+            position: number;
+            target_sets?: number | null;
+            target_reps_min?: number | null;
+            target_reps_max?: number | null;
+            target_duration_seconds?: number | null;
+            rest_seconds: number;
+            note: string;
+            exercise_name: string;
+            tracking_mode: components["schemas"]["ExerciseTrackingMode"];
+            images: string[];
+            primary_muscles: string[];
+            sets: components["schemas"]["WorkoutSet"][];
+            /** @description Sets of the latest earlier finished session that logged this exercise */
+            previous_sets: components["schemas"]["WorkoutPreviousSet"][];
         };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
+        /**
+         * @description Result of matching the session with Mi Fitness data: null before the session is finished, pending while the band has not synced past the session's end, matched with heart-rate samples or a band workout, no_data when newer samples exist and none fall inside the session.
+         * @enum {string|null}
+         */
+        WorkoutHealthStatus: "pending" | "matched" | "no_data" | null;
+        WorkoutSession: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            routine_id: string | null;
+            name: string;
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            finished_at: string | null;
+            note: string;
+            /** @description Latest body weight when the session started */
+            bodyweight_kg: number | null;
+            health_status: components["schemas"]["WorkoutHealthStatus"];
+            hr_avg: number | null;
+            hr_max: number | null;
+            hr_samples: number;
+            band_workout_id: string | null;
+            band_calories_kcal: number | null;
+            /** Format: date-time */
+            reconciled_at: string | null;
+            exercises: components["schemas"]["WorkoutSessionExercise"][];
         };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
+        WorkoutSessionSummary: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uuid */
+            routine_id: string | null;
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            finished_at: string;
+            health_status: components["schemas"]["WorkoutHealthStatus"];
+            hr_avg: number | null;
+            hr_max: number | null;
+            band_calories_kcal: number | null;
+            exercise_count: number;
+            /** @description Work sets only */
+            set_count: number;
+            /** @description Reps times load over work sets; bodyweight exercises add the session's body weight */
+            volume_kg: number;
         };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
+        WorkoutSessionResponse: {
+            data: components["schemas"]["WorkoutSession"];
         };
-        /** @description Three parses of this user are still open (too_many_parses) */
-        429: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
+        WorkoutActiveSessionResponse: {
+            data: components["schemas"]["WorkoutSession"] | null;
         };
-        /** @description not_configured, storage_unavailable or queue_unavailable */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
+        WorkoutSessionListResponse: {
+            data: components["schemas"]["WorkoutSessionSummary"][];
+            count: number;
+            total: number;
         };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/parse/receipt': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Send a receipt photo (a jpeg, png or webp data URL, at most 4 MB decoded) to the LLM parse job */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            /** @description data:image/jpeg;base64,... */
-            image: string;
-            /** Format: date */
-            hint_date?: string;
-          };
+        WorkoutSessionPatch: {
+            name?: string;
+            note?: string;
+            /** Format: date-time */
+            started_at?: string;
+            /** Format: date-time */
+            finished_at?: string;
+            /** @description Finish now when the session has no finished_at yet */
+            finish?: boolean;
         };
-      };
-      responses: {
-        /** @description Queued */
-        202: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: {
-                /** Format: uuid */
-                id: string;
-                /** @enum {string} */
-                status: 'queued';
-              };
-            };
-          };
-        };
-        /** @description Validation failed */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Three parses of this user are still open (too_many_parses) */
-        429: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description not_configured, storage_unavailable or queue_unavailable */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/parse/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    /** A parse job and its proposed lines (never the photo) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The job */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyParseJob'];
-            };
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the job is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/parse/{id}/accept': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** The edited lines of a finished parse into the inbox as pending rows (once) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            lines: components['schemas']['MoneyTransactionInput'][];
-          };
-        };
-      };
-      responses: {
-        /** @description The pending rows */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyTransaction'][];
-              count: number;
-            };
-          };
-        };
-        /** @description Validation failed (each line needs an account) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the job is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The job is not finished or its lines were accepted already (already_accepted) */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/advisor/reports': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** The advisor's reviews, newest period first (without their facts) */
-    get: {
-      parameters: {
-        query?: {
-          limit?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The reviews */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyAdvisorReportSummary'][];
-              count: number;
-            };
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/advisor/reports/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    /** One review with the facts it was built on */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The review */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyAdvisorReport'];
-            };
-          };
-        };
-        /** @description id is not a UUID */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled, or the review is not the caller's */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/advisor/run': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Ask for a review of the week, month or quarter containing a day (once per period; a failed one is queued again) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
+        WorkoutSetInput: {
+            /** Format: uuid */
+            session_exercise_id: string;
+            position: number;
             /**
-             * @default week
+             * @default work
              * @enum {string}
              */
-            period?: 'week' | 'month' | 'quarter';
+            kind: "work" | "warmup";
+            weight_kg?: number | null;
+            reps?: number | null;
+            duration_seconds?: number | null;
+            distance_m?: number | null;
+            rpe?: number | null;
+            /**
+             * Format: date-time
+             * @description Defaults to now
+             */
+            completed_at?: string;
+        };
+        WorkoutSetResponse: {
+            data: components["schemas"]["WorkoutSet"];
+        };
+        WorkoutHeartRateResponse: {
+            data: {
+                samples: {
+                    /** Format: date-time */
+                    timestamp: string;
+                    bpm: number;
+                }[];
+                /**
+                 * Format: date-time
+                 * @description Newest heart-rate sample in the database, to tell "not synced yet" from "no data"
+                 */
+                latest_sample_at: string | null;
+            };
+        };
+        WorkoutReadinessResponse: {
+            data: {
+                /** @description Longest non-nap sleep that ended in the last 18 hours */
+                sleep_minutes: number | null;
+                sleep_score: number | null;
+                sleep_minutes_avg_30d: number | null;
+                /** @description Latest resting sample of the last 24 hours */
+                resting_bpm: number | null;
+                resting_bpm_avg_30d: number | null;
+                /** @description Mean stress of the last 12 hours */
+                stress: number | null;
+                stress_avg_30d: number | null;
+                bodyweight_kg: number | null;
+            };
+        };
+        WorkoutReconcileResponse: {
+            data: {
+                /** @description Sessions written */
+                reconciled: number;
+            };
+        };
+        /** @description The caller's Mi account link. Only `status` is present when it is `none`. */
+        MiAccountStatus: {
+            /**
+             * @description reauth_required: Xiaomi refused the stored token, link again
+             * @enum {string}
+             */
+            status: "none" | "ok" | "reauth_required";
+            /** @description Masked Xiaomi account id */
+            account?: string;
+            /** @enum {string} */
+            region?: "ru" | "cn" | "de" | "i2" | "sg" | "us";
+            /** @description false while no region returned data for the account */
+            region_detected?: boolean;
+            /** Format: date-time */
+            linked_at?: string;
+            /**
+             * Format: date-time
+             * @description Last login Xiaomi accepted
+             */
+            last_ok_at?: string | null;
+            last_error?: string | null;
+            last_sync?: {
+                id: number;
+                status: string;
+                /** Format: date-time */
+                finished_at: string;
+            } | null;
+        };
+        MiAccountStatusResponse: {
+            data: components["schemas"]["MiAccountStatus"];
+        };
+        MiLinkStart: {
+            /** @description Id of the attempt, valid only for the user who started it */
+            link_id: string;
+            /** @description PNG of the QR code to scan in a Xiaomi app */
+            qr_png_base64: string;
+            /** @description Xiaomi page that confirms the sign-in, for a phone */
+            confirm_url: string;
+            expires_in_seconds: number;
+            /** Format: date-time */
+            expires_at: string;
+        };
+        MiLinkStep: {
+            /** @enum {string} */
+            state: "pending" | "linked" | "failed";
+            /**
+             * @description Present when state is failed
+             * @enum {string}
+             */
+            error?: "account_linked_elsewhere" | "different_account" | "xiaomi_refused" | "xiaomi_unavailable";
+        };
+        FoodItem: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            source: "custom" | "off" | "ai";
+            /** @description Open Food Facts barcode of a copied product */
+            off_code: string | null;
+            name: string;
+            brand: string;
+            /**
+             * @description What the nutrient fields refer to
+             * @enum {string}
+             */
+            per: "100g" | "100ml";
+            kcal: number;
+            protein_g: number;
+            fat_g: number;
+            carbs_g: number;
+            fiber_g: number | null;
+            sugar_g: number | null;
+            salt_g: number | null;
+            servings: components["schemas"]["FoodServing"][];
+            archived: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        FoodServing: {
+            label: string;
+            grams: number;
+        };
+        FoodItemInput: {
+            name?: string;
+            brand?: string;
+            /**
+             * @default 100g
+             * @enum {string}
+             */
+            per: "100g" | "100ml";
+            kcal?: number;
+            protein_g?: number;
+            fat_g?: number;
+            carbs_g?: number;
+            fiber_g?: number | null;
+            sugar_g?: number | null;
+            salt_g?: number | null;
+            servings?: components["schemas"]["FoodServing"][];
+            /** @description PATCH only */
+            archived?: boolean;
+        };
+        FoodItemResponse: {
+            data: components["schemas"]["FoodItem"];
+        };
+        FoodItemListResponse: {
+            data: components["schemas"]["FoodItem"][];
+            count: number;
+            total: number;
+        };
+        /** @description An Open Food Facts product mapped to the item shape; nutrients per 100 g or 100 ml. */
+        OffProduct: {
+            code: string;
+            name: string;
+            brand: string;
+            /** @enum {string} */
+            per: "100g" | "100ml";
+            kcal: number;
+            protein_g: number;
+            fat_g: number;
+            carbs_g: number;
+            fiber_g: number | null;
+            sugar_g: number | null;
+            salt_g: number | null;
+            serving_grams: number | null;
+            serving_label: string;
+        };
+        FoodEntry: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            date: string;
+            meal: components["schemas"]["FoodMeal"];
+            /** Format: uuid */
+            item_id: string | null;
+            name: string;
+            grams: number | null;
+            kcal: number;
+            protein_g: number;
+            fat_g: number;
+            carbs_g: number;
+            fiber_g: number | null;
+            sugar_g: number | null;
+            salt_g: number | null;
+            /** @description A quick entry or an estimate, not a product's numbers */
+            estimated: boolean;
+            note: string;
+            position: number;
+            /** Format: date-time */
+            logged_at: string;
+        };
+        /** @enum {string} */
+        FoodMeal: "breakfast" | "lunch" | "dinner" | "snack";
+        /** @description With item_id the numbers come from the item and grams; without, name and kcal are required and the entry is estimated. */
+        FoodEntryInput: {
+            /** Format: date */
+            date: string;
+            meal: components["schemas"]["FoodMeal"];
+            /** Format: uuid */
+            item_id?: string | null;
+            grams?: number | null;
+            name?: string;
+            kcal?: number;
+            protein_g?: number;
+            fat_g?: number;
+            carbs_g?: number;
+            fiber_g?: number | null;
+            sugar_g?: number | null;
+            salt_g?: number | null;
+            note?: string;
+        };
+        FoodEntryPatch: {
+            /** Format: date */
+            date?: string;
+            meal?: components["schemas"]["FoodMeal"];
+            /** @description Recomputes the numbers when the entry still has its item */
+            grams?: number;
+            note?: string;
+        };
+        FoodEntryResponse: {
+            data: components["schemas"]["FoodEntry"];
+        };
+        FoodTotals: {
+            kcal: number;
+            protein_g: number;
+            fat_g: number;
+            carbs_g: number;
+            fiber_g: number | null;
+            sugar_g: number | null;
+            salt_g: number | null;
+            entries: number;
+        };
+        /** @description The daily goals after the overrides; null until the profile is complete. */
+        FoodTargets: {
+            kcal: number;
+            protein_g: number;
+            fat_g: number;
+            carbs_g: number;
+        } | null;
+        FoodDay: {
+            /** Format: date */
+            date: string;
+            totals: components["schemas"]["FoodTotals"];
+            meals: {
+                breakfast: components["schemas"]["FoodEntry"][];
+                lunch: components["schemas"]["FoodEntry"][];
+                dinner: components["schemas"]["FoodEntry"][];
+                snack: components["schemas"]["FoodEntry"][];
+            };
+            /** @description Active kcal the band counted that day, when a Mi account is linked */
+            active_kcal: number | null;
+            targets: components["schemas"]["FoodTargets"];
+        };
+        FoodWeek: {
+            /** Format: date */
+            from: string;
+            days: {
+                /** Format: date */
+                date: string;
+                kcal: number;
+                protein_g: number;
+                fat_g: number;
+                carbs_g: number;
+                entries: number;
+            }[];
+            targets: components["schemas"]["FoodTargets"];
+        };
+        FoodGoalsProfile: {
+            height_cm?: number | null;
+            /** Format: date */
+            birth_date?: string | null;
+            /** @enum {string|null} */
+            sex?: "male" | "female" | null;
+            /**
+             * @default light
+             * @enum {string}
+             */
+            activity: "sedentary" | "light" | "moderate" | "active" | "very_active";
+            target_weight_kg?: number | null;
+            /** @description Positive loses weight, 0 maintains, negative gains */
+            pace_kg_per_week?: number;
+            /** @description Used only without a weigh-in from the Mi scale */
+            manual_weight_kg?: number | null;
+            /** @description Eating habits, handed to the LLM parse */
+            profile_note?: string;
+            kcal_override?: number | null;
+            protein_override_g?: number | null;
+            fat_override_g?: number | null;
+            carbs_override_g?: number | null;
+            /**
+             * Format: date-time
+             * @description Response only
+             */
+            updated_at?: string | null;
+        };
+        FoodGoals: {
+            profile: components["schemas"]["FoodGoalsProfile"];
+            weight: {
+                kg: number | null;
+                /** @enum {string} */
+                source: "scale" | "manual" | "none";
+            };
+            /** @description Profile fields still needed for the computed goal */
+            missing: string[];
+            /** @description Mifflin-St Jeor BMR, maintenance, the deficit from the pace, and the default macros. */
+            computed: {
+                age_years?: number;
+                bmr?: number;
+                maintenance?: number;
+                deficit?: number;
+                kcal?: number;
+                /** @description The goal was raised to the 1200 kcal floor */
+                floored?: boolean;
+                below_bmr?: boolean;
+                protein_g?: number;
+                fat_g?: number;
+                carbs_g?: number;
+            } | null;
+            targets: components["schemas"]["FoodTargets"];
+            /** @description Whether the text parse is set up on this server */
+            llm_available: boolean;
+        };
+        FoodGoalsResponse: {
+            data: components["schemas"]["FoodGoals"];
+        };
+        FoodParseJob: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            status: "queued" | "running" | "done" | "failed";
+            text: string;
+            meal: components["schemas"]["FoodMeal"];
+            /** Format: date */
+            date: string;
+            /** @description The parsed lines when done; confirm them with POST /api/v1/food/entries/batch */
+            result: components["schemas"]["FoodParseLine"][] | null;
+            /** @description code and message when failed; codes: not_configured, food_disabled, provider_refused, provider_error_<status>, provider_unavailable, invalid_answer, internal_error, queue_unavailable */
+            error: string | null;
+            model: string | null;
+            prompt_tokens: number | null;
+            completion_tokens: number | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            finished_at: string | null;
+        };
+        MoneyParseLine: {
+            /** @enum {string} */
+            type: "income" | "expense";
+            /** Format: date */
+            date: string;
+            time: string | null;
+            /**
+             * Format: uuid
+             * @description Null when the text named no account of the user
+             */
+            account_id: string | null;
+            amount: number;
+            merchant: string;
+            name: string;
+            /** Format: uuid */
+            category_id: string | null;
+            receipt_amount: number | null;
+            receipt_currency: string | null;
+            fx_note: string;
+            confidence: number;
+            note: string;
+        };
+        MoneyParseJob: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "text" | "receipt";
+            /** @enum {string} */
+            status: "queued" | "running" | "done" | "failed";
+            text: string;
+            /** Format: date */
+            hint_date: string;
+            result: components["schemas"]["MoneyParseLine"][] | null;
+            /** @description code and message when failed; codes: not_configured, money_disabled, provider_refused, provider_error_<status>, provider_unavailable, invalid_answer, internal_error, queue_unavailable */
+            error: string | null;
+            model: string | null;
+            prompt_tokens: number | null;
+            completion_tokens: number | null;
+            /** Format: date-time */
+            accepted_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            finished_at: string | null;
+        };
+        MoneyAdvisorReportSummary: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            period: "week" | "month" | "quarter";
+            /** Format: date */
+            period_start: string;
+            /** Format: date */
+            period_end: string;
+            /** @enum {string} */
+            status: "queued" | "running" | "done" | "failed";
+            error: string | null;
+            model: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            finished_at: string | null;
+        };
+        MoneyAdvisorReport: components["schemas"]["MoneyAdvisorReportSummary"] & {
+            /** @description The numbers the review was built on (the period report */
+            facts: Record<string, never> | null;
+            /** @description The review as markdown */
+            content: string | null;
+            prompt_tokens: number | null;
+            completion_tokens: number | null;
+        };
+        /** @enum {string} */
+        MoneyTransactionType: "income" | "expense" | "fx_adjustment";
+        MoneyCurrency: {
+            code: string;
+            name: string;
+            /** @enum {string|null} */
+            role: "primary" | "local" | null;
+            decimals: number;
+            archived: boolean;
+        };
+        MoneyCurrencyInput: {
+            code: string;
+            name?: string;
+            /** @enum {string|null} */
+            role?: "primary" | "local" | null;
+            /** @default 2 */
+            decimals: number;
+            /** @default false */
+            archived: boolean;
+        };
+        MoneyCurrencyPatch: {
+            name?: string;
+            /** @enum {string|null} */
+            role?: "primary" | "local" | null;
+            decimals?: number;
+            archived?: boolean;
+        };
+        MoneyAccount: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            bank: string;
+            /** @enum {string} */
+            kind: "card" | "cash" | "deposit" | "other";
+            currency: string;
+            last4: string;
+            opening_balance: number;
+            /** Format: date */
+            opening_date: string | null;
+            archived: boolean;
+            position: number;
+            /** @description Computed: opening + income − expense ± adjustments + transfers in − transfers out, posted rows only */
+            balance: number;
+            /** Format: date */
+            last_activity: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        MoneyAccountInput: {
+            name: string;
+            bank?: string;
+            /**
+             * @default card
+             * @enum {string}
+             */
+            kind: "card" | "cash" | "deposit" | "other";
+            /** @description One of the user's currencies */
+            currency: string;
+            last4?: string;
+            /** @default 0 */
+            opening_balance: number;
+            /** Format: date */
+            opening_date?: string | null;
+            /** @default 0 */
+            position: number;
+        };
+        MoneyAccountPatch: {
+            name?: string;
+            bank?: string;
+            /** @enum {string} */
+            kind?: "card" | "cash" | "deposit" | "other";
+            last4?: string;
+            opening_balance?: number;
+            /** Format: date */
+            opening_date?: string | null;
+            archived?: boolean;
+            position?: number;
+        };
+        MoneyCategory: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "expense" | "income";
+            /** @enum {string} */
+            flexibility: "fixed" | "variable";
+            budget_max: number | null;
+            budget_currency: string | null;
+            archived: boolean;
+            position: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        MoneyCategoryInput: {
+            name: string;
+            /**
+             * @default expense
+             * @enum {string}
+             */
+            kind: "expense" | "income";
+            /**
+             * @default variable
+             * @enum {string}
+             */
+            flexibility: "fixed" | "variable";
+            /** @description With budget_currency */
+            budget_max?: number | null;
+            budget_currency?: string | null;
+            /** @default 0 */
+            position: number;
+        };
+        MoneyCategoryPatch: {
+            name?: string;
+            /** @enum {string} */
+            kind?: "expense" | "income";
+            /** @enum {string} */
+            flexibility?: "fixed" | "variable";
+            budget_max?: number | null;
+            budget_currency?: string | null;
+            archived?: boolean;
+            position?: number;
+        };
+        MoneyAdjustment: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            date: string;
+            /** @description Plus when the bank took more */
+            amount: number;
+            note: string;
+        };
+        MoneyTransaction: {
+            /** Format: uuid */
+            id: string;
+            type: components["schemas"]["MoneyTransactionType"];
+            /** Format: date */
+            date: string;
+            /** @description HH:MM */
+            time: string | null;
+            /** Format: uuid */
+            account_id: string;
+            /** @description The account's currency */
+            currency: string;
+            /** @description In the account's currency; positive */
+            amount: number;
+            /** Format: uuid */
+            category_id: string | null;
+            merchant: string;
+            merchant_key: string;
+            name: string;
+            receipt_amount: number | null;
+            receipt_currency: string | null;
+            fx_note: string;
+            /** Format: uuid */
+            adjusts_id: string | null;
+            trip: string;
+            note: string;
+            /** @enum {string} */
+            source: "manual" | "text" | "receipt" | "api" | "import";
+            /** @enum {string} */
+            status: "posted" | "pending";
+            external_id: string | null;
+            /** @description amount plus its adjustments */
+            final_amount: number;
+            adjustments: components["schemas"]["MoneyAdjustment"][];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        MoneyInboxRow: components["schemas"]["MoneyTransaction"] & {
+            /** @description A posted row of the same account */
+            possible_duplicate: boolean;
+        };
+        /** @description An income or expense needs a category of its kind; an fx_adjustment needs adjusts_id on the same account and may be negative */
+        MoneyTransactionInput: {
+            type?: components["schemas"]["MoneyTransactionType"];
+            /** Format: date */
+            date: string;
+            time?: string | null;
+            /** Format: uuid */
+            account_id: string;
+            amount: number;
+            /** Format: uuid */
+            category_id?: string | null;
+            merchant?: string;
+            name: string;
+            receipt_amount?: number | null;
+            receipt_currency?: string | null;
+            fx_note?: string;
+            /** Format: uuid */
+            adjusts_id?: string | null;
+            trip?: string;
+            note?: string;
+            /**
+             * @default manual
+             * @enum {string}
+             */
+            source: "manual" | "text" | "receipt" | "api" | "import";
+            /**
+             * @default posted
+             * @enum {string}
+             */
+            status: "posted" | "pending";
+            external_id?: string | null;
+        };
+        /** @description type, adjusts_id, status and source do not change; an adjustment accepts amount and note only */
+        MoneyTransactionPatch: {
+            /** Format: date */
+            date?: string;
+            time?: string | null;
+            /** Format: uuid */
+            account_id?: string;
+            amount?: number;
+            /** Format: uuid */
+            category_id?: string;
+            merchant?: string;
+            name?: string;
+            receipt_amount?: number | null;
+            receipt_currency?: string | null;
+            fx_note?: string;
+            trip?: string;
+            note?: string;
+        };
+        MoneyTransfer: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            date: string;
+            /** Format: uuid */
+            from_account_id: string;
+            /** Format: uuid */
+            to_account_id: string;
+            from_currency: string;
+            to_currency: string;
+            amount_sent: number;
+            /** @description Null when both accounts share a currency */
+            amount_received: number | null;
+            /** @description In the source currency */
+            fee: number | null;
+            /** @description amount_sent / amount_received */
+            cost_rate: number | null;
+            name: string;
+            note: string;
+            external_id: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        MoneyTransferInput: {
+            /** Format: date */
+            date: string;
+            /** Format: uuid */
+            from_account_id: string;
+            /** Format: uuid */
+            to_account_id: string;
+            amount_sent: number;
+            /** @description Required across currencies */
+            amount_received?: number | null;
+            fee?: number | null;
+            name?: string;
+            note?: string;
+            external_id?: string | null;
+        };
+        MoneyTransferPatch: {
+            /** Format: date */
+            date?: string;
+            amount_sent?: number;
+            amount_received?: number | null;
+            fee?: number | null;
+            name?: string;
+            note?: string;
+        };
+        MoneyMerchant: {
+            merchant_key: string;
+            display_name: string;
+            /** Format: uuid */
+            category_id: string | null;
+            /** Format: uuid */
+            account_id: string | null;
+            times: number;
+            /** Format: date */
+            last_seen: string;
+        };
+        MoneyRate: {
+            quote: string;
+            /** @description Units of the quote per 1 USD */
+            per_usd: number;
             /**
              * Format: date
-             * @description A day of the period; defaults to today (UTC)
+             * @description The day the quote is from
              */
-            date?: string;
-          };
+            rate_date: string;
+            source: string;
         };
-      };
-      responses: {
-        /** @description Already there, not queued again */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyAdvisorReport'];
-              queued: boolean;
+        MoneyConversion: {
+            amount: number;
+            from: string;
+            to: string;
+            /** Format: date */
+            rate_date: string;
+            rates: {
+                [key: string]: components["schemas"]["MoneyRate"];
             };
-          };
         };
-        /** @description Queued */
-        202: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneyAdvisorReport'];
-              queued: boolean;
+        MoneyCategoryTotal: {
+            category_id: string;
+            spent: number;
+            /** @description Only when the budget is in this currency */
+            budget: number | null;
+            budget_share: number | null;
+        };
+        MoneyCurrencyBlock: {
+            currency: string;
+            income: number;
+            /** @description Expenses plus signed adjustments */
+            expense: number;
+            net: number;
+            fixed_expense: number;
+            fixed_share: number;
+            /** @description expense over the days elapsed */
+            avg_daily: number;
+            /** @description expense + avg_daily × days after today in the period */
+            projection: number;
+            prev_expense: number | null;
+            /** @description Median of the three periods before */
+            median3_expense: number | null;
+            categories: components["schemas"]["MoneyCategoryTotal"][];
+        };
+        MoneyRecurring: {
+            merchant_key: string;
+            currency: string;
+            amount: number;
+            times: number;
+            /** Format: date */
+            last_date: string;
+            /** Format: date */
+            next_expected: string;
+        };
+        /** @description Informational only; every number carries the rate's date */
+        MoneyAsIf: {
+            currency: string;
+            blocks: Record<string, never>[];
+            income: number;
+            expense: number;
+            net: number;
+            /** @description True when a currency had no rate on or before the day */
+            partial: boolean;
+            /** @description Currency blocks without a rate on or before the day */
+            unconverted: number;
+            rates: Record<string, never>;
+            source: string;
+        };
+        MoneyReport: {
+            period: {
+                /** @enum {string} */
+                kind: "week" | "month" | "quarter" | "custom";
+                /** Format: date */
+                from: string;
+                /** Format: date */
+                to: string;
             };
-          };
+            blocks: components["schemas"]["MoneyCurrencyBlock"][];
+            recurring: components["schemas"]["MoneyRecurring"][];
+            new_merchants: string[];
+            as_if?: components["schemas"]["MoneyAsIf"];
         };
-        /** @description Validation failed */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
+        MoneyBalanceGroup: {
+            currency: string;
+            total: number;
+            accounts: components["schemas"]["MoneyAccount"][];
         };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
+        MoneySettings: {
+            view_currency: string | null;
+            advisor_enabled: boolean;
+            /** @description 1 = Monday */
+            advisor_weekday: number;
+            advisor_currencies: string[];
+            advisor_note: string;
+            /** Format: date-time */
+            updated_at: string | null;
+            /** @description GET only; whether the parse is configured */
+            llm_available?: boolean;
         };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
+        MoneySettingsInput: {
+            view_currency?: string | null;
+            /** @default false */
+            advisor_enabled: boolean;
+            /** @default 1 */
+            advisor_weekday: number;
+            advisor_currencies?: string[];
+            advisor_note?: string;
         };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
+        FoodParseLine: {
+            name: string;
+            grams: number;
+            kcal: number;
+            protein_g: number;
+            fat_g: number;
+            carbs_g: number;
+            /**
+             * Format: uuid
+             * @description One of the user's own products when the model matched one
+             */
+            item_id: string | null;
+            estimated: boolean;
+            note: string;
         };
-        /** @description not_configured or queue_unavailable */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
     };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/money/settings': {
+    responses: never;
     parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** The view currency and the advisor settings */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description The settings */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneySettings'];
-            };
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    /** Replace the settings */
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['MoneySettingsInput'];
-        };
-      };
-      responses: {
-        /** @description The settings */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              data: components['schemas']['MoneySettings'];
-            };
-          };
-        };
-        /** @description Validation failed, or a rule of the model (code invariant) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description The principal is not a user account (no_user_account) */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Money module disabled */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-}
-export type webhooks = Record<string, never>;
-export interface components {
-  schemas: {
-    Error: {
-      error: string;
-      /** @description HTTP status code, duplicated into the body */
-      status: number;
-      message?: string;
-      code?: string;
-    };
-    ValidationError: {
-      /** @enum {string} */
-      error: 'validation_failed';
-      status: number;
-      errors: {
-        field: string;
-        code: string;
-        message: string;
-      }[];
-    };
-    Job: {
-      /** Format: uuid */
-      id: string;
-      type: string;
-      payload?: {
-        [key: string]: unknown;
-      };
-      /** @enum {string} */
-      status: 'pending' | 'processing' | 'completed' | 'failed' | 'dead';
-      result?: unknown;
-      error?: string;
-      worker_id?: string;
-      /** @description W3C trace id of the submitting request — deep-link into Jaeger */
-      trace_id?: string;
-      retry_count?: number;
-      max_retries?: number;
-      /**
-       * Format: int64
-       * @description Epoch seconds
-       */
-      created_at: number;
-      /**
-       * Format: int64
-       * @description Epoch seconds
-       */
-      updated_at?: number;
-    };
-    Role: {
-      id: number;
-      name: string;
-      /** @description Bitmask — Domain::Permission::k* */
-      permissions: number;
-      is_default: boolean;
-    };
-    User: {
-      /** Format: uuid */
-      id: string;
-      /** Format: email */
-      email: string;
-      first_name?: string | null;
-      last_name?: string | null;
-      full_name: string;
-      confirmed: boolean;
-      role_id: number;
-      role?: components['schemas']['Role'];
-      created_at: string;
-      updated_at: string;
-    };
-    UserListResponse: {
-      data: components['schemas']['User'][];
-      total: number;
-      limit: number;
-      offset: number;
-    };
-    JobListResponse: {
-      data: components['schemas']['Job'][];
-      total: number;
-      limit: number;
-      offset: number;
-    };
-    DlqListResponse: {
-      data: components['schemas']['Job'][];
-      /** @description Number of jobs returned (after type filter + limit) */
-      count: number;
-      /** @description Total DLQ depth (unfiltered) */
-      depth: number;
-    };
-    AuditEntry: {
-      /** Format: int64 */
-      id: number;
-      /** @description Acting principal subject (uuid) */
-      actor_id?: string | null;
-      /** @description Dotted verb, e.g. user.create */
-      action: string;
-      /** @description Affected entity kind, e.g. user / role */
-      target_type: string;
-      /** @description Affected entity id (uuid or int as text) */
-      target_id?: string | null;
-      /** @description Action-specific context */
-      details: {
-        [key: string]: unknown;
-      };
-      /** Format: date-time */
-      created_at: string;
-    };
-    AuditListResponse: {
-      data: components['schemas']['AuditEntry'][];
-      total: number;
-      limit: number;
-      offset: number;
-    };
-    JobCreate: {
-      type: string;
-      payload?: {
-        [key: string]: unknown;
-      };
-      max_retries?: number;
-    };
-    MeResponse: {
-      user: components['schemas']['User'];
-    };
-    UserDetailResponse: {
-      data: components['schemas']['User'];
-    };
-    InviteResponse: {
-      data: components['schemas']['User'];
-      message?: string;
-    };
-    RolesResponse: {
-      data: components['schemas']['Role'][];
-    };
-    RoleDetailResponse: {
-      data: components['schemas']['Role'];
-    };
-    MessageResponse: {
-      message?: string;
-    };
-    RegisterResponse: {
-      user: components['schemas']['User'];
-      message: string;
-    };
-    BillingPackage: {
-      /** Format: uuid */
-      id: string;
-      title: string;
-      /** Format: int64 */
-      amount_cents: number;
-      /** Format: int64 */
-      credits: number;
-      active: boolean;
-      sort: number;
-      created_at: string;
-      updated_at: string;
-    };
-    BillingPackageListResponse: {
-      data: components['schemas']['BillingPackage'][];
-      /**
-       * Format: int64
-       * @description billing.credits_per_unit — credits per 100 cents
-       */
-      credits_per_unit: number;
-      /**
-       * Format: int64
-       * @description Minimum accepted amount_cents for a custom top-up
-       */
-      min_amount_cents: number;
-      /**
-       * Format: int64
-       * @description Maximum accepted amount_cents for a custom top-up
-       */
-      max_amount_cents: number;
-    };
-    WalletEntry: {
-      /** Format: uuid */
-      id: string;
-      /** Format: uuid */
-      user_id: string;
-      /** Format: int64 */
-      delta_credits: number;
-      /** @enum {string} */
-      kind: 'topup' | 'spend' | 'adjustment' | 'refund';
-      reference: string;
-      note: string;
-      /** Format: uuid */
-      created_by?: string | null;
-      created_at: string;
-    };
-    PublicWalletEntry: {
-      /** Format: uuid */
-      id: string;
-      /** Format: uuid */
-      user_id: string;
-      /** Format: int64 */
-      delta_credits: number;
-      /** @enum {string} */
-      kind: 'topup' | 'spend' | 'adjustment' | 'refund';
-      reference: string;
-      note: string;
-      created_at: string;
-    };
-    WalletResponse: {
-      data: {
-        /** Format: int64 */
-        balance: number;
-        history: components['schemas']['PublicWalletEntry'][];
-      };
-      limit: number;
-      offset: number;
-    };
-    TopupResponse: {
-      data: {
-        /** @description PayPal order id — pass back to POST .../capture */
-        order_id: string;
         /**
-         * Format: uri
-         * @description Redirect the buyer here to approve the order on PayPal
+         * @description Opaque client-generated key. First request with this key + body hash
+         *     is executed and its response cached; subsequent requests replay it.
+         *     Conflicting body with the same key returns 422.
          */
-        approve_url: string;
-      };
-    };
-    CaptureResponse: {
-      data: {
-        /** @description false on an idempotent replay, or when PayPal has not yet COMPLETED the capture */
-        credited: boolean;
-        /**
-         * Format: int64
-         * @description Wallet balance AFTER this call (unchanged if not credited)
-         */
-        balance: number;
-        /** @description "captured" once this or an earlier call credited the wallet; otherwise PayPal's own capture status verbatim (e.g. "PENDING", "DECLINED") — PayPal answers 2xx for both, so this is how a caller tells a settled capture from one still in flight. */
-        status: string;
-        /** @description Present (true) only when PayPal's capture has not reached COMPLETED yet — the payment is left uncaptured for the webhook to resolve. */
-        pending?: boolean;
-      };
-    };
-    WebhookAckResponse: {
-      data: {
-        /** @description true if this event type drives real crediting/refund logic (whether or not it was a no-op replay); false for an ignored/unrecognized event type */
-        handled: boolean;
-      };
-    };
-    AdminPackageResponse: {
-      data: components['schemas']['BillingPackage'];
-    };
-    AdminPackageListResponse: {
-      data: components['schemas']['BillingPackage'][];
-    };
-    AdminPaymentListResponse: {
-      data: components['schemas']['Payment'][];
-      total: number;
-      limit: number;
-      offset: number;
-    };
-    Payment: {
-      /** Format: uuid */
-      id: string;
-      /** Format: uuid */
-      user_id: string;
-      provider: string;
-      provider_order_id: string;
-      provider_capture_id?: string | null;
-      /** Format: int64 */
-      amount_cents: number;
-      currency: string;
-      /** Format: int64 */
-      credits_expected: number;
-      /** Format: int64 */
-      rate_snapshot: number;
-      /** Format: uuid */
-      package_id?: string | null;
-      /** @enum {string} */
-      status: 'created' | 'approved' | 'captured' | 'failed' | 'refunded';
-      failure_reason?: string | null;
-      created_at: string;
-      updated_at: string;
-    };
-    BillingSettings: {
-      /**
-       * Format: int64
-       * @description Credits granted per 100 cents on a custom-amount top-up
-       */
-      credits_per_unit: number;
-      /** Format: int64 */
-      min_amount_cents: number;
-      /** Format: int64 */
-      max_amount_cents: number;
-      updated_at: string;
-    };
-    BillingSettingsResponse: {
-      data: components['schemas']['BillingSettings'];
-    };
-    AdjustResponse: {
-      data: {
-        /**
-         * Format: int64
-         * @description Wallet balance AFTER this adjustment
-         */
-        balance: number;
-        /** @description false only if this exact adjustment somehow no-op'd (not expected in normal use — adjust() has no idempotency key) */
-        credited: boolean;
-      };
-    };
-    BillingMetricsResponse: {
-      data: {
-        /** @enum {string} */
-        period: 'day' | 'week' | 'month';
-        /**
-         * Format: int64
-         * @description Sum of amount_cents over captured payments in-window
-         */
-        revenue_cents: number;
-        /**
-         * Format: int64
-         * @description Count of captured payments in-window
-         */
-        payments_count: number;
-        /**
-         * Format: int64
-         * @description revenue_cents / payments_count (integer division; 0 if payments_count is 0)
-         */
-        avg_payment_cents: number;
-        conversion: {
-          /**
-           * Format: int64
-           * @description Every payment (any status) created in-window
-           */
-          created: number;
-          /**
-           * Format: int64
-           * @description Of those
-           */
-          captured: number;
-          /**
-           * Format: double
-           * @description captured / created as a float ratio; 0 if created is 0
-           */
-          rate: number;
-        };
-        /**
-         * Format: int64
-         * @description Sum of billing_refunds.amount_cents in-window, outcome='applied' only
-         */
-        refunds_cents: number;
-        /**
-         * Format: int64
-         * @description Count of billing_refunds rows in-window, outcome='applied' only
-         */
-        refunds_count: number;
-        /**
-         * Format: int64
-         * @description SUM(wallet_balances.credits) — all-time liability, NOT windowed
-         */
-        outstanding_credits: number;
-        /**
-         * Format: int64
-         * @description outstanding_credits * 100 / credits_per_unit (integer math, current billing_settings rate)
-         */
-        outstanding_value_cents: number;
-        /** @description Calendar-bucketed (hourly for period=day, daily otherwise); every bucket in range is present, zero-filled if no captured payments landed in it */
-        series: {
-          /** @description ISO-8601 UTC bucket start */
-          bucket_start: string;
-          /** Format: int64 */
-          revenue_cents: number;
-          /** Format: int64 */
-          payments_count: number;
-        }[];
-        /** @description Top 5 packages by revenue among captured payments in-window */
-        top_packages: {
-          /** Format: uuid */
-          package_id: string;
-          title: string;
-          /** Format: int64 */
-          revenue_cents: number;
-          /** Format: int64 */
-          payments_count: number;
-        }[];
-        /** @description Top 5 users by top-up credits among captured payments in-window */
-        top_users: {
-          /** Format: uuid */
-          user_id: string;
-          /** Format: email */
-          email: string;
-          /** Format: int64 */
-          topup_credits: number;
-          /** Format: int64 */
-          revenue_cents: number;
-        }[];
-      };
-    };
-    DailyActivityListResponse: {
-      count: number;
-      /** @description Rows in the whole range, ignoring limit/offset */
-      total: number;
-      data: {
-        /** Format: date */
-        date?: string;
-        steps?: number;
-        distance_m?: number | null;
-        active_kcal?: number | null;
-        total_kcal?: number | null;
-        timezone?: string;
-      }[];
-    };
-    SleepListResponse: {
-      count: number;
-      /** @description Rows in the whole range, ignoring limit/offset */
-      total: number;
-      data: {
-        sleep_id?: string;
-        start_at?: string;
-        end_at?: string;
-        duration_minutes?: number;
-        time_asleep_minutes?: number;
-        time_awake_minutes?: number;
-        sleep_score?: number | null;
-        sleep_score_source?: string | null;
-        is_nap?: boolean;
-        timezone?: string;
-        stages?: Record<string, never>[];
-      }[];
-    };
-    HeartRateListResponse: {
-      count: number;
-      /** @description Rows in the whole range, ignoring limit/offset */
-      total: number;
-      data: {
-        timestamp?: string;
-        bpm?: number;
-        sample_type?: string;
-      }[];
-    };
-    StressListResponse: {
-      count: number;
-      /** @description Rows in the whole range, ignoring limit/offset */
-      total: number;
-      data: {
-        timestamp?: string;
-        stress_score?: number;
-        level?: string;
-      }[];
-    };
-    Spo2ListResponse: {
-      count: number;
-      /** @description Rows in the whole range, ignoring limit/offset */
-      total: number;
-      data: {
-        timestamp?: string;
-        spo2_pct?: number;
-      }[];
-    };
-    BodyListResponse: {
-      count: number;
-      /** @description Rows in the whole range, ignoring limit/offset */
-      total: number;
-      data: {
-        timestamp?: string;
-        weight_kg?: number;
-        bmi?: number | null;
-        body_fat_pct?: number | null;
-        muscle_mass_kg?: number | null;
-        water_pct?: number | null;
-        bone_mass_kg?: number | null;
-        visceral_fat_score?: number | null;
-        basal_metabolism_kcal?: number | null;
-        metabolic_age?: number | null;
-      }[];
-    };
-    WorkoutListResponse: {
-      count: number;
-      /** @description Rows in the whole range, ignoring limit/offset */
-      total: number;
-      data: {
-        workout_id?: string;
-        activity_type?: string;
-        start_at?: string;
-        end_at?: string;
-        duration_minutes?: number;
-        distance_m?: number | null;
-        calories_kcal?: number | null;
-        avg_heart_rate_bpm?: number | null;
-        max_heart_rate_bpm?: number | null;
-        avg_pace_sec_per_km?: number | null;
-        max_pace_sec_per_km?: number | null;
-        total_steps?: number | null;
-      }[];
-    };
-    SummaryListResponse: {
-      count: number;
-      /** @description Rows in the whole range, ignoring limit/offset */
-      total: number;
-      data: {
-        /** Format: date */
-        date?: string;
-        steps?: number;
-        distance_m?: number | null;
-        active_kcal?: number | null;
-        sleep_duration_minutes?: number | null;
-        sleep_score?: number | null;
-        resting_bpm?: number | null;
-      }[];
-    };
-    AbnormalListResponse: {
-      count: number;
-      total: number;
-      data: {
-        event_id?: string;
-        start_at?: string;
-        end_at?: string;
-        duration_seconds?: number | null;
-      }[];
-    };
-    CoverageResponse: {
-      data: {
-        [key: string]: {
-          /** Format: date */
-          first_date?: string | null;
-          /** Format: date */
-          last_date?: string | null;
-          records?: number;
-          last_sync_at?: string | null;
-        };
-      };
-    };
-    ExportResponse: {
-      schema_version: string;
-      source: string;
-      generated_at: string;
-      filters: {
-        dataset?: string | null;
-        /** Format: date */
-        start_date?: string;
-        /** Format: date */
-        end_date?: string;
-      };
-      records: {
-        [key: string]: Record<string, never>[];
-      };
-    };
-    Exercise: {
-      /** @description Library id (e.g. Barbell_Squat) or custom_<hex> for own exercises */
-      id: string;
-      /** @enum {string} */
-      source: 'library' | 'custom';
-      name: string;
-      category: string;
-      equipment?: string | null;
-      level?: string | null;
-      force?: string | null;
-      mechanic?: string | null;
-      primary_muscles: string[];
-      secondary_muscles: string[];
-      instructions: string[];
-      /** @description Paths under /exercise-media/ */
-      images: string[];
-      tracking_mode: components['schemas']['ExerciseTrackingMode'];
-      archived: boolean;
-    };
-    /**
-     * @description What a set of the exercise records.
-     * @enum {string}
-     */
-    ExerciseTrackingMode: 'weight_reps' | 'bodyweight_reps' | 'duration' | 'distance_duration';
-    ExerciseResponse: {
-      data: components['schemas']['Exercise'];
-    };
-    ExerciseListResponse: {
-      data: components['schemas']['Exercise'][];
-      count: number;
-      /** @description Rows matching the filters, ignoring limit/offset */
-      total: number;
-    };
-    ExerciseInput: {
-      name?: string;
-      category?: string;
-      equipment?: string;
-      primary_muscles?: string[];
-      secondary_muscles?: string[];
-      instructions?: string[];
-      tracking_mode?: components['schemas']['ExerciseTrackingMode'];
-      archived?: boolean;
-    };
-    RoutineSummary: {
-      /** Format: uuid */
-      id: string;
-      name: string;
-      /** @description 1 = Monday … 7 = Sunday */
-      weekday: number | null;
-      position: number;
-      note: string;
-      exercise_count: number;
-    };
-    RoutineExercise: {
-      /** Format: uuid */
-      id: string;
-      exercise_id: string;
-      position: number;
-      target_sets: number;
-      target_reps_min?: number | null;
-      target_reps_max?: number | null;
-      target_duration_seconds?: number | null;
-      rest_seconds: number;
-      note: string;
-      exercise_name: string;
-      tracking_mode: components['schemas']['ExerciseTrackingMode'];
-      images: string[];
-      primary_muscles: string[];
-    };
-    Routine: {
-      /** Format: uuid */
-      id: string;
-      name: string;
-      weekday: number | null;
-      position: number;
-      note: string;
-      exercises: components['schemas']['RoutineExercise'][];
-    };
-    RoutineResponse: {
-      data: components['schemas']['Routine'];
-    };
-    RoutineListResponse: {
-      data: components['schemas']['RoutineSummary'][];
-      count: number;
-      total: number;
-    };
-    RoutineInput: {
-      name: string;
-      weekday?: number | null;
-      note?: string;
-      exercises: {
-        exercise_id: string;
-        target_sets?: number | null;
-        target_reps_min?: number | null;
-        target_reps_max?: number | null;
-        target_duration_seconds?: number | null;
-        rest_seconds?: number | null;
-        note?: string;
-      }[];
-    };
-    WorkoutSet: {
-      /** Format: uuid */
-      id: string;
-      /**
-       * Format: uuid
-       * @description Present in the answer of PUT sets/{id}
-       */
-      session_exercise_id?: string;
-      position: number;
-      /** @enum {string} */
-      kind: 'work' | 'warmup';
-      /** @description Load; for a bodyweight exercise the extra load */
-      weight_kg: number | null;
-      reps: number | null;
-      duration_seconds: number | null;
-      distance_m: number | null;
-      rpe: number | null;
-      /** Format: date-time */
-      completed_at: string;
-    };
-    WorkoutPreviousSet: {
-      position: number;
-      /** @enum {string} */
-      kind: 'work' | 'warmup';
-      weight_kg: number | null;
-      reps: number | null;
-      duration_seconds: number | null;
-      distance_m: number | null;
-      rpe: number | null;
-    };
-    WorkoutSessionExercise: {
-      /** Format: uuid */
-      id: string;
-      exercise_id: string;
-      position: number;
-      target_sets?: number | null;
-      target_reps_min?: number | null;
-      target_reps_max?: number | null;
-      target_duration_seconds?: number | null;
-      rest_seconds: number;
-      note: string;
-      exercise_name: string;
-      tracking_mode: components['schemas']['ExerciseTrackingMode'];
-      images: string[];
-      primary_muscles: string[];
-      sets: components['schemas']['WorkoutSet'][];
-      /** @description Sets of the latest earlier finished session that logged this exercise */
-      previous_sets: components['schemas']['WorkoutPreviousSet'][];
-    };
-    /**
-     * @description Result of matching the session with Mi Fitness data: null before the session is finished, pending while the band has not synced past the session's end, matched with heart-rate samples or a band workout, no_data when newer samples exist and none fall inside the session.
-     * @enum {string|null}
-     */
-    WorkoutHealthStatus: 'pending' | 'matched' | 'no_data' | null;
-    WorkoutSession: {
-      /** Format: uuid */
-      id: string;
-      /** Format: uuid */
-      routine_id: string | null;
-      name: string;
-      /** Format: date-time */
-      started_at: string;
-      /** Format: date-time */
-      finished_at: string | null;
-      note: string;
-      /** @description Latest body weight when the session started */
-      bodyweight_kg: number | null;
-      health_status: components['schemas']['WorkoutHealthStatus'];
-      hr_avg: number | null;
-      hr_max: number | null;
-      hr_samples: number;
-      band_workout_id: string | null;
-      band_calories_kcal: number | null;
-      /** Format: date-time */
-      reconciled_at: string | null;
-      exercises: components['schemas']['WorkoutSessionExercise'][];
-    };
-    WorkoutSessionSummary: {
-      /** Format: uuid */
-      id: string;
-      name: string;
-      /** Format: uuid */
-      routine_id: string | null;
-      /** Format: date-time */
-      started_at: string;
-      /** Format: date-time */
-      finished_at: string;
-      health_status: components['schemas']['WorkoutHealthStatus'];
-      hr_avg: number | null;
-      hr_max: number | null;
-      band_calories_kcal: number | null;
-      exercise_count: number;
-      /** @description Work sets only */
-      set_count: number;
-      /** @description Reps times load over work sets; bodyweight exercises add the session's body weight */
-      volume_kg: number;
-    };
-    WorkoutSessionResponse: {
-      data: components['schemas']['WorkoutSession'];
-    };
-    WorkoutActiveSessionResponse: {
-      data: components['schemas']['WorkoutSession'] | null;
-    };
-    WorkoutSessionListResponse: {
-      data: components['schemas']['WorkoutSessionSummary'][];
-      count: number;
-      total: number;
-    };
-    WorkoutSessionPatch: {
-      name?: string;
-      note?: string;
-      /** Format: date-time */
-      started_at?: string;
-      /** Format: date-time */
-      finished_at?: string;
-      /** @description Finish now when the session has no finished_at yet */
-      finish?: boolean;
-    };
-    WorkoutSetInput: {
-      /** Format: uuid */
-      session_exercise_id: string;
-      position: number;
-      /**
-       * @default work
-       * @enum {string}
-       */
-      kind: 'work' | 'warmup';
-      weight_kg?: number | null;
-      reps?: number | null;
-      duration_seconds?: number | null;
-      distance_m?: number | null;
-      rpe?: number | null;
-      /**
-       * Format: date-time
-       * @description Defaults to now
-       */
-      completed_at?: string;
-    };
-    WorkoutSetResponse: {
-      data: components['schemas']['WorkoutSet'];
-    };
-    WorkoutHeartRateResponse: {
-      data: {
-        samples: {
-          /** Format: date-time */
-          timestamp: string;
-          bpm: number;
-        }[];
-        /**
-         * Format: date-time
-         * @description Newest heart-rate sample in the database, to tell "not synced yet" from "no data"
-         */
-        latest_sample_at: string | null;
-      };
-    };
-    WorkoutReadinessResponse: {
-      data: {
-        /** @description Longest non-nap sleep that ended in the last 18 hours */
-        sleep_minutes: number | null;
-        sleep_score: number | null;
-        sleep_minutes_avg_30d: number | null;
-        /** @description Latest resting sample of the last 24 hours */
-        resting_bpm: number | null;
-        resting_bpm_avg_30d: number | null;
-        /** @description Mean stress of the last 12 hours */
-        stress: number | null;
-        stress_avg_30d: number | null;
-        bodyweight_kg: number | null;
-      };
-    };
-    WorkoutReconcileResponse: {
-      data: {
-        /** @description Sessions written */
-        reconciled: number;
-      };
-    };
-    /** @description The caller's Mi account link. Only `status` is present when it is `none`. */
-    MiAccountStatus: {
-      /**
-       * @description reauth_required: Xiaomi refused the stored token, link again
-       * @enum {string}
-       */
-      status: 'none' | 'ok' | 'reauth_required';
-      /** @description Masked Xiaomi account id */
-      account?: string;
-      /** @enum {string} */
-      region?: 'ru' | 'cn' | 'de' | 'i2' | 'sg' | 'us';
-      /** @description false while no region returned data for the account */
-      region_detected?: boolean;
-      /** Format: date-time */
-      linked_at?: string;
-      /**
-       * Format: date-time
-       * @description Last login Xiaomi accepted
-       */
-      last_ok_at?: string | null;
-      last_error?: string | null;
-      last_sync?: {
-        id: number;
-        status: string;
-        /** Format: date-time */
-        finished_at: string;
-      } | null;
-    };
-    MiAccountStatusResponse: {
-      data: components['schemas']['MiAccountStatus'];
-    };
-    MiLinkStart: {
-      /** @description Id of the attempt, valid only for the user who started it */
-      link_id: string;
-      /** @description PNG of the QR code to scan in a Xiaomi app */
-      qr_png_base64: string;
-      /** @description Xiaomi page that confirms the sign-in, for a phone */
-      confirm_url: string;
-      expires_in_seconds: number;
-      /** Format: date-time */
-      expires_at: string;
-    };
-    MiLinkStep: {
-      /** @enum {string} */
-      state: 'pending' | 'linked' | 'failed';
-      /**
-       * @description Present when state is failed
-       * @enum {string}
-       */
-      error?:
-        | 'account_linked_elsewhere'
-        | 'different_account'
-        | 'xiaomi_refused'
-        | 'xiaomi_unavailable';
-    };
-    FoodItem: {
-      /** Format: uuid */
-      id: string;
-      /** @enum {string} */
-      source: 'custom' | 'off' | 'ai';
-      /** @description Open Food Facts barcode of a copied product */
-      off_code: string | null;
-      name: string;
-      brand: string;
-      /**
-       * @description What the nutrient fields refer to
-       * @enum {string}
-       */
-      per: '100g' | '100ml';
-      kcal: number;
-      protein_g: number;
-      fat_g: number;
-      carbs_g: number;
-      fiber_g: number | null;
-      sugar_g: number | null;
-      salt_g: number | null;
-      servings: components['schemas']['FoodServing'][];
-      archived: boolean;
-      /** Format: date-time */
-      created_at: string;
-      /** Format: date-time */
-      updated_at: string;
-    };
-    FoodServing: {
-      label: string;
-      grams: number;
-    };
-    FoodItemInput: {
-      name?: string;
-      brand?: string;
-      /**
-       * @default 100g
-       * @enum {string}
-       */
-      per: '100g' | '100ml';
-      kcal?: number;
-      protein_g?: number;
-      fat_g?: number;
-      carbs_g?: number;
-      fiber_g?: number | null;
-      sugar_g?: number | null;
-      salt_g?: number | null;
-      servings?: components['schemas']['FoodServing'][];
-      /** @description PATCH only */
-      archived?: boolean;
-    };
-    FoodItemResponse: {
-      data: components['schemas']['FoodItem'];
-    };
-    FoodItemListResponse: {
-      data: components['schemas']['FoodItem'][];
-      count: number;
-      total: number;
-    };
-    /** @description An Open Food Facts product mapped to the item shape; nutrients per 100 g or 100 ml. */
-    OffProduct: {
-      code: string;
-      name: string;
-      brand: string;
-      /** @enum {string} */
-      per: '100g' | '100ml';
-      kcal: number;
-      protein_g: number;
-      fat_g: number;
-      carbs_g: number;
-      fiber_g: number | null;
-      sugar_g: number | null;
-      salt_g: number | null;
-      serving_grams: number | null;
-      serving_label: string;
-    };
-    FoodEntry: {
-      /** Format: uuid */
-      id: string;
-      /** Format: date */
-      date: string;
-      meal: components['schemas']['FoodMeal'];
-      /** Format: uuid */
-      item_id: string | null;
-      name: string;
-      grams: number | null;
-      kcal: number;
-      protein_g: number;
-      fat_g: number;
-      carbs_g: number;
-      fiber_g: number | null;
-      sugar_g: number | null;
-      salt_g: number | null;
-      /** @description A quick entry or an estimate, not a product's numbers */
-      estimated: boolean;
-      note: string;
-      position: number;
-      /** Format: date-time */
-      logged_at: string;
-    };
-    /** @enum {string} */
-    FoodMeal: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-    /** @description With item_id the numbers come from the item and grams; without, name and kcal are required and the entry is estimated. */
-    FoodEntryInput: {
-      /** Format: date */
-      date: string;
-      meal: components['schemas']['FoodMeal'];
-      /** Format: uuid */
-      item_id?: string | null;
-      grams?: number | null;
-      name?: string;
-      kcal?: number;
-      protein_g?: number;
-      fat_g?: number;
-      carbs_g?: number;
-      fiber_g?: number | null;
-      sugar_g?: number | null;
-      salt_g?: number | null;
-      note?: string;
-    };
-    FoodEntryPatch: {
-      /** Format: date */
-      date?: string;
-      meal?: components['schemas']['FoodMeal'];
-      /** @description Recomputes the numbers when the entry still has its item */
-      grams?: number;
-      note?: string;
-    };
-    FoodEntryResponse: {
-      data: components['schemas']['FoodEntry'];
-    };
-    FoodTotals: {
-      kcal: number;
-      protein_g: number;
-      fat_g: number;
-      carbs_g: number;
-      fiber_g: number | null;
-      sugar_g: number | null;
-      salt_g: number | null;
-      entries: number;
-    };
-    /** @description The daily goals after the overrides; null until the profile is complete. */
-    FoodTargets: {
-      kcal: number;
-      protein_g: number;
-      fat_g: number;
-      carbs_g: number;
-    } | null;
-    FoodDay: {
-      /** Format: date */
-      date: string;
-      totals: components['schemas']['FoodTotals'];
-      meals: {
-        breakfast: components['schemas']['FoodEntry'][];
-        lunch: components['schemas']['FoodEntry'][];
-        dinner: components['schemas']['FoodEntry'][];
-        snack: components['schemas']['FoodEntry'][];
-      };
-      /** @description Active kcal the band counted that day, when a Mi account is linked */
-      active_kcal: number | null;
-      targets: components['schemas']['FoodTargets'];
-    };
-    FoodWeek: {
-      /** Format: date */
-      from: string;
-      days: {
-        /** Format: date */
-        date: string;
-        kcal: number;
-        protein_g: number;
-        fat_g: number;
-        carbs_g: number;
-        entries: number;
-      }[];
-      targets: components['schemas']['FoodTargets'];
-    };
-    FoodGoalsProfile: {
-      height_cm?: number | null;
-      /** Format: date */
-      birth_date?: string | null;
-      /** @enum {string|null} */
-      sex?: 'male' | 'female' | null;
-      /**
-       * @default light
-       * @enum {string}
-       */
-      activity: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
-      target_weight_kg?: number | null;
-      /** @description Positive loses weight, 0 maintains, negative gains */
-      pace_kg_per_week?: number;
-      /** @description Used only without a weigh-in from the Mi scale */
-      manual_weight_kg?: number | null;
-      /** @description Eating habits, handed to the LLM parse */
-      profile_note?: string;
-      kcal_override?: number | null;
-      protein_override_g?: number | null;
-      fat_override_g?: number | null;
-      carbs_override_g?: number | null;
-      /**
-       * Format: date-time
-       * @description Response only
-       */
-      updated_at?: string | null;
-    };
-    FoodGoals: {
-      profile: components['schemas']['FoodGoalsProfile'];
-      weight: {
-        kg: number | null;
-        /** @enum {string} */
-        source: 'scale' | 'manual' | 'none';
-      };
-      /** @description Profile fields still needed for the computed goal */
-      missing: string[];
-      /** @description Mifflin-St Jeor BMR, maintenance, the deficit from the pace, and the default macros. */
-      computed: {
-        age_years?: number;
-        bmr?: number;
-        maintenance?: number;
-        deficit?: number;
-        kcal?: number;
-        /** @description The goal was raised to the 1200 kcal floor */
-        floored?: boolean;
-        below_bmr?: boolean;
-        protein_g?: number;
-        fat_g?: number;
-        carbs_g?: number;
-      } | null;
-      targets: components['schemas']['FoodTargets'];
-      /** @description Whether the text parse is set up on this server */
-      llm_available: boolean;
-    };
-    FoodGoalsResponse: {
-      data: components['schemas']['FoodGoals'];
-    };
-    FoodParseJob: {
-      /** Format: uuid */
-      id: string;
-      /** @enum {string} */
-      status: 'queued' | 'running' | 'done' | 'failed';
-      text: string;
-      meal: components['schemas']['FoodMeal'];
-      /** Format: date */
-      date: string;
-      /** @description The parsed lines when done; confirm them with POST /api/v1/food/entries/batch */
-      result: components['schemas']['FoodParseLine'][] | null;
-      /** @description code and message when failed; codes: not_configured, food_disabled, provider_refused, provider_error_<status>, provider_unavailable, invalid_answer, internal_error, queue_unavailable */
-      error: string | null;
-      model: string | null;
-      prompt_tokens: number | null;
-      completion_tokens: number | null;
-      /** Format: date-time */
-      created_at: string;
-      /** Format: date-time */
-      finished_at: string | null;
-    };
-    MoneyParseLine: {
-      /** @enum {string} */
-      type: 'income' | 'expense';
-      /** Format: date */
-      date: string;
-      time: string | null;
-      /**
-       * Format: uuid
-       * @description Null when the text named no account of the user
-       */
-      account_id: string | null;
-      amount: number;
-      merchant: string;
-      name: string;
-      /** Format: uuid */
-      category_id: string | null;
-      receipt_amount: number | null;
-      receipt_currency: string | null;
-      fx_note: string;
-      confidence: number;
-      note: string;
-    };
-    MoneyParseJob: {
-      /** Format: uuid */
-      id: string;
-      /** @enum {string} */
-      kind: 'text' | 'receipt';
-      /** @enum {string} */
-      status: 'queued' | 'running' | 'done' | 'failed';
-      text: string;
-      /** Format: date */
-      hint_date: string;
-      result: components['schemas']['MoneyParseLine'][] | null;
-      /** @description code and message when failed; codes: not_configured, money_disabled, provider_refused, provider_error_<status>, provider_unavailable, invalid_answer, internal_error, queue_unavailable */
-      error: string | null;
-      model: string | null;
-      prompt_tokens: number | null;
-      completion_tokens: number | null;
-      /** Format: date-time */
-      accepted_at: string | null;
-      /** Format: date-time */
-      created_at: string;
-      /** Format: date-time */
-      finished_at: string | null;
-    };
-    MoneyAdvisorReportSummary: {
-      /** Format: uuid */
-      id: string;
-      /** @enum {string} */
-      period: 'week' | 'month' | 'quarter';
-      /** Format: date */
-      period_start: string;
-      /** Format: date */
-      period_end: string;
-      /** @enum {string} */
-      status: 'queued' | 'running' | 'done' | 'failed';
-      error: string | null;
-      model: string | null;
-      /** Format: date-time */
-      created_at: string;
-      /** Format: date-time */
-      finished_at: string | null;
-    };
-    MoneyAdvisorReport: components['schemas']['MoneyAdvisorReportSummary'] & {
-      /** @description The numbers the review was built on (the period report */
-      facts: Record<string, never> | null;
-      /** @description The review as markdown */
-      content: string | null;
-      prompt_tokens: number | null;
-      completion_tokens: number | null;
-    };
-    /** @enum {string} */
-    MoneyTransactionType: 'income' | 'expense' | 'fx_adjustment';
-    MoneyCurrency: {
-      code: string;
-      name: string;
-      /** @enum {string|null} */
-      role: 'primary' | 'local' | null;
-      decimals: number;
-      archived: boolean;
-    };
-    MoneyCurrencyInput: {
-      code: string;
-      name?: string;
-      /** @enum {string|null} */
-      role?: 'primary' | 'local' | null;
-      /** @default 2 */
-      decimals: number;
-      /** @default false */
-      archived: boolean;
-    };
-    MoneyCurrencyPatch: {
-      name?: string;
-      /** @enum {string|null} */
-      role?: 'primary' | 'local' | null;
-      decimals?: number;
-      archived?: boolean;
-    };
-    MoneyAccount: {
-      /** Format: uuid */
-      id: string;
-      name: string;
-      bank: string;
-      /** @enum {string} */
-      kind: 'card' | 'cash' | 'deposit' | 'other';
-      currency: string;
-      last4: string;
-      opening_balance: number;
-      /** Format: date */
-      opening_date: string | null;
-      archived: boolean;
-      position: number;
-      /** @description Computed: opening + income − expense ± adjustments + transfers in − transfers out, posted rows only */
-      balance: number;
-      /** Format: date */
-      last_activity: string | null;
-      /** Format: date-time */
-      created_at: string;
-      /** Format: date-time */
-      updated_at: string;
-    };
-    MoneyAccountInput: {
-      name: string;
-      bank?: string;
-      /**
-       * @default card
-       * @enum {string}
-       */
-      kind: 'card' | 'cash' | 'deposit' | 'other';
-      /** @description One of the user's currencies */
-      currency: string;
-      last4?: string;
-      /** @default 0 */
-      opening_balance: number;
-      /** Format: date */
-      opening_date?: string | null;
-      /** @default 0 */
-      position: number;
-    };
-    MoneyAccountPatch: {
-      name?: string;
-      bank?: string;
-      /** @enum {string} */
-      kind?: 'card' | 'cash' | 'deposit' | 'other';
-      last4?: string;
-      opening_balance?: number;
-      /** Format: date */
-      opening_date?: string | null;
-      archived?: boolean;
-      position?: number;
-    };
-    MoneyCategory: {
-      /** Format: uuid */
-      id: string;
-      name: string;
-      /** @enum {string} */
-      kind: 'expense' | 'income';
-      /** @enum {string} */
-      flexibility: 'fixed' | 'variable';
-      budget_max: number | null;
-      budget_currency: string | null;
-      archived: boolean;
-      position: number;
-      /** Format: date-time */
-      created_at: string;
-      /** Format: date-time */
-      updated_at: string;
-    };
-    MoneyCategoryInput: {
-      name: string;
-      /**
-       * @default expense
-       * @enum {string}
-       */
-      kind: 'expense' | 'income';
-      /**
-       * @default variable
-       * @enum {string}
-       */
-      flexibility: 'fixed' | 'variable';
-      /** @description With budget_currency */
-      budget_max?: number | null;
-      budget_currency?: string | null;
-      /** @default 0 */
-      position: number;
-    };
-    MoneyCategoryPatch: {
-      name?: string;
-      /** @enum {string} */
-      kind?: 'expense' | 'income';
-      /** @enum {string} */
-      flexibility?: 'fixed' | 'variable';
-      budget_max?: number | null;
-      budget_currency?: string | null;
-      archived?: boolean;
-      position?: number;
-    };
-    MoneyAdjustment: {
-      /** Format: uuid */
-      id: string;
-      /** Format: date */
-      date: string;
-      /** @description Plus when the bank took more */
-      amount: number;
-      note: string;
-    };
-    MoneyTransaction: {
-      /** Format: uuid */
-      id: string;
-      type: components['schemas']['MoneyTransactionType'];
-      /** Format: date */
-      date: string;
-      /** @description HH:MM */
-      time: string | null;
-      /** Format: uuid */
-      account_id: string;
-      /** @description The account's currency */
-      currency: string;
-      /** @description In the account's currency; positive */
-      amount: number;
-      /** Format: uuid */
-      category_id: string | null;
-      merchant: string;
-      merchant_key: string;
-      name: string;
-      receipt_amount: number | null;
-      receipt_currency: string | null;
-      fx_note: string;
-      /** Format: uuid */
-      adjusts_id: string | null;
-      trip: string;
-      note: string;
-      /** @enum {string} */
-      source: 'manual' | 'text' | 'receipt' | 'api' | 'import';
-      /** @enum {string} */
-      status: 'posted' | 'pending';
-      external_id: string | null;
-      /** @description amount plus its adjustments */
-      final_amount: number;
-      adjustments: components['schemas']['MoneyAdjustment'][];
-      /** Format: date-time */
-      created_at: string;
-      /** Format: date-time */
-      updated_at: string;
-    };
-    MoneyInboxRow: components['schemas']['MoneyTransaction'] & {
-      /** @description A posted row of the same account */
-      possible_duplicate: boolean;
-    };
-    /** @description An income or expense needs a category of its kind; an fx_adjustment needs adjusts_id on the same account and may be negative */
-    MoneyTransactionInput: {
-      type?: components['schemas']['MoneyTransactionType'];
-      /** Format: date */
-      date: string;
-      time?: string | null;
-      /** Format: uuid */
-      account_id: string;
-      amount: number;
-      /** Format: uuid */
-      category_id?: string | null;
-      merchant?: string;
-      name: string;
-      receipt_amount?: number | null;
-      receipt_currency?: string | null;
-      fx_note?: string;
-      /** Format: uuid */
-      adjusts_id?: string | null;
-      trip?: string;
-      note?: string;
-      /**
-       * @default manual
-       * @enum {string}
-       */
-      source: 'manual' | 'text' | 'receipt' | 'api' | 'import';
-      /**
-       * @default posted
-       * @enum {string}
-       */
-      status: 'posted' | 'pending';
-      external_id?: string | null;
-    };
-    /** @description type, adjusts_id, status and source do not change; an adjustment accepts amount and note only */
-    MoneyTransactionPatch: {
-      /** Format: date */
-      date?: string;
-      time?: string | null;
-      /** Format: uuid */
-      account_id?: string;
-      amount?: number;
-      /** Format: uuid */
-      category_id?: string;
-      merchant?: string;
-      name?: string;
-      receipt_amount?: number | null;
-      receipt_currency?: string | null;
-      fx_note?: string;
-      trip?: string;
-      note?: string;
-    };
-    MoneyTransfer: {
-      /** Format: uuid */
-      id: string;
-      /** Format: date */
-      date: string;
-      /** Format: uuid */
-      from_account_id: string;
-      /** Format: uuid */
-      to_account_id: string;
-      from_currency: string;
-      to_currency: string;
-      amount_sent: number;
-      /** @description Null when both accounts share a currency */
-      amount_received: number | null;
-      /** @description In the source currency */
-      fee: number | null;
-      /** @description amount_sent / amount_received */
-      cost_rate: number | null;
-      name: string;
-      note: string;
-      external_id: string | null;
-      /** Format: date-time */
-      created_at: string;
-      /** Format: date-time */
-      updated_at: string;
-    };
-    MoneyTransferInput: {
-      /** Format: date */
-      date: string;
-      /** Format: uuid */
-      from_account_id: string;
-      /** Format: uuid */
-      to_account_id: string;
-      amount_sent: number;
-      /** @description Required across currencies */
-      amount_received?: number | null;
-      fee?: number | null;
-      name?: string;
-      note?: string;
-      external_id?: string | null;
-    };
-    MoneyTransferPatch: {
-      /** Format: date */
-      date?: string;
-      amount_sent?: number;
-      amount_received?: number | null;
-      fee?: number | null;
-      name?: string;
-      note?: string;
-    };
-    MoneyMerchant: {
-      merchant_key: string;
-      display_name: string;
-      /** Format: uuid */
-      category_id: string | null;
-      /** Format: uuid */
-      account_id: string | null;
-      times: number;
-      /** Format: date */
-      last_seen: string;
-    };
-    MoneyRate: {
-      quote: string;
-      /** @description Units of the quote per 1 USD */
-      per_usd: number;
-      /**
-       * Format: date
-       * @description The day the quote is from
-       */
-      rate_date: string;
-      source: string;
-    };
-    MoneyConversion: {
-      amount: number;
-      from: string;
-      to: string;
-      /** Format: date */
-      rate_date: string;
-      rates: {
-        [key: string]: components['schemas']['MoneyRate'];
-      };
-    };
-    MoneyCategoryTotal: {
-      category_id: string;
-      spent: number;
-      /** @description Only when the budget is in this currency */
-      budget: number | null;
-      budget_share: number | null;
-    };
-    MoneyCurrencyBlock: {
-      currency: string;
-      income: number;
-      /** @description Expenses plus signed adjustments */
-      expense: number;
-      net: number;
-      fixed_expense: number;
-      fixed_share: number;
-      /** @description expense over the days elapsed */
-      avg_daily: number;
-      /** @description expense + avg_daily × days after today in the period */
-      projection: number;
-      prev_expense: number | null;
-      /** @description Median of the three periods before */
-      median3_expense: number | null;
-      categories: components['schemas']['MoneyCategoryTotal'][];
-    };
-    MoneyRecurring: {
-      merchant_key: string;
-      currency: string;
-      amount: number;
-      times: number;
-      /** Format: date */
-      last_date: string;
-      /** Format: date */
-      next_expected: string;
-    };
-    /** @description Informational only; every number carries the rate's date */
-    MoneyAsIf: {
-      currency: string;
-      blocks: Record<string, never>[];
-      income: number;
-      expense: number;
-      net: number;
-      /** @description True when a currency had no rate on or before the day */
-      partial: boolean;
-      /** @description Currency blocks without a rate on or before the day */
-      unconverted: number;
-      rates: Record<string, never>;
-      source: string;
-    };
-    MoneyReport: {
-      period: {
-        /** @enum {string} */
-        kind: 'week' | 'month' | 'quarter' | 'custom';
-        /** Format: date */
-        from: string;
-        /** Format: date */
-        to: string;
-      };
-      blocks: components['schemas']['MoneyCurrencyBlock'][];
-      recurring: components['schemas']['MoneyRecurring'][];
-      new_merchants: string[];
-      as_if?: components['schemas']['MoneyAsIf'];
-    };
-    MoneyBalanceGroup: {
-      currency: string;
-      total: number;
-      accounts: components['schemas']['MoneyAccount'][];
-    };
-    MoneySettings: {
-      view_currency: string | null;
-      advisor_enabled: boolean;
-      /** @description 1 = Monday */
-      advisor_weekday: number;
-      advisor_currencies: string[];
-      advisor_note: string;
-      /** Format: date-time */
-      updated_at: string | null;
-      /** @description GET only; whether the parse is configured */
-      llm_available?: boolean;
-    };
-    MoneySettingsInput: {
-      view_currency?: string | null;
-      /** @default false */
-      advisor_enabled: boolean;
-      /** @default 1 */
-      advisor_weekday: number;
-      advisor_currencies?: string[];
-      advisor_note?: string;
-    };
-    FoodParseLine: {
-      name: string;
-      grams: number;
-      kcal: number;
-      protein_g: number;
-      fat_g: number;
-      carbs_g: number;
-      /**
-       * Format: uuid
-       * @description One of the user's own products when the model matched one
-       */
-      item_id: string | null;
-      estimated: boolean;
-      note: string;
-    };
-  };
-  responses: never;
-  parameters: {
-    /**
-     * @description Opaque client-generated key. First request with this key + body hash
-     *     is executed and its response cached; subsequent requests replay it.
-     *     Conflicting body with the same key returns 422.
-     */
-    IdempotencyKey: string;
-    /** @description W3C Trace Context header. */
-    Traceparent: string;
-  };
-  requestBodies: never;
-  headers: never;
-  pathItems: never;
+        IdempotencyKey: string;
+        /** @description W3C Trace Context header. */
+        Traceparent: string;
+    };
+    requestBodies: never;
+    headers: never;
+    pathItems: never;
 }
 export type $defs = Record<string, never>;
 export type operations = Record<string, never>;
