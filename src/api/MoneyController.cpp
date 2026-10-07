@@ -999,14 +999,14 @@ void MoneyController::convert(const HttpRequestPtr& req, Callback&& callback) {
 
 void MoneyController::refreshRates(const HttpRequestPtr& req, Callback&& callback) {
     MONEY_GUARD(req, callback, owner);
-    // No body: today's rates. {from, to}: one job per day of the range that has none yet.
+    // No body or {}: today's rates. {from, to}: one job per day of the range that has none yet.
     std::optional<std::string> from;
     std::string to = today_utc();
-    if (!req->body().empty()) {
-        json body;
-        if (!parse_object(req, body, callback)) {
-            return;
-        }
+    json body = json::object();
+    if (!req->body().empty() && !parse_object(req, body, callback)) {
+        return;
+    }
+    if (!body.empty()) {
         Validation::Errors errs;
         Validation::require_string(errs, body, "from");
         date_field(errs, body, "from");

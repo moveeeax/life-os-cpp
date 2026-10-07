@@ -7,7 +7,7 @@
 --    unique per owner, so a second run of the import updates instead of
 --    duplicating (transactions and transfers have had external_id since 025).
 -- 2. A crypto wallet holds amounts with more than four decimals (0.0057635
---    BTC): the transfer amounts widen to eight decimals and a currency may
+--    BTC): every money amount widens to eight decimals and a currency may
 --    show up to eight. The rate column widens too, a BTC quote per US dollar
 --    being about 0.00001.
 
@@ -19,6 +19,10 @@ ALTER TABLE money_categories ADD COLUMN IF NOT EXISTS external_id text CHECK (le
 CREATE UNIQUE INDEX IF NOT EXISTS money_categories_owner_external
     ON money_categories (owner_id, external_id) WHERE external_id IS NOT NULL;
 
+ALTER TABLE money_transactions ALTER COLUMN amount TYPE numeric(24,8);
+ALTER TABLE money_transactions ALTER COLUMN receipt_amount TYPE numeric(24,8);
+ALTER TABLE money_accounts ALTER COLUMN opening_balance TYPE numeric(24,8);
+ALTER TABLE money_categories ALTER COLUMN budget_max TYPE numeric(24,8);
 ALTER TABLE money_transfers ALTER COLUMN amount_sent TYPE numeric(24,8);
 ALTER TABLE money_transfers ALTER COLUMN amount_received TYPE numeric(24,8);
 ALTER TABLE money_transfers ALTER COLUMN fee TYPE numeric(24,8);
