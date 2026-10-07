@@ -1,0 +1,58 @@
+# LLM settings of the money module (the money_parse worker job, the advisor
+# later). Non-secret values only: the API key lives in the Secret
+# life-os-money-llm (MONEY_LLM_API_KEY), created by hand and never committed.
+#
+# The worker speaks the OpenAI-compatible chat completions API: any provider
+# with that API fits by changing MONEY_LLM_BASE_URL and MONEY_LLM_MODEL.
+# The prompt is the one in docs/money/prompt-parse.example.md.
+#
+# Apply: kubectl apply -f deploy/money-llm-configmap.yaml
+# Both the API (presence check) and the worker (the jobs) mount it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: life-os-money-llm
+  namespace: life-os
+data:
+  MONEY_LLM_BASE_URL: "https://api.openai.com/v1"
+  # The model of the food module; it reads receipt photos too (checked from
+  # the worker pod on 2026-10-07), so MONEY_LLM_MODEL_VISION stays unset.
+  MONEY_LLM_MODEL: "gpt-6-luna"
+  MONEY_LLM_TIMEOUT_SECONDS: "90"
+  MONEY_LLM_MAX_TOKENS: "2500"
+  MONEY_LLM_PROMPT_PARSE: |
+    You turn a bank notification, an SMS, a list of purchases or a receipt photo
+    into ledger lines. Answer with JSON only, no prose, no markdown:
+
+    {"lines": [{"type": "expense", "date": "YYYY-MM-DD", "time": "HH:MM",
+                "account_id": null, "amount": 0, "merchant": "", "name": "",
+                "category_id": null, "receipt_amount": null,
+                "receipt_currency": null, "fx_note": "", "confidence": 0.9,
+                "note": ""}]}
+
+    Rules:
+    1. One line per charge or income. A receipt is one line: its total, not
+       its items; list the items briefly in "note".
+    2. "accounts" in the request are the person's accounts with the last four
+       digits of the card and the currency. Set "account_id" only when the text
+       names those digits or the account unmistakably. Otherwise null: never
+       guess an account.
+    3. "amount" is positive and in the account's currency: the money that left
+       or entered the account. When the text shows another currency on the
+       receipt (a THB purchase charged in KZT), put the receipt's own total and
+       code in "receipt_amount" / "receipt_currency" and the chain in "fx_note"
+       ("THB -> KZT"). Never convert amounts yourself.
+    4. A receipt photo without a charged amount: "amount" is the receipt's total,
+       "receipt_amount"/"receipt_currency" null, "account_id" from the card digits
+       on the receipt or null.
+    5. "type" is "income" only for money coming in (salary, a refund, a
+       transfer received); everything else is "expense".
+    6. "category_id" from "categories" (match the kind to the type). Prefer the
+       category "merchants" remembers for that merchant. Unsure: null.
+    7. "merchant" is the shop or payee as written; "name" is a short English
+       description as a ledger would show it: what was bought, details in
+       brackets, no amounts ("Groceries (store, THB)", "Apple Music (Family)").
+    8. "date" from the text; a text without one takes "hint_date". "time" when
+       the text has it, else null.
+    9. "confidence" 0..1 for the whole line; "note" for anything uncertain.
+    10. Never invent charges that are not in the text or the photo. At most 100 lines.

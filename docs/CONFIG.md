@@ -252,6 +252,13 @@ outage can never affect the money path.
 | `FOOD_ENABLED` | `food.enabled` | bool | `false` | Master switch for the food module (`Core::food_enabled()`): products, the diary, goals, Open Food Facts search, the LLM parse job. Routes stay registered, handlers 404 while off. Needs no fitness permission; the weight for the goals and the active kcal of a day come from the user's Mi account when one is linked. |
 | `MONEY_ENABLED` | `money.enabled` | bool | `false` | Master switch for the money module (`Core::money_enabled()`): currencies, accounts, the ledger, transfers, categories with budgets, merchant memory, reports per currency, daily rates (`money_rates` job). Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
 | `MONEY_RATES_SCHEDULE_HOURS` | `money.rates_schedule_hours` | int | `0` | Period in hours of the `money_rates` job that stores the day's quotes against the US dollar (runs in the API pod, enqueues the job). `0` (default) disables the schedule. |
+| `MONEY_LLM_BASE_URL` | `money.llm.base_url` | string | `""` | Base URL of an OpenAI-compatible chat completions API for the `money_parse` job (and the advisor later). With any of base URL, key, model or the parse prompt empty the parse is `not_configured`. Prod: ConfigMap `life-os-money-llm` |
+| `MONEY_LLM_API_KEY` | `money.llm.api_key` | string | `""` | Bearer key of that API. Prod: Secret `life-os-money-llm` |
+| `MONEY_LLM_MODEL` | `money.llm.model` | string | `""` | Model of the money jobs |
+| `MONEY_LLM_MODEL_VISION` | `money.llm.model_vision` | string | `""` | Model for receipt photos; empty uses `MONEY_LLM_MODEL` |
+| `MONEY_LLM_PROMPT_PARSE` | `money.llm.prompt_parse` | string | `""` | System prompt of the parse job; example in `docs/money/prompt-parse.example.md` |
+| `MONEY_LLM_TIMEOUT_SECONDS` | `money.llm.timeout_seconds` | int | `60` | Provider timeout per call (at least 5) |
+| `MONEY_LLM_MAX_TOKENS` | `money.llm.max_tokens` | int | `2500` | Token cap of an answer (at least 100) |
 | `FOOD_LLM_BASE_URL` | `food.llm.base_url` | string | `""` | Base URL of an OpenAI-compatible chat completions API for the `food_parse` job, e.g. `https://api.openai.com/v1`. The worker calls `{base_url}/chat/completions`. With any of the four `FOOD_LLM_*` settings below empty the parse is `not_configured` and the add form hides it. Prod: ConfigMap `life-os-food-llm` |
 | `FOOD_LLM_API_KEY` | `food.llm.api_key` | string | `""` | Bearer token of the provider. Prod: Secret `life-os-food-llm`. Never log or commit |
 | `FOOD_LLM_MODEL` | `food.llm.model` | string | `""` | Model name as the provider expects it |

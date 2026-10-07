@@ -228,7 +228,16 @@
   },
   "money": {
     "enabled": "${MONEY_ENABLED:-false}",
-    "rates_schedule_hours": "${MONEY_RATES_SCHEDULE_HOURS:-0}"
+    "rates_schedule_hours": "${MONEY_RATES_SCHEDULE_HOURS:-0}",
+    "llm": {
+      "base_url": "${MONEY_LLM_BASE_URL:-}",
+      "api_key": "${MONEY_LLM_API_KEY:-}",
+      "model": "${MONEY_LLM_MODEL:-}",
+      "model_vision": "${MONEY_LLM_MODEL_VISION:-}",
+      "prompt_parse": "${MONEY_LLM_PROMPT_PARSE:-}",
+      "timeout_seconds": "${MONEY_LLM_TIMEOUT_SECONDS:-60}",
+      "max_tokens": "${MONEY_LLM_MAX_TOKENS:-2500}"
+    }
   },
   "worker": {
     "id": "worker-1",

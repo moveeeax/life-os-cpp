@@ -35,3 +35,11 @@ triple food.llm.model FOOD_LLM_MODEL
 triple food.llm.prompt FOOD_LLM_PROMPT
 triple food.llm.timeout_seconds FOOD_LLM_TIMEOUT_SECONDS
 triple food.llm.max_tokens FOOD_LLM_MAX_TOKENS
+
+# The same prefix reader for the money module (money/Llm.hpp).
+triple money.llm.base_url MONEY_LLM_BASE_URL
+triple money.llm.api_key MONEY_LLM_API_KEY
+triple money.llm.model MONEY_LLM_MODEL
+triple money.llm.prompt_parse MONEY_LLM_PROMPT_PARSE
+triple money.llm.timeout_seconds MONEY_LLM_TIMEOUT_SECONDS
+triple money.llm.max_tokens MONEY_LLM_MAX_TOKENS
