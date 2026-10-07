@@ -14,6 +14,12 @@ export * from './types';
 // ── formats ────────────────────────────────────────────────────────────────
 
 /** Decimals of a currency from the user's list (2 when unknown). */
+/** "0.01 · kopeck", "1 · yen", "0.00000001 · satoshi": the smallest amount and its name. */
+export function smallestUnit(c: Pick<Currency, 'decimals' | 'minor_unit'>): string {
+  const step = c.decimals === 0 ? '1' : `0.${'0'.repeat(c.decimals - 1)}1`;
+  return c.minor_unit ? `${step} · ${c.minor_unit}` : step;
+}
+
 export const decimalsOf = (currencies: Currency[] | undefined, code: string): number =>
   currencies?.find((c) => c.code === code)?.decimals ?? 2;
 

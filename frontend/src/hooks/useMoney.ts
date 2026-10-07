@@ -16,6 +16,8 @@ import type {
   CategoryInput,
   CategoryPatch,
   Currency,
+  CurrencyInput,
+  CurrencyPatch,
   InboxRow,
   Merchant,
   ParseJob,
@@ -50,7 +52,12 @@ const list = <T>(key: readonly unknown[], path: string, query?: Record<string, u
       (await api.getJson<{ data: T[] }>(`${BASE}${path}`, { query, signal })).data,
   }) as const;
 
-export const useCurrencies = () => useQuery(list<Currency>(qk.money.currencies(), '/currencies'));
+export const useCurrencies = (archived = false) =>
+  useQuery(
+    list<Currency>(qk.money.currencies(archived), '/currencies', {
+      archived: archived ? 'true' : undefined,
+    }),
+  );
 export const useAccounts = (archived = false) =>
   useQuery(
     list<Account>(qk.money.accounts(archived), '/accounts', {
@@ -265,6 +272,26 @@ export function useDeleteTransfer(onSuccess?: () => void) {
     invalidate: ALL,
     onSuccess,
   });
+}
+
+/** A new code goes through POST (upsert); an existing one through PATCH. */
+export function useSaveCurrency(code: string | null, onSuccess?: () => void) {
+  return useApiMutation(
+    async (body: CurrencyInput | CurrencyPatch) =>
+      code
+        ? (await api.patchJson<{ data: Currency }>(`${BASE}/currencies/${code}`, { body })).data
+        : (await api.postJson<{ data: Currency }>(`${BASE}/currencies`, { body })).data,
+    { invalidate: ALL, onSuccess },
+  );
+}
+
+/** Where a merchant's next rows are suggested; past rows keep their category. */
+export function useMoveMerchant(onSuccess?: () => void) {
+  return useApiMutation(
+    async (body: { merchant_key: string; category_id: string | null }) =>
+      (await api.patchJson<{ data: Merchant }>(`${BASE}/merchants`, { body })).data,
+    { invalidate: ALL, onSuccess },
+  );
 }
 
 export function useSaveAccount(id: string | null, onSuccess?: () => void) {

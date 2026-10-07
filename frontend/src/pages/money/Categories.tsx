@@ -9,6 +9,7 @@ import {
   useCurrencies,
   useDeleteCategory,
   useMerchantMemory,
+  useMoveMerchant,
   useReport,
   useSaveCategory,
 } from '@/hooks/useMoney';
@@ -35,6 +36,65 @@ import {
 } from '../workout/styles';
 import { LoadError, MoneyFrame, Placeholder } from './frame';
 
+/** Picks where a merchant's next rows are suggested; past rows keep their category. */
+function MerchantMove({
+  merchant,
+  from,
+  onDone,
+}: {
+  merchant: Merchant;
+  from: Category;
+  onDone: () => void;
+}) {
+  const targets = (useCategories().data ?? []).filter((c) => c.id !== from.id);
+  const [to, setTo] = useState('');
+  const move = useMoveMerchant(onDone);
+  return (
+    <div className="mt-3 rounded-lg border border-gray-200 p-3 dark:border-white/10">
+      <label htmlFor="merchant-move" className={labelClass}>
+        Move {merchant.display_name} to
+      </label>
+      <div className="flex flex-wrap gap-2">
+        <select
+          id="merchant-move"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          className={cn(inputClass, 'flex-1')}
+        >
+          <option value="">Choose a category</option>
+          {targets.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name} ({c.kind})
+            </option>
+          ))}
+          <option value="none">No category</option>
+        </select>
+        <button
+          type="button"
+          disabled={to === '' || move.isPending}
+          onClick={() =>
+            move.mutate({
+              merchant_key: merchant.merchant_key,
+              category_id: to === 'none' ? null : to,
+            })
+          }
+          className={secondaryButton}
+        >
+          {move.isPending ? 'Moving…' : 'Move'}
+        </button>
+      </div>
+      <p className="mt-1.5 text-theme-xs text-gray-500">
+        New rows of this merchant will be suggested there. Rows already posted keep {from.name}.
+      </p>
+      {move.error && (
+        <p role="alert" className="mt-1.5 text-theme-sm text-error-500">
+          {move.error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function CategoryForm({
   category,
   merchants,
@@ -54,6 +114,7 @@ function CategoryForm({
   const [budgetCurrency, setBudgetCurrency] = useState(category?.budget_currency ?? 'KZT');
   const [confirm, setConfirm] = useState(false);
   const [outcome, setOutcome] = useState<string | null>(null);
+  const [moving, setMoving] = useState<Merchant | null>(null);
   const save = useSaveCategory(category?.id ?? null, onClose);
   const remove = useDeleteCategory((o) =>
     setOutcome(
@@ -180,15 +241,27 @@ function CategoryForm({
             ) : (
               <ul className="flex flex-wrap gap-1.5">
                 {merchants.map((m) => (
-                  <li
-                    key={m.merchant_key}
-                    className="rounded-full bg-gray-100 px-2.5 py-1 text-theme-xs text-gray-700 dark:bg-white/5 dark:text-gray-300"
-                  >
-                    {m.display_name}
-                    <span className="ms-1 text-gray-500 tabular-nums">{m.times}×</span>
+                  <li key={m.merchant_key}>
+                    <button
+                      type="button"
+                      onClick={() => setMoving(moving?.merchant_key === m.merchant_key ? null : m)}
+                      aria-pressed={moving?.merchant_key === m.merchant_key}
+                      className={cn(
+                        'rounded-full px-2.5 py-1 text-theme-xs',
+                        moving?.merchant_key === m.merchant_key
+                          ? 'bg-brand-500 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-white/5 dark:text-gray-300',
+                      )}
+                    >
+                      {m.display_name}
+                      <span className="ms-1 tabular-nums opacity-70">{m.times}×</span>
+                    </button>
                   </li>
                 ))}
               </ul>
+            )}
+            {moving && (
+              <MerchantMove merchant={moving} from={category} onDone={() => setMoving(null)} />
             )}
             <Link
               to={`/money?category=${category.id}`}
