@@ -89,6 +89,14 @@ export const qk = {
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['money-enabled'] as const,
   },
+  tasks: {
+    all: () => ['tasks'] as const,
+    agenda: (date: string, tz: string) => ['tasks', 'agenda', date, tz] as const,
+    notes: (status: string) => ['tasks', 'notes', status] as const,
+    status: () => ['tasks', 'status'] as const,
+    /** Whether the module answers at all (it is 404 while switched off). */
+    enabled: () => ['tasks-enabled'] as const,
+  },
   admin: {
     users: (page?: number) =>
       page === undefined ? (['admin', 'users'] as const) : (['admin', 'users', page] as const),
