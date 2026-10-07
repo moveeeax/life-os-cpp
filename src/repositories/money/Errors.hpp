@@ -28,6 +28,11 @@ struct Duplicate : ConflictError {
     Duplicate() : ConflictError("duplicate", "a row with this external_id already exists") {}
 };
 
+struct AlreadyAccepted : ConflictError {
+    AlreadyAccepted()
+        : ConflictError("already_accepted", "the parse is not finished or its lines were accepted already") {}
+};
+
 struct InvalidDate : ValidationError {
     InvalidDate() : ValidationError("invalid_date", "not a valid date") {}
 };

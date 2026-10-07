@@ -3989,6 +3989,189 @@
      }
     }
    },
+   "MoneyParseLine": {
+    "type": "object",
+    "required": [
+     "type",
+     "date",
+     "time",
+     "account_id",
+     "amount",
+     "merchant",
+     "name",
+     "category_id",
+     "receipt_amount",
+     "receipt_currency",
+     "fx_note",
+     "confidence",
+     "note"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "enum": [
+       "income",
+       "expense"
+      ]
+     },
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "time": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "account_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "Null when the text named no account of the user"
+     },
+     "amount": {
+      "type": "number"
+     },
+     "merchant": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "category_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid"
+     },
+     "receipt_amount": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "receipt_currency": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "fx_note": {
+      "type": "string"
+     },
+     "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+     },
+     "note": {
+      "type": "string"
+     }
+    }
+   },
+   "MoneyParseJob": {
+    "type": "object",
+    "required": [
+     "id",
+     "kind",
+     "status",
+     "text",
+     "hint_date",
+     "result",
+     "error",
+     "model",
+     "prompt_tokens",
+     "completion_tokens",
+     "accepted_at",
+     "created_at",
+     "finished_at"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "text",
+       "receipt"
+      ]
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "queued",
+       "running",
+       "done",
+       "failed"
+      ]
+     },
+     "text": {
+      "type": "string"
+     },
+     "hint_date": {
+      "type": "string",
+      "format": "date"
+     },
+     "result": {
+      "type": [
+       "array",
+       "null"
+      ],
+      "items": {
+       "$ref": "#/components/schemas/MoneyParseLine"
+      }
+     },
+     "error": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "code and message when failed; codes: not_configured, money_disabled, provider_refused, provider_error_<status>, provider_unavailable, invalid_answer, internal_error, queue_unavailable"
+     },
+     "model": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "prompt_tokens": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "completion_tokens": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "accepted_at": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "finished_at": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time"
+     }
+    }
+   },
    "MoneyTransactionType": {
     "type": "string",
     "enum": [
@@ -5379,6 +5562,10 @@
        "null"
       ],
       "format": "date-time"
+     },
+     "llm_available": {
+      "type": "boolean",
+      "description": "GET only; whether the parse is configured"
      }
     }
    },
@@ -15401,6 +15588,480 @@
     }
    }
   },
+  "/api/v1/money/parse": {
+   "post": {
+    "summary": "Send a bank mail, an SMS or a list of purchases to the LLM parse job",
+    "tags": [
+     "money"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "text"
+        ],
+        "properties": {
+         "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+         },
+         "hint_date": {
+          "type": "string",
+          "format": "date",
+          "description": "The date of a line without one; defaults to today (UTC)"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Queued",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "id",
+            "status"
+           ],
+           "properties": {
+            "id": {
+             "type": "string",
+             "format": "uuid"
+            },
+            "status": {
+             "type": "string",
+             "enum": [
+              "queued"
+             ]
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Money module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Three parses of this user are still open (too_many_parses)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "not_configured, storage_unavailable or queue_unavailable",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/money/parse/receipt": {
+   "post": {
+    "summary": "Send a receipt photo (a jpeg, png or webp data URL, at most 4 MB decoded) to the LLM parse job",
+    "tags": [
+     "money"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "image"
+        ],
+        "properties": {
+         "image": {
+          "type": "string",
+          "description": "data:image/jpeg;base64,..."
+         },
+         "hint_date": {
+          "type": "string",
+          "format": "date"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Queued",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "id",
+            "status"
+           ],
+           "properties": {
+            "id": {
+             "type": "string",
+             "format": "uuid"
+            },
+            "status": {
+             "type": "string",
+             "enum": [
+              "queued"
+             ]
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Money module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Three parses of this user are still open (too_many_parses)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "not_configured, storage_unavailable or queue_unavailable",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/money/parse/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "get": {
+    "summary": "A parse job and its proposed lines (never the photo)",
+    "tags": [
+     "money"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The job",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MoneyParseJob"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "id is not a UUID",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Money module disabled, or the job is not the caller's",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/money/parse/{id}/accept": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "post": {
+    "summary": "The edited lines of a finished parse into the inbox as pending rows (once)",
+    "tags": [
+     "money"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "lines"
+        ],
+        "properties": {
+         "lines": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+           "$ref": "#/components/schemas/MoneyTransactionInput"
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "The pending rows",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data",
+          "count"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/MoneyTransaction"
+           }
+          },
+          "count": {
+           "type": "integer"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed (each line needs an account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Money module disabled, or the job is not the caller's",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "The job is not finished or its lines were accepted already (already_accepted)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/money/settings": {
    "get": {
     "summary": "The view currency and the advisor settings",
@@ -15549,7 +16210,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 234631,
-  "source_fnv1a64": "15075fed4df57baf"
+  "source_bytes": 243685,
+  "source_fnv1a64": "4b1270d9fe705ad0"
  }
 }

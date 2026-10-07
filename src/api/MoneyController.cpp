@@ -29,7 +29,9 @@
 #include "api/Validation.hpp"
 #include "core/Modules.hpp"
 #include "jobs/Jobs.hpp"
+#include "jobs/MoneyParseHandler.hpp"
 #include "jobs/MoneyRatesHandler.hpp"
+#include "money/Llm.hpp"
 #include "money/Period.hpp"
 #include "money/Rates.hpp"
 #include "money/Reports.hpp"
@@ -39,6 +41,7 @@
 #include "repositories/money/Errors.hpp"
 #include "repositories/money/FxRateRepository.hpp"
 #include "repositories/money/MerchantRepository.hpp"
+#include "repositories/money/ParseJobRepository.hpp"
 #include "repositories/money/SettingsRepository.hpp"
 #include "repositories/money/TransactionRepository.hpp"
 #include "repositories/money/TransferRepository.hpp"
@@ -65,6 +68,9 @@ constexpr std::size_t kBatchMax = 100;
 constexpr double kAmountMax = 1e12;
 constexpr std::size_t kNameMax = 200;
 constexpr std::size_t kNoteMax = 2000;
+constexpr std::size_t kParseTextMax = 8000;
+constexpr long kParseOpenMax = 3;
+constexpr std::size_t kImageMaxBytes = 4 * 1024 * 1024;
 
 const std::vector<std::string> kTypes = {"income", "expense", "fx_adjustment"};
 const std::vector<std::string> kKinds = {"expense", "income"};
@@ -1208,12 +1214,232 @@ void MoneyController::balances(const HttpRequestPtr& req, Callback&& callback) {
     });
 }
 
+// ── parse ───────────────────────────────────────────────────────────────────
+
+namespace {
+
+/// "data:image/<type>;base64,<payload>" -> {type, payload}; nullopt with a reason.
+struct DataUrl {
+    std::string type;
+    std::string payload;
+};
+
+std::optional<DataUrl> data_url(const std::string& url, std::string& problem) {
+    static const std::vector<std::string> kTypes = {"image/jpeg", "image/png", "image/webp"};
+    const std::string prefix = "data:";
+    const auto comma = url.find(',');
+    if (url.rfind(prefix, 0) != 0 || comma == std::string::npos) {
+        problem = "expected a data URL: data:image/jpeg;base64,...";
+        return std::nullopt;
+    }
+    const std::string meta = url.substr(prefix.size(), comma - prefix.size());
+    const auto semi = meta.find(";base64");
+    if (semi == std::string::npos || semi + 7 != meta.size()) {
+        problem = "the data URL must be base64";
+        return std::nullopt;
+    }
+    DataUrl out{meta.substr(0, semi), url.substr(comma + 1)};
+    if (std::find(kTypes.begin(), kTypes.end(), out.type) == kTypes.end()) {
+        problem = "the image must be jpeg, png or webp";
+        return std::nullopt;
+    }
+    if (out.payload.empty() || out.payload.size() % 4 != 0) {
+        problem = "the base64 payload is broken";
+        return std::nullopt;
+    }
+    std::size_t padding = 0;
+    for (std::size_t i = 0; i < out.payload.size(); ++i) {
+        const char c = out.payload[i];
+        const bool alnum = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+        if (c == '=') {
+            if (i + 2 < out.payload.size()) {
+                problem = "the base64 payload is broken";
+                return std::nullopt;
+            }
+            ++padding;
+        } else if (!alnum && c != '+' && c != '/') {
+            problem = "the base64 payload is broken";
+            return std::nullopt;
+        } else if (padding > 0) {
+            problem = "the base64 payload is broken";
+            return std::nullopt;
+        }
+    }
+    if (out.payload.size() / 4 * 3 - padding > kImageMaxBytes) {
+        problem = "the image is larger than 4 MB";
+        return std::nullopt;
+    }
+    return out;
+}
+
+/// The shared tail of both parse routes: the cap, the row, the job.
+template <typename Create>
+void start_parse(const std::string& owner, MoneyController::Callback& callback, Create&& create) {
+    if (!Money::Llm::parse_settings().has_value()) {
+        callback(ErrorResponse::service_unavailable("not_configured", "the money parse is not set up on this server"));
+        return;
+    }
+    Repo::ParseJobRepository repo;
+    std::string id;
+    try {
+        if (repo.open_count(owner) >= kParseOpenMax) {
+            callback(ErrorResponse::make({k429TooManyRequests,
+                                          "too_many_parses",
+                                          "wait for your running parses to finish",
+                                          json{{"retry_after_sec", 30}}}));
+            return;
+        }
+        id = create(repo)["id"].template get<std::string>();
+    } catch (const std::exception& e) {
+        spdlog::warn("money parse create failed: {}", e.what());
+        callback(ErrorResponse::service_unavailable("storage_unavailable"));
+        return;
+    }
+    try {
+        if (!Jobs::is_initialized()) {
+            throw std::runtime_error("the job queue is not initialized");
+        }
+        Jobs::get().submit(
+            Jobs::MoneyParse::kJobType,
+            json{{"job_id", id}, {"owner_id", owner}, {"max_attempts", Jobs::get().default_max_retries()}});
+    } catch (const std::exception& e) {
+        spdlog::warn("money parse enqueue unavailable: {}", e.what());
+        try {
+            repo.fail(id, "queue_unavailable", "the job queue did not take the job");
+        } catch (const std::exception& inner) {
+            spdlog::warn("money parse {}: could not mark failed: {}", id, inner.what());
+        }
+        callback(ErrorResponse::service_unavailable("queue_unavailable"));
+        return;
+    }
+    auto resp = Response::ok(json{{"data", {{"id", id}, {"status", "queued"}}}});
+    resp->setStatusCode(k202Accepted);
+    callback(resp);
+}
+
+}  // namespace
+
+void MoneyController::parseText(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    Validation::require_string(errs, body, "text");
+    text_length(errs, body, "text", 1, kParseTextMax);
+    date_field(errs, body, "hint_date");
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    const std::string text = body["text"].get<std::string>();
+    const std::string hint = Validation::opt_string(body, "hint_date").value_or(today_utc());
+    start_parse(owner, callback, [&](Repo::ParseJobRepository& repo) { return repo.create_text(owner, text, hint); });
+}
+
+void MoneyController::parseReceipt(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    Validation::require_string(errs, body, "image");
+    date_field(errs, body, "hint_date");
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    std::string problem;
+    const auto image = data_url(body["image"].get<std::string>(), problem);
+    if (!image) {
+        errs.add("image", "invalid", problem);
+        callback(Validation::response_400(errs));
+        return;
+    }
+    const std::string hint = Validation::opt_string(body, "hint_date").value_or(today_utc());
+    start_parse(owner, callback, [&](Repo::ParseJobRepository& repo) {
+        return repo.create_receipt(owner, image->payload, image->type, hint);
+    });
+}
+
+void MoneyController::parseStatus(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MONEY_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "money.parseStatus", [&] {
+        const auto row = Repo::ParseJobRepository().get(owner, id);
+        if (!row) {
+            callback(ErrorResponse::not_found("money_parse"));
+            return;
+        }
+        callback(Response::ok(json{{"data", *row}}));
+    });
+}
+
+void MoneyController::parseAccept(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MONEY_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    if (!body.contains("lines") || !body["lines"].is_array() || body["lines"].empty() || body["lines"].size() > 100) {
+        callback(ErrorResponse::bad_request("invalid_lines", "lines must hold 1..100 rows"));
+        return;
+    }
+    std::optional<json> job;
+    if (!with_repo_errors(
+            callback, "money.parseAccept.load", [&] { job = Repo::ParseJobRepository().get(owner, id); })) {
+        return;
+    }
+    if (!job) {
+        callback(ErrorResponse::not_found("money_parse"));
+        return;
+    }
+    Validation::Errors errs;
+    std::vector<Repo::TransactionRepository::Input> inputs;
+    for (std::size_t i = 0; i < body["lines"].size(); ++i) {
+        json line = body["lines"][i];
+        if (line.is_object()) {
+            // The inbox holds what a parse proposed; the user posts each row.
+            line.erase("status");
+            line.erase("source");
+            line.erase("adjusts_id");
+            if (line.contains("type") && line["type"] == "fx_adjustment") {
+                errs.add("lines[" + std::to_string(i) + "].type", "invalid", "a parse proposes incomes and expenses");
+                continue;
+            }
+        }
+        Repo::TransactionRepository::Input in;
+        if (transaction_input(line, "lines[" + std::to_string(i) + "].", errs, in)) {
+            in.status = "pending";
+            in.source = (*job)["kind"] == "receipt" ? "receipt" : "text";
+            inputs.push_back(in);
+        }
+    }
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    with_repo_errors(callback, "money.parseAccept", [&] {
+        const json rows = Repo::TransactionRepository().accept_parse(owner, id, inputs);
+        callback(Response::created(json{{"data", rows}, {"count", rows.size()}}));
+    });
+}
+
 // ── settings ────────────────────────────────────────────────────────────────
 
 void MoneyController::getSettings(const HttpRequestPtr& req, Callback&& callback) {
     MONEY_GUARD(req, callback, owner);
     with_repo_errors(callback, "money.getSettings", [&] {
-        callback(Response::ok(json{{"data", Repo::SettingsRepository().load(owner)}}));
+        json data = Repo::SettingsRepository().load(owner);
+        data["llm_available"] = Money::Llm::parse_settings().has_value();
+        callback(Response::ok(json{{"data", data}}));
     });
 }
 
