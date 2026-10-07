@@ -655,7 +655,11 @@ TEST_F(MoneyParseApiTest, BadImagesAreRefusedBeforeAnythingIsQueued) {
     EXPECT_EQ(call_json(&Api::MoneyController::parseText, user(kAnna), json{{"text", "x"}, {"hint_date", "2026-02-30"}})
                   ->statusCode(),
               k400BadRequest);
-    EXPECT_FALSE(Jobs::get().pick({"money_parse"}, 1).has_value()) << "nothing was queued";
+    // Nothing was created, so nothing was queued (an empty queue is not picked from:
+    // the test Redis answers a blocking pop on an empty list with a socket timeout).
+    const long rows = Database::get().execute_read(
+        [](auto& txn) { return txn.exec("SELECT count(*) FROM money_parse_jobs")[0][0].template as<long>(); });
+    EXPECT_EQ(rows, 0);
 }
 
 TEST_F(MoneyParseApiTest, AcceptPutsTheEditedLinesInTheInboxOnce) {
@@ -701,7 +705,9 @@ TEST_F(MoneyParseApiTest, AFewOpenParsesPerUser) {
               k429TooManyRequests);
     EXPECT_EQ(call_json(&Api::MoneyController::parseText, user(kBoris), json{{"text", "x"}})->statusCode(),
               k202Accepted);
-    while (auto job = Jobs::get().pick({"money_parse"}, 1)) {
+    for (int i = 0; i < 4; ++i) {  // exactly what was queued: three of Anna's, one of Boris's
+        auto job = Jobs::get().pick({"money_parse"}, 1);
+        ASSERT_TRUE(job.has_value());
         Jobs::get().complete(job->id, json::object());
     }
 }
