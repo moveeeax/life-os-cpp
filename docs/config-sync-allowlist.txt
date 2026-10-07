@@ -44,3 +44,11 @@ triple money.llm.prompt_parse MONEY_LLM_PROMPT_PARSE
 triple money.llm.timeout_seconds MONEY_LLM_TIMEOUT_SECONDS
 triple money.llm.max_tokens MONEY_LLM_MAX_TOKENS
 triple money.llm.prompt_advisor MONEY_LLM_PROMPT_ADVISOR
+
+# The same prefix reader for the tasks module (tasks/Llm.hpp).
+triple tasks.llm.base_url TASKS_LLM_BASE_URL
+triple tasks.llm.api_key TASKS_LLM_API_KEY
+triple tasks.llm.model TASKS_LLM_MODEL
+triple tasks.llm.prompt_parse TASKS_LLM_PROMPT_PARSE
+triple tasks.llm.timeout_seconds TASKS_LLM_TIMEOUT_SECONDS
+triple tasks.llm.max_tokens TASKS_LLM_MAX_TOKENS

@@ -27,6 +27,10 @@ extraEnvFrom:
   - secretRef:
       name: life-os-money-llm
       optional: true
+  # The prompt of the tasks parse; the provider and key are the money module's.
+  - configMapRef:
+      name: life-os-tasks-llm
+      optional: true
 
 externalDatabase:
   host: postgresql-rw.db.svc.cluster.local
@@ -67,6 +71,9 @@ food:
 
 # The money_rates and money_parse jobs.
 money:
+  enabled: true
+
+tasks:
   enabled: true
 
 mail:

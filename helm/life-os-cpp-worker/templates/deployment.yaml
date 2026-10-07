@@ -142,6 +142,9 @@ spec:
             # money module
             - name: MONEY_ENABLED
               value: {{ .Values.money.enabled | quote }}
+            # tasks module — master switch
+            - name: TASKS_ENABLED
+              value: {{ .Values.tasks.enabled | quote }}
             # Worker
             - name: WORKER_ID
               value: {{ .Values.worker.id | quote }}

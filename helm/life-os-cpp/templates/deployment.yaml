@@ -215,6 +215,9 @@ spec:
             # money module — master switch
             - name: MONEY_ENABLED
               value: {{ .Values.money.enabled | quote }}
+            # tasks module — master switch
+            - name: TASKS_ENABLED
+              value: {{ .Values.tasks.enabled | quote }}
             {{- if .Values.billing.enabled }}
             - name: PAYPAL_ENV
               value: {{ .Values.billing.paypal.environment | quote }}
