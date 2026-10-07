@@ -13,6 +13,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/money/CurrencyRepository.hpp"
 #include "repositories/money/Errors.hpp"
 
 namespace Repositories::Money {
@@ -60,6 +61,7 @@ public:
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
+                    CurrencyRepository::check_scale_in(txn, owner, in.currency, in.opening_balance, "opening_balance");
                     auto r = txn.exec_params(
                         "INSERT INTO money_accounts (owner_id, name, bank, kind, currency, last4, opening_balance, "
                         " opening_date, position) VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8::date, $9) RETURNING "
@@ -84,6 +86,12 @@ public:
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
+                    if (p.opening_balance.has_value()) {
+                        if (const auto code = currency_in(txn, owner, id); code.has_value()) {
+                            CurrencyRepository::check_scale_in(
+                                txn, owner, *code, *p.opening_balance, "opening_balance");
+                        }
+                    }
                     auto r = txn.exec_params(
                         "UPDATE money_accounts SET name = COALESCE($3, name), bank = COALESCE($4, bank), "
                         " kind = COALESCE($5, kind), last4 = COALESCE($6, last4), "

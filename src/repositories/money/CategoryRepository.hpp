@@ -13,6 +13,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/money/CurrencyRepository.hpp"
 #include "repositories/money/Errors.hpp"
 
 namespace Repositories::Money {
@@ -59,6 +60,10 @@ public:
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
+                    if (in.budget_max.has_value() && in.budget_currency.has_value()) {
+                        CurrencyRepository::check_scale_in(
+                            txn, owner, *in.budget_currency, *in.budget_max, "budget_max");
+                    }
                     auto r = txn.exec_params(
                         "INSERT INTO money_categories (owner_id, name, kind, flexibility, budget_max, budget_currency, "
                         " position) VALUES ($1::uuid, $2, $3, $4, $5, $6, $7) RETURNING id::text",
@@ -94,6 +99,11 @@ public:
                         }
                     }
                     const bool budget_given = p.budget_max.has_value() || p.budget_currency.has_value();
+                    if (p.budget_max.has_value() && *p.budget_max && p.budget_currency.has_value() &&
+                        *p.budget_currency) {
+                        CurrencyRepository::check_scale_in(
+                            txn, owner, **p.budget_currency, **p.budget_max, "budget_max");
+                    }
                     auto r = txn.exec_params(
                         "UPDATE money_categories SET name = COALESCE($3, name), kind = COALESCE($4, kind), "
                         " flexibility = COALESCE($5, flexibility), "

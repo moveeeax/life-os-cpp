@@ -4301,6 +4301,7 @@
      "name",
      "role",
      "decimals",
+     "minor_unit",
      "archived"
     ],
     "properties": {
@@ -4325,7 +4326,12 @@
      "decimals": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 8
+      "maximum": 8,
+      "description": "Decimals of the smallest unit; every amount in this currency is a whole number of it"
+     },
+     "minor_unit": {
+      "type": "string",
+      "description": "The smallest unit: kopeck for RUB, satoshi for BTC, dong for VND"
      },
      "archived": {
       "type": "boolean"
@@ -4334,6 +4340,7 @@
    },
    "MoneyCurrencyInput": {
     "type": "object",
+    "description": "A code in the built-in table (ISO 4217 minor units plus BTC) takes decimals and minor_unit from it; decimals that differ answer 400. Any other code must give decimals and may name its minor_unit.",
     "required": [
      "code"
     ],
@@ -4360,8 +4367,11 @@
      "decimals": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 8,
-      "default": 2
+      "maximum": 8
+     },
+     "minor_unit": {
+      "type": "string",
+      "maxLength": 30
      },
      "archived": {
       "type": "boolean",
@@ -4371,6 +4381,7 @@
    },
    "MoneyCurrencyPatch": {
     "type": "object",
+    "description": "The decimals and minor_unit of a code in the built-in table do not change.",
     "properties": {
      "name": {
       "type": "string",
@@ -4391,6 +4402,10 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 8
+     },
+     "minor_unit": {
+      "type": "string",
+      "maxLength": 30
      },
      "archived": {
       "type": "boolean"
@@ -16684,7 +16699,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 250294,
-  "source_fnv1a64": "f4a2c5f56966cc43"
+  "source_bytes": 250943,
+  "source_fnv1a64": "500be4709925be03"
  }
 }

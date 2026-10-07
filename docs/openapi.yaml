@@ -1433,28 +1433,35 @@ components:
       enum: [income, expense, fx_adjustment]
     MoneyCurrency:
       type: object
-      required: [code, name, role, decimals, archived]
+      required: [code, name, role, decimals, minor_unit, archived]
       properties:
         code: { type: string, pattern: '^[A-Z]{3}$' }
         name: { type: string }
         role: { type: [string, 'null'], enum: [primary, local, null] }
-        decimals: { type: integer, minimum: 0, maximum: 8 }
+        decimals: { type: integer, minimum: 0, maximum: 8, description: Decimals of the smallest unit; every amount in this currency is a whole number of it }
+        minor_unit: { type: string, description: 'The smallest unit: kopeck for RUB, satoshi for BTC, dong for VND' }
         archived: { type: boolean }
     MoneyCurrencyInput:
       type: object
+      description: >-
+        A code in the built-in table (ISO 4217 minor units plus BTC) takes decimals and minor_unit from it;
+        decimals that differ answer 400. Any other code must give decimals and may name its minor_unit.
       required: [code]
       properties:
         code: { type: string, pattern: '^[A-Z]{3}$' }
         name: { type: string, maxLength: 60 }
         role: { type: [string, 'null'], enum: [primary, local, null] }
-        decimals: { type: integer, minimum: 0, maximum: 8, default: 2 }
+        decimals: { type: integer, minimum: 0, maximum: 8 }
+        minor_unit: { type: string, maxLength: 30 }
         archived: { type: boolean, default: false }
     MoneyCurrencyPatch:
       type: object
+      description: The decimals and minor_unit of a code in the built-in table do not change.
       properties:
         name: { type: string, maxLength: 60 }
         role: { type: [string, 'null'], enum: [primary, local, null] }
         decimals: { type: integer, minimum: 0, maximum: 8 }
+        minor_unit: { type: string, maxLength: 30 }
         archived: { type: boolean }
     MoneyAccount:
       type: object

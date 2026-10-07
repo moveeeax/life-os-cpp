@@ -11117,24 +11117,30 @@ export interface components {
             name: string;
             /** @enum {string|null} */
             role: "primary" | "local" | null;
+            /** @description Decimals of the smallest unit; every amount in this currency is a whole number of it */
             decimals: number;
+            /** @description The smallest unit: kopeck for RUB, satoshi for BTC, dong for VND */
+            minor_unit: string;
             archived: boolean;
         };
+        /** @description A code in the built-in table (ISO 4217 minor units plus BTC) takes decimals and minor_unit from it; decimals that differ answer 400. Any other code must give decimals and may name its minor_unit. */
         MoneyCurrencyInput: {
             code: string;
             name?: string;
             /** @enum {string|null} */
             role?: "primary" | "local" | null;
-            /** @default 2 */
-            decimals: number;
+            decimals?: number;
+            minor_unit?: string;
             /** @default false */
             archived: boolean;
         };
+        /** @description The decimals and minor_unit of a code in the built-in table do not change. */
         MoneyCurrencyPatch: {
             name?: string;
             /** @enum {string|null} */
             role?: "primary" | "local" | null;
             decimals?: number;
+            minor_unit?: string;
             archived?: boolean;
         };
         MoneyAccount: {

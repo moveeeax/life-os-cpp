@@ -33,6 +33,7 @@
 #include "jobs/MoneyAdvisorHandler.hpp"
 #include "jobs/MoneyParseHandler.hpp"
 #include "jobs/MoneyRatesHandler.hpp"
+#include "money/Currencies.hpp"
 #include "money/Llm.hpp"
 #include "money/Period.hpp"
 #include "money/Rates.hpp"
@@ -303,7 +304,22 @@ void MoneyController::upsertCurrency(const HttpRequestPtr& req, Callback&& callb
         Validation::one_of(errs, body, "role", kRoles);
     }
     Validation::int_range(errs, body, "decimals", 0, 8);
+    text_length(errs, body, "minor_unit", 0, 30);
     Validation::boolean(errs, body, "archived");
+    // A code the table knows takes its smallest unit from it; another code names its own.
+    std::optional<Money::Currencies::MinorUnit> iso;
+    if (!errs.any()) {
+        iso = Money::Currencies::known(body["code"].get<std::string>());
+    }
+    if (iso.has_value()) {
+        if (opt_int(body, "decimals").value_or(iso->decimals) != iso->decimals) {
+            errs.add("decimals",
+                     "fixed",
+                     body["code"].get<std::string>() + " has " + std::to_string(iso->decimals) + " decimal(s)");
+        }
+    } else if (!errs.any() && !opt_int(body, "decimals").has_value()) {
+        errs.add("decimals", "missing", "an unknown currency needs its decimals (0..8)");
+    }
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;
@@ -311,7 +327,8 @@ void MoneyController::upsertCurrency(const HttpRequestPtr& req, Callback&& callb
     Repo::CurrencyRepository::Input in;
     in.name = Validation::opt_string(body, "name").value_or("");
     in.role = Validation::opt_string(body, "role");
-    in.decimals = opt_int(body, "decimals").value_or(2);
+    in.decimals = iso.has_value() ? iso->decimals : *opt_int(body, "decimals");
+    in.minor_unit = iso.has_value() ? std::string(iso->unit) : Validation::opt_string(body, "minor_unit").value_or("");
     in.archived = body.contains("archived") && body["archived"].is_boolean() && body["archived"].get<bool>();
     with_repo_errors(callback, "money.upsertCurrency", [&] {
         callback(Response::ok(json{{"data", Repo::CurrencyRepository().upsert(owner, body["code"], in)}}));
@@ -330,12 +347,22 @@ void MoneyController::patchCurrency(const HttpRequestPtr& req, Callback&& callba
         Validation::one_of(errs, body, "role", kRoles);
     }
     Validation::int_range(errs, body, "decimals", 0, 8);
+    text_length(errs, body, "minor_unit", 0, 30);
     Validation::boolean(errs, body, "archived");
+    if (const auto iso = Money::Currencies::known(code);
+        iso.has_value() && !errs.any() &&
+        (opt_int(body, "decimals").value_or(iso->decimals) != iso->decimals ||
+         Validation::opt_string(body, "minor_unit").value_or(std::string(iso->unit)) != iso->unit)) {
+        errs.add("decimals",
+                 "fixed",
+                 code + " has " + std::to_string(iso->decimals) + " decimal(s), the " + std::string(iso->unit));
+    }
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;
     }
     Repo::CurrencyRepository::Patch p;
+    p.minor_unit = Validation::opt_string(body, "minor_unit");
     p.name = Validation::opt_string(body, "name");
     if (body.contains("role")) {
         p.role = Validation::opt_string(body, "role");
