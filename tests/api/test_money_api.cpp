@@ -731,7 +731,8 @@ TEST_F(MoneyApiTest, ImportRefusesAnEmptyOrMalformedBody) {
     // A currency row without a name or role keeps the seeded ones.
     call_json(
         &Api::MoneyController::importNotion, user(kAnna), json{{"currencies", json::array({json{{"code", "USD"}}})}});
-    for (const auto& c : body_of(call(&Api::MoneyController::listCurrencies, user(kAnna), Get))["data"]) {
+    const json currencies = body_of(call(&Api::MoneyController::listCurrencies, user(kAnna), Get))["data"];
+    for (const auto& c : currencies) {
         if (c["code"] == "USD") {
             EXPECT_FALSE(c["name"].get<std::string>().empty());
             EXPECT_EQ(c["role"], "primary");
