@@ -9,12 +9,14 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
 #include "repositories/tasks/Errors.hpp"
 #include "repositories/tasks/NoteRepository.hpp"
+#include "repositories/tasks/TaskRepository.hpp"
 
 namespace Repositories::Tasks {
 
@@ -115,6 +117,36 @@ public:
                 message.empty() ? code : code + ": " + message);
             return true;
         });
+    }
+
+    /// The edited lines as tasks, the note (if any) archived and linked to the first one, the job
+    /// marked accepted: one transaction. @throws AlreadyAccepted when the job is not done or was
+    /// accepted before (another owner's job reads the same way), Invariant.
+    nlohmann::json accept(const std::string& owner,
+                          const std::string& id,
+                          const std::vector<TaskRepository::Input>& inputs) {
+        return detail::translate_sql(
+            [&] {
+                return Database::get().execute_write([&](auto& txn) {
+                    auto marked = txn.exec_params(
+                        "UPDATE task_parse_jobs SET accepted_at = now() WHERE owner_id = $1::uuid AND id = $2::uuid "
+                        " AND status = 'done' AND accepted_at IS NULL RETURNING id",
+                        owner,
+                        id);
+                    if (marked.empty()) {
+                        throw AlreadyAccepted();
+                    }
+                    nlohmann::json out = nlohmann::json::array();
+                    for (const auto& in : inputs) {
+                        out.push_back(*TaskRepository::find_in(txn, owner, TaskRepository::create_in(txn, owner, in)));
+                    }
+                    if (const auto note = note_in(txn, owner, id); note.has_value() && !out.empty()) {
+                        NoteRepository::archive_in(txn, owner, *note, out[0]["id"].get<std::string>());
+                    }
+                    return out;
+                });
+            },
+            &detail::translate);
     }
 
     /// Jobs of the owner that are queued or running.

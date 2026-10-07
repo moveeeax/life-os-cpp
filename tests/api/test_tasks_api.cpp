@@ -243,3 +243,63 @@ TEST_F(TasksOffTest, EveryRouteIs404WhileTheModuleIsOff) {
     EXPECT_EQ(call(&Api::TasksController::status, user(kAnna), Get)->statusCode(), k404NotFound);
     EXPECT_EQ(call(&Api::TasksController::agenda, user(kAnna), Get)->statusCode(), k404NotFound);
 }
+
+// ── parse ───────────────────────────────────────────────────────────────────
+
+namespace {
+
+class TasksParseApiTest : public TasksApiTest {
+protected:
+    std::string config_file_name() const override { return "tasks_parse_api_test_config.json"; }
+    void config_overrides(nlohmann::json& cfg) override {
+        TasksApiTest::config_overrides(cfg);
+        cfg["jobs"]["enabled"] = true;
+        cfg["jobs"]["result_ttl"] = 3600;
+        cfg["tasks"]["llm"]["base_url"] = "https://llm.example/v1";
+        cfg["tasks"]["llm"]["api_key"] = "sk-test";
+        cfg["tasks"]["llm"]["model"] = "gpt-6-luna";
+        cfg["tasks"]["llm"]["prompt_parse"] = "Answer with JSON.";
+    }
+};
+
+}  // namespace
+
+TEST_F(TasksParseApiTest, ANoteBecomesATaskOnceAndIsArchived) {
+    const json note = created(&Api::TasksController::createNote, kAnna, json{{"text", "завтра купить воду"}});
+    const auto queued =
+        call_json(&Api::TasksController::parse,
+                  user(kAnna),
+                  json{{"text", "завтра купить воду"}, {"hint_date", "2026-10-07"}, {"note_id", note["id"]}});
+    ASSERT_EQ(queued->statusCode(), k202Accepted) << queued->body();
+    const std::string id = body_of(queued)["data"]["id"];
+    auto job = Jobs::get().pick({"tasks_parse"}, 1);
+    ASSERT_TRUE(job.has_value());
+    Jobs::get().complete(job->id, json::object());
+    Repositories::Tasks::ParseJobRepository().finish(
+        id, json::array({json{{"title", "Купить воду"}, {"area", "projects"}, {"due", "2026-10-08"}}}), "m", 1, 1);
+    const json lines = json::array({json{{"title", "Купить воду"}, {"area", "projects"}, {"due", "2026-10-08"}}});
+    const auto accepted = call_id(&Api::TasksController::parseAccept, user(kAnna), Post, id, json{{"lines", lines}});
+    ASSERT_EQ(accepted->statusCode(), k201Created) << accepted->body();
+    const std::string task_id = body_of(accepted)["data"][0]["id"];
+    const json archived =
+        body_of(call(&Api::TasksController::listNotes, user(kAnna), Get, {{"status", "archived"}}))["data"];
+    ASSERT_EQ(archived.size(), 1u);
+    EXPECT_EQ(archived[0]["task_id"], task_id);
+    EXPECT_EQ(call_id(&Api::TasksController::parseAccept, user(kAnna), Post, id, json{{"lines", lines}})->statusCode(),
+              k409Conflict);
+    EXPECT_EQ(call_id(&Api::TasksController::parseStatus, user(kBoris), Get, id)->statusCode(), k404NotFound);
+}
+
+TEST_F(TasksParseApiTest, AFewOpenParsesPerUser) {
+    for (int i = 0; i < 3; ++i) {
+        ASSERT_EQ(call_json(&Api::TasksController::parse, user(kAnna), json{{"text", "x"}})->statusCode(),
+                  k202Accepted);
+    }
+    EXPECT_EQ(call_json(&Api::TasksController::parse, user(kAnna), json{{"text", "x"}})->statusCode(),
+              k429TooManyRequests);
+    for (int i = 0; i < 3; ++i) {
+        auto job = Jobs::get().pick({"tasks_parse"}, 1);
+        ASSERT_TRUE(job.has_value());
+        Jobs::get().complete(job->id, json::object());
+    }
+}

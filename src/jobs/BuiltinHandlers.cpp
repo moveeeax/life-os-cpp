@@ -21,6 +21,7 @@
 #include "jobs/MoneyAdvisorHandler.hpp"
 #include "jobs/MoneyParseHandler.hpp"
 #include "jobs/MoneyRatesHandler.hpp"
+#include "jobs/TasksParseHandler.hpp"
 #include "webhooks/Webhooks.hpp"
 
 namespace Jobs {
@@ -44,6 +45,7 @@ void register_builtin_handlers() {
     d.register_handler(MoneyRates::kJobType, [](const json& payload) { return MoneyRates::process_job(payload); });
     d.register_handler(MoneyParse::kJobType, [](const json& payload) { return MoneyParse::process_job(payload); });
     d.register_handler(MoneyAdvisor::kJobType, [](const json& payload) { return MoneyAdvisor::process_job(payload); });
+    d.register_handler(TasksParse::kJobType, [](const json& payload) { return TasksParse::process_job(payload); });
     // Demo handlers used by examples/tests.
     d.register_handler("echo", [](const json& payload) { return payload; });
     d.register_handler("slow", [](const json& payload) -> json {

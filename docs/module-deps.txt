@@ -142,3 +142,5 @@ repositories/tasks -> repositories
 repositories/tasks -> tasks
 api -> repositories/tasks
 api -> tasks
+jobs -> repositories/tasks
+jobs -> tasks
