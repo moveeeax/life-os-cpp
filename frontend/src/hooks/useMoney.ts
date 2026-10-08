@@ -105,6 +105,17 @@ export function useTransactions(filter: TransactionFilter) {
   });
 }
 
+/** One ledger row by id (a link from a task opens it). */
+export function useTransaction(id: string | null) {
+  return useQuery({
+    queryKey: qk.money.transaction(id ?? ''),
+    enabled: id !== null && id !== '',
+    retry: false,
+    queryFn: async ({ signal }) =>
+      (await api.getJson<{ data: Transaction }>(`${BASE}/transactions/${id}`, { signal })).data,
+  });
+}
+
 export function useTransfers(from?: string, to?: string, account?: string) {
   return useQuery({
     queryKey: qk.money.transfers(from, to, account),

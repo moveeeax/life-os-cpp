@@ -39,9 +39,7 @@ export function ResetPasswordPage() {
         <CardContent>
           {reset.isSuccess ? (
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Password updated. You can log in now.
-              </p>
+              <p className="text-sm text-muted-foreground">Password updated. You can log in now.</p>
               <Button asChild className="w-full">
                 <Link to="/login">Continue to log in</Link>
               </Button>

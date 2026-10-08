@@ -12,6 +12,7 @@ import {
   useDeleteTransaction,
   useInbox,
   useReport,
+  useTransaction,
   useTransactions,
   useUpdateTransaction,
 } from '@/hooks/useMoney';
@@ -414,6 +415,20 @@ export function MoneyLedgerPage() {
   }, [text]);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
+  // ?row=<id>: a link (from a task) that opens one row of the ledger.
+  const rowId = params.get('row');
+  const linked = useTransaction(rowId);
+  useEffect(() => {
+    if (linked.data && rowId) setEditing(linked.data);
+  }, [linked.data, rowId]);
+  const closeEditor = () => {
+    setEditing(null);
+    if (rowId) {
+      const next = new URLSearchParams(params);
+      next.delete('row');
+      setParams(next, { replace: true });
+    }
+  };
 
   const currencies = useCurrencies().data;
   const accounts = useAccounts().data ?? [];
@@ -633,12 +648,12 @@ export function MoneyLedgerPage() {
         </Modal>
       )}
       {editing && (
-        <Modal onClose={() => setEditing(null)} className="max-w-lg">
+        <Modal onClose={closeEditor} className="max-w-lg">
           <TransactionEditor
             row={editing}
             accounts={accounts}
             categories={categories}
-            onClose={() => setEditing(null)}
+            onClose={closeEditor}
           />
         </Modal>
       )}
