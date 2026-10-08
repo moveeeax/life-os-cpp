@@ -25,6 +25,7 @@
 #include "core/Modules.hpp"
 #include "jobs/Jobs.hpp"
 #include "jobs/TasksParseHandler.hpp"
+#include "repositories/goals/GoalRepository.hpp"
 #include "repositories/tasks/Errors.hpp"
 #include "repositories/tasks/NoteRepository.hpp"
 #include "repositories/tasks/ParseJobRepository.hpp"
@@ -51,7 +52,7 @@ constexpr int kMaxLimit = 200;
 constexpr std::size_t kSourceRefMax = 2000;
 constexpr std::size_t kExternalIdMax = 100;
 constexpr long kParseOpenMax = 3;
-const std::vector<std::string> kStatuses = {"open", "done"};
+const std::vector<std::string> kStatuses = {"open", "in_progress", "done"};
 const std::vector<std::string> kNoteStatuses = {"inbox", "archived"};
 const std::vector<std::string> kSourceKinds = {"url", "money_transaction"};
 
@@ -155,6 +156,31 @@ void source_fields(Validation::Errors& errs, const json& body, const std::string
     }
 }
 
+/// The goal link: a goal of the caller, and a section only of that goal (given in the same body).
+void goal_link_fields(Validation::Errors& errs, const json& body, const std::string& owner) {
+    const bool has_goal = body.contains("goal_id") && !body["goal_id"].is_null();
+    const bool has_section = body.contains("goal_section_id") && !body["goal_section_id"].is_null();
+    if (has_goal) {
+        Validation::uuid(errs, body, "goal_id");
+    }
+    if (has_section) {
+        Validation::uuid(errs, body, "goal_section_id");
+        if (!has_goal) {
+            errs.add("goal_section_id", "needs_goal", "a section comes with its goal_id");
+        }
+    }
+    if (errs.any() || !has_goal) {
+        return;
+    }
+    Repositories::Goals::GoalRepository goals;
+    const std::string goal = body["goal_id"].get<std::string>();
+    if (!goals.kind_of(owner, goal).has_value()) {
+        errs.add("goal_id", "not_yours", "the goal is not yours");
+    } else if (has_section && !goals.section_of_goal(owner, body["goal_section_id"].get<std::string>(), goal)) {
+        errs.add("goal_section_id", "not_of_goal", "the section belongs to another goal");
+    }
+}
+
 Repo::TaskRepository::Input task_input(const json& body) {
     Repo::TaskRepository::Input in;
     in.title = body["title"].get<std::string>();
@@ -167,6 +193,8 @@ Repo::TaskRepository::Input task_input(const json& body) {
     in.source_ref = Validation::opt_string(body, "source_ref");
     in.external_id = Validation::opt_string(body, "external_id");
     in.status = Validation::opt_string(body, "status").value_or("open");
+    in.goal_id = Validation::opt_string(body, "goal_id");
+    in.goal_section_id = Validation::opt_string(body, "goal_section_id");
     return in;
 }
 
@@ -231,6 +259,9 @@ void TasksController::createItem(const HttpRequestPtr& req, Callback&& callback)
     if (!errs.any()) {
         source_fields(errs, body, owner);
     }
+    if (!errs.any()) {
+        goal_link_fields(errs, body, owner);
+    }
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;
@@ -270,6 +301,9 @@ void TasksController::updateItem(const HttpRequestPtr& req, Callback&& callback,
     if (!errs.any()) {
         source_fields(errs, body, owner);
     }
+    if (!errs.any()) {
+        goal_link_fields(errs, body, owner);
+    }
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;
@@ -285,6 +319,8 @@ void TasksController::updateItem(const HttpRequestPtr& req, Callback&& callback,
     p.status = Validation::opt_string(body, "status");
     p.source_kind = nullable(body, "source_kind");
     p.source_ref = nullable(body, "source_ref");
+    p.goal_id = nullable(body, "goal_id");
+    p.goal_section_id = nullable(body, "goal_section_id");
     with_repo_errors(callback, "tasks.updateItem", [&] {
         callback(Response::ok(json{{"data", Repo::TaskRepository().update(owner, id, p)}}));
     });
@@ -526,7 +562,7 @@ void TasksController::parseAccept(const HttpRequestPtr& req, Callback&& callback
             continue;
         }
         // A draft becomes an open task; its origin is the phrase, not a source.
-        for (const char* key : {"status", "source_kind", "source_ref", "external_id"}) {
+        for (const char* key : {"status", "source_kind", "source_ref", "external_id", "goal_id", "goal_section_id"}) {
             line.erase(std::string(key));
         }
         Validation::Errors local;

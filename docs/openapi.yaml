@@ -52,6 +52,110 @@ components:
         pattern: '^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$'
 
   schemas:
+    GoalKind:
+      type: string
+      enum: [number, steps, count, binary]
+    GoalProgress:
+      type: object
+      description: Computed at the date asked for. number adds current, current_date, expected, gap (positive when ahead), per_week, stale; steps adds done, total; count adds done, target, expected, reached; binary adds result and has no progress.
+      required: [kind, elapsed, days_left, pace, progress]
+      properties:
+        kind: { $ref: '#/components/schemas/GoalKind' }
+        elapsed: { type: number, minimum: 0, maximum: 1 }
+        days_left: { type: integer }
+        pace: { type: string, enum: [on_track, behind, passed, failed] }
+        progress: { type: [number, 'null'], minimum: 0, maximum: 1 }
+        current: { type: number }
+        current_date: { type: string, format: date }
+        expected: { type: number }
+        gap: { type: number }
+        per_week: { type: number }
+        stale: { type: boolean }
+        done: { type: integer }
+        total: { type: integer }
+        target: { type: integer }
+        reached: { type: boolean }
+        result: { type: [string, 'null'], enum: [pass, fail, null] }
+    Goal:
+      type: object
+      required: [id, title, area, kind, why, start_date, due, status, completed_at, unit, start_value, target_value, target_count, result, created_at, updated_at, progress]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        area: { $ref: '#/components/schemas/TaskArea' }
+        kind: { $ref: '#/components/schemas/GoalKind' }
+        why: { type: string }
+        start_date: { type: string, format: date }
+        due: { type: string, format: date }
+        status: { type: string, enum: [active, done, dropped] }
+        completed_at: { type: [string, 'null'], format: date-time }
+        unit: { type: string }
+        start_value: { type: [number, 'null'] }
+        target_value: { type: [number, 'null'] }
+        target_count: { type: [integer, 'null'] }
+        result: { type: [string, 'null'], enum: [pass, fail, null] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        progress: { $ref: '#/components/schemas/GoalProgress' }
+    GoalDetail:
+      allOf:
+        - { $ref: '#/components/schemas/Goal' }
+        - type: object
+          required: [checkins, sections, tasks, milestones]
+          properties:
+            checkins: { type: array, items: { $ref: '#/components/schemas/GoalCheckin' } }
+            sections: { type: array, items: { allOf: [ { $ref: '#/components/schemas/GoalSection' }, { type: object, required: [tasks], properties: { tasks: { type: array, items: { $ref: '#/components/schemas/Task' } } } } ] } }
+            tasks: { type: array, items: { $ref: '#/components/schemas/Task' }, description: The goal's tasks without a section }
+            milestones: { type: array, items: { $ref: '#/components/schemas/GoalMilestone' } }
+    GoalInput:
+      type: object
+      required: [title, area, kind, due]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        area: { $ref: '#/components/schemas/TaskArea' }
+        kind: { $ref: '#/components/schemas/GoalKind' }
+        why: { type: string, maxLength: 300 }
+        start_date: { type: string, format: date }
+        due: { type: string, format: date }
+        unit: { type: string, maxLength: 20 }
+        start_value: { type: number }
+        target_value: { type: number }
+        target_count: { type: integer, minimum: 1, maximum: 10000 }
+    GoalPatch:
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        area: { $ref: '#/components/schemas/TaskArea' }
+        why: { type: string, maxLength: 300 }
+        due: { type: string, format: date }
+        status: { type: string, enum: [active, done, dropped] }
+        unit: { type: string, maxLength: 20 }
+        start_value: { type: number }
+        target_value: { type: number }
+        target_count: { type: integer, minimum: 1, maximum: 10000 }
+        result: { type: string, enum: [pass, fail] }
+    GoalCheckin:
+      type: object
+      required: [id, date, value, note]
+      properties:
+        id: { type: string, format: uuid }
+        date: { type: string, format: date }
+        value: { type: number }
+        note: { type: string }
+    GoalSection:
+      type: object
+      required: [id, name, position]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        position: { type: integer }
+    GoalMilestone:
+      type: object
+      required: [id, date, label]
+      properties:
+        id: { type: string, format: uuid }
+        date: { type: string, format: date }
+        label: { type: string }
     TaskArea:
       type: string
       enum: [finance, health, travel, growth, relationships, projects]
@@ -60,7 +164,7 @@ components:
       enum: ['5min', '30min', deep, null]
     Task:
       type: object
-      required: [id, title, area, effort, due, next_step, note, status, completed_at, source_kind, source_ref, external_id, created_at, updated_at]
+      required: [id, title, area, effort, due, next_step, note, status, completed_at, source_kind, source_ref, external_id, goal_id, goal_section_id, goal_title, created_at, updated_at]
       properties:
         id: { type: string, format: uuid }
         title: { type: string }
@@ -69,11 +173,14 @@ components:
         due: { type: [string, 'null'], format: date }
         next_step: { type: string }
         note: { type: string }
-        status: { type: string, enum: [open, done] }
+        status: { type: string, enum: [open, in_progress, done] }
         completed_at: { type: [string, 'null'], format: date-time }
         source_kind: { type: [string, 'null'], enum: [url, money_transaction, null] }
         source_ref: { type: [string, 'null'], description: The link, or the id of a money ledger row of the same user }
         external_id: { type: [string, 'null'] }
+        goal_id: { type: [string, 'null'], format: uuid }
+        goal_section_id: { type: [string, 'null'], format: uuid }
+        goal_title: { type: [string, 'null'], description: The title of the goal the task belongs to }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
     TaskInput:
@@ -86,9 +193,11 @@ components:
         due: { type: [string, 'null'], format: date }
         next_step: { type: string, maxLength: 300 }
         note: { type: string, maxLength: 2000 }
-        status: { type: string, enum: [open, done] }
+        status: { type: string, enum: [open, in_progress, done] }
         source_kind: { type: [string, 'null'], enum: [url, money_transaction, null] }
         source_ref: { type: [string, 'null'], maxLength: 2000 }
+        goal_id: { type: [string, 'null'], format: uuid, description: A goal of the caller }
+        goal_section_id: { type: [string, 'null'], format: uuid, description: A section of that goal; given together with goal_id }
         external_id: { type: string, minLength: 1, maxLength: 100 }
     TaskPatch:
       type: object
@@ -99,9 +208,11 @@ components:
         due: { type: [string, 'null'], format: date }
         next_step: { type: string, maxLength: 300 }
         note: { type: string, maxLength: 2000 }
-        status: { type: string, enum: [open, done] }
+        status: { type: string, enum: [open, in_progress, done] }
         source_kind: { type: [string, 'null'], enum: [url, money_transaction, null] }
         source_ref: { type: [string, 'null'], maxLength: 2000 }
+        goal_id: { type: [string, 'null'], format: uuid, description: A goal of the caller }
+        goal_section_id: { type: [string, 'null'], format: uuid, description: A section of that goal; given together with goal_id }
     TaskAgenda:
       type: object
       required: [date, tz, late, soon, dated, someday, done_today, review]
@@ -6819,6 +6930,423 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '409':
           description: The parse is not finished or was accepted already (already_accepted)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/goals:
+    get:
+      summary: The caller's goals with their progress
+      tags: [goals]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [active, done, dropped] } }
+        - { name: date, in: query, schema: { type: string, format: date }, description: The person's local day the progress is computed at; defaults to today in UTC }
+      responses:
+        '200':
+          description: Goals by due date
+          content:
+            application/json:
+              schema: { type: object, required: [data, count], properties: { data: { type: array, items: { $ref: '#/components/schemas/Goal' } }, count: { type: integer } } }
+        '400':
+          description: status or date is not valid (invalid_query)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Goals module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Create a goal
+      description: >-
+        number needs start_value and target_value (different); count needs target_count; unit is for number only; start_date defaults to today; due must be after it.
+      tags: [goals]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: date, in: query, schema: { type: string, format: date }, description: The person's local day the progress is computed at; defaults to today in UTC }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoalInput' }
+      responses:
+        '201':
+          description: The goal
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/Goal' } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Goals module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/goals/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: One goal with its check-ins, sections with tasks, tasks without a section and milestones
+      tags: [goals]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: date, in: query, schema: { type: string, format: date }, description: The person's local day the progress is computed at; defaults to today in UTC }
+      responses:
+        '200':
+          description: The goal
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/GoalDetail' } } }
+        '400':
+          description: id is not a UUID or date is not valid
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Goals module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    patch:
+      summary: Change a goal
+      description: >-
+        kind and start_date do not change. A result (binary only, pass or fail) closes the goal and cannot be cleared. status done sets completed_at; active or dropped clears it.
+      tags: [goals]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: date, in: query, schema: { type: string, format: date }, description: The person's local day the progress is computed at; defaults to today in UTC }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoalPatch' }
+      responses:
+        '200':
+          description: The goal
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/Goal' } } }
+        '400':
+          description: Validation failed, or a rule of the model (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Goals module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a goal; its tasks stay, unlinked
+      tags: [goals]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Goals module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/goals/{id}/checkins:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: A check-in of a number goal; a second one for the same date replaces the first
+      tags: [goals]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [value], properties: { value: { type: number }, date: { type: string, format: date, description: Defaults to today in UTC }, note: { type: string, maxLength: 200 } } }
+      responses:
+        '201':
+          description: The check-in
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/GoalCheckin' } } }
+        '400':
+          description: Validation failed, or not a number goal (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Goals module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/goals/{id}/checkins/{child}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: child, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      summary: Delete a check-in
+      tags: [goals]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          description: An id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Goals module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/goals/{id}/sections:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Add a section to a steps goal
+      tags: [goals]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [name], properties: { name: { type: string, minLength: 1, maxLength: 120 }, position: { type: integer, minimum: 0, maximum: 10000, description: Defaults to after the last section } } }
+      responses:
+        '201':
+          description: The section
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/GoalSection' } } }
+        '400':
+          description: Validation failed, or not a steps goal (code invariant)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Goals module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/goals/{id}/sections/{child}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: child, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Rename or move a section
+      tags: [goals]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { name: { type: string, minLength: 1, maxLength: 120 }, position: { type: integer, minimum: 0, maximum: 10000 } } }
+      responses:
+        '200':
+          description: The section
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/GoalSection' } } }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Goals module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a section; its tasks stay on the goal without a section
+      tags: [goals]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          description: An id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Goals module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/goals/{id}/milestones:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Add a milestone
+      tags: [goals]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [date, label], properties: { date: { type: string, format: date }, label: { type: string, minLength: 1, maxLength: 120 } } }
+      responses:
+        '201':
+          description: The milestone
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/GoalMilestone' } } }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Goals module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/goals/{id}/milestones/{child}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: child, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      summary: Delete a milestone
+      tags: [goals]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          description: An id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Goals module disabled, or the row is not the caller's
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

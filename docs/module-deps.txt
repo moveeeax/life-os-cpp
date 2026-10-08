@@ -150,3 +150,5 @@ repositories/goals -> database
 repositories/goals -> goals
 repositories/goals -> repositories
 repositories/goals -> repositories/tasks
+api -> goals
+api -> repositories/goals
