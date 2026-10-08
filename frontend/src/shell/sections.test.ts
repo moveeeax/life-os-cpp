@@ -15,9 +15,9 @@ describe('visibleSections', () => {
     expect(list.find((s) => s.key === 'food')).toMatchObject({ path: '/food' });
     expect(list.find((s) => s.key === 'money')).toMatchObject({ path: '/money' });
     expect(list.find((s) => s.key === 'tasks')).toMatchObject({ path: '/tasks' });
+    expect(list.find((s) => s.key === 'goals')).toMatchObject({ path: '/goals' });
     expect(list.filter((s) => !s.path).map((s) => s.label)).toEqual([
       'Day',
-      'Goals',
       'Journal',
       'Learning',
       'Travel',

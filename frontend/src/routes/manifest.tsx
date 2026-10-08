@@ -87,6 +87,7 @@ const TasksLaterPage = lazy(() =>
 const TasksInboxPage = lazy(() =>
   import('@/pages/tasks/Inbox').then((m) => ({ default: m.TasksInboxPage })),
 );
+const GoalsPage = lazy(() => import('@/pages/goals/Goals').then((m) => ({ default: m.GoalsPage })));
 const AdminDashboardPage = lazy(() =>
   import('@/pages/admin/Dashboard').then((m) => ({ default: m.AdminDashboardPage })),
 );
@@ -276,6 +277,9 @@ export const routes: RouteEntry[] = [
   { path: '/tasks', element: <TasksTodayPage />, guard: 'confirmed', layout: 'shell' },
   { path: '/tasks/later', element: <TasksLaterPage />, guard: 'confirmed', layout: 'shell' },
   { path: '/tasks/inbox', element: <TasksInboxPage />, guard: 'confirmed', layout: 'shell' },
+
+  // ── Goals — any confirmed user; the module switch is the only gate ───────
+  { path: '/goals', element: <GoalsPage />, guard: 'confirmed', layout: 'shell' },
 
   // ── Admin — gated by Permission.Administer (0x40000000 sentinel) ────────
   {

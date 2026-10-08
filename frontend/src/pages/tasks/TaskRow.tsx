@@ -98,6 +98,15 @@ export function TaskRow({
               </>
             )}
           </p>
+          {task.goal_title && (
+            <p>
+              Goal:{' '}
+              <Link to="/goals" className="text-brand-500 hover:underline">
+                {task.goal_title}
+              </Link>
+              {task.status === 'in_progress' && ' · in progress'}
+            </p>
+          )}
           {task.note && <p className="whitespace-pre-line">{task.note}</p>}
           <div className="mt-1 flex gap-3.5">
             <button
