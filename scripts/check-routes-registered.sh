@@ -51,6 +51,23 @@ if [[ "$missing" -ne 0 ]]; then
     exit 1
 fi
 
+# Linking lint: a controller registers its routes only when its header is
+# compiled into a binary, and the binaries pull every controller in through
+# src/api/Api.hpp. A controller missing there compiles, passes the tests that
+# call it directly, and answers 404 in production (the tasks routes in 1.16.0).
+unlinked=""
+for header in $(grep -lE 'METHOD_LIST_BEGIN' "$API_DIR"/*.hpp); do
+    name="api/$(basename "$header")"
+    if ! grep -qF "#include \"$name\"" "$API_DIR/Api.hpp"; then
+        unlinked+="  $name"$'\n'
+    fi
+done
+if [[ -n "$unlinked" ]]; then
+    echo "CONTROLLER(S) not included by src/api/Api.hpp — their routes never reach the binary:" >&2
+    printf '%s' "$unlinked" >&2
+    exit 1
+fi
+
 # Versioning lint (docs/ARCHITECTURE.md §7): every /api route must be
 # /api/v<N>/... . Catches someone re-introducing an unversioned route. Pulls
 # paths from both the controllers and the registry.
@@ -67,4 +84,4 @@ if [[ -n "$unversioned" ]]; then
     exit 1
 fi
 
-echo "✓ routes registered: every ADD_METHOD_TO is in Api::get_endpoints(), all /api routes versioned"
+echo "✓ routes registered: every ADD_METHOD_TO is in Api::get_endpoints(), every controller is in Api.hpp, all /api routes versioned"
