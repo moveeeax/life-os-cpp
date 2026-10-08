@@ -252,6 +252,9 @@
       "max_tokens": "${TASKS_LLM_MAX_TOKENS:-1500}"
     }
   },
+  "goals": {
+    "enabled": "${GOALS_ENABLED:-false}"
+  },
   "worker": {
     "id": "worker-1",
     "types": [

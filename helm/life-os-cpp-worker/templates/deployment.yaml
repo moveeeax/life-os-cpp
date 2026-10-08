@@ -145,6 +145,9 @@ spec:
             # tasks module — master switch
             - name: TASKS_ENABLED
               value: {{ .Values.tasks.enabled | quote }}
+            # goals module — master switch
+            - name: GOALS_ENABLED
+              value: {{ .Values.goals.enabled | quote }}
             # Worker
             - name: WORKER_ID
               value: {{ .Values.worker.id | quote }}

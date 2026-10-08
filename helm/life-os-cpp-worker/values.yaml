@@ -186,6 +186,12 @@ money:
 tasks:
   enabled: false
 
+# ---------------------------------------------------------------
+# goals module — keep in sync with the life-os-cpp chart. Env var set: GOALS_ENABLED
+# ---------------------------------------------------------------
+goals:
+  enabled: false
+
 
 # ---------------------------------------------------------------
 # External PostgreSQL connection
