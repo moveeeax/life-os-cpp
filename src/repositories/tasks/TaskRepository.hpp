@@ -160,16 +160,19 @@ public:
         return Database::get().execute_read([&](auto& txn) {
             const std::string where =
                 " WHERE owner_id = $1::uuid AND ($2 = '' OR status = $2) AND ($3 = '' OR area = $3) "
-                " AND ($4 = '' OR title ILIKE '%' || $4 || '%' OR next_step ILIKE '%' || $4 || '%') "
-                " AND ($5 = '' OR due <= $5::date) AND ($6 = '' OR completed_at >= $6::date) ";
+                " AND ($4 = '' OR title ILIKE '%' || $4 || '%' ESCAPE '\\' OR next_step ILIKE '%' || $4 || '%' ESCAPE "
+                "'\\') "
+                " AND ($5 = '' OR due <= $5::date) AND ($6 = '' OR completed_at >= ($6::date::timestamp AT TIME ZONE "
+                "'UTC')) ";
+            const std::string q = escape_like(f.q);
             auto total = txn.exec_params(
-                "SELECT count(*) FROM task_items" + where, owner, f.status, f.area, f.q, f.due_to, f.done_since);
+                "SELECT count(*) FROM task_items" + where, owner, f.status, f.area, q, f.due_to, f.done_since);
             auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
                                          " FROM task_items" + where + " ORDER BY created_at DESC LIMIT $7 OFFSET $8) t",
                                      owner,
                                      f.status,
                                      f.area,
-                                     f.q,
+                                     q,
                                      f.due_to,
                                      f.done_since,
                                      f.limit,
@@ -193,7 +196,8 @@ public:
                     ") t)::text, goal_id IS NOT NULL "
                     "FROM task_items WHERE owner_id = $1::uuid AND (status <> 'done' OR "
                     " (completed_at AT TIME ZONE $3)::date >= $2::date - 1) "
-                    "ORDER BY due NULLS LAST, created_at",
+                    // Dated by date; undated (someday) newest first.
+                    "ORDER BY due NULLS LAST, CASE WHEN due IS NULL THEN created_at END DESC, created_at",
                 owner,
                 date,
                 tz);
@@ -227,9 +231,30 @@ public:
         });
     }
 
+    /// The zone names PostgreSQL knows, read once per process (the list only changes with a server upgrade).
     static bool is_timezone(const std::string& tz) {
-        return Database::get().execute_read(
-            [&](auto& txn) { return !txn.exec_params("SELECT 1 FROM pg_timezone_names WHERE name = $1", tz).empty(); });
+        static const std::set<std::string> zones = [] {
+            return Database::get().execute_read([](auto& txn) {
+                std::set<std::string> out;
+                for (const auto& row : txn.exec("SELECT name FROM pg_timezone_names")) {
+                    out.insert(row[0].template as<std::string>());
+                }
+                return out;
+            });
+        }();
+        return zones.count(tz) > 0;
+    }
+
+    /// The text with LIKE's own characters escaped by a backslash.
+    static std::string escape_like(const std::string& text) {
+        std::string out;
+        for (const char c : text) {
+            if (c == '%' || c == '_' || c == '\\') {
+                out.push_back('\\');
+            }
+            out.push_back(c);
+        }
+        return out;
     }
 
     /// Whether a money ledger row is the owner's (the table exists whether the module is on or not).

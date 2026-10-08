@@ -91,13 +91,20 @@ json with_progress(GoalRepository& repo,
                    const std::string& owner,
                    json row,
                    const std::string& date,
-                   const std::map<std::string, ::Goals::Progress::Counts>& counts) {
+                   const std::map<std::string, ::Goals::Progress::Counts>& counts,
+                   const std::map<std::string, std::vector<::Goals::Progress::Checkin>>* all_points = nullptr) {
     const std::string id = row["id"].get<std::string>();
     const auto goal = GoalRepository::progress_goal(row);
     const auto it = counts.find(id);
     const ::Goals::Progress::Counts tasks = it == counts.end() ? ::Goals::Progress::Counts{0, 0} : it->second;
-    const std::vector<::Goals::Progress::Checkin> points =
-        goal.kind == "number" ? repo.checkin_points(owner, id) : std::vector<::Goals::Progress::Checkin>{};
+    std::vector<::Goals::Progress::Checkin> points;
+    if (goal.kind == "number") {
+        if (all_points == nullptr) {
+            points = repo.checkin_points(owner, id);
+        } else if (const auto found = all_points->find(id); found != all_points->end()) {
+            points = found->second;
+        }
+    }
     row["progress"] = ::Goals::Progress::compute(goal, date, points, tasks);
     return row;
 }
@@ -175,9 +182,10 @@ void GoalsController::listGoals(const HttpRequestPtr& req, Callback&& callback) 
     with_repo_errors(callback, "goals.list", [&] {
         GoalRepository repo;
         const auto counts = repo.task_counts(owner);
+        const auto points = repo.checkin_points_all(owner);
         json rows = json::array();
         for (const auto& row : repo.list(owner, status)) {
-            rows.push_back(with_progress(repo, owner, row, *date, counts));
+            rows.push_back(with_progress(repo, owner, row, *date, counts, &points));
         }
         callback(Response::ok(json{{"data", rows}, {"count", rows.size()}}));
     });
@@ -313,6 +321,18 @@ void GoalsController::updateGoal(const HttpRequestPtr& req, Callback&& callback,
             errs.add("start_date", "immutable", "the start of a goal does not change");
         }
         goal_fields(errs, body, kind);
+        // A binary goal is done exactly when it has a result (spec §3.2): no closing without
+        // one, no reopening with one.
+        if (kind == "binary" && body.contains("status") && body["status"].is_string()) {
+            const std::string next = body["status"].get<std::string>();
+            const bool has_result = (*current)["result"].is_string();
+            if (next == "done" && !has_result && !body.contains("result")) {
+                errs.add("status", "needs_result", "a pass / fail goal is done when its result is set");
+            }
+            if (next != "done" && has_result) {
+                errs.add("status", "has_result", "a pass / fail goal with a result stays closed");
+            }
+        }
         if (!errs.any() && body.contains("due") && body["due"].is_string() &&
             body["due"].get<std::string>() <= (*current)["start_date"].get<std::string>()) {
             errs.add("due", "before_start", "due must be after start_date");

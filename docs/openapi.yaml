@@ -6003,6 +6003,7 @@ paths:
                     oneOf:
                       - { type: object, required: [job_id, status], properties: { job_id: { type: string }, status: { type: string, enum: [queued] } } }
                       - { type: object, required: [queued, from, to], properties: { queued: { type: integer }, from: { type: string, format: date }, to: { type: string, format: date } } }
+                      - { type: object, required: [status, waiting], description: Today's rates while a rates job still waits; nothing new is queued, properties: { status: { type: string, enum: [already_queued] }, waiting: { type: integer } } }
         '400':
           description: Bad dates, or a range outside 2024-03-02..today (invalid_range)
           content:

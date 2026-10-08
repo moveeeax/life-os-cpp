@@ -1076,6 +1076,13 @@ void MoneyController::refreshRates(const HttpRequestPtr& req, Callback&& callbac
             callback(resp);
             return;
         }
+        // A rates job still waiting will fetch today's rates too: no second one.
+        if (const long waiting = Jobs::MoneyRates::waiting(); waiting > 0) {
+            auto resp = Response::ok(json{{"data", {{"status", "already_queued"}, {"waiting", waiting}}}});
+            resp->setStatusCode(k202Accepted);
+            callback(resp);
+            return;
+        }
         const auto job = Jobs::get().submit(Jobs::MoneyRates::kJobType, json{{"date", "latest"}});
         auto resp = Response::ok(json{{"data", {{"job_id", job.id}, {"status", "queued"}}}});
         resp->setStatusCode(k202Accepted);

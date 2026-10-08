@@ -16489,6 +16489,25 @@
                "format": "date"
               }
              }
+            },
+            {
+             "type": "object",
+             "required": [
+              "status",
+              "waiting"
+             ],
+             "description": "Today's rates while a rates job still waits; nothing new is queued",
+             "properties": {
+              "status": {
+               "type": "string",
+               "enum": [
+                "already_queued"
+               ]
+              },
+              "waiting": {
+               "type": "integer"
+              }
+             }
             }
            ]
           }
@@ -20102,7 +20121,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 298547,
-  "source_fnv1a64": "4670a0210b69585b"
+  "source_bytes": 298792,
+  "source_fnv1a64": "1ea5f76f902645b4"
  }
 }

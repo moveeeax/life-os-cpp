@@ -161,6 +161,21 @@ public:
         });
     }
 
+    /// Every check-in of the owner's goals, oldest first, by goal: one query for the list.
+    std::map<std::string, std::vector<::Goals::Progress::Checkin>> checkin_points_all(const std::string& owner) {
+        return Database::get().execute_read([&](auto& txn) {
+            std::map<std::string, std::vector<::Goals::Progress::Checkin>> out;
+            for (const auto& row :
+                 txn.exec_params("SELECT goal_id::text, to_char(date, 'YYYY-MM-DD'), value::float8 FROM goal_checkins "
+                                 "WHERE owner_id = $1::uuid ORDER BY goal_id, date",
+                                 owner)) {
+                out[row[0].template as<std::string>()].push_back(
+                    ::Goals::Progress::Checkin{row[1].template as<std::string>(), row[2].template as<double>()});
+            }
+            return out;
+        });
+    }
+
     /// Check-ins newest first, as the page lists them.
     nlohmann::json checkins(const std::string& owner, const std::string& goal) {
         return Database::get().execute_read([&](auto& txn) {
@@ -184,6 +199,11 @@ public:
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
                     require_kind_in(txn, owner, goal, "number", "only a number goal takes check-ins");
+                    auto starts =
+                        txn.exec_params("SELECT $2::date < start_date FROM goal_items WHERE id = $1::uuid", goal, date);
+                    if (starts[0][0].template as<bool>()) {
+                        throw Invariant("a check-in is on or after the goal's start");
+                    }
                     auto r = txn.exec_params(
                         "INSERT INTO goal_checkins (owner_id, goal_id, date, value, note) "
                         "VALUES ($1::uuid, $2::uuid, $3::date, $4, $5) "

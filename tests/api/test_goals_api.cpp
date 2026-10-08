@@ -171,6 +171,7 @@ TEST_F(GoalsApiTest, ANumberGoalWithCheckinsOnePerDate) {
     };
     EXPECT_EQ(checkin("2026-10-06", 91.6)->statusCode(), k201Created);
     EXPECT_EQ(checkin("2026-10-06", 91.4)->statusCode(), k201Created);
+    EXPECT_EQ(checkin("2026-08-31", 94)->statusCode(), k400BadRequest) << "before the goal's start";
     const json d = detail(id);
     ASSERT_EQ(d["checkins"].size(), 1u) << "the same date replaced";
     EXPECT_DOUBLE_EQ(d["progress"]["current"].get<double>(), 91.4);
@@ -304,6 +305,13 @@ TEST_F(GoalsApiTest, ABinaryResultClosesTheGoalAndStays) {
     EXPECT_EQ(patch(json{{"result", nullptr}})->statusCode(), k400BadRequest) << "a result is not taken back";
     EXPECT_EQ(patch(json{{"kind", "number"}})->statusCode(), k400BadRequest) << "the kind does not change";
     EXPECT_EQ(patch(json{{"due", nullptr}})->statusCode(), k400BadRequest) << "a goal keeps a due date (not a 500)";
+    EXPECT_EQ(patch(json{{"status", "active"}})->statusCode(), k400BadRequest) << "a result keeps the goal closed";
+    const json open_exam =
+        goal({{"title", "Another exam"}, {"area", "growth"}, {"kind", "binary"}, {"due", "2027-01-01"}});
+    EXPECT_EQ(call_id(goals, &Api::GoalsController::updateGoal, kAnna, Patch, open_exam["id"], json{{"status", "done"}})
+                  ->statusCode(),
+              k400BadRequest)
+        << "a pass / fail goal is done by its result";
 }
 
 TEST_F(GoalsApiTest, DeletingAGoalLeavesItsTasks) {
