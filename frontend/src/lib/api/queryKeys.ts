@@ -97,6 +97,13 @@ export const qk = {
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['tasks-enabled'] as const,
   },
+  goals: {
+    all: () => ['goals'] as const,
+    list: (status: string, date: string) => ['goals', 'list', status, date] as const,
+    detail: (id: string, date: string) => ['goals', 'detail', id, date] as const,
+    /** Whether the module answers at all (it is 404 while switched off). */
+    enabled: () => ['goals-enabled'] as const,
+  },
   admin: {
     users: (page?: number) =>
       page === undefined ? (['admin', 'users'] as const) : (['admin', 'users', page] as const),
