@@ -19,8 +19,11 @@ import {
 // path templates); the response types come from the same OpenAPI schemas.
 const BASE = '/api/v1/tasks';
 
-/** Every write invalidates the whole section: the agenda, the lists and the inbox move together. */
-const ALL = [qk.tasks.all()] as const;
+/**
+ * Every write invalidates the whole section (the agenda, the lists and the
+ * inbox move together) and the goals, whose progress counts their tasks.
+ */
+const ALL = [qk.tasks.all(), qk.goals.all()] as const;
 
 export const TASKS_PARSE_POLL_MS = 1500;
 /** The provider call is capped by its timeout; a job unfinished after this is stuck. */
