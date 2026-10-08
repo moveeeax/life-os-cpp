@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useGoal, useGoals } from '@/hooks/useGoals';
 import { useDeleteTask, useUpdateTask } from '@/hooks/useTasks';
 import {
   AREAS,
   EFFORT_LABEL,
+  localToday,
   type Area,
   type Effort,
   type Task,
@@ -31,6 +33,12 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
   const [due, setDue] = useState(task.due ?? '');
   const [next, setNext] = useState(task.next_step);
   const [note, setNote] = useState(task.note);
+  const [status, setStatus] = useState<Task['status']>(task.status);
+  const [goalId, setGoalId] = useState(task.goal_id ?? '');
+  const [sectionId, setSectionId] = useState(task.goal_section_id ?? '');
+  const today = localToday();
+  const goals = useGoals('active', today).data ?? [];
+  const goal = useGoal(goalId || null, today).data;
   const [confirm, setConfirm] = useState(false);
   const update = useUpdateTask(task.id, onClose);
   const remove = useDeleteTask(onClose);
@@ -46,6 +54,12 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
     if ((due || null) !== task.due) patch.due = due || null;
     if (next.trim() !== task.next_step) patch.next_step = next.trim();
     if (note !== task.note) patch.note = note;
+    if (status !== task.status) patch.status = status;
+    if ((goalId || null) !== task.goal_id || (sectionId || null) !== task.goal_section_id) {
+      // A section travels with its goal (the API checks the pair).
+      patch.goal_id = goalId || null;
+      patch.goal_section_id = goalId && sectionId ? sectionId : null;
+    }
     if (Object.keys(patch).length === 0) {
       onClose();
       return;
@@ -131,6 +145,62 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
               className={inputClass}
             />
           </div>
+          <div>
+            <label htmlFor="task-status" className={labelClass}>
+              Status
+            </label>
+            <select
+              id="task-status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as Task['status'])}
+              className={inputClass}
+            >
+              <option value="open">Not started</option>
+              <option value="in_progress">In progress</option>
+              <option value="done">Done</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="task-goal" className={labelClass}>
+              Goal
+            </label>
+            <select
+              id="task-goal"
+              value={goalId}
+              onChange={(e) => {
+                setGoalId(e.target.value);
+                setSectionId('');
+              }}
+              className={inputClass}
+            >
+              <option value="">None</option>
+              {goals.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.title}
+                </option>
+              ))}
+            </select>
+          </div>
+          {goal?.kind === 'steps' && goal.sections.length > 0 && (
+            <div>
+              <label htmlFor="task-section" className={labelClass}>
+                Section
+              </label>
+              <select
+                id="task-section"
+                value={sectionId}
+                onChange={(e) => setSectionId(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">None</option>
+                {goal.sections.map((sec) => (
+                  <option key={sec.id} value={sec.id}>
+                    {sec.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="sm:col-span-2">
             <label htmlFor="task-note" className={labelClass}>
               Note

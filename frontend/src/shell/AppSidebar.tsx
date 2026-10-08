@@ -5,6 +5,7 @@ import { Ellipsis, Shield, X } from 'lucide-react';
 import { useFoodEnabled } from '@/hooks/useFood';
 import { useMe } from '@/hooks/useMe';
 import { useMoneyEnabled } from '@/hooks/useMoney';
+import { useGoalsEnabled } from '@/hooks/useGoals';
 import { useTasksEnabled } from '@/hooks/useTasks';
 import { useWorkoutEnabled } from '@/hooks/useWorkoutSession';
 import { Permission, userCan, userIsAdmin } from '@/lib/auth/permissions';
@@ -27,11 +28,13 @@ export function AppSidebar() {
   const foodOn = useFoodEnabled(user !== null);
   const moneyOn = useMoneyEnabled(user !== null);
   const tasksOn = useTasksEnabled(user !== null);
+  const goalsOn = useGoalsEnabled(user !== null);
   const off = new Set([
     ...(workoutOn ? [] : ['workout']),
     ...(foodOn ? [] : ['food']),
     ...(moneyOn ? [] : ['money']),
     ...(tasksOn ? [] : ['tasks']),
+    ...(goalsOn ? [] : ['goals']),
   ]);
 
   // Close the drawer after a navigation on small screens.
