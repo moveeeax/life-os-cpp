@@ -8922,6 +8922,10 @@ export interface paths {
                                 from: string;
                                 /** Format: date */
                                 to: string;
+                            } | {
+                                /** @enum {string} */
+                                status: "already_queued";
+                                waiting: number;
                             };
                         };
                     };

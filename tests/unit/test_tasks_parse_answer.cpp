@@ -40,3 +40,9 @@ TEST(TasksParseAnswer, ReadsAFencedAnswer) {
     const auto lines = parse_answer("```json\n{\"lines\": [{\"title\": \"x\", \"area\": \"finance\"}]}\n```", {});
     ASSERT_EQ(lines.size(), 1u);
 }
+
+TEST(TasksParseAnswer, AnEmptyDueReadsAsNoDate) {
+    const auto lines = parse_answer(R"({"lines": [{"title": "x", "area": "projects", "due": ""}]})", {});
+    ASSERT_EQ(lines.size(), 1u);
+    EXPECT_FALSE(lines[0].due.has_value());
+}

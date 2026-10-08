@@ -126,7 +126,8 @@ inline std::vector<Line> parse_answer(std::string_view content, const std::set<s
         if (const auto e = detail::text_of(o, "effort"); Fields::is_effort(e)) {
             l.effort = e;
         }
-        if (o.contains("due") && o["due"].is_string()) {
+        // An empty string reads as no date: a model writes "" as often as null.
+        if (o.contains("due") && o["due"].is_string() && !o["due"].get<std::string>().empty()) {
             const auto d = o["due"].get<std::string>();
             try {
                 (void)Utils::Date::parse_ymd(d);

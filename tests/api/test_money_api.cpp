@@ -868,6 +868,18 @@ TEST_F(MoneyParseApiTest, AFewOpenParsesPerUser) {
     }
 }
 
+TEST_F(MoneyParseApiTest, TodaysRatesAreQueuedOnce) {
+    const auto first = call_json(&Api::MoneyController::refreshRates, user(kAnna), json::object());
+    ASSERT_EQ(first->statusCode(), k202Accepted) << first->body();
+    EXPECT_EQ(body_of(first)["data"]["status"], "queued");
+    const auto again = call_json(&Api::MoneyController::refreshRates, user(kAnna), json::object());
+    ASSERT_EQ(again->statusCode(), k202Accepted);
+    EXPECT_EQ(body_of(again)["data"]["status"], "already_queued") << "the waiting job covers it";
+    auto job = Jobs::get().pick({"money_rates"}, 1);
+    ASSERT_TRUE(job.has_value());
+    Jobs::get().complete(job->id, json::object());
+}
+
 TEST_F(MoneyParseApiTest, ASecondBackfillWaitsForTheFirst) {
     const auto post = [&](const json& b) { return call_json(&Api::MoneyController::refreshRates, user(kAnna), b); };
     const auto first = post(json{{"from", "2024-04-01"}, {"to", "2024-04-02"}});

@@ -50,7 +50,7 @@ inline void translate(std::string_view sqlstate) {
     if (sqlstate == "23503") {  // foreign_key_violation
         throw Invariant("the row refers to a goal or section that is not there");
     }
-    if (sqlstate == "23505") {  // unique_violation: only external_id is unique among user-written columns
+    if (sqlstate == "23505") {  // unique_violation: one check-in per goal and date
         throw Duplicate();
     }
     if (sqlstate == "22008" || sqlstate == "22007") {  // datetime_field_overflow, invalid_datetime_format

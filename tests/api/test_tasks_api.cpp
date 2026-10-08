@@ -304,3 +304,19 @@ TEST_F(TasksParseApiTest, AFewOpenParsesPerUser) {
         Jobs::get().complete(job->id, json::object());
     }
 }
+
+TEST_F(TasksApiTest, SearchTakesPercentLiterallyAndSomedayIsNewestFirst) {
+    created(&Api::TasksController::createItem, kAnna, json{{"title", "Old someday"}, {"area", "projects"}});
+    created(&Api::TasksController::createItem, kAnna, json{{"title", "Save 100% of it"}, {"area", "finance"}});
+    Database::get().execute_write([](auto& txn) {
+        txn.exec("UPDATE task_items SET created_at = now() - interval '3 days' WHERE title = 'Old someday'");
+        return true;
+    });
+    const json found = body_of(call(&Api::TasksController::listItems, user(kAnna), Get, {{"q", "100%"}}));
+    EXPECT_EQ(found["total"], 1) << "% is a character, not a wildcard";
+    EXPECT_EQ(body_of(call(&Api::TasksController::listItems, user(kAnna), Get, {{"q", "%"}}))["total"], 1);
+    const json someday =
+        body_of(call(&Api::TasksController::agenda, user(kAnna), Get, {{"date", "2026-10-07"}}))["data"]["someday"];
+    ASSERT_EQ(someday.size(), 2u);
+    EXPECT_EQ(someday[0]["title"], "Save 100% of it") << "newest first";
+}
