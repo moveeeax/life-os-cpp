@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react';
 
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+
 import { useAddMilestone, useAddSection, usePutCheckin, useSaveGoal } from '@/hooks/useGoals';
 import { useCreateTask, useUpdateTask } from '@/hooks/useTasks';
 import { formatValue, shelf, type GoalDetail } from '@/lib/goals';
@@ -336,6 +338,7 @@ export function CountPart({ goal, today }: { goal: GoalDetail; today: string }) 
 
 export function BinaryPart({ goal, today }: { goal: GoalDetail; today: string }) {
   const save = useSaveGoal(goal.id);
+  const [confirm, setConfirm] = useState<'pass' | 'fail' | null>(null);
   const [label, setLabel] = useState('');
   const [mdate, setMdate] = useState('');
   const addMilestone = useAddMilestone(goal.id, () => {
@@ -424,7 +427,7 @@ export function BinaryPart({ goal, today }: { goal: GoalDetail; today: string })
           <button
             type="button"
             disabled={save.isPending}
-            onClick={() => save.mutate({ result: 'pass' })}
+            onClick={() => setConfirm('pass')}
             className={ghost}
           >
             Passed
@@ -432,12 +435,26 @@ export function BinaryPart({ goal, today }: { goal: GoalDetail; today: string })
           <button
             type="button"
             disabled={save.isPending}
-            onClick={() => save.mutate({ result: 'fail' })}
+            onClick={() => setConfirm('fail')}
             className="text-theme-sm font-medium text-error-500 disabled:opacity-50"
           >
             Not passed
           </button>
         </div>
+      )}
+      {confirm && (
+        <ConfirmDialog
+          title={confirm === 'pass' ? 'Mark as passed?' : 'Mark as not passed?'}
+          description="The result closes the goal and is not taken back."
+          confirmLabel={confirm === 'pass' ? 'Passed' : 'Not passed'}
+          destructive={confirm === 'fail'}
+          busy={save.isPending}
+          onConfirm={() => {
+            save.mutate({ result: confirm });
+            setConfirm(null);
+          }}
+          onClose={() => setConfirm(null)}
+        />
       )}
     </div>
   );

@@ -7,7 +7,14 @@ import {
   useTasksStatus,
   useUpdateNote,
 } from '@/hooks/useTasks';
-import { areaOf, dueLabel, EFFORT_LABEL, localToday, type TaskParseLine } from '@/lib/tasks';
+import {
+  areaOf,
+  dueLabel,
+  EFFORT_LABEL,
+  localToday,
+  parseErrorText,
+  type TaskParseLine,
+} from '@/lib/tasks';
 
 const PLACEHOLDER = 'завтра написать в Kaspi про списание 2790';
 
@@ -112,9 +119,7 @@ export function Capture({
       {busy && <p className="text-theme-sm text-gray-500">Reading…</p>}
       {parse.state === 'failed' && (
         <p role="alert" className="text-theme-sm text-error-500">
-          {parse.error === 'not_configured'
-            ? 'The phrase reader is not set up.'
-            : `Could not read the phrase (${parse.error ?? 'unknown error'}).`}{' '}
+          {parseErrorText(parse.error)}{' '}
           <button type="button" onClick={asTyped} className="font-medium text-brand-500">
             Add as typed
           </button>

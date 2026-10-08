@@ -24,6 +24,7 @@ export function TaskRow({
 }) {
   const update = useUpdateTask(task.id);
   const [editing, setEditing] = useState(false);
+  const [moving, setMoving] = useState(false);
   const done = task.status === 'done';
   // A closed task's deadline no longer asks for anything.
   const due = done ? null : dueLabel(task.due, today);
@@ -91,8 +92,10 @@ export function TaskRow({
             {task.source_kind === 'money_transaction' && (
               <>
                 {' · '}
-                {/* The ledger has no link to one row yet: this opens the ledger. */}
-                <Link to="/money" className="text-brand-500 hover:underline">
+                <Link
+                  to={`/money?row=${encodeURIComponent(task.source_ref ?? '')}`}
+                  className="text-brand-500 hover:underline"
+                >
                   from the ledger
                 </Link>
               </>
@@ -109,6 +112,41 @@ export function TaskRow({
           )}
           {task.note && <p className="whitespace-pre-line">{task.note}</p>}
           <div className="mt-1 flex gap-3.5">
+            {!moving ? (
+              <button
+                type="button"
+                onClick={() => setMoving(true)}
+                className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+              >
+                Move date
+              </button>
+            ) : (
+              <span className="flex items-center gap-2">
+                <input
+                  type="date"
+                  autoFocus
+                  defaultValue={task.due ?? ''}
+                  aria-label="New due date"
+                  onChange={(e) => {
+                    update.mutate({ due: e.target.value || null });
+                    setMoving(false);
+                  }}
+                  className="h-7 rounded-md border border-gray-200 bg-transparent px-2 text-theme-xs dark:border-white/10"
+                />
+                {task.due && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      update.mutate({ due: null });
+                      setMoving(false);
+                    }}
+                    className="text-theme-xs text-gray-500"
+                  >
+                    No date
+                  </button>
+                )}
+              </span>
+            )}
             <button
               type="button"
               onClick={() => setEditing(true)}

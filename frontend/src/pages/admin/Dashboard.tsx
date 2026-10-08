@@ -1,12 +1,5 @@
 import { Link } from 'react-router';
-import {
-  Users,
-  UserPlus,
-  Shield,
-  ListChecks,
-  ScrollText,
-  Wallet,
-} from 'lucide-react';
+import { Users, UserPlus, Shield, ListChecks, ScrollText, Wallet } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMe } from '@/hooks/useMe';

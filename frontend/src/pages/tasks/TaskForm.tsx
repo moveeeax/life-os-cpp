@@ -37,7 +37,12 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
   const [goalId, setGoalId] = useState(task.goal_id ?? '');
   const [sectionId, setSectionId] = useState(task.goal_section_id ?? '');
   const today = localToday();
-  const goals = useGoals('active', today).data ?? [];
+  const active = useGoals('active', today).data ?? [];
+  // A task of a done or dropped goal still shows that goal, by its title.
+  const goals =
+    task.goal_id && !active.some((g) => g.id === task.goal_id)
+      ? [{ id: task.goal_id, title: task.goal_title ?? 'This goal' }, ...active]
+      : active;
   const goal = useGoal(goalId || null, today).data;
   const [confirm, setConfirm] = useState(false);
   const update = useUpdateTask(task.id, onClose);

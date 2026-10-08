@@ -70,6 +70,8 @@ export const qk = {
     categories: (archived = false) => ['money', 'categories', archived] as const,
     inbox: () => ['money', 'inbox'] as const,
     balances: () => ['money', 'balances'] as const,
+    /** One ledger row, for a link that opens it. */
+    transaction: (id: string) => ['money', 'transaction', id] as const,
     transactions: (filter: Record<string, unknown>) =>
       ['money', 'transactions', JSON.stringify(filter)] as const,
     transfers: (from?: string, to?: string, account?: string) =>

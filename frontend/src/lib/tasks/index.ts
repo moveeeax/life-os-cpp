@@ -51,6 +51,21 @@ export function safeLink(ref: string | null | undefined): string | null {
   }
 }
 
+/** What a failed phrase parse says to a person; the raw `code: message` stays out of sight. */
+export function parseErrorText(error: string | null | undefined): string {
+  const code = (error ?? '').split(':')[0].trim();
+  const words: Record<string, string> = {
+    not_configured: 'The phrase reader is not set up.',
+    invalid_answer: 'The reader answered something that is not a task.',
+    provider_unavailable: 'The reader is not answering right now.',
+    parse_timeout: 'The reader took too long.',
+    queue_unavailable: 'The phrase could not be queued.',
+    too_many_parses: 'Three phrases are still being read; wait a moment.',
+    refusal: 'The reader declined this phrase.',
+  };
+  return words[code] ?? 'The phrase could not be read.';
+}
+
 export function localToday(): string {
   const n = new Date();
   const p = (x: number) => String(x).padStart(2, '0');

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dueLabel, safeLink } from './index';
+import { dueLabel, parseErrorText, safeLink } from './index';
 
 describe('dueLabel', () => {
   const today = '2026-10-07';
@@ -27,5 +27,16 @@ describe('safeLink', () => {
     expect(safeLink('data:text/html,<script>1</script>')).toBeNull();
     expect(safeLink('not a url')).toBeNull();
     expect(safeLink(null)).toBeNull();
+  });
+});
+
+describe('parseErrorText', () => {
+  it('says what went wrong without the raw code', () => {
+    expect(parseErrorText('invalid_answer: a line has an area outside the six: work')).toBe(
+      'The reader answered something that is not a task.',
+    );
+    expect(parseErrorText('not_configured')).toBe('The phrase reader is not set up.');
+    expect(parseErrorText('something_new: x')).toBe('The phrase could not be read.');
+    expect(parseErrorText(null)).toBe('The phrase could not be read.');
   });
 });
