@@ -33,6 +33,8 @@ public:
         std::optional<std::string> source_ref;
         std::optional<std::string> external_id;
         std::string status = "open";
+        std::optional<std::string> goal_id;
+        std::optional<std::string> goal_section_id;
     };
 
     struct Patch {
@@ -45,6 +47,8 @@ public:
         std::optional<std::string> status;
         std::optional<std::optional<std::string>> source_kind;
         std::optional<std::optional<std::string>> source_ref;
+        std::optional<std::optional<std::string>> goal_id;
+        std::optional<std::optional<std::string>> goal_section_id;
     };
 
     struct Filter {
@@ -70,8 +74,9 @@ public:
     static std::string create_in(Txn& txn, const std::string& owner, const Input& in) {
         auto r = txn.exec_params(
             "INSERT INTO task_items (owner_id, title, area, effort, due, next_step, note, status, completed_at, "
-            " source_kind, source_ref, external_id) "
-            "VALUES ($1::uuid, $2, $3, $4, $5::date, $6, $7, $8, CASE WHEN $8 = 'done' THEN now() END, $9, $10, $11) "
+            " source_kind, source_ref, external_id, goal_id, goal_section_id) "
+            "VALUES ($1::uuid, $2, $3, $4, $5::date, $6, $7, $8, CASE WHEN $8 = 'done' THEN now() END, $9, $10, $11, "
+            " $12::uuid, $13::uuid) "
             "RETURNING id::text",
             owner,
             in.title,
@@ -83,7 +88,9 @@ public:
             in.status,
             in.source_kind,
             in.source_ref,
-            in.external_id);
+            in.external_id,
+            in.goal_id,
+            in.goal_section_id);
         return r[0][0].template as<std::string>();
     }
 
@@ -106,6 +113,8 @@ public:
                         "   THEN COALESCE(CASE WHEN status = 'done' THEN completed_at END, now()) END, "
                         " source_kind = CASE WHEN $12::boolean THEN $13 ELSE source_kind END, "
                         " source_ref = CASE WHEN $14::boolean THEN $15 ELSE source_ref END, "
+                        " goal_id = CASE WHEN $16::boolean THEN $17::uuid ELSE goal_id END, "
+                        " goal_section_id = CASE WHEN $18::boolean THEN $19::uuid ELSE goal_section_id END, "
                         " updated_at = now() "
                         "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
                         owner,
@@ -122,7 +131,11 @@ public:
                         p.source_kind.has_value(),
                         p.source_kind.has_value() ? *p.source_kind : std::optional<std::string>(),
                         p.source_ref.has_value(),
-                        p.source_ref.has_value() ? *p.source_ref : std::optional<std::string>());
+                        p.source_ref.has_value() ? *p.source_ref : std::optional<std::string>(),
+                        p.goal_id.has_value(),
+                        p.goal_id.has_value() ? *p.goal_id : std::optional<std::string>(),
+                        p.goal_section_id.has_value(),
+                        p.goal_section_id.has_value() ? *p.goal_section_id : std::optional<std::string>());
                     if (r.empty()) {
                         throw NotFound("task");
                     }
@@ -177,8 +190,8 @@ public:
                 " ($2::date - (created_at AT TIME ZONE $3)::date), ($2::date - (updated_at AT TIME ZONE $3)::date), "
                 " (SELECT row_to_json(t) FROM (SELECT " +
                     std::string(kColumns) +
-                    ") t)::text "
-                    "FROM task_items WHERE owner_id = $1::uuid AND (status = 'open' OR "
+                    ") t)::text, goal_id IS NOT NULL "
+                    "FROM task_items WHERE owner_id = $1::uuid AND (status <> 'done' OR "
                     " (completed_at AT TIME ZONE $3)::date >= $2::date - 1) "
                     "ORDER BY due NULLS LAST, created_at",
                 owner,
@@ -193,7 +206,8 @@ public:
                                                     row[4].template as<std::string>(),
                                                     row[5].template as<int>(),
                                                     row[6].template as<int>(),
-                                                    nlohmann::json::parse(row[7].template as<std::string>())});
+                                                    nlohmann::json::parse(row[7].template as<std::string>()),
+                                                    row[8].template as<bool>()});
             }
             return out;
         });
@@ -204,7 +218,7 @@ public:
         return Database::get().execute_read([&](auto& txn) {
             std::set<std::string> out;
             for (const auto& row :
-                 txn.exec_params("SELECT lower(title) FROM task_items WHERE owner_id = $1::uuid AND status = 'open' "
+                 txn.exec_params("SELECT lower(title) FROM task_items WHERE owner_id = $1::uuid AND status <> 'done' "
                                  " AND created_at > now() - interval '30 days'",
                                  owner)) {
                 out.insert(row[0].template as<std::string>());
@@ -230,7 +244,8 @@ public:
     static constexpr const char* kColumns =
         "id, title, area, effort, to_char(due, 'YYYY-MM-DD') AS due, next_step, note, status, "
         " to_char(completed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS completed_at, "
-        " source_kind, source_ref, external_id, "
+        " source_kind, source_ref, external_id, goal_id, goal_section_id, "
+        " (SELECT g.title FROM goal_items g WHERE g.id = task_items.goal_id) AS goal_title, "
         " to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
         " to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";
 

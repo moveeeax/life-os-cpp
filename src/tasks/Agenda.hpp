@@ -31,6 +31,7 @@ struct Item {
     int age_days = 0;   // days since created, at the agenda date
     int idle_days = 0;  // days since last updated, at the agenda date
     nlohmann::json row;
+    bool has_goal = false;  // a goal's task without a due date lives on the goal, not in someday
 };
 
 struct Groups {
@@ -49,7 +50,9 @@ inline Groups group(const std::vector<Item>& items, std::string_view date) {
             continue;
         }
         if (it.due.empty()) {
-            g.someday.push_back(it.row);
+            if (!it.has_goal) {
+                g.someday.push_back(it.row);
+            }
         } else {
             const auto gap = (sys_days{Utils::Date::parse_ymd(it.due)} - today).count();
             if (gap < 0) {
