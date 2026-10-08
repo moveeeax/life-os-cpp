@@ -321,6 +321,10 @@ void TasksController::updateItem(const HttpRequestPtr& req, Callback&& callback,
     p.source_ref = nullable(body, "source_ref");
     p.goal_id = nullable(body, "goal_id");
     p.goal_section_id = nullable(body, "goal_section_id");
+    if (p.goal_id.has_value() && !p.goal_section_id.has_value()) {
+        // A new goal (or none) does not keep the old goal's section.
+        p.goal_section_id = std::optional<std::string>();
+    }
     with_repo_errors(callback, "tasks.updateItem", [&] {
         callback(Response::ok(json{{"data", Repo::TaskRepository().update(owner, id, p)}}));
     });
