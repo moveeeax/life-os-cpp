@@ -6,6 +6,26 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-10-08
+
+### Added
+- Goals: a new module (`GOALS_ENABLED`) for goals of four kinds. A `number`
+  goal has a start, a target and a unit, and its check-ins (one per date); a
+  `steps` goal has sections of tasks; a `count` goal counts done tasks against a
+  target; a `binary` goal has milestones and a result that closes it. Every
+  goal comes with its progress and pace at the caller's date (`?date=`):
+  expected value, gap, needed pace per week, "not updated" after 14 days.
+  Tasks can belong to a goal and to one of its sections, and gain the
+  `in_progress` status; a goal's undated tasks stay off the agenda's someday.
+  Migration 030.
+- Goals page: active goals as rows with the area colour, the kind, the due
+  date, a progress bar and a pace word ("on track", "behind 1.2 kg", "not
+  updated", "84 days left"). A row opens in place: a chart of check-ins against
+  the even pace for a number goal, sections with their tasks for a steps goal,
+  a shelf of done items for a count goal, a deadline line with milestones and
+  Passed / Not passed for a binary goal. Tasks get a Goal, a Section and a
+  Status (with "in progress") in their form, and show their goal.
+
 ## [1.16.1] - 2026-10-08
 
 ### Fixed
