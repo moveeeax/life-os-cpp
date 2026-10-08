@@ -266,8 +266,17 @@ TEST_F(GoalsApiTest, ATaskLinksOnlyToTheCallersGoalAndItsSections) {
     EXPECT_EQ(post(kAnna, json{{"title", "x"}, {"area", "growth"}, {"goal_section_id", other_section["id"]}}),
               k400BadRequest)
         << "a section without its goal";
-    const json t = task({{"title", "x"}, {"area", "growth"}, {"goal_id", mine["id"]}});
+    const json mine_section = body_of(
+        call_id(goals, &Api::GoalsController::addSection, kAnna, Post, mine["id"], json{{"name", "M"}}))["data"];
+    const json t =
+        task({{"title", "x"}, {"area", "growth"}, {"goal_id", mine["id"]}, {"goal_section_id", mine_section["id"]}});
     EXPECT_EQ(t["goal_title"], "Mine");
+    // Moving the task to another goal drops the old goal's section.
+    const auto moved =
+        call_id(tasks, &Api::TasksController::updateItem, kAnna, Patch, t["id"], json{{"goal_id", other["id"]}});
+    ASSERT_EQ(moved->statusCode(), k200OK) << moved->body();
+    EXPECT_EQ(body_of(moved)["data"]["goal_id"], other["id"]);
+    EXPECT_TRUE(body_of(moved)["data"]["goal_section_id"].is_null()) << "a section of the old goal does not travel";
 }
 
 TEST_F(GoalsApiTest, ABinaryResultClosesTheGoalAndStays) {
@@ -294,6 +303,7 @@ TEST_F(GoalsApiTest, ABinaryResultClosesTheGoalAndStays) {
     EXPECT_EQ(body_of(passed)["data"]["progress"]["pace"], "passed");
     EXPECT_EQ(patch(json{{"result", nullptr}})->statusCode(), k400BadRequest) << "a result is not taken back";
     EXPECT_EQ(patch(json{{"kind", "number"}})->statusCode(), k400BadRequest) << "the kind does not change";
+    EXPECT_EQ(patch(json{{"due", nullptr}})->statusCode(), k400BadRequest) << "a goal keeps a due date (not a 500)";
 }
 
 TEST_F(GoalsApiTest, DeletingAGoalLeavesItsTasks) {

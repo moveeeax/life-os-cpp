@@ -126,7 +126,14 @@ void goal_fields(Validation::Errors& errs, const json& body, const std::string& 
     number_range(errs, body, "target_value", -kValueMax, kValueMax);
     Validation::int_range(errs, body, "target_count", 1, ::Goals::Fields::kTargetCountMax);
     if (body.contains("result")) {
-        Validation::one_of(errs, body, "result", kResults);  // null is refused: a result is not taken back
+        if (body["result"].is_null()) {
+            errs.add("result", "not_allowed", "a result is not taken back");
+        } else {
+            Validation::one_of(errs, body, "result", kResults);
+        }
+    }
+    if (body.contains("due") && body["due"].is_null()) {
+        errs.add("due", "missing", "a goal keeps a due date");
     }
     only_for(errs, body, "unit", kind, "number");
     only_for(errs, body, "start_value", kind, "number");
@@ -306,7 +313,7 @@ void GoalsController::updateGoal(const HttpRequestPtr& req, Callback&& callback,
             errs.add("start_date", "immutable", "the start of a goal does not change");
         }
         goal_fields(errs, body, kind);
-        if (!errs.any() && body.contains("due") &&
+        if (!errs.any() && body.contains("due") && body["due"].is_string() &&
             body["due"].get<std::string>() <= (*current)["start_date"].get<std::string>()) {
             errs.add("due", "before_start", "due must be after start_date");
         }
