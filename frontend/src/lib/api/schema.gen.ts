@@ -10980,10 +10980,1032 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's goals with their progress */
+        get: {
+            parameters: {
+                query?: {
+                    status?: "active" | "done" | "dropped";
+                    /** @description The person's local day the progress is computed at; defaults to today in UTC */
+                    date?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Goals by due date */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Goal"][];
+                            count: number;
+                        };
+                    };
+                };
+                /** @description status or date is not valid (invalid_query) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Goals module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Create a goal
+         * @description number needs start_value and target_value (different); count needs target_count; unit is for number only; start_date defaults to today; due must be after it.
+         */
+        post: {
+            parameters: {
+                query?: {
+                    /** @description The person's local day the progress is computed at; defaults to today in UTC */
+                    date?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["GoalInput"];
+                };
+            };
+            responses: {
+                /** @description The goal */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Goal"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or a rule of the model (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Goals module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/goals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** One goal with its check-ins, sections with tasks, tasks without a section and milestones */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The person's local day the progress is computed at; defaults to today in UTC */
+                    date?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The goal */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["GoalDetail"];
+                        };
+                    };
+                };
+                /** @description id is not a UUID or date is not valid */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Goals module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete a goal; its tasks stay, unlinked */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Goals module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /**
+         * Change a goal
+         * @description kind and start_date do not change. A result (binary only, pass or fail) closes the goal and cannot be cleared. status done sets completed_at; active or dropped clears it.
+         */
+        patch: {
+            parameters: {
+                query?: {
+                    /** @description The person's local day the progress is computed at; defaults to today in UTC */
+                    date?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["GoalPatch"];
+                };
+            };
+            responses: {
+                /** @description The goal */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Goal"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or a rule of the model (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Goals module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/goals/{id}/checkins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A check-in of a number goal; a second one for the same date replaces the first */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        value: number;
+                        /**
+                         * Format: date
+                         * @description Defaults to today in UTC
+                         */
+                        date?: string;
+                        note?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The check-in */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["GoalCheckin"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or not a number goal (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Goals module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/goals/{id}/checkins/{child}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                child: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a check-in */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    child: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description An id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Goals module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/goals/{id}/sections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a section to a steps goal */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        /** @description Defaults to after the last section */
+                        position?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description The section */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["GoalSection"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or not a steps goal (code invariant) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Goals module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/goals/{id}/sections/{child}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                child: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a section; its tasks stay on the goal without a section */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    child: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description An id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Goals module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Rename or move a section */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    child: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name?: string;
+                        position?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description The section */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["GoalSection"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Goals module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/goals/{id}/milestones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a milestone */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        date: string;
+                        label: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The milestone */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["GoalMilestone"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Goals module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/goals/{id}/milestones/{child}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                child: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a milestone */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    child: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description An id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Goals module disabled, or the row is not the caller's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        GoalKind: "number" | "steps" | "count" | "binary";
+        /** @description Computed at the date asked for. number adds current, current_date, expected, gap (positive when ahead), per_week, stale; steps adds done, total; count adds done, target, expected, reached; binary adds result and has no progress. */
+        GoalProgress: {
+            kind: components["schemas"]["GoalKind"];
+            elapsed: number;
+            days_left: number;
+            /** @enum {string} */
+            pace: "on_track" | "behind" | "passed" | "failed";
+            progress: number | null;
+            current?: number;
+            /** Format: date */
+            current_date?: string;
+            expected?: number;
+            gap?: number;
+            per_week?: number;
+            stale?: boolean;
+            done?: number;
+            total?: number;
+            target?: number;
+            reached?: boolean;
+            /** @enum {string|null} */
+            result?: "pass" | "fail" | null;
+        };
+        Goal: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            area: components["schemas"]["TaskArea"];
+            kind: components["schemas"]["GoalKind"];
+            why: string;
+            /** Format: date */
+            start_date: string;
+            /** Format: date */
+            due: string;
+            /** @enum {string} */
+            status: "active" | "done" | "dropped";
+            /** Format: date-time */
+            completed_at: string | null;
+            unit: string;
+            start_value: number | null;
+            target_value: number | null;
+            target_count: number | null;
+            /** @enum {string|null} */
+            result: "pass" | "fail" | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            progress: components["schemas"]["GoalProgress"];
+        };
+        GoalDetail: components["schemas"]["Goal"] & {
+            checkins: components["schemas"]["GoalCheckin"][];
+            sections: (components["schemas"]["GoalSection"] & {
+                tasks: components["schemas"]["Task"][];
+            })[];
+            /** @description The goal's tasks without a section */
+            tasks: components["schemas"]["Task"][];
+            milestones: components["schemas"]["GoalMilestone"][];
+        };
+        GoalInput: {
+            title: string;
+            area: components["schemas"]["TaskArea"];
+            kind: components["schemas"]["GoalKind"];
+            why?: string;
+            /** Format: date */
+            start_date?: string;
+            /** Format: date */
+            due: string;
+            unit?: string;
+            start_value?: number;
+            target_value?: number;
+            target_count?: number;
+        };
+        GoalPatch: {
+            title?: string;
+            area?: components["schemas"]["TaskArea"];
+            why?: string;
+            /** Format: date */
+            due?: string;
+            /** @enum {string} */
+            status?: "active" | "done" | "dropped";
+            unit?: string;
+            start_value?: number;
+            target_value?: number;
+            target_count?: number;
+            /** @enum {string} */
+            result?: "pass" | "fail";
+        };
+        GoalCheckin: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            date: string;
+            value: number;
+            note: string;
+        };
+        GoalSection: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            position: number;
+        };
+        GoalMilestone: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            date: string;
+            label: string;
+        };
         /** @enum {string} */
         TaskArea: "finance" | "health" | "travel" | "growth" | "relationships" | "projects";
         /** @enum {string|null} */
@@ -10999,7 +12021,7 @@ export interface components {
             next_step: string;
             note: string;
             /** @enum {string} */
-            status: "open" | "done";
+            status: "open" | "in_progress" | "done";
             /** Format: date-time */
             completed_at: string | null;
             /** @enum {string|null} */
@@ -11007,6 +12029,12 @@ export interface components {
             /** @description The link */
             source_ref: string | null;
             external_id: string | null;
+            /** Format: uuid */
+            goal_id: string | null;
+            /** Format: uuid */
+            goal_section_id: string | null;
+            /** @description The title of the goal the task belongs to */
+            goal_title: string | null;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -11021,10 +12049,20 @@ export interface components {
             next_step?: string;
             note?: string;
             /** @enum {string} */
-            status?: "open" | "done";
+            status?: "open" | "in_progress" | "done";
             /** @enum {string|null} */
             source_kind?: "url" | "money_transaction" | null;
             source_ref?: string | null;
+            /**
+             * Format: uuid
+             * @description A goal of the caller
+             */
+            goal_id?: string | null;
+            /**
+             * Format: uuid
+             * @description A section of that goal; given together with goal_id
+             */
+            goal_section_id?: string | null;
             external_id?: string;
         };
         TaskPatch: {
@@ -11036,10 +12074,20 @@ export interface components {
             next_step?: string;
             note?: string;
             /** @enum {string} */
-            status?: "open" | "done";
+            status?: "open" | "in_progress" | "done";
             /** @enum {string|null} */
             source_kind?: "url" | "money_transaction" | null;
             source_ref?: string | null;
+            /**
+             * Format: uuid
+             * @description A goal of the caller
+             */
+            goal_id?: string | null;
+            /**
+             * Format: uuid
+             * @description A section of that goal; given together with goal_id
+             */
+            goal_section_id?: string | null;
         };
         TaskAgenda: {
             /** Format: date */
