@@ -1,8 +1,8 @@
-# CI profiles: hosted runners, self-hosted runners, and why there is no arm64 CI
+# CI profiles: hosted runners, self-hosted runners, and arm64 on native runners
 
 The workflows in `.github/workflows/` are tuned for GitHub-hosted runners.
 This page records what changes (and what breaks) when you move them to
-self-hosted/weak runners, and why arm64 is deliberately out of CI. Every rule
+self-hosted/weak runners, and why arm64 builds only on native arm64 runners. Every rule
 here was learned the expensive way on self-hosted runners.
 
 ## Hosted-runner profile (the default in this repo)
@@ -95,10 +95,16 @@ incident):
 
 A C++ build of this dependency world under QEMU emulation (buildx
 `linux/arm64` on an amd64 hosted runner) takes HOURS, not minutes — it never
-fit any CI budget and was removed from the release workflow; release images
-are amd64-only by default. If you need arm64 images, either build on native
-arm64 hardware (a self-hosted arm64 runner) or accept amd64-only. Do not
-re-add a QEMU arm64 leg to CI "for completeness" — it will time out.
+fit any CI budget. Do not add a QEMU arm64 leg to CI — it will time out.
+
+Release images are multi-arch (`linux/amd64` + `linux/arm64`) and each
+architecture builds on native hardware: `release.yml` runs a `build-staging`
+matrix on `ubuntu-latest` and the hosted arm64 runner `ubuntu-24.04-arm`,
+pushes each leg by digest, and `merge-staging` stitches the digests into one
+`:<version>-staging` index with `docker buildx imagetools create`. A cold
+arm64 leg rebuilds the whole vcpkg world first, hence its 90-minute timeout.
+To add arm64 to an already released version, run the workflow manually
+(`workflow_dispatch`) with that tag.
 
 When you do build multi-arch on native hardware, keep the
 `id=vcpkg-downloads-${TARGETARCH}` scoping on the BuildKit cache mounts in

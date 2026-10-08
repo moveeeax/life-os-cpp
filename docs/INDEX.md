@@ -62,7 +62,7 @@ tree.
 | File | What's there |
 |---|---|
 | [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml) | GitHub Actions CI: build + test + format + secret-scan |
-| [`CI-PROFILES.md`](CI-PROFILES.md) | Hosted vs self-hosted runner profiles: serialize-vs-parallel, cache layers, honest timeouts, retry policy, why arm64/QEMU is out |
+| [`CI-PROFILES.md`](CI-PROFILES.md) | Hosted vs self-hosted runner profiles: serialize-vs-parallel, cache layers, honest timeouts, retry policy, arm64 on native runners, never QEMU |
 | [`../.github/workflows/release.yml`](../.github/workflows/release.yml) | Tag-driven image build → Trivy gate → promote → SPDX SBOM + cosign keyless sign/attest → GitHub Release (verify: [`../SECURITY.md`](../SECURITY.md)) |
 | [`RUNBOOK.md`](RUNBOOK.md) | Operator runbook: what to do when an alert fires (each alert's `runbook_url` anchors here) |
 | [`SLO.md`](SLO.md) | SLOs + alert thresholds — the rationale behind the Prometheus rules |
