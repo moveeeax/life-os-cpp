@@ -144,3 +144,5 @@ api -> repositories/tasks
 api -> tasks
 jobs -> repositories/tasks
 jobs -> tasks
+goals -> tasks
+goals -> utils
