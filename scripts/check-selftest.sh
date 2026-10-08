@@ -229,6 +229,20 @@ PY
 
 # 3. A hand-written ADD_METHOD_TO the registry never saw: the route would
 #    work, invisibly to --print-routes and the OpenAPI drift check.
+break_unlinked_controller() {
+    python3 - "$1/src/api/Api.hpp" <<'PY'
+import sys
+path = sys.argv[1]
+line = '#include "api/TasksController.hpp"\n'
+with open(path, encoding="utf-8") as fh:
+    text = fh.read()
+if line not in text:
+    sys.exit("break_unlinked_controller: %s does not include TasksController.hpp" % path)
+with open(path, "w", encoding="utf-8") as fh:
+    fh.write(text.replace(line, ""))
+PY
+}
+
 break_rogue_controller_route() {
     python3 - "$1/src/api/HealthController.hpp" <<'PY'
 import sys
@@ -553,6 +567,11 @@ run_case rogue-controller-route check-routes-registered.sh break_rogue_controlle
     "src/api" \
     'MISSING from Api::get_endpoints() (Endpoints.hpp): GET /api/v1/selftest-ghost' \
     'Add the missing route(s)'
+
+run_case unlinked-controller check-routes-registered.sh break_unlinked_controller \
+    "src/api" \
+    'not included by src/api/Api.hpp' \
+    'api/TasksController.hpp'
 
 run_case unversioned-registry-row check-routes-registered.sh break_unversioned_registry_row \
     "src/api" \
