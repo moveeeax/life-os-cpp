@@ -218,6 +218,9 @@ spec:
             # tasks module — master switch
             - name: TASKS_ENABLED
               value: {{ .Values.tasks.enabled | quote }}
+            # goals module — master switch
+            - name: GOALS_ENABLED
+              value: {{ .Values.goals.enabled | quote }}
             {{- if .Values.billing.enabled }}
             - name: PAYPAL_ENV
               value: {{ .Values.billing.paypal.environment | quote }}

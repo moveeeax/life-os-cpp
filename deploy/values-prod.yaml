@@ -94,6 +94,9 @@ money:
 tasks:
   enabled: true
 
+goals:
+  enabled: true
+
 mail:
   enabled: false
 

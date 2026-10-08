@@ -268,6 +268,7 @@ outage can never affect the money path.
 | `TASKS_LLM_PROMPT_PARSE` | `tasks.llm.prompt_parse` | string | `""` | System prompt of the tasks parse; example in `docs/tasks/prompt-parse.example.md`. Empty: the parse is `not_configured` and the page saves tasks as typed. Prod: ConfigMap `life-os-tasks-llm` |
 | `TASKS_LLM_TIMEOUT_SECONDS` | `tasks.llm.timeout_seconds` | int | `60` | Provider timeout per call (at least 5) |
 | `TASKS_LLM_MAX_TOKENS` | `tasks.llm.max_tokens` | int | `1500` | Token cap of an answer (at least 100) |
+| `GOALS_ENABLED` | `goals.enabled` | bool | `false` | Master switch for the goals module (`Core::goals_enabled()`): goals of four kinds, check-ins, sections, milestones, the progress and pace computed at the caller's date, and the goal link of tasks. Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
 | `FOOD_LLM_BASE_URL` | `food.llm.base_url` | string | `""` | Base URL of an OpenAI-compatible chat completions API for the `food_parse` job, e.g. `https://api.openai.com/v1`. The worker calls `{base_url}/chat/completions`. With any of the four `FOOD_LLM_*` settings below empty the parse is `not_configured` and the add form hides it. Prod: ConfigMap `life-os-food-llm` |
 | `FOOD_LLM_API_KEY` | `food.llm.api_key` | string | `""` | Bearer token of the provider. Prod: Secret `life-os-food-llm`. Never log or commit |
 | `FOOD_LLM_MODEL` | `food.llm.model` | string | `""` | Model name as the provider expects it |
