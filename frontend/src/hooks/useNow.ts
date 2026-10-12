@@ -7,9 +7,12 @@ import {
   cacheKey,
   readCache,
   writeCache,
+  type AdminSound,
   type AdminWallpaper,
   type Device,
   type Focus,
+  type Sound,
+  type SoundCreate,
   type FocusInput,
   type Today,
   type Wallpaper,
@@ -147,6 +150,55 @@ export function useWallpaperReady() {
 
 export function useDeleteWallpaper() {
   return useApiMutation((id: string) => del(`${ADMIN}/${id}`), {
+    invalidate: [qk.now.all()],
+  });
+}
+
+// ── sounds ──────────────────────────────────────────────────────────────────
+
+const SOUNDS_ADMIN = '/api/v1/admin/sounds';
+
+/** The ready focus sounds; empty while storage is not set up. */
+export function useSounds(enabled = true) {
+  return useQuery({
+    queryKey: qk.now.sounds(),
+    enabled,
+    retry: false,
+    staleTime: 10 * 60_000,
+    queryFn: async ({ signal }) =>
+      (await api.getJson<{ data: Sound[] }>('/api/v1/sounds', { signal })).data,
+  });
+}
+
+export function useAdminSounds() {
+  return useQuery({
+    queryKey: qk.now.adminSounds(),
+    retry: false,
+    queryFn: async ({ signal }) =>
+      (await api.getJson<{ data: AdminSound[] }>(SOUNDS_ADMIN, { signal })).data,
+  });
+}
+
+export function useCreateSound() {
+  return useApiMutation(
+    async (body: SoundCreate) =>
+      (
+        await api.postJson<{ data: { id: string; upload: WallpaperUpload } }>(SOUNDS_ADMIN, {
+          body,
+        })
+      ).data,
+  );
+}
+
+export function useSoundReady() {
+  return useApiMutation(
+    async (id: string) => (await api.postJson<{ data: Sound }>(`${SOUNDS_ADMIN}/${id}/ready`)).data,
+    { invalidate: [qk.now.all()] },
+  );
+}
+
+export function useDeleteSound() {
+  return useApiMutation((id: string) => del(`${SOUNDS_ADMIN}/${id}`), {
     invalidate: [qk.now.all()],
   });
 }

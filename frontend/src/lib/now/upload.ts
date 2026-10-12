@@ -3,11 +3,31 @@
 
 const MB = 1024 * 1024;
 
-export const LIMITS = { video: 100 * MB, image: 10 * MB, poster: MB } as const;
+export const LIMITS = { video: 100 * MB, image: 10 * MB, poster: MB, sound: 30 * MB } as const;
 export const TYPES = {
   video: ['video/mp4', 'video/webm'],
   image: ['image/jpeg', 'image/webp'],
 } as const;
+
+export const AUDIO_TYPES = [
+  'audio/mpeg',
+  'audio/mp4',
+  'audio/x-m4a',
+  'audio/aac',
+  'audio/ogg',
+] as const;
+
+/** A focus sound: MP3, AAC/M4A or Ogg up to 30 MB. */
+export function checkAudio(file: {
+  type: string;
+  size: number;
+}): { ok: true } | { ok: false; reason: string } {
+  if (!(AUDIO_TYPES as readonly string[]).includes(file.type))
+    return { ok: false, reason: 'Use MP3, AAC/M4A or Ogg for a sound.' };
+  if (file.size <= 0) return { ok: false, reason: 'The file is empty.' };
+  if (file.size > LIMITS.sound) return { ok: false, reason: 'A sound can be at most 30 MB.' };
+  return { ok: true };
+}
 
 export type CheckResult = { ok: true; kind: 'video' | 'image' } | { ok: false; reason: string };
 

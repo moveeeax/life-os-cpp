@@ -8,3 +8,6 @@ export type Wallpaper = S['Wallpaper'];
 export type AdminWallpaper = S['AdminWallpaper'];
 export type WallpaperCreate = S['WallpaperCreate'];
 export type WallpaperUpload = S['WallpaperUpload'];
+export type Sound = S['Sound'];
+export type AdminSound = S['AdminSound'];
+export type SoundCreate = S['SoundCreate'];

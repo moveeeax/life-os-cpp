@@ -104,6 +104,8 @@ export const qk = {
     today: (date: string, tz: string) => ['now', 'today', date, tz] as const,
     wallpapers: (device: string) => ['now', 'wallpapers', device] as const,
     adminWallpapers: () => ['now', 'admin-wallpapers'] as const,
+    sounds: () => ['now', 'sounds'] as const,
+    adminSounds: () => ['now', 'admin-sounds'] as const,
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['now-enabled'] as const,
   },

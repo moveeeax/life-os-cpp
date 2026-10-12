@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { LIMITS, checkFile } from './upload';
+import { LIMITS, checkAudio, checkFile } from './upload';
 
 const MB = 1024 * 1024;
 
@@ -38,5 +38,18 @@ describe('checkFile', () => {
 
   it('refuses an empty file', () => {
     expect(checkFile({ type: 'image/jpeg', size: 0 }, 'phone').ok).toBe(false);
+  });
+});
+
+describe('checkAudio', () => {
+  it('takes MP3, AAC/M4A and Ogg up to 30 MB', () => {
+    expect(checkAudio({ type: 'audio/mpeg', size: 8 * MB })).toEqual({ ok: true });
+    expect(checkAudio({ type: 'audio/x-m4a', size: LIMITS.sound })).toEqual({ ok: true });
+    expect(checkAudio({ type: 'audio/ogg', size: 1 })).toEqual({ ok: true });
+  });
+  it('refuses other types, empty files and files over 30 MB', () => {
+    expect(checkAudio({ type: 'audio/wav', size: MB }).ok).toBe(false);
+    expect(checkAudio({ type: 'audio/mpeg', size: 0 }).ok).toBe(false);
+    expect(checkAudio({ type: 'audio/mpeg', size: LIMITS.sound + 1 }).ok).toBe(false);
   });
 });
