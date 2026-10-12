@@ -12704,8 +12704,18 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     title: string;
+                    /** @enum {string} */
+                    status: "open" | "in_progress" | "done";
                 }[];
                 inbox_count: number;
+                /** @description Up to 5 late tasks, oldest first */
+                late?: {
+                    /** Format: uuid */
+                    id: string;
+                    title: string;
+                    /** Format: date */
+                    due: string;
+                }[];
             };
             goals?: {
                 /** Format: uuid */
@@ -12717,30 +12727,64 @@ export interface components {
                 due: string;
                 /** @enum {string} */
                 pace: "on_track" | "behind";
+                /** @description 0..1; null for a pass / fail goal */
+                progress: number | null;
+                days_left: number | null;
             }[];
             food?: {
                 eaten: {
                     kcal: number;
                     protein_g: number;
+                    fat_g: number;
+                    carbs_g: number;
                 };
                 target: {
                     kcal: number;
                     protein_g: number;
+                    fat_g: number | null;
+                    carbs_g: number | null;
                 } | null;
             };
             money?: {
-                currency: string;
-                /** @description Spent on the date in this currency */
-                today: number;
-                /** @description The month projected to its end */
-                projection: number | null;
-                /** @description Median spend of the three months before */
-                median3: number | null;
-            }[];
+                currencies: {
+                    currency: string;
+                    /** @description Spent on the date in this currency */
+                    today: number;
+                    /** @description The month projected to its end */
+                    projection: number | null;
+                    /** @description Median spend of the three months before */
+                    median3: number | null;
+                }[];
+                /** @description Up to 5 posted spends of the date, newest first, each in its own currency */
+                spends_today: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    amount: number;
+                    currency: string;
+                }[];
+            };
             health?: {
-                sleep_minutes: number | null;
                 steps: number | null;
+                active_kcal: number | null;
+                resting_bpm: number | null;
+                sleep: {
+                    /** @description Minutes asleep */
+                    minutes: number;
+                    /** Format: date-time */
+                    start: string | null;
+                    /** Format: date-time */
+                    end: string;
+                    stages: {
+                        /** @enum {string} */
+                        stage: "deep" | "light" | "rem" | "awake";
+                        minutes: number;
+                    }[];
+                } | null;
+                sleep_minutes: number | null;
                 weight_kg: number | null;
+                /** @description Against the latest weighing at least 6 days older */
+                weight_change_7d: number | null;
             };
             focus: components["schemas"]["Focus"] | null;
             errors: string[];

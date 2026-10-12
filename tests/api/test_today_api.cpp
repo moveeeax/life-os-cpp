@@ -66,6 +66,24 @@ std::string insert_goal(const std::string& owner, const std::string& title) {
     });
 }
 
+void insert_spend(const std::string& owner, const std::string& name, double amount) {
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("INSERT INTO money_currencies (owner_id, code) VALUES ($1::uuid, 'KZT') ON CONFLICT DO NOTHING",
+                        owner);
+        txn.exec_params(
+            "WITH a AS (INSERT INTO money_accounts (owner_id, name, currency) VALUES ($1::uuid, 'Kaspi', 'KZT') "
+            " RETURNING id), c AS (INSERT INTO money_categories (owner_id, name, kind) VALUES ($1::uuid, 'Food', "
+            " 'expense') RETURNING id) "
+            "INSERT INTO money_transactions (owner_id, type, date, account_id, category_id, amount, name) "
+            "SELECT $1::uuid, 'expense', $2::date, a.id, c.id, $3, $4 FROM a, c",
+            owner,
+            std::string(kDay),
+            amount,
+            name);
+        return true;
+    });
+}
+
 std::string task_status(const std::string& id) {
     return Database::get().execute_read([&](auto& txn) {
         return txn.exec_params("SELECT status FROM task_items WHERE id = $1::uuid", id)[0][0]
@@ -92,6 +110,18 @@ protected:
             return;
         Database::get().execute_write([](auto& txn) {
             txn.exec("TRUNCATE TABLE day_focus, task_parse_jobs, task_notes, task_items, goal_items CASCADE");
+            txn.exec(
+                "DELETE FROM money_transactions WHERE owner_id IN ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaae7', "
+                "'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbe7')");
+            txn.exec(
+                "DELETE FROM money_accounts WHERE owner_id IN ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaae7', "
+                "'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbe7')");
+            txn.exec(
+                "DELETE FROM money_categories WHERE owner_id IN ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaae7', "
+                "'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbe7')");
+            txn.exec(
+                "DELETE FROM money_currencies WHERE owner_id IN ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaae7', "
+                "'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbe7')");
             for (const char* id : {kAnna, kBoris}) {
                 txn.exec_params(
                     "INSERT INTO users (id, email, confirmed, role_id) "
@@ -274,4 +304,28 @@ TEST_F(TodayApiTest, PuttingAgainReplacesAndClearsDone) {
 TEST_F(TodayApiTest, EachUserHasTheirOwnFocus) {
     ASSERT_EQ(put_focus(json{{"date", kDay}, {"kind", "text"}, {"text", "Anna's"}})->statusCode(), k200OK);
     EXPECT_TRUE(today(kBoris)["focus"].is_null());
+}
+
+TEST_F(TodayApiTest, TheDigestCarriesTheCornerDetails) {
+    insert_task(kAnna, "Pay the rent", "2026-10-01", "open");
+    insert_task(kAnna, "Renew the insurance", "2026-10-05", "open");
+    insert_goal(kAnna, "Read 12 books");
+    insert_spend(kAnna, "Groceries", 5000);
+    const json d = today();
+    ASSERT_EQ(d["tasks"]["late"].size(), 2u);
+    EXPECT_EQ(d["tasks"]["late"][0]["title"], "Pay the rent");
+    EXPECT_TRUE(d["goals"][0].contains("days_left"));
+    EXPECT_TRUE(d["goals"][0].contains("progress"));
+    ASSERT_TRUE(d.contains("money")) << d.dump();
+    ASSERT_EQ(d["money"]["spends_today"].size(), 1u);
+    EXPECT_EQ(d["money"]["spends_today"][0]["name"], "Groceries");
+    EXPECT_EQ(d["money"]["spends_today"][0]["currency"], "KZT");
+    EXPECT_DOUBLE_EQ(d["money"]["spends_today"][0]["amount"].get<double>(), 5000);
+    ASSERT_TRUE(d["money"]["currencies"].is_array());
+    EXPECT_EQ(d["money"]["currencies"][0]["currency"], "KZT");
+}
+
+TEST_F(TodayApiTest, ASpendOfSomeoneElseStaysTheirs) {
+    insert_spend(kBoris, "Boris's lunch", 3000);
+    EXPECT_FALSE(today()["money"].is_object() && !today()["money"]["spends_today"].empty());
 }
