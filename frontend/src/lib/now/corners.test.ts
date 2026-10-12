@@ -276,10 +276,35 @@ describe('the Food and money chip with all accounts', () => {
       money: {
         currencies: [],
         spends_today: [],
-        net_worth: { currency: 'USD', total: 23456.7, partial: false, change_30d: 312 },
+        net_worth: {
+          currency: 'USD',
+          total: 23456.7,
+          partial: false,
+          rate_date: '2026-10-13',
+          change_30d: 312,
+          change_partial: false,
+        },
       },
     };
     expect(text(chips(t, 10, '2026-10-13')[2].small)).toBe('All accounts 23,457 USD');
+  });
+  it('says when the total leaves money out', () => {
+    const t: Today = {
+      ...base,
+      money: {
+        currencies: [],
+        spends_today: [],
+        net_worth: {
+          currency: 'USD',
+          total: 23456.7,
+          partial: true,
+          rate_date: '2026-10-13',
+          change_30d: 312,
+          change_partial: true,
+        },
+      },
+    };
+    expect(text(chips(t, 10, '2026-10-13')[2].small)).toBe('All accounts 23,457 USD · partial');
   });
   it('keeps the spend line when something was spent', () => {
     const t: Today = {
@@ -287,7 +312,14 @@ describe('the Food and money chip with all accounts', () => {
       money: {
         currencies: [{ currency: 'KZT', today: 7500, projection: null, median3: null }],
         spends_today: [],
-        net_worth: { currency: 'USD', total: 23456.7, partial: false, change_30d: 312 },
+        net_worth: {
+          currency: 'USD',
+          total: 23456.7,
+          partial: false,
+          rate_date: '2026-10-13',
+          change_30d: 312,
+          change_partial: false,
+        },
       },
     };
     expect(text(chips(t, 10, '2026-10-13')[2].small)).toBe('7,500 KZT spent today');
