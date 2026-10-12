@@ -42,6 +42,10 @@ export function FocusMode({
   const timer = useRef<number | null>(null);
   const done = useFocusDone();
   const [ticked, setTicked] = useState(false);
+  // The latest Exit, so the listeners below are set up once (the countdown
+  // re-renders every second and would otherwise wake the bar each time).
+  const exitRef = useRef(onExit);
+  exitRef.current = onExit;
 
   useEffect(() => {
     document.documentElement.classList.add('focus-mode');
@@ -55,7 +59,7 @@ export function FocusMode({
       if (!isPhone()) timer.current = window.setTimeout(() => setAwake(false), IDLE_MS);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onExit();
+      if (e.key === 'Escape') exitRef.current();
       else wake();
     };
     wake();
@@ -68,7 +72,7 @@ export function FocusMode({
       window.removeEventListener('pointerdown', wake);
       window.removeEventListener('keydown', onKey);
     };
-  }, [onExit]);
+  }, []);
 
   // The tab title carries the time left.
   useEffect(() => {
