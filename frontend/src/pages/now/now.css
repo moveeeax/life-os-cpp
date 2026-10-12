@@ -10,6 +10,9 @@
 .n-where {
   font-size: 14px;
   color: var(--g-ink-soft);
+  /* Centred under the nav: the top corners hold Body and Goals. */
+  justify-self: center;
+  text-align: center;
 }
 .n-center {
   align-self: center;

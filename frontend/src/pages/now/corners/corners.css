@@ -105,6 +105,12 @@
     animation: none;
   }
 }
+.c-panel.c-tr,
+.c-panel.c-br {
+  /* A panel on the right reads left to right like the others. */
+  text-align: left;
+  justify-items: stretch;
+}
 .c-panel.c-tl,
 .c-panel.c-tr {
   top: calc(max(14px, env(safe-area-inset-top, 0px)) + 120px);
@@ -346,6 +352,10 @@
   .c-chip .c-s {
     display: none;
   }
+  /* The sheet covers the strip while it is open. */
+  .c-strip[data-open] {
+    visibility: hidden;
+  }
   .c-panel,
   .c-panel.c-tl,
   .c-panel.c-tr,
@@ -355,8 +365,10 @@
     left: 8px;
     right: 8px;
     width: auto;
-    bottom: max(8px, env(safe-area-inset-bottom, 0px));
-    max-height: 72vh;
+    /* Above the Hide numbers button. */
+    bottom: calc(max(8px, env(safe-area-inset-bottom, 0px)) + 44px);
+    max-height: 68vh;
+    background: rgba(14, 20, 36, 0.9);
     --c-origin: bottom center;
   }
 }

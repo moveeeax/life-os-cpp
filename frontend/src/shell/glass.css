@@ -154,7 +154,9 @@
 .g-eye {
   position: fixed;
   z-index: 30;
-  right: 16px;
+  /* Bottom centre: the bottom corners of Now hold its chips. */
+  left: 50%;
+  transform: translateX(-50%);
   bottom: max(16px, env(safe-area-inset-bottom, 0px));
   font-size: 13px;
   color: var(--g-ink-soft);
