@@ -6,6 +6,29 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-10-13
+
+### Added
+- `GET /api/v1/money/summary?currency=USD&days=90` gives all Money accounts in
+  one currency at the day's rates: the total with each account's rate and rate
+  day, money without a rate listed apart (the total then says it is partial),
+  the total of every day of the period and the change split into what the ledger
+  did and what the rates did. It answers to an API key too. `/api/v1/today`
+  carries the same total in USD as `money.net_worth`. The rates job always keeps
+  RUB with USD, EUR and KZT.
+- Money has a Summary tab: all accounts in USD, EUR, KZT or RUB at the day's
+  rates, the line over 30, 90 or 365 days with a hover readout, the change split
+  into the ledger and the rates, each account with its rate and rate day, and
+  money without a rate listed apart. A card on top of the Ledger and a row in the
+  Food and money panel on Now show the same total. Everywhere the total shows
+  the rate day and says "partial" when some money has no rate; the change says
+  so when money had no rate on the first or the last day.
+
+### Changed
+- Wallpapers, posters and focus sounds are uploaded with `Cache-Control:
+  public, max-age=31536000, immutable` (a file never changes under its key), so
+  the browser keeps them instead of downloading the video again for every new tab.
+
 ## [1.20.0] - 2026-10-13
 
 ### Added
