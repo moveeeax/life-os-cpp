@@ -6,6 +6,28 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-10-12
+
+### Added
+- Now gets four corners, Momentum style: Body (sleep and steps, weight over the
+  week), Goals (the nearest countdown, a goal behind), Food and money (protein
+  left, spent today) and Tasks (today and late). Each corner is one quiet line
+  with a dot when something is off; a click opens its glass panel over the
+  picture (on a phone, a sheet from the bottom): sleep stages and resting heart
+  rate, countdowns and pace, kcal and macros with today's spends, late and
+  today's tasks with ticks and a one-phrase quick add for today. A "Focus 25 min"
+  timer sits under the focus and keeps its time across tabs. The quiet lines
+  under the focus give way to the corners, and "Hide numbers" moves to the bottom
+  centre.
+
+### Changed
+- `GET /api/v1/today` carries what the corners of Now show: up to five late
+  tasks and the status of today's tasks, each goal's progress and days left,
+  last night's sleep with its stages, steps, active kcal and resting heart rate
+  at the band account's day, the weight and its change over the week, fat and
+  carbs eaten against their targets, and up to five of today's spends, each in
+  its own currency. The money block is now `{currencies, spends_today}`.
+
 ## [1.18.0] - 2026-10-12
 
 ### Added
