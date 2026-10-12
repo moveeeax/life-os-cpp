@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <exception>
 #include <optional>
 #include <string>
 #include <utility>
@@ -323,5 +324,18 @@ private:
 
     std::string key_b64_;
 };
+
+/// Region day offset of the owner's account: cn is UTC+8, others UTC (same
+/// rule as sync range bounds). Without a link the offset does not matter:
+/// there are no rows to place.
+inline long long region_offset_seconds(const std::string& owner) {
+    std::string region = "cn";
+    try {
+        region = MiAccountRepository("").region_of(owner).value_or("cn");
+    } catch (const std::exception&) {
+        // An unreachable database is reported by the query that follows.
+    }
+    return (region.empty() || region == "cn") ? 8 * 3600 : 0;
+}
 
 }  // namespace Repositories

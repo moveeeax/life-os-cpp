@@ -48,19 +48,6 @@ namespace {
 constexpr long kDefaultLimit = 1000;
 constexpr long kMaxLimit = 10000;
 
-/// Region day offset of the caller's account: cn is UTC+8, others UTC (same
-/// rule as sync range bounds). Without a link the offset does not matter:
-/// there are no rows to place.
-long long region_offset_seconds(const std::string& owner) {
-    std::string region = "cn";
-    try {
-        region = Repositories::MiAccountRepository("").region_of(owner).value_or("cn");
-    } catch (const std::exception&) {
-        // An unreachable database is reported by the query that follows.
-    }
-    return (region.empty() || region == "cn") ? 8 * 3600 : 0;
-}
-
 /// Rows belong to an app user; a static-bearer principal has no user id.
 bool require_user(const std::string& owner, const std::function<void(const HttpResponsePtr&)>& callback) {
     if (is_valid_uuid(owner)) {
@@ -634,7 +621,7 @@ void FitnessController::summary(const HttpRequestPtr& req, std::function<void(co
     // Sleep and resting heart rate windows start at local midnight in the
     // region's zone: the activity date is local (same rule as the sync
     // range bounds).
-    const long long offset = region_offset_seconds(owner);
+    const long long offset = Repositories::region_offset_seconds(owner);
     respond_page(
         [q, offset, account] {
             return Repositories::HealthReadRepository(account).summary(q.from, q.to, q.limit, q.offset, offset);
