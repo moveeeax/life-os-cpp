@@ -7,3 +7,4 @@ export * from './wallpaper';
 export * from './cache';
 export * from './corners';
 export * from './timer';
+export * from './focus';
