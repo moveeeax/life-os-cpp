@@ -146,3 +146,19 @@
     gap: 6px;
   }
 }
+.n-under {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+}
+.n-timer {
+  font-size: 15px;
+  color: var(--g-ink);
+  font-variant-numeric: tabular-nums;
+}
+/* Room for the corner strip at the bottom of a phone. */
+@media (max-width: 640px) {
+  .n-now {
+    padding-bottom: 190px;
+  }
+}

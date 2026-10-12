@@ -1,15 +1,42 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate } from 'react-router';
+import { Navigate } from 'react-router';
 
 import { useMe } from '@/hooks/useMe';
 import { useToday } from '@/hooks/useNow';
-import { greeting, localDate, quietLines } from '@/lib/now';
+import { greeting, localDate } from '@/lib/now';
 import { homeOf } from '@/shell/sections';
 import { useGlassNav } from '@/shell/useGlassNav';
 
+import { Corners } from './corners/Corners';
+import { useFocusTimer } from './corners/useFocusTimer';
 import { FocusLine } from './FocusLine';
 import { FocusPicker } from './FocusPicker';
 import './now.css';
+
+/** "Focus 25 min": a timer under the focus, the time left kept across tabs. */
+function FocusTimer({ userId }: { userId: string | null }) {
+  const timer = useFocusTimer(userId);
+  const mm = String(Math.floor(timer.left / 60)).padStart(2, '0');
+  const ss = String(timer.left % 60).padStart(2, '0');
+  return (
+    <div className="n-under">
+      {timer.running ? (
+        <button
+          type="button"
+          className="n-timer"
+          onClick={timer.stop}
+          aria-label={`Focus timer, ${mm}:${ss} left. Stop`}
+        >
+          {mm}:{ss} · stop
+        </button>
+      ) : (
+        <button type="button" className="n-change" onClick={timer.start}>
+          {timer.done ? 'Done. Another 25 min?' : 'Focus 25 min'}
+        </button>
+      )}
+    </div>
+  );
+}
 
 /** The current time, updated on the minute. */
 function useMinute(): Date {
@@ -86,29 +113,14 @@ function NowScreen() {
             </button>
           )}
         </div>
-        {data && (
-          <nav className="n-lines" aria-label="Worth a look">
-            {quietLines(data, hour).map((l) => (
-              <Link key={l.key} to={l.to}>
-                {l.parts.map((p, i) =>
-                  p.num ? (
-                    <span key={i} className="num">
-                      {p.text}
-                    </span>
-                  ) : (
-                    <span key={i}>{p.text}</span>
-                  ),
-                )}
-              </Link>
-            ))}
-          </nav>
-        )}
+        <FocusTimer userId={me?.id ?? null} />
         {today.isError && (
           <span className="n-note">
             {data ? 'Offline: showing the last answer' : 'Could not load the day'}
           </span>
         )}
       </div>
+      {data && <Corners today={data} hour={hour} date={date} />}
     </div>
   );
 }
