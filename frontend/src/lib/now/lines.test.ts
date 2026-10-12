@@ -4,7 +4,7 @@ import { MONEY_ABOVE_USUAL, quietLines } from './lines';
 import type { Today } from './types';
 
 const quiet: Today = {
-  tasks: { late_count: 0, first_late: null, today: [], inbox_count: 0 },
+  tasks: { late_count: 0, first_late: null, late: [], today: [], inbox_count: 0 },
   goals: [],
   focus: null,
   errors: [],
@@ -22,10 +22,19 @@ describe('quietLines', () => {
         late_count: 2,
         first_late: { id: 'a', title: 'Pay the rent', due: '2026-10-01' },
         today: [],
+        late: [],
         inbox_count: 0,
       },
       goals: [
-        { id: 'g', title: 'Read 12 books', kind: 'count', due: '2026-12-31', pace: 'behind' },
+        {
+          id: 'g',
+          title: 'Read 12 books',
+          kind: 'count',
+          due: '2026-12-31',
+          pace: 'behind',
+          progress: 0.3,
+          days_left: 80,
+        },
       ],
     };
     const lines = quietLines(t, 9);
@@ -39,24 +48,40 @@ describe('quietLines', () => {
   it('skips goals on track', () => {
     const t: Today = {
       ...quiet,
-      goals: [{ id: 'g', title: 'Run', kind: 'steps', due: '2026-12-01', pace: 'on_track' }],
+      goals: [
+        {
+          id: 'g',
+          title: 'Run',
+          kind: 'steps',
+          due: '2026-12-01',
+          pace: 'on_track',
+          progress: 0.5,
+          days_left: 50,
+        },
+      ],
     };
     expect(quietLines(t, 9)).toEqual([]);
   });
 
   it('names the protein left only in the evening and only when it is worth it', () => {
-    const food = { eaten: { kcal: 1500, protein_g: 80 }, target: { kcal: 2200, protein_g: 142 } };
+    const food = {
+      eaten: { kcal: 1500, protein_g: 80, fat_g: 40, carbs_g: 150 },
+      target: { kcal: 2200, protein_g: 142, fat_g: 73, carbs_g: 230 },
+    };
     const t: Today = { ...quiet, food };
     expect(quietLines(t, 17)).toEqual([]);
     const evening = quietLines(t, 18);
     expect(evening).toHaveLength(1);
     expect(evening[0].text).toBe('62 g protein left');
     expect(evening[0].to).toBe('/food');
-    const nearly: Today = { ...quiet, food: { ...food, eaten: { kcal: 2000, protein_g: 125 } } };
+    const nearly: Today = {
+      ...quiet,
+      food: { ...food, eaten: { kcal: 2000, protein_g: 125, fat_g: 60, carbs_g: 200 } },
+    };
     expect(quietLines(nearly, 20)).toEqual([]);
     const noTarget: Today = {
       ...quiet,
-      food: { eaten: { kcal: 100, protein_g: 5 }, target: null },
+      food: { eaten: { kcal: 100, protein_g: 5, fat_g: 1, carbs_g: 10 }, target: null },
     };
     expect(quietLines(noTarget, 20)).toEqual([]);
   });
@@ -67,7 +92,7 @@ describe('quietLines', () => {
       { currency: 'KZT', today: 7500, projection: 412000, median3: 350000 },
     ];
     expect(412000 / 350000).toBeGreaterThanOrEqual(MONEY_ABOVE_USUAL);
-    const lines = quietLines({ ...quiet, money }, 10);
+    const lines = quietLines({ ...quiet, money: { currencies: money, spends_today: [] } }, 10);
     expect(lines).toHaveLength(1);
     expect(lines[0].key).toBe('money');
     expect(lines[0].text).toBe('On pace for 412,000 KZT this month, above usual');
@@ -81,11 +106,28 @@ describe('quietLines', () => {
         late_count: 1,
         first_late: { id: 'a', title: 'A', due: '2026-10-01' },
         today: [],
+        late: [],
         inbox_count: 0,
       },
-      goals: [{ id: 'g', title: 'B', kind: 'count', due: '2026-12-31', pace: 'behind' }],
-      food: { eaten: { kcal: 0, protein_g: 0 }, target: { kcal: 2000, protein_g: 100 } },
-      money: [{ currency: 'KZT', today: 1, projection: 500, median3: 100 }],
+      goals: [
+        {
+          id: 'g',
+          title: 'B',
+          kind: 'count',
+          due: '2026-12-31',
+          pace: 'behind',
+          progress: 0.3,
+          days_left: 80,
+        },
+      ],
+      food: {
+        eaten: { kcal: 0, protein_g: 0, fat_g: 0, carbs_g: 0 },
+        target: { kcal: 2000, protein_g: 100, fat_g: 60, carbs_g: 200 },
+      },
+      money: {
+        currencies: [{ currency: 'KZT', today: 1, projection: 500, median3: 100 }],
+        spends_today: [],
+      },
     };
     const lines = quietLines(t, 21);
     expect(lines.map((l) => l.key)).toEqual(['late', 'goal', 'protein']);
@@ -98,6 +140,7 @@ describe('quietLines', () => {
         late_count: 3,
         first_late: { id: 'a', title: 'A', due: '2026-10-01' },
         today: [],
+        late: [],
         inbox_count: 0,
       },
     };

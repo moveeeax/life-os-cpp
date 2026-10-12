@@ -246,57 +246,109 @@ components:
               type: array
               items:
                 type: object
-                required: [id, title]
+                required: [id, title, status]
                 properties:
                   id: { type: string, format: uuid }
                   title: { type: string }
+                  status: { type: string, enum: [open, in_progress, done] }
             inbox_count: { type: integer }
+            late:
+              type: array
+              description: Up to 5 late tasks, oldest first
+              items:
+                type: object
+                required: [id, title, due]
+                properties:
+                  id: { type: string, format: uuid }
+                  title: { type: string }
+                  due: { type: string, format: date }
         goals:
           type: array
           items:
             type: object
-            required: [id, title, kind, due, pace]
+            required: [id, title, kind, due, pace, progress, days_left]
             properties:
               id: { type: string, format: uuid }
               title: { type: string }
               kind: { type: string, enum: [number, steps, count, binary] }
               due: { type: string, format: date }
               pace: { type: string, enum: [on_track, behind] }
+              progress: { type: [number, 'null'], description: '0..1; null for a pass / fail goal' }
+              days_left: { type: [integer, 'null'] }
         food:
           type: object
           required: [eaten, target]
           properties:
             eaten:
               type: object
-              required: [kcal, protein_g]
+              required: [kcal, protein_g, fat_g, carbs_g]
               properties:
                 kcal: { type: number }
                 protein_g: { type: number }
+                fat_g: { type: number }
+                carbs_g: { type: number }
             target:
               oneOf:
                 - type: object
-                  required: [kcal, protein_g]
+                  required: [kcal, protein_g, fat_g, carbs_g]
                   properties:
                     kcal: { type: number }
                     protein_g: { type: number }
+                    fat_g: { type: [number, 'null'] }
+                    carbs_g: { type: [number, 'null'] }
                 - { type: 'null' }
         money:
-          type: array
-          items:
-            type: object
-            required: [currency, today, projection, median3]
-            properties:
-              currency: { type: string }
-              today: { type: number, description: Spent on the date in this currency }
-              projection: { type: [number, 'null'], description: 'The month projected to its end' }
-              median3: { type: [number, 'null'], description: 'Median spend of the three months before' }
+          type: object
+          required: [currencies, spends_today]
+          properties:
+            currencies:
+              type: array
+              items:
+                type: object
+                required: [currency, today, projection, median3]
+                properties:
+                  currency: { type: string }
+                  today: { type: number, description: Spent on the date in this currency }
+                  projection: { type: [number, 'null'], description: 'The month projected to its end' }
+                  median3: { type: [number, 'null'], description: 'Median spend of the three months before' }
+            spends_today:
+              type: array
+              description: Up to 5 posted spends of the date, newest first, each in its own currency
+              items:
+                type: object
+                required: [id, name, amount, currency]
+                properties:
+                  id: { type: string, format: uuid }
+                  name: { type: string }
+                  amount: { type: number }
+                  currency: { type: string }
         health:
           type: object
-          required: [sleep_minutes, steps, weight_kg]
+          required: [steps, active_kcal, resting_bpm, sleep, sleep_minutes, weight_kg, weight_change_7d]
           properties:
-            sleep_minutes: { type: [integer, 'null'] }
             steps: { type: [integer, 'null'] }
+            active_kcal: { type: [number, 'null'] }
+            resting_bpm: { type: [integer, 'null'] }
+            sleep:
+              oneOf:
+                - type: object
+                  required: [minutes, start, end, stages]
+                  properties:
+                    minutes: { type: integer, description: Minutes asleep }
+                    start: { type: [string, 'null'], format: date-time }
+                    end: { type: string, format: date-time }
+                    stages:
+                      type: array
+                      items:
+                        type: object
+                        required: [stage, minutes]
+                        properties:
+                          stage: { type: string, enum: [deep, light, rem, awake] }
+                          minutes: { type: integer }
+                - { type: 'null' }
+            sleep_minutes: { type: [integer, 'null'] }
             weight_kg: { type: [number, 'null'] }
+            weight_change_7d: { type: [number, 'null'], description: 'Against the latest weighing at least 6 days older' }
         focus:
           oneOf:
             - { $ref: '#/components/schemas/Focus' }

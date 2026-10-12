@@ -832,7 +832,8 @@
          "type": "object",
          "required": [
           "id",
-          "title"
+          "title",
+          "status"
          ],
          "properties": {
           "id": {
@@ -841,12 +842,45 @@
           },
           "title": {
            "type": "string"
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "open",
+            "in_progress",
+            "done"
+           ]
           }
          }
         }
        },
        "inbox_count": {
         "type": "integer"
+       },
+       "late": {
+        "type": "array",
+        "description": "Up to 5 late tasks, oldest first",
+        "items": {
+         "type": "object",
+         "required": [
+          "id",
+          "title",
+          "due"
+         ],
+         "properties": {
+          "id": {
+           "type": "string",
+           "format": "uuid"
+          },
+          "title": {
+           "type": "string"
+          },
+          "due": {
+           "type": "string",
+           "format": "date"
+          }
+         }
+        }
        }
       }
      },
@@ -859,7 +893,9 @@
         "title",
         "kind",
         "due",
-        "pace"
+        "pace",
+        "progress",
+        "days_left"
        ],
        "properties": {
         "id": {
@@ -888,6 +924,19 @@
           "on_track",
           "behind"
          ]
+        },
+        "progress": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "0..1; null for a pass / fail goal"
+        },
+        "days_left": {
+         "type": [
+          "integer",
+          "null"
+         ]
         }
        }
       }
@@ -903,13 +952,21 @@
         "type": "object",
         "required": [
          "kcal",
-         "protein_g"
+         "protein_g",
+         "fat_g",
+         "carbs_g"
         ],
         "properties": {
          "kcal": {
           "type": "number"
          },
          "protein_g": {
+          "type": "number"
+         },
+         "fat_g": {
+          "type": "number"
+         },
+         "carbs_g": {
           "type": "number"
          }
         }
@@ -920,7 +977,9 @@
           "type": "object",
           "required": [
            "kcal",
-           "protein_g"
+           "protein_g",
+           "fat_g",
+           "carbs_g"
           ],
           "properties": {
            "kcal": {
@@ -928,6 +987,18 @@
            },
            "protein_g": {
             "type": "number"
+           },
+           "fat_g": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "carbs_g": {
+            "type": [
+             "number",
+             "null"
+            ]
            }
           }
          },
@@ -939,36 +1010,73 @@
       }
      },
      "money": {
-      "type": "array",
-      "items": {
-       "type": "object",
-       "required": [
-        "currency",
-        "today",
-        "projection",
-        "median3"
-       ],
-       "properties": {
-        "currency": {
-         "type": "string"
-        },
-        "today": {
-         "type": "number",
-         "description": "Spent on the date in this currency"
-        },
-        "projection": {
-         "type": [
-          "number",
-          "null"
+      "type": "object",
+      "required": [
+       "currencies",
+       "spends_today"
+      ],
+      "properties": {
+       "currencies": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "required": [
+          "currency",
+          "today",
+          "projection",
+          "median3"
          ],
-         "description": "The month projected to its end"
-        },
-        "median3": {
-         "type": [
-          "number",
-          "null"
+         "properties": {
+          "currency": {
+           "type": "string"
+          },
+          "today": {
+           "type": "number",
+           "description": "Spent on the date in this currency"
+          },
+          "projection": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "description": "The month projected to its end"
+          },
+          "median3": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "description": "Median spend of the three months before"
+          }
+         }
+        }
+       },
+       "spends_today": {
+        "type": "array",
+        "description": "Up to 5 posted spends of the date, newest first, each in its own currency",
+        "items": {
+         "type": "object",
+         "required": [
+          "id",
+          "name",
+          "amount",
+          "currency"
          ],
-         "description": "Median spend of the three months before"
+         "properties": {
+          "id": {
+           "type": "string",
+           "format": "uuid"
+          },
+          "name": {
+           "type": "string"
+          },
+          "amount": {
+           "type": "number"
+          },
+          "currency": {
+           "type": "string"
+          }
+         }
         }
        }
       }
@@ -976,18 +1084,91 @@
      "health": {
       "type": "object",
       "required": [
-       "sleep_minutes",
        "steps",
-       "weight_kg"
+       "active_kcal",
+       "resting_bpm",
+       "sleep",
+       "sleep_minutes",
+       "weight_kg",
+       "weight_change_7d"
       ],
       "properties": {
-       "sleep_minutes": {
+       "steps": {
         "type": [
          "integer",
          "null"
         ]
        },
-       "steps": {
+       "active_kcal": {
+        "type": [
+         "number",
+         "null"
+        ]
+       },
+       "resting_bpm": {
+        "type": [
+         "integer",
+         "null"
+        ]
+       },
+       "sleep": {
+        "oneOf": [
+         {
+          "type": "object",
+          "required": [
+           "minutes",
+           "start",
+           "end",
+           "stages"
+          ],
+          "properties": {
+           "minutes": {
+            "type": "integer",
+            "description": "Minutes asleep"
+           },
+           "start": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "format": "date-time"
+           },
+           "end": {
+            "type": "string",
+            "format": "date-time"
+           },
+           "stages": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "stage",
+              "minutes"
+             ],
+             "properties": {
+              "stage": {
+               "type": "string",
+               "enum": [
+                "deep",
+                "light",
+                "rem",
+                "awake"
+               ]
+              },
+              "minutes": {
+               "type": "integer"
+              }
+             }
+            }
+           }
+          }
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "sleep_minutes": {
         "type": [
          "integer",
          "null"
@@ -998,6 +1179,13 @@
          "number",
          "null"
         ]
+       },
+       "weight_change_7d": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "description": "Against the latest weighing at least 6 days older"
        }
       }
      },
@@ -21173,7 +21361,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 312848,
-  "source_fnv1a64": "4036a92083d9706e"
+  "source_bytes": 315359,
+  "source_fnv1a64": "947f7215843b956e"
  }
 }

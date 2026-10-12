@@ -39,7 +39,7 @@ function numberOfTheDay(today: Today, hour: number): QuietLine | null {
       ]);
     }
   }
-  for (const m of today.money ?? []) {
+  for (const m of today.money?.currencies ?? []) {
     if (
       m.projection != null &&
       m.median3 != null &&

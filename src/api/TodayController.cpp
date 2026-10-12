@@ -7,6 +7,7 @@
 
 #include "api/TodayController.hpp"
 
+#include <chrono>
 #include <optional>
 #include <string>
 #include <vector>
@@ -38,6 +39,7 @@
 #include "repositories/tasks/TaskRepository.hpp"
 #include "security/Auth.hpp"
 #include "tasks/Agenda.hpp"
+#include "utils/Date.hpp"
 #include "utils/ErrorResponse.hpp"
 
 namespace Api {
@@ -135,46 +137,62 @@ json food_part(const std::string& owner, const std::string& date) {
     const json totals = Repositories::EntryRepository().day(owner, date)["totals"];
     const json targets = Repositories::food_goals_body(owner, date)["targets"];
     const double kcal = totals.value("kcal", 0.0);
-    const double protein = totals.value("protein_g", 0.0);
-    if (kcal == 0.0 && protein == 0.0 && targets.is_null()) {
+    if (kcal == 0.0 && totals.value("protein_g", 0.0) == 0.0 && targets.is_null()) {
         return json();
     }
-    return json{
-        {"eaten", {{"kcal", kcal}, {"protein_g", protein}}},
-        {"target", targets.is_null() ? json() : json{{"kcal", targets["kcal"]}, {"protein_g", targets["protein_g"]}}}};
+    json eaten = json::object();
+    json target = targets.is_null() ? json() : json::object();
+    for (const char* k : {"kcal", "protein_g", "fat_g", "carbs_g"}) {
+        eaten[k] = totals.value(k, 0.0);
+        if (!targets.is_null()) {
+            target[k] = targets.contains(k) ? targets[k] : json();
+        }
+    }
+    return json{{"eaten", eaten}, {"target", target}};
 }
 
 json money_part(const std::string& owner, const std::string& date) {
     using ::Money::Period::Kind;
-    const json rows = Repositories::Money::TransactionRepository().report_rows(owner, date, date);
+    Repositories::Money::TransactionRepository tx;
+    const json rows = tx.report_rows(owner, date, date);
     const json report = Repositories::Money::ReportBuilder::build(
         owner, Kind::month, "month", ::Money::Period::of(Kind::month, date), date, "");
-    return ::Now::Today::money_block(rows, report);
+    const json currencies = ::Now::Today::money_block(rows, report);
+    Repositories::Money::TransactionRepository::Filter f;
+    f.from = date;
+    f.to = date;
+    f.type = "expense";
+    f.status = "posted";
+    f.limit = static_cast<long>(::Now::Today::kSpendsShown);
+    const json spends = ::Now::Today::spends_block(tx.list(owner, f).rows);
+    if (currencies.is_null() && spends.empty()) {
+        return json();
+    }
+    return json{{"currencies", currencies.is_null() ? json::array() : currencies}, {"spends_today", spends}};
 }
 
 json health_part(const std::string& owner, const std::string& date) {
     const std::string xiaomi = Repositories::MiAccountRepository("").xiaomi_id_of(owner).value_or("");
-    json sleep_minutes;
-    json steps;
+    json summary_row;
+    json sleep_rows = json::array();
+    json body_rows = json::array();
     if (!xiaomi.empty()) {
         Repositories::HealthReadRepository health(xiaomi);
-        // The main sleep ending on the day: the latest one that is not a nap.
-        for (const auto& s : health.sleep(date, date, 10, 0).rows) {
-            const bool nap = s["is_nap"].is_boolean() && s["is_nap"].get<bool>();
-            if (!nap && s["time_asleep_minutes"].is_number()) {
-                sleep_minutes = s["time_asleep_minutes"];
-            }
+        const auto summary = health.summary(date, date, 1, 0, Repositories::region_offset_seconds(owner)).rows;
+        if (!summary.empty()) {
+            summary_row = summary[0];
         }
-        const auto days = health.daily_activity(date, date, 1, 0).rows;
-        if (!days.empty() && days[0]["steps"].is_number()) {
-            steps = days[0]["steps"];
+        sleep_rows = health.sleep(date, date, 10, 0).rows;
+        const auto day = std::chrono::sys_days{Utils::Date::parse_ymd(date)};
+        body_rows = health.body(::Money::Period::detail::text_of(day - std::chrono::days{8}), date, 50, 0).rows;
+    }
+    if (body_rows.empty()) {
+        // No weighing synced from the scale: the latest weight the food profile knows, if any.
+        if (const auto weight = Repositories::GoalsRepository().scale_weight(owner)) {
+            body_rows.push_back(json{{"timestamp", date + "T00:00:00Z"}, {"weight_kg", *weight}});
         }
     }
-    const auto weight = Repositories::GoalsRepository().scale_weight(owner);
-    if (sleep_minutes.is_null() && steps.is_null() && !weight) {
-        return json();
-    }
-    return json{{"sleep_minutes", sleep_minutes}, {"steps", steps}, {"weight_kg", weight ? json(*weight) : json()}};
+    return ::Now::Today::health_block(summary_row, sleep_rows, body_rows);
 }
 
 }  // namespace
