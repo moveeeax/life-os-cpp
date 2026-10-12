@@ -64,6 +64,9 @@ const FoodGoalsPage = lazy(() =>
 const MoneyLedgerPage = lazy(() =>
   import('@/pages/money/Ledger').then((m) => ({ default: m.MoneyLedgerPage })),
 );
+const MoneySummaryPage = lazy(() =>
+  import('@/pages/money/Summary').then((m) => ({ default: m.MoneySummaryPage })),
+);
 const MoneyAccountsPage = lazy(() =>
   import('@/pages/money/Accounts').then((m) => ({ default: m.MoneyAccountsPage })),
 );
@@ -264,6 +267,7 @@ export const routes: RouteEntry[] = [
 
   // ── Money — any confirmed user; the module switch is the only gate ───────
   { path: '/money', element: <MoneyLedgerPage />, guard: 'confirmed', layout: 'shell' },
+  { path: '/money/summary', element: <MoneySummaryPage />, guard: 'confirmed', layout: 'shell' },
   { path: '/money/accounts', element: <MoneyAccountsPage />, guard: 'confirmed', layout: 'shell' },
   {
     path: '/money/categories',

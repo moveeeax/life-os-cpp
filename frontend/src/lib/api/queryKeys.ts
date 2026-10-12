@@ -65,6 +65,7 @@ export const qk = {
   /** Money section: every key starts with 'money' so one write refreshes balances, totals and reports. */
   money: {
     all: () => ['money'] as const,
+    summary: (currency: string, days: number) => ['money', 'summary', currency, days] as const,
     currencies: (archived = false) => ['money', 'currencies', archived] as const,
     accounts: (archived = false) => ['money', 'accounts', archived] as const,
     categories: (archived = false) => ['money', 'categories', archived] as const,

@@ -4,6 +4,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { ApiClientError, api, apiErrorMessage } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
+import type { components } from '@/lib/api/schema.gen';
 import { isDay, shiftDay, type AcceptLine } from '@/lib/ledger';
 import type {
   AdvisorReport,
@@ -507,4 +508,18 @@ export function useRunAdvisor(onSuccess?: () => void) {
       ).data,
     { invalidate: [qk.money.advisorReports()], onSuccess },
   );
+}
+
+/** All accounts in one currency at the day's rates, with the days of the period. */
+export function useMoneySummary(currency: string, days: number) {
+  return useQuery({
+    queryKey: qk.money.summary(currency, days),
+    queryFn: async ({ signal }) =>
+      (
+        await api.getJson<{ data: components['schemas']['MoneySummary'] }>(`${BASE}/summary`, {
+          query: { currency, days },
+          signal,
+        })
+      ).data,
+  });
 }

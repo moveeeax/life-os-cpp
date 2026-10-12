@@ -268,3 +268,28 @@ describe('the Food and money chip with cents', () => {
     expect(text(chips(t, 10, '2026-10-12')[2].small)).toBe('4.50 USD spent today');
   });
 });
+
+describe('the Food and money chip with all accounts', () => {
+  it('shows all accounts when nothing was spent today', () => {
+    const t: Today = {
+      ...base,
+      money: {
+        currencies: [],
+        spends_today: [],
+        net_worth: { currency: 'USD', total: 23456.7, partial: false, change_30d: 312 },
+      },
+    };
+    expect(text(chips(t, 10, '2026-10-13')[2].small)).toBe('All accounts 23,457 USD');
+  });
+  it('keeps the spend line when something was spent', () => {
+    const t: Today = {
+      ...base,
+      money: {
+        currencies: [{ currency: 'KZT', today: 7500, projection: null, median3: null }],
+        spends_today: [],
+        net_worth: { currency: 'USD', total: 23456.7, partial: false, change_30d: 312 },
+      },
+    };
+    expect(text(chips(t, 10, '2026-10-13')[2].small)).toBe('7,500 KZT spent today');
+  });
+});

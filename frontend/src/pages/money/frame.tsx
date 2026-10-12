@@ -8,6 +8,7 @@ import { cardClass, secondaryButton } from '../workout/styles';
 
 const TABS = [
   { to: '/money', label: 'Ledger', end: true },
+  { to: '/money/summary', label: 'Summary', end: false },
   { to: '/money/accounts', label: 'Accounts', end: false },
   { to: '/money/categories', label: 'Categories', end: false },
   { to: '/money/currencies', label: 'Currencies', end: false },

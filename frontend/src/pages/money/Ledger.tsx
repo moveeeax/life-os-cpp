@@ -47,6 +47,7 @@ import {
 import { AddForm } from './AddForm';
 import { Amount, CurrencyTotals, PeriodRow } from './bits';
 import { LoadError, MoneyFrame, Placeholder } from './frame';
+import { SummaryCard } from './SummaryCard';
 import { TransfersList } from './Transfers';
 
 function TransactionEditor({
@@ -472,6 +473,7 @@ export function MoneyLedgerPage() {
         </button>
       }
     >
+      <SummaryCard />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div role="tablist" aria-label="Ledger or inbox" className="flex gap-1">
           {(['ledger', 'inbox'] as const).map((v) => (
