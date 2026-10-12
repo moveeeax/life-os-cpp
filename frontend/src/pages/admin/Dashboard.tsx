@@ -1,5 +1,13 @@
 import { Link } from 'react-router';
-import { Users, UserPlus, Shield, ListChecks, ScrollText, Wallet } from 'lucide-react';
+import {
+  Users,
+  UserPlus,
+  Shield,
+  ListChecks,
+  ScrollText,
+  Wallet,
+  Image as ImageIcon,
+} from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMe } from '@/hooks/useMe';
@@ -48,6 +56,15 @@ export function AdminDashboardPage() {
               <ListChecks className="h-6 w-6 mb-2 text-muted-foreground" />
               <CardTitle>Jobs</CardTitle>
               <CardDescription>Queue statuses, payloads, DLQ requeue.</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+        <Link to="/admin/wallpapers">
+          <Card className="hover:bg-accent transition-colors h-full">
+            <CardHeader>
+              <ImageIcon className="h-6 w-6 mb-2 text-muted-foreground" />
+              <CardTitle>Wallpapers</CardTitle>
+              <CardDescription>Videos and images behind every screen.</CardDescription>
             </CardHeader>
           </Card>
         </Link>

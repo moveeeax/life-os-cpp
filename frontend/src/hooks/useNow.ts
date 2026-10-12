@@ -20,6 +20,12 @@ import {
 const TODAY = '/api/v1/today';
 const ADMIN = '/api/v1/admin/wallpapers';
 
+/** A DELETE answering 204: no body to parse, only an error to raise. */
+async function del(path: string, query?: Record<string, string>): Promise<void> {
+  const { error } = await api.DELETE(path, query ? { query } : undefined);
+  if (error) throw error;
+}
+
 /** The focus moves a task, so a focus write refreshes Tasks too. */
 const AFTER_FOCUS = [qk.now.all(), qk.tasks.all()] as const;
 
@@ -84,10 +90,10 @@ export function useFocusDone() {
 }
 
 export function useClearFocus(onSuccess?: () => void) {
-  return useApiMutation(
-    (date: string) => api.deleteJson<unknown>(`${TODAY}/focus`, { query: { date } }),
-    { invalidate: AFTER_FOCUS, onSuccess },
-  );
+  return useApiMutation((date: string) => del(`${TODAY}/focus`, { date }), {
+    invalidate: AFTER_FOCUS,
+    onSuccess,
+  });
 }
 
 // ── admin ───────────────────────────────────────────────────────────────────
@@ -122,7 +128,7 @@ export function useWallpaperReady() {
 }
 
 export function useDeleteWallpaper() {
-  return useApiMutation((id: string) => api.deleteJson<unknown>(`${ADMIN}/${id}`), {
+  return useApiMutation((id: string) => del(`${ADMIN}/${id}`), {
     invalidate: [qk.now.all()],
   });
 }

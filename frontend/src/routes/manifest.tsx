@@ -110,6 +110,9 @@ const AdminJobsPage = lazy(() =>
 const AdminAuditPage = lazy(() =>
   import('@/pages/admin/Audit').then((m) => ({ default: m.AdminAuditPage })),
 );
+const AdminWallpapersPage = lazy(() =>
+  import('@/pages/admin/Wallpapers').then((m) => ({ default: m.AdminWallpapersPage })),
+);
 const AdminBillingPage = lazy(() =>
   import('@/pages/admin/Billing').then((m) => ({ default: m.AdminBillingPage })),
 );
@@ -297,6 +300,7 @@ export const routes: RouteEntry[] = [
   { path: '/admin/invite', element: <AdminInviteUserPage />, guard: 'admin' },
   { path: '/admin/roles', element: <AdminRolesPage />, guard: 'admin' },
   { path: '/admin/jobs', element: <AdminJobsPage />, guard: 'admin' },
+  { path: '/admin/wallpapers', element: <AdminWallpapersPage />, guard: 'admin' },
 
   // ── Audit — read-only, gated on kAuditRead (0x02) rather than full ──────
   // Administer. A 'confirmed' guard + requirePermission means App.tsx wraps
