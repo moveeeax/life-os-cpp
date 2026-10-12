@@ -334,8 +334,10 @@ async function request<T>(
  * boilerplate every TanStack queryFn/mutationFn was repeating.
  */
 async function fetchJson<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
-  const { data, error } = await request<T>(method, path, opts);
+  const { data, error, response } = await request<T>(method, path, opts);
   if (error) throw error;
+  // 204 No Content (a delete) carries no body by definition; any other empty 2xx is a bug.
+  if (response?.status === 204) return undefined as T;
   if (data === undefined)
     throw new ApiClientError({ status: 0, message: `${method} ${path} returned an empty body` });
   return data;
