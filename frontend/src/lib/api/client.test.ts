@@ -263,3 +263,15 @@ describe('apiErrorMessage', () => {
     expect(apiErrorMessage(null, 'custom')).toBe('custom');
   });
 });
+
+describe('a 204 No Content answer', () => {
+  it('resolves deleteJson instead of throwing on the empty body', async () => {
+    mockFetchSequence([() => new Response(null, { status: 204 })]);
+    await expect(api.deleteJson('/api/v1/tasks/items/abc')).resolves.toBeUndefined();
+  });
+
+  it('still refuses an empty 200, where a body was due', async () => {
+    mockFetchSequence([() => new Response('', { status: 200 })]);
+    await expect(api.getJson('/api/v1/tasks/items')).rejects.toThrow(/empty body/);
+  });
+});
