@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 
-import { countdowns, type Today } from '@/lib/now';
+import { countdownFigure, countdowns, type Today } from '@/lib/now';
 
 import { Meter } from './Parts';
 
@@ -13,20 +13,23 @@ export function GoalsPanel({ today, date }: { today: Today; date: string }) {
         Countdowns <Link to="/goals">Open Goals →</Link>
       </h2>
       {soon.length === 0 && <p className="c-empty">No goal is due in the next 60 days.</p>}
-      {soon.map((c) => (
-        <div key={c.id} className="c-count">
-          <span>{c.title}</span>
-          <span className="c-n num">{c.days}</span>
-          <span className="c-d">
-            {new Date(`${c.due}T00:00:00Z`).toLocaleDateString('en-GB', {
-              day: 'numeric',
-              month: 'short',
-              timeZone: 'UTC',
-            })}{' '}
-            · {c.days === 0 ? 'today' : c.days === 1 ? 'tomorrow' : 'days left'}
-          </span>
-        </div>
-      ))}
+      {soon.map((c) => {
+        const f = countdownFigure(c.days);
+        return (
+          <div key={c.id} className="c-count">
+            <span>{c.title}</span>
+            {f.figure !== null && <span className="c-n num">{f.figure}</span>}
+            <span className="c-d">
+              {new Date(`${c.due}T00:00:00Z`).toLocaleDateString('en-GB', {
+                day: 'numeric',
+                month: 'short',
+                timeZone: 'UTC',
+              })}{' '}
+              · {f.words}
+            </span>
+          </div>
+        );
+      })}
       {goals.length > 0 && (
         <>
           <h2>Pace</h2>

@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 
-import { MONEY_ABOVE_USUAL, type Today } from '@/lib/now';
+import { MONEY_ABOVE_USUAL, formatMoney, type Today } from '@/lib/now';
 
 import { n0 } from './format';
 import { Meter } from './Parts';
@@ -75,7 +75,7 @@ export function DayPanel({ today }: { today: Today }) {
           <div key={s.id} className="c-row c-plain">
             <span className="c-t">{s.name}</span>
             <span className="c-r num">
-              −{n0.format(s.amount)} {s.currency}
+              −{formatMoney(s.amount)} {s.currency}
             </span>
           </div>
         ))}

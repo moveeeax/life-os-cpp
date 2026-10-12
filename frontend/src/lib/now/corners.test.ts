@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { chips, countdowns, formatSleep } from './corners';
+import { chips, countdownFigure, countdowns, formatMoney, formatSleep } from './corners';
 import type { Today } from './types';
 
 const base: Today = {
@@ -235,5 +235,34 @@ describe('countdowns', () => {
   });
   it('uses the local date, not the instant', () => {
     expect(at('2026-10-12T00:00:00Z').getTime()).toBeGreaterThan(0);
+  });
+});
+
+describe('formatMoney', () => {
+  it('keeps the cents when there are any', () => {
+    expect(formatMoney(4.5)).toBe('4.50');
+    expect(formatMoney(2790)).toBe('2,790');
+    expect(formatMoney(13275.61)).toBe('13,275.61');
+  });
+});
+
+describe('countdownFigure', () => {
+  it('shows a number only from two days on', () => {
+    expect(countdownFigure(0)).toEqual({ figure: null, words: 'today' });
+    expect(countdownFigure(1)).toEqual({ figure: null, words: 'tomorrow' });
+    expect(countdownFigure(19)).toEqual({ figure: '19', words: 'days left' });
+  });
+});
+
+describe('the Food and money chip with cents', () => {
+  it('writes 4.50 USD, not 5', () => {
+    const t: Today = {
+      ...base,
+      money: {
+        currencies: [{ currency: 'USD', today: 4.5, projection: null, median3: null }],
+        spends_today: [],
+      },
+    };
+    expect(text(chips(t, 10, '2026-10-12')[2].small)).toBe('4.50 USD spent today');
   });
 });

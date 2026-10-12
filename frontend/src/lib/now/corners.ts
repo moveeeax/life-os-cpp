@@ -26,6 +26,26 @@ export const COUNTDOWN_DAYS = 60;
 const n0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const n1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
 
+const money0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+const money2 = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+/** An amount in its own currency: whole numbers stay whole, cents show as two digits. */
+export function formatMoney(amount: number): string {
+  return Number.isInteger(Math.round(amount * 100) / 100)
+    ? money0.format(amount)
+    : money2.format(amount);
+}
+
+/** The big figure of a countdown row: none for today and tomorrow, where the words say it. */
+export function countdownFigure(days: number): { figure: string | null; words: string } {
+  if (days === 0) return { figure: null, words: 'today' };
+  if (days === 1) return { figure: null, words: 'tomorrow' };
+  return { figure: String(days), words: 'days left' };
+}
+
 /** 412 → "6 h 52"; under an hour → "45 min". */
 export function formatSleep(minutes: number): string {
   const m = Math.round(minutes);
@@ -129,7 +149,7 @@ function dayChip(t: Today, hour: number): Chip {
   }
   const first = (t.money?.currencies ?? []).find((c) => c.today > 0);
   const small: LinePart[] = first
-    ? [{ text: n0.format(first.today), num: true }, { text: ` ${first.currency} spent today` }]
+    ? [{ text: formatMoney(first.today), num: true }, { text: ` ${first.currency} spent today` }]
     : [{ text: 'Nothing spent today' }];
   const off = quietLines(t, hour).some((l) => l.key === 'protein' || l.key === 'money');
   return { key: 'day', title: 'Food and money', main, small, dot: off ? 'warn' : null };
