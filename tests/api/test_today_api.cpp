@@ -323,6 +323,10 @@ TEST_F(TodayApiTest, TheDigestCarriesTheCornerDetails) {
     EXPECT_DOUBLE_EQ(d["money"]["spends_today"][0]["amount"].get<double>(), 5000);
     ASSERT_TRUE(d["money"]["currencies"].is_array());
     EXPECT_EQ(d["money"]["currencies"][0]["currency"], "KZT");
+    ASSERT_TRUE(d["money"]["net_worth"].is_object()) << d.dump();
+    EXPECT_EQ(d["money"]["net_worth"]["currency"], "USD");
+    EXPECT_TRUE(d["money"]["net_worth"].contains("rate_date"));
+    EXPECT_TRUE(d["money"]["net_worth"]["change_partial"].is_boolean());
 }
 
 TEST_F(TodayApiTest, ASpendOfSomeoneElseStaysTheirs) {

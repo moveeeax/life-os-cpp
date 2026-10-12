@@ -3,7 +3,8 @@
  * @brief GET /api/v1/money/summary: all accounts in one currency at the day's
  *        rates, an archived account left out, a currency without a rate listed
  *        apart (partial), a transfer between own accounts, the day series, the
- *        change split adding up, bad queries.
+ *        change split adding up (partial without a start rate), account rows at
+ *        the date, bad queries.
  */
 
 #include <string>
@@ -146,13 +147,64 @@ TEST_F(MoneySummaryApiTest, ATransferMovesMoneyWithoutCreatingIt) {
         << "10 USD went over as 4900 KZT (10 USD at 490) and 1 USD of fee is gone";
 }
 
-TEST_F(MoneySummaryApiTest, TheChangeSplitAddsUp) {
+TEST_F(MoneySummaryApiTest, TheChangeWithoutAStartRateIsPartial) {
+    // From is 09-14 and KZT has no quote before 10-01: the split covers USD alone.
     const json d = ok({{"currency", "USD"}, {"days", "30"}, {"date", kDay}});
     const json ch = d["change"];
+    EXPECT_TRUE(ch["partial"].get<bool>());
+    EXPECT_NEAR(ch["ledger"].get<double>() + ch["rates"].get<double>(), ch["total"].get<double>(), 1e-6);
+}
+
+TEST_F(MoneySummaryApiTest, TheChangeSplitAddsUpToTheLine) {
+    Database::get().execute_write([](auto& txn) {
+        txn.exec("INSERT INTO money_fx_rates (date, quote, per_usd) VALUES ('2026-09-01', 'KZT', 520)");
+        txn.exec_params(
+            "INSERT INTO money_transfers (owner_id, date, from_account_id, to_account_id, amount_sent, "
+            "amount_received, fee) VALUES ($1::uuid, '2026-10-12', 'c0000000-0000-4000-8000-000000000002', "
+            "'c0000000-0000-4000-8000-000000000001', 10, 4900, 1)",
+            std::string(kOwner));
+        return true;
+    });
+    const json d = ok({{"currency", "USD"}, {"days", "30"}, {"date", kDay}});
+    const json ch = d["change"];
+    EXPECT_FALSE(ch["partial"].get<bool>());
     EXPECT_NEAR(ch["ledger"].get<double>() + ch["rates"].get<double>(), ch["total"].get<double>(), 1e-6);
     EXPECT_NEAR(ch["total"].get<double>(),
                 d["days"].back()["total"].get<double>() - d["days"].front()["total"].get<double>(),
                 1e-6);
+    EXPECT_NEAR(ch["rates"].get<double>(), 100000.0 / 490.0 - 100000.0 / 520.0, 1e-6) << "KZT got dearer";
+}
+
+TEST_F(MoneySummaryApiTest, AccountRowsAreAtTheDate) {
+    Database::get().execute_write([](auto& txn) {
+        txn.exec_params(
+            "WITH c AS (INSERT INTO money_categories (owner_id, name, kind) VALUES ($1::uuid, 'Food', 'expense') "
+            " RETURNING id) "
+            "INSERT INTO money_transactions (owner_id, type, date, account_id, category_id, amount, name) "
+            "SELECT $1::uuid, 'expense', '2026-10-20', 'c0000000-0000-4000-8000-000000000001', c.id, 9000, 'Later' "
+            "FROM c",
+            std::string(kOwner));
+        return true;
+    });
+    const json d = ok({{"currency", "USD"}, {"days", "30"}, {"date", kDay}});
+    ASSERT_EQ(d["accounts"][0]["name"], "Kaspi");
+    EXPECT_DOUBLE_EQ(d["accounts"][0]["balance"].get<double>(), 100000.0) << "a spend after the date is not in";
+    EXPECT_NEAR(d["accounts"][0]["value"].get<double>() + d["accounts"][1]["value"].get<double>(),
+                d["total"].get<double>(),
+                1e-6);
+}
+
+TEST_F(MoneySummaryApiTest, AnEmptyAccountWithoutARateLeavesTheTotalWhole) {
+    Database::get().execute_write([](auto& txn) {
+        txn.exec_params(
+            "INSERT INTO money_accounts (owner_id, name, currency, opening_balance) "
+            "VALUES ($1::uuid, 'Bangkok', 'THB', 0)",
+            std::string(kOwner));
+        return true;
+    });
+    const json d = ok({{"currency", "USD"}, {"days", "30"}, {"date", kDay}});
+    EXPECT_FALSE(d["partial"].get<bool>());
+    EXPECT_TRUE(d["not_converted"].empty());
 }
 
 TEST_F(MoneySummaryApiTest, DaysBeforeTheFirstRateArePartial) {
