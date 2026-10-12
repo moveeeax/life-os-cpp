@@ -178,12 +178,15 @@ json health_part(const std::string& owner, const std::string& date) {
     json body_rows = json::array();
     if (!xiaomi.empty()) {
         Repositories::HealthReadRepository health(xiaomi);
-        const auto summary = health.summary(date, date, 1, 0, Repositories::region_offset_seconds(owner)).rows;
+        const long long offset = Repositories::region_offset_seconds(owner);
+        const auto summary = health.summary(date, date, 1, 0, offset).rows;
         if (!summary.empty()) {
             summary_row = summary[0];
         }
-        sleep_rows = health.sleep(date, date, 10, 0).rows;
         const auto day = std::chrono::sys_days{Utils::Date::parse_ymd(date)};
+        // Sleep rows are filed by the UTC day of their end; the account's day may start hours earlier.
+        sleep_rows = ::Now::Today::sleep_on_local_day(
+            health.sleep(::Money::Period::detail::text_of(day - std::chrono::days{1}), date, 20, 0).rows, date, offset);
         body_rows = health.body(::Money::Period::detail::text_of(day - std::chrono::days{8}), date, 50, 0).rows;
     }
     if (body_rows.empty()) {
