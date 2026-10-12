@@ -150,7 +150,13 @@ function dayChip(t: Today, hour: number): Chip {
   const first = (t.money?.currencies ?? []).find((c) => c.today > 0);
   const small: LinePart[] = first
     ? [{ text: formatMoney(first.today), num: true }, { text: ` ${first.currency} spent today` }]
-    : [{ text: 'Nothing spent today' }];
+    : t.money?.net_worth
+      ? [
+          { text: 'All accounts ' },
+          { text: n0.format(t.money.net_worth.total), num: true },
+          { text: ` ${t.money.net_worth.currency}` },
+        ]
+      : [{ text: 'Nothing spent today' }];
   const off = quietLines(t, hour).some((l) => l.key === 'protein' || l.key === 'money');
   return { key: 'day', title: 'Food and money', main, small, dot: off ? 'warn' : null };
 }

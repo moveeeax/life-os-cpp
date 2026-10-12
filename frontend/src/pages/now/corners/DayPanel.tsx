@@ -91,6 +91,15 @@ export function DayPanel({ today }: { today: Today }) {
           </div>
         ))}
       </div>
+      {m?.net_worth && (
+        <Link className="c-row c-plain c-link" to="/money/summary">
+          <span className="c-t">All accounts</span>
+          <span className="c-r">
+            <span className="num">{n0.format(m.net_worth.total)}</span> {m.net_worth.currency}
+            {m.net_worth.partial ? ' · partial' : ''}
+          </span>
+        </Link>
+      )}
       <div className="c-links">
         <Link className="c-link" to="/money">
           Add a spend →
