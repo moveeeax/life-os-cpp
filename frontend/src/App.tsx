@@ -6,7 +6,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { NotFoundPage } from '@/pages/NotFound';
 import { Permission } from '@/lib/auth/permissions';
 import { routes, type RouteEntry, type RouteGuard, type RouteLayout } from '@/routes/manifest';
-import { AppShell } from '@/shell/AppShell';
+import { GlassShell } from '@/shell/GlassShell';
 
 /**
  * Guard groups expressed as layout routes: the wrapper renders once and
@@ -75,10 +75,10 @@ export default function App() {
       {/* No frame: the full-screen sign-in page and its /login alias. */}
       {routesFor('public', 'bare').map(renderRoute)}
 
-      {/* Dashboard shell: sidebar + header, signed-in and confirmed users. */}
-      {/* The guard wraps the frame, so the sidebar never renders for a guest. */}
+      {/* The glass shell: the picture, the pill nav and the screen; signed-in and confirmed users. */}
+      {/* The guard wraps the frame, so the shell never renders for a guest. */}
       <Route element={<RequireConfirmed />}>
-        <Route element={<AppShell />}>{routesFor('confirmed', 'shell').map(renderRoute)}</Route>
+        <Route element={<GlassShell />}>{routesFor('confirmed', 'shell').map(renderRoute)}</Route>
       </Route>
 
       <Route element={<Layout />}>

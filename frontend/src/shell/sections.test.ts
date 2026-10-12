@@ -2,69 +2,52 @@ import { describe, expect, it } from 'vitest';
 
 import { Permission, type PermissionUser } from '@/lib/auth/permissions';
 
-import { rootTarget, sections, visibleSections } from './sections';
+import { DASHBOARD_HOME, glassNav, rootTarget } from './sections';
 
 const user = (permissions: number) =>
   ({ role: { id: 1, name: 'role', permissions } }) as PermissionUser;
 
-describe('visibleSections', () => {
-  it('lists Health first and keeps every not-yet-built section as an inactive item', () => {
-    const list = visibleSections(user(Permission.General | Permission.FitnessRead));
-    expect(list[0]).toMatchObject({ key: 'health', path: '/health' });
-    expect(list.find((s) => s.key === 'workout')).toMatchObject({ path: '/workout' });
-    expect(list.find((s) => s.key === 'food')).toMatchObject({ path: '/food' });
-    expect(list.find((s) => s.key === 'money')).toMatchObject({ path: '/money' });
-    expect(list.find((s) => s.key === 'tasks')).toMatchObject({ path: '/tasks' });
-    expect(list.find((s) => s.key === 'goals')).toMatchObject({ path: '/goals' });
-    expect(list.filter((s) => !s.path).map((s) => s.label)).toEqual([
-      'Day',
-      'Journal',
-      'Learning',
-      'Travel',
-      'Work',
-      'Freelance',
-      'Ideas',
-      'OSS',
+describe('glassNav', () => {
+  it('lists the sections of the glass nav in order', () => {
+    const list = glassNav(user(Permission.General | Permission.FitnessRead));
+    expect(list.map((s) => [s.label, s.to])).toEqual([
+      ['Now', '/now'],
+      ['Tasks', '/tasks'],
+      ['Goals', '/goals'],
+      ['Money', '/money'],
+      ['Food', '/food'],
+      ['Body', '/health'],
+      ['Training', '/workout'],
     ]);
   });
 
-  it('shows a section whose module is off as not built yet, in its place', () => {
-    const who = user(Permission.General | Permission.FitnessRead);
-    const list = visibleSections(who, new Set(['workout']));
-    expect(list).toHaveLength(sections.length);
-    expect(list.find((s) => s.key === 'workout')?.path).toBeUndefined();
-    expect(list.map((s) => s.key)).toEqual(sections.map((s) => s.key));
-    // Without the permission the inactive item still shows, like the other unbuilt ones.
-    expect(
-      visibleSections(user(Permission.General), new Set(['workout'])).some(
-        (s) => s.key === 'workout',
-      ),
-    ).toBe(true);
+  it('hides Body and Training without fitness:read', () => {
+    expect(glassNav(user(Permission.General)).map((s) => s.label)).toEqual([
+      'Now',
+      'Tasks',
+      'Goals',
+      'Money',
+      'Food',
+    ]);
   });
 
-  it('hides Health from a user without fitness:read but keeps the inactive items', () => {
-    const list = visibleSections(user(Permission.General));
-    expect(list.find((s) => s.key === 'health')).toBeUndefined();
-    expect(list.find((s) => s.key === 'workout')).toBeUndefined();
-    expect(list).toHaveLength(sections.length - 2);
+  it('shows Body and Training to an administrator through the sentinel bit', () => {
+    expect(glassNav(user(Permission.Administer)).map((s) => s.label)).toContain('Training');
   });
 
-  it('shows Food to any user and as not built yet while its module is off', () => {
-    expect(visibleSections(user(Permission.General)).find((s) => s.key === 'food')).toMatchObject({
-      path: '/food',
-    });
-    expect(
-      visibleSections(user(Permission.General), new Set(['food'])).find((s) => s.key === 'food')
-        ?.path,
-    ).toBeUndefined();
+  it('leaves out a section whose module is off, never Now', () => {
+    const list = glassNav(user(Permission.General), new Set(['goals', 'now']));
+    expect(list.map((s) => s.label)).toEqual(['Now', 'Tasks', 'Money', 'Food']);
   });
 
-  it('shows Health to an administrator through the sentinel bit', () => {
-    expect(visibleSections(user(Permission.Administer))[0].key).toBe('health');
+  it('gives no user only Now', () => {
+    expect(glassNav(null).map((s) => s.label)).toEqual(['Now']);
   });
+});
 
-  it('returns only inactive items for no user', () => {
-    expect(visibleSections(null).every((s) => !s.path)).toBe(true);
+describe('DASHBOARD_HOME', () => {
+  it('is the Now screen', () => {
+    expect(DASHBOARD_HOME).toBe('/now');
   });
 });
 
