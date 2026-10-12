@@ -9,6 +9,9 @@
 #pragma once
 
 #include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <cstddef>
 #include <exception>
 #include <functional>
 #include <map>
@@ -21,10 +24,17 @@
 #include <nlohmann/json.hpp>
 
 #include "tasks/Agenda.hpp"
+#include "utils/Date.hpp"
 
 namespace Now::Today {
 
 using json = nlohmann::json;
+
+/// How many late tasks and spends the corners list.
+inline constexpr std::size_t kLateShown = 5;
+inline constexpr std::size_t kSpendsShown = 5;
+/// The weight change compares with the latest weighing at least this many days older.
+inline constexpr int kWeightChangeDays = 6;
 
 struct Part {
     std::string key;             // "tasks" | "goals" | "food" | "money" | "health"
@@ -55,7 +65,8 @@ inline json assemble(const std::vector<Part>& parts, json focus) {
     return out;
 }
 
-/// {late_count, first_late: {id, title, due} | null, today: [{id, title}], inbox_count}.
+/// {late_count, first_late: {id, title, due} | null, late: up to 5 {id, title, due} oldest first,
+/// today: [{id, title, status}], inbox_count}.
 inline json tasks_block(const ::Tasks::Agenda::Groups& g, std::string_view date, long inbox_count) {
     json first_late;
     for (const auto& row : g.late) {
@@ -66,14 +77,25 @@ inline json tasks_block(const ::Tasks::Agenda::Groups& g, std::string_view date,
     json today = json::array();
     for (const auto& row : g.soon) {
         if (row.value("due", "") == date) {
-            today.push_back(json{{"id", row["id"]}, {"title", row["title"]}});
+            today.push_back(json{{"id", row["id"]}, {"title", row["title"]}, {"status", row.value("status", "open")}});
         }
     }
-    return json{
-        {"late_count", g.late.size()}, {"first_late", first_late}, {"today", today}, {"inbox_count", inbox_count}};
+    std::vector<json> late(g.late.begin(), g.late.end());
+    std::stable_sort(
+        late.begin(), late.end(), [](const json& a, const json& b) { return a.value("due", "") < b.value("due", ""); });
+    json late_out = json::array();
+    for (std::size_t i = 0; i < late.size() && i < kLateShown; ++i) {
+        late_out.push_back(json{{"id", late[i]["id"]}, {"title", late[i]["title"]}, {"due", late[i].value("due", "")}});
+    }
+    return json{{"late_count", g.late.size()},
+                {"first_late", first_late},
+                {"late", late_out},
+                {"today", today},
+                {"inbox_count", inbox_count}};
 }
 
-/// Active goals {id, title, kind, due, pace}: behind first, then by due; passed and failed left out.
+/// Active goals {id, title, kind, due, pace, progress, days_left}: behind first, then by due; passed and failed left
+/// out.
 inline json goals_block(const json& goals_with_progress) {
     std::vector<json> kept;
     for (const auto& g : goals_with_progress) {
@@ -81,8 +103,14 @@ inline json goals_block(const json& goals_with_progress) {
         if (pace == "passed" || pace == "failed") {
             continue;
         }
-        kept.push_back(
-            json{{"id", g["id"]}, {"title", g["title"]}, {"kind", g["kind"]}, {"due", g["due"]}, {"pace", pace}});
+        const json& p = g["progress"];
+        kept.push_back(json{{"id", g["id"]},
+                            {"title", g["title"]},
+                            {"kind", g["kind"]},
+                            {"due", g["due"]},
+                            {"pace", pace},
+                            {"progress", p.contains("progress") ? p["progress"] : json()},
+                            {"days_left", p.contains("days_left") ? p["days_left"] : json()}});
     }
     std::stable_sort(kept.begin(), kept.end(), [](const json& a, const json& b) {
         const bool ab = a["pace"] == "behind";
@@ -131,6 +159,95 @@ inline json money_block(const json& today_rows, const json& month_report) {
     json out = json::array();
     for (auto& [currency, e] : by_currency) {
         out.push_back(std::move(e));
+    }
+    return out;
+}
+
+namespace detail {
+inline json number_or_null(const json& row, const char* key) {
+    return row.is_object() && row.contains(key) && row[key].is_number() ? row[key] : json();
+}
+inline std::chrono::sys_days day_of(const json& ts) {
+    return std::chrono::sys_days{Utils::Date::parse_ymd(ts.get<std::string>().substr(0, 10))};
+}
+}  // namespace detail
+
+/// {steps, active_kcal, resting_bpm, sleep {minutes, start, end, stages} | null, sleep_minutes,
+/// weight_kg, weight_change_7d}; null when steps, sleep and weight are all missing.
+/// @p summary_row is the summary row of the date or null; @p sleep_rows the day's sleep sessions;
+/// @p body_rows the weighings of the last 8 days, oldest first.
+inline json health_block(const json& summary_row, const json& sleep_rows, const json& body_rows) {
+    json sleep;
+    std::string latest_end;
+    for (const auto& s : sleep_rows) {
+        const bool nap = s.contains("is_nap") && s["is_nap"].is_boolean() && s["is_nap"].get<bool>();
+        const bool usable = s.contains("time_asleep_minutes") && s["time_asleep_minutes"].is_number() &&
+                            s.contains("end_at") && s["end_at"].is_string();
+        if (nap || !usable) {
+            continue;
+        }
+        const std::string end = s["end_at"].get<std::string>();
+        if (sleep.is_null() || end > latest_end) {
+            latest_end = end;
+            sleep = json{{"minutes", s["time_asleep_minutes"]},
+                         {"start", s.contains("start_at") ? s["start_at"] : json()},
+                         {"end", s["end_at"]},
+                         {"stages", s.contains("stages") && s["stages"].is_array() ? s["stages"] : json::array()}};
+        }
+    }
+    json weight;
+    json change;
+    std::vector<json> weighed;
+    for (const auto& b : body_rows) {
+        if (b.contains("weight_kg") && b["weight_kg"].is_number() && b.contains("timestamp") &&
+            b["timestamp"].is_string()) {
+            weighed.push_back(b);
+        }
+    }
+    if (!weighed.empty()) {
+        const json& last = weighed.back();
+        weight = last["weight_kg"];
+        const auto last_day = detail::day_of(last["timestamp"]);
+        for (auto it = weighed.rbegin(); it != weighed.rend(); ++it) {
+            if ((last_day - detail::day_of((*it)["timestamp"])).count() >= kWeightChangeDays) {
+                const double d = last["weight_kg"].get<double>() - (*it)["weight_kg"].get<double>();
+                change = std::round(d * 10.0) / 10.0;
+                break;
+            }
+        }
+    }
+    const json steps = detail::number_or_null(summary_row, "steps");
+    if (steps.is_null() && sleep.is_null() && weight.is_null()) {
+        return json();
+    }
+    return json{{"steps", steps},
+                {"active_kcal", detail::number_or_null(summary_row, "active_kcal")},
+                {"resting_bpm", detail::number_or_null(summary_row, "resting_bpm")},
+                {"sleep", sleep},
+                {"sleep_minutes", sleep.is_null() ? json() : sleep["minutes"]},
+                {"weight_kg", weight},
+                {"weight_change_7d", change}};
+}
+
+/// Up to five spends of the day as the ledger lists them (newest first): {id, name, amount, currency}.
+/// The amount is the final one (with adjustments), positive as stored; currencies stay apart.
+inline json spends_block(const json& rows) {
+    json out = json::array();
+    for (const auto& r : rows) {
+        if (out.size() >= kSpendsShown) {
+            break;
+        }
+        std::string name = r.contains("name") && r["name"].is_string() ? r["name"].get<std::string>() : "";
+        if (name.empty() && r.contains("merchant") && r["merchant"].is_string()) {
+            name = r["merchant"].get<std::string>();
+        }
+        if (name.empty()) {
+            name = "Spend";
+        }
+        const json& amount =
+            r.contains("final_amount") && r["final_amount"].is_number() ? r["final_amount"] : r["amount"];
+        out.push_back(
+            json{{"id", r["id"]}, {"name", name}, {"amount", amount.get<double>()}, {"currency", r["currency"]}});
     }
     return out;
 }

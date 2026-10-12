@@ -64,7 +64,7 @@ TEST(NowToday, TasksBlockTakesTheOldestLateAndTodaysOnly) {
     EXPECT_EQ(b["first_late"]["title"], "Pay the rent");
     EXPECT_EQ(b["first_late"]["due"], "2026-10-01");
     ASSERT_EQ(b["today"].size(), 1u);
-    EXPECT_EQ(b["today"][0], (json{{"id", "c"}, {"title", "Call the bank"}}));
+    EXPECT_EQ(b["today"][0], (json{{"id", "c"}, {"title", "Call the bank"}, {"status", "open"}}));
     EXPECT_EQ(b["inbox_count"], 3);
 }
 
@@ -93,7 +93,13 @@ TEST(NowToday, GoalsBlockPutsBehindFirstAndDropsTheDecided) {
     EXPECT_EQ(b[1]["id"], "2");
     EXPECT_EQ(b[2]["id"], "1");
     EXPECT_EQ(b[0],
-              (json{{"id", "4"}, {"title", "Weight"}, {"kind", "number"}, {"due", "2026-11-15"}, {"pace", "behind"}}));
+              (json{{"id", "4"},
+                    {"title", "Weight"},
+                    {"kind", "number"},
+                    {"due", "2026-11-15"},
+                    {"pace", "behind"},
+                    {"progress", nullptr},
+                    {"days_left", nullptr}}));
 }
 
 TEST(NowToday, MoneyBlockKeepsEachCurrencyApart) {
@@ -115,4 +121,118 @@ TEST(NowToday, MoneyBlockKeepsEachCurrencyApart) {
 
 TEST(NowToday, MoneyBlockIsNullWhenThereIsNothing) {
     EXPECT_TRUE(Now::Today::money_block(json::array(), json{{"blocks", json::array()}}).is_null());
+}
+
+TEST(NowToday, TasksBlockListsUpToFiveLateOldestFirstAndTodaysStatus) {
+    ::Tasks::Agenda::Groups g;
+    for (int i = 0; i < 7; ++i) {
+        g.late.push_back(json{{"id", std::to_string(i)},
+                              {"title", "Late " + std::to_string(i)},
+                              {"due", "2026-10-0" + std::to_string(9 - i)}});
+    }
+    g.soon = {json{{"id", "t"}, {"title", "Today"}, {"due", "2026-10-12"}, {"status", "in_progress"}}};
+    const json b = Now::Today::tasks_block(g, "2026-10-12", 0);
+    ASSERT_EQ(b["late"].size(), 5u);
+    EXPECT_EQ(b["late"][0]["due"], "2026-10-03");
+    EXPECT_EQ(b["late"][4]["due"], "2026-10-07");
+    EXPECT_EQ(b["late_count"], 7);
+    EXPECT_EQ(b["today"][0]["status"], "in_progress");
+}
+
+TEST(NowToday, GoalsBlockCarriesProgressAndDaysLeft) {
+    const json goals = json::array({{{"id", "1"},
+                                     {"title", "Books"},
+                                     {"kind", "count"},
+                                     {"due", "2026-12-31"},
+                                     {"progress", {{"pace", "on_track"}, {"progress", 0.58}, {"days_left", 80}}}}});
+    const json b = Now::Today::goals_block(goals);
+    EXPECT_DOUBLE_EQ(b[0]["progress"].get<double>(), 0.58);
+    EXPECT_EQ(b[0]["days_left"], 80);
+}
+
+namespace {
+json sleep_row(const char* end, int asleep, bool nap) {
+    return json{{"start_at", "2026-10-11T18:41:00Z"},
+                {"end_at", end},
+                {"time_asleep_minutes", asleep},
+                {"is_nap", nap},
+                {"stages", json::array({{{"stage", "deep"}, {"minutes", 75}}, {{"stage", "rem"}, {"minutes", 91}}})}};
+}
+json weight(const char* ts, double kg) {
+    return json{{"timestamp", ts}, {"weight_kg", kg}};
+}
+}  // namespace
+
+TEST(NowToday, HealthBlockFromAFullDay) {
+    const json summary = {{"steps", 6120}, {"active_kcal", 370}, {"resting_bpm", 58}};
+    const json sleeps =
+        json::array({sleep_row("2026-10-12T01:58:00Z", 412, false), sleep_row("2026-10-12T09:30:00Z", 25, true)});
+    json body = json::array();
+    const char* days[] = {"2026-10-04T05:00:00Z",
+                          "2026-10-05T05:00:00Z",
+                          "2026-10-06T05:00:00Z",
+                          "2026-10-08T05:00:00Z",
+                          "2026-10-10T05:00:00Z",
+                          "2026-10-12T05:00:00Z"};
+    const double kgs[] = {92.3, 92.0, 92.1, 91.9, 91.8, 91.6};
+    for (int i = 0; i < 6; ++i) {
+        body.push_back(weight(days[i], kgs[i]));
+    }
+    const json h = Now::Today::health_block(summary, sleeps, body);
+    EXPECT_EQ(h["steps"], 6120);
+    EXPECT_EQ(h["active_kcal"], 370);
+    EXPECT_EQ(h["resting_bpm"], 58);
+    EXPECT_EQ(h["sleep"]["minutes"], 412) << "the nap is skipped";
+    EXPECT_EQ(h["sleep"]["stages"].size(), 2u);
+    EXPECT_EQ(h["sleep_minutes"], 412);
+    EXPECT_DOUBLE_EQ(h["weight_kg"].get<double>(), 91.6);
+    EXPECT_DOUBLE_EQ(h["weight_change_7d"].get<double>(), -0.5) << "91.6 against 92.1 on 10-06, 6 days older";
+}
+
+TEST(NowToday, HealthBlockWithAShortWeightSeriesHasNoChange) {
+    const json body = json::array({weight("2026-10-10T05:00:00Z", 91.8), weight("2026-10-12T05:00:00Z", 91.6)});
+    const json h = Now::Today::health_block(json(), json::array(), body);
+    EXPECT_DOUBLE_EQ(h["weight_kg"].get<double>(), 91.6);
+    EXPECT_TRUE(h["weight_change_7d"].is_null());
+    EXPECT_TRUE(h["sleep"].is_null());
+    EXPECT_TRUE(h["steps"].is_null());
+}
+
+TEST(NowToday, HealthBlockIsNullWithNothing) {
+    EXPECT_TRUE(Now::Today::health_block(json(), json::array(), json::array()).is_null());
+    EXPECT_TRUE(Now::Today::health_block(json{{"steps", nullptr}}, json::array(), json::array()).is_null());
+}
+
+TEST(NowToday, SpendsBlockKeepsFiveWithNamesAndCurrencies) {
+    json rows = json::array();
+    rows.push_back({{"id", "a"},
+                    {"name", "Groceries"},
+                    {"merchant", "Magnum"},
+                    {"amount", 5000},
+                    {"final_amount", 5000},
+                    {"currency", "KZT"}});
+    rows.push_back({{"id", "b"},
+                    {"name", ""},
+                    {"merchant", "Starbucks"},
+                    {"amount", 4},
+                    {"final_amount", 4.5},
+                    {"currency", "USD"}});
+    rows.push_back(
+        {{"id", "c"}, {"name", ""}, {"merchant", ""}, {"amount", 300}, {"final_amount", nullptr}, {"currency", "THB"}});
+    for (int i = 0; i < 4; ++i) {
+        rows.push_back({{"id", "x" + std::to_string(i)},
+                        {"name", "More"},
+                        {"merchant", ""},
+                        {"amount", 1},
+                        {"final_amount", 1},
+                        {"currency", "KZT"}});
+    }
+    const json b = Now::Today::spends_block(rows);
+    ASSERT_EQ(b.size(), 5u);
+    EXPECT_EQ(b[0], (json{{"id", "a"}, {"name", "Groceries"}, {"amount", 5000.0}, {"currency", "KZT"}}));
+    EXPECT_EQ(b[1]["name"], "Starbucks");
+    EXPECT_DOUBLE_EQ(b[1]["amount"].get<double>(), 4.5) << "the final amount, with adjustments";
+    EXPECT_EQ(b[1]["currency"], "USD");
+    EXPECT_EQ(b[2]["name"], "Spend");
+    EXPECT_DOUBLE_EQ(b[2]["amount"].get<double>(), 300);
 }
