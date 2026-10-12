@@ -6,6 +6,35 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-10-12
+
+### Added
+- Now: a new module (`NOW_ENABLED`) behind the Now screen. `GET /api/v1/today`
+  gives the day's digest in one call: late and today's tasks, active goals with
+  their pace (behind first), food eaten against the targets, money spent today
+  per currency with the month's projection and usual spend, last night's sleep,
+  the day's steps and the latest weight. A section that is off or fails is left
+  out and named in `errors`. The focus of the day (`/api/v1/today/focus`) is a
+  task, a goal or typed text; ticking a task focus closes the task. The
+  wallpaper library (`/api/v1/wallpapers`, `/api/v1/admin/wallpapers`) keeps
+  videos and images in an S3-compatible bucket (`S3_*` settings): the admin
+  uploads straight to the bucket through presigned URLs, and every user lists
+  the ready ones per device. Migration 031.
+- Now and the glass shell: every screen now sits over one picture, a random
+  wallpaper from the shared library (a video on a desktop, an image on a
+  phone), with a glass pill nav (Now, Tasks, Goals, Money, Food, Body,
+  Training) and an account menu instead of the sidebar. `/now` is the new
+  landing screen: the clock, a greeting by name, the day's one focus (a task,
+  a goal or typed text; ticking a task closes it) and up to three quiet lines
+  when something is off (late tasks, a goal behind, protein left in the
+  evening or a month above usual spend). Sections not redesigned yet sit on one
+  glass sheet. "Hide numbers" blurs amounts for a shared screen. Admins upload
+  wallpapers on `/admin/wallpapers` straight to the bucket, with a poster frame
+  taken in the browser. With the now module off, Now is left out and the app
+  opens on the first section. The frontend chart's `csp.storageHosts` lets the
+  bucket through the CSP (`docs/wallpapers.md`). A Chrome extension in
+  `tools/newtab-extension` opens Now in every new tab.
+
 ## [1.17.1] - 2026-10-08
 
 ### Fixed
