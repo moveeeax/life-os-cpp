@@ -43,8 +43,10 @@ api -> observability
 api -> repositories
 api -> repositories/fitness
 api -> repositories/food
+api -> repositories/now
 api -> repositories/workout
 api -> security
+api -> storage
 api -> utils
 billing -> database
 billing -> domain
@@ -118,6 +120,8 @@ repositories/food -> repositories
 repositories/money -> database
 repositories/money -> money
 repositories/money -> repositories
+repositories/now -> database
+repositories/now -> repositories
 repositories/workout -> database
 repositories/workout -> repositories
 root -> api

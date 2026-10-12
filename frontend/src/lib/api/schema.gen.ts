@@ -11896,6 +11896,335 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/wallpapers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The ready wallpapers of a device, with their public URLs */
+        get: {
+            parameters: {
+                query: {
+                    device: "desktop" | "phone";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The ready wallpapers, oldest first */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Wallpaper"][];
+                        };
+                    };
+                };
+                /** @description device is not desktop or phone */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Storage not configured (storage_not_configured) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/wallpapers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every wallpaper, pending ones included, newest first (admin) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The library */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AdminWallpaper"][];
+                        };
+                    };
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Storage not configured (storage_not_configured) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Start a wallpaper upload; answers presigned PUT URLs for the file and the poster (admin) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["WallpaperCreate"];
+                };
+            };
+            responses: {
+                /** @description A pending row and where to upload */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                                upload: components["schemas"]["WallpaperUpload"];
+                                poster_upload: components["schemas"]["WallpaperUpload"] | null;
+                            };
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Storage not configured (storage_not_configured) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/wallpapers/{id}/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a wallpaper ready once the file and the poster are in the bucket at the declared sizes (admin) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Ready */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Wallpaper"];
+                        };
+                    };
+                };
+                /** @description The id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled, or no such wallpaper */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description An object is missing or has another size (upload_incomplete) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Storage not configured or not answering (storage_not_configured, storage_error) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/wallpapers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a wallpaper and its objects (admin) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled, or no such wallpaper */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Storage not configured or not answering (storage_not_configured, storage_error) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -12009,6 +12338,74 @@ export interface components {
             /** Format: date */
             date: string;
             label: string;
+        };
+        Wallpaper: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "video" | "image";
+            /** @description Public URL of the file (bucket or CDN) */
+            url: string;
+            /** @description JPEG frame of a video; null for an image */
+            poster_url: string | null;
+            width: number | null;
+            height: number | null;
+        };
+        AdminWallpaper: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "video" | "image";
+            /** @enum {string} */
+            device: "desktop" | "phone";
+            object_key: string;
+            poster_key: string | null;
+            content_type: string;
+            /** Format: int64 */
+            bytes: number;
+            /** Format: int64 */
+            poster_bytes: number | null;
+            width: number | null;
+            height: number | null;
+            /** @enum {string} */
+            status: "pending" | "ready";
+            /** Format: uuid */
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
+            url: string;
+            poster_url: string | null;
+        };
+        WallpaperCreate: {
+            /** @enum {string} */
+            kind: "video" | "image";
+            /**
+             * @description A phone takes images only
+             * @enum {string}
+             */
+            device: "desktop" | "phone";
+            /** @enum {string} */
+            content_type: "video/mp4" | "video/webm" | "image/jpeg" | "image/webp";
+            /**
+             * Format: int64
+             * @description Video at most 100 MB, image at most 10 MB
+             */
+            bytes: number;
+            /**
+             * Format: int64
+             * @description Required for a video, refused for an image
+             */
+            poster_bytes?: number;
+            width?: number;
+            height?: number;
+        };
+        WallpaperUpload: {
+            /** @description Presigned PUT, valid 15 minutes */
+            url: string;
+            /** @description Headers the PUT must carry exactly as given */
+            headers: {
+                [key: string]: string;
+            };
         };
         /** @enum {string} */
         TaskArea: "finance" | "health" | "travel" | "growth" | "relationships" | "projects";

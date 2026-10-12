@@ -479,6 +479,230 @@
      }
     }
    },
+   "Wallpaper": {
+    "type": "object",
+    "required": [
+     "id",
+     "kind",
+     "url",
+     "poster_url",
+     "width",
+     "height"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "video",
+       "image"
+      ]
+     },
+     "url": {
+      "type": "string",
+      "description": "Public URL of the file (bucket or CDN)"
+     },
+     "poster_url": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "JPEG frame of a video; null for an image"
+     },
+     "width": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "height": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     }
+    }
+   },
+   "AdminWallpaper": {
+    "type": "object",
+    "required": [
+     "id",
+     "kind",
+     "device",
+     "object_key",
+     "poster_key",
+     "content_type",
+     "bytes",
+     "poster_bytes",
+     "width",
+     "height",
+     "status",
+     "created_by",
+     "created_at",
+     "url",
+     "poster_url"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "video",
+       "image"
+      ]
+     },
+     "device": {
+      "type": "string",
+      "enum": [
+       "desktop",
+       "phone"
+      ]
+     },
+     "object_key": {
+      "type": "string"
+     },
+     "poster_key": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "content_type": {
+      "type": "string"
+     },
+     "bytes": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "poster_bytes": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "format": "int64"
+     },
+     "width": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "height": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "pending",
+       "ready"
+      ]
+     },
+     "created_by": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "url": {
+      "type": "string"
+     },
+     "poster_url": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    }
+   },
+   "WallpaperCreate": {
+    "type": "object",
+    "required": [
+     "kind",
+     "device",
+     "content_type",
+     "bytes"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "video",
+       "image"
+      ]
+     },
+     "device": {
+      "type": "string",
+      "enum": [
+       "desktop",
+       "phone"
+      ],
+      "description": "A phone takes images only"
+     },
+     "content_type": {
+      "type": "string",
+      "enum": [
+       "video/mp4",
+       "video/webm",
+       "image/jpeg",
+       "image/webp"
+      ]
+     },
+     "bytes": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 1,
+      "description": "Video at most 100 MB, image at most 10 MB"
+     },
+     "poster_bytes": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 1,
+      "maximum": 1048576,
+      "description": "Required for a video, refused for an image"
+     },
+     "width": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000
+     },
+     "height": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000
+     }
+    }
+   },
+   "WallpaperUpload": {
+    "type": "object",
+    "required": [
+     "url",
+     "headers"
+    ],
+    "properties": {
+     "url": {
+      "type": "string",
+      "description": "Presigned PUT, valid 15 minutes"
+     },
+     "headers": {
+      "type": "object",
+      "description": "Headers the PUT must carry exactly as given",
+      "additionalProperties": {
+       "type": "string"
+      }
+     }
+    }
+   },
    "TaskArea": {
     "type": "string",
     "enum": [
@@ -20116,12 +20340,300 @@
      }
     }
    }
+  },
+  "/api/v1/wallpapers": {
+   "get": {
+    "summary": "The ready wallpapers of a device, with their public URLs",
+    "tags": [
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "enum": [
+        "desktop",
+        "phone"
+       ]
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The ready wallpapers, oldest first",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Wallpaper"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "device is not desktop or phone"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Now module disabled"
+     },
+     "503": {
+      "description": "Storage not configured (storage_not_configured)"
+     }
+    }
+   }
+  },
+  "/api/v1/admin/wallpapers": {
+   "get": {
+    "summary": "Every wallpaper, pending ones included, newest first (admin)",
+    "tags": [
+     "admin",
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The library",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/AdminWallpaper"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Not an admin"
+     },
+     "404": {
+      "description": "Now module disabled"
+     },
+     "503": {
+      "description": "Storage not configured (storage_not_configured)"
+     }
+    }
+   },
+   "post": {
+    "summary": "Start a wallpaper upload; answers presigned PUT URLs for the file and the poster (admin)",
+    "tags": [
+     "admin",
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/WallpaperCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "A pending row and where to upload",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "id",
+            "upload",
+            "poster_upload"
+           ],
+           "properties": {
+            "id": {
+             "type": "string",
+             "format": "uuid"
+            },
+            "upload": {
+             "$ref": "#/components/schemas/WallpaperUpload"
+            },
+            "poster_upload": {
+             "oneOf": [
+              {
+               "$ref": "#/components/schemas/WallpaperUpload"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "403": {
+      "description": "Not an admin"
+     },
+     "404": {
+      "description": "Now module disabled"
+     },
+     "503": {
+      "description": "Storage not configured (storage_not_configured)"
+     }
+    }
+   }
+  },
+  "/api/v1/admin/wallpapers/{id}/ready": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "post": {
+    "summary": "Mark a wallpaper ready once the file and the poster are in the bucket at the declared sizes (admin)",
+    "tags": [
+     "admin",
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Ready",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Wallpaper"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "The id is not a UUID"
+     },
+     "403": {
+      "description": "Not an admin"
+     },
+     "404": {
+      "description": "Now module disabled, or no such wallpaper"
+     },
+     "409": {
+      "description": "An object is missing or has another size (upload_incomplete)"
+     },
+     "503": {
+      "description": "Storage not configured or not answering (storage_not_configured, storage_error)"
+     }
+    }
+   }
+  },
+  "/api/v1/admin/wallpapers/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "delete": {
+    "summary": "Delete a wallpaper and its objects (admin)",
+    "tags": [
+     "admin",
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "400": {
+      "description": "The id is not a UUID"
+     },
+     "403": {
+      "description": "Not an admin"
+     },
+     "404": {
+      "description": "Now module disabled, or no such wallpaper"
+     },
+     "503": {
+      "description": "Storage not configured or not answering (storage_not_configured, storage_error)"
+     }
+    }
+   }
   }
  },
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 298792,
-  "source_fnv1a64": "1ea5f76f902645b4"
+  "source_bytes": 305702,
+  "source_fnv1a64": "b6c8b95afe7f5667"
  }
 }
