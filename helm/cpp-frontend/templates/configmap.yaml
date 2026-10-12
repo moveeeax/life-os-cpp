@@ -47,9 +47,10 @@ data:
             add_header Referrer-Policy "no-referrer" always;
             add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
             # csp.storageHosts: the wallpaper bucket or its CDN (pictures,
-            # videos and the admin's direct upload); docs/wallpapers.md.
+            # videos and the admin's direct upload); docs/wallpapers.md. blob: lets
+            # the upload page read the picked file for its poster and size.
             {{- $storage := join " " .Values.csp.storageHosts }}
-            add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: {{ $storage }}; media-src 'self' {{ $storage }}; font-src 'self'; connect-src 'self' {{ $storage }}; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" always;
+            add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: {{ $storage }}; media-src 'self' blob: {{ $storage }}; font-src 'self'; connect-src 'self' {{ $storage }}; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" always;
         }
 
         location /assets/ {
