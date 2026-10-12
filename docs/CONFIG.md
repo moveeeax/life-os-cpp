@@ -269,6 +269,15 @@ outage can never affect the money path.
 | `TASKS_LLM_TIMEOUT_SECONDS` | `tasks.llm.timeout_seconds` | int | `60` | Provider timeout per call (at least 5) |
 | `TASKS_LLM_MAX_TOKENS` | `tasks.llm.max_tokens` | int | `1500` | Token cap of an answer (at least 100) |
 | `GOALS_ENABLED` | `goals.enabled` | bool | `false` | Master switch for the goals module (`Core::goals_enabled()`): goals of four kinds, check-ins, sections, milestones, the progress and pace computed at the caller's date, and the goal link of tasks. Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
+| `NOW_ENABLED` | `now.enabled` | bool | `false` | Master switch for the now module (`Core::now_enabled()`): `GET /api/v1/today` (the day's digest for the Now screen), the focus of the day, and the wallpaper library. Routes stay registered, handlers 404 while off. |
+| `S3_ENDPOINT` | `storage.s3.endpoint` | string | `""` | Origin of the S3-compatible store, e.g. `https://storage.example.com`, no trailing slash. Setup in `docs/wallpapers.md` |
+| `S3_REGION` | `storage.s3.region` | string | `""` | Region used in the SigV4 signature |
+| `S3_BUCKET` | `storage.s3.bucket` | string | `""` | Bucket of the wallpapers. Empty: the wallpaper routes answer 503 `storage_not_configured` and the app paints a gradient |
+| `S3_PREFIX` | `storage.s3.prefix` | string | `life-os/` | Key prefix; objects go to `<prefix>wallpapers/<id>/` |
+| `S3_ACCESS_KEY_ID` | `storage.s3.access_key_id` | string | `""` | Access key with write and delete on the prefix. Prod: a Secret (`storage.s3.credentialsSecret` in the chart). Never log or commit |
+| `S3_SECRET_ACCESS_KEY` | `storage.s3.secret_access_key` | string | `""` | Its secret. Never log or commit |
+| `S3_PUBLIC_BASE_URL` | `storage.s3.public_base_url` | string | `""` | Origin the browser reads objects from (public bucket or CDN); a wallpaper's URL is this plus the object key. Empty: 503 as above |
+| `S3_PATH_STYLE` | `storage.s3.path_style` | bool | `true` | `true`: `endpoint/bucket/key` (MinIO and most S3-compatible stores); `false`: `bucket.endpoint-host/key` |
 | `FOOD_LLM_BASE_URL` | `food.llm.base_url` | string | `""` | Base URL of an OpenAI-compatible chat completions API for the `food_parse` job, e.g. `https://api.openai.com/v1`. The worker calls `{base_url}/chat/completions`. With any of the four `FOOD_LLM_*` settings below empty the parse is `not_configured` and the add form hides it. Prod: ConfigMap `life-os-food-llm` |
 | `FOOD_LLM_API_KEY` | `food.llm.api_key` | string | `""` | Bearer token of the provider. Prod: Secret `life-os-food-llm`. Never log or commit |
 | `FOOD_LLM_MODEL` | `food.llm.model` | string | `""` | Model name as the provider expects it |

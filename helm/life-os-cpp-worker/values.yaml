@@ -192,6 +192,12 @@ tasks:
 goals:
   enabled: false
 
+# ---------------------------------------------------------------
+# now module — keep in sync with the life-os-cpp chart. Env var set: NOW_ENABLED
+# ---------------------------------------------------------------
+now:
+  enabled: false
+
 
 # ---------------------------------------------------------------
 # External PostgreSQL connection

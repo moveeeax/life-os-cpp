@@ -148,6 +148,9 @@ spec:
             # goals module — master switch
             - name: GOALS_ENABLED
               value: {{ .Values.goals.enabled | quote }}
+            # now module — master switch
+            - name: NOW_ENABLED
+              value: {{ .Values.now.enabled | quote }}
             # Worker
             - name: WORKER_ID
               value: {{ .Values.worker.id | quote }}

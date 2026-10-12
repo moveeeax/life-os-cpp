@@ -255,6 +255,21 @@
   "goals": {
     "enabled": "${GOALS_ENABLED:-false}"
   },
+  "now": {
+    "enabled": "${NOW_ENABLED:-false}"
+  },
+  "storage": {
+    "s3": {
+      "endpoint": "${S3_ENDPOINT:-}",
+      "region": "${S3_REGION:-}",
+      "bucket": "${S3_BUCKET:-}",
+      "prefix": "${S3_PREFIX:-life-os/}",
+      "access_key_id": "${S3_ACCESS_KEY_ID:-}",
+      "secret_access_key": "${S3_SECRET_ACCESS_KEY:-}",
+      "public_base_url": "${S3_PUBLIC_BASE_URL:-}",
+      "path_style": "${S3_PATH_STYLE:-true}"
+    }
+  },
   "worker": {
     "id": "worker-1",
     "types": ["default"],
