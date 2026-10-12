@@ -51,7 +51,7 @@ export function TasksPanel({ today, date }: { today: Today; date: string }) {
         Tasks <Link to="/tasks">Open Tasks →</Link>
       </h2>
       <div className="c-capture">
-        <Capture />
+        <Capture defaultDue={date} />
       </div>
       {late.length > 0 && (
         <div>

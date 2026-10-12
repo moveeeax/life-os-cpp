@@ -37,6 +37,7 @@ export function Capture({
   onDone,
   autoFocus,
   autoStart,
+  defaultDue,
 }: {
   initial?: string;
   noteId?: string;
@@ -44,6 +45,8 @@ export function Capture({
   autoFocus?: boolean;
   /** Read `initial` at once (a note turned into a task). */
   autoStart?: boolean;
+  /** The date a task gets when the phrase names none (Now's Tasks corner: today). */
+  defaultDue?: string;
 }) {
   const status = useTasksStatus().data;
   const parse = useTasksParse();
@@ -66,8 +69,9 @@ export function Capture({
   const plain = status?.llm_available === false;
 
   useEffect(() => {
-    if (parse.state === 'done' && parse.job?.result) setLines(parse.job.result);
-  }, [parse.state, parse.job]);
+    if (parse.state === 'done' && parse.job?.result)
+      setLines(parse.job.result.map((l) => ({ ...l, due: l.due ?? defaultDue ?? null })));
+  }, [parse.state, parse.job, defaultDue]);
 
   const { start } = parse;
   useEffect(() => {
@@ -76,7 +80,12 @@ export function Capture({
 
   const asTyped = () => {
     const t = text.trim();
-    if (t) create.mutate({ title: t.slice(0, 200), area: 'projects' });
+    if (t)
+      create.mutate({
+        title: t.slice(0, 200),
+        area: 'projects',
+        ...(defaultDue ? { due: defaultDue } : {}),
+      });
   };
 
   const submit = (e: FormEvent) => {

@@ -21,9 +21,10 @@ const BASE = '/api/v1/tasks';
 
 /**
  * Every write invalidates the whole section (the agenda, the lists and the
- * inbox move together) and the goals, whose progress counts their tasks.
+ * inbox move together), the goals, whose progress counts their tasks, and the
+ * day's digest of Now, whose corners list them.
  */
-const ALL = [qk.tasks.all(), qk.goals.all()] as const;
+const ALL = [qk.tasks.all(), qk.goals.all(), qk.now.all()] as const;
 
 export const TASKS_PARSE_POLL_MS = 1500;
 /** The provider call is capped by its timeout; a job unfinished after this is stuck. */
