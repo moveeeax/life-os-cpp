@@ -172,6 +172,31 @@ inline std::chrono::sys_days day_of(const json& ts) {
 }
 }  // namespace detail
 
+/// The sleep sessions that ended on @p date in the account's day: end_at is UTC
+/// ("YYYY-MM-DDTHH:MM:SSZ"), the account's day is UTC shifted by @p offset_seconds
+/// (Repositories::region_offset_seconds). Read the rows of the day before too.
+inline json sleep_on_local_day(const json& rows, std::string_view date, long long offset_seconds) {
+    using namespace std::chrono;
+    const sys_days want{Utils::Date::parse_ymd(date)};
+    json out = json::array();
+    for (const auto& r : rows) {
+        if (!r.contains("end_at") || !r["end_at"].is_string()) {
+            continue;
+        }
+        const std::string end = r["end_at"].get<std::string>();
+        if (end.size() < 19) {
+            continue;
+        }
+        const sys_seconds at = sys_days{Utils::Date::parse_ymd(end.substr(0, 10))} +
+                               hours{std::stoi(end.substr(11, 2))} + minutes{std::stoi(end.substr(14, 2))} +
+                               seconds{std::stoi(end.substr(17, 2))};
+        if (floor<days>(at + seconds{offset_seconds}) == want) {
+            out.push_back(r);
+        }
+    }
+    return out;
+}
+
 /// {steps, active_kcal, resting_bpm, sleep {minutes, start, end, stages} | null, sleep_minutes,
 /// weight_kg, weight_change_7d}; null when steps, sleep and weight are all missing.
 /// @p summary_row is the summary row of the date or null; @p sleep_rows the day's sleep sessions;

@@ -236,3 +236,17 @@ TEST(NowToday, SpendsBlockKeepsFiveWithNamesAndCurrencies) {
     EXPECT_EQ(b[2]["name"], "Spend");
     EXPECT_DOUBLE_EQ(b[2]["amount"].get<double>(), 300);
 }
+
+TEST(NowToday, SleepOfTheLocalDayFollowsTheAccountOffset) {
+    // A cn account (UTC+8): woke at 06:58 local on 10-12 = 22:58 UTC on 10-11.
+    const json rows = json::array({sleep_row("2026-10-11T22:58:00Z", 412, false),
+                                   sleep_row("2026-10-10T23:10:00Z", 380, false),
+                                   sleep_row("2026-10-12T17:00:00Z", 30, false)});
+    const json kept = Now::Today::sleep_on_local_day(rows, "2026-10-12", 8 * 3600);
+    ASSERT_EQ(kept.size(), 1u);
+    EXPECT_EQ(kept[0]["time_asleep_minutes"], 412);
+    // The same rows read in UTC keep the evening one of 10-12 only.
+    const json utc = Now::Today::sleep_on_local_day(rows, "2026-10-12", 0);
+    ASSERT_EQ(utc.size(), 1u);
+    EXPECT_EQ(utc[0]["time_asleep_minutes"], 30);
+}
