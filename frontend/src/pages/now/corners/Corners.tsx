@@ -29,8 +29,9 @@ export function Corners({ today, hour, date }: { today: Today; hour: number; dat
   useEffect(() => {
     if (!open) return;
     const close = () => {
-      chipRefs.current[open]?.focus();
       setOpen(null);
+      // After the repaint: on a phone the strip is hidden while the sheet is open.
+      requestAnimationFrame(() => chipRefs.current[open]?.focus());
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close();
@@ -52,7 +53,7 @@ export function Corners({ today, hour, date }: { today: Today; hour: number; dat
   const list = chips(today, hour, date);
   return (
     <>
-      <div className="c-strip">
+      <div className="c-strip" data-open={open ? '' : undefined}>
         {list.map((c) => (
           <button
             key={c.key}
