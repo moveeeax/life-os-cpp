@@ -1060,7 +1060,9 @@
            "currency",
            "total",
            "partial",
-           "change_30d"
+           "rate_date",
+           "change_30d",
+           "change_partial"
           ],
           "properties": {
            "currency": {
@@ -1076,8 +1078,16 @@
            "partial": {
             "type": "boolean"
            },
+           "rate_date": {
+            "type": "string",
+            "format": "date",
+            "description": "The oldest rate day used"
+           },
            "change_30d": {
             "type": "number"
+           },
+           "change_partial": {
+            "type": "boolean"
            }
           }
          },
@@ -1469,7 +1479,8 @@
        "from",
        "total",
        "ledger",
-       "rates"
+       "rates",
+       "partial"
       ],
       "properties": {
        "from": {
@@ -1486,6 +1497,10 @@
        "rates": {
         "type": "number",
         "description": "What the rates did to the balances of the first day"
+       },
+       "partial": {
+        "type": "boolean",
+        "description": "Money without a quote on the first or the last day is left out of the change"
        }
       }
      },
@@ -22006,7 +22021,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 324306,
-  "source_fnv1a64": "d8f7e74bd50a6126"
+  "source_bytes": 324631,
+  "source_fnv1a64": "adefbba7b0d52011"
  }
 }

@@ -173,7 +173,9 @@ json money_part(const std::string& owner, const std::string& date) {
             net_worth = json{{"currency", "USD"},
                              {"total", (*s)["total"]},
                              {"partial", (*s)["partial"]},
-                             {"change_30d", (*s)["change"]["total"]}};
+                             {"rate_date", (*s)["rate_date"]},
+                             {"change_30d", (*s)["change"]["total"]},
+                             {"change_partial", (*s)["change"]["partial"]}};
         }
     }
     if (currencies.is_null() && spends.empty() && net_worth.is_null()) {
