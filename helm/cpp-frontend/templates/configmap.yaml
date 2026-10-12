@@ -46,7 +46,10 @@ data:
             add_header X-Frame-Options "DENY" always;
             add_header Referrer-Policy "no-referrer" always;
             add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-            add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" always;
+            # csp.storageHosts: the wallpaper bucket or its CDN (pictures,
+            # videos and the admin's direct upload); docs/wallpapers.md.
+            {{- $storage := join " " .Values.csp.storageHosts }}
+            add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: {{ $storage }}; media-src 'self' {{ $storage }}; font-src 'self'; connect-src 'self' {{ $storage }}; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" always;
         }
 
         location /assets/ {

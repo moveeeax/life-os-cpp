@@ -102,3 +102,10 @@ podAnnotations: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# Origins of the wallpaper storage (the S3 bucket or the CDN in front of it,
+# and the bucket endpoint the admin uploads to), added to img-src, media-src
+# and connect-src of the SPA's CSP. Empty: wallpapers are blocked by the CSP
+# and the app shows its gradient. Example: ["https://cdn.example.com"].
+csp:
+  storageHosts: []
