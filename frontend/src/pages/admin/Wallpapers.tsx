@@ -1,5 +1,4 @@
 import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
@@ -34,8 +33,8 @@ function imageSize(file: File): Promise<{ width: number; height: number }> {
   });
 }
 
-/** The shared wallpaper library: upload a video or an image straight to the bucket. */
-export function AdminWallpapersPage() {
+/** The wallpapers of the library: upload a video or an image straight to the bucket. */
+export function WallpapersSection() {
   const list = useAdminWallpapers();
   const create = useCreateWallpaper();
   const ready = useWallpaperReady();
@@ -116,17 +115,14 @@ export function AdminWallpapersPage() {
   const rows = list.data ?? [];
 
   return (
-    <div className="container mx-auto max-w-4xl py-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Wallpapers</h1>
-          <p className="text-sm text-muted-foreground">
-            Shared by every user. A random one shows behind every screen; phones get images only.
-          </p>
-        </div>
-        <Button asChild variant="ghost">
-          <Link to="/admin">← Admin</Link>
-        </Button>
+    <section className="space-y-6" aria-labelledby="library-wallpapers">
+      <div>
+        <h2 id="library-wallpapers" className="text-2xl font-semibold">
+          Wallpapers
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Shared by every user. A random one shows behind every screen; phones get images only.
+        </p>
       </div>
 
       <Card>
@@ -231,6 +227,6 @@ export function AdminWallpapersPage() {
           onClose={() => setDeleting(null)}
         />
       )}
-    </div>
+    </section>
   );
 }

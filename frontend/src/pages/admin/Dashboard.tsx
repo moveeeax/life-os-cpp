@@ -59,12 +59,12 @@ export function AdminDashboardPage() {
             </CardHeader>
           </Card>
         </Link>
-        <Link to="/admin/wallpapers">
+        <Link to="/admin/library">
           <Card className="hover:bg-accent transition-colors h-full">
             <CardHeader>
               <ImageIcon className="h-6 w-6 mb-2 text-muted-foreground" />
-              <CardTitle>Wallpapers</CardTitle>
-              <CardDescription>Videos and images behind every screen.</CardDescription>
+              <CardTitle>Library</CardTitle>
+              <CardDescription>Wallpapers behind every screen and focus sounds.</CardDescription>
             </CardHeader>
           </Card>
         </Link>
