@@ -154,6 +154,7 @@ inline const std::vector<EndpointInfo>& get_endpoints() {
         {"GET", "/api/v1/money/rates/convert", "Money: an informational conversion with the rate and its date"},
         {"POST", "/api/v1/money/rates/refresh", "Money: enqueue today's rates fetch, or a backfill of a range"},
         {"GET", "/api/v1/money/reports/period", "Money: a period's numbers per currency"},
+        {"GET", "/api/v1/money/summary", "Money: all accounts in one currency at the day's rates, with the days"},
         {"GET", "/api/v1/money/reports/balances", "Money: accounts and balances grouped by currency"},
         {"POST", "/api/v1/money/parse", "Money: send a bank mail or a list to the LLM parse job"},
         {"POST", "/api/v1/money/parse/receipt", "Money: send a receipt photo to the LLM parse job"},

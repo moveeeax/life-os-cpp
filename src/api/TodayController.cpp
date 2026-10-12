@@ -33,6 +33,7 @@
 #include "repositories/food/GoalsRepository.hpp"
 #include "repositories/goals/GoalRepository.hpp"
 #include "repositories/money/ReportBuilder.hpp"
+#include "repositories/money/SummaryRepository.hpp"
 #include "repositories/money/TransactionRepository.hpp"
 #include "repositories/now/FocusRepository.hpp"
 #include "repositories/tasks/NoteRepository.hpp"
@@ -165,10 +166,22 @@ json money_part(const std::string& owner, const std::string& date) {
     f.status = "posted";
     f.limit = static_cast<long>(::Now::Today::kSpendsShown);
     const json spends = ::Now::Today::spends_block(tx.list(owner, f).rows);
-    if (currencies.is_null() && spends.empty()) {
+    // All accounts in USD with the change over 30 days, for the corners and outside dashboards.
+    json net_worth;
+    if (const auto s = Repositories::Money::summary_json(owner, "USD", 30, date)) {
+        if (!(*s)["accounts"].empty() || !(*s)["not_converted"].empty()) {
+            net_worth = json{{"currency", "USD"},
+                             {"total", (*s)["total"]},
+                             {"partial", (*s)["partial"]},
+                             {"change_30d", (*s)["change"]["total"]}};
+        }
+    }
+    if (currencies.is_null() && spends.empty() && net_worth.is_null()) {
         return json();
     }
-    return json{{"currencies", currencies.is_null() ? json::array() : currencies}, {"spends_today", spends}};
+    return json{{"currencies", currencies.is_null() ? json::array() : currencies},
+                {"spends_today", spends},
+                {"net_worth", net_worth}};
 }
 
 json health_part(const std::string& owner, const std::string& date) {

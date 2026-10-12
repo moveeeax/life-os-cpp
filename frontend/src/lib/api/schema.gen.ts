@@ -12800,6 +12800,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/money/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All accounts in one currency at the day's rates, with the total of each day */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description ISO code of the target currency */
+                    currency?: string;
+                    days?: 30 | 90 | 365;
+                    /** @description The last day; today in UTC by default */
+                    date?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The summary */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneySummary"];
+                        };
+                    };
+                };
+                /** @description Bad currency, days or date */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No rate for the target currency on the date (no_rate) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -13074,6 +13146,14 @@ export interface components {
                     /** @description Median spend of the three months before */
                     median3: number | null;
                 }[];
+                net_worth: {
+                    /** @enum {string} */
+                    currency: "USD";
+                    /** @description All accounts in USD at the day's rates */
+                    total: number;
+                    partial: boolean;
+                    change_30d: number;
+                } | null;
                 /** @description Up to 5 posted spends of the date, newest first, each in its own currency */
                 spends_today: {
                     /** Format: uuid */
@@ -13140,6 +13220,54 @@ export interface components {
             /** Format: int64 */
             bytes: number;
             duration_seconds?: number;
+        };
+        MoneySummary: {
+            /** @description The currency everything is converted to */
+            currency: string;
+            /** Format: date */
+            date: string;
+            total: number;
+            /** @description Some money has no rate on the date and is listed in not_converted */
+            partial: boolean;
+            /**
+             * Format: date
+             * @description The oldest quote day used for the total
+             */
+            rate_date: string;
+            accounts: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                kind: string;
+                currency: string;
+                /** @description In the account currency */
+                balance: number;
+                /** @description Units of the account currency per 1 unit of the target */
+                rate: number;
+                /** Format: date */
+                rate_date: string;
+                /** @description In the target currency */
+                value: number;
+            }[];
+            not_converted: {
+                currency: string;
+                amount: number;
+            }[];
+            change: {
+                /** Format: date */
+                from: string;
+                total: number;
+                /** @description What income and spending did, at the end rates */
+                ledger: number;
+                /** @description What the rates did to the balances of the first day */
+                rates: number;
+            };
+            days: {
+                /** Format: date */
+                date: string;
+                total: number;
+                partial: boolean;
+            }[];
         };
         /** @enum {string} */
         TaskArea: "finance" | "health" | "travel" | "growth" | "relationships" | "projects";

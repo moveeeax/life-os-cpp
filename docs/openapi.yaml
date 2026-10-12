@@ -299,7 +299,7 @@ components:
                 - { type: 'null' }
         money:
           type: object
-          required: [currencies, spends_today]
+          required: [currencies, spends_today, net_worth]
           properties:
             currencies:
               type: array
@@ -311,6 +311,16 @@ components:
                   today: { type: number, description: Spent on the date in this currency }
                   projection: { type: [number, 'null'], description: 'The month projected to its end' }
                   median3: { type: [number, 'null'], description: 'Median spend of the three months before' }
+            net_worth:
+              oneOf:
+                - type: object
+                  required: [currency, total, partial, change_30d]
+                  properties:
+                    currency: { type: string, enum: [USD] }
+                    total: { type: number, description: All accounts in USD at the day's rates }
+                    partial: { type: boolean }
+                    change_30d: { type: number }
+                - { type: 'null' }
             spends_today:
               type: array
               description: Up to 5 posted spends of the date, newest first, each in its own currency
@@ -384,6 +394,54 @@ components:
         content_type: { type: string, enum: [audio/mpeg, audio/mp4, audio/x-m4a, audio/aac, audio/ogg] }
         bytes: { type: integer, format: int64, minimum: 1, maximum: 31457280 }
         duration_seconds: { type: integer, minimum: 1, maximum: 86400 }
+    MoneySummary:
+      type: object
+      required: [currency, date, total, partial, rate_date, accounts, not_converted, change, days]
+      properties:
+        currency: { type: string, description: The currency everything is converted to }
+        date: { type: string, format: date }
+        total: { type: number }
+        partial: { type: boolean, description: 'Some money has no rate on the date and is listed in not_converted' }
+        rate_date: { type: string, format: date, description: The oldest quote day used for the total }
+        accounts:
+          type: array
+          items:
+            type: object
+            required: [id, name, kind, currency, balance, rate, rate_date, value]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              kind: { type: string }
+              currency: { type: string }
+              balance: { type: number, description: In the account currency }
+              rate: { type: number, description: 'Units of the account currency per 1 unit of the target' }
+              rate_date: { type: string, format: date }
+              value: { type: number, description: In the target currency }
+        not_converted:
+          type: array
+          items:
+            type: object
+            required: [currency, amount]
+            properties:
+              currency: { type: string }
+              amount: { type: number }
+        change:
+          type: object
+          required: [from, total, ledger, rates]
+          properties:
+            from: { type: string, format: date }
+            total: { type: number }
+            ledger: { type: number, description: 'What income and spending did, at the end rates' }
+            rates: { type: number, description: 'What the rates did to the balances of the first day' }
+        days:
+          type: array
+          items:
+            type: object
+            required: [date, total, partial]
+            properties:
+              date: { type: string, format: date }
+              total: { type: number }
+              partial: { type: boolean }
     TaskArea:
       type: string
       enum: [finance, health, travel, growth, relationships, projects]
@@ -7870,3 +7928,26 @@ paths:
         '403': { description: Not an admin }
         '404': { description: 'Now module disabled, or no such sound' }
         '503': { description: 'Storage not configured or not answering (storage_not_configured, storage_error)' }
+  /api/v1/money/summary:
+    get:
+      summary: All accounts in one currency at the day's rates, with the total of each day
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: currency, in: query, schema: { type: string, default: USD }, description: 'ISO code of the target currency' }
+        - { name: days, in: query, schema: { type: integer, enum: [30, 90, 365], default: 90 } }
+        - { name: date, in: query, schema: { type: string, format: date }, description: 'The last day; today in UTC by default' }
+      responses:
+        '200':
+          description: The summary
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/MoneySummary' }
+        '400': { description: 'Bad currency, days or date' }
+        '401': { description: Not authenticated }
+        '404': { description: Money module disabled }
+        '422': { description: 'No rate for the target currency on the date (no_rate)' }

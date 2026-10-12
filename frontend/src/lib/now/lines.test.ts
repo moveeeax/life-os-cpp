@@ -92,7 +92,10 @@ describe('quietLines', () => {
       { currency: 'KZT', today: 7500, projection: 412000, median3: 350000 },
     ];
     expect(412000 / 350000).toBeGreaterThanOrEqual(MONEY_ABOVE_USUAL);
-    const lines = quietLines({ ...quiet, money: { currencies: money, spends_today: [] } }, 10);
+    const lines = quietLines(
+      { ...quiet, money: { currencies: money, spends_today: [], net_worth: null } },
+      10,
+    );
     expect(lines).toHaveLength(1);
     expect(lines[0].key).toBe('money');
     expect(lines[0].text).toBe('On pace for 412,000 KZT this month, above usual');
@@ -127,6 +130,7 @@ describe('quietLines', () => {
       money: {
         currencies: [{ currency: 'KZT', today: 1, projection: 500, median3: 100 }],
         spends_today: [],
+        net_worth: null,
       },
     };
     const lines = quietLines(t, 21);

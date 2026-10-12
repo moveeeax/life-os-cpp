@@ -48,6 +48,7 @@
 #include "repositories/money/ParseJobRepository.hpp"
 #include "repositories/money/ReportBuilder.hpp"
 #include "repositories/money/SettingsRepository.hpp"
+#include "repositories/money/SummaryRepository.hpp"
 #include "repositories/money/TransactionRepository.hpp"
 #include "repositories/money/TransferRepository.hpp"
 #include "utils/ErrorResponse.hpp"
@@ -1142,6 +1143,33 @@ void MoneyController::periodReport(const HttpRequestPtr& req, Callback&& callbac
         const std::string target = as_if.empty() ? view_currency(owner).value_or("") : as_if;
         const json out = Repo::ReportBuilder::build(owner, kind, kind_text, range, today, target);
         callback(Response::ok(json{{"data", out}}));
+    });
+}
+
+void MoneyController::summary(const HttpRequestPtr& req, Callback&& callback) {
+    MONEY_GUARD(req, callback, owner);
+    const std::string currency = req->getParameter("currency").empty() ? "USD" : req->getParameter("currency");
+    if (!std::regex_match(currency, kCodeRe)) {
+        callback(ErrorResponse::bad_request("invalid_currency", "currency must be an ISO code like USD"));
+        return;
+    }
+    const std::string days_text = req->getParameter("days").empty() ? "90" : req->getParameter("days");
+    if (days_text != "30" && days_text != "90" && days_text != "365") {
+        callback(ErrorResponse::bad_request("invalid_query", "days must be 30, 90 or 365"));
+        return;
+    }
+    const std::string date = req->getParameter("date").empty() ? today_utc() : req->getParameter("date");
+    if (!is_calendar_date(date)) {
+        callback(ErrorResponse::bad_request("invalid_date", "date must be a calendar day as YYYY-MM-DD"));
+        return;
+    }
+    with_repo_errors(callback, "money.summary", [&] {
+        const auto out = Repo::summary_json(owner, currency, std::stoi(days_text), date);
+        if (!out) {
+            callback(ErrorResponse::unprocessable("no_rate", "there is no rate for " + currency + " on " + date));
+            return;
+        }
+        callback(Response::ok(json{{"data", *out}}));
     });
 }
 
