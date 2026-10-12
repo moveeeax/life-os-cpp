@@ -297,8 +297,12 @@ void TodayController::focusDone(const HttpRequestPtr& req, Callback&& callback) 
                 // The task closes and reopens with the focus; a task already in
                 // that state is left alone (closed elsewhere, ticked twice).
                 TaskRepository tasks;
-                const std::string status = (*tasks.get(owner, ref))["status"].get<std::string>();
-                const bool closed = status == "done";
+                const auto task = tasks.get(owner, ref);
+                if (!task) {  // deleted since the check above
+                    callback(ErrorResponse::unprocessable("focus_ref_not_found", "the task of this focus is gone"));
+                    return;
+                }
+                const bool closed = (*task)["status"].get<std::string>() == "done";
                 if (closed != done) {
                     TaskRepository::Patch p{};
                     p.status = done ? "done" : "open";
