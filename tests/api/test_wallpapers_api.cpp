@@ -66,8 +66,8 @@ public:
     }
     void remove(const std::string& key) const override { removed.push_back(key); }
     std::string public_url(const std::string& key) const override { return "https://cdn.test/" + key; }
-    std::string key_for(const std::string& id, const std::string& name) const override {
-        return "life-os/wallpapers/" + id + "/" + name;
+    std::string key_for(const std::string& folder, const std::string& id, const std::string& name) const override {
+        return "life-os/" + folder + "/" + id + "/" + name;
     }
 };
 

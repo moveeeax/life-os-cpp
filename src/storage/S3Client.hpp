@@ -24,7 +24,7 @@ public:
     ObjectInfo head(const std::string& key) const override;
     void remove(const std::string& key) const override;
     std::string public_url(const std::string& key) const override;
-    std::string key_for(const std::string& id, const std::string& name) const override;
+    std::string key_for(const std::string& folder, const std::string& id, const std::string& name) const override;
 
 private:
     std::string signed_url(const std::string& method,

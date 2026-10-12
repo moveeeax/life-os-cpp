@@ -110,8 +110,8 @@ std::string S3Client::public_url(const std::string& key) const {
     return settings_.public_base_url + "/" + S3::uri_encode(key, true);
 }
 
-std::string S3Client::key_for(const std::string& id, const std::string& name) const {
-    return settings_.prefix + "wallpapers/" + id + "/" + name;
+std::string S3Client::key_for(const std::string& folder, const std::string& id, const std::string& name) const {
+    return settings_.prefix + folder + "/" + id + "/" + name;
 }
 
 ObjectStore* object_store() {

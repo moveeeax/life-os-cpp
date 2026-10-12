@@ -102,7 +102,7 @@ TEST_F(S3SettingsTest, CompleteSettingsAreNormalised) {
 TEST_F(S3SettingsTest, KeysAndPublicUrls) {
     load(complete());
     const Storage::S3Client client(*Storage::S3::settings_from_config());
-    const std::string key = client.key_for("0b8e", "file.mp4");
+    const std::string key = client.key_for("wallpapers", "0b8e", "file.mp4");
     EXPECT_EQ(key, "life-os/wallpapers/0b8e/file.mp4");
     EXPECT_EQ(client.public_url(key), "https://cdn.example.com/life-os/wallpapers/0b8e/file.mp4");
     const std::string url = client.upload_url(key, "video/mp4", 1234);

@@ -354,6 +354,36 @@ components:
             - { $ref: '#/components/schemas/Focus' }
             - { type: 'null' }
         errors: { type: array, items: { type: string } }
+    Sound:
+      type: object
+      required: [id, title, url, duration_seconds]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        url: { type: string, description: Public URL of the file (bucket or CDN) }
+        duration_seconds: { type: [integer, 'null'] }
+    AdminSound:
+      type: object
+      required: [id, title, object_key, content_type, bytes, duration_seconds, status, created_by, created_at, url]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        object_key: { type: string }
+        content_type: { type: string }
+        bytes: { type: integer, format: int64 }
+        duration_seconds: { type: [integer, 'null'] }
+        status: { type: string, enum: [pending, ready] }
+        created_by: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        url: { type: string }
+    SoundCreate:
+      type: object
+      required: [title, content_type, bytes]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 80 }
+        content_type: { type: string, enum: [audio/mpeg, audio/mp4, audio/x-m4a, audio/aac, audio/ogg] }
+        bytes: { type: integer, format: int64, minimum: 1, maximum: 31457280 }
+        duration_seconds: { type: integer, minimum: 1, maximum: 86400 }
     TaskArea:
       type: string
       enum: [finance, health, travel, growth, relationships, projects]
@@ -7741,3 +7771,102 @@ paths:
         '401': { description: Not authenticated }
         '404': { description: 'Now module disabled, or the day has no focus' }
         '422': { description: 'The task or goal of the focus is gone (focus_ref_not_found)' }
+  /api/v1/sounds:
+    get:
+      summary: The ready focus sounds, by title
+      tags: [now]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The ready sounds
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Sound' } }
+        '401': { description: Not authenticated }
+        '404': { description: Now module disabled }
+        '503': { description: Storage not configured (storage_not_configured) }
+  /api/v1/admin/sounds:
+    get:
+      summary: Every focus sound, pending ones included, newest first (admin)
+      tags: [admin, now]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The library
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/AdminSound' } }
+        '403': { description: Not an admin }
+        '404': { description: Now module disabled }
+        '503': { description: Storage not configured (storage_not_configured) }
+    post:
+      summary: Start a sound upload; answers a presigned PUT URL (admin)
+      tags: [admin, now]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SoundCreate' }
+      responses:
+        '201':
+          description: A pending row and where to upload
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [id, upload]
+                    properties:
+                      id: { type: string, format: uuid }
+                      upload: { $ref: '#/components/schemas/WallpaperUpload' }
+        '400': { description: Validation failed }
+        '403': { description: Not an admin }
+        '404': { description: Now module disabled }
+        '503': { description: Storage not configured (storage_not_configured) }
+  /api/v1/admin/sounds/{id}/ready:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Mark a sound ready once its file is in the bucket at the declared size (admin)
+      tags: [admin, now]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Sound' }
+        '400': { description: The id is not a UUID }
+        '403': { description: Not an admin }
+        '404': { description: 'Now module disabled, or no such sound' }
+        '409': { description: 'The file is missing or has another size (upload_incomplete)' }
+        '503': { description: 'Storage not configured or not answering (storage_not_configured, storage_error)' }
+  /api/v1/admin/sounds/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      summary: Delete a sound and its file (admin)
+      tags: [admin, now]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '400': { description: The id is not a UUID }
+        '403': { description: Not an admin }
+        '404': { description: 'Now module disabled, or no such sound' }
+        '503': { description: 'Storage not configured or not answering (storage_not_configured, storage_error)' }
