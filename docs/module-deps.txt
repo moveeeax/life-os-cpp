@@ -108,6 +108,7 @@ jobs -> repositories/workout
 jobs -> utils
 jobs -> webhooks
 now -> tasks
+now -> utils
 observability -> utils
 repositories -> database
 repositories -> domain
