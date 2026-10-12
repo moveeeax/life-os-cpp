@@ -8,12 +8,19 @@
 
 #pragma once
 
+#include <algorithm>
+#include <chrono>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 
+#include <nlohmann/json.hpp>
+
 #include "database/Database.hpp"
+#include "money/Period.hpp"
 #include "money/Summary.hpp"
+#include "repositories/money/AccountRepository.hpp"
 
 namespace Repositories::Money {
 
@@ -82,5 +89,94 @@ public:
         });
     }
 };
+
+/// The summary of all accounts in @p target over the @p days up to @p date (spec
+/// docs/superpowers/specs/2026-10-13-money-summary-design.md), or nullopt when
+/// @p target has no quote on @p date.
+inline std::optional<nlohmann::json> summary_json(const std::string& owner,
+                                                  const std::string& target,
+                                                  int days,
+                                                  const std::string& date) {
+    using nlohmann::json;
+    namespace S = ::Money::Summary;
+    namespace P = ::Money::Period::detail;
+    const auto last = P::day_of(date);
+    const std::string from = P::text_of(last - std::chrono::days{days - 1});
+
+    SummaryRepository repo;
+    const auto balances = repo.daily_balances(owner, from, date);
+    const json accounts = AccountRepository().list(owner, false);
+    std::set<std::string> currencies{target};
+    for (const auto& [day, by_currency] : balances) {
+        for (const auto& entry : by_currency) {
+            currencies.insert(entry.first);
+        }
+    }
+    for (const auto& a : accounts) {
+        currencies.insert(a["currency"].get<std::string>());
+    }
+    const auto quotes = repo.quotes(currencies, from, date);
+    if (!S::nearest(quotes, target, date)) {
+        return std::nullopt;
+    }
+    const std::map<std::string, double> none;
+    const auto on = [&](const std::string& day) -> const std::map<std::string, double>& {
+        const auto it = balances.find(day);
+        return it == balances.end() ? none : it->second;
+    };
+
+    json series = json::array();
+    for (auto d = P::day_of(from); d <= last; d += std::chrono::days{1}) {
+        const std::string day = P::text_of(d);
+        const auto t = S::convert_day(on(day), quotes, target, day);
+        series.push_back(json{{"date", day}, {"total", t.total}, {"partial", t.partial}});
+    }
+
+    json rows = json::array();
+    std::map<std::string, double> unconverted;
+    std::string rate_date = date;
+    const auto target_quote = S::nearest(quotes, target, date);
+    for (const auto& a : accounts) {
+        const std::string currency = a["currency"].get<std::string>();
+        const double balance =
+            a["balance"].is_number() ? a["balance"].get<double>() : std::stod(a["balance"].get<std::string>());
+        const auto quote = S::nearest(quotes, currency, date);
+        const auto rate = S::rate_per_target(quotes, currency, target, date);
+        if (!rate || !quote) {
+            unconverted[currency] += balance;
+            continue;
+        }
+        const std::string day = std::min(quote->date, target_quote->date);
+        rate_date = std::min(rate_date, day);
+        rows.push_back(json{{"id", a["id"]},
+                            {"name", a["name"]},
+                            {"kind", a["kind"]},
+                            {"currency", currency},
+                            {"balance", balance},
+                            {"rate", *rate},
+                            {"rate_date", day},
+                            {"value", balance / *rate}});
+    }
+    std::sort(rows.begin(), rows.end(), [](const json& x, const json& y) {
+        return x["value"].get<double>() > y["value"].get<double>();
+    });
+    json not_converted = json::array();
+    for (const auto& [currency, amount] : unconverted) {
+        not_converted.push_back(json{{"currency", currency}, {"amount", amount}});
+    }
+
+    const auto today = S::convert_day(on(date), quotes, target, date);
+    const auto change = S::split(on(from), on(date), quotes, target, from, date);
+    return json{
+        {"currency", target},
+        {"date", date},
+        {"total", today.total},
+        {"partial", today.partial || !not_converted.empty()},
+        {"rate_date", rate_date},
+        {"accounts", rows},
+        {"not_converted", not_converted},
+        {"change", {{"from", from}, {"total", change.total}, {"ledger", change.ledger}, {"rates", change.rates}}},
+        {"days", series}};
+}
 
 }  // namespace Repositories::Money

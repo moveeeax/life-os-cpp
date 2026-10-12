@@ -54,6 +54,7 @@ public:
     ADD_METHOD_TO(MoneyController::refreshRates, "/api/v1/money/rates/refresh", Post);
     ADD_METHOD_TO(MoneyController::periodReport, "/api/v1/money/reports/period", Get);
     ADD_METHOD_TO(MoneyController::balances, "/api/v1/money/reports/balances", Get);
+    ADD_METHOD_TO(MoneyController::summary, "/api/v1/money/summary", Get);
     ADD_METHOD_TO(MoneyController::parseText, "/api/v1/money/parse", Post);
     ADD_METHOD_TO(MoneyController::parseReceipt, "/api/v1/money/parse/receipt", Post);
     ADD_METHOD_TO(MoneyController::parseStatus, "/api/v1/money/parse/{id}", Get);
@@ -100,6 +101,8 @@ public:
     void refreshRates(const HttpRequestPtr& req, Callback&& callback);
     void periodReport(const HttpRequestPtr& req, Callback&& callback);
     void balances(const HttpRequestPtr& req, Callback&& callback);
+    /// All accounts in one currency at the day's rates, with the series by day.
+    void summary(const HttpRequestPtr& req, Callback&& callback);
     void parseText(const HttpRequestPtr& req, Callback&& callback);
     void parseReceipt(const HttpRequestPtr& req, Callback&& callback);
     void parseStatus(const HttpRequestPtr& req, Callback&& callback, const std::string& id);

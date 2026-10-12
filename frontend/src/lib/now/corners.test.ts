@@ -125,6 +125,7 @@ describe('chips', () => {
           { currency: 'USD', today: 12, projection: null, median3: null },
         ],
         spends_today: [],
+        net_worth: null,
       },
     };
     const d = chips(t, 20, '2026-10-12')[2];
@@ -261,6 +262,7 @@ describe('the Food and money chip with cents', () => {
       money: {
         currencies: [{ currency: 'USD', today: 4.5, projection: null, median3: null }],
         spends_today: [],
+        net_worth: null,
       },
     };
     expect(text(chips(t, 10, '2026-10-12')[2].small)).toBe('4.50 USD spent today');
