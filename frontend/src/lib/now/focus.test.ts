@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   FOCUS_LENGTHS,
   fadeVolume,
+  DONE_KEEP_MS,
   focusKey,
   pauseSession,
   resumeSession,
@@ -65,5 +66,23 @@ describe('fadeVolume', () => {
     expect(fadeVolume(0.6, 4000, 3000, 'in')).toBe(0.6);
     expect(fadeVolume(0.6, 0, 3000, 'out')).toBe(0.6);
     expect(fadeVolume(0.6, 3000, 3000, 'out')).toBe(0);
+  });
+});
+
+describe('a finished session', () => {
+  it('stays done for a while, then goes back to idle', () => {
+    const s = startSession(25, now, '2026-10-13');
+    const end = now + 25 * 60_000;
+    expect(sessionState(s, end + 1000).phase).toBe('done');
+    expect(sessionState(s, end + DONE_KEEP_MS + 1000)).toEqual({
+      phase: 'idle',
+      left: 0,
+      minutes: 25,
+    });
+  });
+
+  it('remembers the day of its focus', () => {
+    expect(startSession(25, now, '2026-10-13').focusDate).toBe('2026-10-13');
+    expect(pauseSession(startSession(25, now, '2026-10-13'), now).focusDate).toBe('2026-10-13');
   });
 });

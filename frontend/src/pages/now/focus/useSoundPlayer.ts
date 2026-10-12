@@ -70,33 +70,44 @@ export function useSoundPlayer(sounds: Sound[]) {
       const el = new Audio(which.url);
       el.loop = true;
       el.volume = 0;
-      el.onerror = () => setState('failed');
+      // Answers of an element that was stopped or replaced meanwhile change nothing.
+      const current = () => audio.current === el;
+      el.onerror = () => {
+        if (current()) setState('failed');
+      };
       audio.current = el;
       el.play().then(
         () => {
+          if (!current()) {
+            el.pause();
+            return;
+          }
           setState('playing');
           ramp(el, volume, 'in');
         },
-        (e: unknown) =>
-          setState(
-            e instanceof DOMException && e.name === 'NotAllowedError' ? 'blocked' : 'failed',
-          ),
+        (e: unknown) => {
+          if (!current()) return;
+          const name = e instanceof DOMException ? e.name : '';
+          if (name === 'AbortError') return;
+          setState(name === 'NotAllowedError' ? 'blocked' : 'failed');
+        },
       );
     },
     [sound, volume, ramp],
   );
 
-  /** Fade out and stop; @p now stops at once (Exit). */
+  /** Stop: the player is off at once, the sound fades out (or stops at once with @p now). */
   const stop = useCallback(
     (now = false) => {
       const el = audio.current;
+      audio.current = null;
+      setState('off');
       if (!el) return;
       const end = () => {
         el.pause();
-        if (audio.current === el) audio.current = null;
-        setState('off');
+        el.onerror = null;
       };
-      if (now) {
+      if (now || el.paused) {
         stopFade();
         end();
       } else ramp(el, el.volume, 'out', end);

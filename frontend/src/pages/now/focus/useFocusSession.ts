@@ -37,7 +37,10 @@ export function useFocusSession(userId: string | null) {
 
   return {
     ...state,
-    start: (minutes: number) => save(startSession(minutes, Date.now())),
+    /** The day of the focus this session is for, so Done only ticks that one. */
+    focusDate: session?.focusDate ?? null,
+    start: (minutes: number, focusDate: string | null = null) =>
+      save(startSession(minutes, Date.now(), focusDate)),
     pause: () => session && save(pauseSession(session, Date.now())),
     resume: () => session && save(resumeSession(session, Date.now())),
     exit: () => save(null),

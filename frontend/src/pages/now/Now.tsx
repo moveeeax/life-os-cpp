@@ -130,7 +130,7 @@ function NowScreen() {
         </div>
         <FocusStart
           onStart={(m) => {
-            session.start(m);
+            session.start(m, focus?.date ?? null);
             player.play();
           }}
         />
@@ -145,7 +145,7 @@ function NowScreen() {
         <FocusMode
           phase={session.phase}
           left={session.left}
-          focus={focus}
+          focus={focus && focus.date === session.focusDate ? focus : null}
           player={player}
           onPause={() => {
             session.pause();
@@ -160,7 +160,7 @@ function NowScreen() {
             session.exit();
           }}
           onAgain={() => {
-            session.start(session.minutes || 25);
+            session.start(session.minutes || 25, focus?.date ?? null);
             player.play();
           }}
         />
