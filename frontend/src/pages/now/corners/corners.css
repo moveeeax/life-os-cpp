@@ -1,0 +1,362 @@
+/* The corners of Now: four chips over the picture, each one quiet line, and
+   one glass panel at a time anchored to its corner. From the approved sketch
+   (docs/superpowers/designs/2026-10-12-now-corners-sketch.html, not shipped). */
+.c-chip {
+  position: fixed;
+  z-index: 20;
+  display: grid;
+  gap: 2px;
+  max-width: min(300px, 40vw);
+  padding: 10px 14px;
+  border-radius: 16px;
+  text-align: left;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.4);
+  transition: background 0.2s;
+}
+.c-chip:hover,
+.c-chip[aria-expanded='true'] {
+  background: var(--g-glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.c-chip .c-k {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--g-ink-faint);
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+.c-chip .c-v,
+.c-chip .c-s {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.c-chip .c-v {
+  font-size: 16px;
+  color: var(--g-ink);
+}
+.c-chip .c-s {
+  font-size: 13px;
+  color: var(--g-ink-soft);
+}
+.c-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--g-warn);
+  display: inline-block;
+}
+.c-dot.c-late {
+  background: var(--g-late);
+}
+.c-tl,
+.c-tr {
+  top: calc(max(14px, env(safe-area-inset-top, 0px)) + 54px);
+}
+.c-bl,
+.c-br {
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+}
+.c-tl,
+.c-bl {
+  left: 16px;
+}
+.c-tr,
+.c-br {
+  right: 16px;
+  text-align: right;
+  justify-items: end;
+}
+.c-tr .c-k,
+.c-br .c-k {
+  justify-content: flex-end;
+}
+
+.c-panel {
+  position: fixed;
+  z-index: 25;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(70vh, 560px);
+  overflow: auto;
+  background: var(--g-glass-strong);
+  border: 1px solid var(--g-glass-line);
+  border-radius: 22px;
+  padding: 18px 20px;
+  backdrop-filter: blur(22px) saturate(1.15);
+  -webkit-backdrop-filter: blur(22px) saturate(1.15);
+  display: grid;
+  gap: 12px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  text-shadow: none;
+  transform-origin: var(--c-origin);
+  animation: c-pop 0.18s ease-out;
+}
+@keyframes c-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .c-panel {
+    animation: none;
+  }
+}
+.c-panel.c-tl,
+.c-panel.c-tr {
+  top: calc(max(14px, env(safe-area-inset-top, 0px)) + 120px);
+}
+.c-panel.c-bl,
+.c-panel.c-br {
+  bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 76px);
+}
+.c-panel.c-tl {
+  --c-origin: top left;
+}
+.c-panel.c-tr {
+  --c-origin: top right;
+}
+.c-panel.c-bl {
+  --c-origin: bottom left;
+}
+.c-panel.c-br {
+  --c-origin: bottom right;
+}
+.c-panel h2 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--g-ink-faint);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.c-panel h2 a {
+  color: var(--g-ink-soft);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+}
+.c-panel h2 a:hover,
+.c-link:hover {
+  color: var(--g-ink);
+}
+.c-big {
+  font-size: 40px;
+  font-weight: 300;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.c-big small {
+  font-size: 15px;
+  color: var(--g-ink-faint);
+  font-weight: 400;
+}
+.c-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 15px;
+}
+.c-row:last-child {
+  border-bottom: 0;
+}
+.c-row.c-plain {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.c-row .c-t {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.c-row .c-r {
+  font-size: 13px;
+  color: var(--g-ink-faint);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.c-row.c-done .c-t {
+  text-decoration: line-through;
+  color: var(--g-ink-faint);
+}
+.c-ring {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid var(--g-ink-soft);
+}
+.c-ring[aria-pressed='true'] {
+  background: var(--g-ok);
+  border-color: var(--g-ok);
+}
+.c-meter {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  font-size: 14px;
+  padding: 4px 0;
+}
+.c-meter .c-l {
+  color: var(--g-ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.c-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--g-ink-ghost);
+  overflow: hidden;
+}
+.c-track span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--g-ink);
+}
+.c-track span.c-warn {
+  background: var(--g-warn);
+}
+.c-track span.c-ok {
+  background: var(--g-ok);
+}
+.c-val {
+  font-size: 13px;
+  color: var(--g-ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.c-label {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--g-ink-faint);
+}
+.c-label.c-late-text,
+.c-late-text {
+  color: var(--g-late);
+}
+.c-warn-text {
+  color: var(--g-warn);
+}
+.c-stages {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.c-stages span {
+  display: block;
+  height: 100%;
+}
+.c-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  color: var(--g-ink-faint);
+}
+.c-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 5px;
+}
+.c-count {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.c-count:last-child {
+  border-bottom: 0;
+}
+.c-count .c-n {
+  font-size: 26px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  grid-row: span 2;
+  align-self: center;
+}
+.c-count .c-d {
+  font-size: 12px;
+  color: var(--g-ink-faint);
+}
+.c-links {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--g-ink-soft);
+}
+.c-empty {
+  font-size: 14px;
+  color: var(--g-ink-faint);
+}
+/* The Tasks page capture inside a glass panel. */
+.c-panel .c-capture input {
+  background: transparent;
+}
+
+/* Phone: the chips line up 2×2 above the bottom; a panel is a sheet from the bottom. */
+.c-strip {
+  display: contents;
+}
+@media (max-width: 640px) {
+  .c-strip {
+    position: fixed;
+    z-index: 20;
+    left: 16px;
+    right: 16px;
+    bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 44px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+  }
+  .c-chip {
+    position: static;
+    max-width: none;
+    padding: 8px 10px;
+    background: var(--g-glass);
+    border: 1px solid var(--g-glass-line);
+    text-align: left;
+    justify-items: start;
+    min-width: 0;
+  }
+  .c-tr .c-k,
+  .c-br .c-k {
+    justify-content: flex-start;
+  }
+  .c-chip .c-v {
+    font-size: 14px;
+  }
+  .c-chip .c-s {
+    display: none;
+  }
+  .c-panel,
+  .c-panel.c-tl,
+  .c-panel.c-tr,
+  .c-panel.c-bl,
+  .c-panel.c-br {
+    top: auto;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    bottom: max(8px, env(safe-area-inset-bottom, 0px));
+    max-height: 72vh;
+    --c-origin: bottom center;
+  }
+}
