@@ -99,6 +99,12 @@ export const qk = {
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['tasks-enabled'] as const,
   },
+  now: {
+    all: () => ['now'] as const,
+    today: (date: string, tz: string) => ['now', 'today', date, tz] as const,
+    wallpapers: (device: string) => ['now', 'wallpapers', device] as const,
+    adminWallpapers: () => ['now', 'admin-wallpapers'] as const,
+  },
   goals: {
     all: () => ['goals'] as const,
     list: (status: string, date: string) => ['goals', 'list', status, date] as const,
