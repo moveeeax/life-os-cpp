@@ -67,7 +67,7 @@ public:
     /// Every currency any user keeps, plus the three the reports always offer.
     std::set<std::string> quotes_needed() {
         return Database::get().execute_read([&](auto& txn) {
-            std::set<std::string> out{"USD", "EUR", "KZT"};
+            std::set<std::string> out{"USD", "EUR", "KZT", "RUB"};
             auto r = txn.exec("SELECT DISTINCT code FROM money_currencies WHERE NOT archived");
             for (const auto& row : r) {
                 out.insert(row[0].template as<std::string>());
