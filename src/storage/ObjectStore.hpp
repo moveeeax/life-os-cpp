@@ -12,6 +12,10 @@
 
 namespace Storage {
 
+/// Objects never change under their key (a new upload gets a new id), so the
+/// browser may keep them a year without asking again. Signed into every upload.
+inline constexpr const char* kImmutableCacheControl = "public, max-age=31536000, immutable";
+
 struct ObjectInfo {
     bool exists = false;
     long long bytes = 0;
@@ -21,7 +25,7 @@ class ObjectStore {
 public:
     virtual ~ObjectStore() = default;
 
-    /// A presigned PUT valid 15 minutes, signed with the content type and length.
+    /// A presigned PUT valid 15 minutes, signed with the content type, length and kImmutableCacheControl.
     virtual std::string upload_url(const std::string& key, const std::string& content_type, long long bytes) const = 0;
     /// Throws std::runtime_error when the store does not answer.
     virtual ObjectInfo head(const std::string& key) const = 0;
