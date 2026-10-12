@@ -6,6 +6,7 @@ import {
   SUMMARY_PERIODS,
   chartGeometry,
   formatTotal,
+  rateDay,
   rateText,
   signed,
 } from '@/lib/networth';
@@ -272,8 +273,11 @@ export function MoneySummaryPage() {
               </div>
             </dl>
             <p className="mt-3 text-theme-xs text-gray-500">
-              Converted at the rates of {shortDay(d.rate_date)}, daily quotes against the US dollar.
+              Converted at the rates of {rateDay(d.rate_date, d.date)}, daily quotes against the US
+              dollar.
               {d.partial && ' Partial: some money has no rate and is listed below.'}
+              {d.change.partial &&
+                ` The change leaves out money without a rate on ${rateDay(d.change.from, d.date)} or ${rateDay(d.date, d.date)}.`}
             </p>
           </section>
 
@@ -333,7 +337,7 @@ export function MoneySummaryPage() {
                       <td className="py-2 text-end tabular-nums">
                         <span className="num">{rateText(a.rate, a.currency, d.currency)}</span>
                         <span className="block text-theme-xs text-gray-500">
-                          {shortDay(a.rate_date)}
+                          {rateDay(a.rate_date, d.date)}
                         </span>
                       </td>
                       <td className="num py-2 text-end tabular-nums">

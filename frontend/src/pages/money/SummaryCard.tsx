@@ -1,7 +1,7 @@
 import { Link } from 'react-router';
 
 import { useMoneySummary } from '@/hooks/useMoney';
-import { formatTotal, signed } from '@/lib/networth';
+import { formatTotal, rateDay, signed } from '@/lib/networth';
 import { cn } from '@/lib/utils';
 
 import { cardClass } from '../workout/styles';
@@ -34,13 +34,16 @@ export function SummaryCard() {
         <span className="num text-2xl font-light tabular-nums text-gray-800 dark:text-white">
           {formatTotal(d.total)} {d.currency}
         </span>
+        <span className="text-theme-xs text-gray-500">
+          {d.partial ? 'partial · ' : ''}rates of {rateDay(d.rate_date, d.date)}
+        </span>
         <span
           className={cn(
             'num text-theme-sm tabular-nums',
             d.change.total >= 0 ? 'text-success-600 dark:text-success-500' : 'text-error-500',
           )}
         >
-          {signed(d.change.total)} in 30 days
+          {signed(d.change.total)} in 30 days{d.change.partial ? ' (partial)' : ''}
         </span>
         <span className="text-theme-sm text-gray-500">Summary →</span>
       </span>

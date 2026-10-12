@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { SUMMARY_CURRENCIES, chartGeometry, formatTotal, rateText, signed } from './networth';
+import {
+  SUMMARY_CURRENCIES,
+  chartGeometry,
+  formatTotal,
+  rateDay,
+  rateText,
+  signed,
+} from './networth';
 
 describe('formatTotal', () => {
   it('keeps cents under a thousand and drops them above', () => {
@@ -73,5 +80,12 @@ describe('chartGeometry', () => {
       chartGeometry([], { width: 700, height: 200, left: 50, right: 10, top: 10, bottom: 20 })
         .points,
     ).toEqual([]);
+  });
+});
+
+describe('rateDay', () => {
+  it('names the day, and the year only when it differs', () => {
+    expect(rateDay('2026-10-10', '2026-10-13')).toBe('Oct 10');
+    expect(rateDay('2025-12-30', '2026-01-02')).toBe('Dec 30, 2025');
   });
 });

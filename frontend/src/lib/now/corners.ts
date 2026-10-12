@@ -155,6 +155,7 @@ function dayChip(t: Today, hour: number): Chip {
           { text: 'All accounts ' },
           { text: n0.format(t.money.net_worth.total), num: true },
           { text: ` ${t.money.net_worth.currency}` },
+          ...(t.money.net_worth.partial ? [{ text: ' · partial' }] : []),
         ]
       : [{ text: 'Nothing spent today' }];
   const off = quietLines(t, hour).some((l) => l.key === 'protein' || l.key === 'money');

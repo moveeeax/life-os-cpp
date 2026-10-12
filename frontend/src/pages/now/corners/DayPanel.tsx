@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 
 import { MONEY_ABOVE_USUAL, formatMoney, type Today } from '@/lib/now';
+import { rateDay } from '@/lib/networth';
 
 import { n0 } from './format';
 import { Meter } from './Parts';
@@ -96,7 +97,8 @@ export function DayPanel({ today }: { today: Today }) {
           <span className="c-t">All accounts</span>
           <span className="c-r">
             <span className="num">{n0.format(m.net_worth.total)}</span> {m.net_worth.currency}
-            {m.net_worth.partial ? ' · partial' : ''}
+            {m.net_worth.partial ? ' · partial' : ''} · rates of{' '}
+            {rateDay(m.net_worth.rate_date, new Date().toISOString().slice(0, 10))}
           </span>
         </Link>
       )}

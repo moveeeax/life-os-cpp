@@ -73,3 +73,15 @@ export function chartGeometry(days: { total: number }[], box: Box): Geometry {
   });
   return { points, line, area, ticks };
 }
+
+/** "Oct 10" for a rate day; the year joins when it is not the year of @p today. */
+export function rateDay(iso: string, today: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  const sameYear = iso.slice(0, 4) === today.slice(0, 4);
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(sameYear ? {} : { year: 'numeric' }),
+    timeZone: 'UTC',
+  });
+}
