@@ -2,38 +2,51 @@ import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router';
 
 import { useMe } from '@/hooks/useMe';
-import { useToday } from '@/hooks/useNow';
-import { greeting, localDate } from '@/lib/now';
+import { useSounds, useToday } from '@/hooks/useNow';
+import { FOCUS_LENGTHS, greeting, localDate } from '@/lib/now';
 import { homeOf } from '@/shell/sections';
 import { useGlassNav } from '@/shell/useGlassNav';
 
 import { Corners } from './corners/Corners';
-import { useFocusTimer } from './corners/useFocusTimer';
+import { FocusMode } from './focus/FocusMode';
+import { useFocusSession } from './focus/useFocusSession';
+import { useSoundPlayer } from './focus/useSoundPlayer';
 import { FocusLine } from './FocusLine';
 import { FocusPicker } from './FocusPicker';
 import './now.css';
 
-/** "Focus 25 min": a timer under the focus, the time left kept across tabs. */
-function FocusTimer({ userId }: { userId: string | null }) {
-  const timer = useFocusTimer(userId);
-  const mm = String(Math.floor(timer.left / 60)).padStart(2, '0');
-  const ss = String(timer.left % 60).padStart(2, '0');
+const LENGTH_KEY = 'now:focus:length';
+
+/** "Focus" and its length under the day's focus. */
+function FocusStart({ onStart }: { onStart: (minutes: number) => void }) {
+  const [minutes, setMinutes] = useState<number>(() => {
+    try {
+      const v = Number(globalThis.localStorage?.getItem(LENGTH_KEY));
+      return (FOCUS_LENGTHS as readonly number[]).includes(v) ? v : 25;
+    } catch {
+      return 25;
+    }
+  });
+  const pick = (m: number) => {
+    setMinutes(m);
+    try {
+      globalThis.localStorage?.setItem(LENGTH_KEY, String(m));
+    } catch {
+      // Remembering the length is a convenience.
+    }
+  };
   return (
     <div className="n-under">
-      {timer.running ? (
-        <button
-          type="button"
-          className="n-timer"
-          onClick={timer.stop}
-          aria-label={`Focus timer, ${mm}:${ss} left. Stop`}
-        >
-          {mm}:{ss} · stop
-        </button>
-      ) : (
-        <button type="button" className="n-change" onClick={timer.start}>
-          {timer.done ? 'Done. Another 25 min?' : 'Focus 25 min'}
-        </button>
-      )}
+      <button type="button" className="n-start" onClick={() => onStart(minutes)}>
+        Focus
+      </button>
+      <span className="n-lengths" role="group" aria-label="Focus length">
+        {FOCUS_LENGTHS.map((m) => (
+          <button key={m} type="button" aria-pressed={m === minutes} onClick={() => pick(m)}>
+            {m} min
+          </button>
+        ))}
+      </span>
     </div>
   );
 }
@@ -82,6 +95,8 @@ function NowScreen() {
     ) % 24;
   const today = useToday(me?.id ?? null, date, tz);
   const [picking, setPicking] = useState(false);
+  const session = useFocusSession(me?.id ?? null);
+  const player = useSoundPlayer(useSounds(me !== null).data ?? []);
   const data = today.data;
   const focus = data?.focus ?? null;
   const clock = new Intl.DateTimeFormat('en-GB', {
@@ -113,7 +128,12 @@ function NowScreen() {
             </button>
           )}
         </div>
-        <FocusTimer userId={me?.id ?? null} />
+        <FocusStart
+          onStart={(m) => {
+            session.start(m);
+            player.play();
+          }}
+        />
         {today.isError && (
           <span className="n-note">
             {data ? 'Offline: showing the last answer' : 'Could not load the day'}
@@ -121,6 +141,30 @@ function NowScreen() {
         )}
       </div>
       {data && <Corners today={data} hour={hour} date={date} />}
+      {session.phase !== 'idle' && (
+        <FocusMode
+          phase={session.phase}
+          left={session.left}
+          focus={focus}
+          player={player}
+          onPause={() => {
+            session.pause();
+            player.stop();
+          }}
+          onResume={() => {
+            session.resume();
+            player.play();
+          }}
+          onExit={() => {
+            player.stop(true);
+            session.exit();
+          }}
+          onAgain={() => {
+            session.start(session.minutes || 25);
+            player.play();
+          }}
+        />
+      )}
     </div>
   );
 }

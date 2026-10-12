@@ -154,10 +154,28 @@
   gap: 18px;
   justify-content: center;
 }
-.n-timer {
+.n-start {
   font-size: 15px;
   color: var(--g-ink);
-  font-variant-numeric: tabular-nums;
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--g-glass-line);
+  background: var(--g-glass);
+  text-shadow: none;
+}
+.n-lengths {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.n-lengths button {
+  font-size: 13px;
+  color: var(--g-ink-faint);
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+.n-lengths button[aria-pressed='true'] {
+  color: var(--g-ink);
 }
 /* Room for the corner strip at the bottom of a phone. */
 @media (max-width: 640px) {
