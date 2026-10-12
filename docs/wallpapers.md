@@ -1,4 +1,4 @@
-# Wallpapers: the bucket behind every screen
+# Wallpapers and sounds: the bucket behind every screen
 
 Life OS shows a random wallpaper behind every screen: a video on a desktop,
 an image on a phone. The admin uploads them on `/admin/wallpapers`; the files
@@ -88,12 +88,19 @@ The access key needs `s3:PutObject`, `s3:GetObject` (HEAD) and
   wide): the screen shows it at once and the video fades in over it. With
   "reduce motion" or data saving on, only the poster shows.
 
+## Sounds
+
+Focus sounds (rain, cafe, quiet music) live in the same bucket under
+`<prefix>sounds/<id>/`, uploaded on `/admin/library`: MP3, AAC/M4A or Ogg, up
+to 30 MB. They need the same public read and the same key rights as the
+wallpapers, on that prefix too.
+
 ## Prod
 
 Prod uses the cluster's MinIO at `https://s3.tarassov.me`: bucket `life-os`,
 user `life-os` with the policy `life-os-rw` (put, get and delete on
-`life-os/wallpapers/*`, list on the bucket), anonymous download on the
-`life-os/wallpapers` prefix, keys in the Secret `life-os-s3` of the `life-os`
+`life-os/wallpapers/*` and `life-os/sounds/*`, list on the bucket), anonymous
+download on the `life-os/wallpapers` and `life-os/sounds` prefixes, keys in the Secret `life-os-s3` of the `life-os`
 namespace. MinIO answers CORS preflights for any origin by itself, so no bucket
 CORS rule is set there. Region `us-east-1` (MinIO's default).
 

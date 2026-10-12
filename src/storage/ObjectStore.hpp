@@ -28,8 +28,8 @@ public:
     /// A missing object is fine; throws std::runtime_error when the store does not answer.
     virtual void remove(const std::string& key) const = 0;
     virtual std::string public_url(const std::string& key) const = 0;
-    /// prefix + "wallpapers/" + id + "/" + name.
-    virtual std::string key_for(const std::string& id, const std::string& name) const = 0;
+    /// prefix + folder + "/" + id + "/" + name, e.g. folder "wallpapers" or "sounds".
+    virtual std::string key_for(const std::string& folder, const std::string& id, const std::string& name) const = 0;
 };
 
 /// The configured store, or nullptr while storage.s3 is incomplete.

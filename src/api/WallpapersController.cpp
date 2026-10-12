@@ -198,10 +198,10 @@ void WallpapersController::createWallpaper(const HttpRequestPtr& req, Callback&&
         in.kind = kind;
         in.device = device;
         in.content_type = body["content_type"].get<std::string>();
-        in.object_key = store->key_for(in.id, "file." + extension_of(in.content_type));
+        in.object_key = store->key_for("wallpapers", in.id, "file." + extension_of(in.content_type));
         in.bytes = body["bytes"].get<long long>();
         if (video) {
-            in.poster_key = store->key_for(in.id, "poster.jpg");
+            in.poster_key = store->key_for("wallpapers", in.id, "poster.jpg");
             in.poster_bytes = body["poster_bytes"].get<long long>();
         }
         in.width = opt_side(body, "width");

@@ -39,6 +39,7 @@
 #include "api/JobsController.hpp"
 #include "api/Middleware.hpp"
 #include "api/MoneyController.hpp"
+#include "api/SoundsController.hpp"
 #include "api/TasksController.hpp"
 #include "api/TodayController.hpp"
 #include "api/WallpapersController.hpp"
