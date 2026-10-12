@@ -13152,7 +13152,13 @@ export interface components {
                     /** @description All accounts in USD at the day's rates */
                     total: number;
                     partial: boolean;
+                    /**
+                     * Format: date
+                     * @description The oldest rate day used
+                     */
+                    rate_date: string;
                     change_30d: number;
+                    change_partial: boolean;
                 } | null;
                 /** @description Up to 5 posted spends of the date, newest first, each in its own currency */
                 spends_today: {
@@ -13261,6 +13267,8 @@ export interface components {
                 ledger: number;
                 /** @description What the rates did to the balances of the first day */
                 rates: number;
+                /** @description Money without a quote on the first or the last day is left out of the change */
+                partial: boolean;
             };
             days: {
                 /** Format: date */

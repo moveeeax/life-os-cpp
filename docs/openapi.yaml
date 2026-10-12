@@ -314,12 +314,14 @@ components:
             net_worth:
               oneOf:
                 - type: object
-                  required: [currency, total, partial, change_30d]
+                  required: [currency, total, partial, rate_date, change_30d, change_partial]
                   properties:
                     currency: { type: string, enum: [USD] }
                     total: { type: number, description: All accounts in USD at the day's rates }
                     partial: { type: boolean }
+                    rate_date: { type: string, format: date, description: 'The oldest rate day used' }
                     change_30d: { type: number }
+                    change_partial: { type: boolean }
                 - { type: 'null' }
             spends_today:
               type: array
@@ -427,12 +429,13 @@ components:
               amount: { type: number }
         change:
           type: object
-          required: [from, total, ledger, rates]
+          required: [from, total, ledger, rates, partial]
           properties:
             from: { type: string, format: date }
             total: { type: number }
             ledger: { type: number, description: 'What income and spending did, at the end rates' }
             rates: { type: number, description: 'What the rates did to the balances of the first day' }
+            partial: { type: boolean, description: 'Money without a quote on the first or the last day is left out of the change' }
         days:
           type: array
           items:
