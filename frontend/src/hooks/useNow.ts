@@ -30,6 +30,24 @@ async function del(path: string, query?: Record<string, string>): Promise<void> 
 const AFTER_FOCUS = [qk.now.all(), qk.tasks.all()] as const;
 
 /**
+ * Whether the now module answers at all: the wallpaper list is 404 only while
+ * the module is off (503 means on, without storage). Undefined while asking.
+ */
+export function useNowEnabled(signedIn: boolean): boolean | undefined {
+  const probe = useQuery({
+    queryKey: qk.now.enabled(),
+    enabled: signedIn,
+    staleTime: Infinity,
+    retry: false,
+    queryFn: async ({ signal }) => {
+      const { error } = await api.GET('/api/v1/wallpapers?device=desktop' as string, { signal });
+      return !(error && error.status === 404);
+    },
+  });
+  return probe.data;
+}
+
+/**
  * The day's digest. The last answer for this user and day paints first
  * (a new tab opens at once); the server answer replaces it and is cached.
  */

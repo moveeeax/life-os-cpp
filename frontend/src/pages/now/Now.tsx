@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, Navigate } from 'react-router';
 
 import { useMe } from '@/hooks/useMe';
 import { useToday } from '@/hooks/useNow';
 import { greeting, localDate, quietLines } from '@/lib/now';
+import { homeOf } from '@/shell/sections';
+import { useGlassNav } from '@/shell/useGlassNav';
 
 import { FocusLine } from './FocusLine';
 import { FocusPicker } from './FocusPicker';
@@ -35,6 +37,12 @@ function useMinute(): Date {
  * the day at once.
  */
 export function NowPage() {
+  const nav = useGlassNav();
+  if (nav.nowOn === false) return <Navigate to={homeOf(nav.items)} replace />;
+  return <NowScreen />;
+}
+
+function NowScreen() {
   const me = useMe().data ?? null;
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const now = useMinute();
