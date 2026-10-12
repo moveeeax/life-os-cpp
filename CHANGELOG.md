@@ -6,6 +6,27 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-10-13
+
+### Added
+- Focus mode on Now: "Focus" with 25, 50 or 90 minutes under the day's focus.
+  The nav, the corners, the clock and the shade go away; the wallpaper, a big
+  countdown and the focus stay, and a sound of the library plays in a loop with
+  a gentle fade in. A thin glass bar (pause, sound and volume, exit) shows when
+  the pointer moves and fades after three quiet seconds; Escape exits. At zero
+  the sound fades out and Done offers to tick the focus. A session survives a
+  reload. The admin's library (`/admin/library`) now keeps wallpapers and focus
+  sounds; `/admin/wallpapers` leads there. The old 25-minute timer is gone.
+- A library of focus sounds next to the wallpapers (`/api/v1/sounds`,
+  `/api/v1/admin/sounds`): the admin uploads MP3, AAC/M4A or Ogg files up to
+  30 MB straight to the bucket through presigned URLs, every user lists the
+  ready ones. Migration 032.
+
+### Fixed
+- Deleting a task, a goal, a ledger row or a transfer no longer shows "returned
+  an empty body" and leaves the row on screen: the API answers these with 204 No
+  Content, and the client now takes an empty 204 as done.
+
 ## [1.19.0] - 2026-10-12
 
 ### Added
