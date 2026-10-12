@@ -57,6 +57,7 @@ export function AdminWallpapersPage() {
       setMessage(check.reason);
       return;
     }
+    let createdId: string | null = null;
     try {
       setProgress(0);
       const poster = check.kind === 'video' ? await posterFrom(file) : null;
@@ -73,6 +74,7 @@ export function AdminWallpapersPage() {
         width: size.width,
         height: size.height,
       });
+      createdId = created.id;
       await putWithProgress(created.upload.url, file, created.upload.headers, (s) =>
         setProgress(s * 0.95),
       );
@@ -91,13 +93,21 @@ export function AdminWallpapersPage() {
       setMessage('Uploaded. It shows up in new tabs from now on.');
     } catch (err) {
       setProgress(null);
-      const status = (err as { status?: number }).status;
+      // A row that will never be ready goes, with whatever reached the bucket.
+      let cleaned = createdId === null;
+      if (createdId !== null) {
+        try {
+          await remove.mutateAsync(createdId);
+          cleaned = true;
+        } catch {
+          // Left as "not finished"; the admin deletes it from the list.
+        }
+      }
+      const reason = err instanceof Error ? err.message : apiErrorMessage(err);
       setMessage(
-        status === 409
-          ? 'The upload did not finish. Delete this row and try again.'
-          : err instanceof Error
-            ? err.message
-            : apiErrorMessage(err),
+        cleaned
+          ? `The upload did not finish: ${reason} Try again.`
+          : `The upload did not finish: ${reason} Delete the "not finished" row and try again.`,
       );
       list.refetch();
     }
