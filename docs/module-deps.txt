@@ -113,6 +113,7 @@ repositories/fitness -> domain/fitness
 repositories/fitness -> fitness/xiaomi
 repositories/fitness -> repositories
 repositories/food -> database
+repositories/food -> food
 repositories/food -> repositories
 repositories/money -> database
 repositories/money -> money

@@ -35,6 +35,7 @@
 #include "jobs/FoodParseHandler.hpp"
 #include "jobs/Jobs.hpp"
 #include "repositories/food/EntryRepository.hpp"
+#include "repositories/food/GoalsBody.hpp"
 #include "repositories/food/GoalsRepository.hpp"
 #include "repositories/food/ItemRepository.hpp"
 #include "repositories/food/ParseJobRepository.hpp"
@@ -134,86 +135,6 @@ json product_json(const Food::Off::Product& p) {
              {"serving_grams", p.serving_grams ? json(*p.serving_grams) : json()},
              {"serving_label", p.serving_label}};
     return out;
-}
-
-/// The goals block of GET/PUT goals and the targets of a day: the profile,
-/// the weight with its source, the computed numbers and the targets after
-/// the overrides. Targets are null until the profile is complete.
-json goals_body(const std::string& owner) {
-    Repositories::GoalsRepository goals;
-    json profile = goals.load(owner).value_or(json{{"height_cm", nullptr},
-                                                   {"birth_date", nullptr},
-                                                   {"sex", nullptr},
-                                                   {"activity", "light"},
-                                                   {"target_weight_kg", nullptr},
-                                                   {"pace_kg_per_week", 0},
-                                                   {"manual_weight_kg", nullptr},
-                                                   {"profile_note", ""},
-                                                   {"kcal_override", nullptr},
-                                                   {"protein_override_g", nullptr},
-                                                   {"fat_override_g", nullptr},
-                                                   {"carbs_override_g", nullptr},
-                                                   {"updated_at", nullptr}});
-    json weight{{"kg", nullptr}, {"source", "none"}};
-    if (const auto scale = goals.scale_weight(owner)) {
-        weight = {{"kg", *scale}, {"source", "scale"}};
-    } else if (profile["manual_weight_kg"].is_number()) {
-        weight = {{"kg", profile["manual_weight_kg"]}, {"source", "manual"}};
-    }
-
-    json missing = json::array();
-    for (const char* f : {"height_cm", "birth_date", "sex", "target_weight_kg"}) {
-        if (profile[f].is_null()) {
-            missing.push_back(f);
-        }
-    }
-    if (weight["kg"].is_null()) {
-        missing.push_back("weight");
-    }
-
-    json computed;
-    json targets;
-    if (missing.empty()) {
-        Food::Goals::Inputs in;
-        in.weight_kg = weight["kg"].get<double>();
-        in.height_cm = profile["height_cm"].get<int>();
-        in.age_years = Food::Goals::age_on(profile["birth_date"].get<std::string>(), today_utc());
-        in.sex = profile["sex"].get<std::string>();
-        in.activity = profile["activity"].get<std::string>();
-        in.target_weight_kg = profile["target_weight_kg"].get<double>();
-        in.pace_kg_per_week = profile["pace_kg_per_week"].get<double>();
-        const auto c = Food::Goals::compute(in);
-        computed = {{"age_years", in.age_years},
-                    {"bmr", c.bmr},
-                    {"maintenance", c.maintenance},
-                    {"deficit", c.deficit},
-                    {"kcal", c.kcal},
-                    {"floored", c.floored},
-                    {"below_bmr", c.below_bmr},
-                    {"protein_g", c.protein_g},
-                    {"fat_g", c.fat_g},
-                    {"carbs_g", c.carbs_g}};
-        const auto t = Food::Goals::apply_overrides(c,
-                                                    opt_int(profile, "kcal_override"),
-                                                    opt_int(profile, "protein_override_g"),
-                                                    opt_int(profile, "fat_override_g"),
-                                                    opt_int(profile, "carbs_override_g"));
-        targets = {{"kcal", t.kcal}, {"protein_g", t.protein_g}, {"fat_g", t.fat_g}, {"carbs_g", t.carbs_g}};
-    } else if (profile["kcal_override"].is_number() && profile["protein_override_g"].is_number() &&
-               profile["fat_override_g"].is_number() && profile["carbs_override_g"].is_number()) {
-        // Everything set by hand: no profile needed.
-        targets = {{"kcal", profile["kcal_override"]},
-                   {"protein_g", profile["protein_override_g"]},
-                   {"fat_g", profile["fat_override_g"]},
-                   {"carbs_g", profile["carbs_override_g"]}};
-    }
-    return json{{"profile", profile},
-                {"weight", weight},
-                {"missing", missing},
-                {"computed", computed},
-                {"targets", targets},
-                // Whether the add form may offer the text parse.
-                {"llm_available", Food::Llm::settings().has_value()}};
 }
 
 /// Validates one entry body; fills @p out. Returns false after adding errors.
@@ -318,7 +239,9 @@ bool FoodController::require_enabled(const Callback& callback) {
 
 void FoodController::getGoals(const HttpRequestPtr& req, Callback&& callback) {
     FOOD_GUARD(req, callback, owner);
-    with_repo_errors(callback, "food.getGoals", [&] { callback(Response::ok(json{{"data", goals_body(owner)}})); });
+    with_repo_errors(callback, "food.getGoals", [&] {
+        callback(Response::ok(json{{"data", Repositories::food_goals_body(owner, today_utc())}}));
+    });
 }
 
 void FoodController::putGoals(const HttpRequestPtr& req, Callback&& callback) {
@@ -374,7 +297,7 @@ void FoodController::putGoals(const HttpRequestPtr& req, Callback&& callback) {
 
     with_repo_errors(callback, "food.putGoals", [&] {
         Repositories::GoalsRepository().put(owner, p);
-        callback(Response::ok(json{{"data", goals_body(owner)}}));
+        callback(Response::ok(json{{"data", Repositories::food_goals_body(owner, today_utc())}}));
     });
 }
 
@@ -610,7 +533,7 @@ void FoodController::day(const HttpRequestPtr& req, Callback&& callback) {
         json out = Repositories::EntryRepository().day(owner, date);
         const auto active = Repositories::GoalsRepository().active_kcal(owner, date);
         out["active_kcal"] = active ? json(*active) : json();
-        out["targets"] = goals_body(owner)["targets"];
+        out["targets"] = Repositories::food_goals_body(owner, today_utc())["targets"];
         callback(Response::ok(json{{"data", out}}));
     });
 }
@@ -626,7 +549,7 @@ void FoodController::week(const HttpRequestPtr& req, Callback&& callback) {
         callback(Response::ok(json{{"data",
                                     {{"from", from},
                                      {"days", Repositories::EntryRepository().week(owner, from)},
-                                     {"targets", goals_body(owner)["targets"]}}}}));
+                                     {"targets", Repositories::food_goals_body(owner, today_utc())["targets"]}}}}));
     });
 }
 
