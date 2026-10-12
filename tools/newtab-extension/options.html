@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Life OS Now: options</title>
+    <style>
+      body {
+        font: 14px system-ui, sans-serif;
+        margin: 24px;
+        max-width: 480px;
+      }
+      input {
+        width: 100%;
+        padding: 6px 8px;
+        font: inherit;
+        box-sizing: border-box;
+      }
+      button {
+        margin-top: 12px;
+        padding: 6px 14px;
+        font: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <label for="origin">Life OS address</label>
+    <input id="origin" type="url" placeholder="https://life-os.tarassov.me" />
+    <button id="save" type="button">Save</button>
+    <span id="saved" hidden>Saved</span>
+    <script src="options.js"></script>
+  </body>
+</html>

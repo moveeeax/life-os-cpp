@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "Life OS Now",
+  "version": "1.0.0",
+  "description": "Opens Life OS Now in every new tab.",
+  "chrome_url_overrides": { "newtab": "newtab.html" },
+  "options_page": "options.html",
+  "permissions": ["storage"]
+}
