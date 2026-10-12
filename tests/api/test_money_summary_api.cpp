@@ -70,8 +70,7 @@ protected:
                 "('c0000000-0000-4000-8000-000000000002', $1::uuid, 'Wise', 'USD', 50), "
                 "('c0000000-0000-4000-8000-000000000003', $1::uuid, 'Old', 'USD', 999)",
                 o);
-            txn.exec_params(
-                "UPDATE money_accounts SET archived = true WHERE id = 'c0000000-0000-4000-8000-000000000003'", o);
+            txn.exec("UPDATE money_accounts SET archived = true WHERE id = 'c0000000-0000-4000-8000-000000000003'");
             txn.exec(
                 "INSERT INTO money_fx_rates (date, quote, per_usd) VALUES "
                 "('2026-10-01', 'KZT', 500), ('2026-10-10', 'KZT', 490), ('2026-10-01', 'EUR', 0.9)");
