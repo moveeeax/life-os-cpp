@@ -129,6 +129,7 @@
 }
 @media (max-width: 640px) {
   .f-bar {
+    width: calc(100vw - 32px);
     border-radius: 18px;
     opacity: 1;
   }
