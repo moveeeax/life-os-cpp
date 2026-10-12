@@ -87,6 +87,7 @@ const TasksLaterPage = lazy(() =>
 const TasksInboxPage = lazy(() =>
   import('@/pages/tasks/Inbox').then((m) => ({ default: m.TasksInboxPage })),
 );
+const NowPage = lazy(() => import('@/pages/now/Now').then((m) => ({ default: m.NowPage })));
 const GoalsPage = lazy(() => import('@/pages/goals/Goals').then((m) => ({ default: m.GoalsPage })));
 const AdminDashboardPage = lazy(() =>
   import('@/pages/admin/Dashboard').then((m) => ({ default: m.AdminDashboardPage })),
@@ -209,6 +210,8 @@ export const routes: RouteEntry[] = [
   // Sections of the dashboard. A section checks its own permission and shows
   // a "no access" card: the guards' permission fallback is `/`, which would
   // bounce a signed-in user straight back here.
+  // Now: the landing screen of the glass shell (DASHBOARD_HOME).
+  { path: '/now', element: <NowPage />, guard: 'confirmed', layout: 'shell' },
   { path: '/health', element: <HealthPage />, guard: 'confirmed', layout: 'shell' },
   { path: '/workout', element: <WorkoutHomePage />, guard: 'confirmed', layout: 'shell' },
   {
