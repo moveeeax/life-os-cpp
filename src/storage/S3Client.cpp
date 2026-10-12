@@ -84,8 +84,12 @@ std::string S3Client::signed_url(const std::string& method,
 }
 
 std::string S3Client::upload_url(const std::string& key, const std::string& content_type, long long bytes) const {
-    return signed_url(
-        "PUT", key, kUploadSeconds, {{"content-length", std::to_string(bytes)}, {"content-type", content_type}});
+    return signed_url("PUT",
+                      key,
+                      kUploadSeconds,
+                      {{"cache-control", kImmutableCacheControl},
+                       {"content-length", std::to_string(bytes)},
+                       {"content-type", content_type}});
 }
 
 ObjectInfo S3Client::head(const std::string& key) const {

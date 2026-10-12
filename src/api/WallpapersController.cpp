@@ -101,7 +101,8 @@ json public_row(const Storage::ObjectStore& store, const json& row) {
 }
 
 json upload_of(const std::string& url, const std::string& content_type) {
-    return json{{"url", url}, {"headers", {{"Content-Type", content_type}}}};
+    return json{{"url", url},
+                {"headers", {{"Content-Type", content_type}, {"Cache-Control", Storage::kImmutableCacheControl}}}};
 }
 
 }  // namespace

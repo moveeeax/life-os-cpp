@@ -211,6 +211,8 @@ TEST_F(WallpapersApiTest, CreateAVideoGivesTwoUploadUrls) {
     EXPECT_FALSE(d["id"].get<std::string>().empty());
     EXPECT_EQ(d["upload"]["url"], "https://fake/life-os/wallpapers/" + d["id"].get<std::string>() + "/file.mp4");
     EXPECT_EQ(d["upload"]["headers"]["Content-Type"], "video/mp4");
+    EXPECT_EQ(d["upload"]["headers"]["Cache-Control"], "public, max-age=31536000, immutable");
+    EXPECT_EQ(d["poster_upload"]["headers"]["Cache-Control"], "public, max-age=31536000, immutable");
     EXPECT_EQ(d["poster_upload"]["url"],
               "https://fake/life-os/wallpapers/" + d["id"].get<std::string>() + "/poster.jpg");
     EXPECT_EQ(d["poster_upload"]["headers"]["Content-Type"], "image/jpeg");

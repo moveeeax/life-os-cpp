@@ -151,8 +151,9 @@ void SoundsController::createSound(const HttpRequestPtr& req, Callback&& callbac
         }
         in.created_by = admin;
         repo.create(in);
-        const json upload{{"url", store->upload_url(in.object_key, in.content_type, in.bytes)},
-                          {"headers", {{"Content-Type", in.content_type}}}};
+        const json upload{
+            {"url", store->upload_url(in.object_key, in.content_type, in.bytes)},
+            {"headers", {{"Content-Type", in.content_type}, {"Cache-Control", Storage::kImmutableCacheControl}}}};
         callback(Response::created(json{{"data", {{"id", in.id}, {"upload", upload}}}}));
     });
 }

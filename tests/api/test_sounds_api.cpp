@@ -163,6 +163,7 @@ TEST_F(SoundsApiTest, ASoundGoesUnderTheSoundsFolder) {
     const json d = create(rain());
     EXPECT_EQ(key_of(d["upload"]["url"]), "life-os/sounds/" + d["id"].get<std::string>() + "/file.mp3");
     EXPECT_EQ(d["upload"]["headers"]["Content-Type"], "audio/mpeg");
+    EXPECT_EQ(d["upload"]["headers"]["Cache-Control"], "public, max-age=31536000, immutable");
 }
 
 TEST_F(SoundsApiTest, CreateRefusesWhatTheLibraryDoesNotTake) {

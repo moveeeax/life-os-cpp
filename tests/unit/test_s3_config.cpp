@@ -108,4 +108,8 @@ TEST_F(S3SettingsTest, KeysAndPublicUrls) {
     const std::string url = client.upload_url(key, "video/mp4", 1234);
     EXPECT_EQ(url.rfind("https://storage.example.com/walls/life-os/wallpapers/0b8e/file.mp4?", 0), 0u) << url;
     EXPECT_NE(url.find("X-Amz-Expires=900"), std::string::npos) << url;
+    // An object never changes under its key: the browser may keep it a year.
+    EXPECT_NE(url.find("X-Amz-SignedHeaders=cache-control%3Bcontent-length%3Bcontent-type%3Bhost"), std::string::npos)
+        << url;
+    EXPECT_STREQ(Storage::kImmutableCacheControl, "public, max-age=31536000, immutable");
 }
