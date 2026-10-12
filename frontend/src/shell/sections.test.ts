@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { Permission, type PermissionUser } from '@/lib/auth/permissions';
 
-import { DASHBOARD_HOME, glassNav, rootTarget } from './sections';
+import { DASHBOARD_HOME, glassNav, homeOf, rootTarget } from './sections';
 
 const user = (permissions: number) =>
   ({ role: { id: 1, name: 'role', permissions } }) as PermissionUser;
@@ -35,13 +35,28 @@ describe('glassNav', () => {
     expect(glassNav(user(Permission.Administer)).map((s) => s.label)).toContain('Training');
   });
 
-  it('leaves out a section whose module is off, never Now', () => {
-    const list = glassNav(user(Permission.General), new Set(['goals', 'now']));
+  it('leaves out a section whose module is off', () => {
+    const list = glassNav(user(Permission.General), new Set(['goals']));
     expect(list.map((s) => s.label)).toEqual(['Now', 'Tasks', 'Money', 'Food']);
+  });
+
+  it('leaves Now out too when its module is off', () => {
+    const list = glassNav(user(Permission.General), new Set(['now']));
+    expect(list.map((s) => s.label)).toEqual(['Tasks', 'Goals', 'Money', 'Food']);
   });
 
   it('gives no user only Now', () => {
     expect(glassNav(null).map((s) => s.label)).toEqual(['Now']);
+  });
+});
+
+describe('homeOf', () => {
+  it('is the first section of the nav', () => {
+    expect(homeOf(glassNav(user(Permission.General)))).toBe('/now');
+    expect(homeOf(glassNav(user(Permission.General), new Set(['now'])))).toBe('/tasks');
+  });
+  it('is the account page when nothing is on', () => {
+    expect(homeOf([])).toBe('/account');
   });
 });
 

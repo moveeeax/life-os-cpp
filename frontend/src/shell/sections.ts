@@ -1,8 +1,8 @@
 import { Permission, userCan, type PermissionUser } from '@/lib/auth/permissions';
 
 /**
- * The glass pill nav: the one list of the signed-in app's sections. Now is
- * always there; a section whose backend module is off is left out; Body and
+ * The glass pill nav: the one list of the signed-in app's sections. A
+ * section whose backend module is off is left out (Now too); Body and
  * Training need fitness:read. Routes keep their paths (Body is /health,
  * Training is /workout).
  */
@@ -30,10 +30,16 @@ export function glassNav(
   off: ReadonlySet<string> = new Set(),
 ): NavItem[] {
   return NAV.filter((s) => {
+    if (off.has(s.key)) return false;
     if (s.key === 'now') return true;
-    if (user == null || off.has(s.key)) return false;
+    if (user == null) return false;
     return s.permission === undefined || userCan(user, s.permission);
   });
+}
+
+/** Where the app opens for this nav: Now, or the first section that is on. */
+export function homeOf(nav: readonly NavItem[]): string {
+  return nav[0]?.to ?? '/account';
 }
 
 /** Where a visitor of `/` lands. */
