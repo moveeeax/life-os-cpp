@@ -1,93 +1,46 @@
-import {
-  Briefcase,
-  Dumbbell,
-  GitBranch,
-  GraduationCap,
-  Handshake,
-  HeartPulse,
-  Lightbulb,
-  ListTodo,
-  NotebookPen,
-  Plane,
-  Sun,
-  Target,
-  Utensils,
-  Wallet,
-  type LucideIcon,
-} from 'lucide-react';
-
 import { Permission, userCan, type PermissionUser } from '@/lib/auth/permissions';
 
 /**
- * Sidebar sections of the dashboard — the one list the sidebar renders.
- * A section without `path` is not built yet: it shows as an inactive item
- * with a "soon" badge. Adding a section is one entry here plus its route.
+ * The glass pill nav: the one list of the signed-in app's sections. Now is
+ * always there; a section whose backend module is off is left out; Body and
+ * Training need fitness:read. Routes keep their paths (Body is /health,
+ * Training is /workout).
  */
-export interface Section {
+export interface NavItem {
   key: string;
   label: string;
-  icon: LucideIcon;
-  /** Route of the section; absent while the section is not built. */
-  path?: string;
+  to: string;
   /** Permission bit the section needs; the item is hidden without it. */
   permission?: number;
 }
 
-export const sections: Section[] = [
-  {
-    key: 'health',
-    label: 'Health',
-    icon: HeartPulse,
-    path: '/health',
-    permission: Permission.FitnessRead,
-  },
-  { key: 'day', label: 'Day', icon: Sun },
-  /** Every confirmed user may keep a diary; the module switch is the only gate. */
-  { key: 'food', label: 'Food', icon: Utensils, path: '/food' },
-  /** Every confirmed user keeps their own money; the module switch is the only gate. */
-  { key: 'money', label: 'Money', icon: Wallet, path: '/money' },
-  /** Every confirmed user keeps their own tasks; the module switch is the only gate. */
-  { key: 'tasks', label: 'Tasks', icon: ListTodo, path: '/tasks' },
-  /** Every confirmed user keeps their own goals; the module switch is the only gate. */
-  { key: 'goals', label: 'Goals', icon: Target, path: '/goals' },
-  { key: 'journal', label: 'Journal', icon: NotebookPen },
-  { key: 'learning', label: 'Learning', icon: GraduationCap },
-  {
-    key: 'workout',
-    label: 'Workout',
-    icon: Dumbbell,
-    path: '/workout',
-    permission: Permission.FitnessRead,
-  },
-  { key: 'travel', label: 'Travel', icon: Plane },
-  { key: 'work', label: 'Work', icon: Briefcase },
-  { key: 'freelance', label: 'Freelance', icon: Handshake },
-  { key: 'ideas', label: 'Ideas', icon: Lightbulb },
-  { key: 'oss', label: 'OSS', icon: GitBranch },
+export const NAV: readonly NavItem[] = [
+  { key: 'now', label: 'Now', to: '/now' },
+  { key: 'tasks', label: 'Tasks', to: '/tasks' },
+  { key: 'goals', label: 'Goals', to: '/goals' },
+  { key: 'money', label: 'Money', to: '/money' },
+  { key: 'food', label: 'Food', to: '/food' },
+  { key: 'health', label: 'Body', to: '/health', permission: Permission.FitnessRead },
+  { key: 'workout', label: 'Training', to: '/workout', permission: Permission.FitnessRead },
 ];
 
-/**
- * Sections this user sees: built ones they may open, plus every inactive one.
- * A section whose key is in `off` (its backend module is switched off) is
- * shown as not built yet.
- */
-export function visibleSections(
+/** The items this user sees; `off` holds the keys of modules switched off. */
+export function glassNav(
   user: PermissionUser | null | undefined,
   off: ReadonlySet<string> = new Set(),
-): Section[] {
-  return sections
-    .map((s) => (off.has(s.key) ? { ...s, path: undefined, permission: undefined } : s))
-    .filter(
-      (s) =>
-        !s.path || (user != null && (s.permission === undefined || userCan(user, s.permission))),
-    );
+): NavItem[] {
+  return NAV.filter((s) => {
+    if (s.key === 'now') return true;
+    if (user == null || off.has(s.key)) return false;
+    return s.permission === undefined || userCan(user, s.permission);
+  });
 }
 
 /** Where a visitor of `/` lands. */
 export type RootTarget = 'loading' | 'signin' | 'dashboard';
 
-/** The dashboard's landing route. */
-export const DASHBOARD_HOME = '/health';
+/** The app's landing route. */
+export const DASHBOARD_HOME = '/now';
 
 export function rootTarget(me: { isPending: boolean; data: unknown }): RootTarget {
   if (me.isPending) return 'loading';

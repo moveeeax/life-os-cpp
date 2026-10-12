@@ -1,0 +1,220 @@
+/* The glass shell: one picture behind every screen, a glass pill nav, and the
+   screens on frosted sheets in one centred column. Single dark look on
+   purpose: white text over the picture. Values from the approved mockup
+   (docs/superpowers/designs/2026-10-08-now-shell-mockup.html, not shipped). */
+.glass {
+  --g-ink: #ffffff;
+  --g-ink-soft: rgba(255, 255, 255, 0.8);
+  --g-ink-faint: rgba(255, 255, 255, 0.56);
+  --g-ink-ghost: rgba(255, 255, 255, 0.14);
+  --g-glass: rgba(14, 20, 36, 0.5);
+  --g-glass-strong: rgba(14, 20, 36, 0.66);
+  --g-glass-line: rgba(255, 255, 255, 0.15);
+  --g-ok: #6ee7b7;
+  --g-warn: #fcd34d;
+  --g-late: #fca5a5;
+  --g-brand: #a5b4fc;
+  position: relative;
+  min-height: 100vh;
+  color: var(--g-ink);
+  background: #1b2140;
+  color-scheme: dark;
+}
+
+/* The picture and its shade. */
+.g-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(160deg, #1b2140, #0b1020);
+}
+.g-backdrop video,
+.g-backdrop img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.g-backdrop .g-shown {
+  opacity: 1;
+}
+.g-shade {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: rgba(8, 10, 24, 0.38);
+  transition: background 0.4s;
+}
+.glass[data-open] .g-shade {
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.35) 100%);
+}
+
+/* The bar: the pill nav centred, the account on the right. */
+.g-bar {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top, 0px));
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding-inline: 16px;
+  pointer-events: none;
+}
+.g-pill {
+  pointer-events: auto;
+  background: var(--g-glass);
+  border: 1px solid var(--g-glass-line);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 999px;
+}
+.g-nav {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: none;
+  min-width: 0;
+}
+.g-nav a {
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  color: var(--g-ink-soft);
+  white-space: nowrap;
+}
+.g-nav a:hover {
+  color: var(--g-ink);
+}
+.g-nav a[aria-current='page'] {
+  background: rgba(255, 255, 255, 0.9);
+  color: #141832;
+}
+.g-account {
+  position: relative;
+  pointer-events: auto;
+  flex: none;
+}
+.g-account > button {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 500;
+}
+.g-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 200px;
+  padding: 6px;
+  border-radius: 16px;
+  background: var(--g-glass-strong);
+  border: 1px solid var(--g-glass-line);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: grid;
+  gap: 2px;
+}
+.g-menu .g-who {
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--g-ink-faint);
+  border-bottom: 1px solid var(--g-glass-line);
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.g-menu a,
+.g-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--g-ink-soft);
+}
+.g-menu a:hover,
+.g-menu button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--g-ink);
+}
+
+/* Hide numbers. */
+.g-eye {
+  position: fixed;
+  z-index: 30;
+  right: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  font-size: 13px;
+  color: var(--g-ink-soft);
+  padding: 6px 12px;
+}
+.hide-numbers .glass .num {
+  filter: blur(7px);
+}
+.hide-numbers .glass [data-legacy-sheet] {
+  filter: blur(7px);
+}
+
+/* Screens. */
+.g-main {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+.g-page {
+  padding: 84px 16px 80px;
+  display: grid;
+  justify-items: center;
+}
+.g-col {
+  width: min(760px, 100%);
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.g-sheet {
+  background: var(--g-glass);
+  border: 1px solid var(--g-glass-line);
+  border-radius: 22px;
+  padding: 18px 20px;
+  backdrop-filter: blur(20px) saturate(1.15);
+  -webkit-backdrop-filter: blur(20px) saturate(1.15);
+  min-width: 0;
+}
+/* An old section page on one sheet until its redesign: it brings its own
+   cards, so the sheet is wider than the column and only a frame. */
+.g-legacy {
+  width: min(1200px, 100%);
+  padding: 16px;
+  overflow-x: auto;
+}
+:focus-visible {
+  outline-offset: 3px;
+}
+.glass :focus-visible {
+  outline: 2px solid var(--g-ink);
+  border-radius: 6px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .g-main > * {
+    animation: g-fade 0.25s ease-out;
+  }
+  @keyframes g-fade {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+}
