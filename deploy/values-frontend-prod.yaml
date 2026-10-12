@@ -29,3 +29,8 @@ ingress:
   tls:
     - hosts: [life-os.tarassov.me]
       secretName: life-os-tls
+
+# The wallpaper bucket (pictures, videos and the admin's direct upload).
+csp:
+  storageHosts:
+    - https://s3.tarassov.me

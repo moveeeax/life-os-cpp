@@ -88,6 +88,15 @@ The access key needs `s3:PutObject`, `s3:GetObject` (HEAD) and
   wide): the screen shows it at once and the video fades in over it. With
   "reduce motion" or data saving on, only the poster shows.
 
+## Prod
+
+Prod uses the cluster's MinIO at `https://s3.tarassov.me`: bucket `life-os`,
+user `life-os` with the policy `life-os-rw` (put, get and delete on
+`life-os/wallpapers/*`, list on the bucket), anonymous download on the
+`life-os/wallpapers` prefix, keys in the Secret `life-os-s3` of the `life-os`
+namespace. MinIO answers CORS preflights for any origin by itself, so no bucket
+CORS rule is set there. Region `us-east-1` (MinIO's default).
+
 ## Check
 
 1. Upload one desktop video and one phone image on `/admin/wallpapers`.
