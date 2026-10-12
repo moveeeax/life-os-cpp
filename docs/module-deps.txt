@@ -38,6 +38,7 @@ api -> fitness/xiaomi
 api -> food
 api -> jobs
 api -> money
+api -> now
 api -> repositories/money
 api -> observability
 api -> repositories
@@ -106,6 +107,7 @@ jobs -> repositories/money
 jobs -> repositories/workout
 jobs -> utils
 jobs -> webhooks
+now -> tasks
 observability -> utils
 repositories -> database
 repositories -> domain

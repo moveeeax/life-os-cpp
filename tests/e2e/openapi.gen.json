@@ -703,6 +703,322 @@
      }
     }
    },
+   "Focus": {
+    "type": "object",
+    "required": [
+     "date",
+     "kind",
+     "ref_id",
+     "text",
+     "done",
+     "missing"
+    ],
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "task",
+       "goal",
+       "text"
+      ]
+     },
+     "ref_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid"
+     },
+     "text": {
+      "type": "string",
+      "description": "The typed text, or the title of the task or goal when it was chosen"
+     },
+     "done": {
+      "type": "boolean"
+     },
+     "missing": {
+      "type": "boolean",
+      "description": "The task or goal is gone"
+     }
+    }
+   },
+   "FocusInput": {
+    "type": "object",
+    "required": [
+     "date",
+     "kind"
+    ],
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "task",
+       "goal",
+       "text"
+      ]
+     },
+     "ref_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Required for task and goal, refused for text"
+     },
+     "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Required for text; ignored for task and goal (the title is copied)"
+     }
+    }
+   },
+   "Today": {
+    "type": "object",
+    "required": [
+     "focus",
+     "errors"
+    ],
+    "description": "A section key is absent when its module is off, the caller has nothing there, or it failed (then it is in errors)",
+    "properties": {
+     "tasks": {
+      "type": "object",
+      "required": [
+       "late_count",
+       "first_late",
+       "today",
+       "inbox_count"
+      ],
+      "properties": {
+       "late_count": {
+        "type": "integer"
+       },
+       "first_late": {
+        "oneOf": [
+         {
+          "type": "object",
+          "required": [
+           "id",
+           "title",
+           "due"
+          ],
+          "properties": {
+           "id": {
+            "type": "string",
+            "format": "uuid"
+           },
+           "title": {
+            "type": "string"
+           },
+           "due": {
+            "type": "string",
+            "format": "date"
+           }
+          }
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "today": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "required": [
+          "id",
+          "title"
+         ],
+         "properties": {
+          "id": {
+           "type": "string",
+           "format": "uuid"
+          },
+          "title": {
+           "type": "string"
+          }
+         }
+        }
+       },
+       "inbox_count": {
+        "type": "integer"
+       }
+      }
+     },
+     "goals": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "required": [
+        "id",
+        "title",
+        "kind",
+        "due",
+        "pace"
+       ],
+       "properties": {
+        "id": {
+         "type": "string",
+         "format": "uuid"
+        },
+        "title": {
+         "type": "string"
+        },
+        "kind": {
+         "type": "string",
+         "enum": [
+          "number",
+          "steps",
+          "count",
+          "binary"
+         ]
+        },
+        "due": {
+         "type": "string",
+         "format": "date"
+        },
+        "pace": {
+         "type": "string",
+         "enum": [
+          "on_track",
+          "behind"
+         ]
+        }
+       }
+      }
+     },
+     "food": {
+      "type": "object",
+      "required": [
+       "eaten",
+       "target"
+      ],
+      "properties": {
+       "eaten": {
+        "type": "object",
+        "required": [
+         "kcal",
+         "protein_g"
+        ],
+        "properties": {
+         "kcal": {
+          "type": "number"
+         },
+         "protein_g": {
+          "type": "number"
+         }
+        }
+       },
+       "target": {
+        "oneOf": [
+         {
+          "type": "object",
+          "required": [
+           "kcal",
+           "protein_g"
+          ],
+          "properties": {
+           "kcal": {
+            "type": "number"
+           },
+           "protein_g": {
+            "type": "number"
+           }
+          }
+         },
+         {
+          "type": "null"
+         }
+        ]
+       }
+      }
+     },
+     "money": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "required": [
+        "currency",
+        "today",
+        "projection",
+        "median3"
+       ],
+       "properties": {
+        "currency": {
+         "type": "string"
+        },
+        "today": {
+         "type": "number",
+         "description": "Spent on the date in this currency"
+        },
+        "projection": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "The month projected to its end"
+        },
+        "median3": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Median spend of the three months before"
+        }
+       }
+      }
+     },
+     "health": {
+      "type": "object",
+      "required": [
+       "sleep_minutes",
+       "steps",
+       "weight_kg"
+      ],
+      "properties": {
+       "sleep_minutes": {
+        "type": [
+         "integer",
+         "null"
+        ]
+       },
+       "steps": {
+        "type": [
+         "integer",
+         "null"
+        ]
+       },
+       "weight_kg": {
+        "type": [
+         "number",
+         "null"
+        ]
+       }
+      }
+     },
+     "focus": {
+      "oneOf": [
+       {
+        "$ref": "#/components/schemas/Focus"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "errors": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
    "TaskArea": {
     "type": "string",
     "enum": [
@@ -20628,12 +20944,236 @@
      }
     }
    }
+  },
+  "/api/v1/today": {
+   "get": {
+    "summary": "The day's digest for the Now screen and the focus of the day",
+    "tags": [
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "date",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "The local day; today in UTC by default"
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The digest",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Today"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Bad date or tz"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Now module disabled"
+     }
+    }
+   }
+  },
+  "/api/v1/today/focus": {
+   "put": {
+    "summary": "Set or replace the focus of a day; a replaced focus is not done",
+    "tags": [
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FocusInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The focus",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Focus"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Now module disabled"
+     },
+     "422": {
+      "description": "The task or goal is not the caller's (focus_ref_not_found)"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Clear the focus of a day",
+    "tags": [
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "date",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Cleared"
+     },
+     "400": {
+      "description": "Bad date"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Now module disabled, or the day has no focus"
+     }
+    }
+   }
+  },
+  "/api/v1/today/focus/done": {
+   "post": {
+    "summary": "Tick or untick the focus; a task focus closes or reopens the task",
+    "tags": [
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "date",
+         "done"
+        ],
+        "properties": {
+         "date": {
+          "type": "string",
+          "format": "date"
+         },
+         "done": {
+          "type": "boolean"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The focus",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Focus"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Now module disabled, or the day has no focus"
+     },
+     "422": {
+      "description": "The task or goal of the focus is gone (focus_ref_not_found)"
+     }
+    }
+   }
   }
  },
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 305702,
-  "source_fnv1a64": "b6c8b95afe7f5667"
+  "source_bytes": 312848,
+  "source_fnv1a64": "4036a92083d9706e"
  }
 }

@@ -12225,6 +12225,262 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The day's digest for the Now screen and the focus of the day */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The local day; today in UTC by default */
+                    date?: string;
+                    /** @description IANA zone of the caller */
+                    tz?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The digest */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Today"];
+                        };
+                    };
+                };
+                /** @description Bad date or tz */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/today/focus": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set or replace the focus of a day; a replaced focus is not done */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FocusInput"];
+                };
+            };
+            responses: {
+                /** @description The focus */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Focus"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The task or goal is not the caller's (focus_ref_not_found) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /** Clear the focus of a day */
+        delete: {
+            parameters: {
+                query: {
+                    date: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Cleared */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad date */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled, or the day has no focus */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/today/focus/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tick or untick the focus; a task focus closes or reopens the task */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        date: string;
+                        done: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description The focus */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Focus"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled, or the day has no focus */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The task or goal of the focus is gone (focus_ref_not_found) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -12406,6 +12662,88 @@ export interface components {
             headers: {
                 [key: string]: string;
             };
+        };
+        Focus: {
+            /** Format: date */
+            date: string;
+            /** @enum {string} */
+            kind: "task" | "goal" | "text";
+            /** Format: uuid */
+            ref_id: string | null;
+            /** @description The typed text, or the title of the task or goal when it was chosen */
+            text: string;
+            done: boolean;
+            /** @description The task or goal is gone */
+            missing: boolean;
+        };
+        FocusInput: {
+            /** Format: date */
+            date: string;
+            /** @enum {string} */
+            kind: "task" | "goal" | "text";
+            /**
+             * Format: uuid
+             * @description Required for task and goal, refused for text
+             */
+            ref_id?: string;
+            /** @description Required for text; ignored for task and goal (the title is copied) */
+            text?: string;
+        };
+        /** @description A section key is absent when its module is off, the caller has nothing there, or it failed (then it is in errors) */
+        Today: {
+            tasks?: {
+                late_count: number;
+                first_late: {
+                    /** Format: uuid */
+                    id: string;
+                    title: string;
+                    /** Format: date */
+                    due: string;
+                } | null;
+                today: {
+                    /** Format: uuid */
+                    id: string;
+                    title: string;
+                }[];
+                inbox_count: number;
+            };
+            goals?: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+                /** @enum {string} */
+                kind: "number" | "steps" | "count" | "binary";
+                /** Format: date */
+                due: string;
+                /** @enum {string} */
+                pace: "on_track" | "behind";
+            }[];
+            food?: {
+                eaten: {
+                    kcal: number;
+                    protein_g: number;
+                };
+                target: {
+                    kcal: number;
+                    protein_g: number;
+                } | null;
+            };
+            money?: {
+                currency: string;
+                /** @description Spent on the date in this currency */
+                today: number;
+                /** @description The month projected to its end */
+                projection: number | null;
+                /** @description Median spend of the three months before */
+                median3: number | null;
+            }[];
+            health?: {
+                sleep_minutes: number | null;
+                steps: number | null;
+                weight_kg: number | null;
+            };
+            focus: components["schemas"]["Focus"] | null;
+            errors: string[];
         };
         /** @enum {string} */
         TaskArea: "finance" | "health" | "travel" | "growth" | "relationships" | "projects";
