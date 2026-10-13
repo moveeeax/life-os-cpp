@@ -980,3 +980,9 @@ select.k-input option {
   color: var(--g-ink-faint);
   font-size: 12.5px;
 }
+.k-check-ring {
+  border-color: var(--g-ink-faint);
+}
+.k-check-ring:hover {
+  border-color: var(--g-ink);
+}

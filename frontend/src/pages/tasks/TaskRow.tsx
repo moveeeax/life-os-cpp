@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 
 import { TaskForm } from './TaskForm';
 
-const TONE = { late: 'text-error-500', today: 'text-warning-600', plain: 'text-gray-400' } as const;
+const TONE = { late: 'k-error-text', today: 'k-warn-text', plain: 'k-muted' } as const;
 
 /** One task: a round check, the area dot, the title, the due on the right; details open under it. */
 export function TaskRow({
@@ -40,7 +40,7 @@ export function TaskRow({
           onClick={() => update.mutate({ status: done ? 'open' : 'done' })}
           className={cn(
             'size-[18px] rounded-full border-[1.5px]',
-            done ? 'border-success-500 bg-success-500' : 'border-gray-400 hover:border-gray-600',
+            done ? 'border-success-500 bg-success-500' : 'k-check-ring',
           )}
         />
         <button
@@ -50,13 +50,8 @@ export function TaskRow({
           className="flex min-w-0 items-center gap-2.5 text-start"
         >
           <span className={cn('size-[7px] shrink-0 rounded-full', area.dot)} aria-hidden="true" />
-          <span
-            className={cn(
-              'truncate text-theme-sm',
-              done ? 'text-gray-400 line-through' : 'text-gray-800 dark:text-white/90',
-            )}
-          >
-            {task.title}
+          <span className={cn('truncate text-theme-sm', done ? 'k-muted line-through' : '')}>
+            <span data-num-ok>{task.title}</span>
           </span>
         </button>
         {due ? (
@@ -68,10 +63,9 @@ export function TaskRow({
         )}
       </div>
       {open && (
-        <div className="grid gap-1 ps-[34px] pb-3.5 text-theme-sm text-gray-500">
+        <div className="grid gap-1 ps-[34px] pb-3.5 text-theme-sm k-muted">
           <p>
-            <span className="font-medium text-gray-800 dark:text-white/90">Next:</span>{' '}
-            {task.next_step || 'not set'}
+            <span className="font-medium">Next:</span> {task.next_step || 'not set'}
           </p>
           <p>
             {area.label}
@@ -79,12 +73,7 @@ export function TaskRow({
             {link && (
               <>
                 {' · '}
-                <a
-                  href={link}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-brand-500 hover:underline"
-                >
+                <a href={link} target="_blank" rel="noreferrer" className="k-link">
                   source
                 </a>
               </>
@@ -94,7 +83,7 @@ export function TaskRow({
                 {' · '}
                 <Link
                   to={`/money?row=${encodeURIComponent(task.source_ref ?? '')}`}
-                  className="text-brand-500 hover:underline"
+                  className="k-link"
                 >
                   from the ledger
                 </Link>
@@ -104,7 +93,7 @@ export function TaskRow({
           {task.goal_title && (
             <p>
               Goal:{' '}
-              <Link to="/goals" className="text-brand-500 hover:underline">
+              <Link to="/goals" className="k-link">
                 {task.goal_title}
               </Link>
               {task.status === 'in_progress' && ' · in progress'}
@@ -116,7 +105,7 @@ export function TaskRow({
               <button
                 type="button"
                 onClick={() => setMoving(true)}
-                className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+                className="k-muted hover:text-gray-800 dark:hover:text-gray-200"
               >
                 Move date
               </button>
@@ -140,7 +129,7 @@ export function TaskRow({
                       update.mutate({ due: null });
                       setMoving(false);
                     }}
-                    className="text-theme-xs text-gray-500"
+                    className="text-theme-xs k-muted"
                   >
                     No date
                   </button>
@@ -150,13 +139,13 @@ export function TaskRow({
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+              className="k-muted hover:text-gray-800 dark:hover:text-gray-200"
             >
               Edit
             </button>
           </div>
           {update.error && (
-            <p role="alert" className="text-error-500">
+            <p role="alert" className="k-error-text">
               {update.error}
             </p>
           )}
@@ -175,7 +164,7 @@ export function TaskRow({
 export function TaskList({ tasks, today }: { tasks: Task[]; today: string }) {
   const [open, setOpen] = useState<string | null>(null);
   return (
-    <ul className="divide-y divide-gray-100 dark:divide-white/5">
+    <ul className="k-divide">
       {tasks.map((t) => (
         <TaskRow
           key={t.id}

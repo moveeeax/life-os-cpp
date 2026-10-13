@@ -15,7 +15,7 @@ export function TasksLaterPage() {
       ) : (
         <>
           {a.dated.length === 0 && a.someday.length === 0 && (
-            <p className="text-theme-sm text-gray-400">Nothing later. Today has the rest.</p>
+            <p className="text-theme-sm k-muted">Nothing later. Today has the rest.</p>
           )}
           {a.dated.length > 0 && (
             <Section title="With a date">

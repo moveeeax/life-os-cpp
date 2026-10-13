@@ -4,7 +4,7 @@ import { Modal } from '@/components/Modal';
 import { useCreateNote, useUpdateNote } from '@/hooks/useTasks';
 import type { TaskNote } from '@/lib/tasks';
 
-import { modalPanel } from '../workout/styles';
+import { modalPanel } from '@/shell/kit/styles';
 import { Capture } from './Capture';
 import { useTasksDay } from './counts';
 import { LoadError, Placeholder, Section, TasksFrame } from './frame';
@@ -38,7 +38,7 @@ export function TasksInboxPage() {
           placeholder="A thought or a link for later"
           aria-label="New note"
           autoComplete="off"
-          className="min-w-0 flex-1 bg-transparent py-1.5 text-theme-sm text-gray-800 outline-none placeholder:text-gray-400 dark:text-white/90"
+          className="min-w-0 flex-1 bg-transparent py-1.5 text-theme-sm text-gray-800 outline-none placeholder:k-muted dark:text-white/90"
         />
       </form>
       {notes.isPending ? (
@@ -46,16 +46,16 @@ export function TasksInboxPage() {
       ) : notes.isError ? (
         <LoadError error={notes.error} onRetry={() => void notes.refetch()} />
       ) : notes.data.length === 0 ? (
-        <p className="text-theme-sm text-gray-400">Inbox is empty.</p>
+        <p className="text-theme-sm k-muted">Inbox is empty.</p>
       ) : (
         <Section title="Not tasks yet">
-          <ul className="divide-y divide-gray-100 dark:divide-white/5">
+          <ul className="k-divide">
             {notes.data.map((n) => (
               <li
                 key={n.id}
                 className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3.5 py-2.5"
               >
-                <span className="text-theme-sm break-words text-gray-800 dark:text-white/90">
+                <span className="text-theme-sm break-words" data-num-ok>
                   {n.text}
                 </span>
                 <span className="flex gap-3.5 text-theme-sm">
@@ -70,7 +70,7 @@ export function TasksInboxPage() {
                     type="button"
                     disabled={update.isPending}
                     onClick={() => update.mutate({ id: n.id, status: 'archived' })}
-                    className="text-gray-500"
+                    className="k-muted"
                   >
                     Archive
                   </button>
@@ -81,7 +81,7 @@ export function TasksInboxPage() {
         </Section>
       )}
       {(add.error || update.error) && (
-        <p role="alert" className="text-theme-sm text-error-500">
+        <p role="alert" className="text-theme-sm k-error-text">
           {add.error ?? update.error}
         </p>
       )}
