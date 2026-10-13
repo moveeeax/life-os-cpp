@@ -26,7 +26,6 @@ export const qk = {
   /** The caller's Mi account link. */
   mi: {
     account: () => ['mi', 'account'] as const,
-    link: (id: string) => ['mi', 'link', id] as const,
   },
   /** Workout section. Lists are keyed under a prefix so one write invalidates every variant. */
   workout: {
@@ -58,7 +57,6 @@ export const qk = {
         : (['food', 'items', q, archived ? 'all' : 'active'] as const),
     recent: () => ['food', 'recent'] as const,
     offSearch: (q: string) => ['food', 'off', q] as const,
-    parse: (id: string) => ['food', 'parse', id] as const,
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['food-enabled'] as const,
   },

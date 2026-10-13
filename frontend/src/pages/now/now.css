@@ -124,18 +124,6 @@
 .n-input::placeholder {
   color: var(--g-ink-faint);
 }
-.n-lines {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px 22px;
-  font-size: 15px;
-  color: var(--g-ink-soft);
-  margin-top: 26px;
-}
-.n-lines a:hover {
-  color: var(--g-ink);
-}
 .n-note {
   font-size: 12px;
   color: var(--g-ink-faint);
@@ -143,10 +131,6 @@
 @media (max-width: 640px) {
   .n-now {
     padding-inline: 16px;
-  }
-  .n-lines {
-    flex-direction: column;
-    gap: 6px;
   }
 }
 .n-under {
