@@ -226,6 +226,10 @@ std::optional<TripRepository::ItemInput> item_input(const json& body, const Trav
     text_length(errs, body, "reference", 0, 80);
     text_length(errs, body, "link", 0, 500);
     text_length(errs, body, "note", 0, 1000);
+    if (const auto link = opt_text(body, "link");
+        link && !link->empty() && link->rfind("https://", 0) != 0 && link->rfind("http://", 0) != 0) {
+        errs.add("link", "bad_format", "a link starts with https:// or http://");
+    }
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return std::nullopt;

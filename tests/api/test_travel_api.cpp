@@ -169,6 +169,22 @@ TEST_F(TravelApiTest, AnotherOwnersIdsAreNotFound) {
     EXPECT_EQ(body_of(list)["data"].size(), 0U);
 }
 
+TEST_F(TravelApiTest, AnItemLinkIsAWebAddress) {
+    const auto trip = created_trip(kAnna)["id"].get<std::string>();
+    const auto add = [&](const char* link) {
+        return call(kAnna,
+                    Post,
+                    json{{"kind", "stay"}, {"date", "2026-11-02"}, {"title", "Lanta Sand"}, {"link", link}},
+                    [&](auto req, auto cb) { c.addItem(req, std::move(cb), trip); })
+            ->statusCode();
+    };
+    EXPECT_EQ(add("https://example.com/booking"), k201Created);
+    EXPECT_EQ(add(""), k201Created) << "no link at all";
+    for (const char* bad : {"javascript:alert(1)", "data:text/html,x", "example.com"}) {
+        EXPECT_EQ(add(bad), k400BadRequest) << bad;
+    }
+}
+
 TEST_F(TravelApiTest, TemplatesAndCounters) {
     ASSERT_EQ(
         call(kAnna, Post, json::object(), [&](auto req, auto cb) { c.addTemplate(req, std::move(cb), "schengen"); })

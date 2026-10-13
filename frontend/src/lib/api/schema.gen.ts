@@ -15147,6 +15147,7 @@ export interface components {
             time?: string | null;
             title: string;
             reference?: string;
+            /** @description A web address (https:// or http://), or empty */
             link?: string;
             note?: string;
         };

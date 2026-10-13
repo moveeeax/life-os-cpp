@@ -14,7 +14,7 @@ import {
 } from '@/hooks/useTravel';
 import { useErrorToast } from '@/hooks/useErrorToast';
 import { formatTotal } from '@/lib/networth';
-import type { Task } from '@/lib/tasks';
+import { safeLink, type Task } from '@/lib/tasks';
 import {
   countdownWords,
   countryName,
@@ -86,11 +86,7 @@ function Plan({ trip, today }: { trip: TravelTrip; today: string }) {
                   Booking <span className="num">{i.reference}</span>
                 </span>
               )}
-              {i.link && (
-                <a className="k-link" href={i.link} target="_blank" rel="noreferrer">
-                  {i.link}
-                </a>
-              )}
+              <ItemLink link={i.link} />
               {i.note && <span>{i.note}</span>}
               <span className="k-actions">
                 <button type="button" className="k-link" onClick={() => setEditing(i)}>
@@ -480,4 +476,14 @@ export function TravelTripPage() {
       )}
     </TravelFrame>
   );
+}
+
+/** A booking link, only when it is a web address. */
+function ItemLink({ link }: { link: string }) {
+  const href = safeLink(link);
+  return href ? (
+    <a className="k-link" href={href} target="_blank" rel="noreferrer">
+      {link}
+    </a>
+  ) : null;
 }
