@@ -15,7 +15,6 @@ import {
 import { cn } from '@/lib/utils';
 
 import {
-  cardClass,
   dangerButton,
   iconButton,
   inputClass,
@@ -23,7 +22,9 @@ import {
   modalPanel,
   primaryButton,
   secondaryButton,
-} from '../workout/styles';
+} from '@/shell/kit/styles';
+import { Num, Row } from '@/shell/kit';
+
 import { FoodFrame, LoadError, Placeholder } from './frame';
 
 const SEARCH_DELAY_MS = 300;
@@ -356,73 +357,76 @@ export function FoodItemsPage() {
     <FoodFrame
       title="Products"
       actions={
-        <button type="button" onClick={() => setOpen('new')} className={primaryButton}>
-          <Plus className="size-4" aria-hidden="true" />
-          New product
-        </button>
+        <>
+          <input
+            type="search"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Search"
+            aria-label="Search products"
+            className="k-input k-search"
+          />
+          <label className="k-check">
+            <input
+              type="checkbox"
+              checked={archived}
+              onChange={(e) => setArchived(e.target.checked)}
+            />
+            Archived
+          </label>
+          <span className="k-grow" />
+          <button type="button" onClick={() => setOpen('new')} className={primaryButton}>
+            New product
+          </button>
+        </>
       }
     >
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="search"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Search"
-          aria-label="Search products"
-          className={cn(inputClass, 'max-w-sm')}
-        />
-        <label className="flex items-center gap-2 text-theme-sm text-gray-700 dark:text-gray-300">
-          <input
-            type="checkbox"
-            checked={archived}
-            onChange={(e) => setArchived(e.target.checked)}
-          />
-          Show archived
-        </label>
-      </div>
       {items.isPending ? (
-        <Placeholder className="h-40" />
+        <Placeholder />
       ) : items.isError ? (
         <LoadError error={items.error} onRetry={() => void items.refetch()} />
       ) : items.data.length === 0 ? (
-        <p className={cn(cardClass, 'text-center text-theme-sm text-gray-500')}>
+        <p className="k-empty">
           {q ? 'Nothing matches.' : 'No products yet. Logging from Open Food Facts adds them here.'}
         </p>
       ) : (
-        <ul className={cn(cardClass, 'divide-y divide-gray-100 p-0 dark:divide-white/5')}>
+        <div className="k-group-rows">
           {items.data.map((it) => (
-            <li key={it.id}>
-              <button
-                type="button"
-                onClick={() => setOpen(it)}
-                className="flex w-full items-center gap-3 px-5 py-3 text-start hover:bg-gray-50 dark:hover:bg-white/5"
-              >
-                <span className="min-w-0 flex-1">
-                  <span
-                    className={cn(
-                      'block truncate text-theme-sm',
-                      it.archived
-                        ? 'text-gray-400 line-through'
-                        : 'text-gray-800 dark:text-white/90',
-                    )}
-                  >
-                    {it.name}
-                  </span>
-                  <span className="block truncate text-theme-xs text-gray-500">
-                    {[it.brand, it.source === 'off' ? 'Open Food Facts' : null]
-                      .filter(Boolean)
-                      .join(' · ')}
-                    {it.servings.length > 0 &&
-                      ` · ${it.servings.map((s) => `${s.label} ${formatGrams(s.grams)} g`).join(', ')}`}
-                  </span>
+            <Row
+              key={it.id}
+              title={
+                <span className={it.archived ? 'k-muted k-strike' : undefined}>{it.name}</span>
+              }
+              sub={
+                [it.brand, it.source === 'off' ? 'Open Food Facts' : null]
+                  .filter(Boolean)
+                  .join(' · ') || undefined
+              }
+              right={
+                <span className="k-muted">
+                  <Num>{formatKcal(it.kcal)}</Num> kcal / <span data-num-ok>{it.per}</span>
                 </span>
-                <span className="text-theme-xs text-gray-500 tabular-nums">
-                  {formatKcal(it.kcal)} kcal / {it.per}
+              }
+            >
+              {it.servings.length > 0 && (
+                <span>
+                  Servings:{' '}
+                  {it.servings.map((sv, i) => (
+                    <span key={sv.label}>
+                      {i > 0 && ', '}
+                      {sv.label} <Num>{formatGrams(sv.grams)} g</Num>
+                    </span>
+                  ))}
                 </span>
-              </button>
-            </li>
+              )}
+              <span className="k-actions">
+                <button type="button" className="k-link" onClick={() => setOpen(it)}>
+                  Edit
+                </button>
+              </span>
+            </Row>
           ))}
-        </ul>
+        </div>
       )}
       {open && (
         <Modal onClose={() => setOpen(null)} className="max-w-xl">

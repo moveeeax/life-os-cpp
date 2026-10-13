@@ -1,7 +1,7 @@
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 
-import { useIsDark } from '@/hooks/useIsDark';
+import { glassChart } from '@/lib/chartTheme';
 
 export interface Series {
   name: string;
@@ -45,11 +45,12 @@ export function TimeChart({
   xLabel,
   height = 300,
 }: TimeChartProps) {
-  const dark = useIsDark();
-  const muted = dark ? '#98a2b3' : '#667085';
-  const grid = dark ? '#1d2939' : '#e4e7ec';
-  // Fewer date labels on a phone, so they do not run into each other.
-  const maxTicks = typeof window !== 'undefined' && window.innerWidth < 640 ? 5 : 10;
+  // The glass shell is dark on every screen: the ink of the sheet.
+  const muted = 'rgba(255, 255, 255, 0.56)';
+  const grid = 'rgba(255, 255, 255, 0.12)';
+  // Fewer date labels and a lower chart on a phone.
+  const phone = typeof window !== 'undefined' && window.innerWidth < 640;
+  const maxTicks = phone ? 5 : 10;
   const ticks = Math.max(1, Math.min(days.length - 1, maxTicks));
 
   const yaxis: ApexOptions['yaxis'] = yTitles.map((text, i) => ({
@@ -64,7 +65,7 @@ export function TimeChart({
     },
   }));
 
-  const options: ApexOptions = {
+  const options: ApexOptions = glassChart({
     chart: {
       fontFamily: "'Outfit Variable', sans-serif",
       toolbar: { show: false },
@@ -73,7 +74,6 @@ export function TimeChart({
       background: 'transparent',
       animations: { enabled: false },
     },
-    theme: { mode: dark ? 'dark' : 'light' },
     colors: series.map((s) => s.color),
     stroke: {
       width: series.map((s) => (s.type === 'column' ? 0 : 2)),
@@ -128,22 +128,24 @@ export function TimeChart({
       },
     },
     noData: { text: 'No data' },
-  };
+  });
 
   return (
-    <Chart
-      options={options}
-      series={series.map((s) => ({
-        name: s.name,
-        type: s.type,
-        data: connect
-          ? s.data.flatMap((y, i) =>
-              y === null ? [] : [{ x: Date.parse(`${days[i]}T00:00:00Z`), y }],
-            )
-          : s.data,
-      }))}
-      type="line"
-      height={height}
-    />
+    <div className="num-chart">
+      <Chart
+        options={options}
+        series={series.map((s) => ({
+          name: s.name,
+          type: s.type,
+          data: connect
+            ? s.data.flatMap((y, i) =>
+                y === null ? [] : [{ x: Date.parse(`${days[i]}T00:00:00Z`), y }],
+              )
+            : s.data,
+        }))}
+        type="line"
+        height={phone ? Math.min(height, 180) : height}
+      />
+    </div>
   );
 }

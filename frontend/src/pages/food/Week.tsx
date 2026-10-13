@@ -14,12 +14,10 @@ import {
   weekdayOf,
   type FoodWeek,
 } from '@/lib/food';
-import { cn } from '@/lib/utils';
 
-import { ChartCard } from '../health/ChartCard';
 import { TimeChart } from '../health/TimeChart';
-import { cardClass, iconButton, secondaryButton } from '../workout/styles';
-import { FoodFrame } from './frame';
+import { Facts, Group, Num, Row } from '@/shell/kit';
+import { FoodFrame, LoadError, Placeholder } from './frame';
 
 /** The Monday of the week lives in the URL; any other value means this week. */
 function useWeekParam(): [string, (from: string) => void] {
@@ -35,68 +33,62 @@ function useWeekParam(): [string, (from: string) => void] {
   return [from, set];
 }
 
-function WeekTable({ week }: { week: FoodWeek }) {
+function WeekDays({ week }: { week: FoodWeek }) {
   const logged = week.days.filter((d) => d.entries > 0);
   const avg = (pick: (d: FoodWeek['days'][number]) => number) =>
     logged.length ? logged.reduce((n, d) => n + pick(d), 0) / logged.length : null;
-  const cell = 'px-3 py-2 text-end tabular-nums';
+  const kcal = avg((d) => d.kcal);
+  const t = week.targets;
   return (
-    <div className={cn(cardClass, 'overflow-x-auto')}>
-      <table className="w-full text-theme-sm">
-        <thead>
-          <tr className="text-theme-xs text-gray-500 uppercase">
-            <th className="px-3 py-2 text-start font-medium">Day</th>
-            <th className={cn(cell, 'font-medium')}>kcal</th>
-            <th className={cn(cell, 'font-medium')}>P</th>
-            <th className={cn(cell, 'font-medium')}>F</th>
-            <th className={cn(cell, 'font-medium')}>C</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-          {week.days.map((d) => (
-            <tr key={d.date} className={d.entries === 0 ? 'text-gray-400' : undefined}>
-              <td className="px-3 py-2">
-                <Link to={`/food?date=${d.date}`} className="hover:underline">
-                  {weekdayOf(d.date)}{' '}
-                  <span className="text-theme-xs text-gray-500">{formatDate(d.date).slice(5)}</span>
-                </Link>
-              </td>
-              <td className={cell}>{d.entries === 0 ? '–' : formatKcal(d.kcal)}</td>
-              <td className={cell}>{d.entries === 0 ? '–' : formatGrams(d.protein_g)}</td>
-              <td className={cell}>{d.entries === 0 ? '–' : formatGrams(d.fat_g)}</td>
-              <td className={cell}>{d.entries === 0 ? '–' : formatGrams(d.carbs_g)}</td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr className="font-medium text-gray-800 dark:text-white/90">
-            <td className="px-3 py-2">
-              Average
-              <span className="ms-1 text-theme-xs font-normal text-gray-500">
-                {logged.length} {logged.length === 1 ? 'day' : 'days'}
+    <>
+      <Facts
+        items={[
+          {
+            label: `Average of ${logged.length} ${logged.length === 1 ? 'day' : 'days'}`,
+            value: <Num>{kcal === null ? '–' : `${formatKcal(kcal)} kcal`}</Num>,
+          },
+          ...(t ? [{ label: 'Goal', value: <Num>{formatKcal(t.kcal)} kcal</Num> }] : []),
+        ]}
+      />
+      <Group label="Days">
+        {week.days.map((d) => (
+          <Row
+            key={d.date}
+            title={
+              <span className={d.entries === 0 ? 'k-muted' : undefined}>
+                {weekdayOf(d.date)} {formatDate(d.date).slice(5)}
               </span>
-            </td>
-            {(['kcal', 'protein_g', 'fat_g', 'carbs_g'] as const).map((k) => {
-              const v = avg((d) => d[k]);
-              return (
-                <td key={k} className={cell}>
-                  {v === null ? '–' : k === 'kcal' ? formatKcal(v) : formatGrams(v)}
-                </td>
-              );
-            })}
-          </tr>
-          {week.targets && (
-            <tr className="text-theme-xs text-gray-500">
-              <td className="px-3 py-2">Goal</td>
-              <td className={cell}>{formatKcal(week.targets.kcal)}</td>
-              <td className={cell}>{formatGrams(week.targets.protein_g)}</td>
-              <td className={cell}>{formatGrams(week.targets.fat_g)}</td>
-              <td className={cell}>{formatGrams(week.targets.carbs_g)}</td>
-            </tr>
-          )}
-        </tfoot>
-      </table>
-    </div>
+            }
+            right={
+              d.entries === 0 ? (
+                <span className="k-muted">–</span>
+              ) : (
+                <Num>{formatKcal(d.kcal)} kcal</Num>
+              )
+            }
+          >
+            {d.entries > 0 && (
+              <span>
+                P <Num>{formatGrams(d.protein_g)}</Num> · F <Num>{formatGrams(d.fat_g)}</Num> · C{' '}
+                <Num>{formatGrams(d.carbs_g)}</Num>
+                {t && (
+                  <span className="k-muted">
+                    {' '}
+                    (goal <Num>{formatGrams(t.protein_g)}</Num> · <Num>{formatGrams(t.fat_g)}</Num>{' '}
+                    · <Num>{formatGrams(t.carbs_g)}</Num>)
+                  </span>
+                )}
+              </span>
+            )}
+            <span className="k-actions">
+              <Link to={`/food?date=${d.date}`} className="k-link">
+                Open the day
+              </Link>
+            </span>
+          </Row>
+        ))}
+      </Group>
+    </>
   );
 }
 
@@ -106,77 +98,81 @@ export function FoodWeekPage() {
   const week = useFoodWeek(from);
   const thisWeek = mondayOf(todayLocal());
   const series = week.data ? weekSeries(week.data) : null;
+  const empty = !!week.data && week.data.days.every((d) => d.entries === 0);
 
   return (
     <FoodFrame
       title="Week"
+      headline={`${formatDate(from)} – ${formatDate(shiftDate(from, 6))}`}
+      sub={
+        series?.target ? (
+          <>
+            Goal <Num>{formatKcal(series.target)}</Num> kcal a day
+          </>
+        ) : undefined
+      }
       actions={
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="k-stepper">
           <button
             type="button"
             onClick={() => setFrom(shiftDate(from, -7))}
-            className={iconButton}
             aria-label="Previous week"
           >
-            <ChevronLeft className="size-5" aria-hidden="true" />
+            <ChevronLeft className="size-4" aria-hidden="true" />
           </button>
-          <p className="min-w-36 text-center text-theme-sm font-medium text-gray-800 dark:text-white/90">
-            {formatDate(from)} – {formatDate(shiftDate(from, 6))}
-          </p>
-          <button
-            type="button"
-            onClick={() => setFrom(shiftDate(from, 7))}
-            className={iconButton}
-            aria-label="Next week"
-          >
-            <ChevronRight className="size-5" aria-hidden="true" />
+          <span>Week</span>
+          <button type="button" onClick={() => setFrom(shiftDate(from, 7))} aria-label="Next week">
+            <ChevronRight className="size-4" aria-hidden="true" />
           </button>
           {from !== thisWeek && (
-            <button
-              type="button"
-              onClick={() => setFrom(thisWeek)}
-              className={cn(secondaryButton, 'px-3 py-2')}
-            >
+            <button type="button" className="k-link" onClick={() => setFrom(thisWeek)}>
               This week
             </button>
           )}
         </div>
       }
     >
-      <ChartCard
-        title="Calories"
-        hint={series?.target ? `Goal ${formatKcal(series.target)} kcal a day` : undefined}
-        isPending={week.isPending}
-        error={week.error}
-        onRetry={() => void week.refetch()}
-        isEmpty={!!week.data && week.data.days.every((d) => d.entries === 0)}
-        emptyText="Nothing logged this week."
-      >
-        {series && (
-          <TimeChart
-            days={series.days}
-            series={[
-              { name: 'Eaten', type: 'column', data: series.kcal, color: '#465fff' },
-              ...(series.target !== null
-                ? [
-                    {
-                      name: 'Goal',
-                      type: 'line' as const,
-                      data: series.days.map(() => series.target),
-                      color: '#f04438',
-                    },
-                  ]
-                : []),
-            ]}
-            yTitles={['kcal']}
-            yBounds={[{ min: 0 }]}
-            format={(v) => `${formatKcal(v)} kcal`}
-            xLabel={weekdayOf}
-            height={260}
-          />
-        )}
-      </ChartCard>
-      {week.data && <WeekTable week={week.data} />}
+      {week.isPending ? (
+        <Placeholder />
+      ) : week.isError ? (
+        <LoadError error={week.error} onRetry={() => void week.refetch()} />
+      ) : empty ? (
+        <p className="k-empty">Nothing logged this week.</p>
+      ) : (
+        <>
+          {series && (
+            <Group label="Calories">
+              <TimeChart
+                days={series.days}
+                series={[
+                  {
+                    name: 'Eaten',
+                    type: 'column',
+                    data: series.kcal,
+                    color: 'rgba(255, 255, 255, 0.7)',
+                  },
+                  ...(series.target !== null
+                    ? [
+                        {
+                          name: 'Goal',
+                          type: 'line' as const,
+                          data: series.days.map(() => series.target),
+                          color: '#fca5a5',
+                        },
+                      ]
+                    : []),
+                ]}
+                yTitles={['kcal']}
+                yBounds={[{ min: 0 }]}
+                format={(v) => `${formatKcal(v)} kcal`}
+                xLabel={weekdayOf}
+                height={240}
+              />
+            </Group>
+          )}
+          {week.data && <WeekDays week={week.data} />}
+        </>
+      )}
     </FoodFrame>
   );
 }

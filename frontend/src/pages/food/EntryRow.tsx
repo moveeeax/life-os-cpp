@@ -20,37 +20,38 @@ import {
   modalPanel,
   primaryButton,
   secondaryButton,
-} from '../workout/styles';
+} from '@/shell/kit/styles';
+import { Num, Row } from '@/shell/kit';
 
-/** One line of a meal: name, grams, kcal; a tap opens the editor. */
+/** One line of a meal: name, grams, kcal; details P · F · C and the editor. */
 export function EntryRow({ entry, onOpen }: { entry: FoodEntry; onOpen: () => void }) {
   return (
-    <li>
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex w-full items-center gap-3 py-2 text-start hover:bg-gray-50 dark:hover:bg-white/5"
-      >
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-theme-sm text-gray-800 dark:text-white/90">
-            {entry.name}
-            {entry.estimated && (
-              <span className="ms-1 text-theme-xs text-gray-500" title="Estimated">
-                est.
-              </span>
-            )}
-          </span>
-          <span className="block text-theme-xs text-gray-500 dark:text-gray-400">
-            {entry.grams !== null ? `${formatGrams(entry.grams)} g` : 'no weight'}
-            {' · '}P {formatGrams(entry.protein_g)} · F {formatGrams(entry.fat_g)} · C{' '}
-            {formatGrams(entry.carbs_g)}
-          </span>
-        </span>
-        <span className="text-theme-sm font-medium text-gray-800 tabular-nums dark:text-white/90">
-          {formatKcal(entry.kcal)}
-        </span>
-      </button>
-    </li>
+    <Row
+      title={
+        <>
+          {entry.name}
+          {entry.estimated && (
+            <span className="k-muted" title="Estimated">
+              {' '}
+              est.
+            </span>
+          )}
+        </>
+      }
+      sub={entry.grams !== null ? <Num>{formatGrams(entry.grams)} g</Num> : 'no weight'}
+      right={<Num>{formatKcal(entry.kcal)} kcal</Num>}
+    >
+      <span>
+        P <Num>{formatGrams(entry.protein_g)}</Num> · F <Num>{formatGrams(entry.fat_g)}</Num> · C{' '}
+        <Num>{formatGrams(entry.carbs_g)}</Num>
+      </span>
+      {entry.note && <span>{entry.note}</span>}
+      <span className="k-actions">
+        <button type="button" className="k-link" onClick={onOpen}>
+          Edit or delete
+        </button>
+      </span>
+    </Row>
   );
 }
 

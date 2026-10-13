@@ -1,59 +1,37 @@
 import type { ReactNode } from 'react';
-import { NavLink } from 'react-router';
 
 import { ApiClientError, apiErrorMessage } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
 
-import { cardClass, secondaryButton } from '../workout/styles';
+import { SectionFrame, type TabItem } from '@/shell/kit';
 
-const TABS = [
+const TABS: TabItem[] = [
   { to: '/food', label: 'Day', end: true },
-  { to: '/food/week', label: 'Week', end: false },
-  { to: '/food/items', label: 'Products', end: false },
-  { to: '/food/goals', label: 'Goals', end: false },
+  { to: '/food/week', label: 'Week' },
+  { to: '/food/items', label: 'Products' },
+  { to: '/food/goals', label: 'Goals' },
 ];
 
 interface FoodFrameProps {
+  /** The page's own name; the headline when the page gives none. */
   title: string;
-  /** Buttons on the right of the title. */
+  headline?: ReactNode;
+  sub?: ReactNode;
+  /** The tools line: date, the main action. */
   actions?: ReactNode;
   children: ReactNode;
 }
 
 /**
- * Frame of every Food page: the title row and the links between the
- * section's pages. Any confirmed user may keep a diary, so there is no
- * permission check here; a switched-off module answers 404 and LoadError
- * says so.
+ * Frame of every Food page on the calm sheet. Any confirmed user may keep a
+ * diary, so there is no permission check here; a switched-off module answers
+ * 404 and LoadError says so.
  */
-export function FoodFrame({ title, actions, children }: FoodFrameProps) {
+export function FoodFrame({ title, headline, sub, actions, children }: FoodFrameProps) {
   return (
-    <div className="flex flex-col gap-4 md:gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-title-sm font-semibold text-gray-800 dark:text-white/90">{title}</h1>
-        {actions && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
-      </div>
-      <nav aria-label="Food pages" className="flex gap-1 overflow-x-auto">
-        {TABS.map((tab) => (
-          <NavLink
-            key={tab.to}
-            to={tab.to}
-            end={tab.end}
-            className={({ isActive }) =>
-              cn(
-                'rounded-lg px-3 py-2 text-theme-sm font-medium whitespace-nowrap transition sm:px-4',
-                isActive
-                  ? 'bg-brand-50 text-brand-500 dark:bg-brand-500/12 dark:text-brand-400'
-                  : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5',
-              )
-            }
-          >
-            {tab.label}
-          </NavLink>
-        ))}
-      </nav>
+    <SectionFrame eyebrow="Food" headline={headline ?? title} sub={sub} tabs={TABS} tools={actions}>
       {children}
-    </div>
+    </SectionFrame>
   );
 }
 
@@ -61,14 +39,14 @@ export function FoodFrame({ title, actions, children }: FoodFrameProps) {
 export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const off = error instanceof ApiClientError && error.status === 404 && error.code === 'not_found';
   return (
-    <div role="alert" className={cn(cardClass, 'flex flex-col items-center gap-3 text-center')}>
-      <p className="text-theme-sm text-error-500">
+    <div role="alert" className="k-banner">
+      <span className="k-error-text">
         {off
           ? 'Not found. The food module may be off on this server.'
           : apiErrorMessage(error, 'Failed to load.')}
-      </p>
-      <button type="button" onClick={onRetry} className={secondaryButton}>
-        Retry
+      </span>
+      <button type="button" onClick={onRetry}>
+        Retry →
       </button>
     </div>
   );
@@ -76,10 +54,5 @@ export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => v
 
 /** A grey block while a query loads. */
 export function Placeholder({ className }: { className?: string }) {
-  return (
-    <div
-      aria-hidden="true"
-      className={cn('animate-pulse rounded-2xl bg-gray-100 dark:bg-white/5', className)}
-    />
-  );
+  return <div aria-hidden="true" className={cn('k-placeholder', className)} />;
 }

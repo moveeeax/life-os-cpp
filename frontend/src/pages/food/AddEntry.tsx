@@ -36,7 +36,7 @@ import {
   primaryButton,
   secondaryButton,
   textareaClass,
-} from '../workout/styles';
+} from '@/shell/kit/styles';
 
 const SEARCH_DELAY_MS = 300;
 
@@ -46,21 +46,23 @@ interface AddEntryProps {
   date: string;
   meal: FoodMeal;
   onClose: () => void;
+  /** The tab to open on (Describe falls back to Search without the LLM). */
+  initialTab?: Tab;
 }
 
 /** The add form of a meal: search, describe (with the LLM) or a quick entry. */
-export function AddEntry({ date, meal, onClose }: AddEntryProps) {
+export function AddEntry({ date, meal, onClose, initialTab = 'search' }: AddEntryProps) {
   const goals = useFoodGoals();
   const llm = goals.data?.llm_available ?? false;
-  const [tab, setTab] = useState<Tab>('search');
+  const [tab, setTab] = useState<Tab>(initialTab === 'describe' && !llm ? 'search' : initialTab);
   const label = mealLabel(meal);
 
   return (
     <div className={modalPanel} aria-labelledby="add-entry-title">
-      <h2 id="add-entry-title" className="text-lg font-semibold">
+      <h2 id="add-entry-title" className="k-panel-title">
         Add to {label}
       </h2>
-      <div role="tablist" aria-label="How to add" className="mt-3 flex gap-1 overflow-x-auto">
+      <div role="tablist" aria-label="How to add" className="k-seg k-seg-wide">
         {(
           [
             ['search', 'Search'],
@@ -76,12 +78,7 @@ export function AddEntry({ date, meal, onClose }: AddEntryProps) {
               role="tab"
               aria-selected={tab === key}
               onClick={() => setTab(key)}
-              className={cn(
-                'rounded-lg px-3 py-2 text-theme-sm font-medium whitespace-nowrap transition',
-                tab === key
-                  ? 'bg-brand-50 text-brand-500 dark:bg-brand-500/12 dark:text-brand-400'
-                  : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5',
-              )}
+              className={tab === key ? 'k-seg-on' : undefined}
             >
               {text}
             </button>
@@ -417,7 +414,7 @@ function DescribeTab({ date, meal, onDone }: TabProps) {
         </p>
         <ul className="flex flex-col gap-3">
           {lines.map((l) => (
-            <li key={l.key} className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+            <li key={l.key} className="k-line">
               <div className="flex items-start gap-2">
                 <input
                   type="checkbox"
@@ -440,7 +437,7 @@ function DescribeTab({ date, meal, onDone }: TabProps) {
                   )}
                 </div>
               </div>
-              <div className="mt-2 grid grid-cols-5 gap-2">
+              <div className="k-macros-in">
                 {(
                   [
                     ['grams', 'g'],
@@ -450,7 +447,7 @@ function DescribeTab({ date, meal, onDone }: TabProps) {
                     ['carbs_g', 'C'],
                   ] as const
                 ).map(([name, short]) => (
-                  <label key={name} className="text-theme-xs text-gray-500">
+                  <label key={name} className="k-field-mini">
                     {short}
                     <input
                       inputMode="decimal"
@@ -458,7 +455,7 @@ function DescribeTab({ date, meal, onDone }: TabProps) {
                       onChange={(e) => edit(l.key, { [name]: e.target.value })}
                       disabled={l.item_id !== null && name !== 'grams'}
                       aria-label={`${l.name} ${short}`}
-                      className={cn(inputClass, 'mt-0.5 h-9 px-2')}
+                      className={inputClass}
                     />
                   </label>
                 ))}
@@ -572,8 +569,8 @@ function QuickTab({ date, meal, onDone }: TabProps) {
           className={inputClass}
         />
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {num('quick-kcal', 'kcal', kcal, setKcal)}
+      <div className="k-fields">{num('quick-kcal', 'kcal', kcal, setKcal)}</div>
+      <div className="k-fields k-fields-3">
         {num('quick-protein', 'Protein, g', protein, setProtein)}
         {num('quick-fat', 'Fat, g', fat, setFat)}
         {num('quick-carbs', 'Carbs, g', carbs, setCarbs)}
