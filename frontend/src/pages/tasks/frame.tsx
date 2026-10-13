@@ -1,7 +1,12 @@
 import type { ReactNode } from 'react';
-import { Group, SectionFrame, type TabItem } from '@/shell/kit';
+import { Group, LoadError as KitLoadError, SectionFrame, type TabItem } from '@/shell/kit';
 
-export { LoadError, Placeholder } from '../money/frame';
+export { Placeholder } from '@/shell/kit';
+
+/** A failed query of Tasks (a 404 names the module). */
+export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  return <KitLoadError error={error} onRetry={onRetry} module="tasks" />;
+}
 
 interface TasksFrameProps {
   /** Quiet counts beside the tab names; zero shows nothing. */

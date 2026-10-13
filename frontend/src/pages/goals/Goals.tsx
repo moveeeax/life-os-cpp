@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 
+import { useErrorToast } from '@/hooks/useErrorToast';
 import { Modal } from '@/components/Modal';
 import { useDeleteGoal, useGoal, useGoals, useSaveGoal } from '@/hooks/useGoals';
 import {
@@ -7,10 +8,10 @@ import {
   KIND_LABEL,
   paceWord,
   type Goal,
-  type GoalInput,
   type GoalKind,
   type Tone,
 } from '@/lib/goals';
+import { goalBody } from '@/lib/goals/bodies';
 import { AREAS, areaOf, localToday, type Area } from '@/lib/tasks';
 import { cn } from '@/lib/utils';
 
@@ -22,7 +23,11 @@ import {
   secondaryButton,
 } from '@/shell/kit/styles';
 import { Facts as KitFacts, Group, Meter, Num, SectionFrame } from '@/shell/kit';
-import { LoadError, Placeholder } from '../money/frame';
+import { LoadError as KitLoadError, Placeholder } from '@/shell/kit';
+
+const LoadError = ({ error, onRetry }: { error: unknown; onRetry: () => void }) => (
+  <KitLoadError error={error} onRetry={onRetry} module="goals" />
+);
 import { BinaryPart, CountPart, NumberPart, StepsPart } from './parts';
 
 const TONE: Record<Tone, string> = {
@@ -74,6 +79,7 @@ function GoalMore({ goal, today }: { goal: Goal; today: string }) {
   const detail = useGoal(goal.id, today);
   const save = useSaveGoal(goal.id);
   const remove = useDeleteGoal();
+  useErrorToast(save.error ?? remove.error);
   const d = detail.data;
   return (
     <div className="k-row-more">
@@ -183,18 +189,7 @@ function GoalForm({ onClose }: { onClose: () => void }) {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!ok) return;
-    const body: GoalInput = {
-      title: title.trim(),
-      area,
-      kind,
-      due,
-      start_date: today,
-      why: why.trim(),
-    };
-    if (kind === 'number')
-      Object.assign(body, { start_value: num(from), target_value: num(to), unit: unit.trim() });
-    if (kind === 'count') body.target_count = num(count);
-    save.mutate(body);
+    save.mutate(goalBody({ title, area, kind, due, today, why, from, to, unit, count }));
   };
   return (
     <form onSubmit={submit} className={modalPanel} aria-labelledby="goal-form-title">

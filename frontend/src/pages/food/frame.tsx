@@ -1,9 +1,7 @@
 import type { ReactNode } from 'react';
 
-import { ApiClientError, apiErrorMessage } from '@/lib/api/client';
-import { cn } from '@/lib/utils';
-
 import { SectionFrame, type TabItem } from '@/shell/kit';
+import { LoadError as KitLoadError } from '@/shell/kit';
 
 const TABS: TabItem[] = [
   { to: '/food', label: 'Day', end: true },
@@ -35,24 +33,9 @@ export function FoodFrame({ title, headline, sub, actions, children }: FoodFrame
   );
 }
 
-/** A failed query: the server's message, or a plain one when the module is off. */
+/** A failed query of this section (a 404 names the module). */
 export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
-  const off = error instanceof ApiClientError && error.status === 404 && error.code === 'not_found';
-  return (
-    <div role="alert" className="k-banner">
-      <span className="k-error-text">
-        {off
-          ? 'Not found. The food module may be off on this server.'
-          : apiErrorMessage(error, 'Failed to load.')}
-      </span>
-      <button type="button" onClick={onRetry}>
-        Retry →
-      </button>
-    </div>
-  );
+  return <KitLoadError error={error} onRetry={onRetry} module="food" />;
 }
 
-/** A grey block while a query loads. */
-export function Placeholder({ className }: { className?: string }) {
-  return <div aria-hidden="true" className={cn('k-placeholder', className)} />;
-}
+export { Placeholder } from '@/shell/kit';

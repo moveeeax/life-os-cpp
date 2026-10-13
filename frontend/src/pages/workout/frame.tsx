@@ -2,10 +2,10 @@ import type { ReactNode } from 'react';
 import { ShieldAlert } from 'lucide-react';
 
 import { useMe } from '@/hooks/useMe';
-import { ApiClientError, apiErrorMessage } from '@/lib/api/client';
 import { Permission, userCan } from '@/lib/auth/permissions';
 
 import { SectionFrame, type TabItem } from '@/shell/kit';
+import { LoadError as KitLoadError } from '@/shell/kit';
 
 const TABS: TabItem[] = [
   { to: '/workout', label: 'Overview', end: true },
@@ -56,22 +56,12 @@ export function WorkoutFrame({ title, headline, sub, actions, children }: Workou
   );
 }
 
-/** A failed query: the server's message, or a plain one when the module is off. */
+/** A failed query of this section (a 404 names the module). */
 export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
-  const off = error instanceof ApiClientError && error.status === 404 && error.code === 'not_found';
-  return (
-    <div role="alert" className="k-banner">
-      <span className="k-error-text">
-        {off
-          ? 'Not found. The workout module may be off on this server.'
-          : apiErrorMessage(error, 'Failed to load.')}
-      </span>
-      <button type="button" onClick={onRetry}>
-        Retry →
-      </button>
-    </div>
-  );
+  return <KitLoadError error={error} onRetry={onRetry} module="workout" />;
 }
+
+export { Placeholder } from '@/shell/kit';
 
 /** Small text under a field with an error. */
 export function FieldError({ id, message }: { id: string; message?: string }) {

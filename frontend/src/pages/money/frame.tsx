@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react';
 
 import { useMoneySummary } from '@/hooks/useMoney';
-import { ApiClientError, apiErrorMessage } from '@/lib/api/client';
 import { cardCurrency, formatTotal, rateDay } from '@/lib/networth';
-import { cn } from '@/lib/utils';
 import { Num, SectionFrame, type TabItem } from '@/shell/kit';
+import { LoadError as KitLoadError } from '@/shell/kit';
 
 const TABS: TabItem[] = [
   { to: '/money', label: 'Ledger', end: true },
@@ -78,24 +77,9 @@ export function MoneyFrame({ title, actions, children }: MoneyFrameProps) {
   );
 }
 
-/** A failed query: the server's message, or a plain one when the module is off. */
+/** A failed query of this section (a 404 names the module). */
 export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
-  const off = error instanceof ApiClientError && error.status === 404 && error.code === 'not_found';
-  return (
-    <div role="alert" className="k-banner">
-      <span className="k-error-text">
-        {off
-          ? 'Not found. The money module may be off on this server.'
-          : apiErrorMessage(error, 'Failed to load.')}
-      </span>
-      <button type="button" onClick={onRetry}>
-        Retry →
-      </button>
-    </div>
-  );
+  return <KitLoadError error={error} onRetry={onRetry} module="money" />;
 }
 
-/** A grey block while a query loads. */
-export function Placeholder({ className }: { className?: string }) {
-  return <div aria-hidden="true" className={cn('k-placeholder', className)} />;
-}
+export { Placeholder } from '@/shell/kit';
