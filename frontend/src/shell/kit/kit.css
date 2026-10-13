@@ -1006,3 +1006,11 @@ select.k-input option {
 .hide-numbers .glass .k-review {
   filter: blur(7px);
 }
+.k-capture-form {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+.k-capture-form .k-input {
+  flex: 1;
+}

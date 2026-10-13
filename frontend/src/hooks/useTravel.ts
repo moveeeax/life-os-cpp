@@ -215,3 +215,18 @@ export function usePacking(tripId: string) {
       ).data,
   });
 }
+
+/** Whether the travel module answers at all (404 while switched off). */
+export function useTravelEnabled(signedIn: boolean): boolean {
+  const probe = useQuery({
+    queryKey: ['travel-enabled'],
+    enabled: signedIn,
+    staleTime: Infinity,
+    retry: false,
+    queryFn: async ({ signal }) => {
+      const { error } = await api.GET(`${BASE}/settings` as string, { signal });
+      return !(error && error.status === 404);
+    },
+  });
+  return probe.data ?? true;
+}

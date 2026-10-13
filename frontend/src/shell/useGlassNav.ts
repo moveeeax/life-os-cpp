@@ -4,6 +4,7 @@ import { useMe } from '@/hooks/useMe';
 import { useMoneyEnabled } from '@/hooks/useMoney';
 import { useNowEnabled } from '@/hooks/useNow';
 import { useTasksEnabled } from '@/hooks/useTasks';
+import { useTravelEnabled } from '@/hooks/useTravel';
 import { useWorkoutEnabled } from '@/hooks/useWorkoutSession';
 import { Permission, userCan } from '@/lib/auth/permissions';
 
@@ -22,6 +23,7 @@ export function useGlassNav(): { items: NavItem[]; nowOn: boolean | undefined } 
   const moneyOn = useMoneyEnabled(signedIn);
   const tasksOn = useTasksEnabled(signedIn);
   const goalsOn = useGoalsEnabled(signedIn);
+  const travelOn = useTravelEnabled(signedIn);
   const off = new Set<string>();
   if (nowOn === false) off.add('now');
   if (!workoutOn) off.add('workout');
@@ -29,5 +31,6 @@ export function useGlassNav(): { items: NavItem[]; nowOn: boolean | undefined } 
   if (!moneyOn) off.add('money');
   if (!tasksOn) off.add('tasks');
   if (!goalsOn) off.add('goals');
+  if (!travelOn) off.add('travel');
   return { items: glassNav(user, off), nowOn };
 }

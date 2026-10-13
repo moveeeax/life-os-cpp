@@ -93,6 +93,18 @@ const TasksInboxPage = lazy(() =>
 );
 const NowPage = lazy(() => import('@/pages/now/Now').then((m) => ({ default: m.NowPage })));
 const GoalsPage = lazy(() => import('@/pages/goals/Goals').then((m) => ({ default: m.GoalsPage })));
+const TravelTripsPage = lazy(() =>
+  import('@/pages/travel/Trips').then((m) => ({ default: m.TravelTripsPage })),
+);
+const TravelDaysPage = lazy(() =>
+  import('@/pages/travel/Days').then((m) => ({ default: m.TravelDaysPage })),
+);
+const TravelRulesPage = lazy(() =>
+  import('@/pages/travel/Rules').then((m) => ({ default: m.TravelRulesPage })),
+);
+const TravelTripPage = lazy(() =>
+  import('@/pages/travel/Trip').then((m) => ({ default: m.TravelTripPage })),
+);
 const AdminDashboardPage = lazy(() =>
   import('@/pages/admin/Dashboard').then((m) => ({ default: m.AdminDashboardPage })),
 );
@@ -291,6 +303,12 @@ export const routes: RouteEntry[] = [
 
   // ── Goals — any confirmed user; the module switch is the only gate ───────
   { path: '/goals', element: <GoalsPage />, guard: 'confirmed', layout: 'shell' },
+
+  // ── Travel — any confirmed user; the module switch is the only gate ──────
+  { path: '/travel', element: <TravelTripsPage />, guard: 'confirmed', layout: 'shell' },
+  { path: '/travel/days', element: <TravelDaysPage />, guard: 'confirmed', layout: 'shell' },
+  { path: '/travel/rules', element: <TravelRulesPage />, guard: 'confirmed', layout: 'shell' },
+  { path: '/travel/trips/:id', element: <TravelTripPage />, guard: 'confirmed', layout: 'shell' },
 
   // ── Admin — gated by Permission.Administer (0x40000000 sentinel) ────────
   {
