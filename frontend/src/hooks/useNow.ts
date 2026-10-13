@@ -110,13 +110,6 @@ export function useFocusDone() {
   );
 }
 
-export function useClearFocus(onSuccess?: () => void) {
-  return useApiMutation((date: string) => del(`${TODAY}/focus`, { date }), {
-    invalidate: AFTER_FOCUS,
-    onSuccess,
-  });
-}
-
 // ── admin ───────────────────────────────────────────────────────────────────
 
 export function useAdminWallpapers() {
