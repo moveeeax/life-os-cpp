@@ -221,6 +221,9 @@ spec:
             # goals module — master switch
             - name: GOALS_ENABLED
               value: {{ .Values.goals.enabled | quote }}
+            # travel module — master switch
+            - name: TRAVEL_ENABLED
+              value: {{ .Values.travel.enabled | quote }}
             # now module — master switch
             - name: NOW_ENABLED
               value: {{ .Values.now.enabled | quote }}

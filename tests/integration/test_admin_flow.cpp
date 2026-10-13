@@ -211,6 +211,15 @@ void seed_module_rows(const std::string& owner) {
             "INSERT INTO food_parse_jobs (owner_id, text, meal, date) VALUES ($1::uuid, 'rice', 'lunch', "
             "'2026-10-01')");
         run("INSERT INTO day_focus (owner_id, date, kind, text) VALUES ($1::uuid, '2026-10-01', 'text', 'Ship')");
+        run("INSERT INTO travel_settings (owner_id, home_country) VALUES ($1::uuid, 'KZ')");
+        run("INSERT INTO travel_crossings (owner_id, date, from_country, to_country) "
+            "VALUES ($1::uuid, '2026-08-03', 'KZ', 'GE')");
+        run("INSERT INTO travel_rules (owner_id, name, countries, window_kind, window_days, threshold_days, "
+            "threshold_kind) VALUES ($1::uuid, 'Schengen', '{SCHENGEN}', 'rolling_days', 180, 90, 'at_most')");
+        run("WITH t AS (INSERT INTO travel_trips (owner_id, name, start_date, end_date) "
+            " VALUES ($1::uuid, 'Georgia', '2026-08-03', '2026-08-12') RETURNING id) "
+            "INSERT INTO travel_trip_items (owner_id, trip_id, kind, date, title) "
+            "SELECT $1::uuid, id, 'flight', '2026-08-03', 'ALA to TBS' FROM t");
         run("WITH x AS (INSERT INTO exercises (id, name, source, owner_id) "
             " VALUES ('custom-' || $1::text, 'Mine', 'custom', $1::uuid) RETURNING id), "
             "r AS (INSERT INTO routines (owner_id, name) VALUES ($1::uuid, 'Push') RETURNING id), "
@@ -249,7 +258,7 @@ TEST_F(AdminFlowTest, deleteUserRemovesEveryModuleRowTheyOwn) {
     seed_module_rows(target.user.id);
     seed_module_rows(admin_user.user.id);
     const auto before = owned_rows(target.user.id);
-    ASSERT_GE(before.second, 24) << "every module table got a row";
+    ASSERT_GE(before.second, 29) << "every module table got a row";
 
     HttpResponsePtr resp;
     admin.deleteUser(
