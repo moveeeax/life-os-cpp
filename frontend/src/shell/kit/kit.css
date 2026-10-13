@@ -22,6 +22,10 @@
   --g-late: #fca5a5;
   --g-brand: #a5b4fc;
   color: var(--g-ink);
+}
+/* Inside the glass shell the dialogs take its dark controls and its font; on
+   the classic pages (admin, profile) the page's own scheme and font stay. */
+.glass .k-scrim {
   color-scheme: dark;
   font-family: 'Outfit Variable', ui-sans-serif, system-ui, sans-serif;
 }

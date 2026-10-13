@@ -194,13 +194,16 @@ export function TransfersList({
         <Row
           key={t.id}
           title={`${name(t.from_account_id)} → ${name(t.to_account_id)}`}
-          sub={formatDay(t.date)}
-          right={
-            <Num>
-              {money(t.amount_sent, t.from_currency)}
-              {t.amount_received !== null && ` → ${money(t.amount_received, t.to_currency)}`}
-            </Num>
+          sub={
+            t.amount_received !== null ? (
+              <>
+                {formatDay(t.date)} · received <Num>{money(t.amount_received, t.to_currency)}</Num>
+              </>
+            ) : (
+              formatDay(t.date)
+            )
           }
+          right={<Num>{money(t.amount_sent, t.from_currency)}</Num>}
         >
           {t.cost_rate !== null && (
             <span>

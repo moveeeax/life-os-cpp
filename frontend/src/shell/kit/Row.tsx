@@ -6,10 +6,6 @@ interface RowProps {
   right?: ReactNode;
   /** A colour dot before the title. */
   dot?: string;
-  /** A small picture before the title (40 px). */
-  thumb?: string;
-  /** Anything before the title that is its own control (a check button). */
-  lead?: ReactNode;
   /** The details; absent means the row does not open. */
   children?: ReactNode;
   open?: boolean;
@@ -18,18 +14,7 @@ interface RowProps {
 }
 
 /** One calm row: title and one value; the rest behind a click. */
-export function Row({
-  title,
-  sub,
-  right,
-  dot,
-  thumb,
-  lead,
-  children,
-  open,
-  onToggle,
-  id,
-}: RowProps) {
+export function Row({ title, sub, right, dot, children, open, onToggle, id }: RowProps) {
   const [own, setOwn] = useState(false);
   const isOpen = open ?? own;
   const detailsId = useId();
@@ -43,7 +28,6 @@ export function Row({
     <>
       <span className="k-row-top">
         {dot && <span className="k-dot" style={{ background: dot }} aria-hidden="true" />}
-        {thumb && <img className="k-thumb" src={thumb} alt="" loading="lazy" />}
         <span className="k-row-title">{title}</span>
         {right !== undefined && <span className="k-row-right">{right}</span>}
       </span>
@@ -53,7 +37,6 @@ export function Row({
   return (
     <div className="k-row" id={id} data-open={isOpen ? '' : undefined}>
       <div className="k-row-line">
-        {lead}
         {expandable ? (
           <button
             type="button"
