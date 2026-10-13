@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 
 import {
   useActivity,
@@ -13,6 +13,7 @@ import {
   useWorkouts,
 } from '@/hooks/useHealth';
 import { LinkMiNotice } from '@/components/LinkMiNotice';
+import { apiErrorMessage } from '@/lib/api/client';
 import { useMe } from '@/hooks/useMe';
 import { useMiAccount } from '@/hooks/useMiAccount';
 import { Permission, userCan } from '@/lib/auth/permissions';
@@ -37,20 +38,21 @@ import {
   type DayStat,
 } from '@/lib/health';
 import { needsLink } from '@/lib/mi';
-import { cn } from '@/lib/utils';
 
-import { ChartCard, cardClass } from './health/ChartCard';
+import { ChartCard } from './health/ChartCard';
 import { SyncPanel } from './health/SyncPanel';
+import { Banner, Facts, Group, Num, Row, SectionFrame } from '@/shell/kit';
 import { TimeChart } from './health/TimeChart';
 
+// Series colours on the dark glass sheet.
 const C = {
-  brand: '#465fff',
-  green: '#12b76a',
-  orange: '#fb6514',
-  violet: '#7a5af8',
-  sky: '#0ba5ec',
-  gray: '#98a2b3',
-  red: '#f04438',
+  brand: '#a5b4fc',
+  green: '#6ee7b7',
+  orange: '#fdba74',
+  violet: '#c4b5fd',
+  sky: '#7dd3fc',
+  gray: 'rgba(255, 255, 255, 0.45)',
+  red: '#fca5a5',
 };
 
 const statSeries = (days: string[], stats: DayStat[], pick: (s: DayStat) => number) =>
@@ -60,16 +62,6 @@ const statSeries = (days: string[], stats: DayStat[], pick: (s: DayStat) => numb
     (s) => s.date,
     (s) => Math.round(pick(s) * 10) / 10,
   );
-
-function Tile({ label, value, note }: { label: string; value: string; note: string }) {
-  return (
-    <div className={cardClass}>
-      <p className="text-theme-sm text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="mt-2 text-title-sm font-semibold text-gray-800 dark:text-white/90">{value}</p>
-      <p className="mt-1 text-theme-xs text-gray-500 dark:text-gray-400">{note}</p>
-    </div>
-  );
-}
 
 const days_ = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`;
 
@@ -90,38 +82,67 @@ function Tiles({ range }: { range: DateRange }) {
   const sNote = summary.isPending ? pending : summary.error ? failed : null;
   const bNote = body.isPending ? pending : body.error ? failed : null;
 
+  const note = (n: string | null, text: string) => n ?? text;
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <Tile
-        label="Steps per day"
-        value={steps.value === null ? '–' : Math.round(steps.value).toLocaleString('en-US')}
-        note={sNote ?? `mean of ${days_(steps.n)}`}
-      />
-      <Tile
-        label="Sleep per night"
-        value={sleep.value === null ? '–' : formatMinutes(sleep.value)}
-        note={sNote ?? `mean of ${days_(sleep.n)}, h:mm`}
-      />
-      <Tile
-        label="Resting heart rate"
-        value={resting.value === null ? '–' : `${Math.round(resting.value)} bpm`}
-        note={sNote ?? `mean of ${days_(resting.n)}`}
-      />
-      <Tile
-        label="Weight"
-        value={weight.last === null ? '–' : `${weight.last.toFixed(1)} kg`}
-        note={
-          bNote ??
-          (weight.delta === null
-            ? `${weight.n} ${weight.n === 1 ? 'measurement' : 'measurements'}`
-            : `${formatDelta(weight.delta)} kg over ${weight.n} measurements`)
-        }
-      />
-    </div>
+    <Facts
+      items={[
+        {
+          label: 'Steps a day',
+          value: (
+            <span title={note(sNote, `mean of ${days_(steps.n)}`)}>
+              <Num>
+                {steps.value === null ? '–' : Math.round(steps.value).toLocaleString('en-US')}
+              </Num>
+            </span>
+          ),
+        },
+        {
+          label: 'Sleep',
+          value: (
+            <span title={note(sNote, `mean of ${days_(sleep.n)}, h:mm`)}>
+              <Num>{sleep.value === null ? '–' : formatMinutes(sleep.value)}</Num>
+            </span>
+          ),
+        },
+        {
+          label: 'Resting',
+          value: (
+            <span title={note(sNote, `mean of ${days_(resting.n)}`)}>
+              <Num>{resting.value === null ? '–' : `${Math.round(resting.value)} bpm`}</Num>
+            </span>
+          ),
+        },
+        {
+          label: 'Weight',
+          value: (
+            <span title={note(bNote, `${weight.n} measurements`)}>
+              <Num>
+                {weight.last === null ? '–' : `${weight.last.toFixed(1)} kg`}
+                {weight.delta !== null && `, ${formatDelta(weight.delta)}`}
+              </Num>
+            </span>
+          ),
+        },
+      ]}
+    />
   );
 }
 
+/** Chart rows open on demand, at most two at a time: a third closes the oldest. */
+function useOpenCharts(
+  max = 2,
+): [(key: string) => boolean, (key: string) => (open: boolean) => void] {
+  const [open, setOpen] = useState<string[]>([]);
+  const isOpen = (key: string) => open.includes(key);
+  const toggle = (key: string) => (next: boolean) =>
+    setOpen((list) =>
+      next ? [...list.filter((k) => k !== key), key].slice(-max) : list.filter((k) => k !== key),
+    );
+  return [isOpen, toggle];
+}
+
 function Charts({ range }: { range: DateRange }) {
+  const [isOpen, toggle] = useOpenCharts();
   const days = daysInRange(range);
   const activity = useActivity(range);
   const sleep = useSleep(range);
@@ -142,7 +163,7 @@ function Charts({ range }: { range: DateRange }) {
   const weighIns = (body.data ?? []).filter((r) => inRange(localDate(r.timestamp), range));
 
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+    <>
       <ChartCard
         title="Activity"
         hint="Steps per day and active calories."
@@ -185,6 +206,8 @@ function Charts({ range }: { range: DateRange }) {
 
       <ChartCard
         title="Sleep"
+        open={isOpen('Sleep')}
+        onToggle={toggle('Sleep')}
         hint="Minutes per stage for the longest session of each night, and the sleep score."
         isPending={sleep.isPending}
         error={sleep.error}
@@ -260,6 +283,8 @@ function Charts({ range }: { range: DateRange }) {
 
       <ChartCard
         title="Heart rate"
+        open={isOpen('Heart rate')}
+        onToggle={toggle('Heart rate')}
         hint="Lowest, mean and highest sample of each day, and the resting rate."
         isPending={heart.isPending}
         error={heart.error}
@@ -295,6 +320,8 @@ function Charts({ range }: { range: DateRange }) {
 
       <ChartCard
         title="Stress"
+        open={isOpen('Stress')}
+        onToggle={toggle('Stress')}
         hint="Mean and highest stress score of each day."
         isPending={stress.isPending}
         error={stress.error}
@@ -322,9 +349,11 @@ function Charts({ range }: { range: DateRange }) {
         />
       </ChartCard>
 
-      <div className="xl:col-span-2">
+      <div>
         <ChartCard
-          title="Body"
+          title="Weight and body fat"
+          open={isOpen('Body')}
+          onToggle={toggle('Body')}
           hint="Weight, body fat and muscle mass; the last weigh-in of each day."
           isPending={body.isPending}
           error={body.error}
@@ -374,58 +403,25 @@ function Charts({ range }: { range: DateRange }) {
           />
         </ChartCard>
       </div>
-    </div>
+    </>
   );
 }
-
-const cell = 'py-2 pe-4';
-const headCell = 'py-2 pe-4 font-medium';
-const headRow =
-  'border-b border-gray-200 text-theme-xs text-gray-500 uppercase dark:border-gray-800 dark:text-gray-400';
-const bodyRow = 'border-b border-gray-100 last:border-0 dark:border-gray-800';
 
 function Tables({ range }: { range: DateRange }) {
   const spo2 = useSpo2(range);
   const workouts = useWorkouts(range);
   const spo2Rows = (spo2.data ?? []).filter((r) => inRange(localDate(r.timestamp), range));
   const workoutRows = (workouts.data ?? []).filter((r) => inRange(localDate(r.start_at), range));
+  const when = (iso: string) =>
+    new Date(iso).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
 
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-      <ChartCard
-        title="SpO2"
-        isPending={spo2.isPending}
-        error={spo2.error}
-        onRetry={() => spo2.refetch()}
-        isEmpty={spo2Rows.length === 0}
-        emptyText="No SpO2 measurements in this period."
-      >
-        <div className="max-h-64 overflow-auto">
-          <table className="w-full text-left text-theme-sm">
-            <thead>
-              <tr className={headRow}>
-                <th scope="col" className={headCell}>
-                  Time
-                </th>
-                <th scope="col" className={cn(headCell, 'text-right')}>
-                  SpO2, %
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {spo2Rows.map((r) => (
-                <tr key={r.timestamp} className={bodyRow}>
-                  <td className={cn(cell, 'text-gray-500 dark:text-gray-400')}>
-                    {new Date(r.timestamp).toLocaleString()}
-                  </td>
-                  <td className={cn(cell, 'text-right tabular-nums')}>{r.spo2_pct}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </ChartCard>
-
+    <>
       <ChartCard
         title="Workouts"
         isPending={workouts.isPending}
@@ -434,53 +430,60 @@ function Tables({ range }: { range: DateRange }) {
         isEmpty={workoutRows.length === 0}
         emptyText="No workouts in this period."
       >
-        <div className="max-h-64 overflow-auto">
-          <table className="w-full text-left text-theme-sm">
-            <thead>
-              <tr className={headRow}>
-                <th scope="col" className={headCell}>
-                  Start
-                </th>
-                <th scope="col" className={headCell}>
-                  Type
-                </th>
-                <th scope="col" className={cn(headCell, 'text-right')}>
-                  Minutes
-                </th>
-                <th scope="col" className={cn(headCell, 'text-right')}>
-                  km
-                </th>
-                <th scope="col" className={cn(headCell, 'text-right')}>
-                  kcal
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {workoutRows.map((r) => (
-                <tr key={r.workout_id} className={bodyRow}>
-                  <td className={cn(cell, 'text-gray-500 dark:text-gray-400')}>
-                    {new Date(r.start_at).toLocaleString()}
-                  </td>
-                  <td className={cell}>{r.activity_type}</td>
-                  <td className={cn(cell, 'text-right tabular-nums')}>
-                    {r.duration_minutes ?? '–'}
-                  </td>
-                  <td className={cn(cell, 'text-right tabular-nums')}>
-                    {r.distance_m === null ? '–' : (r.distance_m / 1000).toFixed(2)}
-                  </td>
-                  <td className={cn(cell, 'text-right tabular-nums')}>{r.calories_kcal ?? '–'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {workoutRows.map((r) => (
+          <Row
+            key={r.workout_id}
+            title={<span className="k-cap">{r.activity_type}</span>}
+            sub={
+              <>
+                {when(r.start_at)}
+                {r.duration_minutes !== null && (
+                  <>
+                    {' '}
+                    · <Num>{r.duration_minutes} min</Num>
+                  </>
+                )}
+              </>
+            }
+            right={
+              r.distance_m !== null ? (
+                <Num>{(r.distance_m / 1000).toFixed(2)} km</Num>
+              ) : r.calories_kcal !== null ? (
+                <Num>{r.calories_kcal} kcal</Num>
+              ) : undefined
+            }
+          />
+        ))}
       </ChartCard>
-    </div>
+      <Group label="Band">
+        <Row
+          title={<span data-num-ok>SpO2</span>}
+          sub="readings of the period, newest first"
+          right={spo2Rows.length ? <Num>{spo2Rows[spo2Rows.length - 1].spo2_pct}%</Num> : undefined}
+        >
+          {spo2.isPending ? (
+            <div className="k-placeholder" />
+          ) : spo2.error ? (
+            <p className="k-error">{apiErrorMessage(spo2.error, 'Failed to load.')}</p>
+          ) : spo2Rows.length === 0 ? (
+            <span>No SpO2 measurements in this period.</span>
+          ) : (
+            <div className="k-scroll">
+              {[...spo2Rows].reverse().map((r) => (
+                <div key={r.timestamp} className="k-kv">
+                  <span className="k-muted">{when(r.timestamp)}</span>
+                  <Num>{r.spo2_pct}%</Num>
+                </div>
+              ))}
+            </div>
+          )}
+        </Row>
+      </Group>
+    </>
   );
 }
 
-const dateInput =
-  'h-10 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:ring-3 focus:ring-brand-500/20 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90';
+const dateInput = 'k-input k-compact';
 
 function PeriodPicker() {
   const [params, setParams] = useSearchParams();
@@ -510,31 +513,22 @@ function PeriodPicker() {
   };
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <div className="flex flex-wrap items-center gap-3">
-        <div
-          className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5 dark:border-gray-800 dark:bg-white/3"
-          role="group"
-          aria-label="Period"
-        >
+    <div className="k-period">
+      <div className="k-tools k-tools-tight">
+        <div className="k-seg" role="group" aria-label="Period">
           {PRESETS.map((p) => (
             <button
               key={p}
               type="button"
               aria-pressed={range.preset === p}
               onClick={() => setParams({ days: String(p) }, { replace: true })}
-              className={cn(
-                'rounded-md px-3 py-2 text-theme-sm font-medium',
-                range.preset === p
-                  ? 'bg-brand-500 text-white'
-                  : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white',
-              )}
+              className={range.preset === p ? 'k-seg-on' : undefined}
             >
-              {p} days
+              {`${p} days`}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="k-dates">
           <input
             type="date"
             aria-label="From"
@@ -547,7 +541,7 @@ function PeriodPicker() {
             onKeyDown={onKeyDown}
             className={dateInput}
           />
-          <span className="text-gray-400">–</span>
+          <span className="k-muted">–</span>
           <input
             type="date"
             aria-label="To"
@@ -563,7 +557,7 @@ function PeriodPicker() {
         </div>
       </div>
       {rejected && (
-        <p role="alert" className="text-theme-xs text-error-500">
+        <p role="alert" className="k-error" data-num-ok>
           Pick a range of at most {MAX_RANGE_DAYS} days, from {MIN_DATE} to today.
         </p>
       )}
@@ -585,60 +579,42 @@ export function HealthPage() {
 
   if (!canRead) {
     return (
-      <div className={cardClass} role="alert">
-        <div className="flex items-start gap-3">
-          <ShieldAlert className="size-6 shrink-0 text-error-500" aria-hidden="true" />
-          <div>
-            <h1 className="text-theme-xl font-semibold text-gray-800 dark:text-white/90">
-              No access to Health
-            </h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Your role does not include reading fitness data. Ask an administrator for the Fitness
-              Reader role.
-            </p>
-          </div>
+      <SectionFrame eyebrow="Body" headline="No access to Health">
+        <div className="k-banner" role="alert">
+          <span>
+            <ShieldAlert className="k-inline-icon" aria-hidden="true" /> Your role does not include
+            reading fitness data. Ask an administrator for the Fitness Reader role.
+          </span>
         </div>
-      </div>
+      </SectionFrame>
     );
   }
+
+  const { from, to, preset } = parseRange(params, today());
+  const range = { from, to };
+  const headline = preset ? `Last ${preset} days` : `${from} – ${to}`;
 
   // Nothing is linked: there is no data to chart, only the way to get some.
   if (needsLink(mi.data)) {
     return (
-      <div className="flex flex-col gap-4 md:gap-6">
-        <h1 className="text-title-sm font-semibold text-gray-800 dark:text-white/90">Health</h1>
+      <SectionFrame eyebrow="Body" headline="Body">
         <LinkMiNotice purpose="to see your steps, sleep, heart rate and weight here" />
-      </div>
+      </SectionFrame>
     );
   }
 
-  const { from, to } = parseRange(params, today());
-  const range = { from, to };
-
   return (
-    <div className="flex flex-col gap-4 md:gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-title-sm font-semibold text-gray-800 dark:text-white/90">Health</h1>
-        <PeriodPicker />
-      </div>
+    <SectionFrame eyebrow="Body" headline={headline} sub="from the band" tools={<PeriodPicker />}>
       {mi.data?.status === 'reauth_required' && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center gap-3 rounded-2xl border border-warning-500 bg-warning-50 px-5 py-3 text-theme-sm text-gray-800 dark:bg-warning-500/10 dark:text-white/90"
-        >
-          <span className="min-w-0 flex-1">
-            Xiaomi asks you to sign in again. Syncing is paused; the data below is what was synced
-            before.
-          </span>
-          <Link to="/account" className="font-medium text-brand-500 hover:underline">
-            Link again in profile
-          </Link>
-        </div>
+        <Banner to="/account" action="Link again in profile">
+          Xiaomi asks you to sign in again. Syncing is paused; the data below is what was synced
+          before.
+        </Banner>
       )}
       <Tiles range={range} />
       <Charts range={range} />
       <Tables range={range} />
       {userCan(user, Permission.FitnessSync) && <SyncPanel />}
-    </div>
+    </SectionFrame>
   );
 }

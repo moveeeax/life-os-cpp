@@ -144,7 +144,7 @@ export function TimeChart({
             : s.data,
         }))}
         type="line"
-        height={phone ? Math.min(height, 180) : height}
+        height={phone ? Math.min(height, 240) : height}
       />
     </div>
   );

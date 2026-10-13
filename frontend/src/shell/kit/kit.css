@@ -783,3 +783,44 @@ select.k-input option {
   gap: 12px;
   font-size: 14px;
 }
+.k-chart-ph {
+  min-height: 180px;
+}
+.k-cov {
+  padding: 6px 0;
+  border-top: 1px solid var(--g-ink-ghost);
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.k-banner.k-col {
+  display: grid;
+}
+.k-inline-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+  flex: none;
+}
+.k-banner .k-grow {
+  flex: 1;
+}
+.k-period {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+}
+.k-tools-tight {
+  margin: 0;
+}
+.k-dates {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.k-scroll {
+  max-height: 260px;
+  overflow-y: auto;
+  display: grid;
+  gap: 4px;
+}

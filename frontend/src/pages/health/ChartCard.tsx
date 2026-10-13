@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 
 import { apiErrorMessage } from '@/lib/api/client';
+import { Group, Row } from '@/shell/kit';
 
+/** The legacy card look, still used by pages not on the calm sheet (Training). */
 export const cardClass =
   'rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 dark:border-gray-800 dark:bg-white/3';
 
@@ -15,54 +17,62 @@ interface ChartCardProps {
   /** True when the query succeeded but there is nothing to draw. */
   isEmpty: boolean;
   emptyText?: string;
+  /** Given: a row whose details hold the chart, mounted only while open. */
+  open?: boolean;
+  onToggle?: (open: boolean) => void;
+  /** The value on the right of a closed row. */
+  right?: ReactNode;
   children: ReactNode;
 }
 
-/**
- * Frame of one Health block. Each block loads on its own: a failed query
- * shows its error and a retry button here and leaves the other blocks alone.
- */
-export function ChartCard({
-  title,
-  hint,
+function Body({
   isPending,
   error,
   onRetry,
   isEmpty,
-  emptyText = 'No data in this period.',
+  emptyText,
   children,
-}: ChartCardProps) {
-  return (
-    <section className={cardClass} aria-label={title}>
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">{title}</h2>
-      {hint && <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">{hint}</p>}
-      <div className="mt-4">
-        {isPending ? (
-          <div
-            className="h-64 animate-pulse rounded-xl bg-gray-100 dark:bg-white/5"
-            aria-label="Loading"
-          />
-        ) : error ? (
-          <div role="alert" className="flex h-64 flex-col items-center justify-center gap-3">
-            <p className="text-theme-sm text-error-500">
-              {apiErrorMessage(error, 'Failed to load.')}
-            </p>
-            <button
-              type="button"
-              onClick={onRetry}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-theme-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
-            >
-              Retry
-            </button>
-          </div>
-        ) : isEmpty ? (
-          <p className="flex h-64 items-center justify-center text-theme-sm text-gray-500 dark:text-gray-400">
-            {emptyText}
-          </p>
-        ) : (
-          children
-        )}
+}: Pick<ChartCardProps, 'isPending' | 'error' | 'onRetry' | 'isEmpty' | 'emptyText' | 'children'>) {
+  if (isPending) return <div className="k-placeholder k-chart-ph" aria-label="Loading" />;
+  if (error)
+    return (
+      <div role="alert" className="k-banner">
+        <span className="k-error-text">{apiErrorMessage(error, 'Failed to load.')}</span>
+        <button type="button" onClick={onRetry}>
+          Retry →
+        </button>
       </div>
-    </section>
+    );
+  if (isEmpty) return <p className="k-empty">{emptyText}</p>;
+  return <>{children}</>;
+}
+
+/**
+ * One Health block on the calm sheet: a group that is always open, or (with
+ * onToggle) a row whose chart opens on a click. Each block loads on its own: a
+ * failed query shows its error and a retry here and leaves the others alone.
+ */
+export function ChartCard({
+  title,
+  hint,
+  open,
+  onToggle,
+  right,
+  emptyText = 'No data in this period.',
+  ...rest
+}: ChartCardProps) {
+  if (onToggle) {
+    return (
+      <Row title={title} sub={hint} right={right} open={open} onToggle={onToggle}>
+        {/* Row mounts its details only while open, so the chart loads its canvas on demand. */}
+        <Body emptyText={emptyText} {...rest} />
+      </Row>
+    );
+  }
+  return (
+    <Group label={title}>
+      {hint && <p className="k-sub">{hint}</p>}
+      <Body emptyText={emptyText} {...rest} />
+    </Group>
   );
 }
