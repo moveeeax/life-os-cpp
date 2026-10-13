@@ -150,6 +150,9 @@ travel -> utils
 repositories/tasks -> database
 repositories/tasks -> repositories
 repositories/tasks -> tasks
+repositories/travel -> database
+repositories/travel -> repositories
+repositories/travel -> travel
 api -> repositories/tasks
 api -> tasks
 jobs -> repositories/tasks
