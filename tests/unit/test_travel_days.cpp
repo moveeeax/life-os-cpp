@@ -57,6 +57,15 @@ TEST(TravelDays, OutAndBackOnTheSameDay) {
     EXPECT_EQ(days.at(d("2026-09-02")), (std::set<std::string>{"KZ"})) << "home again after the day trip";
 }
 
+// The return is stored first (no time, or entered before the outbound): the day's
+// crossings chain from where the owner woke up, so the next day is home.
+TEST(TravelDays, ADayTripRecordedReturnFirst) {
+    const std::vector<Crossing> c{{"2026-09-01", "KG", "KZ"}, {"2026-09-01", "KZ", "KG"}};
+    const auto days = Travel::days_by_country(c, "KZ", d("2026-09-01"), d("2026-09-02"));
+    EXPECT_EQ(days.at(d("2026-09-01")), (std::set<std::string>{"KZ", "KG"}));
+    EXPECT_EQ(days.at(d("2026-09-02")), (std::set<std::string>{"KZ"})) << "home again, whatever the stored order";
+}
+
 // In France Jan 1 – Jan 30 2026, both crossing days counted: 30 days.
 // On Feb 15 the 180-day window (2025-08-20 .. 2026-02-15) holds all 30: 30 used, 60 left.
 TEST(TravelDays, SchengenUsedAndLeft) {
