@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 
+import { useErrorToast } from '@/hooks/useErrorToast';
 import { useUpdateTask } from '@/hooks/useTasks';
 import type { Today } from '@/lib/now';
 import { Capture } from '@/pages/tasks/Capture';
@@ -18,6 +19,7 @@ function TickRow({
   late?: boolean;
 }) {
   const update = useUpdateTask(id);
+  useErrorToast(update.error);
   const pressed = update.isPending ? !done : done;
   return (
     <div className={pressed ? 'c-row c-done' : 'c-row'}>

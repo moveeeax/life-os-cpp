@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 
+import { useErrorToast } from '@/hooks/useErrorToast';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 import { useAddMilestone, useAddSection, usePutCheckin, useSaveGoal } from '@/hooks/useGoals';
@@ -179,6 +180,7 @@ export function NumberPart({ goal, today }: { goal: GoalDetail; today: string })
 /** A task line inside a goal: round check, title, status or done word. */
 function GoalTask({ task, today }: { task: Task; today: string }) {
   const update = useUpdateTask(task.id);
+  useErrorToast(update.error);
   const done = task.status === 'done';
   const due = done ? null : dueLabel(task.due, today);
   return (
@@ -219,6 +221,7 @@ function AddTask({
 }) {
   const [text, setText] = useState('');
   const create = useCreateTask(() => setText(''));
+  useErrorToast(create.error);
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!text.trim()) return;
@@ -248,6 +251,7 @@ function AddTask({
 export function StepsPart({ goal, today }: { goal: GoalDetail; today: string }) {
   const [name, setName] = useState('');
   const add = useAddSection(goal.id, () => setName(''));
+  useErrorToast(add.error);
   const block = (key: string, title: string, tasks: Task[], sectionId?: string) => {
     const k = tasks.filter((t) => t.status === 'done').length;
     return (
@@ -341,6 +345,7 @@ export function CountPart({ goal, today }: { goal: GoalDetail; today: string }) 
 
 export function BinaryPart({ goal, today }: { goal: GoalDetail; today: string }) {
   const save = useSaveGoal(goal.id);
+  useErrorToast(save.error);
   const [confirm, setConfirm] = useState<'pass' | 'fail' | null>(null);
   const [label, setLabel] = useState('');
   const [mdate, setMdate] = useState('');
@@ -348,6 +353,7 @@ export function BinaryPart({ goal, today }: { goal: GoalDetail; today: string })
     setLabel('');
     setMdate('');
   });
+  useErrorToast(addMilestone.error);
   const total = Math.max(1, (day(goal.due) - day(goal.start_date)) / 86_400_000);
   return (
     <div className="grid gap-3">

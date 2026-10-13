@@ -1,5 +1,6 @@
 import { useSearchParams } from 'react-router';
 
+import { useErrorToast } from '@/hooks/useErrorToast';
 import {
   useCategories,
   useCurrencies,
@@ -93,6 +94,7 @@ export function MoneyReportsPage() {
   const categories = useCategories(true).data ?? [];
   const settings = useMoneySettings().data;
   const saveSettings = useSaveSettings();
+  useErrorToast(saveSettings.error);
   const asIf = settings?.view_currency ?? '';
   const report = useReport(custom ? 'custom' : kind, date, asIf || undefined, custom ?? undefined);
   const fmtIn = (currency: string) => (n: number) =>
