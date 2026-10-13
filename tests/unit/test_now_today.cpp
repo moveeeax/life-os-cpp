@@ -99,7 +99,9 @@ TEST(NowToday, GoalsBlockPutsBehindFirstAndDropsTheDecided) {
                     {"due", "2026-11-15"},
                     {"pace", "behind"},
                     {"progress", nullptr},
-                    {"days_left", nullptr}}));
+                    {"days_left", nullptr},
+                    {"unit", ""},
+                    {"detail", {{"pace", "behind"}}}}));
 }
 
 TEST(NowToday, MoneyBlockKeepsEachCurrencyApart) {
@@ -148,6 +150,26 @@ TEST(NowToday, GoalsBlockCarriesProgressAndDaysLeft) {
     const json b = Now::Today::goals_block(goals);
     EXPECT_DOUBLE_EQ(b[0]["progress"].get<double>(), 0.58);
     EXPECT_EQ(b[0]["days_left"], 80);
+}
+
+TEST(NowToday, GoalsBlockCarriesTheUnitAndTheWholeProgress) {
+    const json progress = {{"pace", "behind"}, {"progress", 0.4}, {"days_left", 30}, {"expected", 6}, {"done", 4}};
+    const json goals = json::array({{{"id", "1"},
+                                     {"title", "Books"},
+                                     {"kind", "count"},
+                                     {"unit", "books"},
+                                     {"due", "2026-12-31"},
+                                     {"progress", progress}},
+                                    {{"id", "2"},
+                                     {"title", "Run"},
+                                     {"kind", "steps"},
+                                     {"unit", nullptr},
+                                     {"due", "2026-12-31"},
+                                     {"progress", {{"pace", "on_track"}, {"progress", 0.5}, {"days_left", 30}}}}});
+    const json b = Now::Today::goals_block(goals);
+    EXPECT_EQ(b[0]["unit"], "books");
+    EXPECT_EQ(b[0]["detail"], progress) << "the page words need gap, expected, done, stale, reached";
+    EXPECT_EQ(b[1]["unit"], "") << "a missing unit reads as none";
 }
 
 namespace {

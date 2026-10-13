@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 
-import { countdownFigure, countdowns, type Today } from '@/lib/now';
+import { countdownFigure, countdowns, goalPace, type Today } from '@/lib/now';
 
 import { Meter } from './Parts';
 
@@ -34,19 +34,19 @@ export function GoalsPanel({ today, date }: { today: Today; date: string }) {
         <>
           <h2>Pace</h2>
           <div>
-            {goals.map((g) => (
-              <Meter
-                key={g.id}
-                label={g.title}
-                share={g.progress ?? 0}
-                tone={g.pace === 'behind' ? 'warn' : 'ok'}
-                value={
-                  <span className={g.pace === 'behind' ? 'c-warn-text' : undefined}>
-                    {g.pace === 'behind' ? 'behind' : 'on track'}
-                  </span>
-                }
-              />
-            ))}
+            {goals.map((g) => {
+              const pace = goalPace(g);
+              const off = pace.tone !== 'ok';
+              return (
+                <Meter
+                  key={g.id}
+                  label={g.title}
+                  share={g.progress ?? 0}
+                  tone={off ? 'warn' : 'ok'}
+                  value={<span className={off ? 'c-warn-text' : undefined}>{pace.text}</span>}
+                />
+              );
+            })}
           </div>
         </>
       )}

@@ -110,7 +110,9 @@ inline json goals_block(const json& goals_with_progress) {
                             {"due", g["due"]},
                             {"pace", pace},
                             {"progress", p.contains("progress") ? p["progress"] : json()},
-                            {"days_left", p.contains("days_left") ? p["days_left"] : json()}});
+                            {"days_left", p.contains("days_left") ? p["days_left"] : json()},
+                            {"unit", g.contains("unit") && g["unit"].is_string() ? g["unit"] : json("")},
+                            {"detail", p}});
     }
     std::stable_sort(kept.begin(), kept.end(), [](const json& a, const json& b) {
         const bool ab = a["pace"] == "behind";

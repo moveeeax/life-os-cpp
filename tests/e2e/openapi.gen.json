@@ -895,7 +895,9 @@
         "due",
         "pace",
         "progress",
-        "days_left"
+        "days_left",
+        "unit",
+        "detail"
        ],
        "properties": {
         "id": {
@@ -937,6 +939,12 @@
           "integer",
           "null"
          ]
+        },
+        "unit": {
+         "type": "string"
+        },
+        "detail": {
+         "$ref": "#/components/schemas/GoalProgress"
         }
        }
       }
@@ -22021,7 +22029,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 324631,
-  "source_fnv1a64": "adefbba7b0d52011"
+  "source_bytes": 324750,
+  "source_fnv1a64": "b9ccb8132334878f"
  }
 }

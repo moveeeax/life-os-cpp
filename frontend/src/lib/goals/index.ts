@@ -20,7 +20,10 @@ export function formatValue(v: number, unit: string): string {
 export type Tone = 'ok' | 'behind' | 'stale' | 'fail';
 
 /** The short word on the right of a goal's row. */
-export function paceWord(goal: Goal): { text: string; tone: Tone } {
+export function paceWord(goal: Pick<Goal, 'kind' | 'unit' | 'progress'>): {
+  text: string;
+  tone: Tone;
+} {
   const p = goal.progress;
   if (goal.kind === 'binary') {
     if (p.pace === 'passed') return { text: 'passed', tone: 'ok' };
