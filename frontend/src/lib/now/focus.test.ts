@@ -7,6 +7,7 @@ import {
   focusKey,
   pauseSession,
   resumeSession,
+  sessionFromStorage,
   sessionState,
   startSession,
 } from './focus';
@@ -84,5 +85,22 @@ describe('a finished session', () => {
   it('remembers the day of its focus', () => {
     expect(startSession(25, now, '2026-10-13').focusDate).toBe('2026-10-13');
     expect(pauseSession(startSession(25, now, '2026-10-13'), now).focusDate).toBe('2026-10-13');
+  });
+});
+
+describe('sessionFromStorage', () => {
+  const key = focusKey('u1');
+  it('takes a session started in another tab', () => {
+    const s = startSession(25, now);
+    expect(sessionFromStorage({ key, newValue: JSON.stringify(s) }, key)).toEqual(s);
+  });
+  it('reads an exit or a cleared storage as no session', () => {
+    expect(sessionFromStorage({ key, newValue: 'null' }, key)).toBeNull();
+    expect(sessionFromStorage({ key, newValue: null }, key)).toBeNull();
+    expect(sessionFromStorage({ key: null, newValue: null }, key)).toBeNull();
+  });
+  it('ignores other keys and broken values', () => {
+    expect(sessionFromStorage({ key: 'other', newValue: '{}' }, key)).toBeUndefined();
+    expect(sessionFromStorage({ key, newValue: '{oops' }, key)).toBeUndefined();
   });
 });
