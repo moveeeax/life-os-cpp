@@ -2,9 +2,28 @@
    one sheet in the 760 px column, rows with details on click, facts on one
    line, dialogs from #g-portal. Colours only from the glass tokens. */
 
-/* Dialogs sit over busy rows: nearly opaque so their fields read. */
-.glass {
+/* Dialogs sit over busy rows: nearly opaque so their fields read. The scrim
+   carries the glass tokens itself, so a dialog opened from a page outside the
+   glass shell (admin, profile) looks the same. */
+.glass,
+.k-scrim {
   --k-dlg-bg: rgba(17, 22, 40, 0.94);
+}
+.k-scrim {
+  --g-ink: #ffffff;
+  --g-ink-soft: rgba(255, 255, 255, 0.8);
+  --g-ink-faint: rgba(255, 255, 255, 0.56);
+  --g-ink-ghost: rgba(255, 255, 255, 0.14);
+  --g-glass: rgba(14, 20, 36, 0.5);
+  --g-glass-strong: rgba(14, 20, 36, 0.66);
+  --g-glass-line: rgba(255, 255, 255, 0.15);
+  --g-ok: #6ee7b7;
+  --g-warn: #fcd34d;
+  --g-late: #fca5a5;
+  --g-brand: #a5b4fc;
+  color: var(--g-ink);
+  color-scheme: dark;
+  font-family: 'Outfit Variable', ui-sans-serif, system-ui, sans-serif;
 }
 
 .k-sheet {

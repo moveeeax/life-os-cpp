@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
+import './kit.css';
+
 interface SheetProps {
   title?: string;
   onClose: () => void;
