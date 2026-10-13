@@ -7,13 +7,13 @@ import { useCreateTask, useUpdateTask } from '@/hooks/useTasks';
 import { formatValue, shelf, type GoalDetail } from '@/lib/goals';
 import { dueLabel, type Task } from '@/lib/tasks';
 import { cn } from '@/lib/utils';
+import { Meter, Num } from '@/shell/kit';
 
 const day = (s: string) => Date.parse(`${s}T12:00:00Z`);
 const shortDate = (s: string) =>
   new Date(day(s)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-const inputClass =
-  'h-9 rounded-lg border border-gray-200 bg-white px-3 text-theme-sm dark:border-white/10 dark:bg-white/5';
-const ghost = 'text-theme-sm font-medium text-brand-500 disabled:opacity-50';
+const inputClass = 'k-input k-compact';
+const ghost = 'k-link';
 const STATUS: Record<Task['status'], string> = {
   done: 'done',
   in_progress: 'in progress',
@@ -62,7 +62,13 @@ function NumberChart({ goal, today }: { goal: GoalDetail; today: string }) {
             y2={Y(v)}
             className="stroke-gray-200 dark:stroke-white/10"
           />
-          <text x={P.l - 6} y={Y(v) + 4} textAnchor="end" fontSize="11" className="fill-gray-400">
+          <text
+            x={P.l - 6}
+            y={Y(v) + 4}
+            textAnchor="end"
+            fontSize="11"
+            className="num fill-gray-400"
+          >
             {tick(v)}
           </text>
         </g>
@@ -127,14 +133,14 @@ export function NumberPart({ goal, today }: { goal: GoalDetail; today: string })
   return (
     <div className="grid gap-3">
       <NumberChart goal={goal} today={today} />
-      <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
+      <form onSubmit={submit} className="k-inline-form">
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
           inputMode="decimal"
           placeholder={goal.unit || 'value'}
           aria-label="Value"
-          className={cn(inputClass, 'w-28')}
+          className={inputClass}
         />
         <input
           type="date"
@@ -152,16 +158,18 @@ export function NumberPart({ goal, today }: { goal: GoalDetail; today: string })
         </button>
       </form>
       {put.error && (
-        <p role="alert" className="text-theme-sm text-error-500">
+        <p role="alert" className="text-theme-sm k-error-text">
           {put.error}
         </p>
       )}
       {goal.checkins.length > 0 && (
-        <p className="text-theme-xs text-gray-400 tabular-nums">
-          {goal.checkins
-            .slice(0, 4)
-            .map((c) => `${shortDate(c.date)} · ${formatValue(c.value, goal.unit)}`)
-            .join('  ·  ')}
+        <p className="text-theme-xs k-muted tabular-nums">
+          {goal.checkins.slice(0, 4).map((c, i) => (
+            <span key={c.date}>
+              {i > 0 && '  ·  '}
+              {shortDate(c.date)} · <span className="num">{formatValue(c.value, goal.unit)}</span>
+            </span>
+          ))}
         </p>
       )}
     </div>
@@ -185,18 +193,13 @@ function GoalTask({ task, today }: { task: Task; today: string }) {
           done ? 'border-success-500 bg-success-500' : 'border-gray-400',
         )}
       />
-      <span
-        className={cn(
-          'truncate',
-          done ? 'text-gray-400 line-through' : 'text-gray-800 dark:text-white/90',
-        )}
-      >
+      <span className={cn('truncate', done ? 'k-muted line-through' : '')} data-num-ok>
         {task.title}
       </span>
       <span
         className={cn(
           'text-theme-xs whitespace-nowrap',
-          task.status === 'in_progress' ? 'text-brand-500' : 'text-gray-400',
+          task.status === 'in_progress' ? 'text-brand-500' : 'k-muted',
         )}
       >
         {due ? due.text : STATUS[task.status]}
@@ -236,7 +239,7 @@ function AddTask({
         onChange={(e) => setText(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="min-w-0 flex-1 bg-transparent py-1 text-theme-sm outline-none placeholder:text-gray-400"
+        className="min-w-0 flex-1 bg-transparent py-1 text-theme-sm outline-none placeholder:k-muted"
       />
     </form>
   );
@@ -253,7 +256,7 @@ export function StepsPart({ goal, today }: { goal: GoalDetail; today: string }) 
         className="grid gap-1 rounded-lg border border-gray-200 px-3 py-2.5 dark:border-white/10"
       >
         <div className="grid grid-cols-[minmax(0,1fr)_88px_auto] items-center gap-3">
-          <span className="truncate text-theme-sm font-medium text-gray-800 dark:text-white/90">
+          <span className="truncate text-theme-sm font-medium" data-num-ok>
             {title}
           </span>
           <span className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
@@ -262,7 +265,7 @@ export function StepsPart({ goal, today }: { goal: GoalDetail; today: string }) 
               style={{ width: `${tasks.length ? (k / tasks.length) * 100 : 0}%` }}
             />
           </span>
-          <span className="text-theme-xs text-gray-500 tabular-nums">
+          <span className="text-theme-xs k-muted num">
             {k}/{tasks.length}
           </span>
         </div>
@@ -292,7 +295,7 @@ export function StepsPart({ goal, today }: { goal: GoalDetail; today: string }) 
           onChange={(e) => setName(e.target.value)}
           placeholder="+ Section"
           aria-label="New section"
-          className="min-w-0 flex-1 bg-transparent py-1 text-theme-sm text-gray-500 outline-none placeholder:text-gray-400"
+          className="min-w-0 flex-1 bg-transparent py-1 text-theme-sm k-muted outline-none placeholder:k-muted"
         />
       </form>
     </div>
@@ -346,56 +349,42 @@ export function BinaryPart({ goal, today }: { goal: GoalDetail; today: string })
     setMdate('');
   });
   const total = Math.max(1, (day(goal.due) - day(goal.start_date)) / 86_400_000);
-  const pos = (d: string) =>
-    `${Math.min(100, Math.max(0, ((day(d) - day(goal.start_date)) / 86_400_000 / total) * 100))}%`;
   return (
     <div className="grid gap-3">
-      <div
-        className="relative h-14"
-        aria-label={`From ${shortDate(goal.start_date)} to ${shortDate(goal.due)}, today marked`}
-      >
-        <span className="absolute inset-x-0 top-[22px] h-1.5 rounded-full bg-gray-100 dark:bg-white/10" />
-        <span
-          className="absolute left-0 top-[22px] h-1.5 rounded-full bg-brand-500"
-          style={{ width: pos(today) }}
-        />
-        {goal.milestones.map((m) => (
-          <span
-            key={m.id}
-            title={m.label}
-            className="absolute top-[18px] size-3.5 -translate-x-1/2 rounded-full border-2 border-white bg-gray-400 dark:border-gray-900"
-            style={{ left: pos(m.date) }}
-          />
-        ))}
-        <span
-          className="absolute top-3 h-6 w-0.5 bg-gray-800 dark:bg-white/90"
-          style={{ left: pos(today) }}
-        />
-        <span
-          className="absolute top-9 -translate-x-1/2 text-theme-xs whitespace-nowrap text-gray-500 tabular-nums"
-          style={{ left: pos(today) }}
-        >
-          today · {goal.progress.days_left} d left
-        </span>
-      </div>
+      <Meter
+        label={
+          <>
+            {shortDate(goal.start_date)} – {shortDate(goal.due)} ·{' '}
+            <Num>{goal.progress.days_left} d</Num> left
+          </>
+        }
+        value={Math.max(0, (day(today) - day(goal.start_date)) / 86_400_000)}
+        max={total}
+      />
       {goal.milestones.length > 0 && (
-        <p className="text-theme-xs text-gray-400">
-          {goal.milestones.map((m) => `${shortDate(m.date)} · ${m.label}`).join('  ·  ')}
-        </p>
+        <ol className="k-milestones">
+          {[...goal.milestones]
+            .sort((x, y) => (x.date < y.date ? -1 : 1))
+            .map((m) => (
+              <li key={m.id} className={m.date <= today ? 'k-ms-past' : undefined}>
+                <span className="k-muted">{shortDate(m.date)}</span> {m.label}
+              </li>
+            ))}
+        </ol>
       )}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           if (label.trim() && mdate) addMilestone.mutate({ date: mdate, label: label.trim() });
         }}
-        className="flex flex-wrap items-center gap-2"
+        className="k-inline-form"
       >
         <input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           placeholder="Milestone"
           aria-label="Milestone"
-          className={cn(inputClass, 'w-40')}
+          className={inputClass}
         />
         <input
           type="date"
@@ -409,14 +398,7 @@ export function BinaryPart({ goal, today }: { goal: GoalDetail; today: string })
         </button>
       </form>
       {goal.result ? (
-        <span
-          className={cn(
-            'justify-self-start rounded-lg px-3 py-1.5 text-theme-sm font-semibold',
-            goal.result === 'pass'
-              ? 'bg-success-50 text-success-600 dark:bg-success-500/15'
-              : 'bg-error-50 text-error-600 dark:bg-error-500/15',
-          )}
-        >
+        <span className={goal.result === 'pass' ? 'k-pos' : 'k-error-text'}>
           {goal.result === 'pass' ? 'Passed' : 'Not passed'}
         </span>
       ) : (
@@ -436,7 +418,7 @@ export function BinaryPart({ goal, today }: { goal: GoalDetail; today: string })
             type="button"
             disabled={save.isPending}
             onClick={() => setConfirm('fail')}
-            className="text-theme-sm font-medium text-error-500 disabled:opacity-50"
+            className="text-theme-sm font-medium k-error-text disabled:opacity-50"
           >
             Not passed
           </button>

@@ -1,0 +1,1 @@
+Goals sit on the calm sheet: the count of active goals as the headline, the three tiles of a goal as one facts line, and the milestones of a pass or fail goal as a list instead of a timeline that ran off a phone.

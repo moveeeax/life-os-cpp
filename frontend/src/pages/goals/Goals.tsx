@@ -20,15 +20,16 @@ import {
   modalPanel,
   primaryButton,
   secondaryButton,
-} from '../workout/styles';
+} from '@/shell/kit/styles';
+import { Facts as KitFacts, Group, Meter, Num, SectionFrame } from '@/shell/kit';
 import { LoadError, Placeholder } from '../money/frame';
 import { BinaryPart, CountPart, NumberPart, StepsPart } from './parts';
 
 const TONE: Record<Tone, string> = {
-  ok: 'text-success-600',
-  behind: 'text-warning-600',
-  stale: 'text-gray-400',
-  fail: 'text-error-500',
+  ok: 'k-pos',
+  behind: 'k-warn-text',
+  stale: 'k-muted',
+  fail: 'k-error-text',
 };
 const shortDate = (s: string, today: string) =>
   new Date(`${s}T12:00:00Z`).toLocaleDateString('en-GB', {
@@ -66,18 +67,7 @@ function Facts({ goal }: { goal: Goal }) {
     ];
   }
   if (!facts.length) return null;
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      {facts.map(([v, l]) => (
-        <div key={l}>
-          <div className="text-lg font-semibold text-gray-800 tabular-nums dark:text-white/90">
-            {v}
-          </div>
-          <div className="text-theme-xs text-gray-500">{l}</div>
-        </div>
-      ))}
-    </div>
-  );
+  return <KitFacts items={facts.map(([v, l]) => ({ label: l, value: <Num>{v}</Num> }))} />;
 }
 
 function GoalMore({ goal, today }: { goal: Goal; today: string }) {
@@ -86,12 +76,8 @@ function GoalMore({ goal, today }: { goal: Goal; today: string }) {
   const remove = useDeleteGoal();
   const d = detail.data;
   return (
-    <div className="grid gap-4 ps-4 pb-5">
-      {goal.why && (
-        <p className="border-s-2 border-gray-200 ps-3 text-theme-sm text-gray-500 dark:border-white/10">
-          {goal.why}
-        </p>
-      )}
+    <div className="k-row-more">
+      {goal.why && <p className="k-quote">{goal.why}</p>}
       <Facts goal={goal} />
       {detail.isError ? (
         <LoadError error={detail.error} onRetry={() => void detail.refetch()} />
@@ -106,13 +92,9 @@ function GoalMore({ goal, today }: { goal: Goal; today: string }) {
       ) : (
         <BinaryPart goal={d} today={today} />
       )}
-      <div className="flex gap-4 text-theme-sm">
+      <div className="k-actions">
         {goal.kind !== 'binary' && goal.status === 'active' && (
-          <button
-            type="button"
-            onClick={() => save.mutate({ status: 'done' })}
-            className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
-          >
+          <button type="button" onClick={() => save.mutate({ status: 'done' })} className="k-link">
             Mark done
           </button>
         )}
@@ -120,13 +102,17 @@ function GoalMore({ goal, today }: { goal: Goal; today: string }) {
           <button
             type="button"
             onClick={() => save.mutate({ status: 'dropped' })}
-            className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+            className="k-link"
           >
             Drop
           </button>
         )}
         {goal.status !== 'active' && (
-          <button type="button" onClick={() => remove.mutate(goal.id)} className="text-error-500">
+          <button
+            type="button"
+            onClick={() => remove.mutate(goal.id)}
+            className="k-link k-error-text"
+          >
             Delete
           </button>
         )}
@@ -149,45 +135,25 @@ function GoalRow({
   const pace = paceWord(goal);
   const progress = goal.kind === 'binary' ? goal.progress.elapsed : (goal.progress.progress ?? 0);
   return (
-    <li className="border-b border-gray-100 last:border-b-0 dark:border-white/5">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        className="grid w-full gap-2 py-3.5 text-start"
-      >
-        <span className="flex min-w-0 items-center gap-2.5">
-          <span
-            className={cn('size-[7px] shrink-0 rounded-full', areaOf(goal.area).dot)}
-            aria-hidden="true"
-          />
-          <span className="min-w-0 flex-1 truncate text-theme-sm font-medium text-gray-800 dark:text-white/90">
+    <div className="k-row">
+      <button type="button" onClick={onToggle} aria-expanded={open} className="k-row-head">
+        <span className="k-row-top">
+          <span className={cn('k-dot', areaOf(goal.area).dot)} aria-hidden="true" />
+          <span className="k-row-title" data-num-ok>
             {goal.title}
           </span>
-          <span className="rounded-md border border-gray-200 px-1.5 text-[11px] text-gray-400 dark:border-white/10">
-            {KIND_LABEL[goal.kind]}
-          </span>
-          <span className="text-theme-xs whitespace-nowrap text-gray-400 tabular-nums">
-            {shortDate(goal.due, today)}
+          <span className="k-row-right k-muted">{shortDate(goal.due, today)}</span>
+        </span>
+        <span className="k-row-sub k-goal-line">
+          <Meter value={progress} max={1} />
+          <span className={TONE[pace.tone]}>
+            <Num>{pace.text}</Num>
           </span>
         </span>
-        <span className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 ps-4">
-          <span
-            className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-white/10"
-            aria-label={`${Math.round(progress * 100)}%`}
-          >
-            <span
-              className="block h-full rounded-full bg-brand-500"
-              style={{ width: `${Math.round(progress * 100)}%` }}
-            />
-          </span>
-          <span className={cn('text-theme-xs whitespace-nowrap tabular-nums', TONE[pace.tone])}>
-            {pace.text}
-          </span>
-        </span>
+        <span className="k-row-sub">{KIND_LABEL[goal.kind]}</span>
       </button>
       {open && <GoalMore goal={goal} today={today} />}
-    </li>
+    </div>
   );
 }
 
@@ -363,7 +329,7 @@ function GoalForm({ onClose }: { onClose: () => void }) {
         </div>
       </div>
       {save.error && (
-        <p role="alert" className="mt-3 text-theme-sm text-error-500">
+        <p role="alert" className="mt-3 text-theme-sm k-error-text">
           {save.error}
         </p>
       )}
@@ -396,49 +362,45 @@ export function GoalsPage() {
     });
   const closed = (done.data ?? []).concat(dropped.data ?? []);
   return (
-    <div className="mx-auto grid max-w-2xl gap-7">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-title-sm font-semibold text-gray-800 dark:text-white/90">Goals</h1>
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="text-theme-sm font-medium text-brand-500"
-        >
-          New goal
-        </button>
-      </div>
+    <SectionFrame
+      eyebrow="Goals"
+      headline={active.data ? <span data-num-ok>{active.data.length} active</span> : 'Goals'}
+      tools={
+        <>
+          <span className="k-grow" />
+          <button type="button" onClick={() => setCreating(true)} className="k-btn k-solid">
+            New goal
+          </button>
+        </>
+      }
+    >
       {active.isError ? (
         <LoadError error={active.error} onRetry={() => void active.refetch()} />
       ) : !active.data ? (
-        <Placeholder className="h-40" />
+        <Placeholder />
       ) : active.data.length === 0 ? (
-        <p className="text-theme-sm text-gray-400">
+        <p className="k-empty">
           No goals yet. A goal with a date and a way to measure it is a good start.
         </p>
       ) : (
-        <section aria-label="Active">
-          <h2 className="mb-1 text-theme-xs font-medium tracking-wider text-gray-400 uppercase">
-            Active
-          </h2>
-          <ul>
-            {active.data.map((g) => (
-              <GoalRow
-                key={g.id}
-                goal={g}
-                today={today}
-                open={open.has(g.id)}
-                onToggle={() => toggle(g.id)}
-              />
-            ))}
-          </ul>
-        </section>
+        <Group label="Active">
+          {active.data.map((g) => (
+            <GoalRow
+              key={g.id}
+              goal={g}
+              today={today}
+              open={open.has(g.id)}
+              onToggle={() => toggle(g.id)}
+            />
+          ))}
+        </Group>
       )}
       {closed.length > 0 && (
-        <details>
-          <summary className="cursor-pointer text-theme-sm text-gray-500">
-            Done and dropped ({closed.length})
+        <details className="k-details">
+          <summary>
+            Done and dropped (<span data-num-ok>{closed.length}</span>)
           </summary>
-          <ul className="mt-2">
+          <div className="k-group-rows">
             {closed.map((g) => (
               <GoalRow
                 key={g.id}
@@ -448,7 +410,7 @@ export function GoalsPage() {
                 onToggle={() => toggle(g.id)}
               />
             ))}
-          </ul>
+          </div>
         </details>
       )}
       {creating && (
@@ -456,6 +418,6 @@ export function GoalsPage() {
           <GoalForm onClose={() => setCreating(false)} />
         </Modal>
       )}
-    </div>
+    </SectionFrame>
   );
 }
