@@ -249,6 +249,26 @@ TEST_F(TodayApiTest, ATextFocusNeedsItsText) {
                     {"missing", false}}));
 }
 
+TEST_F(TodayApiTest, ACyrillicTitleAndTextAreMeasuredInCharacters) {
+    std::string long_title;
+    for (int i = 0; i < 150; ++i) {
+        long_title += "я";  // two bytes each: 300 bytes, 150 characters
+    }
+    const std::string task = insert_task(kAnna, long_title, kDay, "open");
+    auto r = put_focus(json{{"date", kDay}, {"kind", "task"}, {"ref_id", task}});
+    ASSERT_EQ(r->statusCode(), k200OK) << "a byte cut would split a character: " << std::string(r->body());
+    EXPECT_EQ(body_of(r)["data"]["text"], long_title);
+
+    r = put_focus(json{{"date", kDay}, {"kind", "text"}, {"text", long_title}});
+    ASSERT_EQ(r->statusCode(), k200OK) << "150 characters fit the 200 the table allows";
+    EXPECT_EQ(body_of(r)["data"]["text"], long_title);
+    std::string too_long;
+    for (int i = 0; i < 201; ++i) {
+        too_long += "я";
+    }
+    EXPECT_EQ(put_focus(json{{"date", kDay}, {"kind", "text"}, {"text", too_long}})->statusCode(), k400BadRequest);
+}
+
 TEST_F(TodayApiTest, TickingATaskFocusClosesAndReopensTheTask) {
     const std::string t = insert_task(kAnna, "Call the bank", kDay, "open");
     ASSERT_EQ(put_focus(json{{"date", kDay}, {"kind", "task"}, {"ref_id", t}})->statusCode(), k200OK);

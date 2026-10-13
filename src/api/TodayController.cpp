@@ -269,7 +269,7 @@ void TodayController::putFocus(const HttpRequestPtr& req, Callback&& callback) {
             errs.add("ref_id", "not_allowed", "a text focus points at nothing");
         }
         Validation::require(errs, body, "text");
-        Validation::string_length(errs, body, "text", 1, kTextMax);
+        Api::Fields::text_length(errs, body, "text", 1, kTextMax);
     }
     if (errs.any()) {
         callback(Validation::response_400(errs));
@@ -293,7 +293,8 @@ void TodayController::putFocus(const HttpRequestPtr& req, Callback&& callback) {
                 callback(ErrorResponse::unprocessable("focus_ref_not_found", "no such " + kind + " of yours"));
                 return;
             }
-            text = (*row)["title"].get<std::string>().substr(0, kTextMax);
+            // Task and goal titles are capped at kTextMax characters by their own CHECK.
+            text = (*row)["title"].get<std::string>();
         }
         const json saved = FocusRepository().put(owner, date, kind, ref, text);
         callback(Response::ok(json{{"data", focus_out(owner, saved)}}));
