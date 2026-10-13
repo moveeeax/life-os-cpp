@@ -6,6 +6,7 @@ import {
   countryName,
   flightsWithoutCrossing,
   splitTrips,
+  whereNow,
 } from './index';
 import type { TravelCounter, TravelCrossing, TravelTrip, TravelTripItem } from './types';
 
@@ -97,5 +98,32 @@ describe('splitTrips', () => {
     );
     expect(coming.map((t) => t.id)).toEqual(['now', 'th', 'lisbon']);
     expect(past.map((t) => t.id)).toEqual(['bali']);
+  });
+});
+
+describe('whereNow', () => {
+  const x = (date: string, from: string, to: string) =>
+    ({
+      id: date + to,
+      date,
+      from_country: from,
+      to_country: to,
+      time: null,
+      place: '',
+      note: '',
+    }) as TravelCrossing;
+  // Newest first, as the list comes.
+  const list = [
+    x('2026-11-01', 'KZ', 'TH'),
+    x('2026-09-14', 'DE', 'KZ'),
+    x('2026-08-24', 'GE', 'DE'),
+  ];
+  it('takes the country of today, not a crossing still to come', () => {
+    expect(whereNow(list, ['KZ'], '2026-10-13')).toEqual({ country: 'KZ', since: '2026-09-14' });
+  });
+  it('has no since on a crossing day or without a crossing into it', () => {
+    expect(whereNow(list, ['DE', 'KZ'], '2026-09-14')).toBeNull();
+    expect(whereNow([], ['KZ'], '2026-10-13')).toEqual({ country: 'KZ', since: null });
+    expect(whereNow([], [], '2026-10-13')).toBeNull();
   });
 });
