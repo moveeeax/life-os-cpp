@@ -261,12 +261,14 @@ public:
      *        mi_accounts cascades from users.
      */
     static constexpr const char* kOwnedTables[] = {
-        "workout_sessions", "routines",        "exercises",        "money_transactions",
-        "money_transfers",  "money_merchants", "money_categories", "money_accounts",
-        "money_currencies", "money_settings",  "money_parse_jobs", "money_advisor_reports",
-        "task_parse_jobs",  "task_notes",      "task_items",       "goal_checkins",
-        "goal_milestones",  "goal_sections",   "goal_items",       "food_entries",
-        "food_items",       "food_goals",      "food_parse_jobs",  "day_focus",
+        "workout_sessions",  "routines",        "exercises",        "money_transactions",
+        "money_transfers",   "money_merchants", "money_categories", "money_accounts",
+        "money_currencies",  "money_settings",  "money_parse_jobs", "money_advisor_reports",
+        "task_parse_jobs",   "task_notes",      "task_items",       "goal_checkins",
+        "goal_milestones",   "goal_sections",   "goal_items",       "food_entries",
+        "food_items",        "food_goals",      "food_parse_jobs",  "day_focus",
+        "travel_trip_items", "travel_trips",    "travel_rules",     "travel_crossings",
+        "travel_settings",
     };
 
     /**

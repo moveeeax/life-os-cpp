@@ -79,6 +79,9 @@ tasks:
 goals:
   enabled: true
 
+travel:
+  enabled: true
+
 now:
   enabled: true
 

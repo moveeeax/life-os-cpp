@@ -193,6 +193,12 @@ goals:
   enabled: false
 
 # ---------------------------------------------------------------
+# travel module — keep in sync with the life-os-cpp chart. Env var set: TRAVEL_ENABLED
+# ---------------------------------------------------------------
+travel:
+  enabled: false
+
+# ---------------------------------------------------------------
 # now module — keep in sync with the life-os-cpp chart. Env var set: NOW_ENABLED
 # ---------------------------------------------------------------
 now:

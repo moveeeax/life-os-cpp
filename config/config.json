@@ -270,6 +270,9 @@
       "path_style": "${S3_PATH_STYLE:-true}"
     }
   },
+  "travel": {
+    "enabled": "${TRAVEL_ENABLED:-false}"
+  },
   "worker": {
     "id": "worker-1",
     "types": ["default"],
