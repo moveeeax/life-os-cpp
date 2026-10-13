@@ -6,6 +6,42 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-10-13
+
+### Added
+- Travel under `/api/v1/travel` (module switch `TRAVEL_ENABLED`): border
+  crossings, day counters per rule (rolling window, 12 months ending this year,
+  since the last entry; at most or over a threshold) with the Schengen 90/180
+  and Kazakhstan tax residency templates, the date a running stay meets the
+  threshold and the date a full stay fits again; trips with a plan of flights,
+  stays and notes, packing from the tasks linked by `trip_id`, and expenses
+  linked to a trip with a total in one currency. `/api/v1/today` carries the
+  next trip and the counters within 14 days of their threshold.
+- A Travel section with Trips, Days and Rules tabs: a trip page with its plan,
+  packing list and linked spends, crossings and counters on Days, rules with
+  their source. Now counts down to the next trip and puts a counter close to
+  its threshold on the Goals corner.
+
+### Changed
+- The helm gate now renders the real prod values in `deploy/` and requires rate
+  limiting (fail-closed), CSRF and idempotency there; `release.sh` bumps and
+  `check-version-sync.sh` checks the prod image tags; the unused stage overlay is
+  gone; the release workflow scans the frontend image and no longer runs twice
+  for one tag; CI lints the OpenAPI spec; docs match the current prod setup.
+
+### Fixed
+- Backend fixes from a review: parse jobs left running by a dead worker no
+  longer lock a user out of new parses, and a late result cannot overwrite a
+  finished one; a money advisor review the queue refused is marked failed, and
+  Run now rewrites a review made before its period ended; the focus of the day
+  handles Cyrillic titles; a failed fitness probe answers with a JSON 503;
+  deleting a user removes their money, tasks, goals, food, workout and focus
+  rows; a refresh token can be used only once even under a race; a racing
+  workout start is a 409; the exercise search matches `%` and `_` literally;
+  money amounts go down to one satoshi.
+- Now refreshes after a change in Goals, Food, Money or a band sync; failed goal and task actions say so; Tasks and Goals name their own module when it is switched off; dialogs are announced by their heading; the goal gap on Now blurs under Hide numbers. In production login is throttled, cookie sessions use a CSRF token and retried requests are answered once.
+- Dialogs on the admin and profile pages keep the page's own controls and font; a transfer row shows the received amount under its title so two long amounts fit on a phone.
+
 ## [1.22.0] - 2026-10-13
 
 ### Changed
