@@ -939,6 +939,43 @@ select.k-input option {
   background: var(--g-ink-ghost);
   font-size: 13px;
 }
+.k-goal-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding-left: 18px;
+}
+.k-goal-line .k-meter-bar {
+  margin-top: 0;
+}
+.k-quote {
+  margin: 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--g-glass-line);
+  color: var(--g-ink-faint);
+}
+.k-milestones {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 12px;
+  border-left: 2px solid var(--g-glass-line);
+  display: grid;
+  gap: 4px;
+}
+.k-ms-past {
+  color: var(--g-ink-faint);
+}
+.k-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.k-inline-form .k-input {
+  flex: 1 1 140px;
+  width: auto;
+}
 .k-stat-note {
   color: var(--g-ink-faint);
   font-size: 12.5px;
