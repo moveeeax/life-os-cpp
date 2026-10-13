@@ -31,6 +31,7 @@
 #include "repositories/tasks/NoteRepository.hpp"
 #include "repositories/tasks/ParseJobRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
+#include "repositories/travel/TripRepository.hpp"
 #include "tasks/Agenda.hpp"
 #include "tasks/Fields.hpp"
 #include "tasks/Llm.hpp"
@@ -181,6 +182,21 @@ void goal_link_fields(Validation::Errors& errs, const json& body, const std::str
     }
 }
 
+/// The trip link: a trip of the caller (packing for it), or null to unlink.
+void trip_link_fields(Validation::Errors& errs, const json& body, const std::string& owner) {
+    if (!body.contains("trip_id") || body["trip_id"].is_null()) {
+        return;
+    }
+    Validation::uuid(errs, body, "trip_id");
+    if (errs.any()) {
+        return;
+    }
+    if (!Core::travel_enabled() ||
+        !Repositories::Travel::TripRepository().get(owner, body["trip_id"].get<std::string>())) {
+        errs.add("trip_id", "not_yours", "the trip is not yours");
+    }
+}
+
 Repo::TaskRepository::Input task_input(const json& body) {
     Repo::TaskRepository::Input in;
     in.title = body["title"].get<std::string>();
@@ -195,6 +211,7 @@ Repo::TaskRepository::Input task_input(const json& body) {
     in.status = Validation::opt_string(body, "status").value_or("open");
     in.goal_id = Validation::opt_string(body, "goal_id");
     in.goal_section_id = Validation::opt_string(body, "goal_section_id");
+    in.trip_id = Validation::opt_string(body, "trip_id");
     return in;
 }
 
@@ -230,15 +247,16 @@ void TasksController::listItems(const HttpRequestPtr& req, Callback&& callback) 
     f.q = req->getParameter("q");
     f.due_to = req->getParameter("due_to");
     f.done_since = req->getParameter("done_since");
+    f.trip = req->getParameter("trip");
     f.limit = clamp_int(req->getParameter("limit"), kDefaultLimit, 1, kMaxLimit);
     f.offset = clamp_int(req->getParameter("offset"), 0, 0, 1000000);
     const auto bad = [](const std::string& v, const std::vector<std::string>& allowed) {
         return !v.empty() && std::find(allowed.begin(), allowed.end(), v) == allowed.end();
     };
     if (bad(f.status, kStatuses) || bad(f.area, kAreas) || (!f.due_to.empty() && !is_calendar_date(f.due_to)) ||
-        (!f.done_since.empty() && !is_calendar_date(f.done_since))) {
-        callback(ErrorResponse::bad_request("invalid_query",
-                                            "status, area, due_to and done_since must be known values and days"));
+        (!f.done_since.empty() && !is_calendar_date(f.done_since)) || (!f.trip.empty() && !is_valid_uuid(f.trip))) {
+        callback(ErrorResponse::bad_request(
+            "invalid_query", "status, area, due_to, done_since and trip must be known values, days and ids"));
         return;
     }
     with_repo_errors(callback, "tasks.listItems", [&] {
@@ -261,6 +279,9 @@ void TasksController::createItem(const HttpRequestPtr& req, Callback&& callback)
     }
     if (!errs.any()) {
         goal_link_fields(errs, body, owner);
+    }
+    if (!errs.any()) {
+        trip_link_fields(errs, body, owner);
     }
     if (errs.any()) {
         callback(Validation::response_400(errs));
@@ -304,6 +325,9 @@ void TasksController::updateItem(const HttpRequestPtr& req, Callback&& callback,
     if (!errs.any()) {
         goal_link_fields(errs, body, owner);
     }
+    if (!errs.any()) {
+        trip_link_fields(errs, body, owner);
+    }
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;
@@ -321,6 +345,7 @@ void TasksController::updateItem(const HttpRequestPtr& req, Callback&& callback,
     p.source_ref = nullable(body, "source_ref");
     p.goal_id = nullable(body, "goal_id");
     p.goal_section_id = nullable(body, "goal_section_id");
+    p.trip_id = nullable(body, "trip_id");
     if (p.goal_id.has_value() && !p.goal_section_id.has_value()) {
         // A new goal (or none) does not keep the old goal's section.
         p.goal_section_id = std::optional<std::string>();

@@ -164,3 +164,5 @@ repositories/goals -> repositories
 repositories/goals -> repositories/tasks
 api -> goals
 api -> repositories/goals
+api -> repositories/travel
+api -> travel

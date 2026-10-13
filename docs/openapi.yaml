@@ -455,7 +455,7 @@ components:
       enum: ['5min', '30min', deep, null]
     Task:
       type: object
-      required: [id, title, area, effort, due, next_step, note, status, completed_at, source_kind, source_ref, external_id, goal_id, goal_section_id, goal_title, created_at, updated_at]
+      required: [id, title, area, effort, due, next_step, note, status, completed_at, source_kind, source_ref, external_id, goal_id, goal_section_id, trip_id, goal_title, created_at, updated_at]
       properties:
         id: { type: string, format: uuid }
         title: { type: string }
@@ -471,6 +471,7 @@ components:
         external_id: { type: [string, 'null'] }
         goal_id: { type: [string, 'null'], format: uuid }
         goal_section_id: { type: [string, 'null'], format: uuid }
+        trip_id: { type: [string, 'null'], format: uuid, description: The trip this task is packing for }
         goal_title: { type: [string, 'null'], description: The title of the goal the task belongs to }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
@@ -489,6 +490,7 @@ components:
         source_ref: { type: [string, 'null'], maxLength: 2000 }
         goal_id: { type: [string, 'null'], format: uuid, description: A goal of the caller }
         goal_section_id: { type: [string, 'null'], format: uuid, description: A section of that goal; given together with goal_id }
+        trip_id: { type: [string, 'null'], format: uuid, description: A trip of the caller (packing) }
         external_id: { type: string, minLength: 1, maxLength: 100 }
     TaskPatch:
       type: object
@@ -504,6 +506,152 @@ components:
         source_ref: { type: [string, 'null'], maxLength: 2000 }
         goal_id: { type: [string, 'null'], format: uuid, description: A goal of the caller }
         goal_section_id: { type: [string, 'null'], format: uuid, description: A section of that goal; given together with goal_id }
+        trip_id: { type: [string, 'null'], format: uuid, description: A trip of the caller (packing) }
+    TravelCrossing:
+      type: object
+      required: [id, date, from_country, to_country, time, place, note]
+      properties:
+        id: { type: string, format: uuid }
+        date: { type: string, format: date }
+        from_country: { type: string, pattern: '^[A-Z]{2}$' }
+        to_country: { type: string, pattern: '^[A-Z]{2}$' }
+        time: { type: [string, 'null'], description: HH:MM }
+        place: { type: string }
+        note: { type: string }
+    TravelCrossingInput:
+      type: object
+      required: [date, from, to]
+      properties:
+        date: { type: string, format: date }
+        from: { type: string, pattern: '^[A-Z]{2}$' }
+        to: { type: string, pattern: '^[A-Z]{2}$' }
+        time: { type: [string, 'null'], description: HH:MM }
+        place: { type: string, maxLength: 120 }
+        note: { type: string, maxLength: 500 }
+    TravelRule:
+      type: object
+      required: [id, name, countries, window_kind, window_days, threshold_days, threshold_kind, count_crossing_days, source, position]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        countries: { type: array, items: { type: string }, description: ISO codes or the group key SCHENGEN }
+        window_kind: { type: string, enum: [rolling_days, rolling_12_months_in_year, since_last_entry] }
+        window_days: { type: [integer, 'null'] }
+        threshold_days: { type: integer }
+        threshold_kind: { type: string, enum: [at_most, over] }
+        count_crossing_days: { type: boolean }
+        source: { type: string }
+        position: { type: integer }
+    TravelRuleInput:
+      type: object
+      required: [name, countries, window_kind, threshold_days, threshold_kind]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        countries: { type: array, items: { type: string }, maxItems: 60 }
+        window_kind: { type: string, enum: [rolling_days, rolling_12_months_in_year, since_last_entry] }
+        window_days: { type: [integer, 'null'], minimum: 1, maximum: 3650 }
+        threshold_days: { type: integer, minimum: 1, maximum: 3650 }
+        threshold_kind: { type: string, enum: [at_most, over] }
+        count_crossing_days: { type: boolean }
+        source: { type: string, maxLength: 600 }
+    TravelCounter:
+      type: object
+      required: [id, name, countries, window_kind, window_days, threshold_days, threshold_kind, used, left, reached_on, reentry, source]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        countries: { type: array, items: { type: string } }
+        window_kind: { type: string }
+        window_days: { type: [integer, 'null'] }
+        threshold_days: { type: integer }
+        threshold_kind: { type: string, enum: [at_most, over] }
+        used: { type: integer, description: Days counted in the window }
+        left: { type: integer, description: 'Days until the threshold: at_most N → N − used, over N → N + 1 − used' }
+        reached_on: { type: [string, 'null'], format: date, description: The day a running stay meets the threshold }
+        reentry: { type: [string, 'null'], format: date, description: 'rolling_days and at_most: the first day a full stay fits again' }
+        source: { type: string }
+    TravelTripItem:
+      type: object
+      required: [id, trip_id, kind, date, time, title, reference, link, note]
+      properties:
+        id: { type: string, format: uuid }
+        trip_id: { type: string, format: uuid }
+        kind: { type: string, enum: [flight, stay, booking, note] }
+        date: { type: string, format: date }
+        time: { type: [string, 'null'] }
+        title: { type: string }
+        reference: { type: string }
+        link: { type: string }
+        note: { type: string }
+    TravelTripItemInput:
+      type: object
+      required: [kind, date, title]
+      properties:
+        kind: { type: string, enum: [flight, stay, booking, note] }
+        date: { type: string, format: date }
+        time: { type: [string, 'null'] }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        reference: { type: string, maxLength: 80 }
+        link: { type: string, maxLength: 500 }
+        note: { type: string, maxLength: 1000 }
+    TravelSpend:
+      type: object
+      required: [id, date, name, amount, currency, linked]
+      properties:
+        id: { type: string, format: uuid }
+        date: { type: string, format: date }
+        name: { type: string }
+        amount: { type: number }
+        currency: { type: string }
+        linked: { type: boolean }
+    TravelSpends:
+      type: object
+      required: [by_currency, total, count]
+      properties:
+        by_currency:
+          type: array
+          items:
+            type: object
+            required: [currency, amount]
+            properties:
+              currency: { type: string }
+              amount: { type: number }
+        total:
+          type: object
+          required: [currency, amount, partial, rate_date]
+          properties:
+            currency: { type: string }
+            amount: { type: number }
+            partial: { type: boolean, description: A spend without a rate is left out }
+            rate_date: { type: [string, 'null'], format: date, description: The oldest rate day used }
+        count: { type: integer }
+    TravelTrip:
+      type: object
+      required: [id, name, start_date, end_date, countries, note, packing, spends]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        countries: { type: array, items: { type: string } }
+        note: { type: string }
+        packing:
+          type: object
+          required: [done, total]
+          properties:
+            done: { type: integer }
+            total: { type: integer }
+        spends: { $ref: '#/components/schemas/TravelSpends' }
+        items: { type: array, items: { $ref: '#/components/schemas/TravelTripItem' } }
+        spend_rows: { type: array, items: { $ref: '#/components/schemas/TravelSpend' } }
+    TravelTripInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        countries: { type: array, items: { type: string, pattern: '^[A-Z]{2}$' }, maxItems: 60 }
+        note: { type: string, maxLength: 2000 }
     TaskAgenda:
       type: object
       required: [date, tz, late, soon, dated, someday, done_today, review]
@@ -7956,3 +8104,850 @@ paths:
         '401': { description: Not authenticated }
         '404': { description: Money module disabled }
         '422': { description: 'No rate for the target currency on the date (no_rate)' }
+  /api/v1/travel/settings:
+    get:
+      summary: The home country
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: object, properties: { home_country: { type: [string, 'null'] } } }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    put:
+      summary: Set the home country
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [home_country], properties: { home_country: { type: string, pattern: '^[A-Z]{2}$' } } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: object, properties: { home_country: { type: string } } }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/travel/crossings:
+    get:
+      summary: Border crossings, newest first
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/TravelCrossing' } }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Record a border crossing
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TravelCrossingInput' }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/TravelCrossing' }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/travel/crossings/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Replace a crossing (all fields)
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TravelCrossingInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/TravelCrossing' }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a crossing
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/travel/rules:
+    get:
+      summary: The day counter rules
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/TravelRule' } }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Add a day counter rule
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TravelRuleInput' }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/TravelRule' }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/travel/rules/templates/{key}:
+    parameters:
+      - { name: key, in: path, required: true, schema: { type: string, enum: [schengen, kz_tax] } }
+    post:
+      summary: Add the Schengen 90/180 or the Kazakhstan tax residency rule
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/TravelRule' }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/travel/rules/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Replace a rule (all fields)
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TravelRuleInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/TravelRule' }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a rule
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/travel/counters:
+    get:
+      summary: Every rule counted on a date
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: date, in: query, schema: { type: string, format: date }, description: 'Today in UTC by default' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/TravelCounter' } }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/travel/days:
+    get:
+      summary: The countries of each day of a range (at most 800 days)
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { type: object, required: [date, countries], properties: { date: { type: string, format: date }, countries: { type: array, items: { type: string } } } } }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/travel/trips:
+    get:
+      summary: Trips with packing and spends, the latest first
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: currency, in: query, schema: { type: string, default: USD } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/TravelTrip' } }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Create a trip
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TravelTripInput' }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/TravelTrip' }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/travel/trips/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: A trip with its plan, packing and spends
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: currency, in: query, schema: { type: string, default: USD } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/TravelTrip' }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    patch:
+      summary: Update a trip
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TravelTripInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/TravelTrip' }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a trip; its tasks and spends stay, unlinked
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/travel/trips/{id}/items:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Add an item to the plan
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TravelTripItemInput' }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/TravelTripItem' }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/travel/trips/{id}/items/{child}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: child, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Replace a plan item (all fields)
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TravelTripItemInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/TravelTripItem' }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a plan item
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/travel/trips/{id}/candidate-spends:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Posted spends of the trip dates that belong to no other trip
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/TravelSpend' } }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/travel/trips/{id}/spends:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Link or unlink posted spends
+      tags: [travel]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { link: { type: array, items: { type: string, format: uuid }, maxItems: 500 }, unlink: { type: array, items: { type: string, format: uuid }, maxItems: 500 } } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: object, required: [changed], properties: { changed: { type: integer } } }
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the travel module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
