@@ -222,6 +222,26 @@ TEST_F(MoneyAdvisorJobTest, TheWeeklyEnqueueHappensOncePerUserAndWeek) {
     Jobs::get().complete(job->id, json::object());
 }
 
+TEST_F(MoneyAdvisorJobTest, ARunningReviewIsRetriedAndALateResultChangesNothing) {
+    const auto [row, queued] = reports.create_or_get(kAnna, "month", "2026-09-01", "2026-09-30");
+    ASSERT_EQ(reports.start(row["id"]), 1) << "a worker claimed the row and died";
+    EXPECT_THROW(run(row["id"]), std::runtime_error) << "a redelivery must not drop the review";
+    EXPECT_EQ((*reports.get(kAnna, row["id"]))["status"], "running");
+
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params(
+            "UPDATE money_advisor_reports SET started_at = now() - interval '11 minutes' WHERE id = $1::uuid",
+            row["id"].get<std::string>());
+        return true;
+    });
+    EXPECT_EQ(run(row["id"])["status"], "done") << "the stale row is claimed again";
+    reports.finish(row["id"], json::object(), "late", "late-model", 1, 1);
+    reports.fail(row["id"], "internal_error", "late");
+    const json after = *reports.get(kAnna, row["id"]);
+    EXPECT_EQ(after["status"], "done");
+    EXPECT_EQ(after["content"], Jobs::MoneyAdvisor::kNothing);
+}
+
 TEST(MoneyAdvisorHandler, IsRegisteredAmongBuiltins) {
     Jobs::register_builtin_handlers();
     EXPECT_TRUE(Jobs::Dispatcher::get().has_handler(Jobs::MoneyAdvisor::kJobType));

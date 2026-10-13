@@ -3,7 +3,7 @@
  * @brief Text descriptions sent to the LLM (table food_parse_jobs).
  *
  * A job row is created by the API when the user asks for a parse, claimed by
- * the worker (queued -> running once: a redelivered job finds it taken), and
+ * the worker (see JobRows.hpp for the claim and the stale rule), and
  * closed with the parsed lines or an error code. The lines wait there until
  * the user confirms them into the diary.
  */
@@ -16,11 +16,14 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/JobRows.hpp"
 
 namespace Repositories {
 
 class ParseJobRepository {
 public:
+    static constexpr const char* kTable = "food_parse_jobs";
+
     /// A queued job; returns its row.
     nlohmann::json create(const std::string& owner,
                           const std::string& text,
@@ -57,43 +60,17 @@ public:
         });
     }
 
-    /// A `running` row older than this is one a crashed worker left behind:
-    /// the provider call is capped at FOOD_LLM_TIMEOUT_SECONDS (60 by default).
-    static constexpr const char* kStaleRunning = "10 minutes";
+    /// queued (or stale running) -> running, one more attempt; 0 when not claimable.
+    int start(const std::string& id) { return JobRows::start(kTable, id); }
 
-    /// queued -> running and one more attempt; a stale `running` row (see
-    /// kStaleRunning) is claimed the same way. Returns the attempt number
-    /// (1 for the first run), or 0 when the row is not claimable.
-    int start(const std::string& id) {
-        return Database::get().execute_write([&](auto& txn) {
-            auto r = txn.exec_params(
-                "UPDATE food_parse_jobs SET status = 'running', attempts = attempts + 1, started_at = now() "
-                "WHERE id = $1::uuid AND (status = 'queued' OR (status = 'running' AND "
-                " COALESCE(started_at, created_at) < now() - $2::interval)) RETURNING attempts",
-                id,
-                kStaleRunning);
-            return r.empty() ? 0 : r[0][0].template as<int>();
-        });
-    }
+    /// The row's status now; nullopt when the row is gone.
+    std::optional<std::string> status(const std::string& id) { return JobRows::status(kTable, id); }
 
-    /// Jobs of the owner that are queued or running.
-    long open_count(const std::string& owner) {
-        return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params(
-                "SELECT count(*) FROM food_parse_jobs WHERE owner_id = $1::uuid AND status IN ('queued', 'running')",
-                owner);
-            return r[0][0].template as<long>();
-        });
-    }
+    /// Jobs of the owner that are queued or running (a stale running row is not counted).
+    long open_count(const std::string& owner) { return JobRows::open_count(kTable, owner); }
 
-    /// running -> queued, for a provider outage the queue will retry.
-    void requeue(const std::string& id) {
-        Database::get().execute_write([&](auto& txn) {
-            txn.exec_params("UPDATE food_parse_jobs SET status = 'queued' WHERE id = $1::uuid AND status = 'running'",
-                            id);
-            return true;
-        });
-    }
+    /// running -> queued, for an outage the queue will retry.
+    void requeue(const std::string& id) { JobRows::requeue(kTable, id); }
 
     void finish(const std::string& id,
                 const nlohmann::json& lines,
@@ -103,7 +80,8 @@ public:
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params(
                 "UPDATE food_parse_jobs SET status = 'done', result = $2::jsonb, error = NULL, model = $3, "
-                " prompt_tokens = $4, completion_tokens = $5, finished_at = now() WHERE id = $1::uuid",
+                " prompt_tokens = $4, completion_tokens = $5, finished_at = now() WHERE id = $1::uuid" +
+                    std::string(JobRows::kWhileRunning),
                 id,
                 lines.dump(),
                 model,
@@ -117,7 +95,8 @@ public:
     void fail(const std::string& id, const std::string& code, const std::string& message) {
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params(
-                "UPDATE food_parse_jobs SET status = 'failed', error = $2, finished_at = now() WHERE id = $1::uuid",
+                "UPDATE food_parse_jobs SET status = 'failed', error = $2, finished_at = now() WHERE id = $1::uuid" +
+                    std::string(JobRows::kWhileOpen),
                 id,
                 message.empty() ? code : code + ": " + message);
             return true;

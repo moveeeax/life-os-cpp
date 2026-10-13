@@ -34,6 +34,7 @@
 #include "food/OpenFoodFacts.hpp"
 #include "jobs/FoodParseHandler.hpp"
 #include "jobs/Jobs.hpp"
+#include "repositories/JobRows.hpp"
 #include "repositories/food/EntryRepository.hpp"
 #include "repositories/food/GoalsBody.hpp"
 #include "repositories/food/GoalsRepository.hpp"
@@ -56,7 +57,6 @@ constexpr std::size_t kNoteMax = 500;
 constexpr std::size_t kProfileNoteMax = 1000;
 constexpr std::size_t kParseTextMax = 2000;
 constexpr std::size_t kBatchMax = 50;
-constexpr long kParseOpenMax = 3;
 constexpr std::size_t kServingLabelMax = 60;
 constexpr double kServingGramsMax = 5000;
 constexpr std::size_t kServingsMax = 20;
@@ -672,7 +672,7 @@ void FoodController::parseStart(const HttpRequestPtr& req, Callback&& callback) 
     std::string id;
     try {
         // Each parse costs provider tokens: a few in flight per user is plenty.
-        if (repo.open_count(owner) >= kParseOpenMax) {
+        if (repo.open_count(owner) >= Repositories::JobRows::kOpenMax) {
             callback(ErrorResponse::make({drogon::k429TooManyRequests,
                                           "too_many_parses",
                                           "wait for your running parses to finish",

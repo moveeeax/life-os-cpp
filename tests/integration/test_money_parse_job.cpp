@@ -243,6 +243,27 @@ TEST_F(MoneyParseJobTest, AStaleRunningRowIsClaimedAgainAndAFinishedOneIsLeftAlo
     EXPECT_EQ(provider.bodies.size(), 1u);
 }
 
+TEST_F(MoneyParseJobTest, ARunningRowIsRetriedAndALateResultChangesNothing) {
+    const std::string id = text_job();
+    ASSERT_EQ(jobs.start(id), 1) << "a worker claimed the row and died";
+    EXPECT_THROW(run(id), std::runtime_error) << "a redelivery must not drop the job";
+    EXPECT_TRUE(provider.bodies.empty());
+
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE money_parse_jobs SET started_at = now() - interval '11 minutes' WHERE id = $1::uuid",
+                        id);
+        return true;
+    });
+    EXPECT_EQ(jobs.open_count(kAnna), 0) << "a stale row does not hold a parse slot";
+    provider.replies.push_back({200, completion(good_lines())});
+    EXPECT_EQ(run(id)["status"], "done");
+    jobs.finish(id, json::array(), "late-model", 1, 1);
+    jobs.fail(id, "internal_error", "late");
+    const json row = *jobs.get(kAnna, id);
+    EXPECT_EQ(row["status"], "done");
+    EXPECT_EQ(row["result"].size(), 1u);
+}
+
 TEST(MoneyParseHandler, IsRegisteredAmongBuiltins) {
     Jobs::register_builtin_handlers();
     EXPECT_TRUE(Jobs::Dispatcher::get().has_handler(Jobs::MoneyParse::kJobType));

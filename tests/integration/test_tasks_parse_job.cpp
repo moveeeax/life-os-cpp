@@ -163,3 +163,37 @@ TEST_F(TasksParseFallbackTest, UsesTheMoneyProviderWithTheTasksPrompt) {
     EXPECT_EQ(provider.urls[0].rfind("https://money-llm.example/v1", 0), 0u);
     EXPECT_EQ(provider.bodies[0]["messages"][0]["content"], "Answer with task JSON.");
 }
+
+TEST_F(TasksParseJobTest, ARedeliveryOfARunningRowIsRetriedNotDropped) {
+    const std::string id = job("buy water");
+    ASSERT_EQ(jobs.start(id), 1) << "a worker claimed the row and died";
+    EXPECT_THROW(run(id), std::runtime_error) << "the queue retries with backoff until the row is stale";
+    EXPECT_TRUE(provider.bodies.empty());
+    EXPECT_EQ((*jobs.get(kAnna, id))["status"], "running");
+}
+
+TEST_F(TasksParseJobTest, AStaleRunningRowDoesNotHoldAParseSlot) {
+    for (int i = 0; i < 3; ++i) {
+        job("buy water");
+    }
+    EXPECT_EQ(jobs.open_count(kAnna), 3);
+    Database::get().execute_write([](auto& txn) {
+        txn.exec("UPDATE task_parse_jobs SET status = 'running', started_at = now() - interval '11 minutes'");
+        return true;
+    });
+    EXPECT_EQ(jobs.open_count(kAnna), 0) << "rows a dead worker left must not lock the user out";
+    ASSERT_EQ(jobs.start(job("call parents")), 1);
+    EXPECT_EQ(jobs.open_count(kAnna), 1) << "a fresh running row still counts";
+}
+
+TEST_F(TasksParseJobTest, ALateResultDoesNotOverwriteAFinishedRow) {
+    provider.replies.push_back({200, completion(json{{"lines", {{{"title", "Buy water"}, {"area", "projects"}}}}})});
+    const std::string id = job("buy water");
+    ASSERT_EQ(run(id)["status"], "done");
+    jobs.finish(id, json::array(), "late-model", 1, 1);
+    jobs.fail(id, "internal_error", "a worker whose stale row was claimed again");
+    const json row = *jobs.get(kAnna, id);
+    EXPECT_EQ(row["status"], "done");
+    EXPECT_EQ(row["result"].size(), 1u);
+    EXPECT_EQ(row["model"], "gpt-6-luna-2026");
+}

@@ -38,6 +38,7 @@
 #include "money/Period.hpp"
 #include "money/Rates.hpp"
 #include "money/Reports.hpp"
+#include "repositories/JobRows.hpp"
 #include "repositories/money/AccountRepository.hpp"
 #include "repositories/money/AdvisorReportRepository.hpp"
 #include "repositories/money/CategoryRepository.hpp"
@@ -75,7 +76,6 @@ constexpr double kAmountMax = 1e12;
 constexpr std::size_t kNameMax = 200;
 constexpr std::size_t kNoteMax = 2000;
 constexpr std::size_t kParseTextMax = 8000;
-constexpr long kParseOpenMax = 3;
 constexpr std::size_t kImageMaxBytes = 4 * 1024 * 1024;
 // The first day the rates source has a snapshot for (checked 2026-10-07).
 constexpr const char* kRatesHistoryStart = "2024-03-02";
@@ -1262,7 +1262,7 @@ void start_parse(const std::string& owner, MoneyController::Callback& callback, 
     Repo::ParseJobRepository repo;
     std::string id;
     try {
-        if (repo.open_count(owner) >= kParseOpenMax) {
+        if (repo.open_count(owner) >= Repositories::JobRows::kOpenMax) {
             callback(ErrorResponse::make({k429TooManyRequests,
                                           "too_many_parses",
                                           "wait for your running parses to finish",

@@ -25,6 +25,7 @@
 #include "core/Modules.hpp"
 #include "jobs/Jobs.hpp"
 #include "jobs/TasksParseHandler.hpp"
+#include "repositories/JobRows.hpp"
 #include "repositories/goals/GoalRepository.hpp"
 #include "repositories/tasks/Errors.hpp"
 #include "repositories/tasks/NoteRepository.hpp"
@@ -51,7 +52,6 @@ constexpr int kDefaultLimit = 50;
 constexpr int kMaxLimit = 200;
 constexpr std::size_t kSourceRefMax = 2000;
 constexpr std::size_t kExternalIdMax = 100;
-constexpr long kParseOpenMax = 3;
 const std::vector<std::string> kStatuses = {"open", "in_progress", "done"};
 const std::vector<std::string> kNoteStatuses = {"inbox", "archived"};
 const std::vector<std::string> kSourceKinds = {"url", "money_transaction"};
@@ -476,7 +476,7 @@ void TasksController::parse(const HttpRequestPtr& req, Callback&& callback) {
     Repo::ParseJobRepository repo;
     std::string id;
     try {
-        if (repo.open_count(owner) >= kParseOpenMax) {
+        if (repo.open_count(owner) >= Repositories::JobRows::kOpenMax) {
             callback(ErrorResponse::make({k429TooManyRequests,
                                           "too_many_parses",
                                           "wait for your running parses to finish",

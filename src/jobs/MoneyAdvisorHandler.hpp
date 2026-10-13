@@ -106,7 +106,13 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     }
     const int attempt = reports.start(id);
     if (attempt == 0) {
-        return {{"report_id", id}, {"status", row->value("status", "unknown")}};
+        // A row still `running` is held by another delivery, or by a worker that died less than
+        // JobRows::kStaleRunning ago: the queue retries with backoff instead of dropping the job.
+        const auto now = reports.status(id);
+        if (now == "running") {
+            throw std::runtime_error("money_advisor: the row is running elsewhere");
+        }
+        return {{"report_id", id}, {"status", now.value_or("missing")}};
     }
     const int max_attempts =
         payload.contains("max_attempts") && payload["max_attempts"].is_number_integer()
