@@ -15,8 +15,8 @@ export function GoalsPanel({ today, date }: { today: Today; date: string }) {
           <h2>
             Days abroad <Link to="/travel/days">Open Travel →</Link>
           </h2>
-          {near.map((n) => (
-            <div key={n.rule} className="c-count">
+          {near.map((n, i) => (
+            <div key={`${i}-${n.rule}`} className="c-count">
               <span>{n.rule}</span>
               <span className="c-n num c-warn-text">{n.left}</span>
               <span className="c-d">days left</span>

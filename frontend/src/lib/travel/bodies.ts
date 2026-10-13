@@ -82,6 +82,7 @@ export interface ItemForm {
   reference: string;
   link: string;
   note: string;
+  no_crossing: boolean;
 }
 
 export function itemBody(f: ItemForm): TravelTripItemInput {
@@ -93,5 +94,7 @@ export function itemBody(f: ItemForm): TravelTripItemInput {
     reference: f.reference.trim(),
     link: f.link.trim(),
     note: f.note.trim(),
+    // Only a flight asks for a crossing; any other kind keeps the default.
+    no_crossing: f.kind === 'flight' && f.no_crossing,
   };
 }

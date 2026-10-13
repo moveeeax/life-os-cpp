@@ -37,7 +37,7 @@ function CounterRow({ c, today }: { c: TravelCounter; today: string }) {
             <Num>{c.left}</Num> days left
           </>
         ) : c.left === 0 ? (
-          'Over the threshold by days'
+          'Threshold met'
         ) : (
           <>
             <Num>{c.left}</Num> more days make it
