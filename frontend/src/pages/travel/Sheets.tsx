@@ -192,6 +192,7 @@ export function ItemSheet({
     reference: item?.reference ?? '',
     link: item?.link ?? '',
     note: item?.note ?? '',
+    no_crossing: item?.no_crossing ?? false,
   });
   const save = useSaveItem(tripId, item?.id ?? null, onClose);
   const set = (k: keyof ItemForm) => (e: { target: { value: string } }) =>
@@ -246,6 +247,16 @@ export function ItemSheet({
           <span>Note</span>
           <input maxLength={1000} value={f.note} onChange={set('note')} />
         </label>
+        {f.kind === 'flight' && (
+          <label className="k-check">
+            <input
+              type="checkbox"
+              checked={f.no_crossing}
+              onChange={(e) => setF({ ...f, no_crossing: e.target.checked })}
+            />{' '}
+            No border crossing for me: domestic, or I am not on this flight
+          </label>
+        )}
         <ErrorLine error={save.error} />
         <Actions busy={save.isPending} label={item ? 'Save' : 'Add'} onCancel={onClose} />
       </form>

@@ -212,6 +212,22 @@ TEST_F(TravelApiTest, AComingTripSaysHowLongAStayMayLast) {
     EXPECT_EQ(allowed[0]["days"], 60);
 }
 
+TEST_F(TravelApiTest, AFlightCanNeedNoCrossing) {
+    const auto trip = created_trip(kAnna)["id"].get<std::string>();
+    const auto add = [&](const json& extra) {
+        json body = {{"kind", "flight"}, {"date", "2026-11-02"}, {"title", "CTU to SYX"}};
+        body.update(extra);
+        return call(kAnna, Post, body, [&](auto req, auto cb) { c.addItem(req, std::move(cb), trip); });
+    };
+    auto plain = add(json::object());
+    ASSERT_EQ(plain->statusCode(), k201Created) << std::string(plain->body());
+    EXPECT_EQ(body_of(plain)["data"]["no_crossing"], false);
+    auto domestic = add({{"no_crossing", true}});
+    ASSERT_EQ(domestic->statusCode(), k201Created);
+    EXPECT_EQ(body_of(domestic)["data"]["no_crossing"], true);
+    EXPECT_EQ(add({{"no_crossing", "yes"}})->statusCode(), k400BadRequest);
+}
+
 TEST_F(TravelApiTest, TemplatesAndCounters) {
     ASSERT_EQ(
         call(kAnna, Post, json::object(), [&](auto req, auto cb) { c.addTemplate(req, std::move(cb), "schengen"); })
@@ -295,6 +311,7 @@ TEST_F(TravelApiTest, SpendsInOneCurrencyArePartialWithoutARate) {
     EXPECT_EQ(spends["by_currency"].size(), 2U);
     EXPECT_DOUBLE_EQ(spends["total"]["amount"].get<double>(), 40.0) << "USD counts, XYZ has no rate";
     EXPECT_TRUE(spends["total"]["partial"].get<bool>());
+    EXPECT_TRUE(spends["total"]["rate_date"].is_null()) << "USD into USD uses no rate";
 }
 
 TEST_F(TravelApiTest, ADeletedTripLeavesItsTasksAndSpends) {

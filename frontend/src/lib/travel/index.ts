@@ -28,13 +28,13 @@ export function counterLine(c: TravelCounter): string {
   return c.threshold_kind === 'at_most' ? `${c.used} of ${c.threshold_days}` : `${c.used} days`;
 }
 
-/** The flights of a plan with no recorded crossing on their date. */
+/** The flights of a plan with no recorded crossing on their date (a flight needing none left out). */
 export function flightsWithoutCrossing(
   items: TravelTripItem[],
   crossings: TravelCrossing[],
 ): TravelTripItem[] {
   const days = new Set(crossings.map((c) => c.date));
-  return items.filter((i) => i.kind === 'flight' && !days.has(i.date));
+  return items.filter((i) => i.kind === 'flight' && !i.no_crossing && !days.has(i.date));
 }
 
 /** Running and future trips soonest first; finished ones latest first. */

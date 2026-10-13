@@ -2214,7 +2214,8 @@
      "title",
      "reference",
      "link",
-     "note"
+     "note",
+     "no_crossing"
     ],
     "properties": {
      "id": {
@@ -2255,6 +2256,10 @@
      },
      "note": {
       "type": "string"
+     },
+     "no_crossing": {
+      "type": "boolean",
+      "description": "A flight that crosses no border of the owner: domestic, or one the owner is not on"
      }
     }
    },
@@ -2302,6 +2307,11 @@
      "note": {
       "type": "string",
       "maxLength": 1000
+     },
+     "no_crossing": {
+      "type": "boolean",
+      "default": false,
+      "description": "A flight that crosses no border of the owner: domestic, or one the owner is not on"
      }
     }
    },
@@ -23913,6 +23923,17 @@
       "BearerAuth": []
      }
     ],
+    "parameters": [
+     {
+      "name": "currency",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "USD"
+      },
+      "description": "The currency of the spends total in the answer"
+     }
+    ],
     "requestBody": {
      "required": true,
      "content": {
@@ -24095,6 +24116,17 @@
     "security": [
      {
       "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "currency",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "USD"
+      },
+      "description": "The currency of the spends total in the answer"
      }
     ],
     "requestBody": {
@@ -24689,7 +24721,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 362552,
-  "source_fnv1a64": "4647890d172c52f0"
+  "source_bytes": 363179,
+  "source_fnv1a64": "5edb702598578992"
  }
 }

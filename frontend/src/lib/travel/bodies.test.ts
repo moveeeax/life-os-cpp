@@ -82,6 +82,7 @@ describe('travel bodies', () => {
         reference: 'X7K2PD',
         link: '',
         note: '',
+        no_crossing: true,
       }),
     ).toEqual({
       kind: 'flight',
@@ -91,6 +92,20 @@ describe('travel bodies', () => {
       reference: 'X7K2PD',
       link: '',
       note: '',
+      no_crossing: true,
     });
+  });
+  it('only a flight keeps the no-crossing mark', () => {
+    const stay = itemBody({
+      kind: 'stay',
+      date: '2026-11-02',
+      time: '',
+      title: 'Lanta Sand',
+      reference: '',
+      link: '',
+      note: '',
+      no_crossing: true,
+    });
+    expect(stay.no_crossing).toBe(false);
   });
 });

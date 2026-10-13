@@ -13877,7 +13877,10 @@ export interface paths {
         /** Create a trip */
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description The currency of the spends total in the answer */
+                    currency?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -14081,7 +14084,10 @@ export interface paths {
         /** Update a trip */
         patch: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description The currency of the spends total in the answer */
+                    currency?: string;
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -15144,6 +15150,8 @@ export interface components {
             reference: string;
             link: string;
             note: string;
+            /** @description A flight that crosses no border of the owner: domestic, or one the owner is not on */
+            no_crossing: boolean;
         };
         TravelTripItemInput: {
             /** @enum {string} */
@@ -15156,6 +15164,11 @@ export interface components {
             /** @description A web address (https:// or http://), or empty */
             link?: string;
             note?: string;
+            /**
+             * @description A flight that crosses no border of the owner: domestic, or one the owner is not on
+             * @default false
+             */
+            no_crossing: boolean;
         };
         TravelSpend: {
             /** Format: uuid */

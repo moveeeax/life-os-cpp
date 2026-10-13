@@ -61,6 +61,7 @@ describe('flightsWithoutCrossing', () => {
     reference: '',
     link: '',
     note: '',
+    no_crossing: false,
   });
   const crossing = (date: string): TravelCrossing => ({
     id: date,
@@ -80,6 +81,10 @@ describe('flightsWithoutCrossing', () => {
     expect(flightsWithoutCrossing(items, [crossing('2026-11-01')]).map((i) => i.id)).toEqual([
       'back',
     ]);
+  });
+  it('leaves out a flight marked as needing no crossing (domestic, or not mine)', () => {
+    const domestic = { ...item('ctu', 'flight', '2026-11-05'), no_crossing: true };
+    expect(flightsWithoutCrossing([domestic], [])).toEqual([]);
   });
 });
 

@@ -595,7 +595,7 @@ components:
         source: { type: string }
     TravelTripItem:
       type: object
-      required: [id, trip_id, kind, date, time, title, reference, link, note]
+      required: [id, trip_id, kind, date, time, title, reference, link, note, no_crossing]
       properties:
         id: { type: string, format: uuid }
         trip_id: { type: string, format: uuid }
@@ -606,6 +606,7 @@ components:
         reference: { type: string }
         link: { type: string }
         note: { type: string }
+        no_crossing: { type: boolean, description: 'A flight that crosses no border of the owner: domestic, or one the owner is not on' }
     TravelTripItemInput:
       type: object
       required: [kind, date, title]
@@ -617,6 +618,7 @@ components:
         reference: { type: string, maxLength: 80 }
         link: { type: string, maxLength: 500, description: "A web address (https:// or http://), or empty" }
         note: { type: string, maxLength: 1000 }
+        no_crossing: { type: boolean, default: false, description: 'A flight that crosses no border of the owner: domestic, or one the owner is not on' }
     TravelSpend:
       type: object
       required: [id, date, name, amount, currency, linked]
@@ -8657,6 +8659,8 @@ paths:
       summary: Create a trip
       tags: [travel]
       security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: currency, in: query, schema: { type: string, default: USD }, description: 'The currency of the spends total in the answer' }
       requestBody:
         required: true
         content:
@@ -8736,6 +8740,8 @@ paths:
       summary: Update a trip
       tags: [travel]
       security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: currency, in: query, schema: { type: string, default: USD }, description: 'The currency of the spends total in the answer' }
       requestBody:
         required: true
         content:

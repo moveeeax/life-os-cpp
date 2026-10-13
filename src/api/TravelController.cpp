@@ -227,6 +227,9 @@ std::optional<TripRepository::ItemInput> item_input(const json& body, const Trav
     text_length(errs, body, "reference", 0, 80);
     text_length(errs, body, "link", 0, 500);
     text_length(errs, body, "note", 0, 1000);
+    if (body.contains("no_crossing") && !body["no_crossing"].is_boolean()) {
+        errs.add("no_crossing", "invalid", "must be true or false");
+    }
     if (const auto link = opt_text(body, "link");
         link && !link->empty() && link->rfind("https://", 0) != 0 && link->rfind("http://", 0) != 0) {
         errs.add("link", "bad_format", "a link starts with https:// or http://");
@@ -241,7 +244,8 @@ std::optional<TripRepository::ItemInput> item_input(const json& body, const Trav
                                      body["title"].get<std::string>(),
                                      opt_text(body, "reference").value_or(""),
                                      opt_text(body, "link").value_or(""),
-                                     opt_text(body, "note").value_or("")};
+                                     opt_text(body, "note").value_or(""),
+                                     body.value("no_crossing", false)};
 }
 
 /// The trip's spends in each currency and in @p target at each spend's day rate.
@@ -279,10 +283,15 @@ json spends_summary(const json& spends, const std::string& target) {
             continue;
         }
         sum += s["amount"].get<double>() / *rate;
-        const auto from = ::Money::Summary::nearest(quotes, c, d);
-        const auto to = ::Money::Summary::nearest(quotes, target, d);
-        const std::string used = std::min(from->date, to->date);
-        rate_date = rate_date.empty() ? used : std::min(rate_date, used);
+        // The day of each quote used; USD is the base and needs none, so a spend
+        // already in the target currency adds no rate day.
+        for (const auto& code : {c, target}) {
+            if (code == "USD" || c == target) {
+                continue;
+            }
+            const std::string used = ::Money::Summary::nearest(quotes, code, d)->date;
+            rate_date = rate_date.empty() ? used : std::min(rate_date, used);
+        }
     }
     total["amount"] = sum;
     total["partial"] = partial;
@@ -570,6 +579,10 @@ void TravelController::listTrips(const HttpRequestPtr& req, Callback&& callback)
 
 void TravelController::createTrip(const HttpRequestPtr& req, Callback&& callback) {
     TRAVEL_GUARD(req, callback, owner);
+    const auto currency = target_currency(req, callback);
+    if (!currency) {
+        return;
+    }
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -598,7 +611,7 @@ void TravelController::createTrip(const HttpRequestPtr& req, Callback&& callback
                                       body["end_date"].get<std::string>(),
                                       countries.value_or(std::set<std::string>{}),
                                       opt_text(body, "note").value_or("")});
-        callback(Response::created(json{{"data", trip_view(repo, owner, row, "USD", true)}}));
+        callback(Response::created(json{{"data", trip_view(repo, owner, row, *currency, true)}}));
     });
 }
 
@@ -633,6 +646,10 @@ void TravelController::updateTrip(const HttpRequestPtr& req, Callback&& callback
     if (!require_valid_uuid(id, callback)) {
         return;
     }
+    const auto currency = target_currency(req, callback);
+    if (!currency) {
+        return;
+    }
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -655,7 +672,7 @@ void TravelController::updateTrip(const HttpRequestPtr& req, Callback&& callback
     p.note = opt_text(body, "note");
     with_repo_errors(callback, "travel.trips.update", [&] {
         TripRepository repo;
-        callback(Response::ok(json{{"data", trip_view(repo, owner, repo.update(owner, id, p), "USD", true)}}));
+        callback(Response::ok(json{{"data", trip_view(repo, owner, repo.update(owner, id, p), *currency, true)}}));
     });
 }
 

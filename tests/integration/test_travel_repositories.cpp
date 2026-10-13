@@ -143,6 +143,8 @@ TEST_F(TravelRepositoriesTest, OnlyTheOwnersPostedSpendsLink) {
     EXPECT_EQ(trips.link_spends(kAnna, t, {mine, income, theirs}, true), 1);
     ASSERT_EQ(trips.spends(kAnna, t).size(), 1U);
     EXPECT_THROW(trips.link_spends(kBoris, t, {theirs}, true), NotFound) << "not Boris's trip";
+    const auto other = trips.create(kAnna, {"Laos", "2026-11-01", "2026-11-20", {"LA"}, ""})["id"].get<std::string>();
+    EXPECT_EQ(trips.link_spends(kAnna, other, {mine}, true), 0) << "already linked to another trip";
     EXPECT_EQ(trips.link_spends(kAnna, t, {mine}, false), 1);
     EXPECT_EQ(trips.spends(kAnna, t).size(), 0U);
 }

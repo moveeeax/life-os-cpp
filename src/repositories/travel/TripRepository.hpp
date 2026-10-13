@@ -45,6 +45,7 @@ public:
         std::string reference;
         std::string link;
         std::string note;
+        bool no_crossing = false;  // a domestic flight, or one the owner is not on
     };
 
     nlohmann::json create(const std::string& owner, const Input& in) {
@@ -158,8 +159,8 @@ public:
                 return Database::get().execute_write([&](auto& txn) {
                     auto r = txn.exec_params(
                         "INSERT INTO travel_trip_items (owner_id, trip_id, kind, date, time, title, reference, link, "
-                        " note) SELECT $1::uuid, id, $3, $4::date, $5::time, $6, $7, $8, $9 FROM travel_trips "
-                        "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id::text",
+                        " note, no_crossing) SELECT $1::uuid, id, $3, $4::date, $5::time, $6, $7, $8, $9, $10 "
+                        "FROM travel_trips WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id::text",
                         owner,
                         trip,
                         in.kind,
@@ -168,7 +169,8 @@ public:
                         in.title,
                         in.reference,
                         in.link,
-                        in.note);
+                        in.note,
+                        in.no_crossing);
                     if (r.empty()) {
                         throw NotFound("trip");
                     }
@@ -188,7 +190,7 @@ public:
                 return Database::get().execute_write([&](auto& txn) {
                     auto r = txn.exec_params(
                         "UPDATE travel_trip_items SET kind = $4, date = $5::date, time = $6::time, title = $7, "
-                        " reference = $8, link = $9, note = $10 "
+                        " reference = $8, link = $9, note = $10, no_crossing = $11 "
                         "WHERE owner_id = $1::uuid AND trip_id = $2::uuid AND id = $3::uuid RETURNING id",
                         owner,
                         trip,
@@ -199,7 +201,8 @@ public:
                         in.title,
                         in.reference,
                         in.link,
-                        in.note);
+                        in.note,
+                        in.no_crossing);
                     if (r.empty()) {
                         throw NotFound("trip_item");
                     }
@@ -270,7 +273,8 @@ public:
             list += "}";
             auto r = link ? txn.exec_params(
                                 "UPDATE money_transactions SET trip_id = $2::uuid WHERE owner_id = $1::uuid "
-                                " AND id = ANY($3::uuid[]) AND type = 'expense' AND status = 'posted' RETURNING id",
+                                " AND id = ANY($3::uuid[]) AND type = 'expense' AND status = 'posted' "
+                                " AND (trip_id IS NULL OR trip_id = $2::uuid) RETURNING id",
                                 owner,
                                 trip,
                                 list)
@@ -290,7 +294,7 @@ private:
         "countries, note";
     static constexpr const char* kItemColumns =
         "id, trip_id, kind, to_char(date, 'YYYY-MM-DD') AS date, to_char(time, 'HH24:MI') AS time, title, reference, "
-        "link, note";
+        "link, note, no_crossing";
 
     nlohmann::json spend_rows(const std::string& owner, const std::string& trip, const std::string& where) {
         return Database::get().execute_read([&](auto& txn) {
