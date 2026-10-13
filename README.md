@@ -9,8 +9,9 @@ module that pulls Mi Fitness (Xiaomi cloud) health data into Postgres.
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-Current version: 1.7.0. Images: `ghcr.io/moveeeax/life-os-cpp`,
-`ghcr.io/moveeeax/life-os-cpp-worker`, `ghcr.io/moveeeax/life-os-cpp-frontend`.
+Images: `ghcr.io/moveeeax/life-os-cpp`, `ghcr.io/moveeeax/life-os-cpp-worker`,
+`ghcr.io/moveeeax/life-os-cpp-frontend`. The current version is the newest
+heading in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## What's inside
 
@@ -106,7 +107,8 @@ handlers check them, not role names.
 Every knob has an env var, a key in `config/config.json` (with
 `${VAR:-default}` expansion) and a built-in default, in that priority order.
 `CONFIG_FILE` points at another JSON file, for example `config/worker.json`
-for the worker or a gitignored `config/local.json` overlay.
+for the worker or a local overlay such as `config/dev.local.json` (the
+`config/*.local.json` pattern and `config/local/` are gitignored).
 `config/config.production.json` is the hardened profile; `make prod-check`
 validates it and `make env-check` reports unset placeholders.
 
@@ -198,20 +200,30 @@ Four charts under `helm/`:
 - `cpp-frontend`, the SPA behind rootless nginx
 - `cpp-env`, an umbrella that deploys the three as one environment
 
-`deploy/values-prod.yaml` and `deploy/values-worker-prod.yaml` are the values
-for the owner's cluster (external CNPG Postgres and Redis, secrets through
-`extraEnvFrom`); `deploy/db/` documents the database and role setup,
-`deploy/sync-tuning-configmap.yaml` holds the fitness sync knobs. Each chart
-also ships a secret-free `values-prod.example.yaml` to copy from.
+Production is the owner's arm64 k3s cluster (kube context `oci-k3s`),
+namespace `life-os`, as three helm releases. Their values live in `deploy/`:
+`values-prod.yaml` (release `life-os-cpp`), `values-worker-prod.yaml`
+(`life-os-cpp-worker`) and `values-frontend-prod.yaml`
+(`life-os-cpp-frontend`). External CNPG Postgres and Redis, secrets through
+`extraEnvFrom`; `deploy/db/` documents the database and role setup,
+`deploy/sync-tuning-configmap.yaml` holds the fitness sync knobs. There is
+no stage environment. Each chart also ships a secret-free
+`values-prod.example.yaml` to copy from.
 
 ```bash
 make helm-lint        # helm lint + template over every chart
-make helm-validate    # render the cpp-env umbrella and assert deploy invariants
-helm upgrade --install api ./helm/life-os-cpp -n life-os -f deploy/values-prod.yaml
+make helm-validate    # render the umbrella and the deploy/ prod values, assert invariants
+helm --kube-context oci-k3s upgrade --install life-os-cpp ./helm/life-os-cpp \
+  -n life-os -f deploy/values-prod.yaml
+helm --kube-context oci-k3s upgrade --install life-os-cpp-worker ./helm/life-os-cpp-worker \
+  -n life-os -f deploy/values-worker-prod.yaml
+helm --kube-context oci-k3s upgrade --install life-os-cpp-frontend ./helm/cpp-frontend \
+  -n life-os -f deploy/values-frontend-prod.yaml
 ```
 
-Release images are `linux/amd64` only, built by `release.yml` on `v*` tags
-after a Trivy scan. Alerts and what to do when they fire are in
+Release images are multi-arch (`linux/amd64` and `linux/arm64`), built
+natively per architecture by `release.yml` on `v*` tags and promoted only
+after a Trivy scan. Prod runs only these images. Alerts and what to do when they fire are in
 [`docs/RUNBOOK.md`](docs/RUNBOOK.md); the production hardening checklist is in
 [`SECURITY.md`](SECURITY.md).
 

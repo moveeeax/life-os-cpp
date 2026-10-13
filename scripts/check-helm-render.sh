@@ -75,27 +75,50 @@ printf '%s' "$workloads" | grep -qi jaeger && fail "values-minimal still renders
 # 7. Production security floor. prod-check.sh validates the JSON app-config, but
 #    the deploy-path env comes from Helm — so the rate limiter shipping fail-OPEN
 #    in prod (a Redis blip silently disables login throttling) was invisible to
-#    it. Render the life-os-cpp chart with the TRACKED prod example overlay and
-#    assert the security-critical env the cluster actually runs with.
-echo "==> helm template (life-os-cpp prod example) + security assertions"
+#    it. Render the REAL prod releases — the values files under deploy/ that the
+#    cluster runs (namespace life-os, releases life-os-cpp, life-os-cpp-worker,
+#    life-os-cpp-frontend) — with their charts, and assert the security-critical
+#    env the API pod actually gets. The values-prod.example.yaml overlays are
+#    examples only; nothing deploys from them, so asserting on them proved
+#    nothing about prod.
 API_CHART="$ROOT/helm/life-os-cpp"
-PROD_RENDERED="$(helm template prod-smoke "$API_CHART" -f "$API_CHART/values-prod.example.yaml")"
+WORKER_CHART="$ROOT/helm/life-os-cpp-worker"
+FRONTEND_CHART="$ROOT/helm/cpp-frontend"
+PROD_API_VALUES="$ROOT/deploy/values-prod.yaml"
+PROD_WORKER_VALUES="$ROOT/deploy/values-worker-prod.yaml"
+PROD_FRONTEND_VALUES="$ROOT/deploy/values-frontend-prod.yaml"
+for f in "$PROD_API_VALUES" "$PROD_WORKER_VALUES" "$PROD_FRONTEND_VALUES"; do
+    [ -f "$f" ] || fail "prod values file $f is gone — update the list in this script"
+done
+
+echo "==> helm lint + template (prod: deploy/values-*prod.yaml) + security assertions"
+helm lint "$API_CHART" -f "$PROD_API_VALUES" >/dev/null || fail "helm lint life-os-cpp with deploy/values-prod.yaml"
+helm lint "$WORKER_CHART" -f "$PROD_WORKER_VALUES" >/dev/null || fail "helm lint life-os-cpp-worker with deploy/values-worker-prod.yaml"
+helm lint "$FRONTEND_CHART" -f "$PROD_FRONTEND_VALUES" >/dev/null || fail "helm lint cpp-frontend with deploy/values-frontend-prod.yaml"
+PROD_RENDERED="$(helm template life-os-cpp "$API_CHART" -n life-os -f "$PROD_API_VALUES")"
+WORKER_RENDERED="$(helm template life-os-cpp-worker "$WORKER_CHART" -n life-os -f "$PROD_WORKER_VALUES")"
+FRONTEND_RENDERED="$(helm template life-os-cpp-frontend "$FRONTEND_CHART" -n life-os -f "$PROD_FRONTEND_VALUES")"
 penv() {
     printf '%s' "$PROD_RENDERED" |
         yq "select(.kind==\"Deployment\") | .spec.template.spec.containers[0].env[] | select(.name==\"$1\") | .value"
 }
 
-[ "$(penv RATE_LIMIT_ENABLED)" = "true" ] || fail "prod overlay: RATE_LIMIT_ENABLED != true (login is unthrottled)"
+[ "$(penv RATE_LIMIT_ENABLED)" = "true" ] ||
+    fail "deploy/values-prod.yaml: RATE_LIMIT_ENABLED != true (login is unthrottled). Set rateLimit.enabled=true."
 [ "$(penv RATE_LIMIT_FAIL_OPEN)" = "false" ] ||
-    fail "prod overlay: rate limiter is fail-OPEN — a Redis outage disables the brute-force throttle on login. Set rateLimit.failOpen=false."
-[ "$(penv AUTH_MODE)" = "jwt" ] || fail "prod overlay: AUTH_MODE != jwt (endpoints would be public)"
-[ "$(penv AUTH_COOKIE_SECURE)" = "true" ] || fail "prod overlay: AUTH_COOKIE_SECURE != true (__Host- cookies need Secure)"
+    fail "deploy/values-prod.yaml: rate limiter is fail-OPEN — a Redis outage disables the brute-force throttle on login. Set rateLimit.failOpen=false."
+[ "$(penv SECURITY_CSRF_ENABLED)" = "true" ] ||
+    fail "deploy/values-prod.yaml: SECURITY_CSRF_ENABLED != true (cookie auth without CSRF protection). Set auth.csrf.enabled=true."
+[ "$(penv IDEMPOTENCY_ENABLED)" = "true" ] ||
+    fail "deploy/values-prod.yaml: IDEMPOTENCY_ENABLED != true (retried POSTs are not de-duplicated). Set idempotency.enabled=true."
+[ "$(penv AUTH_MODE)" = "jwt" ] || fail "deploy/values-prod.yaml: AUTH_MODE != jwt (endpoints would be public)"
+[ "$(penv AUTH_COOKIE_SECURE)" = "true" ] || fail "deploy/values-prod.yaml: AUTH_COOKIE_SECURE != true (__Host- cookies need Secure)"
 
-# No plaintext secret may be baked into a TRACKED overlay — DB password / JWT
+# No plaintext secret may be baked into a TRACKED values file — DB password / JWT
 # secret must arrive via --set or external-secrets (rendered as secretKeyRef),
 # so their plain .value is empty here. A non-empty value = a committed secret.
 for s in DATABASE_PASSWORD JWT_SECRET; do
-    [ -z "$(penv "$s")" ] || fail "prod overlay: $s carries a plaintext value — pass it via --set / external-secrets, never a tracked overlay"
+    [ -z "$(penv "$s")" ] || fail "deploy/values-prod.yaml: $s carries a plaintext value — pass it via --set / external-secrets, never a tracked overlay"
 done
 
 # 8. …but that env check can only ever see the plain `.value` path, and every
@@ -104,8 +127,8 @@ done
 #    was looking. That blind spot is how a working placeholder JWT key sat in
 #    the umbrella's values with CI green until a downstream release inherited
 #    it in production (cyber-accountant e19985b). Assert on the Secret payload
-#    itself, over every TRACKED deployable overlay, so a credential re-entering
-#    values.yaml / values-stage.yaml fails here.
+#    itself, over every TRACKED deployable values file, so a credential
+#    re-entering values.yaml or a deploy/values-*prod.yaml fails here.
 #
 #    values-ci.yaml is deliberately absent from the list: its `ci-*` strings
 #    are render fixtures whose whole job is to make the secretKeyRef path
@@ -122,17 +145,18 @@ assert_no_secret_credentials() {
         fail "$label: rendered Secret carries a committed credential (${leaked}) — tracked overlays must leave these empty and take them via --set / external-secrets"
 }
 
-assert_no_secret_credentials "life-os-cpp values-prod.example.yaml" "$PROD_RENDERED"
+assert_no_secret_credentials "life-os-cpp + deploy/values-prod.yaml" "$PROD_RENDERED"
+assert_no_secret_credentials "life-os-cpp-worker + deploy/values-worker-prod.yaml" "$WORKER_RENDERED"
+assert_no_secret_credentials "cpp-frontend + deploy/values-frontend-prod.yaml" "$FRONTEND_RENDERED"
 
 echo "==> helm template (umbrella, chart defaults) + committed-credential assertion"
 DEFAULT_RENDERED="$(helm template env-smoke "$CHART")"
 assert_no_secret_credentials "umbrella defaults (values.yaml)" "$DEFAULT_RENDERED"
 
-for overlay in values-stage.yaml values-minimal.yaml; do
-    [ -f "$CHART/$overlay" ] || fail "env overlay $overlay is gone — update the list in this script"
-    echo "==> helm template (umbrella, $overlay) + committed-credential assertion"
-    OVERLAY_RENDERED="$(helm template env-smoke "$CHART" -f "$CHART/$overlay")"
-    assert_no_secret_credentials "umbrella + $overlay" "$OVERLAY_RENDERED"
-done
+# values-minimal.yaml is the only other tracked umbrella overlay (values-ci.yaml
+# is excluded above; the stage overlay is gone, there is no stage environment).
+echo "==> helm template (umbrella, values-minimal.yaml) + committed-credential assertion"
+MINIMAL_ONLY="$(helm template env-smoke "$CHART" -f "$CHART/values-minimal.yaml")"
+assert_no_secret_credentials "umbrella + values-minimal.yaml" "$MINIMAL_ONLY"
 
 echo "==> helm-render: all assertions passed"

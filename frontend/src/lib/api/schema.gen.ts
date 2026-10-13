@@ -9004,7 +9004,7 @@ export interface paths {
             parameters: {
                 query?: {
                     kind?: "week" | "month" | "quarter" | "custom";
-                    /** @description A day of the period (week */
+                    /** @description A day of the period (week, month, quarter); defaults to today */
                     date?: string;
                     /** @description Custom period start */
                     from?: string;

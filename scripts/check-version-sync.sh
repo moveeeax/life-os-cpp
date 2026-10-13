@@ -11,9 +11,12 @@
 # value has to stay honest.
 #
 # The helm side drifts the same way and is checked the same way:
-#   - helm/cpp-env/values{,-stage}.yaml pin the api/worker/frontend
-#     image tags (3 pins per file). values-stage.yaml sat on v1.4.0 pins —
-#     GHCR tags that never existed — through two releases before #29 caught it.
+#   - helm/cpp-env/values.yaml pins the api/worker/frontend image tags (3 pins).
+#     A since-removed stage overlay sat on v1.4.0 pins — GHCR tags that never
+#     existed — through two releases before #29 caught it.
+#   - deploy/values-prod.yaml, deploy/values-worker-prod.yaml and
+#     deploy/values-frontend-prod.yaml are what prod actually runs (one image
+#     tag each); a stale pin there deploys the previous release.
 #   - helm/*/Chart.yaml appVersion is the default image tag for a standalone
 #     chart install and the app.kubernetes.io/version label; it sat at 1.4.0
 #     while 1.5.x shipped.
@@ -55,19 +58,30 @@ if [ "$cmake_version" != "$changelog_version" ]; then
     fail=1
 fi
 
-# --- helm image-tag pins (cpp-env umbrella overlays) -------------------------
-# Each tracked overlay pins exactly 3 app image tags (life-os-cpp, life-os-cpp-worker,
-# cpp-frontend). The count is asserted so a restructure that stops the parser
-# from matching fails loudly instead of degrading into a green no-op.
-for overlay in values.yaml values-stage.yaml; do
-    path="helm/cpp-env/$overlay"
+# --- helm image-tag pins (cpp-env umbrella + prod values) --------------------
+# Each entry is <path>:<expected pin count>. The umbrella pins 3 app image tags
+# (life-os-cpp, life-os-cpp-worker, cpp-frontend); each prod values file under
+# deploy/ pins the one image of its release. The count is asserted so a
+# restructure that stops the parser from matching fails loudly instead of
+# degrading into a green no-op.
+pin_total=0
+for entry in helm/cpp-env/values.yaml:3 deploy/values-prod.yaml:1 \
+    deploy/values-worker-prod.yaml:1 deploy/values-frontend-prod.yaml:1; do
+    path="${entry%:*}"
+    want="${entry##*:}"
+    pin_total=$((pin_total + want))
+    if [ ! -f "$REPO/$path" ]; then
+        echo "✗ $path is gone — update the pin list in this script" >&2
+        fail=1
+        continue
+    fi
     tags="$(sed -n 's/^[[:space:]]*tag:[[:space:]]*"\([0-9][0-9.]*\)".*/\1/p' "$REPO/$path")"
     count=0
     [ -n "$tags" ] && count="$(printf '%s\n' "$tags" | wc -l | tr -d ' ')"
-    if [ "$count" -ne 3 ]; then
-        echo "✗ $path: expected exactly 3 pinned image tags (life-os-cpp, life-os-cpp-worker," >&2
-        echo "    cpp-frontend), parsed $count — the file layout changed under the" >&2
-        echo "    parser; fix the pins or re-anchor this check." >&2
+    if [ "$count" -ne "$want" ]; then
+        echo "✗ $path: expected exactly $want pinned image tag(s), parsed $count —" >&2
+        echo "    the file layout changed under the parser; fix the pins or" >&2
+        echo "    re-anchor this check." >&2
         fail=1
         continue
     fi
@@ -77,7 +91,7 @@ for overlay in values.yaml values-stage.yaml; do
                 echo "✗ helm image tag drift: $path pins tag \"$tag\""
                 echo "    but the newest CHANGELOG release heading is [$changelog_version]."
                 echo "    A stale pin deploys an old image (or one that never existed:"
-                echo "    values-stage.yaml carried v1.4.0 GHCR tags for two releases)."
+                echo "    a stage overlay once carried v1.4.0 GHCR tags for two releases)."
             } >&2
             fail=1
         fi
@@ -114,4 +128,4 @@ if [ "$fail" -ne 0 ]; then
 fi
 
 echo "✓ version in sync: $cmake_version (CMakeLists.txt == newest CHANGELOG heading" \
-    "== 6 helm image-tag pins == 4 Chart.yaml appVersions)"
+    "== $pin_total helm image-tag pins == 4 Chart.yaml appVersions)"

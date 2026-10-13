@@ -203,6 +203,8 @@ jobs:
         run: ./scripts/check-config-sync.sh
       - name: Check changelog fragment format (changelog.d/ — fragments stay optional)
         run: ./scripts/assemble-changelog.sh --check
+      - name: Lint OpenAPI spec (spectral; errors fail, warnings are reported)
+        run: ./scripts/lint-openapi.sh
 
   gate-selftest:
     runs-on: ubuntu-latest
@@ -216,7 +218,7 @@ jobs:
     # workflow-level `paths:` filter — a path-skipped required job reports
     # success, which is the disease this job exists to cure): the job always
     # starts, and runs the selftest only when the diff touches where gate
-    # mutations live (scripts/, .github/workflows/, helm/). Rot insurance for
+    # mutations live (scripts/, .github/workflows/, helm/, deploy/). Rot insurance for
     # everything else is .github/workflows/gates-nightly.yml — a daily
     # unconditional run.
     timeout-minutes: 10
@@ -232,7 +234,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          RELEVANT: '^(scripts/|helm/|\.github/workflows/)'
+          RELEVANT: '^(scripts/|helm/|deploy/|\.github/workflows/)'
         run: |
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             changed=$(gh api --paginate \
@@ -275,6 +277,12 @@ jobs:
     # both runtime targets from cache and prove the shipped binaries load,
     # link, and can see a CA bundle.
     timeout-minutes: 45
+    # Explicit bash = `bash -eo pipefail`: the smoke steps pipe `docker run`
+    # into tee, and without pipefail a binary that fails to start would be
+    # masked by tee's exit 0.
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -410,8 +418,11 @@ jobs:
     runs-on: ubuntu-latest
     # Render the cpp-env umbrella with CI values and assert deploy-path
     # invariants (ingress<->service port match, MAIL_VIA_JOBS injected,
-    # baseDomain expanded, no null ports). No cluster — pure template smoke
-    # test. Catches the helm bug class that compile + unit tests cannot.
+    # baseDomain expanded, no null ports), then render the real prod releases
+    # from deploy/values-*prod.yaml and assert the prod security floor (rate
+    # limit fail-closed, CSRF, idempotency, JWT, Secure cookies). No cluster —
+    # pure template smoke test. Catches the helm bug class that compile + unit
+    # tests cannot.
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Install helm + yq
