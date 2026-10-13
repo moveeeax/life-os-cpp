@@ -208,7 +208,7 @@ export function usePacking(tripId: string) {
     queryKey: qk.travel.packing(tripId),
     queryFn: async ({ signal }) =>
       (
-        await api.getJson<{ data: Task[] }>('/api/v1/tasks', {
+        await api.getJson<{ data: Task[] }>('/api/v1/tasks/items', {
           query: { trip: tripId, limit: 200 },
           signal,
         })
