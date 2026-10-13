@@ -6,6 +6,29 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-10-13
+
+### Changed
+- Body sits on the calm sheet: the period as facts on one line, the steps chart open, the other charts as rows that open on a click (two at a time), workouts and SpO2 as rows, sync folded into one row.
+- Food sits on the calm sheet: the day as kcal of the goal with thin macro bars, meals as groups of rows, the week as a chart and day rows, and the numbers of the add sheet in two rows on a phone.
+- Goals sit on the calm sheet: the count of active goals as the headline, the three tiles of a goal as one facts line, and the milestones of a pass or fail goal as a list instead of a timeline that ran off a phone.
+- Dialogs open over the whole screen, centred on a desktop and from the bottom on a phone.
+- Money sits on one calm sheet: rows with details on click, filters and forms in sheets, all accounts as the headline, and Hide numbers blurs only the amounts.
+- Tasks moved onto the same calm sheet frame as the other sections; the weekly review line is a banner and the capture example is neutral.
+- Training sits on the calm sheet: readiness as one facts line, routines, recent workouts and history as rows, exercises as rows with a small photo, and the session keeps time, sets and volume pinned while you scroll.
+
+### Removed
+- Every section is on the calm sheet; the wide legacy sheet and its whole-sheet blur are gone. Dialogs opened from admin and profile pages keep their look.
+
+### Fixed
+- The Goals panel on Now uses the pace words of the Goals page ("behind 2",
+  "not updated", "79 days left"); `/api/v1/today` carries each goal's unit and
+  full progress for that. A focus session started, paused or ended in one tab
+  shows up in the others. An opened corner panel takes the keyboard focus. The
+  all-accounts total on Money shows USD instead of disappearing when the
+  remembered currency has no rate. The task capture shows a neutral example
+  instead of a personal one.
+
 ## [1.21.0] - 2026-10-13
 
 ### Added
