@@ -13,7 +13,7 @@ function stored(): boolean {
 
 /**
  * "Hide numbers" for a shared screen: a class on the root that blurs every
- * marked number (and the whole sheet of a section not redesigned yet).
+ * marked number (`.num`) and chart (`.num-chart`).
  * Remembered per browser.
  */
 export function useHideNumbers(): [boolean, (v: boolean) => void] {

@@ -3,10 +3,6 @@ import type { ReactNode } from 'react';
 import { apiErrorMessage } from '@/lib/api/client';
 import { Group, Row } from '@/shell/kit';
 
-/** The legacy card look, still used by pages not on the calm sheet (Training). */
-export const cardClass =
-  'rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 dark:border-gray-800 dark:bg-white/3';
-
 interface ChartCardProps {
   title: string;
   /** One line under the title, e.g. what the series are. */

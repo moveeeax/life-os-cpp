@@ -172,10 +172,6 @@
   :is(.apexcharts-series, .apexcharts-yaxis-label, .apexcharts-datalabels, .apexcharts-tooltip) {
   filter: blur(7px);
 }
-.hide-numbers .glass [data-legacy-sheet],
-.hide-numbers .glass #g-portal[data-legacy] :is([role='dialog'], [role='alertdialog']) {
-  filter: blur(7px);
-}
 
 /* Screens. */
 .g-main {
@@ -202,13 +198,6 @@
   backdrop-filter: blur(20px) saturate(1.15);
   -webkit-backdrop-filter: blur(20px) saturate(1.15);
   min-width: 0;
-}
-/* An old section page on one sheet until its redesign: it brings its own
-   cards, so the sheet is wider than the column and only a frame. */
-.g-legacy {
-  width: min(1200px, 100%);
-  padding: 16px;
-  overflow-x: auto;
 }
 :focus-visible {
   outline-offset: 3px;
