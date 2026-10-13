@@ -76,9 +76,11 @@ auth:
   csrf:
     enabled: true
 
-# Login throttling and the API limit. Traefik (externalTrafficPolicy Cluster)
-# does not keep the client address, so the IP seen here is a node's: signed-in
-# requests are limited per user, the login per that IP.
+# Login throttling and the API limit. Two proxies stand in front: Traefik
+# (client address kept through proxy protocol from the balancer) and the
+# frontend nginx, which takes the client from X-Forwarded-For (real_ip) and
+# passes it on in X-Real-IP. Signed-in requests are limited per user, the
+# login per client address.
 rateLimit:
   enabled: true
   trustProxy: true
