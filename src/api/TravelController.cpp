@@ -504,8 +504,10 @@ void TravelController::counters(const HttpRequestPtr& req, Callback&& callback) 
         const auto crossings = CrossingRepository().all(owner);
         const std::string home = Repositories::Travel::home_of(owner, crossings);
         const auto day = ::Travel::day_of(*date);
+        // Kept in a variable: a range-for over a member of a temporary reads freed memory.
+        const auto today = ::Travel::days_by_country(crossings, home, day, day);
         json here = json::array();
-        for (const auto& c : ::Travel::days_by_country(crossings, home, day, day).begin()->second) {
+        for (const auto& c : today.begin()->second) {
             if (!c.empty()) {
                 here.push_back(c);
             }
