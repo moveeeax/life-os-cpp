@@ -268,6 +268,16 @@ TEST_F(TravelApiTest, ARuleIsChecked) {
                         {"threshold_kind", "at_most"}},
                    [&](auto req, auto cb) { c.createRule(req, std::move(cb)); });
     EXPECT_EQ(ok->statusCode(), k201Created) << std::string(ok->body());
+    auto year = call(kAnna,
+                     Post,
+                     json{{"name", "Russia tax residency"},
+                          {"countries", {"RU"}},
+                          {"window_kind", "calendar_year"},
+                          {"threshold_days", 182},
+                          {"threshold_kind", "over"}},
+                     [&](auto req, auto cb) { c.createRule(req, std::move(cb)); });
+    ASSERT_EQ(year->statusCode(), k201Created) << std::string(year->body());
+    EXPECT_EQ(body_of(year)["data"]["window_kind"], "calendar_year");
 }
 
 TEST_F(TravelApiTest, SpendsInOneCurrencyArePartialWithoutARate) {

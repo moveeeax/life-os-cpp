@@ -125,6 +125,33 @@ TEST(TravelDays, TaxResidentAt184) {
     EXPECT_EQ(r.left, 0);
 }
 
+// Russia counts the calendar year for the year's final status. Home Russia, in Kazakhstan
+// Jan 12–18, Mar 7–14 and from May 24 on, crossing days in both: Jan 1–12 = 12,
+// Jan 18 – Mar 7 = 14 + 28 + 7 = 49, Mar 14 – May 24 = 18 + 30 + 24 = 72 → 133.
+TEST(TravelDays, CalendarYearCountsOnlyThisYear) {
+    const Rule tax{{"RU"}, Window::CalendarYear, 0, 182, Threshold::Over, true};
+    const std::vector<Crossing> c{{"2026-01-12", "RU", "KZ"},
+                                  {"2026-01-18", "KZ", "RU"},
+                                  {"2026-03-07", "RU", "KZ"},
+                                  {"2026-03-14", "KZ", "RU"},
+                                  {"2026-05-24", "RU", "KZ"}};
+    const auto r = Travel::count(tax, c, "RU", d("2026-10-13"));
+    EXPECT_EQ(r.used, 133) << "2025 at home does not count";
+    EXPECT_EQ(r.left, 50) << "183 days make a resident";
+    EXPECT_FALSE(r.reached_on.has_value()) << "outside Russia, nothing runs";
+    EXPECT_FALSE(r.reentry.has_value());
+}
+
+// At home all year: on Mar 1 2026, Jan 1 – Mar 1 = 31 + 28 + 1 = 60 days; the 183rd day
+// of the year is Jul 2 (31 + 28 + 31 + 30 + 31 + 30 = 181 by Jun 30).
+TEST(TravelDays, CalendarYearReachedOn) {
+    const Rule tax{{"RU"}, Window::CalendarYear, 0, 182, Threshold::Over, true};
+    const auto r = Travel::count(tax, {}, "RU", d("2026-03-01"));
+    EXPECT_EQ(r.used, 60);
+    ASSERT_TRUE(r.reached_on.has_value());
+    EXPECT_EQ(Travel::text_of(*r.reached_on), "2026-07-02");
+}
+
 // Entered Thailand Nov 1, today Nov 10: 10 used of 60; the 60th day is Nov 1 + 59 = Dec 30.
 TEST(TravelDays, SinceTheLastEntry) {
     const Rule visa{{"TH"}, Window::SinceLastEntry, 0, 60, Threshold::AtMost, true};

@@ -558,7 +558,7 @@ components:
         id: { type: string, format: uuid }
         name: { type: string }
         countries: { type: array, items: { type: string }, description: ISO codes or the group key SCHENGEN }
-        window_kind: { type: string, enum: [rolling_days, rolling_12_months_in_year, since_last_entry] }
+        window_kind: { type: string, enum: [rolling_days, rolling_12_months_in_year, calendar_year, since_last_entry] }
         window_days: { type: [integer, 'null'] }
         threshold_days: { type: integer }
         threshold_kind: { type: string, enum: [at_most, over] }
@@ -571,7 +571,7 @@ components:
       properties:
         name: { type: string, minLength: 1, maxLength: 80 }
         countries: { type: array, items: { type: string }, maxItems: 60 }
-        window_kind: { type: string, enum: [rolling_days, rolling_12_months_in_year, since_last_entry] }
+        window_kind: { type: string, enum: [rolling_days, rolling_12_months_in_year, calendar_year, since_last_entry] }
         window_days: { type: [integer, 'null'], minimum: 1, maximum: 3650 }
         threshold_days: { type: integer, minimum: 1, maximum: 3650 }
         threshold_kind: { type: string, enum: [at_most, over] }

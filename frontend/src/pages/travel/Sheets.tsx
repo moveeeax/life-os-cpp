@@ -297,6 +297,7 @@ export function RuleSheet({ rule, onClose }: { rule?: TravelRule; onClose: () =>
             <option value="since_last_entry">Since the last entry</option>
             <option value="rolling_days">Any period of N days</option>
             <option value="rolling_12_months_in_year">Any 12 months ending this year</option>
+            <option value="calendar_year">This calendar year</option>
           </select>
         </label>
         <div className="k-fields">

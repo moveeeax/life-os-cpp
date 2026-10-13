@@ -25,7 +25,7 @@ public:
     struct Input {
         std::string name;
         std::set<std::string> countries;  // ISO codes or SCHENGEN
-        std::string window_kind;          // rolling_days | rolling_12_months_in_year | since_last_entry
+        std::string window_kind;          // rolling_days | rolling_12_months_in_year | calendar_year | since_last_entry
         std::optional<int> window_days;
         int threshold_days = 0;
         std::string threshold_kind;  // at_most | over
@@ -163,6 +163,7 @@ public:
         const auto kind = row.at("window_kind").get<std::string>();
         r.window = kind == "rolling_days"                ? ::Travel::Window::RollingDays
                    : kind == "rolling_12_months_in_year" ? ::Travel::Window::Rolling12MonthsInYear
+                   : kind == "calendar_year"             ? ::Travel::Window::CalendarYear
                                                          : ::Travel::Window::SinceLastEntry;
         r.window_days = row.at("window_days").is_null() ? 0 : row.at("window_days").get<int>();
         r.threshold_days = row.at("threshold_days").get<int>();

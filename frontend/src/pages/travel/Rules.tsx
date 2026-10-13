@@ -17,6 +17,7 @@ import { RuleSheet } from './Sheets';
 const WINDOW: Record<TravelRule['window_kind'], (r: TravelRule) => string> = {
   rolling_days: (r) => `any ${r.window_days} days`,
   rolling_12_months_in_year: () => 'any 12 months ending this year',
+  calendar_year: () => 'this calendar year',
   since_last_entry: () => 'since the last entry',
 };
 
