@@ -39,7 +39,7 @@ export function TravelRulesPage() {
       actions={
         <>
           <button type="button" className="k-btn" onClick={() => template.mutate('schengen')}>
-            Add Schengen 90/180
+            <span data-num-ok>Add Schengen 90/180</span>
           </button>
           <button type="button" className="k-btn" onClick={() => template.mutate('kz_tax')}>
             Add Kazakhstan tax residency
@@ -90,9 +90,13 @@ export function TravelRulesPage() {
               <Row
                 key={r.id}
                 title={r.name}
-                sub={`${r.countries.map((c) => (c === 'SCHENGEN' ? 'Schengen' : countryName(c))).join(', ')} · ${WINDOW[r.window_kind](r)} · ${r.threshold_kind === 'at_most' ? 'at most' : 'over'} ${r.threshold_days}`}
+                sub={
+                  <span
+                    data-num-ok
+                  >{`${r.countries.map((c) => (c === 'SCHENGEN' ? 'Schengen' : countryName(c))).join(', ')} · ${WINDOW[r.window_kind](r)} · ${r.threshold_kind === 'at_most' ? 'at most' : 'over'} ${r.threshold_days}`}</span>
+                }
               >
-                {r.source && <span>{r.source}</span>}
+                {r.source && <span data-num-ok>{r.source}</span>}
                 <span className="k-actions">
                   <button type="button" className="k-link" onClick={() => setEditing(r)}>
                     Edit
