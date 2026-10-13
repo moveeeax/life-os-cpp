@@ -24,7 +24,8 @@ const BASE = '/api/v1/tasks';
  * inbox move together), the goals, whose progress counts their tasks, and the
  * day's digest of Now, whose corners list them.
  */
-const ALL = [qk.tasks.all(), qk.goals.all(), qk.now.all()] as const;
+// A task write also moves a trip's packing.
+const ALL = [qk.tasks.all(), qk.goals.all(), qk.now.all(), qk.travel.all()] as const;
 
 export const TASKS_PARSE_POLL_MS = 1500;
 /** The provider call is capped by its timeout; a job unfinished after this is stuck. */
