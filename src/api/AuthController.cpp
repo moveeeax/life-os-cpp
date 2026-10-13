@@ -172,8 +172,9 @@ void AuthController::refresh(const HttpRequestPtr& req, std::function<void(const
         return;
     }
 
-    // Revocation check.
-    if (!is_refresh_live(cfg, jti)) {
+    // Revocation check and rotation in one step: the delete is atomic, so of
+    // two refreshes racing with the same token only one gets past here.
+    if (!consume_refresh(cfg, jti)) {
         callback(ErrorResponse::unauthorized("revoked"));
         return;
     }
@@ -181,14 +182,11 @@ void AuthController::refresh(const HttpRequestPtr& req, std::function<void(const
     Repositories::UserRepository users;
     auto user = users.find(sub);
     if (!user) {
-        // User deleted while session was active.
-        revoke_refresh(cfg, refresh);  // best effort
+        // User deleted while session was active; the token is spent already.
         callback(ErrorResponse::unauthorized("user_gone"));
         return;
     }
 
-    // Rotate.
-    revoke_jti(cfg, jti);
     auto session = mint_session(*user);
     if (!session) {
         callback(ErrorResponse::service_unavailable("session_unavailable"));
@@ -278,8 +276,8 @@ std::optional<AuthController::Session> AuthController::mint_session(const Domain
     return s;
 }
 
-bool AuthController::is_refresh_live(const Security::Auth::AuthConfig& cfg, const std::string& jti) {
-    return Security::Sessions::is_live(cfg.cookies, jti);
+bool AuthController::consume_refresh(const Security::Auth::AuthConfig& cfg, const std::string& jti) {
+    return Security::Sessions::consume(cfg.cookies, jti);
 }
 
 void AuthController::revoke_jti(const Security::Auth::AuthConfig& cfg, const std::string& jti) {

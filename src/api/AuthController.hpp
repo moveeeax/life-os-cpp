@@ -108,7 +108,8 @@ private:
      */
     std::optional<Session> mint_session(const Domain::User& user);
 
-    static bool is_refresh_live(const Security::Auth::AuthConfig& cfg, const std::string& jti);
+    /// True only for the one caller that removed the live JTI (see Sessions::consume).
+    static bool consume_refresh(const Security::Auth::AuthConfig& cfg, const std::string& jti);
 
     static void revoke_jti(const Security::Auth::AuthConfig& cfg, const std::string& jti);
 
