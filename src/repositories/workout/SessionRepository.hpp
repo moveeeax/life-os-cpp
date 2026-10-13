@@ -88,6 +88,19 @@ public:
      * @throws RoutineNotFound when the routine is not the owner's.
      */
     nlohmann::json start(const std::string& owner, const std::optional<std::string>& routine_id) {
+        // The check below cannot see a session another request is inserting
+        // right now; the one-active-session index catches it (23505).
+        return detail::translate_sql([&] { return start_once(owner, routine_id); },
+                                     [&](std::string_view state) {
+                                         if (state == "23505") {
+                                             const auto other = active(owner);
+                                             throw SessionActive(other ? (*other)["id"].get<std::string>() : "");
+                                         }
+                                     });
+    }
+
+private:
+    nlohmann::json start_once(const std::string& owner, const std::optional<std::string>& routine_id) {
         return Database::get().execute_write([&](auto& txn) {
             auto active = txn.exec_params(
                 "SELECT id::text FROM workout_sessions WHERE owner_id = $1::uuid "
@@ -125,6 +138,7 @@ public:
         });
     }
 
+public:
     /// One session in full, or nullopt.
     std::optional<nlohmann::json> find(const std::string& owner, const std::string& id) {
         return Database::get().execute_read(
