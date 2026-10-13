@@ -108,6 +108,18 @@ export const qk = {
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['now-enabled'] as const,
   },
+  /** Travel section. */
+  travel: {
+    all: () => ['travel'] as const,
+    settings: () => ['travel', 'settings'] as const,
+    crossings: () => ['travel', 'crossings'] as const,
+    rules: () => ['travel', 'rules'] as const,
+    counters: (date: string) => ['travel', 'counters', date] as const,
+    trips: (currency: string) => ['travel', 'trips', currency] as const,
+    trip: (id: string, currency: string) => ['travel', 'trip', id, currency] as const,
+    candidates: (id: string) => ['travel', 'candidates', id] as const,
+    packing: (id: string) => ['travel', 'packing', id] as const,
+  },
   goals: {
     all: () => ['goals'] as const,
     list: (status: string, date: string) => ['goals', 'list', status, date] as const,
