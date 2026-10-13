@@ -34,6 +34,8 @@ describe('quietLines', () => {
           pace: 'behind',
           progress: 0.3,
           days_left: 80,
+          unit: '',
+          detail: { kind: 'count', elapsed: 0.5, days_left: 80, pace: 'behind', progress: 0.3 },
         },
       ],
     };
@@ -57,6 +59,8 @@ describe('quietLines', () => {
           pace: 'on_track',
           progress: 0.5,
           days_left: 50,
+          unit: '',
+          detail: { kind: 'steps', elapsed: 0.5, days_left: 50, pace: 'on_track', progress: 0.5 },
         },
       ],
     };
@@ -121,6 +125,8 @@ describe('quietLines', () => {
           pace: 'behind',
           progress: 0.3,
           days_left: 80,
+          unit: '',
+          detail: { kind: 'count', elapsed: 0.5, days_left: 80, pace: 'behind', progress: 0.3 },
         },
       ],
       food: {

@@ -266,7 +266,7 @@ components:
           type: array
           items:
             type: object
-            required: [id, title, kind, due, pace, progress, days_left]
+            required: [id, title, kind, due, pace, progress, days_left, unit, detail]
             properties:
               id: { type: string, format: uuid }
               title: { type: string }
@@ -275,6 +275,8 @@ components:
               pace: { type: string, enum: [on_track, behind] }
               progress: { type: [number, 'null'], description: '0..1; null for a pass / fail goal' }
               days_left: { type: [integer, 'null'] }
+              unit: { type: string }
+              detail: { $ref: '#/components/schemas/GoalProgress' }
         food:
           type: object
           required: [eaten, target]

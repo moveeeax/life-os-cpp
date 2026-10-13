@@ -13121,6 +13121,8 @@ export interface components {
                 /** @description 0..1; null for a pass / fail goal */
                 progress: number | null;
                 days_left: number | null;
+                unit: string;
+                detail: components["schemas"]["GoalProgress"];
             }[];
             food?: {
                 eaten: {

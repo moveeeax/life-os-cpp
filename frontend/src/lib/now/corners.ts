@@ -1,6 +1,8 @@
 // The four corners of Now: one main line and one small line each, a dot when
 // something is off (the rules of the quiet lines), and the countdowns of the
 // Goals corner.
+import { paceWord, type Tone } from '@/lib/goals';
+
 import { quietLines, type LinePart } from './lines';
 import type { Today } from './types';
 
@@ -181,4 +183,9 @@ function tasksChip(t: Today): Chip {
 /** The four corners in their order: top left, top right, bottom left, bottom right. */
 export function chips(today: Today, hour: number, todayDate: string): Chip[] {
   return [bodyChip(today), goalsChip(today, todayDate), dayChip(today, hour), tasksChip(today)];
+}
+
+/** The pace word of a goal in the digest: the same words as the Goals page. */
+export function goalPace(g: NonNullable<Today['goals']>[number]): { text: string; tone: Tone } {
+  return paceWord({ kind: g.kind, unit: g.unit, progress: g.detail });
 }

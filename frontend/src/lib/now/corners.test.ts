@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { chips, countdownFigure, countdowns, formatMoney, formatSleep } from './corners';
+import {
+  chips,
+  countdownFigure,
+  countdowns,
+  formatMoney,
+  formatSleep,
+  goalPace,
+} from './corners';
 import type { Today } from './types';
 
 const base: Today = {
@@ -87,6 +94,8 @@ describe('chips', () => {
           pace: 'behind',
           progress: 0.08,
           days_left: 170,
+          unit: '',
+          detail: { kind: 'number', elapsed: 0.5, days_left: 170, pace: 'behind', progress: 0.08 },
         },
         {
           id: 'a',
@@ -96,6 +105,8 @@ describe('chips', () => {
           pace: 'on_track',
           progress: null,
           days_left: 19,
+          unit: '',
+          detail: { kind: 'binary', elapsed: 0.5, days_left: 19, pace: 'on_track', progress: null },
         },
       ],
     };
@@ -183,6 +194,8 @@ describe('countdowns', () => {
       pace: 'on_track',
       progress: null,
       days_left: 19,
+      unit: '',
+      detail: { kind: 'binary', elapsed: 0.5, days_left: 19, pace: 'on_track', progress: null },
     },
     {
       id: '2',
@@ -192,6 +205,8 @@ describe('countdowns', () => {
       pace: 'on_track',
       progress: 0.58,
       days_left: 80,
+      unit: '',
+      detail: { kind: 'count', elapsed: 0.5, days_left: 80, pace: 'on_track', progress: 0.58 },
     },
     {
       id: '3',
@@ -201,6 +216,8 @@ describe('countdowns', () => {
       pace: 'behind',
       progress: 0.3,
       days_left: 1,
+      unit: '',
+      detail: { kind: 'steps', elapsed: 0.5, days_left: 1, pace: 'behind', progress: 0.3 },
     },
     {
       id: '4',
@@ -210,6 +227,8 @@ describe('countdowns', () => {
       pace: 'on_track',
       progress: null,
       days_left: 0,
+      unit: '',
+      detail: { kind: 'binary', elapsed: 0.5, days_left: 0, pace: 'on_track', progress: null },
     },
     {
       id: '5',
@@ -219,6 +238,8 @@ describe('countdowns', () => {
       pace: 'behind',
       progress: 0.1,
       days_left: 0,
+      unit: '',
+      detail: { kind: 'count', elapsed: 0.5, days_left: 0, pace: 'behind', progress: 0.1 },
     },
   ];
   it('lists goals due within 60 days, nearest first, past ones left out', () => {
@@ -323,5 +344,36 @@ describe('the Food and money chip with all accounts', () => {
       },
     };
     expect(text(chips(t, 10, '2026-10-13')[2].small)).toBe('7,500 KZT spent today');
+  });
+});
+
+describe('goalPace', () => {
+  it('uses the words of the Goals page', () => {
+    const g: NonNullable<Today['goals']>[number] = {
+      id: '1',
+      title: 'Books',
+      kind: 'count',
+      due: '2026-12-31',
+      pace: 'behind',
+      progress: 0.4,
+      days_left: 30,
+      unit: 'books',
+      detail: { kind: 'count', elapsed: 0.5, days_left: 30, pace: 'behind', progress: 0.4, expected: 6, done: 4 },
+    };
+    expect(goalPace(g)).toEqual({ text: 'behind 2', tone: 'behind' });
+  });
+  it('says not updated for a stale number goal', () => {
+    const g: NonNullable<Today['goals']>[number] = {
+      id: '2',
+      title: 'Weight',
+      kind: 'number',
+      due: '2026-12-31',
+      pace: 'on_track',
+      progress: 0.5,
+      days_left: 30,
+      unit: 'kg',
+      detail: { kind: 'number', elapsed: 0.5, days_left: 30, pace: 'on_track', progress: 0.5, stale: true },
+    };
+    expect(goalPace(g).text).toBe('not updated');
   });
 });
