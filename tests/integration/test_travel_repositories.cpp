@@ -153,8 +153,8 @@ TEST_F(TravelRepositoriesTest, ADeletedTripLeavesItsTasksAndSpends) {
     trips.link_spends(kAnna, t, {s}, true);
     Database::get().execute_write([&](auto& txn) {
         txn.exec_params(
-            "INSERT INTO task_items (owner_id, title, area, trip_id, status) VALUES ($1::uuid, 'Adapter', 'travel', "
-            "$2::uuid, 'done'), ($1::uuid, 'Insurance', 'travel', $2::uuid, 'open')",
+            "INSERT INTO task_items (owner_id, title, area, trip_id, status, completed_at) VALUES ($1::uuid, "
+            "'Adapter', 'travel', $2::uuid, 'done', now()), ($1::uuid, 'Insurance', 'travel', $2::uuid, 'open', NULL)",
             std::string(kAnna),
             t);
         return true;
