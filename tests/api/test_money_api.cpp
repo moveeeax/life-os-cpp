@@ -688,6 +688,14 @@ TEST_F(MoneyApiTest, ACryptoWalletKeepsEightDecimals) {
                   ->statusCode(),
               k400BadRequest)
         << "below one satoshi";
+    const auto satoshi = call_json(&Api::MoneyController::createTransfer,
+                                   user(kAnna),
+                                   json{{"date", "2026-09-26"},
+                                        {"from_account_id", wallet["id"]},
+                                        {"to_account_id", kaspi["id"]},
+                                        {"amount_sent", 0.00000001},
+                                        {"amount_received", 0.01}});
+    EXPECT_EQ(satoshi->statusCode(), k201Created) << "one satoshi is a real amount: " << satoshi->body();
     EXPECT_EQ(
         call_id(
             &Api::MoneyController::updateAccount, user(kAnna), Patch, kaspi["id"], json{{"opening_balance", 10.005}})
