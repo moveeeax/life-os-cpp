@@ -43,7 +43,11 @@ protected:
         if (::testing::Test::IsSkipped())
             return;
         Database::get().execute_write([](auto& txn) {
-            txn.exec("TRUNCATE TABLE travel_trip_items, travel_trips, travel_rules, travel_crossings, travel_settings");
+            // DELETE, not TRUNCATE: task_items and money_transactions reference travel_trips.
+            for (const char* table :
+                 {"travel_trip_items", "travel_trips", "travel_rules", "travel_crossings", "travel_settings"}) {
+                txn.exec(std::string("DELETE FROM ") + table);
+            }
             for (const char* id : {kAnna, kBoris}) {
                 const std::string o = id;
                 txn.exec_params("DELETE FROM task_items WHERE owner_id = $1::uuid", o);
