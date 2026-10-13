@@ -71,8 +71,26 @@ export function countdowns(
   todayDate: string,
   horizonDays = COUNTDOWN_DAYS,
 ): Countdown[] {
-  return (today.goals ?? [])
-    .map((g) => ({ id: g.id, title: g.title, due: g.due, days: daysBetween(todayDate, g.due) }))
+  const trip = today.travel?.next_trip;
+  const trips = trip
+    ? [
+        {
+          id: `trip:${trip.id}`,
+          title: trip.name,
+          due: trip.start_date,
+          days: daysBetween(todayDate, trip.start_date),
+        },
+      ]
+    : [];
+  return [
+    ...(today.goals ?? []).map((g) => ({
+      id: g.id,
+      title: g.title,
+      due: g.due,
+      days: daysBetween(todayDate, g.due),
+    })),
+    ...trips,
+  ]
     .filter((c) => c.days >= 0 && c.days <= horizonDays)
     .sort((a, b) => a.days - b.days || a.title.localeCompare(b.title))
     .map((c) => ({ ...c, words: inDays(c.days) }));
@@ -131,10 +149,13 @@ function goalsChip(t: Today, todayDate: string): Chip {
       ? [{ text: `${next.title} ${next.words}` }]
       : [{ text: `${next.title} in ` }, { text: String(next.days), num: true }, { text: ' days' }]
     : [{ text: 'No goal due soon' }];
-  const small: LinePart[] = behind
-    ? [{ text: `${behind.title} is behind` }]
-    : [{ text: 'All on track' }];
-  return { key: 'goals', title: 'Goals', main, small, dot: behind ? 'warn' : null };
+  const near = t.travel?.near?.[0];
+  const small: LinePart[] = near
+    ? [{ text: `${near.rule}: ` }, { text: String(near.left), num: true }, { text: ' days left' }]
+    : behind
+      ? [{ text: `${behind.title} is behind` }]
+      : [{ text: 'All on track' }];
+  return { key: 'goals', title: 'Goals', main, small, dot: behind || near ? 'warn' : null };
 }
 
 function dayChip(t: Today, hour: number): Chip {

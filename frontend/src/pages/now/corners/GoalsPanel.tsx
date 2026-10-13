@@ -7,12 +7,27 @@ import { Meter } from './Parts';
 export function GoalsPanel({ today, date }: { today: Today; date: string }) {
   const soon = countdowns(today, date);
   const goals = today.goals ?? [];
+  const near = today.travel?.near ?? [];
   return (
     <>
+      {near.length > 0 && (
+        <>
+          <h2>
+            Days abroad <Link to="/travel/days">Open Travel →</Link>
+          </h2>
+          {near.map((n) => (
+            <div key={n.rule} className="c-count">
+              <span>{n.rule}</span>
+              <span className="c-n num c-warn-text">{n.left}</span>
+              <span className="c-d">days left</span>
+            </div>
+          ))}
+        </>
+      )}
       <h2>
         Countdowns <Link to="/goals">Open Goals →</Link>
       </h2>
-      {soon.length === 0 && <p className="c-empty">No goal is due in the next 60 days.</p>}
+      {soon.length === 0 && <p className="c-empty">No goal or trip in the next 60 days.</p>}
       {soon.map((c) => {
         const f = countdownFigure(c.days);
         return (
