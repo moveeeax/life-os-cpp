@@ -15,6 +15,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/LikePattern.hpp"
 #include "repositories/RepoErrors.hpp"
 
 namespace Repositories {
@@ -72,12 +73,13 @@ public:
     /// Library exercises plus the owner's own, filtered and paged by name.
     Page list(const std::string& owner, const Filter& f, long limit, long offset) {
         Page out;
+        const std::string q = escape_like(f.q);
         Database::get().execute_read([&](auto& txn) {
             auto agg =
                 txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
                                     " FROM exercises e " + kWhere + " ORDER BY e.name, e.id LIMIT $8 OFFSET $9) t",
                                 owner,
-                                f.q,
+                                q,
                                 f.muscle,
                                 f.equipment,
                                 f.category,
@@ -88,7 +90,7 @@ public:
             out.rows = nlohmann::json::parse(agg[0][0].template as<std::string>());
             auto total = txn.exec_params("SELECT COUNT(*) FROM exercises e " + std::string(kWhere),
                                          owner,
-                                         f.q,
+                                         q,
                                          f.muscle,
                                          f.equipment,
                                          f.category,
@@ -188,7 +190,7 @@ private:
     // $1 owner, $2 q, $3 muscle, $4 equipment, $5 category, $6 source, $7 include_archived.
     static constexpr const char* kWhere =
         "WHERE (e.source = 'library' OR e.owner_id = $1::uuid) "
-        "AND ($2 = '' OR e.name ILIKE '%' || $2 || '%') "
+        "AND ($2 = '' OR e.name ILIKE '%' || $2 || '%' ESCAPE '\\') "
         "AND ($3 = '' OR $3 = ANY(e.primary_muscles) OR $3 = ANY(e.secondary_muscles)) "
         "AND ($4 = '' OR e.equipment = $4) "
         "AND ($5 = '' OR e.category = $5) "

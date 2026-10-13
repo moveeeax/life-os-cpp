@@ -196,6 +196,12 @@ TEST_F(WorkoutApiTest, SearchFiltersByNameMuscleAndEquipment) {
     EXPECT_TRUE(none["data"].empty());
 }
 
+TEST_F(WorkoutApiTest, SearchTextIsMatchedLiterally) {
+    // No library name holds % or _: as wildcards they would match all 876.
+    EXPECT_EQ(body_of(list_exercises(owner(), {{"q", "%"}}))["total"], 0);
+    EXPECT_EQ(body_of(list_exercises(owner(), {{"q", "_"}}))["total"], 0);
+}
+
 TEST_F(WorkoutApiTest, UnknownSourceIs400) {
     const auto resp = list_exercises(owner(), {{"source", "elsewhere"}});
     ASSERT_TRUE(resp);

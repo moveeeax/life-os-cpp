@@ -14,6 +14,7 @@
 
 #include "database/Database.hpp"
 #include "money/Merchant.hpp"
+#include "repositories/LikePattern.hpp"
 #include "repositories/money/CategoryRepository.hpp"
 #include "repositories/money/Errors.hpp"
 
@@ -75,17 +76,6 @@ public:
 
 private:
     inline static const std::string kColumns = kColumnsRaw;
-
-    static std::string escape_like(const std::string& text) {
-        std::string out;
-        for (const char c : text) {
-            if (c == '%' || c == '_' || c == '\\') {
-                out.push_back('\\');
-            }
-            out.push_back(c);
-        }
-        return out;
-    }
 };
 
 }  // namespace Repositories::Money
