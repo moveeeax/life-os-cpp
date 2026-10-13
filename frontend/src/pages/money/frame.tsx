@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 import { useMoneySummary } from '@/hooks/useMoney';
 import { ApiClientError, apiErrorMessage } from '@/lib/api/client';
-import { formatTotal, rateDay } from '@/lib/networth';
+import { cardCurrency, formatTotal, rateDay } from '@/lib/networth';
 import { cn } from '@/lib/utils';
 import { Num, SectionFrame, type TabItem } from '@/shell/kit';
 
@@ -39,7 +39,12 @@ interface MoneyFrameProps {
  * a switched-off module answers 404 and LoadError says so.
  */
 export function MoneyFrame({ title, actions, children }: MoneyFrameProps) {
-  const s = useMoneySummary(currency(), 30).data;
+  const remembered = currency();
+  const first = useMoneySummary(remembered, 30);
+  const shown = cardCurrency(remembered, first.isError);
+  // The remembered currency lost its rate: the headline shows USD instead of going away.
+  const fallback = useMoneySummary(shown, 30, shown !== remembered);
+  const s = shown === remembered ? first.data : fallback.data;
   const has = !!s && (s.accounts.length > 0 || s.not_converted.length > 0);
   return (
     <SectionFrame
