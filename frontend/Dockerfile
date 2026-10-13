@@ -52,6 +52,12 @@ RUN wget -q -O /tmp/db.tar.gz \
 # podSecurityContext (runAsNonRoot) without a privileged port or root pidfile.
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 
+# The base image lags the Alpine security fixes (OpenSSL CVE-2026-31789 in 1.23.0);
+# the release scan fails on a fixable CRITICAL, so take the fixed packages here.
+USER root
+RUN apk upgrade --no-cache
+USER 101
+
 # Photos first: this layer changes only with the pinned commit.
 COPY --from=exercise-media /exercise-media /usr/share/nginx/html/exercise-media
 COPY --from=builder /app/dist /usr/share/nginx/html
