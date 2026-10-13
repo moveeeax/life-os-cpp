@@ -14,14 +14,14 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/JobRows.hpp"
 #include "repositories/money/Errors.hpp"
 
 namespace Repositories::Money {
 
 class ParseJobRepository {
 public:
-    /// A row `running` longer than this was left by a worker that died.
-    static constexpr const char* kStaleRunning = "10 minutes";
+    static constexpr const char* kTable = "money_parse_jobs";
 
     nlohmann::json create_text(const std::string& owner, const std::string& text, const std::string& hint_date) {
         return detail::translate_sql(
@@ -82,26 +82,13 @@ public:
     }
 
     /// queued (or stale running) -> running, one more attempt; 0 when not claimable.
-    int start(const std::string& id) {
-        return Database::get().execute_write([&](auto& txn) {
-            auto r = txn.exec_params(
-                "UPDATE money_parse_jobs SET status = 'running', attempts = attempts + 1, started_at = now() "
-                "WHERE id = $1::uuid AND (status = 'queued' OR (status = 'running' AND "
-                " COALESCE(started_at, created_at) < now() - $2::interval)) RETURNING attempts",
-                id,
-                kStaleRunning);
-            return r.empty() ? 0 : r[0][0].template as<int>();
-        });
-    }
+    int start(const std::string& id) { return JobRows::start(kTable, id); }
+
+    /// The row's status now; nullopt when the row is gone.
+    std::optional<std::string> status(const std::string& id) { return JobRows::status(kTable, id); }
 
     /// running -> queued, for an outage the queue will retry.
-    void requeue(const std::string& id) {
-        Database::get().execute_write([&](auto& txn) {
-            txn.exec_params("UPDATE money_parse_jobs SET status = 'queued' WHERE id = $1::uuid AND status = 'running'",
-                            id);
-            return true;
-        });
-    }
+    void requeue(const std::string& id) { JobRows::requeue(kTable, id); }
 
     void finish(const std::string& id,
                 const nlohmann::json& lines,
@@ -111,7 +98,8 @@ public:
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params(
                 "UPDATE money_parse_jobs SET status = 'done', result = $2::jsonb, error = NULL, model = $3, "
-                " prompt_tokens = $4, completion_tokens = $5, image = NULL, finished_at = now() WHERE id = $1::uuid",
+                " prompt_tokens = $4, completion_tokens = $5, image = NULL, finished_at = now() WHERE id = $1::uuid" +
+                    std::string(JobRows::kWhileRunning),
                 id,
                 lines.dump(),
                 model,
@@ -126,7 +114,8 @@ public:
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params(
                 "UPDATE money_parse_jobs SET status = 'failed', error = $2, image = NULL, finished_at = now() "
-                "WHERE id = $1::uuid",
+                "WHERE id = $1::uuid" +
+                    std::string(JobRows::kWhileOpen),
                 id,
                 message.empty() ? code : code + ": " + message);
             return true;
@@ -144,15 +133,8 @@ public:
         return !r.empty();
     }
 
-    /// Jobs of the owner that are queued or running.
-    long open_count(const std::string& owner) {
-        return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params(
-                "SELECT count(*) FROM money_parse_jobs WHERE owner_id = $1::uuid AND status IN ('queued', 'running')",
-                owner);
-            return r[0][0].template as<long>();
-        });
-    }
+    /// Jobs of the owner that are queued or running (a stale running row is not counted).
+    long open_count(const std::string& owner) { return JobRows::open_count(kTable, owner); }
 
     /// Whether the photo is still stored (tests and the cleanup check).
     bool has_image(const std::string& id) {

@@ -77,8 +77,13 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     }
     const int attempt = jobs.start(job_id);
     if (attempt == 0) {
-        // A redelivery of a job that already ran: its journal stays as it is.
-        return {{"job_id", job_id}, {"status", job->value("status", "unknown")}};
+        // A row still `running` is held by another delivery, or by a worker that died less than
+        // JobRows::kStaleRunning ago: the queue retries with backoff instead of dropping the job.
+        const auto now = jobs.status(job_id);
+        if (now == "running") {
+            throw std::runtime_error("food_parse: the row is running elsewhere");
+        }
+        return {{"job_id", job_id}, {"status", now.value_or("missing")}};
     }
     const std::string owner = job->value("owner_id", std::string());
     // The job carries the retry limit it was submitted with; the worker's own

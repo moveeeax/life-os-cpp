@@ -14,13 +14,14 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/JobRows.hpp"
 #include "repositories/money/Errors.hpp"
 
 namespace Repositories::Money {
 
 class AdvisorReportRepository {
 public:
-    static constexpr const char* kStaleRunning = "10 minutes";
+    static constexpr const char* kTable = "money_advisor_reports";
 
     /**
      * The owner's review of the period, created queued when there is none.
@@ -96,25 +97,14 @@ public:
         });
     }
 
-    int start(const std::string& id) {
-        return Database::get().execute_write([&](auto& txn) {
-            auto r = txn.exec_params(
-                "UPDATE money_advisor_reports SET status = 'running', attempts = attempts + 1, started_at = now() "
-                "WHERE id = $1::uuid AND (status = 'queued' OR (status = 'running' AND "
-                " COALESCE(started_at, created_at) < now() - $2::interval)) RETURNING attempts",
-                id,
-                kStaleRunning);
-            return r.empty() ? 0 : r[0][0].template as<int>();
-        });
-    }
+    /// queued (or stale running) -> running, one more attempt; 0 when not claimable.
+    int start(const std::string& id) { return JobRows::start(kTable, id); }
 
-    void requeue(const std::string& id) {
-        Database::get().execute_write([&](auto& txn) {
-            txn.exec_params(
-                "UPDATE money_advisor_reports SET status = 'queued' WHERE id = $1::uuid AND status = 'running'", id);
-            return true;
-        });
-    }
+    /// The row's status now; nullopt when the row is gone.
+    std::optional<std::string> status(const std::string& id) { return JobRows::status(kTable, id); }
+
+    /// running -> queued, for an outage the queue will retry.
+    void requeue(const std::string& id) { JobRows::requeue(kTable, id); }
 
     void finish(const std::string& id,
                 const nlohmann::json& facts,
@@ -125,7 +115,8 @@ public:
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params(
                 "UPDATE money_advisor_reports SET status = 'done', facts = $2::jsonb, content = $3, error = NULL, "
-                " model = $4, prompt_tokens = $5, completion_tokens = $6, finished_at = now() WHERE id = $1::uuid",
+                " model = $4, prompt_tokens = $5, completion_tokens = $6, finished_at = now() WHERE id = $1::uuid" +
+                    std::string(JobRows::kWhileRunning),
                 id,
                 facts.dump(),
                 content,
@@ -140,7 +131,8 @@ public:
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params(
                 "UPDATE money_advisor_reports SET status = 'failed', error = $2, finished_at = now() WHERE id = "
-                "$1::uuid",
+                "$1::uuid" +
+                    std::string(JobRows::kWhileOpen),
                 id,
                 message.empty() ? code : code + ": " + message);
             return true;

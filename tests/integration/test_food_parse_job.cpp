@@ -300,8 +300,14 @@ TEST_F(FoodParseJobTest, AStaleRunningRowIsClaimedAgain) {
         txn.exec_params("UPDATE food_parse_jobs SET status = 'running', started_at = now() WHERE id = $1::uuid", fresh);
         return true;
     });
-    EXPECT_EQ(run(fresh)["status"], "running") << "a row another worker holds is left alone";
+    EXPECT_THROW(run(fresh), std::runtime_error) << "a row another worker holds is retried later, not dropped";
+    EXPECT_EQ((*jobs.get(kAnna, fresh))["status"], "running");
     EXPECT_EQ(provider.calls.size(), 1u);
+    EXPECT_EQ(jobs.open_count(kAnna), 1) << "the fresh running row counts, the done one does not";
+
+    jobs.finish(id, json::array(), "late-model", 1, 1);
+    jobs.fail(id, "internal_error", "late");
+    EXPECT_EQ((*jobs.get(kAnna, id))["status"], "done") << "a late result does not overwrite a finished row";
 }
 
 TEST_F(FoodParseJobTest, TheRetryLimitComesWithTheJob) {

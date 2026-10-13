@@ -754,6 +754,7 @@ protected:
     std::string done_job(const json& account, const json& category) {
         Repositories::Money::ParseJobRepository jobs;
         const std::string id = jobs.create_text(kAnna, "Kaspi *8880 13275.61 KZT", "2026-10-07")["id"];
+        EXPECT_EQ(jobs.start(id), 1) << "the worker claims it before it answers";
         jobs.finish(id,
                     json::array({json{{"date", "2026-10-05"},
                                       {"account_id", account["id"]},
