@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  chips,
-  countdownFigure,
-  countdowns,
-  formatMoney,
-  formatSleep,
-  goalPace,
-} from './corners';
+import { chips, countdownFigure, countdowns, formatMoney, formatSleep, goalPace } from './corners';
 import type { Today } from './types';
 
 const base: Today = {
@@ -358,7 +351,15 @@ describe('goalPace', () => {
       progress: 0.4,
       days_left: 30,
       unit: 'books',
-      detail: { kind: 'count', elapsed: 0.5, days_left: 30, pace: 'behind', progress: 0.4, expected: 6, done: 4 },
+      detail: {
+        kind: 'count',
+        elapsed: 0.5,
+        days_left: 30,
+        pace: 'behind',
+        progress: 0.4,
+        expected: 6,
+        done: 4,
+      },
     };
     expect(goalPace(g)).toEqual({ text: 'behind 2', tone: 'behind' });
   });
@@ -372,7 +373,14 @@ describe('goalPace', () => {
       progress: 0.5,
       days_left: 30,
       unit: 'kg',
-      detail: { kind: 'number', elapsed: 0.5, days_left: 30, pace: 'on_track', progress: 0.5, stale: true },
+      detail: {
+        kind: 'number',
+        elapsed: 0.5,
+        days_left: 30,
+        pace: 'on_track',
+        progress: 0.5,
+        stale: true,
+      },
     };
     expect(goalPace(g).text).toBe('not updated');
   });
