@@ -43,7 +43,7 @@ export function GoalsPanel({ today, date }: { today: Today; date: string }) {
                   label={g.title}
                   share={g.progress ?? 0}
                   tone={off ? 'warn' : 'ok'}
-                  value={<span className={off ? 'c-warn-text' : undefined}>{pace.text}</span>}
+                  value={<span className={off ? 'num c-warn-text' : 'num'}>{pace.text}</span>}
                 />
               );
             })}
