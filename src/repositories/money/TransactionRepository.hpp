@@ -18,6 +18,7 @@
 
 #include "database/Database.hpp"
 #include "money/Merchant.hpp"
+#include "repositories/LikePattern.hpp"
 #include "repositories/money/AccountRepository.hpp"
 #include "repositories/money/CategoryRepository.hpp"
 #include "repositories/money/CurrencyRepository.hpp"
@@ -379,17 +380,6 @@ private:
         " to_char(t.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";
     inline static const std::string kFrom = " FROM money_transactions t JOIN money_accounts a ON a.id = t.account_id";
     inline static const std::string kSelect = "SELECT " + kColumns + kFrom;
-
-    static std::string escape_like(const std::string& text) {
-        std::string out;
-        for (const char c : text) {
-            if (c == '%' || c == '_' || c == '\\') {
-                out.push_back('\\');
-            }
-            out.push_back(c);
-        }
-        return out;
-    }
 
     template <typename Txn>
     static std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& id) {

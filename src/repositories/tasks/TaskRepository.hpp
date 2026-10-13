@@ -15,6 +15,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/LikePattern.hpp"
 #include "repositories/tasks/Errors.hpp"
 #include "tasks/Agenda.hpp"
 
@@ -243,18 +244,6 @@ public:
             });
         }();
         return zones.count(tz) > 0;
-    }
-
-    /// The text with LIKE's own characters escaped by a backslash.
-    static std::string escape_like(const std::string& text) {
-        std::string out;
-        for (const char c : text) {
-            if (c == '%' || c == '_' || c == '\\') {
-                out.push_back('\\');
-            }
-            out.push_back(c);
-        }
-        return out;
     }
 
     /// Whether a money ledger row is the owner's (the table exists whether the module is on or not).

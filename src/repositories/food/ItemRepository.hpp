@@ -16,24 +16,10 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/LikePattern.hpp"
 #include "repositories/RepoErrors.hpp"
 
 namespace Repositories {
-
-namespace detail {
-/// `%`, `_` and the escape itself quoted for an ILIKE ... ESCAPE '\\' pattern.
-inline std::string escape_like(const std::string& text) {
-    std::string out;
-    out.reserve(text.size());
-    for (const char c : text) {
-        if (c == '%' || c == '_' || c == '\\') {
-            out.push_back('\\');
-        }
-        out.push_back(c);
-    }
-    return out;
-}
-}  // namespace detail
 
 struct FoodItemNotFound : NotFoundError {
     FoodItemNotFound() : NotFoundError("food_item") {}
@@ -90,13 +76,13 @@ public:
                                             " FROM food_items WHERE " + where +
                                             " ORDER BY lower(name), id LIMIT $4 OFFSET $5) t",
                                         owner,
-                                        detail::escape_like(q),
+                                        escape_like(q),
                                         include_archived,
                                         limit,
                                         offset);
             out.rows = nlohmann::json::parse(rows[0][0].template as<std::string>());
             auto total = txn.exec_params(
-                "SELECT COUNT(*) FROM food_items WHERE " + where, owner, detail::escape_like(q), include_archived);
+                "SELECT COUNT(*) FROM food_items WHERE " + where, owner, escape_like(q), include_archived);
             out.total = total[0][0].template as<long>();
             return 0;
         });
