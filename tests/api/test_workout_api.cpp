@@ -5,8 +5,12 @@
  *        disabled module.
  */
 
+#include <chrono>
 #include <cstdint>
+#include <future>
+#include <pqxx/pqxx>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -601,6 +605,22 @@ TEST_F(WorkoutSessionsTest, OnlyOneSessionIsActiveAtATime) {
     // Another user has no active session and may start one.
     EXPECT_TRUE(body_of(active(stranger()))["data"].is_null());
     EXPECT_EQ(start(stranger())->statusCode(), k201Created);
+}
+
+TEST_F(WorkoutSessionsTest, AStartRacingAnotherIsAConflictNotAServerError) {
+    // Another connection inserts the owner's session and holds its transaction
+    // open: start() does not see that row in its check, then waits on the
+    // one-active-session index until the other side commits (23505).
+    pqxx::connection side(TestHelpers::pg_conn_string());
+    pqxx::work hold(side);
+    hold.exec("INSERT INTO workout_sessions (owner_id) VALUES ('" + std::string(kOwner) + "'::uuid)");
+    auto racing = std::async(std::launch::async, [&] { return start(owner()); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    hold.commit();
+    const auto resp = racing.get();
+    ASSERT_TRUE(resp);
+    EXPECT_EQ(resp->statusCode(), k409Conflict) << std::string(resp->body());
+    EXPECT_EQ(body_of(resp)["error"], "session_active");
 }
 
 TEST_F(WorkoutSessionsTest, StartValidatesTheRoutine) {
