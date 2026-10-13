@@ -34,7 +34,7 @@ import {
   primaryButton,
   secondaryButton,
   textareaClass,
-} from './styles';
+} from '@/shell/kit/styles';
 
 const LIST = '/workout/routines';
 
@@ -88,12 +88,10 @@ function ItemCard({ item, index, count, errors, onChange, onMove, onRemove }: It
           className="size-14 shrink-0 rounded-lg"
         />
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+          <h3 className="truncate text-theme-sm font-semibold">
             {index + 1}. {item.exercise_name}
           </h3>
-          <p className="text-theme-xs text-gray-500 dark:text-gray-400">
-            {trackingLabel(item.tracking_mode)}
-          </p>
+          <p className="text-theme-xs k-muted">{trackingLabel(item.tracking_mode)}</p>
         </div>
         <div className="flex shrink-0 gap-1.5">
           <button
@@ -267,9 +265,7 @@ function Editor({ routineId, isNew, initial }: EditorProps) {
         </div>
 
         {draft.items.length === 0 ? (
-          <p className={cn(cardClass, 'text-theme-sm text-gray-500 dark:text-gray-400')}>
-            No exercises yet.
-          </p>
+          <p className={cn(cardClass, 'text-theme-sm k-muted')}>No exercises yet.</p>
         ) : (
           <ol className="flex flex-col gap-4">
             {draft.items.map((item, index) => (
@@ -291,7 +287,7 @@ function Editor({ routineId, isNew, initial }: EditorProps) {
           </ol>
         )}
         {errors.items && (
-          <p role="alert" className="text-theme-sm text-error-500">
+          <p role="alert" className="text-theme-sm k-error-text">
             {errors.items}
           </p>
         )}
@@ -307,12 +303,12 @@ function Editor({ routineId, isNew, initial }: EditorProps) {
         </button>
 
         {(save.error || remove.error) && (
-          <p role="alert" className="text-theme-sm text-error-500">
+          <p role="alert" className="text-theme-sm k-error-text">
             {save.error ?? remove.error}
           </p>
         )}
         {submitted && Object.keys(errors).length > 0 && (
-          <p role="alert" className="text-theme-sm text-error-500">
+          <p role="alert" className="text-theme-sm k-error-text">
             Some fields need fixing before the routine can be saved.
           </p>
         )}
@@ -341,7 +337,7 @@ function Editor({ routineId, isNew, initial }: EditorProps) {
         <Modal onClose={() => setPicking(false)} className="max-w-5xl">
           <div className={modalPanel}>
             <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold">Add exercise</h2>
+              <h2 className="k-panel-title">Add exercise</h2>
               <button type="button" onClick={() => setPicking(false)} className={secondaryButton}>
                 Close
               </button>
@@ -394,10 +390,7 @@ export function WorkoutRoutineEditorPage() {
       ) : routine.error ? (
         <LoadError error={routine.error} onRetry={() => routine.refetch()} />
       ) : (
-        <div
-          className="h-64 animate-pulse rounded-2xl bg-gray-100 dark:bg-white/5"
-          aria-label="Loading"
-        />
+        <div className="h-64 k-placeholder" aria-label="Loading" />
       )}
     </WorkoutFrame>
   );

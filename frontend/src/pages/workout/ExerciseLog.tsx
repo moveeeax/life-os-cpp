@@ -24,7 +24,13 @@ import { cn } from '@/lib/utils';
 
 import { ExerciseDetails } from './ExerciseDetails';
 import { ExercisePhoto } from './ExercisePhoto';
-import { cardClass, iconButton, modalPanel, primaryButton, secondaryButton } from './styles';
+import {
+  cardClass,
+  iconButton,
+  modalPanel,
+  primaryButton,
+  secondaryButton,
+} from '@/shell/kit/styles';
 
 interface SetFormProps {
   exercise: WorkoutSessionExercise;
@@ -62,10 +68,7 @@ function SetForm({
       <div className="grid grid-cols-2 gap-3">
         {fieldsFor(mode).map((field) => (
           <div key={field} className={fieldsFor(mode).length === 1 ? 'col-span-2' : undefined}>
-            <label
-              htmlFor={id(field)}
-              className="mb-1 block text-theme-xs font-medium text-gray-500 dark:text-gray-400"
-            >
+            <label htmlFor={id(field)} className="mb-1 block text-theme-xs font-medium k-muted">
               {FIELD_LABELS[mode][field]}
             </label>
             <input
@@ -77,17 +80,17 @@ function SetForm({
               onFocus={(e) => e.target.select()}
               aria-invalid={errors[field] ? true : undefined}
               aria-describedby={errors[field] ? `${id(field)}-error` : undefined}
-              className="h-14 w-full rounded-xl border border-gray-300 bg-transparent px-3 text-center text-2xl font-semibold text-gray-800 tabular-nums shadow-theme-xs focus:border-brand-300 focus:ring-3 focus:ring-brand-500/20 focus:outline-hidden aria-invalid:border-error-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+              className="k-input k-big num"
             />
             {errors[field] && (
-              <p id={`${id(field)}-error`} className="mt-1 text-theme-xs text-error-500">
+              <p id={`${id(field)}-error`} className="mt-1 text-theme-xs k-error-text">
                 {errors[field]}
               </p>
             )}
           </div>
         ))}
       </div>
-      <label className="flex items-center gap-2 text-theme-sm text-gray-700 dark:text-gray-300">
+      <label className="flex items-center gap-2 text-theme-sm k-soft">
         <input
           type="checkbox"
           checked={warmup}
@@ -186,46 +189,39 @@ export function ExerciseLog({ exercise, queue, onPut, onRemove, onLogged }: Exer
           <ExercisePhoto path={exercise.images[0]} alt="" className="size-16 rounded-lg" />
         </button>
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-            {exercise.exercise_name}
-          </h2>
-          <p className="text-theme-sm text-gray-500 dark:text-gray-400">
-            {targetSummary(exercise)}
-          </p>
+          <h2 className="k-ex-title">{exercise.exercise_name}</h2>
+          <p className="text-theme-sm k-muted">{targetSummary(exercise)}</p>
         </div>
       </div>
-      {exercise.note && (
-        <p className="mt-2 text-theme-sm text-gray-700 dark:text-gray-300">{exercise.note}</p>
-      )}
+      {exercise.note && <p className="mt-2 text-theme-sm k-soft">{exercise.note}</p>}
       {previous.length > 0 && (
-        <p className="mt-2 text-theme-sm text-gray-500 dark:text-gray-400">
+        <p className="mt-2 text-theme-sm k-muted">
           Last time: {previous.map((s) => describeSet(s, mode)).join(' · ')}
         </p>
       )}
 
       {sets.length > 0 && (
-        <ol className="mt-4 divide-y divide-gray-100 dark:divide-gray-800">
+        <ol className="mt-4 k-divide">
           {sets.map((set) => {
             const tag = set.kind === 'warmup' ? 'W' : String(++workNumber);
             return (
               <li key={set.id} className="flex items-center gap-3 py-2">
                 <span
-                  className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-theme-sm font-medium text-gray-600 dark:bg-white/5 dark:text-gray-300"
+                  className="k-set-tag"
+                  data-num-ok
                   title={set.kind === 'warmup' ? 'Warm-up set' : `Set ${tag}`}
                 >
                   {tag}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-base font-medium text-gray-800 tabular-nums dark:text-white/90">
-                    {describeSet(set, mode)}
-                  </span>
+                  <span className="num k-set">{describeSet(set, mode)}</span>
                   {set.rejected ? (
-                    <span role="alert" className="block text-theme-xs text-error-500">
+                    <span role="alert" className="block text-theme-xs k-error-text">
                       Not saved: {set.rejected}
                     </span>
                   ) : (
                     set.unsent && (
-                      <span className="block text-theme-xs text-warning-600 dark:text-orange-400">
+                      <span className="block text-theme-xs k-warn-text">
                         Not saved yet, will retry
                       </span>
                     )
@@ -253,7 +249,7 @@ export function ExerciseLog({ exercise, queue, onPut, onRemove, onLogged }: Exer
         </ol>
       )}
       {removeError && (
-        <p role="alert" className="mt-2 text-theme-sm text-error-500">
+        <p role="alert" className="mt-2 text-theme-sm k-error-text">
           {removeError}
         </p>
       )}
@@ -261,9 +257,7 @@ export function ExerciseLog({ exercise, queue, onPut, onRemove, onLogged }: Exer
       <div className="mt-4">
         {editing ? (
           <>
-            <p className="mb-2 text-theme-sm font-medium text-gray-700 dark:text-gray-300">
-              Editing a logged set
-            </p>
+            <p className="mb-2 text-theme-sm font-medium k-soft">Editing a logged set</p>
             <SetForm
               key={`edit-${editing.id}`}
               exercise={exercise}
@@ -293,7 +287,7 @@ export function ExerciseLog({ exercise, queue, onPut, onRemove, onLogged }: Exer
             <ExerciseDetails exercise={details.data} onClose={() => setShowDetails(false)} />
           ) : (
             <div className={modalPanel}>
-              <p className="text-theme-sm text-gray-500 dark:text-gray-400">
+              <p className="text-theme-sm k-muted">
                 {details.error ? apiErrorMessage(details.error, 'Failed to load.') : 'Loading…'}
               </p>
               <button

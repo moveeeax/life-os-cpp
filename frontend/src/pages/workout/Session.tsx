@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import { Link, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { Modal } from '@/components/Modal';
 import {
   useActiveSession,
   useAddSessionExercise,
@@ -23,7 +22,8 @@ import { Stat } from './bits';
 import { ExerciseBrowser } from './ExerciseBrowser';
 import { ExerciseLog } from './ExerciseLog';
 import { LoadError, WorkoutFrame } from './frame';
-import { cardClass, dangerButton, modalPanel, primaryButton, secondaryButton } from './styles';
+import { Banner, Sheet } from '@/shell/kit';
+import { dangerButton, primaryButton, secondaryButton } from '@/shell/kit/styles';
 
 type Confirm = 'finish' | 'discard' | 'remove' | null;
 
@@ -35,31 +35,15 @@ interface RestBarProps {
 function RestBar({ rest }: RestBarProps) {
   if (!rest.running && !rest.justEnded) return null;
   return (
-    <div
-      role="status"
-      className={cn(
-        'sticky bottom-3 z-20 flex items-center gap-3 rounded-2xl px-4 py-3 text-white shadow-theme-lg',
-        rest.running ? 'bg-gray-900 dark:bg-gray-700' : 'animate-pulse bg-success-600',
-      )}
-    >
+    <div role="status" className={cn('k-rest', !rest.running && 'k-rest-done')}>
       {rest.running ? (
         <>
-          <span className="text-theme-sm">Rest</span>
-          <span className="flex-1 text-2xl font-semibold tabular-nums">
-            {formatClock(rest.remaining)}
-          </span>
-          <button
-            type="button"
-            onClick={() => rest.add(30)}
-            className="rounded-lg border border-white/30 px-3 py-2 text-theme-sm font-medium hover:bg-white/10"
-          >
+          <span className="k-muted">Rest</span>
+          <span className="k-rest-clock">{formatClock(rest.remaining)}</span>
+          <button type="button" onClick={() => rest.add(30)} className="k-btn">
             +30 s
           </button>
-          <button
-            type="button"
-            onClick={rest.stop}
-            className="rounded-lg border border-white/30 px-3 py-2 text-theme-sm font-medium hover:bg-white/10"
-          >
+          <button type="button" onClick={rest.stop} className="k-btn">
             Skip
           </button>
         </>
@@ -107,24 +91,22 @@ function ActiveSession({ session }: { session: WorkoutSession }) {
   const error = finish.error ?? discard.error ?? addExercise.error ?? removeExercise.error;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className={cardClass}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-            {session.name || 'Workout'}
-          </h2>
+    <div className="k-form">
+      <div className="k-sticky">
+        <div className="k-tools k-tools-tight">
+          <span className="k-row-title">{session.name || 'Workout'}</span>
           <button type="button" onClick={() => setConfirm('finish')} className={primaryButton}>
             <Check className="size-4" aria-hidden="true" />
             Finish
           </button>
         </div>
-        <div className="mt-3 grid grid-cols-3 gap-3">
+        <div className="k-facts">
           <Stat label="Time" value={formatClock((now - Date.parse(session.started_at)) / 1000)} />
           <Stat label="Work sets" value={String(workSetCount(shown))} />
           <Stat label="Volume" value={formatVolume(sessionVolume(shown))} />
         </div>
         {unsent > 0 && (
-          <p className="mt-3 text-theme-sm text-warning-600 dark:text-orange-400" role="status">
+          <p className="k-sub k-warn-text" role="status">
             {unsent} {unsent === 1 ? 'set is' : 'sets are'} not saved on the server yet: kept on
             this device and sent again automatically.
           </p>
@@ -132,7 +114,7 @@ function ActiveSession({ session }: { session: WorkoutSession }) {
       </div>
 
       {count > 0 && (
-        <nav aria-label="Exercises of this workout" className="flex gap-2 overflow-x-auto pb-1">
+        <nav aria-label="Exercises of this workout" className="k-chips">
           {shown.exercises.map((e, i) => {
             const done = e.sets.length >= (e.target_sets ?? 1) && e.sets.length > 0;
             return (
@@ -141,15 +123,10 @@ function ActiveSession({ session }: { session: WorkoutSession }) {
                 type="button"
                 onClick={() => setPosition(i)}
                 aria-current={i === index ? 'step' : undefined}
-                className={cn(
-                  'flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-theme-sm font-medium whitespace-nowrap transition',
-                  i === index
-                    ? 'border-brand-500 bg-brand-500 text-white'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5',
-                )}
+                className={i === index ? 'k-btn k-solid' : 'k-btn'}
               >
                 {done && <Check className="size-3.5" aria-label="done" />}
-                {i + 1}. {e.exercise_name}
+                <span data-num-ok>{i + 1}.</span> {e.exercise_name}
               </button>
             );
           })}
@@ -166,13 +143,11 @@ function ActiveSession({ session }: { session: WorkoutSession }) {
           onLogged={() => rest.start(exercise.rest_seconds)}
         />
       ) : (
-        <p className={cn(cardClass, 'text-theme-sm text-gray-500 dark:text-gray-400')}>
-          This workout has no exercises yet. Add the first one.
-        </p>
+        <p className="k-empty">This workout has no exercises yet. Add the first one.</p>
       )}
 
       {count > 1 && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="k-fields">
           <button
             type="button"
             onClick={() => setPosition(index - 1)}
@@ -194,7 +169,7 @@ function ActiveSession({ session }: { session: WorkoutSession }) {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-3">
+      <div className="k-tools">
         <button type="button" onClick={() => setPicking(true)} className={secondaryButton}>
           <Plus className="size-4" aria-hidden="true" />
           Add exercise
@@ -207,32 +182,24 @@ function ActiveSession({ session }: { session: WorkoutSession }) {
         <button
           type="button"
           onClick={() => setConfirm('discard')}
-          className={cn(dangerButton, 'ms-auto')}
+          className={cn(dangerButton, 'k-push')}
         >
           Discard workout
         </button>
       </div>
 
       {error && (
-        <p role="alert" className="text-theme-sm text-error-500">
-          {error}
+        <p role="alert" className="k-error">
+          {String(error)}
         </p>
       )}
 
       <RestBar rest={rest} />
 
       {picking && (
-        <Modal onClose={() => setPicking(false)} className="max-w-5xl">
-          <div className={modalPanel}>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold">Add exercise</h2>
-              <button type="button" onClick={() => setPicking(false)} className={secondaryButton}>
-                Close
-              </button>
-            </div>
-            <ExerciseBrowser onSelect={(e) => addExercise.mutate(e.id)} />
-          </div>
-        </Modal>
+        <Sheet title="Add exercise" onClose={() => setPicking(false)} width={720}>
+          <ExerciseBrowser onSelect={(e) => addExercise.mutate(e.id)} />
+        </Sheet>
       )}
       {confirm === 'finish' && (
         <ConfirmDialog
@@ -285,25 +252,17 @@ export function WorkoutSessionPage() {
   const active = useActiveSession();
 
   return (
-    <WorkoutFrame title="Workout">
+    <WorkoutFrame title="Workout in progress">
       {active.isPending ? (
-        <div
-          className="h-64 animate-pulse rounded-2xl bg-gray-100 dark:bg-white/5"
-          aria-label="Loading"
-        />
+        <div className="k-placeholder" aria-label="Loading" />
       ) : active.error ? (
         <LoadError error={active.error} onRetry={() => active.refetch()} />
       ) : active.data ? (
         <ActiveSession key={active.data.id} session={active.data} />
       ) : (
-        <div className={cardClass}>
-          <p className="text-theme-sm text-gray-500 dark:text-gray-400">
-            No workout is in progress.
-          </p>
-          <Link to="/workout" className={cn(primaryButton, 'mt-4')}>
-            Start one
-          </Link>
-        </div>
+        <Banner to="/workout" action="Start one">
+          No workout is in progress.
+        </Banner>
       )}
     </WorkoutFrame>
   );

@@ -1,4 +1,3 @@
-import { Play } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
 
 import { LinkMiNotice } from '@/components/LinkMiNotice';
@@ -19,14 +18,11 @@ import { weekdayLabel } from '@/lib/workout';
 import { formatDay, formatDuration, formatTime, formatVolume } from '@/lib/workout/format';
 import { durationMinutes, weekdayOf, workSetCount } from '@/lib/workout/session';
 import type { RoutineSummary } from '@/lib/workout/types';
-import { cn } from '@/lib/utils';
 
 import { HealthBadge, Stat } from './bits';
 import { LoadError, WorkoutFrame } from './frame';
-import { cardClass, primaryButton, secondaryButton } from './styles';
-
-const heading = 'text-lg font-semibold text-gray-800 dark:text-white/90';
-const muted = 'text-theme-sm text-gray-500 dark:text-gray-400';
+import { Banner, Group, Num, Row } from '@/shell/kit';
+import { primaryButton, secondaryButton } from '@/shell/kit/styles';
 
 /** Numbers to look at before training; no score and no advice. */
 function Readiness() {
@@ -38,27 +34,26 @@ function Readiness() {
     mean == null ? 'no 30-day mean' : `30-day mean ${format(mean)}`;
 
   return (
-    <section className={cardClass} aria-label="Readiness">
-      <h2 className={heading}>Before the workout</h2>
+    <Group label="Before the workout">
       {needsLink(mi.data) ? (
         // These numbers come from the band; logging a workout does not need it.
-        <div className="mt-4">
+        <div>
           <LinkMiNotice
             purpose="to see last night's sleep, resting heart rate and stress"
             compact
           />
         </div>
       ) : q.isPending ? (
-        <div className="mt-4 h-16 animate-pulse rounded-xl bg-gray-100 dark:bg-white/5" />
+        <div className="k-placeholder" />
       ) : q.error || !r ? (
-        <p className="mt-2 text-theme-sm text-error-500" role="alert">
+        <p className="k-error" role="alert">
           {apiErrorMessage(q.error, 'Failed to load.')}{' '}
-          <button type="button" className="underline" onClick={() => q.refetch()}>
+          <button type="button" className="k-link" onClick={() => q.refetch()}>
             Retry
           </button>
         </p>
       ) : (
-        <div className="mt-4 grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <div className="k-facts">
           <Stat
             label="Last night's sleep"
             value={r.sleep_minutes == null ? '–' : formatMinutes(r.sleep_minutes)}
@@ -86,7 +81,7 @@ function Readiness() {
           />
         </div>
       )}
-    </section>
+    </Group>
   );
 }
 
@@ -94,49 +89,43 @@ function Recent() {
   const q = useSessions(5);
   const rows = q.data?.pages[0]?.data ?? [];
   return (
-    <section className={cardClass} aria-label="Recent workouts">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className={heading}>Recent workouts</h2>
-        <Link
-          to="/workout/history"
-          className="text-theme-sm font-medium text-brand-500 hover:underline"
-        >
+    <Group
+      label="Recent workouts"
+      total={
+        <Link to="/workout/history" className="k-link">
           All history
         </Link>
-      </div>
+      }
+    >
       {q.isPending ? (
-        <div className="mt-4 h-24 animate-pulse rounded-xl bg-gray-100 dark:bg-white/5" />
+        <div className="k-placeholder" />
       ) : q.error ? (
-        <p className="mt-2 text-theme-sm text-error-500" role="alert">
+        <p className="k-error" role="alert">
           {apiErrorMessage(q.error, 'Failed to load.')}
         </p>
       ) : rows.length === 0 ? (
-        <p className={cn(muted, 'mt-2')}>No finished workouts yet.</p>
+        <p className="k-empty">No finished workouts yet.</p>
       ) : (
-        <ul className="mt-2 divide-y divide-gray-100 dark:divide-gray-800">
-          {rows.map((s) => (
-            <li key={s.id}>
-              <Link
-                to={`/workout/history/${s.id}`}
-                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3 hover:bg-gray-50 dark:hover:bg-white/3"
-              >
-                <span className="min-w-0">
-                  <span className="block text-theme-sm font-medium text-gray-800 dark:text-white/90">
-                    {s.name || 'Workout'}
-                  </span>
-                  <span className={cn(muted, 'block')}>
-                    {formatDay(s.started_at)} ·{' '}
-                    {formatDuration(durationMinutes(s.started_at, s.finished_at))} · {s.set_count}{' '}
-                    sets · {formatVolume(s.volume_kg)}
-                  </span>
-                </span>
-                <HealthBadge status={s.health_status} />
+        rows.map((s) => (
+          <Row
+            key={s.id}
+            title={
+              <Link to={`/workout/history/${s.id}`} className="k-link-plain">
+                {s.name || 'Workout'}
               </Link>
-            </li>
-          ))}
-        </ul>
+            }
+            sub={
+              <>
+                {formatDay(s.started_at)} ·{' '}
+                {formatDuration(durationMinutes(s.started_at, s.finished_at))} ·{' '}
+                <Num>{s.set_count} sets</Num> · <HealthBadge status={s.health_status} />
+              </>
+            }
+            right={<Num>{formatVolume(s.volume_kg)}</Num>}
+          />
+        ))
       )}
-    </section>
+    </Group>
   );
 }
 
@@ -156,58 +145,42 @@ export function WorkoutHomePage() {
   ];
 
   const routineRow = (r: RoutineSummary) => (
-    <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-      <span className="min-w-0">
-        <span className="block text-theme-sm font-medium text-gray-800 dark:text-white/90">
+    <Row
+      key={r.id}
+      dot={r.weekday === today ? 'var(--g-ok)' : undefined}
+      title={
+        <>
           {r.name}
-          {r.weekday === today && (
-            <span className="ms-2 rounded-full bg-brand-50 px-2 py-0.5 text-theme-xs text-brand-500 dark:bg-brand-500/12 dark:text-brand-400">
-              today
-            </span>
-          )}
-        </span>
-        <span className={cn(muted, 'block')}>
-          {weekdayLabel(r.weekday)} · {r.exercise_count}{' '}
+          {r.weekday === today && <span className="k-muted"> · today</span>}
+        </>
+      }
+      sub={
+        <>
+          {weekdayLabel(r.weekday)} · <Num>{r.exercise_count}</Num>{' '}
           {r.exercise_count === 1 ? 'exercise' : 'exercises'}
-        </span>
-      </span>
-      <button
-        type="button"
-        onClick={() => start.mutate(r.id)}
-        disabled={start.isPending}
-        className={r.weekday === today ? primaryButton : secondaryButton}
-      >
-        <Play className="size-4" aria-hidden="true" />
-        Start
-      </button>
-    </li>
+        </>
+      }
+      right={
+        <button
+          type="button"
+          onClick={() => start.mutate(r.id)}
+          disabled={start.isPending}
+          className={r.weekday === today ? primaryButton : secondaryButton}
+        >
+          Start
+        </button>
+      }
+    />
   );
 
   return (
-    <WorkoutFrame title="Workout">
-      {active.isPending || routines.isPending ? (
-        <div
-          className="h-40 animate-pulse rounded-2xl bg-gray-100 dark:bg-white/5"
-          aria-label="Loading"
-        />
-      ) : active.error ? (
-        <LoadError error={active.error} onRetry={() => active.refetch()} />
-      ) : active.data ? (
-        <section className={cardClass} aria-label="Workout in progress">
-          <h2 className={heading}>{active.data.name || 'Workout'} is in progress</h2>
-          <p className={cn(muted, 'mt-1')}>
-            Started {formatDay(active.data.started_at)} at {formatTime(active.data.started_at)} ·{' '}
-            {workSetCount(active.data)} work sets logged
-          </p>
-          <Link to="/workout/session" className={cn(primaryButton, 'mt-4')}>
-            <Play className="size-4" aria-hidden="true" />
-            Continue
-          </Link>
-        </section>
-      ) : (
-        <section className={cardClass} aria-label="Start a workout">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className={heading}>Start a workout</h2>
+    <WorkoutFrame
+      title="Training"
+      headline={active.data ? `${active.data.name || 'Workout'} is in progress` : 'Training'}
+      actions={
+        !active.data && !active.isPending ? (
+          <>
+            <span className="k-grow" />
             <button
               type="button"
               onClick={() => start.mutate(null)}
@@ -216,33 +189,42 @@ export function WorkoutHomePage() {
             >
               Empty workout
             </button>
-          </div>
+          </>
+        ) : undefined
+      }
+    >
+      {active.isPending || routines.isPending ? (
+        <div className="k-placeholder" aria-label="Loading" />
+      ) : active.error ? (
+        <LoadError error={active.error} onRetry={() => active.refetch()} />
+      ) : active.data ? (
+        <Banner to="/workout/session" action="Continue">
+          Started {formatDay(active.data.started_at)} at {formatTime(active.data.started_at)} ·{' '}
+          <Num>{workSetCount(active.data)}</Num> work sets logged
+        </Banner>
+      ) : (
+        <Group label="Start a workout">
           {routines.error ? (
-            <p className="mt-2 text-theme-sm text-error-500" role="alert">
+            <p className="k-error" role="alert">
               {apiErrorMessage(routines.error, 'Failed to load routines.')}
             </p>
           ) : ordered.length === 0 ? (
-            <p className={cn(muted, 'mt-2')}>
+            <p className="k-empty">
               No routines yet.{' '}
-              <Link
-                to="/workout/routines/new"
-                className="font-medium text-brand-500 hover:underline"
-              >
+              <Link to="/workout/routines/new" className="k-link">
                 Create one
               </Link>{' '}
               or start an empty workout and add exercises as you go.
             </p>
           ) : (
-            <ul className="mt-2 divide-y divide-gray-100 dark:divide-gray-800">
-              {ordered.map(routineRow)}
-            </ul>
+            ordered.map(routineRow)
           )}
           {start.error && (
-            <p role="alert" className="mt-2 text-theme-sm text-error-500">
-              {start.error}
+            <p role="alert" className="k-error">
+              {String(start.error)}
             </p>
           )}
-        </section>
+        </Group>
       )}
       <Readiness />
       <Recent />

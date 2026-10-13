@@ -16,7 +16,7 @@ import {
   primaryButton,
   secondaryButton,
   textareaClass,
-} from './styles';
+} from '@/shell/kit/styles';
 
 function NewExerciseForm({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState('');
@@ -40,7 +40,7 @@ function NewExerciseForm({ onClose }: { onClose: () => void }) {
 
   return (
     <form onSubmit={submit} className={modalPanel} aria-labelledby="new-exercise-title">
-      <h2 id="new-exercise-title" className="text-lg font-semibold">
+      <h2 id="new-exercise-title" className="k-panel-title">
         New exercise
       </h2>
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -124,7 +124,7 @@ function NewExerciseForm({ onClose }: { onClose: () => void }) {
         </div>
       </div>
       {create.error && (
-        <p role="alert" className="mt-3 text-theme-sm text-error-500">
+        <p role="alert" className="mt-3 text-theme-sm k-error-text">
           {create.error}
         </p>
       )}

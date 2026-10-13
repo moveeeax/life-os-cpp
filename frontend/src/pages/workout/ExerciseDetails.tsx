@@ -7,13 +7,13 @@ import { TRACKING_MODES, capitalize, trackingLabel } from '@/lib/workout';
 import type { Exercise, TrackingMode } from '@/lib/workout/types';
 
 import { ExercisePhoto } from './ExercisePhoto';
-import { iconButton, modalPanel } from './styles';
+import { iconButton, modalPanel } from '@/shell/kit/styles';
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-theme-xs text-gray-500 dark:text-gray-400">{label}</dt>
-      <dd className="text-theme-sm text-gray-800 dark:text-white/90">{value}</dd>
+      <dt className="text-theme-xs k-muted">{label}</dt>
+      <dd className="text-theme-sm">{value}</dd>
     </div>
   );
 }
@@ -35,7 +35,7 @@ export function ExerciseDetails({
   return (
     <div className={modalPanel}>
       <div className="flex items-start justify-between gap-3">
-        <h2 id="exercise-title" className="text-lg font-semibold">
+        <h2 id="exercise-title" className="k-panel-title">
           {exercise.name}
         </h2>
         <button type="button" onClick={onClose} className={iconButton} aria-label="Close">
@@ -64,10 +64,7 @@ export function ExerciseDetails({
         {editable ? (
           <div>
             <dt>
-              <label
-                htmlFor="exercise-mode"
-                className="text-theme-xs text-gray-500 dark:text-gray-400"
-              >
+              <label htmlFor="exercise-mode" className="text-theme-xs k-muted">
                 A set records
               </label>
             </dt>
@@ -94,13 +91,13 @@ export function ExerciseDetails({
       </dl>
 
       {setMode.error && (
-        <p role="alert" className="mt-2 text-theme-sm text-error-500">
+        <p role="alert" className="mt-2 text-theme-sm k-error-text">
           {setMode.error}
         </p>
       )}
 
       {exercise.instructions.length > 0 && (
-        <ol className="mt-4 list-decimal space-y-2 ps-5 text-theme-sm text-gray-700 dark:text-gray-300">
+        <ol className="mt-4 list-decimal space-y-2 ps-5 text-theme-sm k-soft">
           {exercise.instructions.map((step, i) => (
             <li key={i}>{step}</li>
           ))}

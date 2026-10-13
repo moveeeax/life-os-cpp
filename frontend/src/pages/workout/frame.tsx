@@ -1,82 +1,58 @@
 import type { ReactNode } from 'react';
 import { ShieldAlert } from 'lucide-react';
-import { NavLink } from 'react-router';
 
 import { useMe } from '@/hooks/useMe';
 import { ApiClientError, apiErrorMessage } from '@/lib/api/client';
 import { Permission, userCan } from '@/lib/auth/permissions';
-import { cn } from '@/lib/utils';
 
-import { cardClass, secondaryButton } from './styles';
+import { SectionFrame, type TabItem } from '@/shell/kit';
 
-const TABS = [
+const TABS: TabItem[] = [
   { to: '/workout', label: 'Overview', end: true },
-  { to: '/workout/routines', label: 'Routines', end: false },
-  { to: '/workout/exercises', label: 'Exercises', end: false },
-  { to: '/workout/history', label: 'History', end: false },
+  { to: '/workout/routines', label: 'Routines' },
+  { to: '/workout/exercises', label: 'Exercises' },
+  { to: '/workout/history', label: 'History' },
 ];
 
 interface WorkoutFrameProps {
+  /** The page's own name; the headline when the page gives none. */
   title: string;
-  /** Buttons on the right of the title. */
+  headline?: ReactNode;
+  sub?: ReactNode;
+  /** The tools line. */
   actions?: ReactNode;
   children: ReactNode;
 }
 
 /**
- * Frame of every Workout page: the permission check, the title row and the
- * links between the section's pages. The permission is checked here, not by
- * a route guard, for the same reason as on the Health page.
+ * Frame of every Training page on the calm sheet, with the permission check.
+ * The permission is checked here, not by a route guard, for the same reason as
+ * on the Body page.
  */
-export function WorkoutFrame({ title, actions, children }: WorkoutFrameProps) {
+export function WorkoutFrame({ title, headline, sub, actions, children }: WorkoutFrameProps) {
   const user = useMe().data ?? null;
-
   if (!userCan(user, Permission.FitnessRead)) {
     return (
-      <div className={cardClass} role="alert">
-        <div className="flex items-start gap-3">
-          <ShieldAlert className="size-6 shrink-0 text-error-500" aria-hidden="true" />
-          <div>
-            <h1 className="text-theme-xl font-semibold text-gray-800 dark:text-white/90">
-              No access to Workout
-            </h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Your role does not include reading fitness data. Ask an administrator for the Fitness
-              Reader role.
-            </p>
-          </div>
+      <SectionFrame eyebrow="Training" headline="No access to Training">
+        <div className="k-banner" role="alert">
+          <span>
+            <ShieldAlert className="k-inline-icon" aria-hidden="true" /> Your role does not include
+            reading fitness data. Ask an administrator for the Fitness Reader role.
+          </span>
         </div>
-      </div>
+      </SectionFrame>
     );
   }
-
   return (
-    <div className="flex flex-col gap-4 md:gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-title-sm font-semibold text-gray-800 dark:text-white/90">{title}</h1>
-        {actions && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
-      </div>
-      <nav aria-label="Workout pages" className="flex gap-1 overflow-x-auto">
-        {TABS.map((tab) => (
-          <NavLink
-            key={tab.to}
-            to={tab.to}
-            end={tab.end}
-            className={({ isActive }) =>
-              cn(
-                'rounded-lg px-3 py-2 text-theme-sm font-medium whitespace-nowrap transition sm:px-4',
-                isActive
-                  ? 'bg-brand-50 text-brand-500 dark:bg-brand-500/12 dark:text-brand-400'
-                  : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5',
-              )
-            }
-          >
-            {tab.label}
-          </NavLink>
-        ))}
-      </nav>
+    <SectionFrame
+      eyebrow="Training"
+      headline={headline ?? title}
+      sub={sub}
+      tabs={TABS}
+      tools={actions}
+    >
       {children}
-    </div>
+    </SectionFrame>
   );
 }
 
@@ -84,14 +60,14 @@ export function WorkoutFrame({ title, actions, children }: WorkoutFrameProps) {
 export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const off = error instanceof ApiClientError && error.status === 404 && error.code === 'not_found';
   return (
-    <div role="alert" className={cn(cardClass, 'flex flex-col items-center gap-3 text-center')}>
-      <p className="text-theme-sm text-error-500">
+    <div role="alert" className="k-banner">
+      <span className="k-error-text">
         {off
           ? 'Not found. The workout module may be off on this server.'
           : apiErrorMessage(error, 'Failed to load.')}
-      </p>
-      <button type="button" onClick={onRetry} className={secondaryButton}>
-        Retry
+      </span>
+      <button type="button" onClick={onRetry}>
+        Retry →
       </button>
     </div>
   );
@@ -101,7 +77,7 @@ export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => v
 export function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null;
   return (
-    <p id={id} className="mt-1 text-theme-xs text-error-500">
+    <p id={id} className="k-error">
       {message}
     </p>
   );

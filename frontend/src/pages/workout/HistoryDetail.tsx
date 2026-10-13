@@ -45,10 +45,10 @@ import {
   primaryButton,
   secondaryButton,
   textareaClass,
-} from './styles';
+} from '@/shell/kit/styles';
 
-const heading = 'text-lg font-semibold text-gray-800 dark:text-white/90';
-const muted = 'text-theme-sm text-gray-500 dark:text-gray-400';
+const heading = 'k-group-label';
+const muted = 'k-muted';
 
 /** What the band recorded during the workout, or why there is nothing yet. */
 function HealthBlock({ session }: { session: WorkoutSession & { finished_at: string } }) {
@@ -88,7 +88,7 @@ function HealthBlock({ session }: { session: WorkoutSession & { finished_at: str
       </div>
 
       {session.health_status === 'matched' && (
-        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="k-facts">
           <Stat
             label="Mean heart rate"
             value={session.hr_avg == null ? '–' : `${session.hr_avg} bpm`}
@@ -151,7 +151,7 @@ function HealthBlock({ session }: { session: WorkoutSession & { finished_at: str
         )
       )}
       {hr.error && (
-        <p role="alert" className="mt-2 text-theme-sm text-error-500">
+        <p role="alert" className="mt-2 text-theme-sm k-error-text">
           {apiErrorMessage(hr.error, 'Failed to load heart rate.')}
         </p>
       )}
@@ -289,7 +289,7 @@ function EditForm({ session }: { session: WorkoutSession & { finished_at: string
           {saved ? 'Saved. Changed times are matched with the band data again.' : ''}
         </span>
         {(timeError ?? patch.error) && (
-          <span role="alert" className="text-theme-sm text-error-500">
+          <span role="alert" className="text-theme-sm k-error-text">
             {timeError ?? patch.error}
           </span>
         )}
@@ -317,7 +317,7 @@ function Detail({ session }: { session: WorkoutSession & { finished_at: string }
           {formatDay(session.started_at)}, {formatTime(session.started_at)}–
           {formatTime(session.finished_at)}
         </p>
-        <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="k-facts">
           <Stat
             label="Duration"
             value={formatDuration(durationMinutes(session.started_at, session.finished_at))}
@@ -331,9 +331,7 @@ function Detail({ session }: { session: WorkoutSession & { finished_at: string }
           />
         </div>
         {session.note && (
-          <p className="mt-3 text-theme-sm whitespace-pre-line text-gray-700 dark:text-gray-300">
-            {session.note}
-          </p>
+          <p className="mt-3 text-theme-sm whitespace-pre-line k-soft">{session.note}</p>
         )}
       </section>
 
@@ -363,22 +361,17 @@ function Detail({ session }: { session: WorkoutSession & { finished_at: string }
             let work = 0;
             return (
               <li key={e.id} className={cardClass}>
-                <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-                  {e.exercise_name}
-                </h3>
+                <h3 className="k-ex-title">{e.exercise_name}</h3>
                 {e.sets.length === 0 ? (
                   <p className={cn(muted, 'mt-1')}>No sets.</p>
                 ) : (
                   <ol className="mt-2 flex flex-wrap gap-2">
                     {e.sets.map((s) => (
-                      <li
-                        key={s.id}
-                        className="rounded-lg bg-gray-100 px-3 py-1.5 text-theme-sm text-gray-800 tabular-nums dark:bg-white/5 dark:text-white/90"
-                      >
-                        <span className="me-1.5 text-gray-500 dark:text-gray-400">
+                      <li key={s.id} className="k-set-chip">
+                        <span className="k-muted" data-num-ok>
                           {s.kind === 'warmup' ? 'W' : ++work}
-                        </span>
-                        {describeSet(s, e.tracking_mode)}
+                        </span>{' '}
+                        <span className="num">{describeSet(s, e.tracking_mode)}</span>
                       </li>
                     ))}
                   </ol>
@@ -397,7 +390,7 @@ function Detail({ session }: { session: WorkoutSession & { finished_at: string }
         </button>
       </div>
       {del.error && (
-        <p role="alert" className="text-theme-sm text-error-500">
+        <p role="alert" className="text-theme-sm k-error-text">
           {del.error}
         </p>
       )}
@@ -425,10 +418,7 @@ export function WorkoutHistoryDetailPage() {
   return (
     <WorkoutFrame title={session ? session.name || 'Workout' : 'Workout'}>
       {q.isPending ? (
-        <div
-          className="h-64 animate-pulse rounded-2xl bg-gray-100 dark:bg-white/5"
-          aria-label="Loading"
-        />
+        <div className="h-64 k-placeholder" aria-label="Loading" />
       ) : q.error || !session ? (
         <LoadError error={q.error} onRetry={() => q.refetch()} />
       ) : session.finished_at === null ? (

@@ -6,7 +6,7 @@ import type { Exercise } from '@/lib/workout/types';
 
 import { ExercisePhoto } from './ExercisePhoto';
 import { LoadError } from './frame';
-import { inputClass, secondaryButton } from './styles';
+import { inputClass, secondaryButton } from '@/shell/kit/styles';
 
 const SEARCH_DELAY_MS = 300;
 
@@ -17,7 +17,7 @@ interface ExerciseBrowserProps {
 
 /**
  * Search and filters over the library and the user's own exercises, as a
- * grid of cards. The Exercises page opens the card; the routine editor adds
+ * list of rows. The Exercises page opens the card; the routine editor adds
  * the exercise to the routine.
  */
 export function ExerciseBrowser({ onSelect }: ExerciseBrowserProps) {
@@ -46,7 +46,7 @@ export function ExerciseBrowser({ onSelect }: ExerciseBrowserProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="k-filters">
         <input
           type="search"
           value={text}
@@ -95,39 +95,26 @@ export function ExerciseBrowser({ onSelect }: ExerciseBrowserProps) {
       </div>
 
       {list.isPending ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4" aria-label="Loading">
-          {Array.from({ length: 8 }, (_, i) => (
-            <div
-              key={i}
-              className="aspect-4/3 animate-pulse rounded-xl bg-gray-100 dark:bg-white/5"
-            />
-          ))}
-        </div>
+        <div className="k-placeholder" aria-label="Loading" />
       ) : list.error ? (
         <LoadError error={list.error} onRetry={() => list.refetch()} />
       ) : rows.length === 0 ? (
-        <p className="py-10 text-center text-theme-sm text-gray-500 dark:text-gray-400">
-          No exercises match these filters.
-        </p>
+        <p className="k-empty">No exercises match these filters.</p>
       ) : (
         <>
-          <p className="text-theme-xs text-gray-500 dark:text-gray-400" aria-live="polite">
-            {rows.length} of {total}
+          <p className="k-sub" aria-live="polite">
+            <span data-num-ok>
+              {rows.length} of {total}
+            </span>
           </p>
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+          <ul className="k-group-rows k-plain-list">
             {rows.map((e) => (
-              <li key={e.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(e)}
-                  className="group flex h-full w-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left transition hover:border-brand-300 focus-visible:ring-3 focus-visible:ring-brand-500/30 focus-visible:outline-hidden dark:border-gray-800 dark:bg-white/3 dark:hover:border-brand-800"
-                >
-                  <ExercisePhoto path={e.images[0]} alt={e.name} className="aspect-4/3 w-full" />
-                  <span className="flex flex-1 flex-col gap-1 p-3">
-                    <span className="text-theme-sm font-medium text-gray-800 dark:text-white/90">
-                      {e.name}
-                    </span>
-                    <span className="text-theme-xs text-gray-500 dark:text-gray-400">
+              <li key={e.id} className="k-row">
+                <button type="button" onClick={() => onSelect(e)} className="k-row-head k-row-pic">
+                  <ExercisePhoto path={e.images[0]} alt="" className="k-thumb" />
+                  <span className="k-row-text">
+                    <span className="k-row-title">{e.name}</span>
+                    <span className="k-row-sub">
                       {[e.primary_muscles[0], e.equipment, e.source === 'custom' ? 'my own' : null]
                         .filter(Boolean)
                         .join(' · ')}

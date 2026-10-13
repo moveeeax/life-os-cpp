@@ -1,0 +1,1 @@
+Training sits on the calm sheet: readiness as one facts line, routines, recent workouts and history as rows, exercises as rows with a small photo, and the session keeps time, sets and volume pinned while you scroll.
