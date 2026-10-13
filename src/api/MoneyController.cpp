@@ -73,6 +73,8 @@ constexpr int kDefaultLimit = 50;
 constexpr int kMaxLimit = 200;
 constexpr std::size_t kBatchMax = 100;
 constexpr double kAmountMax = 1e12;
+/// The smallest positive amount: one unit of the eighth decimal (a satoshi), migration 028.
+constexpr double kAmountMin = 0.00000001;
 constexpr std::size_t kNameMax = 200;
 constexpr std::size_t kNoteMax = 2000;
 constexpr std::size_t kParseTextMax = 8000;
@@ -184,7 +186,7 @@ bool transaction_input(const json& body,
     text_length(local, body, "merchant", 0, kNameMax);
     Validation::require_string(local, body, "name");
     text_length(local, body, "name", 1, kNameMax);
-    number_range(local, body, "receipt_amount", 0.0001, kAmountMax);
+    number_range(local, body, "receipt_amount", kAmountMin, kAmountMax);
     code_field(local, body, "receipt_currency");
     if ((body.contains("receipt_amount") && !body["receipt_amount"].is_null()) !=
         (body.contains("receipt_currency") && !body["receipt_currency"].is_null())) {
@@ -510,7 +512,7 @@ void category_fields(Validation::Errors& errs, const json& body) {
     if (body.contains("flexibility")) {
         Validation::one_of(errs, body, "flexibility", kFlex);
     }
-    number_range(errs, body, "budget_max", 0.0001, kAmountMax);
+    number_range(errs, body, "budget_max", kAmountMin, kAmountMax);
     code_field(errs, body, "budget_currency");
     const bool has_max = body.contains("budget_max") && !body["budget_max"].is_null();
     const bool has_cur = body.contains("budget_currency") && !body["budget_currency"].is_null();
@@ -710,7 +712,7 @@ void MoneyController::updateTransaction(const HttpRequestPtr& req, Callback&& ca
     uuid_field(errs, body, "category_id");
     text_length(errs, body, "merchant", 0, kNameMax);
     text_length(errs, body, "name", 1, kNameMax);
-    number_range(errs, body, "receipt_amount", 0.0001, kAmountMax);
+    number_range(errs, body, "receipt_amount", kAmountMin, kAmountMax);
     code_field(errs, body, "receipt_currency");
     text_length(errs, body, "fx_note", 0, 200);
     text_length(errs, body, "trip", 0, 60);
@@ -812,8 +814,8 @@ void transfer_fields(Validation::Errors& errs, const json& body) {
     date_field(errs, body, "date");
     uuid_field(errs, body, "from_account_id");
     uuid_field(errs, body, "to_account_id");
-    number_range(errs, body, "amount_sent", 0.0001, kAmountMax);
-    number_range(errs, body, "amount_received", 0.0001, kAmountMax);
+    number_range(errs, body, "amount_sent", kAmountMin, kAmountMax);
+    number_range(errs, body, "amount_received", kAmountMin, kAmountMax);
     number_range(errs, body, "fee", 0, kAmountMax);
     text_length(errs, body, "name", 0, kNameMax);
     text_length(errs, body, "note", 0, kNoteMax);
