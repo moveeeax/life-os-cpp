@@ -242,6 +242,52 @@ TEST_F(MoneyAdvisorJobTest, ARunningReviewIsRetriedAndALateResultChangesNothing)
     EXPECT_EQ(after["content"], Jobs::MoneyAdvisor::kNothing);
 }
 
+TEST_F(MoneyAdvisorJobTest, AReviewTheQueueRefusedIsFailedAndCanBeAskedAgain) {
+    const auto refuse = [](const json&) { throw std::runtime_error("redis is down"); };
+    const auto [row, queued] = reports.create_or_get(kAnna, "month", "2026-09-01", "2026-09-30");
+    ASSERT_TRUE(queued);
+    EXPECT_FALSE(Jobs::MoneyAdvisor::submit_review(row["id"], kAnna, refuse));
+    const json failed = *reports.get(kAnna, row["id"]);
+    EXPECT_EQ(failed["status"], "failed") << "a queued row nobody will run must not stay queued";
+    EXPECT_EQ(failed["error"].get<std::string>().rfind("queue_unavailable", 0), 0u);
+    const auto [again, requeued] = reports.create_or_get(kAnna, "month", "2026-09-01", "2026-09-30");
+    EXPECT_TRUE(requeued) << "the next Run now queues it again";
+
+    Repositories::Money::SettingsRepository::Input s;
+    s.advisor_enabled = true;
+    s.advisor_weekday = 1;
+    Repositories::Money::SettingsRepository().put(kAnna, s);
+    EXPECT_EQ(Jobs::MoneyAdvisor::enqueue_weekly(1, "2026-10-12", refuse), 0);
+    EXPECT_EQ(Jobs::MoneyAdvisor::enqueue_weekly(1, "2026-10-12"), 1) << "the next tick queues the failed week";
+    auto job = Jobs::get().pick({"money_advisor"}, 1);
+    ASSERT_TRUE(job.has_value());
+    Jobs::get().complete(job->id, json::object());
+}
+
+TEST_F(MoneyAdvisorJobTest, AReviewWrittenBeforeItsPeriodEndedIsQueuedAgain) {
+    const auto [row, queued] = reports.create_or_get(kAnna, "week", "2026-10-05", "2026-10-11");
+    ASSERT_TRUE(queued);
+    const auto finish_at = [&](const std::string& at) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params(
+                "UPDATE money_advisor_reports SET status = 'done', content = 'review', finished_at = $2::timestamptz "
+                "WHERE id = $1::uuid",
+                row["id"].get<std::string>(),
+                at);
+            return true;
+        });
+    };
+    finish_at("2026-10-09 12:00:00+00");
+    const auto [partial, rerun] = reports.create_or_get(kAnna, "week", "2026-10-05", "2026-10-11");
+    EXPECT_TRUE(rerun) << "a review of a week still running is written again";
+    EXPECT_EQ(partial["status"], "queued");
+
+    finish_at("2026-10-12 08:00:00+00");
+    const auto [final_row, again] = reports.create_or_get(kAnna, "week", "2026-10-05", "2026-10-11");
+    EXPECT_FALSE(again) << "a review written after the week ended stands";
+    EXPECT_EQ(final_row["status"], "done");
+}
+
 TEST(MoneyAdvisorHandler, IsRegisteredAmongBuiltins) {
     Jobs::register_builtin_handlers();
     EXPECT_TRUE(Jobs::Dispatcher::get().has_handler(Jobs::MoneyAdvisor::kJobType));

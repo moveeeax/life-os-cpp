@@ -1482,11 +1482,9 @@ void MoneyController::advisorRun(const HttpRequestPtr& req, Callback&& callback)
     const auto range = Money::Period::of(kind, date);
     with_repo_errors(callback, "money.advisorRun", [&] {
         const auto [row, queued] = Repo::AdvisorReportRepository().create_or_get(owner, period, range.from, range.to);
-        if (queued) {
-            Jobs::get().submit(Jobs::MoneyAdvisor::kJobType,
-                               json{{"report_id", row["id"]},
-                                    {"owner_id", owner},
-                                    {"max_attempts", Jobs::get().default_max_retries()}});
+        if (queued && !Jobs::MoneyAdvisor::submit_review(row["id"].get<std::string>(), owner)) {
+            callback(ErrorResponse::service_unavailable("queue_unavailable"));
+            return;
         }
         auto resp = Response::ok(json{{"data", row}, {"queued", queued}});
         resp->setStatusCode(queued ? k202Accepted : k200OK);

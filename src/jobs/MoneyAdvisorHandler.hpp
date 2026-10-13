@@ -12,6 +12,7 @@
 #pragma once
 
 #include <chrono>
+#include <functional>
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -177,26 +178,58 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     }
 }
 
+/// Hands one job payload to the queue; tests pass one that fails.
+using Submit = std::function<void(const nlohmann::json& payload)>;
+
+/**
+ * Hand a queued review to the job queue (@p submit, or Jobs::get() when it is
+ * empty). When the queue refuses it, the row is marked failed with
+ * queue_unavailable: a row left queued with no job behind it would never run,
+ * and create_or_get would never queue it again.
+ * @returns false when the queue refused the job.
+ */
+inline bool submit_review(const std::string& report_id, const std::string& owner, const Submit& submit = {}) {
+    try {
+        const nlohmann::json payload{
+            {"report_id", report_id},
+            {"owner_id", owner},
+            {"max_attempts", Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries}};
+        if (submit) {
+            submit(payload);
+        } else {
+            if (!Jobs::is_initialized()) {
+                throw std::runtime_error("the job queue is not initialized");
+            }
+            Jobs::get().submit(kJobType, payload);
+        }
+        return true;
+    } catch (const std::exception& e) {
+        spdlog::warn("money advisor {}: enqueue failed: {}", report_id, e.what());
+        try {
+            Repositories::Money::AdvisorReportRepository().fail(
+                report_id, "queue_unavailable", "the job queue did not take the job");
+        } catch (const std::exception& inner) {
+            spdlog::warn("money advisor {}: could not mark failed: {}", report_id, inner.what());
+        }
+        return false;
+    }
+}
+
 /**
  * Queue the week that just ended for every owner whose advisor runs on this
  * weekday (1 = Monday). The unique key makes a second call a no-op.
  * @returns how many reviews were queued.
  */
-inline int enqueue_weekly(int weekday, const std::string& today) {
+inline int enqueue_weekly(int weekday, const std::string& today, const Submit& submit = {}) {
     const auto last_week =
         Money::Period::previous(Money::Period::Kind::week, Money::Period::of(Money::Period::Kind::week, today));
     Repositories::Money::AdvisorReportRepository reports;
     int n = 0;
     for (const auto& owner : Repositories::Money::SettingsRepository().advisor_owners(weekday)) {
         const auto [row, queued] = reports.create_or_get(owner, "week", last_week.from, last_week.to);
-        if (!queued) {
-            continue;
+        if (queued && submit_review(row["id"].get<std::string>(), owner, submit)) {
+            ++n;
         }
-        Jobs::get().submit(
-            kJobType,
-            nlohmann::json{
-                {"report_id", row["id"]}, {"owner_id", owner}, {"max_attempts", Jobs::get().default_max_retries()}});
-        ++n;
     }
     return n;
 }
