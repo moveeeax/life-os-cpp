@@ -47,16 +47,15 @@ export function Tabs({ items, max = 5, label }: { items: TabItem[]; max?: number
           <button
             type="button"
             className={inMore ? 'k-tab k-on' : 'k-tab'}
-            aria-haspopup="menu"
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
           >
             {inMore ? inMore.label : 'More'} ▾
           </button>
           {open && (
-            <div className="k-menu" role="menu">
+            <div className="k-menu">
               {more.map((t) => (
-                <NavLink key={t.to} to={t.to} end={t.end} role="menuitem" className="k-menu-item">
+                <NavLink key={t.to} to={t.to} end={t.end} className="k-menu-item">
                   {t.label}
                 </NavLink>
               ))}
