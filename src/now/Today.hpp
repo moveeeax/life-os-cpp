@@ -305,7 +305,9 @@ inline json travel_block(const json& next_trip, const json& counters, std::strin
         const std::string kind = c.value("threshold_kind", "");
         if (kind == "at_most" && c.value("left", kNoLimit) <= kTravelNearDays) {
             near.push_back({{"rule", c.at("name")}, {"left", c.at("left")}});
-        } else if (kind == "over" && c.contains("reached_on") && c.at("reached_on").is_string()) {
+        } else if (kind == "over" && c.value("left", 0) > 0 && c.contains("reached_on") &&
+                   c.at("reached_on").is_string()) {
+            // A threshold already met is no longer coming: living at home is not a warning.
             const int until = static_cast<int>((day(c.at("reached_on").get<std::string>()) - today).count());
             if (until >= 0 && until <= kTravelNearDays) {
                 near.push_back({{"rule", c.at("name")}, {"left", until}});
