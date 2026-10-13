@@ -452,7 +452,14 @@ function ParseLines({
           <p className="mt-1 ps-6 text-theme-xs text-gray-500">
             {l.type === 'income' ? 'Income' : 'Expense'}
             {l.merchant && ` · ${l.merchant}`}
-            {l.receipt_amount && ` · receipt ${l.receipt_amount} ${l.receipt_currency}`}
+            {l.receipt_amount && (
+              <>
+                {' · receipt '}
+                <span className="num">
+                  {l.receipt_amount} {l.receipt_currency}
+                </span>
+              </>
+            )}
             {l.note && ` · ${l.note}`}
           </p>
         </li>
@@ -749,7 +756,8 @@ function TransferTab({ onDone, accounts }: { onDone: () => void; accounts: Accou
       </div>
       {needsReceived && s !== null && r !== null && r > 0 && (
         <p className="text-theme-xs text-gray-500 tabular-nums">
-          Rate of this exchange: {(s / r).toFixed(4)} {fromCur} per {toCur}
+          Rate of this exchange: <span className="num">{(s / r).toFixed(4)}</span> {fromCur} per{' '}
+          {toCur}
         </p>
       )}
       {create.error && (

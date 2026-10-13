@@ -145,7 +145,7 @@ function HealthBlock({ session }: { session: WorkoutSession & { finished_at: str
       ) : (
         samples.length === 1 && (
           <p className={cn(muted, 'mt-2')}>
-            One sample inside the workout: {samples[0].bpm} bpm at{' '}
+            One sample inside the workout: <span className="num">{samples[0].bpm} bpm</span> at{' '}
             {formatTime(samples[0].timestamp)}.
           </p>
         )

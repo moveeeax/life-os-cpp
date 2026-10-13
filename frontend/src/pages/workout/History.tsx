@@ -32,11 +32,7 @@ export function WorkoutHistoryPage() {
             {rows.map((s) => (
               <Row
                 key={s.id}
-                title={
-                  <Link to={`/workout/history/${s.id}`} className="k-link-plain">
-                    {s.name || 'Workout'}
-                  </Link>
-                }
+                title={s.name || 'Workout'}
                 sub={
                   <>
                     {formatDay(s.started_at)}, {formatTime(s.started_at)} ·{' '}

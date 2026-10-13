@@ -13,6 +13,11 @@ const FOCUSABLE =
  */
 export function useFocusTrap<T extends HTMLElement>(onClose: () => void) {
   const ref = useRef<T>(null);
+  // The latest close callback, read on Escape: a parent re-render passes a new
+  // function, and re-running the effect would steal focus from the field being
+  // typed in and reorder the stack of open traps.
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     const node = ref.current;
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -26,7 +31,7 @@ export function useFocusTrap<T extends HTMLElement>(onClose: () => void) {
       if (stack[stack.length - 1] !== me) return;
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        close.current();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -48,7 +53,7 @@ export function useFocusTrap<T extends HTMLElement>(onClose: () => void) {
       document.removeEventListener('keydown', onKey);
       previouslyFocused?.focus?.();
     };
-  }, [onClose]);
+  }, []);
 
   return ref;
 }

@@ -351,7 +351,7 @@ function GramsStep({
           className={inputClass}
         />
       </div>
-      <p className="text-theme-sm text-gray-800 tabular-nums dark:text-white/90">
+      <p className="text-theme-sm num">
         {formatKcal(preview.kcal)} kcal · P {formatGrams(preview.protein_g)} · F{' '}
         {formatGrams(preview.fat_g)} · C {formatGrams(preview.carbs_g)}
       </p>

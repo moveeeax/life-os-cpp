@@ -102,9 +102,20 @@ function TransactionEditor({
         </h2>
         <p className="mt-1 text-theme-sm text-gray-500">
           {account?.name} · {row.currency}
-          {row.receipt_amount !== null &&
-            ` · receipt ${row.receipt_amount} ${row.receipt_currency}`}
-          {row.fx_note && ` · ${row.fx_note}`}
+          {row.receipt_amount !== null && (
+            <>
+              {' · receipt '}
+              <span className="num">
+                {row.receipt_amount} {row.receipt_currency}
+              </span>
+            </>
+          )}
+          {row.fx_note && (
+            <>
+              {' · '}
+              <span className="num">{row.fx_note}</span>
+            </>
+          )}
         </p>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
