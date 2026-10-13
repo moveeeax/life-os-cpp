@@ -1,4 +1,4 @@
-import { useCallback, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useFocusTrap } from '@/hooks/useFocusTrap';
@@ -43,6 +43,17 @@ export function Sheet({
     onClose();
   }, [onClose]);
   const ref = useFocusTrap<HTMLDivElement>(requestClose);
+  // A dialog without a title or labelledBy takes its name from the first
+  // heading of its content (the forms bring their own <h2>).
+  const fallbackId = useId();
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || title || labelledBy) return;
+    const heading = node.querySelector<HTMLElement>('h1, h2, h3');
+    if (!heading) return;
+    if (!heading.id) heading.id = fallbackId;
+    node.setAttribute('aria-labelledby', heading.id);
+  }, [ref, title, labelledBy, fallbackId]);
   // Only a press that started and ended on the scrim dismisses: a text
   // selection dragged out of the panel must not close it.
   const pressedScrim = useRef(false);
