@@ -23,7 +23,7 @@ class RateLimitRedisTest : public ::testing::Test {
 protected:
     void SetUp() override {
         if (!TestHelpers::is_redis_available())
-            GTEST_SKIP() << "Redis not available";
+            return TestHelpers::skip_or_fail_without_infra("Redis");
         TestHelpers::reset_all_globals();
         Cache::initialize(TestHelpers::redis_url(), 2);
         // Clear any leftover window keys from a previous run.

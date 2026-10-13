@@ -78,7 +78,7 @@ public:
     void SetUp() override {
         std::filesystem::create_directories("logs");
         if (!TestHelpers::is_postgres_available() || !TestHelpers::is_redis_available()) {
-            return;  // tests will GTEST_SKIP
+            return;  // tests skip, or fail under CI_REQUIRE_INFRA
         }
 
         json cfg = json::parse(TestHelpers::minimal_config());
@@ -129,9 +129,10 @@ private:
     std::thread server_thread_;
 };
 
+// Skips locally, fails under CI_REQUIRE_INFRA (TestHelpers::skip_or_fail_without_infra).
 #define REQUIRE_E2E_ENV() \
     if (!g_env_ok)        \
-    GTEST_SKIP() << "Postgres/Redis sidecars unavailable — e2e server not started"
+    return TestHelpers::skip_or_fail_without_infra("the e2e server (Postgres/Redis sidecars)")
 
 // ---------------------------------------------------------------------------
 // Small sync-request helpers.

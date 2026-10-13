@@ -19,7 +19,7 @@ protected:
 
     void SetUp() override {
         if (!TestHelpers::is_postgres_available() || !TestHelpers::is_redis_available()) {
-            GTEST_SKIP() << "Postgres or Redis not available";
+            return TestHelpers::skip_or_fail_without_infra("Postgres or Redis");
         }
         config_path = TestHelpers::create_temp_config(TestHelpers::minimal_config(), "core_test_config.json");
     }

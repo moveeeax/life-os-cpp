@@ -284,6 +284,34 @@ inline bool is_redis_available() {
     }
 }
 
+/// Whether CI_REQUIRE_INFRA asks for the Postgres/Redis sidecars: set to
+/// anything but "", "0" or "false".
+inline bool infra_required() {
+    const char* v = std::getenv("CI_REQUIRE_INFRA");
+    if (v == nullptr) {
+        return false;
+    }
+    const std::string s(v);
+    return !s.empty() && s != "0" && s != "false";
+}
+
+/**
+ * @brief The one answer to "the sidecars are not there": skip locally, FAIL
+ *        when CI_REQUIRE_INFRA is set. In CI a skip is a trap — a mis-wired
+ *        integration job (no Postgres/Redis service) would SKIP every suite
+ *        and report all-green. Call it from SetUp or a test body and return
+ *        right after (`return skip_or_fail_without_infra(...)`): both
+ *        outcomes only end this helper, not its caller.
+ */
+inline void skip_or_fail_without_infra(const std::string& what) {
+    if (infra_required()) {
+        FAIL() << "CI_REQUIRE_INFRA is set but " << what
+               << " is unavailable. This suite would have SKIPPED — failing instead so a mis-configured "
+                  "integration job can't report all-green.";
+    }
+    GTEST_SKIP() << what << " not available";
+}
+
 // Temp config file helpers. Pass a distinct filename when suites may run
 // interleaved in the same process/working dir.
 inline std::string create_temp_config(const std::string& content, const std::string& path = "test_temp_config.json") {
@@ -449,21 +477,8 @@ protected:
         const bool pg_ok = !requires_postgres() || is_postgres_available();
         const bool redis_ok = is_redis_available();
         if (!pg_ok || !redis_ok) {
-            // Locally, skipping when infra is absent is convenient. In CI it is a
-            // trap: a mis-wired integration job (no Postgres/Redis service) would
-            // SKIP every suite and report all-green, silently disabling the whole
-            // integration safety net. Set CI_REQUIRE_INFRA=1 in CI so a missing
-            // dependency FAILS loudly instead.
-            const char* require_infra = std::getenv("CI_REQUIRE_INFRA");
-            const bool must_have_infra = require_infra != nullptr && std::string(require_infra) != "" &&
-                                         std::string(require_infra) != "0" && std::string(require_infra) != "false";
-            if (must_have_infra) {
-                FAIL() << "CI_REQUIRE_INFRA is set but test infra is unavailable (postgres_ok=" << pg_ok
-                       << ", redis_ok=" << redis_ok
-                       << "). This suite would have SKIPPED — failing instead so a mis-configured "
-                          "integration job can't report all-green.";
-            }
-            GTEST_SKIP() << "Postgres or Redis not available";
+            return skip_or_fail_without_infra(std::string("Postgres or Redis (postgres_ok=") + (pg_ok ? "1" : "0") +
+                                              ", redis_ok=" + (redis_ok ? "1" : "0") + ")");
         }
         // Defensive: if the previous suite died before its TearDown,
         // Core::initialize would throw "already initialized" and cascade the
