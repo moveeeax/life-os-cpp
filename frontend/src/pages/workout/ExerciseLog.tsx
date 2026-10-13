@@ -18,14 +18,13 @@ import {
   type SetField,
   type SetFields,
 } from '@/lib/workout/session';
+import { newSetBody, type SetValues } from '@/lib/workout/bodies';
 import type { WorkoutSessionExercise, WorkoutSetInput } from '@/lib/workout/types';
 import { cn } from '@/lib/utils';
 
 import { ExerciseDetails } from './ExerciseDetails';
 import { ExercisePhoto } from './ExercisePhoto';
 import { cardClass, iconButton, modalPanel, primaryButton, secondaryButton } from './styles';
-
-type SetValues = Pick<WorkoutSetInput, 'weight_kg' | 'reps' | 'duration_seconds' | 'distance_m'>;
 
 interface SetFormProps {
   exercise: WorkoutSessionExercise;
@@ -138,14 +137,16 @@ export function ExerciseLog({ exercise, queue, onPut, onRemove, onLogged }: Exer
   const onServer = (set: DisplaySet) => exercise.sets.some((s) => s.id === set.id);
 
   const log = (values: SetValues, warmup: boolean) => {
-    const position = sets.reduce((max, s) => Math.max(max, s.position), 0) + 1;
-    onPut(crypto.randomUUID(), {
-      session_exercise_id: exercise.id,
-      position,
-      kind: warmup ? 'warmup' : 'work',
-      ...values,
-      completed_at: new Date().toISOString(),
-    });
+    onPut(
+      crypto.randomUUID(),
+      newSetBody({
+        exerciseId: exercise.id,
+        positions: sets.map((x) => x.position),
+        values,
+        warmup,
+        now: new Date().toISOString(),
+      }),
+    );
     onLogged?.();
   };
 
