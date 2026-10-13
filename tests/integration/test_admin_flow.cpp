@@ -9,6 +9,8 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <string>
+#include <utility>
 
 #include <drogon/HttpRequest.h>
 #include <drogon/HttpResponse.h>
@@ -164,6 +166,102 @@ TEST_F(AdminFlowTest, deleteUserAsAdmin) {
     ASSERT_EQ(resp->statusCode(), k200OK);
     Repositories::UserRepository repo;
     EXPECT_FALSE(repo.find(target.user.id).has_value());
+}
+
+namespace {
+
+/// One row (or a few) in every module table that keeps owner_id, for @p owner.
+void seed_module_rows(const std::string& owner) {
+    Database::get().execute_write([&](auto& txn) {
+        const auto run = [&](const char* sql) { txn.exec_params(sql, owner); };
+        run("INSERT INTO money_currencies (owner_id, code) VALUES ($1::uuid, 'KZT')");
+        run("WITH a AS (INSERT INTO money_accounts (owner_id, name, currency) VALUES ($1::uuid, 'Cash', 'KZT'), "
+            " ($1::uuid, 'Card', 'KZT') RETURNING id), "
+            "c AS (INSERT INTO money_categories (owner_id, name) VALUES ($1::uuid, 'Food') RETURNING id), "
+            "t AS (INSERT INTO money_transactions (owner_id, type, date, account_id, amount, name, category_id) "
+            " SELECT $1::uuid, 'expense', '2026-10-01', (SELECT min(id::text)::uuid FROM a), 10, 'Lunch', "
+            " (SELECT id FROM c) RETURNING id) "
+            "INSERT INTO money_transfers (owner_id, date, from_account_id, to_account_id, amount_sent) "
+            "SELECT $1::uuid, '2026-10-01', (SELECT min(id::text)::uuid FROM a), (SELECT max(id::text)::uuid FROM a), "
+            "5");
+        run("INSERT INTO money_merchants (owner_id, merchant_key, display_name, last_seen) "
+            "VALUES ($1::uuid, 'shop', 'Shop', '2026-10-01')");
+        run("INSERT INTO money_settings (owner_id) VALUES ($1::uuid)");
+        run("INSERT INTO money_parse_jobs (owner_id, kind, text, hint_date) VALUES ($1::uuid, 'text', 'x', "
+            "'2026-10-01')");
+        run("INSERT INTO money_advisor_reports (owner_id, period, period_start, period_end) "
+            "VALUES ($1::uuid, 'week', '2026-10-05', '2026-10-11')");
+        run("WITH g AS (INSERT INTO goal_items (owner_id, title, area, kind, start_date, due) "
+            " VALUES ($1::uuid, 'Read', 'growth', 'binary', '2026-01-01', '2026-12-31') RETURNING id), "
+            "ck AS (INSERT INTO goal_checkins (owner_id, goal_id, date, value) SELECT $1::uuid, id, '2026-10-01', 1 "
+            "FROM g), "
+            "sc AS (INSERT INTO goal_sections (owner_id, goal_id, name) SELECT $1::uuid, id, 'Part' FROM g RETURNING "
+            "id), "
+            "ms AS (INSERT INTO goal_milestones (owner_id, goal_id, date, label) "
+            " SELECT $1::uuid, id, '2026-06-01', 'Half' FROM g) "
+            "INSERT INTO task_items (owner_id, title, area, goal_id, goal_section_id) "
+            "SELECT $1::uuid, 'Buy water', 'projects', (SELECT id FROM g), (SELECT id FROM sc)");
+        run("WITH n AS (INSERT INTO task_notes (owner_id, text) VALUES ($1::uuid, 'note') RETURNING id) "
+            "INSERT INTO task_parse_jobs (owner_id, text, hint_date, note_id) SELECT $1::uuid, 'x', '2026-10-01', id "
+            "FROM n");
+        run("WITH i AS (INSERT INTO food_items (owner_id, name, kcal) VALUES ($1::uuid, 'Rice', 130) RETURNING id), "
+            "e AS (INSERT INTO food_entries (owner_id, date, meal, name, kcal, item_id) "
+            " SELECT $1::uuid, '2026-10-01', 'lunch', 'Rice', 130, id FROM i), "
+            "gl AS (INSERT INTO food_goals (owner_id) VALUES ($1::uuid)) "
+            "INSERT INTO food_parse_jobs (owner_id, text, meal, date) VALUES ($1::uuid, 'rice', 'lunch', "
+            "'2026-10-01')");
+        run("INSERT INTO day_focus (owner_id, date, kind, text) VALUES ($1::uuid, '2026-10-01', 'text', 'Ship')");
+        run("WITH x AS (INSERT INTO exercises (id, name, source, owner_id) "
+            " VALUES ('custom-' || $1::text, 'Mine', 'custom', $1::uuid) RETURNING id), "
+            "r AS (INSERT INTO routines (owner_id, name) VALUES ($1::uuid, 'Push') RETURNING id), "
+            "re AS (INSERT INTO routine_exercises (routine_id, exercise_id, position) SELECT r.id, x.id, 1 FROM r, x), "
+            "s AS (INSERT INTO workout_sessions (owner_id) VALUES ($1::uuid) RETURNING id) "
+            "INSERT INTO session_exercises (session_id, exercise_id, position) SELECT s.id, x.id, 1 FROM s, x");
+        return 0;
+    });
+}
+
+/// Rows of @p owner in every table that has an owner_id column, and how many tables hold any.
+std::pair<long, long> owned_rows(const std::string& owner) {
+    return Database::get().execute_read([&](auto& txn) {
+        auto tables = txn.exec(
+            "SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' "
+            "AND column_name = 'owner_id' ORDER BY table_name");
+        long rows = 0;
+        long holding = 0;
+        for (const auto& t : tables) {
+            // The name comes from the catalog, not from input.
+            auto n = txn.exec_params(
+                "SELECT count(*) FROM \"" + t[0].template as<std::string>() + "\" WHERE owner_id = $1::uuid", owner);
+            const long c = n[0][0].template as<long>();
+            rows += c;
+            holding += c > 0 ? 1 : 0;
+        }
+        return std::pair<long, long>{rows, holding};
+    });
+}
+
+}  // namespace
+
+TEST_F(AdminFlowTest, deleteUserRemovesEveryModuleRowTheyOwn) {
+    auto admin_user = seed_user("admin@example.com", "Administrator");
+    auto target = seed_user("leaver@example.com", "User");
+    seed_module_rows(target.user.id);
+    seed_module_rows(admin_user.user.id);
+    const auto before = owned_rows(target.user.id);
+    ASSERT_GE(before.second, 24) << "every module table got a row";
+
+    HttpResponsePtr resp;
+    admin.deleteUser(
+        authed(admin_user.principal), [&](const HttpResponsePtr& r) { resp = r; }, target.user.id);
+    ASSERT_EQ(resp->statusCode(), k200OK) << std::string(resp->body());
+
+    EXPECT_EQ(owned_rows(target.user.id).first, 0) << "no orphan rows stay behind (no FK to users by design)";
+    EXPECT_EQ(owned_rows(admin_user.user.id), before) << "another user's rows stay";
+
+    // These tables have no FK to users, so the suite's TRUNCATE users would leave them behind.
+    Repositories::UserRepository().remove(admin_user.user.id);
+    EXPECT_EQ(owned_rows(admin_user.user.id).first, 0);
 }
 
 TEST_F(AdminFlowTest, adminCannotDeleteSelf) {
