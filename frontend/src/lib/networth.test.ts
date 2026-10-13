@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   SUMMARY_CURRENCIES,
+  cardCurrency,
   chartGeometry,
   formatTotal,
   rateDay,
@@ -80,6 +81,16 @@ describe('chartGeometry', () => {
       chartGeometry([], { width: 700, height: 200, left: 50, right: 10, top: 10, bottom: 20 })
         .points,
     ).toEqual([]);
+  });
+});
+
+describe('cardCurrency', () => {
+  it('keeps the remembered currency while it answers', () => {
+    expect(cardCurrency('KZT', false)).toBe('KZT');
+  });
+  it('falls back to USD when the remembered one has no rate', () => {
+    expect(cardCurrency('RUB', true)).toBe('USD');
+    expect(cardCurrency('USD', true)).toBe('USD');
   });
 });
 

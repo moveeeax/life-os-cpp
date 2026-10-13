@@ -511,8 +511,9 @@ export function useRunAdvisor(onSuccess?: () => void) {
 }
 
 /** All accounts in one currency at the day's rates, with the days of the period. */
-export function useMoneySummary(currency: string, days: number) {
+export function useMoneySummary(currency: string, days: number, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: qk.money.summary(currency, days),
     queryFn: async ({ signal }) =>
       (

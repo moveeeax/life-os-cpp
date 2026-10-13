@@ -5,6 +5,11 @@
 export const SUMMARY_CURRENCIES = ['USD', 'EUR', 'KZT', 'RUB'] as const;
 export const SUMMARY_PERIODS = [30, 90, 365] as const;
 
+/** The currency of the Ledger card: the remembered one, or USD once that one fails (no rate). */
+export function cardCurrency(remembered: string, rememberedFailed: boolean): string {
+  return rememberedFailed ? 'USD' : remembered;
+}
+
 const cents = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
