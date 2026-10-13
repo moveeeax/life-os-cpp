@@ -22,6 +22,25 @@ export function focusKey(userId: string): string {
   return `now:focus:${userId}`;
 }
 
+/**
+ * The session another tab wrote, from a `storage` event: null when it ended or
+ * the storage was cleared, undefined when the event is not about @p key or
+ * its value cannot be read.
+ */
+export function sessionFromStorage(
+  e: { key: string | null; newValue: string | null },
+  key: string,
+): Session | null | undefined {
+  if (e.key === null) return null;
+  if (e.key !== key) return undefined;
+  if (e.newValue === null) return null;
+  try {
+    return JSON.parse(e.newValue) as Session | null;
+  } catch {
+    return undefined;
+  }
+}
+
 export function startSession(
   minutes: number,
   now: number,

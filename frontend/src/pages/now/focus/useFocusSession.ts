@@ -5,6 +5,7 @@ import {
   pauseSession,
   readCache,
   resumeSession,
+  sessionFromStorage,
   sessionState,
   startSession,
   writeCache,
@@ -25,6 +26,19 @@ export function useFocusSession(userId: string | null) {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [state.phase]);
+
+  // A start, pause or exit in another tab shows up here too.
+  useEffect(() => {
+    if (!key) return;
+    const onStorage = (e: StorageEvent) => {
+      const s = sessionFromStorage(e, key);
+      if (s === undefined) return;
+      setSession(s);
+      setNow(Date.now());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [key]);
 
   const save = useCallback(
     (s: Session | null) => {
