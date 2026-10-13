@@ -82,49 +82,60 @@ function Tiles({ range }: { range: DateRange }) {
   const sNote = summary.isPending ? pending : summary.error ? failed : null;
   const bNote = body.isPending ? pending : body.error ? failed : null;
 
-  const note = (n: string | null, text: string) => n ?? text;
   return (
-    <Facts
-      items={[
-        {
-          label: 'Steps a day',
-          value: (
-            <span title={note(sNote, `mean of ${days_(steps.n)}`)}>
-              <Num>
-                {steps.value === null ? '–' : Math.round(steps.value).toLocaleString('en-US')}
-              </Num>
-            </span>
-          ),
-        },
-        {
-          label: 'Sleep',
-          value: (
-            <span title={note(sNote, `mean of ${days_(sleep.n)}, h:mm`)}>
-              <Num>{sleep.value === null ? '–' : formatMinutes(sleep.value)}</Num>
-            </span>
-          ),
-        },
-        {
-          label: 'Resting',
-          value: (
-            <span title={note(sNote, `mean of ${days_(resting.n)}`)}>
-              <Num>{resting.value === null ? '–' : `${Math.round(resting.value)} bpm`}</Num>
-            </span>
-          ),
-        },
-        {
-          label: 'Weight',
-          value: (
-            <span title={note(bNote, `${weight.n} measurements`)}>
-              <Num>
-                {weight.last === null ? '–' : `${weight.last.toFixed(1)} kg`}
-                {weight.delta !== null && `, ${formatDelta(weight.delta)}`}
-              </Num>
-            </span>
-          ),
-        },
-      ]}
-    />
+    <>
+      <Facts
+        items={[
+          {
+            label: 'Steps a day',
+            value: (
+              <span>
+                <Num>
+                  {steps.value === null ? '–' : Math.round(steps.value).toLocaleString('en-US')}
+                </Num>
+              </span>
+            ),
+          },
+          {
+            label: 'Sleep',
+            value: (
+              <span>
+                <Num>{sleep.value === null ? '–' : formatMinutes(sleep.value)}</Num>
+              </span>
+            ),
+          },
+          {
+            label: 'Resting',
+            value: (
+              <span>
+                <Num>{resting.value === null ? '–' : `${Math.round(resting.value)} bpm`}</Num>
+              </span>
+            ),
+          },
+          {
+            label: 'Weight',
+            value: (
+              <span>
+                <Num>
+                  {weight.last === null ? '–' : `${weight.last.toFixed(1)} kg`}
+                  {weight.delta !== null && `, ${formatDelta(weight.delta)}`}
+                </Num>
+              </span>
+            ),
+          },
+        ]}
+      />
+      <p className="k-sub">
+        {sNote ?? `Means of ${days_(Math.max(steps.n, sleep.n, resting.n))} with data`}
+        {' · weight '}
+        {bNote ?? (
+          <>
+            <span className="num">{weight.n}</span> {weight.n === 1 ? 'weigh-in' : 'weigh-ins'},
+            change over the period
+          </>
+        )}
+      </p>
+    </>
   );
 }
 

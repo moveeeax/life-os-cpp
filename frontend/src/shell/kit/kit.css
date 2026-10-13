@@ -939,3 +939,7 @@ select.k-input option {
   background: var(--g-ink-ghost);
   font-size: 13px;
 }
+.k-stat-note {
+  color: var(--g-ink-faint);
+  font-size: 12.5px;
+}
