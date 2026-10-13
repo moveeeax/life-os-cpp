@@ -35,6 +35,8 @@ inline constexpr std::size_t kLateShown = 5;
 inline constexpr std::size_t kSpendsShown = 5;
 /// The weight change compares with the latest weighing at least this many days older.
 inline constexpr int kWeightChangeDays = 6;
+/// A count that is never near (a counter without a left field).
+inline constexpr int kNoLimit = 1 << 20;
 
 struct Part {
     std::string key;             // "tasks" | "goals" | "food" | "money" | "health"
@@ -277,6 +279,43 @@ inline json spends_block(const json& rows) {
             json{{"id", r["id"]}, {"name", name}, {"amount", amount.get<double>()}, {"currency", r["currency"]}});
     }
     return out;
+}
+
+/// How near a threshold must be to show on Now, in days.
+inline constexpr int kTravelNearDays = 14;
+
+/// {next_trip: {id, name, start_date, days_to} | null, near: [{rule, left}]} from the
+/// next trip (or null) and the counters of /api/v1/travel/counters on @p date;
+/// null when there is no trip and nothing near.
+/// Near: an at_most rule with at most 14 days left, or an over rule whose
+/// threshold day is within 14 days (left is then the days until that day).
+inline json travel_block(const json& next_trip, const json& counters, std::string_view date) {
+    const auto day = [](std::string_view text) { return std::chrono::sys_days{Utils::Date::parse_ymd(text)}; };
+    const auto today = day(date);
+    json trip;
+    if (next_trip.is_object()) {
+        const auto start = day(next_trip.at("start_date").get<std::string>());
+        trip = {{"id", next_trip.at("id")},
+                {"name", next_trip.at("name")},
+                {"start_date", next_trip.at("start_date")},
+                {"days_to", static_cast<int>((start - today).count())}};
+    }
+    json near = json::array();
+    for (const auto& c : counters) {
+        const std::string kind = c.value("threshold_kind", "");
+        if (kind == "at_most" && c.value("left", kNoLimit) <= kTravelNearDays) {
+            near.push_back({{"rule", c.at("name")}, {"left", c.at("left")}});
+        } else if (kind == "over" && c.contains("reached_on") && c.at("reached_on").is_string()) {
+            const int until = static_cast<int>((day(c.at("reached_on").get<std::string>()) - today).count());
+            if (until >= 0 && until <= kTravelNearDays) {
+                near.push_back({{"rule", c.at("name")}, {"left", until}});
+            }
+        }
+    }
+    if (trip.is_null() && near.empty()) {
+        return json();
+    }
+    return {{"next_trip", trip}, {"near", near}};
 }
 
 }  // namespace Now::Today

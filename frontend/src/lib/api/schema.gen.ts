@@ -14737,6 +14737,22 @@ export interface components {
         };
         /** @description A section key is absent when its module is off, the caller has nothing there, or it failed (then it is in errors) */
         Today: {
+            /** @description The next trip and the day counters near their threshold (within 14 days) */
+            travel?: {
+                next_trip: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    /** Format: date */
+                    start_date: string;
+                    days_to: number;
+                } | null;
+                near: {
+                    rule: string;
+                    /** @description Days left */
+                    left: number;
+                }[];
+            };
             tasks?: {
                 late_count: number;
                 first_late: {

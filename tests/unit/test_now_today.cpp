@@ -272,3 +272,32 @@ TEST(NowToday, SleepOfTheLocalDayFollowsTheAccountOffset) {
     ASSERT_EQ(utc.size(), 1u);
     EXPECT_EQ(utc[0]["time_asleep_minutes"], 30);
 }
+
+TEST(NowToday, TravelBlockCountsDownToTheNextTrip) {
+    const json trip = {{"id", "t1"}, {"name", "Thailand"}, {"start_date", "2026-11-01"}};
+    const json b = Now::Today::travel_block(trip, json::array(), "2026-10-13");
+    ASSERT_TRUE(b.is_object());
+    EXPECT_EQ(b["next_trip"]["days_to"], 19);
+    EXPECT_EQ(b["near"].size(), 0U);
+}
+
+TEST(NowToday, TravelBlockListsRulesNearTheirThreshold) {
+    const json counters = {
+        {{"name", "Schengen"}, {"threshold_kind", "at_most"}, {"left", 6}, {"reached_on", "2026-10-18"}},
+        {{"name", "Thailand"}, {"threshold_kind", "at_most"}, {"left", 40}, {"reached_on", nullptr}},
+        {{"name", "KZ tax"}, {"threshold_kind", "over"}, {"left", 30}, {"reached_on", "2026-10-20"}},
+        {{"name", "Far"}, {"threshold_kind", "over"}, {"left", 3}, {"reached_on", "2026-12-31"}},
+    };
+    const json b = Now::Today::travel_block(nullptr, counters, "2026-10-13");
+    ASSERT_TRUE(b.is_object());
+    EXPECT_TRUE(b["next_trip"].is_null());
+    ASSERT_EQ(b["near"].size(), 2U) << "Schengen with 6 days left, the tax rule reached in 7 days";
+    EXPECT_EQ(b["near"][0]["rule"], "Schengen");
+    EXPECT_EQ(b["near"][0]["left"], 6);
+    EXPECT_EQ(b["near"][1]["rule"], "KZ tax");
+    EXPECT_EQ(b["near"][1]["left"], 7) << "days until the threshold day";
+}
+
+TEST(NowToday, TravelBlockIsNullWhenThereIsNothing) {
+    EXPECT_TRUE(Now::Today::travel_block(nullptr, json::array(), "2026-10-13").is_null());
+}
