@@ -75,6 +75,10 @@
   justify-content: flex-end;
 }
 
+/* The panel takes the focus when it opens; the sheet itself needs no ring. */
+.c-panel:focus {
+  outline: none;
+}
 .c-panel {
   position: fixed;
   z-index: 25;

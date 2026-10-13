@@ -26,6 +26,11 @@ export function Corners({ today, hour, date }: { today: Today; hour: number; dat
   const chipRefs = useRef<Partial<Record<Chip['key'], HTMLButtonElement | null>>>({});
   const panelRef = useRef<HTMLElement>(null);
 
+  // An opened panel takes the focus, so the keyboard and a screen reader land in it.
+  useEffect(() => {
+    if (open) panelRef.current?.focus({ preventScroll: true });
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const close = () => {
@@ -92,6 +97,7 @@ export function Corners({ today, hour, date }: { today: Today; hour: number; dat
           id={`corner-${open}`}
           className={`c-panel ${SPOT[open]}`}
           role="dialog"
+          tabIndex={-1}
           aria-label={list.find((c) => c.key === open)?.title}
         >
           {open === 'body' && <BodyPanel today={today} />}
