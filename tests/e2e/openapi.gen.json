@@ -10924,7 +10924,7 @@
       }
      },
      "503": {
-      "description": "Not configured, upstream refused authentication, or protocol mismatch",
+      "description": "Not configured, upstream refused authentication, protocol mismatch, or upstream_unavailable (any other failure)",
       "content": {
        "application/json": {
         "schema": {
@@ -22029,7 +22029,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 324750,
-  "source_fnv1a64": "b9ccb8132334878f"
+  "source_bytes": 324792,
+  "source_fnv1a64": "ee65ad28860c78cc"
  }
 }

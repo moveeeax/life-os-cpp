@@ -3498,7 +3498,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '503':
-          description: Not configured, upstream refused authentication, or protocol mismatch
+          description: Not configured, upstream refused authentication, protocol mismatch, or upstream_unavailable (any other failure)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
