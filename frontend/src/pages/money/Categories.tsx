@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
-import { Plus } from 'lucide-react';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Modal } from '@/components/Modal';
@@ -26,14 +25,15 @@ import { decimalsOf } from '@/lib/ledger';
 import { cn } from '@/lib/utils';
 
 import {
-  cardClass,
   dangerButton,
   inputClass,
   labelClass,
   modalPanel,
   primaryButton,
   secondaryButton,
-} from '../workout/styles';
+} from '@/shell/kit/styles';
+import { Group, Meter, Num, Row } from '@/shell/kit';
+
 import { LoadError, MoneyFrame, Placeholder } from './frame';
 
 /** Picks where a merchant's next rows are suggested; past rows keep their category. */
@@ -319,11 +319,7 @@ function spentIn(report: Report | undefined, category: Category): number {
   return block?.categories.find((c) => c.category_id === category.id)?.spent ?? 0;
 }
 
-const BAR: Record<string, string> = {
-  ok: 'bg-brand-500',
-  near: 'bg-warning-500',
-  over: 'bg-error-500',
-};
+const TONE = { ok: 'ok', near: 'warn', over: 'late' } as const;
 
 /** Expense and income categories, each budget against this month's spend. */
 export function MoneyCategoriesPage() {
@@ -337,10 +333,12 @@ export function MoneyCategoriesPage() {
     <MoneyFrame
       title="Categories"
       actions={
-        <button type="button" onClick={() => setOpen('new')} className={primaryButton}>
-          <Plus className="size-4" aria-hidden="true" />
-          New category
-        </button>
+        <>
+          <span className="k-grow" />
+          <button type="button" onClick={() => setOpen('new')} className={primaryButton}>
+            New category
+          </button>
+        </>
       }
     >
       {categories.isPending ? (
@@ -349,71 +347,55 @@ export function MoneyCategoriesPage() {
         <LoadError error={categories.error} onRetry={() => void categories.refetch()} />
       ) : (
         (['expense', 'income'] as const).map((kind) => (
-          <section key={kind} className={cardClass} aria-label={kind}>
-            <h2 className="text-base font-semibold text-gray-800 dark:text-white/90">
-              {kind === 'expense' ? 'Expenses' : 'Income'}
-            </h2>
-            <ul className="mt-2 divide-y divide-gray-100 dark:divide-white/5">
-              {categories.data
-                .filter((c) => c.kind === kind)
-                .map((c) => {
-                  const spent = spentIn(report, c);
-                  const state = budgetState(spent, c.budget_max);
-                  return (
-                    <li key={c.id}>
-                      <button
-                        type="button"
-                        onClick={() => setOpen(c)}
-                        className="w-full py-2.5 text-start hover:bg-gray-50 dark:hover:bg-white/5"
-                      >
-                        <span className="flex items-baseline justify-between gap-3">
-                          <span className="text-theme-sm text-gray-800 dark:text-white/90">
-                            {c.name}
-                            {c.flexibility === 'fixed' && (
-                              <span className="ms-1.5 text-theme-xs text-gray-500">fixed</span>
-                            )}
-                          </span>
-                          {c.budget_max != null && c.budget_currency && (
-                            <span className="text-theme-xs text-gray-500 tabular-nums">
-                              {formatMoney(
-                                spent,
-                                c.budget_currency,
-                                decimalsOf(currencies, c.budget_currency),
-                              )}{' '}
-                              /{' '}
-                              {formatMoney(
-                                c.budget_max,
-                                c.budget_currency,
-                                decimalsOf(currencies, c.budget_currency),
-                              )}
-                            </span>
-                          )}
+          <Group key={kind} label={kind === 'expense' ? 'Expenses' : 'Income'}>
+            {categories.data
+              .filter((c) => c.kind === kind)
+              .map((c) => {
+                const spent = spentIn(report, c);
+                const state = budgetState(spent, c.budget_max);
+                const merchants = byCategory.get(c.id) ?? [];
+                const money = (v: number) =>
+                  formatMoney(v, c.budget_currency!, decimalsOf(currencies, c.budget_currency!));
+                return (
+                  <Row
+                    key={c.id}
+                    title={
+                      <>
+                        {c.name}
+                        {c.flexibility === 'fixed' && <span className="k-muted"> · fixed</span>}
+                      </>
+                    }
+                    right={
+                      c.budget_max != null && c.budget_currency ? (
+                        <span className="k-muted">
+                          <Num>{money(spent)}</Num> / <Num>{money(c.budget_max)}</Num>
                         </span>
-                        {(byCategory.get(c.id)?.length ?? 0) > 0 && (
-                          <span className="mt-0.5 block truncate text-theme-xs text-gray-500">
-                            {byCategory
-                              .get(c.id)!
-                              .slice(0, 3)
-                              .map((m) => m.display_name)
-                              .join(', ')}
-                            {byCategory.get(c.id)!.length > 3 &&
-                              ` +${byCategory.get(c.id)!.length - 3}`}
-                          </span>
-                        )}
-                        {state && c.budget_max && (
-                          <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
-                            <span
-                              className={cn('block h-full rounded-full', BAR[state])}
-                              style={{ width: `${Math.min(100, (spent / c.budget_max) * 100)}%` }}
-                            />
-                          </span>
-                        )}
+                      ) : undefined
+                    }
+                    sub={
+                      state && c.budget_max ? (
+                        <Meter
+                          value={spent}
+                          max={c.budget_max}
+                          tone={TONE[state as keyof typeof TONE]}
+                        />
+                      ) : undefined
+                    }
+                  >
+                    {merchants.length > 0 && (
+                      <span data-num-ok>
+                        Merchants: {merchants.map((m) => m.display_name).join(', ')}
+                      </span>
+                    )}
+                    <span className="k-actions">
+                      <button type="button" className="k-link" onClick={() => setOpen(c)}>
+                        Edit
                       </button>
-                    </li>
-                  );
-                })}
-            </ul>
-          </section>
+                    </span>
+                  </Row>
+                );
+              })}
+          </Group>
         ))
       )}
       {open && (

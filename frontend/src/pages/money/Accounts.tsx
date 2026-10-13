@@ -1,5 +1,4 @@
 import { useState, type FormEvent } from 'react';
-import { Plus } from 'lucide-react';
 import { Link } from 'react-router';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -7,17 +6,17 @@ import { Modal } from '@/components/Modal';
 import { useBalances, useCurrencies, useDeleteAccount, useSaveAccount } from '@/hooks/useMoney';
 import { formatMoney, type Account, type AccountInput } from '@/lib/ledger';
 import { decimalsOf } from '@/lib/ledger';
-import { cn } from '@/lib/utils';
 
 import {
-  cardClass,
   dangerButton,
   inputClass,
   labelClass,
   modalPanel,
   primaryButton,
   secondaryButton,
-} from '../workout/styles';
+} from '@/shell/kit/styles';
+import { Group, Num, Row } from '@/shell/kit';
+
 import { LoadError, MoneyFrame, Placeholder } from './frame';
 
 const KINDS = [
@@ -93,7 +92,7 @@ function AccountForm({ account, onClose }: { account: Account | null; onClose: (
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={120}
-              placeholder="Kaspi Gold Visa •8880"
+              placeholder="Everyday card"
               className={inputClass}
             />
           </div>
@@ -220,10 +219,12 @@ export function MoneyAccountsPage() {
     <MoneyFrame
       title="Accounts"
       actions={
-        <button type="button" onClick={() => setOpen('new')} className={primaryButton}>
-          <Plus className="size-4" aria-hidden="true" />
-          New account
-        </button>
+        <>
+          <span className="k-grow" />
+          <button type="button" onClick={() => setOpen('new')} className={primaryButton}>
+            New account
+          </button>
+        </>
       }
     >
       {balances.isPending ? (
@@ -231,53 +232,41 @@ export function MoneyAccountsPage() {
       ) : balances.isError ? (
         <LoadError error={balances.error} onRetry={() => void balances.refetch()} />
       ) : balances.data.length === 0 ? (
-        <p className={cn(cardClass, 'text-center text-theme-sm text-gray-500')}>No accounts yet.</p>
+        <p className="k-empty">No accounts yet.</p>
       ) : (
         balances.data.map((g) => (
-          <section key={g.currency} aria-label={g.currency}>
-            <div className="flex items-baseline justify-between gap-3">
-              <h2 className="text-base font-semibold text-gray-800 dark:text-white/90">
-                {g.currency}
-              </h2>
-              <p className="text-theme-sm font-medium text-gray-800 tabular-nums dark:text-white/90">
-                {formatMoney(g.total, g.currency, decimalsOf(currencies, g.currency))}
-              </p>
-            </div>
-            <div className="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {g.accounts.map((a) => (
-                <div key={a.id} className={cardClass}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-theme-sm font-medium text-gray-800 dark:text-white/90">
-                        {a.name}
-                      </p>
-                      <p className="text-theme-xs text-gray-500">
-                        {[a.bank, a.kind, a.last4 && `•${a.last4}`].filter(Boolean).join(' · ')}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setOpen(a)}
-                      className={cn(secondaryButton, 'px-3 py-1.5')}
-                    >
-                      Edit
-                    </button>
-                  </div>
-                  <p className="mt-3 text-xl font-semibold text-gray-800 tabular-nums dark:text-white/90">
+          <Group
+            key={g.currency}
+            label={g.currency}
+            total={
+              <Num>{formatMoney(g.total, g.currency, decimalsOf(currencies, g.currency))}</Num>
+            }
+          >
+            {g.accounts.map((a) => (
+              <Row
+                key={a.id}
+                title={a.name}
+                sub={[a.bank, a.kind, a.last4 && `•${a.last4}`].filter(Boolean).join(' · ')}
+                right={
+                  <Num>
                     {formatMoney(a.balance, a.currency, decimalsOf(currencies, a.currency))}
-                  </p>
-                  <p className="mt-1 flex justify-between text-theme-xs text-gray-500">
-                    <span>
-                      {a.last_activity ? `Last activity ${a.last_activity}` : 'No activity yet'}
-                    </span>
-                    <Link to={`/money?account=${a.id}`} className="text-brand-500 hover:underline">
-                      Rows
-                    </Link>
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
+                  </Num>
+                }
+              >
+                <span>
+                  {a.last_activity ? `Last activity ${a.last_activity}` : 'No activity yet'}
+                </span>
+                <span className="k-actions">
+                  <Link to={`/money?account=${a.id}`} className="k-link">
+                    Rows
+                  </Link>
+                  <button type="button" className="k-link" onClick={() => setOpen(a)}>
+                    Edit
+                  </button>
+                </span>
+              </Row>
+            ))}
+          </Group>
         ))
       )}
       {open && (

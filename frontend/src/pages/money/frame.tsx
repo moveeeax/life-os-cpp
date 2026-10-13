@@ -1,61 +1,75 @@
 import type { ReactNode } from 'react';
-import { NavLink } from 'react-router';
 
+import { useMoneySummary } from '@/hooks/useMoney';
 import { ApiClientError, apiErrorMessage } from '@/lib/api/client';
+import { formatTotal, rateDay } from '@/lib/networth';
 import { cn } from '@/lib/utils';
+import { Num, SectionFrame, type TabItem } from '@/shell/kit';
 
-import { cardClass, secondaryButton } from '../workout/styles';
-
-const TABS = [
+const TABS: TabItem[] = [
   { to: '/money', label: 'Ledger', end: true },
-  { to: '/money/summary', label: 'Summary', end: false },
-  { to: '/money/accounts', label: 'Accounts', end: false },
-  { to: '/money/categories', label: 'Categories', end: false },
-  { to: '/money/currencies', label: 'Currencies', end: false },
-  { to: '/money/reports', label: 'Reports', end: false },
-  { to: '/money/advisor', label: 'Advisor', end: false },
+  { to: '/money/summary', label: 'Summary' },
+  { to: '/money/reports', label: 'Reports' },
+  { to: '/money/accounts', label: 'Accounts' },
+  { to: '/money/categories', label: 'Categories' },
+  { to: '/money/currencies', label: 'Currencies' },
+  { to: '/money/advisor', label: 'Advisor' },
 ];
 
+function currency(): string {
+  try {
+    return globalThis.localStorage?.getItem('money:summary:currency') || 'USD';
+  } catch {
+    return 'USD';
+  }
+}
+
 interface MoneyFrameProps {
+  /** The page's own name, read by screen readers under the section headline. */
   title: string;
-  /** Buttons on the right of the title. */
+  /** The tools line: period, filter, the main action. */
   actions?: ReactNode;
   children: ReactNode;
 }
 
 /**
- * Frame of every Money page: the title row and the links between the
- * section's pages. Every confirmed user keeps their own money, so there is
- * no permission check; a switched-off module answers 404 and LoadError says so.
+ * Frame of every Money page on the calm sheet: all accounts in the remembered
+ * currency as the headline, the rate day under it, the tabs, the tools line.
+ * Every confirmed user keeps their own money, so there is no permission check;
+ * a switched-off module answers 404 and LoadError says so.
  */
 export function MoneyFrame({ title, actions, children }: MoneyFrameProps) {
+  const s = useMoneySummary(currency(), 30).data;
+  const has = !!s && (s.accounts.length > 0 || s.not_converted.length > 0);
   return (
-    <div className="flex flex-col gap-4 md:gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-title-sm font-semibold text-gray-800 dark:text-white/90">{title}</h1>
-        {actions && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
-      </div>
-      <nav aria-label="Money pages" className="flex gap-1 overflow-x-auto">
-        {TABS.map((tab) => (
-          <NavLink
-            key={tab.to}
-            to={tab.to}
-            end={tab.end}
-            className={({ isActive }) =>
-              cn(
-                'rounded-lg px-3 py-2 text-theme-sm font-medium whitespace-nowrap transition sm:px-4',
-                isActive
-                  ? 'bg-brand-50 text-brand-500 dark:bg-brand-500/12 dark:text-brand-400'
-                  : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5',
-              )
-            }
-          >
-            {tab.label}
-          </NavLink>
-        ))}
-      </nav>
+    <SectionFrame
+      eyebrow="Money"
+      headline={
+        has ? (
+          <>
+            All accounts <Num>{formatTotal(s.total)}</Num> {s.currency}
+          </>
+        ) : (
+          'Money'
+        )
+      }
+      sub={
+        has ? (
+          <>
+            {s.partial ? 'partial · ' : ''}rates of {rateDay(s.rate_date, s.date)} ·{' '}
+            <Num>{(s.change.total >= 0 ? '+' : '−') + formatTotal(Math.abs(s.change.total))}</Num>{' '}
+            in 30 days{s.change.partial ? ' (partial)' : ''}
+            <span className="sr-only"> · {title}</span>
+          </>
+        ) : (
+          <span className="sr-only">{title}</span>
+        )
+      }
+      tabs={TABS}
+      tools={actions}
+    >
       {children}
-    </div>
+    </SectionFrame>
   );
 }
 
@@ -63,14 +77,14 @@ export function MoneyFrame({ title, actions, children }: MoneyFrameProps) {
 export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const off = error instanceof ApiClientError && error.status === 404 && error.code === 'not_found';
   return (
-    <div role="alert" className={cn(cardClass, 'flex flex-col items-center gap-3 text-center')}>
-      <p className="text-theme-sm text-error-500">
+    <div role="alert" className="k-banner">
+      <span className="k-error-text">
         {off
           ? 'Not found. The money module may be off on this server.'
           : apiErrorMessage(error, 'Failed to load.')}
-      </p>
-      <button type="button" onClick={onRetry} className={secondaryButton}>
-        Retry
+      </span>
+      <button type="button" onClick={onRetry}>
+        Retry →
       </button>
     </div>
   );
@@ -78,10 +92,5 @@ export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => v
 
 /** A grey block while a query loads. */
 export function Placeholder({ className }: { className?: string }) {
-  return (
-    <div
-      aria-hidden="true"
-      className={cn('animate-pulse rounded-2xl bg-gray-100 dark:bg-white/5', className)}
-    />
-  );
+  return <div aria-hidden="true" className={cn('k-placeholder', className)} />;
 }

@@ -5,6 +5,7 @@ import { Modal } from '@/components/Modal';
 import { useDeleteTransfer, useTransfers, useUpdateTransfer } from '@/hooks/useMoney';
 import {
   decimalsOf,
+  formatDay,
   formatMoney,
   isDay,
   type Account,
@@ -12,15 +13,15 @@ import {
   type Transfer,
 } from '@/lib/ledger';
 
+import { Group, Num, Row } from '@/shell/kit';
 import {
-  cardClass,
   dangerButton,
   inputClass,
   labelClass,
   modalPanel,
   primaryButton,
   secondaryButton,
-} from '../workout/styles';
+} from '@/shell/kit/styles';
 
 const num = (v: string): number | null => {
   const t = v.trim().replace(',', '.');
@@ -188,46 +189,41 @@ export function TransfersList({
   const name = (id: string) => accounts.find((a) => a.id === id)?.name ?? '';
   const money = (n: number, c: string) => formatMoney(n, c, decimalsOf(currencies, c));
   return (
-    <section className={cardClass} aria-label="Transfers">
-      <h2 className="text-theme-sm font-semibold text-gray-800 dark:text-white/90">
-        Transfers and exchanges
-      </h2>
-      <ul className="mt-2 divide-y divide-gray-100 dark:divide-white/5">
-        {rows.map((t) => (
-          <li key={t.id}>
-            <button
-              type="button"
-              onClick={() => setOpen(t)}
-              className="flex w-full items-center gap-3 py-2.5 text-start hover:bg-gray-50 dark:hover:bg-white/5"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-theme-sm text-gray-800 dark:text-white/90">
-                  {name(t.from_account_id)} → {name(t.to_account_id)}
-                </span>
-                <span className="block truncate text-theme-xs text-gray-500">
-                  {t.date}
-                  {t.cost_rate !== null &&
-                    ` · ${t.cost_rate.toFixed(4)} ${t.from_currency} per ${t.to_currency}`}
-                  {t.fee !== null && t.fee > 0 && ` · fee ${money(t.fee, t.from_currency)}`}
-                </span>
-              </span>
-              <span className="text-end text-theme-sm tabular-nums">
-                <span className="block">−{money(t.amount_sent, t.from_currency)}</span>
-                {t.amount_received !== null && (
-                  <span className="block text-theme-xs text-success-600 dark:text-success-500">
-                    +{money(t.amount_received, t.to_currency)}
-                  </span>
-                )}
-              </span>
+    <Group label="Transfers and exchanges">
+      {rows.map((t) => (
+        <Row
+          key={t.id}
+          title={`${name(t.from_account_id)} → ${name(t.to_account_id)}`}
+          sub={formatDay(t.date)}
+          right={
+            <Num>
+              {money(t.amount_sent, t.from_currency)}
+              {t.amount_received !== null && ` → ${money(t.amount_received, t.to_currency)}`}
+            </Num>
+          }
+        >
+          {t.cost_rate !== null && (
+            <span>
+              Rate <Num>{t.cost_rate.toFixed(4)}</Num> {t.from_currency} per {t.to_currency}
+            </span>
+          )}
+          {t.fee !== null && t.fee > 0 && (
+            <span>
+              Fee <Num>{money(t.fee, t.from_currency)}</Num>
+            </span>
+          )}
+          <span className="k-actions">
+            <button type="button" className="k-link" onClick={() => setOpen(t)}>
+              Edit or delete
             </button>
-          </li>
-        ))}
-      </ul>
+          </span>
+        </Row>
+      ))}
       {open && (
         <Modal onClose={() => setOpen(null)} className="max-w-lg">
           <TransferEditor transfer={open} onClose={() => setOpen(null)} />
         </Modal>
       )}
-    </section>
+    </Group>
   );
 }

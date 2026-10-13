@@ -17,9 +17,10 @@ import {
   inputClass,
   labelClass,
   primaryButton,
-  secondaryButton,
   textareaClass,
-} from '../workout/styles';
+} from '@/shell/kit/styles';
+import { Group, Row, Sheet } from '@/shell/kit';
+
 import { LoadError, MoneyFrame, Placeholder } from './frame';
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -179,6 +180,7 @@ export function MoneyAdvisorPage() {
   const reports = useAdvisorReports();
   const [selected, setSelected] = useState<string | undefined>(undefined);
   const [period, setPeriod] = useState<'week' | 'month' | 'quarter'>('week');
+  const [settings, setSettings] = useState(false);
   const run = useRunAdvisor();
   const list = reports.data ?? [];
   const current = list.find((r) => r.id === selected) ?? list[0];
@@ -188,12 +190,12 @@ export function MoneyAdvisorPage() {
     <MoneyFrame
       title="Advisor"
       actions={
-        <div className="flex flex-wrap items-center gap-2">
+        <>
           <select
             value={period}
             onChange={(e) => setPeriod(e.target.value as typeof period)}
             aria-label="Period to review"
-            className={cn(inputClass, 'h-10 w-auto')}
+            className="k-input k-compact"
           >
             <option value="week">This week</option>
             <option value="month">This month</option>
@@ -207,79 +209,74 @@ export function MoneyAdvisorPage() {
           >
             {run.isPending ? 'Asking…' : 'Run now'}
           </button>
-        </div>
+          <span className="k-grow" />
+          <button type="button" className="k-btn" onClick={() => setSettings(true)}>
+            Settings
+          </button>
+        </>
       }
     >
       {run.error && (
-        <p role="alert" className="text-theme-sm text-error-500">
-          {run.error}
+        <p role="alert" className="k-error">
+          {String(run.error)}
         </p>
       )}
       {reports.isPending ? (
-        <Placeholder className="h-48" />
+        <Placeholder />
       ) : reports.isError ? (
         <LoadError error={reports.error} onRetry={() => void reports.refetch()} />
       ) : !current ? (
-        <p className={cn(cardClass, 'text-center text-theme-sm text-gray-500')}>
-          No reviews yet. Run one now or switch on the weekly review below.
+        <p className="k-empty">
+          No reviews yet. Run one now or switch on the weekly review in Settings.
         </p>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[1fr_16rem]">
-          <section className={cardClass} aria-label="Review">
-            <p className="text-theme-xs text-gray-500">
-              {current.period} {current.period_start} – {current.period_end}
-              {current.model && ` · ${current.model}`}
-            </p>
-            <div className="mt-3">
-              {current.status === 'queued' || current.status === 'running' ? (
-                <p className="text-theme-sm text-gray-500">The advisor is writing…</p>
-              ) : current.status === 'failed' ? (
-                <p role="alert" className="text-theme-sm text-error-500">
-                  {parseErrorText(current.error)}
-                </p>
-              ) : report.data?.content ? (
-                <Review content={report.data.content} />
-              ) : (
-                <Placeholder className="h-24" />
-              )}
-            </div>
-            {report.data?.facts && (
-              <details className="mt-4 text-theme-xs text-gray-500">
-                <summary className="cursor-pointer">The numbers this review was built on</summary>
-                <pre className="mt-2 max-h-80 overflow-auto rounded-lg bg-gray-50 p-3 dark:bg-white/5">
-                  {JSON.stringify(report.data.facts, null, 2)}
-                </pre>
-              </details>
+        <>
+          <p className="k-sub">
+            {current.period} {current.period_start} – {current.period_end}
+            {current.model && ` · ${current.model}`}
+          </p>
+          <div className="k-review">
+            {current.status === 'queued' || current.status === 'running' ? (
+              <p className="k-sub">The advisor is writing…</p>
+            ) : current.status === 'failed' ? (
+              <p role="alert" className="k-error">
+                {parseErrorText(current.error)}
+              </p>
+            ) : report.data?.content ? (
+              <Review content={report.data.content} />
+            ) : (
+              <Placeholder />
             )}
-          </section>
-          <section className={cardClass} aria-label="Earlier reviews">
-            <h2 className="text-theme-sm font-semibold text-gray-800 dark:text-white/90">
-              Reviews
-            </h2>
-            <ul className="mt-2 flex flex-col gap-1">
-              {list.map((r) => (
-                <li key={r.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelected(r.id)}
-                    className={cn(
-                      secondaryButton,
-                      'w-full justify-between px-3 py-2 text-theme-xs',
-                      r.id === current.id && 'border-brand-500 text-brand-500',
-                    )}
-                  >
-                    <span>
-                      {r.period} {r.period_start}
-                    </span>
-                    <span>{r.status === 'done' ? '' : r.status}</span>
+          </div>
+          {report.data?.facts && (
+            <details className="k-details">
+              <summary>The numbers this review was built on</summary>
+              <pre className="num">{JSON.stringify(report.data.facts, null, 2)}</pre>
+            </details>
+          )}
+          <Group label="Reviews">
+            {list.map((r) => (
+              <Row
+                key={r.id}
+                title={
+                  <button type="button" className="k-link-plain" onClick={() => setSelected(r.id)}>
+                    {r.period} {r.period_start}
+                    {r.id === current.id ? ' · shown' : ''}
                   </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
+                }
+                right={
+                  r.status === 'done' ? undefined : <span className="k-muted">{r.status}</span>
+                }
+              />
+            ))}
+          </Group>
+        </>
       )}
-      <SettingsForm />
+      {settings && (
+        <Sheet title="Advisor settings" onClose={() => setSettings(false)} width={560}>
+          <SettingsForm />
+        </Sheet>
+      )}
     </MoneyFrame>
   );
 }
