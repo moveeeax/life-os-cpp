@@ -503,15 +503,16 @@ void TravelController::counters(const HttpRequestPtr& req, Callback&& callback) 
     with_repo_errors(callback, "travel.counters", [&] {
         const auto crossings = CrossingRepository().all(owner);
         const std::string home = Repositories::Travel::home_of(owner, crossings);
-        callback(Response::ok(json{
-            {"data", Repositories::Travel::counters_json(owner, *date)},
-            {"date", *date},
-            {"current_country",
-             home.empty() && crossings.empty()
-                 ? json()
-                 : json(::Travel::days_by_country(crossings, home, ::Travel::day_of(*date), ::Travel::day_of(*date))
-                            .begin()
-                            ->second)}}));
+        const auto day = ::Travel::day_of(*date);
+        json here = json::array();
+        for (const auto& c : ::Travel::days_by_country(crossings, home, day, day).begin()->second) {
+            if (!c.empty()) {
+                here.push_back(c);
+            }
+        }
+        callback(Response::ok(json{{"data", Repositories::Travel::counters_json(owner, *date)},
+                                   {"date", *date},
+                                   {"current_country", here.empty() ? json() : here}}));
     });
 }
 
@@ -607,13 +608,20 @@ void TravelController::getTrip(const HttpRequestPtr& req, Callback&& callback, c
     if (!currency) {
         return;
     }
+    const auto date = at_date(req, callback);
+    if (!date) {
+        return;
+    }
     with_repo_errors(callback, "travel.trips.get", [&] {
         TripRepository repo;
         const auto row = repo.get(owner, id);
         if (!row) {
             throw Repositories::Travel::NotFound("trip");
         }
-        callback(Response::ok(json{{"data", trip_view(repo, owner, *row, *currency, true)}}));
+        json view = trip_view(repo, owner, *row, *currency, true);
+        view["allowed"] = Repositories::Travel::allowed_json(
+            owner, (*row)["countries"].get<std::set<std::string>>(), (*row)["start_date"].get<std::string>(), *date);
+        callback(Response::ok(json{{"data", view}}));
     });
 }
 

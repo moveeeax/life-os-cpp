@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <algorithm>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -51,6 +53,33 @@ inline nlohmann::json counters_json(const std::string& owner, const std::string&
             {"reentry", c.reentry ? nlohmann::json(::Travel::text_of(*c.reentry)) : nlohmann::json()},
             {"source", row["source"]},
         });
+    }
+    return out;
+}
+
+/// For a trip starting on @p start (not before @p date): how many days in a row a stay may
+/// last under each rolling "at most" rule that counts one of @p countries.
+inline nlohmann::json allowed_json(const std::string& owner,
+                                   const std::set<std::string>& countries,
+                                   const std::string& start,
+                                   const std::string& date) {
+    nlohmann::json out = nlohmann::json::array();
+    if (start < date || countries.empty()) {
+        return out;
+    }
+    const auto crossings = CrossingRepository().all(owner);
+    const std::string home = home_of(owner, crossings);
+    for (const auto& stored : RuleRepository().all(owner)) {
+        const auto& rule = stored.rule;
+        if (rule.window != ::Travel::Window::RollingDays || rule.kind != ::Travel::Threshold::AtMost ||
+            std::none_of(
+                countries.begin(), countries.end(), [&](const auto& c) { return rule.countries.contains(c); })) {
+            continue;
+        }
+        out.push_back(
+            {{"rule", stored.row["name"]},
+             {"days",
+              ::Travel::stay_allowed_from(rule, crossings, home, ::Travel::day_of(date), ::Travel::day_of(start))}});
     }
     return out;
 }

@@ -185,6 +185,33 @@ TEST_F(TravelApiTest, AnItemLinkIsAWebAddress) {
     }
 }
 
+// Home KZ, in France Aug 1 – Aug 30 2026 (30 Schengen days). A trip to France from
+// Nov 1: the window of every day to Feb 26 still holds those 30, so 60 days in a row fit.
+TEST_F(TravelApiTest, AComingTripSaysHowLongAStayMayLast) {
+    call(kAnna, Post, json::object(), [&](auto req, auto cb) { c.addTemplate(req, std::move(cb), "schengen"); });
+    call(kAnna, Post, json::object(), [&](auto req, auto cb) { c.addTemplate(req, std::move(cb), "kz_tax"); });
+    for (const json& x : {json{{"date", "2026-08-01"}, {"from", "KZ"}, {"to", "FR"}},
+                          json{{"date", "2026-08-30"}, {"from", "FR"}, {"to", "KZ"}}}) {
+        call(kAnna, Post, x, [&](auto req, auto cb) { c.createCrossing(req, std::move(cb)); });
+    }
+    auto trip = body_of(call(
+        kAnna,
+        Post,
+        json{{"name", "Paris"}, {"start_date", "2026-11-01"}, {"end_date", "2026-11-20"}, {"countries", {"FR"}}},
+        [&](auto req, auto cb) { c.createTrip(req, std::move(cb)); }))["data"]["id"]
+                    .get<std::string>();
+    auto view = call(kAnna,
+                     Get,
+                     json::object(),
+                     [&](auto req, auto cb) { c.getTrip(req, std::move(cb), trip); },
+                     {{"date", "2026-10-13"}});
+    ASSERT_EQ(view->statusCode(), k200OK) << std::string(view->body());
+    const auto allowed = body_of(view)["data"]["allowed"];
+    ASSERT_EQ(allowed.size(), 1U) << "only the rolling at-most rule: " << allowed.dump();
+    EXPECT_EQ(allowed[0]["rule"], "Schengen");
+    EXPECT_EQ(allowed[0]["days"], 60);
+}
+
 TEST_F(TravelApiTest, TemplatesAndCounters) {
     ASSERT_EQ(
         call(kAnna, Post, json::object(), [&](auto req, auto cb) { c.addTemplate(req, std::move(cb), "schengen"); })

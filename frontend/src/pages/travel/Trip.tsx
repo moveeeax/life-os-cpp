@@ -48,6 +48,7 @@ function Plan({ trip, today }: { trip: TravelTrip; today: string }) {
   const [crossingFrom, setCrossingFrom] = useState<TravelTripItem | null>(null);
   const items = trip.items ?? [];
   const missing = flightsWithoutCrossing(items, crossings.data ?? []);
+  const tripDays = daysBetween(trip.start_date, trip.end_date) + 1;
   const byDay = new Map<string, TravelTripItem[]>();
   for (const i of items) byDay.set(i.date, [...(byDay.get(i.date) ?? []), i]);
   return (
@@ -63,6 +64,20 @@ function Plan({ trip, today }: { trip: TravelTrip; today: string }) {
           {f.title} on {shortDay(f.date, today)} has no crossing yet
         </Banner>
       ))}
+      {(trip.allowed ?? []).length > 0 && (
+        <Facts
+          items={(trip.allowed ?? []).map((a) => ({
+            label: a.rule,
+            value: (
+              <Num>
+                <span className={a.days < tripDays ? 'k-warn-text' : undefined}>
+                  {`up to ${a.days} days in a row from ${shortDay(trip.start_date, today)}`}
+                </span>
+              </Num>
+            ),
+          }))}
+        />
+      )}
       {items.length === 0 && (
         <p className="k-empty">Nothing planned yet: flights, stays, bookings, notes.</p>
       )}
