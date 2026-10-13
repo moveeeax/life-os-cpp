@@ -6,7 +6,8 @@ import { durationMinutes } from '@/lib/workout/session';
 
 import { HealthBadge } from './bits';
 import { LoadError, WorkoutFrame } from './frame';
-import { cardClass, secondaryButton } from './styles';
+import { Num, Row } from '@/shell/kit';
+import { secondaryButton } from '@/shell/kit/styles';
 
 /** Finished workouts, newest first. */
 export function WorkoutHistoryPage() {
@@ -17,48 +18,52 @@ export function WorkoutHistoryPage() {
   return (
     <WorkoutFrame title="History">
       {list.isPending ? (
-        <div
-          className="h-64 animate-pulse rounded-2xl bg-gray-100 dark:bg-white/5"
-          aria-label="Loading"
-        />
+        <div className="k-placeholder" aria-label="Loading" />
       ) : list.error ? (
         <LoadError error={list.error} onRetry={() => list.refetch()} />
       ) : rows.length === 0 ? (
-        <p className={`${cardClass} text-theme-sm text-gray-500 dark:text-gray-400`}>
-          No finished workouts yet.
-        </p>
+        <p className="k-empty">No finished workouts yet.</p>
       ) : (
         <>
-          <p className="text-theme-xs text-gray-500 dark:text-gray-400">
+          <p className="k-sub" data-num-ok>
             {rows.length} of {total}
           </p>
-          <ul className="flex flex-col gap-3">
+          <div className="k-group-rows">
             {rows.map((s) => (
-              <li key={s.id}>
-                <Link
-                  to={`/workout/history/${s.id}`}
-                  className={`${cardClass} block transition hover:border-brand-300 focus-visible:ring-3 focus-visible:ring-brand-500/30 focus-visible:outline-hidden dark:hover:border-brand-800`}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="text-base font-semibold text-gray-800 dark:text-white/90">
-                      {s.name || 'Workout'}
-                    </h2>
-                    <HealthBadge status={s.health_status} />
-                  </div>
-                  <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">
+              <Row
+                key={s.id}
+                title={
+                  <Link to={`/workout/history/${s.id}`} className="k-link-plain">
+                    {s.name || 'Workout'}
+                  </Link>
+                }
+                sub={
+                  <>
                     {formatDay(s.started_at)}, {formatTime(s.started_at)} ·{' '}
-                    {formatDuration(durationMinutes(s.started_at, s.finished_at))}
-                  </p>
-                  <p className="mt-1 text-theme-sm text-gray-700 tabular-nums dark:text-gray-300">
-                    {s.exercise_count} {s.exercise_count === 1 ? 'exercise' : 'exercises'} ·{' '}
-                    {s.set_count} work {s.set_count === 1 ? 'set' : 'sets'} ·{' '}
-                    {formatVolume(s.volume_kg)}
-                    {s.hr_avg != null && ` · ${s.hr_avg} bpm mean`}
-                  </p>
-                </Link>
-              </li>
+                    {formatDuration(durationMinutes(s.started_at, s.finished_at))} ·{' '}
+                    <HealthBadge status={s.health_status} />
+                  </>
+                }
+                right={<Num>{formatVolume(s.volume_kg)}</Num>}
+              >
+                <span>
+                  <Num>{s.exercise_count}</Num> {s.exercise_count === 1 ? 'exercise' : 'exercises'}{' '}
+                  · <Num>{s.set_count}</Num> work {s.set_count === 1 ? 'set' : 'sets'}
+                  {s.hr_avg != null && (
+                    <>
+                      {' '}
+                      · <Num>{s.hr_avg} bpm</Num> mean
+                    </>
+                  )}
+                </span>
+                <span className="k-actions">
+                  <Link to={`/workout/history/${s.id}`} className="k-link">
+                    Open
+                  </Link>
+                </span>
+              </Row>
             ))}
-          </ul>
+          </div>
           {list.hasNextPage && (
             <button
               type="button"

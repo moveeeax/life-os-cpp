@@ -1,7 +1,7 @@
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 
-import { useIsDark } from '@/hooks/useIsDark';
+import { glassChart } from '@/lib/chartTheme';
 
 interface HeartRateChartProps {
   samples: { timestamp: string; bpm: number }[];
@@ -11,10 +11,10 @@ interface HeartRateChartProps {
 
 /** Heart rate inside one workout: a point per band sample, local time on the axis. */
 export function HeartRateChart({ samples, startedAt, finishedAt }: HeartRateChartProps) {
-  const dark = useIsDark();
-  const muted = dark ? '#98a2b3' : '#667085';
+  // The glass sheet is dark on every screen.
+  const muted = 'rgba(255, 255, 255, 0.56)';
 
-  const options: ApexOptions = {
+  const options: ApexOptions = glassChart({
     chart: {
       fontFamily: "'Outfit Variable', sans-serif",
       toolbar: { show: false },
@@ -22,12 +22,11 @@ export function HeartRateChart({ samples, startedAt, finishedAt }: HeartRateChar
       background: 'transparent',
       animations: { enabled: false },
     },
-    theme: { mode: dark ? 'dark' : 'light' },
-    colors: ['#f04438'],
+    colors: ['#fca5a5'],
     stroke: { width: 2, curve: 'straight' },
     markers: { size: 4, strokeWidth: 0 },
     dataLabels: { enabled: false },
-    grid: { borderColor: dark ? '#1d2939' : '#e4e7ec', strokeDashArray: 4 },
+    grid: { borderColor: 'rgba(255, 255, 255, 0.12)', strokeDashArray: 4 },
     xaxis: {
       type: 'datetime',
       min: Date.parse(startedAt),
@@ -42,19 +41,21 @@ export function HeartRateChart({ samples, startedAt, finishedAt }: HeartRateChar
       labels: { style: { colors: muted }, formatter: (v: number) => String(Math.round(v)) },
     },
     tooltip: { x: { format: 'HH:mm' }, y: { formatter: (v: number) => `${Math.round(v)} bpm` } },
-  };
+  });
 
   return (
-    <Chart
-      options={options}
-      series={[
-        {
-          name: 'Heart rate',
-          data: samples.map((s) => ({ x: Date.parse(s.timestamp), y: s.bpm })),
-        },
-      ]}
-      type="line"
-      height={240}
-    />
+    <div className="num-chart">
+      <Chart
+        options={options}
+        series={[
+          {
+            name: 'Heart rate',
+            data: samples.map((s) => ({ x: Date.parse(s.timestamp), y: s.bpm })),
+          },
+        ]}
+        type="line"
+        height={240}
+      />
+    </div>
   );
 }
