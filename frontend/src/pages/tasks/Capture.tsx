@@ -117,17 +117,17 @@ export function Capture({
           autoComplete="off"
           autoFocus={autoFocus}
           disabled={busy}
-          className="min-w-0 flex-1 bg-transparent py-1.5 text-theme-sm text-gray-800 outline-none placeholder:text-gray-400 dark:text-white/90"
+          className="min-w-0 flex-1 bg-transparent py-1.5 text-theme-sm text-gray-800 outline-none placeholder:k-muted dark:text-white/90"
         />
       </form>
       {plain && (
-        <p className="text-theme-xs text-gray-500">
+        <p className="text-theme-xs k-muted">
           Typed tasks are saved as written: the phrase reader is not set up.
         </p>
       )}
-      {busy && <p className="text-theme-sm text-gray-500">Reading…</p>}
+      {busy && <p className="text-theme-sm k-muted">Reading…</p>}
       {parse.state === 'failed' && (
-        <p role="alert" className="text-theme-sm text-error-500">
+        <p role="alert" className="text-theme-sm k-error-text">
           {parseErrorText(parse.error)}{' '}
           <button type="button" onClick={asTyped} className="font-medium text-brand-500">
             Add as typed
@@ -141,10 +141,8 @@ export function Capture({
               key={i}
               className="grid gap-0.5 rounded-lg bg-brand-50 px-3.5 py-3 dark:bg-brand-500/15"
             >
-              <p className="text-theme-sm font-medium text-gray-800 dark:text-white/90">
-                {l.title}
-              </p>
-              <p className="text-theme-xs text-gray-500">{lineMeta(l, today)}</p>
+              <p className="text-theme-sm font-medium">{l.title}</p>
+              <p className="text-theme-xs k-muted">{lineMeta(l, today)}</p>
               {l.possible_duplicate && (
                 <p className="text-theme-xs text-warning-600">An open task has the same title.</p>
               )}
@@ -165,7 +163,7 @@ export function Capture({
                 setLines(null);
                 parse.cancel();
               }}
-              className="text-gray-500"
+              className="k-muted"
             >
               Discard
             </button>
@@ -173,7 +171,7 @@ export function Capture({
         </div>
       )}
       {(create.error || accept.error) && (
-        <p role="alert" className="text-theme-sm text-error-500">
+        <p role="alert" className="text-theme-sm k-error-text">
           {create.error ?? accept.error}
         </p>
       )}

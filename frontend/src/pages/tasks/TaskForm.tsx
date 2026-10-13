@@ -21,7 +21,7 @@ import {
   primaryButton,
   secondaryButton,
   textareaClass,
-} from '../workout/styles';
+} from '@/shell/kit/styles';
 
 const EFFORTS = Object.keys(EFFORT_LABEL) as Effort[];
 
@@ -221,7 +221,7 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
           </div>
         </div>
         {(update.error || remove.error) && (
-          <p role="alert" className="mt-3 text-theme-sm text-error-500">
+          <p role="alert" className="mt-3 text-theme-sm k-error-text">
             {update.error ?? remove.error}
           </p>
         )}

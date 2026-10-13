@@ -20,7 +20,7 @@ export function TasksTodayPage() {
       ) : (
         <>
           {a.late.length === 0 && a.soon.length === 0 && (
-            <p className="text-theme-sm text-gray-400">Nothing due. Later has the rest.</p>
+            <p className="text-theme-sm k-muted">Nothing due. Later has the rest.</p>
           )}
           {a.late.length > 0 && (
             <Section title="Late" tone="late">
@@ -38,14 +38,12 @@ export function TasksTodayPage() {
             </Section>
           )}
           {review > 0 && (
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3.5 py-2.5 text-theme-sm text-gray-500 dark:border-white/10">
-              <span>
+            <div className="k-banner">
+              <span data-num-ok>
                 Weekly review: {a.review.no_next_step.length} without a next step,{' '}
                 {a.review.stale.length} untouched for two weeks
               </span>
-              <Link to="/tasks/later#review" className="font-medium text-brand-500">
-                Look
-              </Link>
+              <Link to="/tasks/later#review">Look</Link>
             </div>
           )}
         </>
