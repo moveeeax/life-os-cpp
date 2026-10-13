@@ -17,11 +17,15 @@ export function HealthBadge({ status }: { status: WorkoutHealthStatus }) {
   );
 }
 
-/** "Label value": one fact of a facts line (put several in a `.k-facts` row). */
+/**
+ * "Label value": one fact of a facts line (put several in a `.k-facts` row).
+ * The note shows beside the value as a number too: a tooltip would escape Hide numbers.
+ */
 export function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
-    <div className="k-stat" title={note}>
+    <div className="k-stat">
       <span className="k-muted">{label}</span> <span className="num">{value}</span>
+      {note && <span className="num k-stat-note"> ({note})</span>}
     </div>
   );
 }

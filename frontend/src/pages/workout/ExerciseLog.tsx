@@ -190,13 +190,16 @@ export function ExerciseLog({ exercise, queue, onPut, onRemove, onLogged }: Exer
         </button>
         <div className="min-w-0">
           <h2 className="k-ex-title">{exercise.exercise_name}</h2>
-          <p className="text-theme-sm k-muted">{targetSummary(exercise)}</p>
+          <p className="text-theme-sm k-muted">
+            <span className="num">{targetSummary(exercise)}</span>
+          </p>
         </div>
       </div>
       {exercise.note && <p className="mt-2 text-theme-sm k-soft">{exercise.note}</p>}
       {previous.length > 0 && (
         <p className="mt-2 text-theme-sm k-muted">
-          Last time: {previous.map((s) => describeSet(s, mode)).join(' · ')}
+          Last time:{' '}
+          <span className="num">{previous.map((s) => describeSet(s, mode)).join(' · ')}</span>
         </p>
       )}
 
