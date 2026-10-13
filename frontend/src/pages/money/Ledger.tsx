@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Plus } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -33,21 +32,19 @@ import {
   type Transaction,
   type TransactionPatch,
 } from '@/lib/ledger';
-import { cn } from '@/lib/utils';
 
+import { Banner, Filters, Group, Row as KitRow } from '@/shell/kit';
 import {
-  cardClass,
   dangerButton,
   inputClass,
   labelClass,
   modalPanel,
   primaryButton,
   secondaryButton,
-} from '../workout/styles';
+} from '@/shell/kit/styles';
 import { AddForm } from './AddForm';
 import { Amount, CurrencyTotals, PeriodRow } from './bits';
 import { LoadError, MoneyFrame, Placeholder } from './frame';
-import { SummaryCard } from './SummaryCard';
 import { TransfersList } from './Transfers';
 
 function TransactionEditor({
@@ -236,7 +233,7 @@ function TransactionEditor({
   );
 }
 
-function Row({
+function LedgerRow({
   row,
   account,
   category,
@@ -251,45 +248,33 @@ function Row({
 }) {
   const adjustment = row.type === 'fx_adjustment';
   return (
-    <li>
-      <button
-        type="button"
-        onClick={onOpen}
-        className={cn(
-          'flex w-full items-center gap-3 py-2.5 text-start hover:bg-gray-50 dark:hover:bg-white/5',
-          adjustment && 'ps-5',
-        )}
-      >
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-theme-sm text-gray-800 dark:text-white/90">
-            {adjustment ? 'Bank recalculation' : row.name}
-          </span>
-          <span className="block truncate text-theme-xs text-gray-500 dark:text-gray-400">
-            {[
-              row.merchant && row.merchant !== row.name ? row.merchant : null,
-              category?.name,
-              account?.name,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
+    <KitRow
+      title={adjustment ? 'Bank recalculation' : row.name}
+      sub={[category?.name, account?.name].filter(Boolean).join(' · ')}
+      right={<Amount row={row} currencies={currencies} />}
+    >
+      {row.merchant && row.merchant !== row.name && <span>Merchant {row.merchant}</span>}
+      {row.receipt_amount !== null && (
+        <span>
+          Receipt{' '}
+          <span className="num">
+            {row.receipt_currency
+              ? formatMoney(
+                  row.receipt_amount,
+                  row.receipt_currency,
+                  decimalsOf(currencies, row.receipt_currency),
+                )
+              : row.receipt_amount}
           </span>
         </span>
-        <span className="text-end">
-          <Amount row={row} currencies={currencies} className="block text-theme-sm font-medium" />
-          {row.receipt_amount !== null && (
-            <span className="block text-theme-xs text-gray-500 tabular-nums">
-              {row.receipt_currency
-                ? formatMoney(
-                    row.receipt_amount,
-                    row.receipt_currency,
-                    decimalsOf(currencies, row.receipt_currency),
-                  )
-                : row.receipt_amount}
-            </span>
-          )}
-        </span>
-      </button>
-    </li>
+      )}
+      {row.note && <span>{row.note}</span>}
+      <span className="k-actions">
+        <button type="button" className="k-link" onClick={onOpen}>
+          Edit or delete
+        </button>
+      </span>
+    </KitRow>
   );
 }
 
@@ -318,67 +303,64 @@ function Inbox({
   };
 
   if (rows.length === 0) {
-    return (
-      <p className={cn(cardClass, 'text-center text-theme-sm text-gray-500')}>
-        The inbox is empty.
-      </p>
-    );
+    return <p className="k-empty">The inbox is empty.</p>;
   }
   return (
-    <div className={cardClass}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-theme-sm text-gray-500">
+    <div>
+      <div className="k-tools">
+        <span className="k-sub k-grow">
           Rows a parse or an agent proposed. They count once you post them.
-        </p>
+        </span>
         <button
           type="button"
           onClick={() => post(rows)}
           disabled={confirm.isPending}
-          className={cn(primaryButton, 'px-3 py-2')}
+          className={primaryButton}
         >
           Post all {rows.length}
         </button>
       </div>
-      <ul className="mt-3 divide-y divide-gray-100 dark:divide-white/5">
+      <div className="k-group-rows">
         {rows.map((r) => (
-          <li key={r.id} className="flex flex-wrap items-center gap-3 py-2.5">
-            <button type="button" onClick={() => onOpen(r)} className="min-w-0 flex-1 text-start">
-              <span className="block truncate text-theme-sm text-gray-800 dark:text-white/90">
-                {r.name}
-              </span>
-              <span className="block truncate text-theme-xs text-gray-500">
-                {r.date} · {accounts.find((a) => a.id === r.account_id)?.name} ·{' '}
+          <KitRow
+            key={r.id}
+            title={r.name}
+            sub={
+              <>
+                {formatDay(r.date)} · {accounts.find((a) => a.id === r.account_id)?.name} ·{' '}
                 {categories.find((c) => c.id === r.category_id)?.name ?? 'no category'}
-                {r.possible_duplicate && (
-                  <span className="ms-1 text-warning-600">· possible duplicate</span>
-                )}
-              </span>
-            </button>
-            <Amount row={r} currencies={currencies} className="text-theme-sm font-medium" />
-            <div className="flex gap-2">
+                {r.possible_duplicate && <span className="k-warn-text"> · possible duplicate</span>}
+              </>
+            }
+            right={<Amount row={r} currencies={currencies} />}
+          >
+            <span className="k-actions">
               <button
                 type="button"
+                className="k-link"
                 onClick={() => post([r])}
                 disabled={confirm.isPending}
-                className={cn(secondaryButton, 'px-3 py-2')}
               >
                 Post
               </button>
+              <button type="button" className="k-link" onClick={() => onOpen(r)}>
+                Edit
+              </button>
               <button
                 type="button"
+                className="k-link"
                 onClick={() => remove.mutate(r.id)}
                 disabled={remove.isPending}
-                className={cn(secondaryButton, 'px-3 py-2')}
               >
                 Discard
               </button>
-            </div>
-          </li>
+            </span>
+          </KitRow>
         ))}
-      </ul>
+      </div>
       {(confirm.error || remove.error) && (
-        <p role="alert" className="mt-3 text-theme-sm text-error-500">
-          {confirm.error ?? remove.error}
+        <p role="alert" className="k-error">
+          {String(confirm.error ?? remove.error)}
         </p>
       )}
       {asking && (
@@ -463,48 +445,87 @@ export function MoneyLedgerPage() {
   };
   const inboxCount = inbox.data?.length ?? 0;
 
+  const filterCount = [account, category, type, q].filter((v) => v !== '').length;
+  const clearFilters = () => {
+    setAccount('');
+    setCategory('');
+    setType('');
+    setText('');
+  };
+
   return (
     <MoneyFrame
-      title="Money"
+      title="Ledger"
       actions={
-        <button type="button" onClick={() => setAdding(true)} className={primaryButton}>
-          <Plus className="size-4" aria-hidden="true" />
-          Add
-        </button>
+        <>
+          {view === 'ledger' ? (
+            <PeriodRow kind={kind} date={date} onChange={setPeriod} />
+          ) : (
+            <button type="button" className="k-link" onClick={() => setView('ledger')}>
+              ← Back to the ledger
+            </button>
+          )}
+          <span className="k-grow" />
+          {view === 'ledger' && (
+            <Filters active={filterCount} onClear={clearFilters}>
+              <label className="k-field">
+                <span>Account</span>
+                <select value={account} onChange={(e) => setAccount(e.target.value)}>
+                  <option value="">All accounts</option>
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="k-field">
+                <span>Type</span>
+                <select value={type} onChange={(e) => setType(e.target.value)}>
+                  <option value="">All types</option>
+                  <option value="expense">Expenses</option>
+                  <option value="income">Incomes</option>
+                  <option value="fx_adjustment">Bank adjustments</option>
+                </select>
+              </label>
+              <label className="k-field">
+                <span>Category</span>
+                <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                  <option value="">All categories</option>
+                  {(['expense', 'income'] as const).map((k) => (
+                    <optgroup key={k} label={k === 'expense' ? 'Expense' : 'Income'}>
+                      {categories
+                        .filter((c) => c.kind === k)
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                            {c.archived ? ' (archived)' : ''}
+                          </option>
+                        ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </label>
+              <label className="k-field">
+                <span>Search</span>
+                <input
+                  type="search"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="Name or merchant"
+                />
+              </label>
+            </Filters>
+          )}
+          <button type="button" onClick={() => setAdding(true)} className={primaryButton}>
+            Add
+          </button>
+        </>
       }
     >
-      <SummaryCard />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div role="tablist" aria-label="Ledger or inbox" className="flex gap-1">
-          {(['ledger', 'inbox'] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              role="tab"
-              aria-selected={view === v}
-              onClick={() => setView(v)}
-              className={cn(
-                'rounded-lg px-3 py-2 text-theme-sm font-medium transition',
-                view === v
-                  ? 'bg-brand-50 text-brand-500 dark:bg-brand-500/12 dark:text-brand-400'
-                  : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5',
-              )}
-            >
-              {v === 'ledger' ? 'Posted' : 'Inbox'}
-              {v === 'inbox' && inboxCount > 0 && (
-                <span className="ms-1.5 rounded-full bg-brand-500 px-1.5 text-theme-xs text-white">
-                  {inboxCount}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-        {view === 'ledger' && <PeriodRow kind={kind} date={date} onChange={setPeriod} />}
-      </div>
-
       {view === 'inbox' ? (
         inbox.isPending ? (
-          <Placeholder className="h-32" />
+          <Placeholder />
         ) : inbox.isError ? (
           <LoadError error={inbox.error} onRetry={() => void inbox.refetch()} />
         ) : (
@@ -518,110 +539,46 @@ export function MoneyLedgerPage() {
         )
       ) : (
         <>
-          <div className="flex flex-wrap gap-3">
-            <select
-              value={account}
-              onChange={(e) => setAccount(e.target.value)}
-              aria-label="Account"
-              className={cn(inputClass, 'h-10 w-auto max-w-full')}
-            >
-              <option value="">All accounts</option>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              aria-label="Type"
-              className={cn(inputClass, 'h-10 w-auto max-w-full')}
-            >
-              <option value="">All types</option>
-              <option value="expense">Expenses</option>
-              <option value="income">Incomes</option>
-              <option value="fx_adjustment">Bank adjustments</option>
-            </select>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              aria-label="Category"
-              className={cn(inputClass, 'h-10 w-auto max-w-full')}
-            >
-              <option value="">All categories</option>
-              {(['expense', 'income'] as const).map((k) => (
-                <optgroup key={k} label={k === 'expense' ? 'Expense' : 'Income'}>
-                  {categories
-                    .filter((c) => c.kind === k)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                        {c.archived ? ' (archived)' : ''}
-                      </option>
-                    ))}
-                </optgroup>
-              ))}
-            </select>
-            <input
-              type="search"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Search name or merchant"
-              aria-label="Search"
-              className={cn(inputClass, 'h-10 max-w-xs')}
-            />
-          </div>
+          {inboxCount > 0 && (
+            <Banner action="Review" onAction={() => setView('inbox')}>
+              <span data-num-ok>
+                {inboxCount === 1 ? '1 row waits' : `${inboxCount} rows wait`}
+              </span>{' '}
+              in Inbox
+            </Banner>
+          )}
+          {periodTotals.length > 0 && (
+            <div className="k-sub">
+              {filtered
+                ? `Shown rows${list.hasNextPage ? ' (more to load)' : ''}: `
+                : 'This period: '}
+              <CurrencyTotals totals={periodTotals} currencies={currencies} />
+            </div>
+          )}
           {list.isPending ? (
-            <Placeholder className="h-48" />
+            <Placeholder />
           ) : list.isError ? (
             <LoadError error={list.error} onRetry={() => void list.refetch()} />
-          ) : days.length === 0 ? (
-            <>
-              <p className={cn(cardClass, 'text-center text-theme-sm text-gray-500')}>
-                Nothing in this period.
-              </p>
-              <TransfersList
-                from={range.from}
-                to={range.to}
-                account={account}
-                accounts={accounts}
-                currencies={currencies}
-              />
-            </>
           ) : (
             <>
-              <div className={cardClass}>
-                <p className="text-theme-xs font-medium text-gray-500 uppercase">
-                  {filtered
-                    ? `Shown rows, per currency${list.hasNextPage ? ' (more to load)' : ''}`
-                    : 'Period, per currency'}
-                </p>
-                <div className="mt-1">
-                  <CurrencyTotals totals={periodTotals} currencies={currencies} />
-                </div>
-              </div>
+              {days.length === 0 && <p className="k-empty">Nothing in this period.</p>}
               {days.map((d) => (
-                <section key={d.date} className={cardClass} aria-label={formatDay(d.date)}>
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <h2 className="text-theme-sm font-semibold text-gray-800 dark:text-white/90">
-                      {formatDay(d.date)}
-                    </h2>
-                    <CurrencyTotals totals={d.totals} currencies={currencies} />
-                  </div>
-                  <ul className="mt-2 divide-y divide-gray-100 dark:divide-white/5">
-                    {d.rows.map((r) => (
-                      <Row
-                        key={r.id}
-                        row={r}
-                        account={accounts.find((a) => a.id === r.account_id)}
-                        category={categories.find((c) => c.id === r.category_id)}
-                        currencies={currencies}
-                        onOpen={() => setEditing(r)}
-                      />
-                    ))}
-                  </ul>
-                </section>
+                <Group
+                  key={d.date}
+                  label={formatDay(d.date)}
+                  total={<CurrencyTotals totals={d.totals} currencies={currencies} />}
+                >
+                  {d.rows.map((r) => (
+                    <LedgerRow
+                      key={r.id}
+                      row={r}
+                      account={accounts.find((a) => a.id === r.account_id)}
+                      category={categories.find((c) => c.id === r.category_id)}
+                      currencies={currencies}
+                      onOpen={() => setEditing(r)}
+                    />
+                  ))}
+                </Group>
               ))}
               <TransfersList
                 from={range.from}

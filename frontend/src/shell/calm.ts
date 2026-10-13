@@ -3,7 +3,7 @@
  * The shell renders their routes without the legacy sheet; each section's
  * move adds its prefix here.
  */
-export const CALM_PREFIXES: readonly string[] = [];
+export const CALM_PREFIXES: readonly string[] = ['/money'];
 
 export function matchesPrefix(pathname: string, prefixes: readonly string[]): boolean {
   return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));

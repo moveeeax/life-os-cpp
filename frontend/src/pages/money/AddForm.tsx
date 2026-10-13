@@ -37,7 +37,7 @@ import {
   primaryButton,
   secondaryButton,
   textareaClass,
-} from '../workout/styles';
+} from '@/shell/kit/styles';
 
 type Tab = 'manual' | 'describe' | 'receipt' | 'transfer';
 
@@ -210,7 +210,7 @@ function ManualTab({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <div role="radiogroup" aria-label="Direction" className="flex gap-2">
+      <div role="radiogroup" aria-label="Direction" className="k-seg k-seg-start">
         {(['expense', 'income'] as const).map((t) => (
           <button
             key={t}
@@ -221,11 +221,7 @@ function ManualTab({
               setType(t);
               setCategory('');
             }}
-            className={cn(
-              secondaryButton,
-              'px-3 py-2',
-              type === t && 'border-brand-500 text-brand-500',
-            )}
+            className={type === t ? 'k-seg-on' : undefined}
           >
             {t === 'expense' ? 'Expense' : 'Income'}
           </button>
@@ -275,7 +271,7 @@ function ManualTab({
                           setCategory(m.category_id);
                         if (m.account_id && !account) setAccount(m.account_id);
                       }}
-                      className="rounded-full border border-gray-200 px-2.5 py-1 text-theme-xs text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
+                      className="k-btn k-chip"
                     >
                       {m.display_name}
                     </button>
@@ -391,7 +387,7 @@ function ParseLines({
   return (
     <ul className="flex flex-col gap-3">
       {lines.map((l, i) => (
-        <li key={l.key} className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+        <li key={l.key} className="k-line">
           <div className="flex items-start gap-2">
             <input
               type="checkbox"
@@ -605,7 +601,7 @@ function ParseTab({
         onChange={(e) => setText(e.target.value)}
         rows={6}
         maxLength={8000}
-        placeholder="Kaspi Gold *8880: purchase 13 275.61 KZT, BIG C PHUKET"
+        placeholder="Card *1234: purchase 2,500.00 USD, Grocery store"
         autoFocus
         className={textareaClass}
       />
@@ -794,7 +790,7 @@ export function AddForm({ onClose }: { onClose: () => void }) {
 
   return (
     <div className={modalPanel} aria-labelledby="money-add-title">
-      <h2 id="money-add-title" className="text-lg font-semibold">
+      <h2 id="money-add-title" className="k-panel-title">
         Add
       </h2>
       {accountsQuery.isPending ? (
@@ -805,7 +801,7 @@ export function AddForm({ onClose }: { onClose: () => void }) {
         </p>
       ) : (
         <>
-          <div role="tablist" aria-label="How to add" className="mt-3 flex gap-1 overflow-x-auto">
+          <div role="tablist" aria-label="How to add" className="k-seg k-seg-wide">
             {tabs.map(([key, text]) => (
               <button
                 key={key}
@@ -813,12 +809,7 @@ export function AddForm({ onClose }: { onClose: () => void }) {
                 role="tab"
                 aria-selected={tab === key}
                 onClick={() => setTab(key)}
-                className={cn(
-                  'rounded-lg px-3 py-2 text-theme-sm font-medium whitespace-nowrap transition',
-                  tab === key
-                    ? 'bg-brand-50 text-brand-500 dark:bg-brand-500/12 dark:text-brand-400'
-                    : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5',
-                )}
+                className={tab === key ? 'k-seg-on' : undefined}
               >
                 {text}
               </button>

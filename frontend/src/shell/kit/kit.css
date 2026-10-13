@@ -507,3 +507,208 @@ button.k-row-head {
   font-size: 14px;
   color: var(--g-ink-soft);
 }
+
+/* The legacy class names on a calm page (shell/kit/styles.ts). */
+.k-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 4px 0 10px;
+}
+.k-card + .k-card {
+  border-top: 1px solid var(--g-ink-ghost);
+  padding-top: 12px;
+}
+.k-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--g-ink-faint);
+}
+.k-input select option,
+select.k-input option {
+  color: #11162b;
+}
+.k-textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+.k-input[aria-invalid='true'] {
+  border-color: var(--g-late);
+}
+.k-input::placeholder {
+  color: var(--g-ink-faint);
+}
+.k-btn.k-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+.k-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.k-panel {
+  padding: 16px 18px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--g-glass-line);
+  background: var(--g-glass-strong);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  color: var(--g-ink);
+}
+@media (max-width: 640px) {
+  .k-panel {
+    border-radius: 18px 18px 0 0;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    max-height: 90dvh;
+    overflow-y: auto;
+  }
+}
+
+.k-error-text {
+  color: var(--g-late);
+}
+.k-placeholder {
+  min-height: 48px;
+  border-radius: 12px;
+  background: var(--g-ink-ghost);
+  animation: k-pulse 1.4s ease-in-out infinite;
+}
+@keyframes k-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .k-placeholder {
+    animation: none;
+  }
+}
+
+.k-totals {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 2px 12px;
+}
+.k-input.k-compact {
+  width: auto;
+  padding: 3px 8px;
+  font-size: 13px;
+}
+.k-stepper button {
+  display: inline-grid;
+  place-items: center;
+}
+
+.k-warn-text {
+  color: var(--g-warn);
+}
+.k-sub .k-totals {
+  display: inline-flex;
+}
+.k-field > span:first-child {
+  font-size: 12px;
+  color: var(--g-ink-faint);
+}
+
+.k-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid var(--g-glass-line);
+}
+.k-seg button {
+  font: inherit;
+  font-size: 12.5px;
+  padding: 2px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--g-ink-faint);
+  cursor: pointer;
+}
+.k-seg button.k-seg-on {
+  background: var(--g-ink);
+  color: #11162b;
+}
+.k-cap {
+  text-transform: capitalize;
+}
+.k-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--g-ink-soft);
+}
+.k-code {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.k-review {
+  margin: 10px 0;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--g-ink-soft);
+}
+.k-details {
+  margin: 8px 0;
+  font-size: 12.5px;
+  color: var(--g-ink-faint);
+}
+.k-details summary {
+  cursor: pointer;
+}
+.k-details pre {
+  max-height: 320px;
+  overflow: auto;
+  margin: 8px 0 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--g-ink-ghost);
+  white-space: pre-wrap;
+}
+.k-link-plain {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.k-seg-start {
+  align-self: flex-start;
+}
+.k-seg-wide {
+  display: flex;
+  margin: 10px 0 2px;
+  overflow-x: auto;
+}
+.k-seg-wide button {
+  flex: 1;
+  white-space: nowrap;
+}
+.k-line {
+  padding: 10px 0;
+  border-top: 1px solid var(--g-ink-ghost);
+}
+.k-btn.k-chip {
+  padding: 3px 10px;
+  font-size: 12px;
+}
+.k-panel-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 500;
+}
+.k-sub .k-totals {
+  justify-content: flex-start;
+}

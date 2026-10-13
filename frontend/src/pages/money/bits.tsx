@@ -13,8 +13,6 @@ import {
 } from '@/lib/ledger';
 import { cn } from '@/lib/utils';
 
-import { iconButton, inputClass } from '../workout/styles';
-
 /** An amount in its currency, signed and colored by direction. */
 export function Amount({
   row,
@@ -27,13 +25,7 @@ export function Amount({
 }) {
   const v = signedAmount(row);
   return (
-    <span
-      className={cn(
-        'tabular-nums whitespace-nowrap',
-        v < 0 ? 'text-gray-800 dark:text-white/90' : 'text-success-600 dark:text-success-500',
-        className,
-      )}
-    >
+    <span className={cn('num k-amount', v > 0 && 'k-pos', className)}>
       {v < 0 ? '−' : '+'}
       {formatMoney(Math.abs(v), row.currency, decimalsOf(currencies, row.currency))}
     </span>
@@ -50,21 +42,21 @@ export function CurrencyTotals({
 }) {
   if (totals.length === 0) return null;
   return (
-    <div className="flex flex-wrap gap-x-5 gap-y-1 text-theme-xs text-gray-500 dark:text-gray-400">
+    <span className="k-totals">
       {totals.map((t) => (
-        <span key={t.currency} className="tabular-nums whitespace-nowrap">
+        <span key={t.currency} className="num k-amount">
           {t.expense > 0 && (
             <>−{formatMoney(t.expense, t.currency, decimalsOf(currencies, t.currency))}</>
           )}
           {t.expense > 0 && t.income > 0 && ' · '}
           {t.income > 0 && (
-            <span className="text-success-600 dark:text-success-500">
+            <span className="k-pos">
               +{formatMoney(t.income, t.currency, decimalsOf(currencies, t.currency))}
             </span>
           )}
         </span>
       ))}
-    </div>
+    </span>
   );
 }
 
@@ -89,12 +81,12 @@ export function PeriodRow({
   onChange: (kind: PeriodKind, date: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="k-stepper">
       <select
         value={kind}
         onChange={(e) => onChange(e.target.value as PeriodKind, date)}
         aria-label="Period"
-        className={cn(inputClass, 'h-10 w-auto')}
+        className="k-input k-compact"
       >
         <option value="week">Week</option>
         <option value="month">Month</option>
@@ -103,21 +95,17 @@ export function PeriodRow({
       <button
         type="button"
         onClick={() => onChange(kind, shiftPeriod(kind, date, -1))}
-        className={iconButton}
         aria-label="Previous period"
       >
-        <ChevronLeft className="size-5" aria-hidden="true" />
+        <ChevronLeft className="size-4" aria-hidden="true" />
       </button>
-      <p className="min-w-32 text-center text-theme-sm font-medium text-gray-800 dark:text-white/90">
-        {label(kind, date)}
-      </p>
+      <span>{label(kind, date)}</span>
       <button
         type="button"
         onClick={() => onChange(kind, shiftPeriod(kind, date, 1))}
-        className={iconButton}
         aria-label="Next period"
       >
-        <ChevronRight className="size-5" aria-hidden="true" />
+        <ChevronRight className="size-4" aria-hidden="true" />
       </button>
     </div>
   );

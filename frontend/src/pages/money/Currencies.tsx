@@ -1,5 +1,4 @@
 import { useState, type FormEvent } from 'react';
-import { Plus } from 'lucide-react';
 
 import { Modal } from '@/components/Modal';
 import { useCurrencies, useSaveCurrency } from '@/hooks/useMoney';
@@ -7,13 +6,14 @@ import { smallestUnit, type Currency, type CurrencyInput } from '@/lib/ledger';
 import { cn } from '@/lib/utils';
 
 import {
-  cardClass,
   inputClass,
   labelClass,
   modalPanel,
   primaryButton,
   secondaryButton,
-} from '../workout/styles';
+} from '@/shell/kit/styles';
+import { Group, Row } from '@/shell/kit';
+
 import { LoadError, MoneyFrame, Placeholder } from './frame';
 
 type Role = Currency['role'];
@@ -180,18 +180,8 @@ export function MoneyCurrenciesPage() {
     <MoneyFrame
       title="Currencies"
       actions={
-        <button type="button" onClick={() => setOpen('new')} className={primaryButton}>
-          <Plus className="size-4" aria-hidden="true" />
-          New currency
-        </button>
-      }
-    >
-      <section className={cardClass} aria-label="Currencies">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-gray-800 dark:text-white/90">
-            Currencies and their smallest unit
-          </h2>
-          <label className="flex items-center gap-2 text-theme-sm text-gray-600 dark:text-gray-400">
+        <>
+          <label className="k-check">
             <input
               type="checkbox"
               checked={showArchived}
@@ -199,40 +189,44 @@ export function MoneyCurrenciesPage() {
             />
             Show archived
           </label>
-        </div>
-        {currencies.isPending ? (
-          <Placeholder className="mt-3 h-48" />
-        ) : currencies.isError ? (
-          <LoadError error={currencies.error} onRetry={() => void currencies.refetch()} />
-        ) : (
-          <ul className="mt-2 divide-y divide-gray-100 dark:divide-white/5">
-            {currencies.data.map((c) => (
-              <li key={c.code}>
-                <button
-                  type="button"
-                  onClick={() => setOpen(c)}
-                  className={cn(
-                    'flex w-full items-baseline justify-between gap-3 py-2.5 text-start hover:bg-gray-50 dark:hover:bg-white/5',
-                    c.archived && 'opacity-60',
-                  )}
-                >
-                  <span className="text-theme-sm text-gray-800 dark:text-white/90">
-                    <span className="font-mono font-semibold">{c.code}</span>
-                    {c.name && <span className="ms-2">{c.name}</span>}
-                    {c.role && <span className="ms-1.5 text-theme-xs text-gray-500">{c.role}</span>}
-                    {c.archived && (
-                      <span className="ms-1.5 text-theme-xs text-gray-500">archived</span>
-                    )}
-                  </span>
-                  <span className="text-theme-xs text-gray-500 tabular-nums">
-                    {smallestUnit(c)}
-                  </span>
+          <span className="k-grow" />
+          <button type="button" onClick={() => setOpen('new')} className={primaryButton}>
+            New currency
+          </button>
+        </>
+      }
+    >
+      {currencies.isPending ? (
+        <Placeholder />
+      ) : currencies.isError ? (
+        <LoadError error={currencies.error} onRetry={() => void currencies.refetch()} />
+      ) : (
+        <Group label="Currencies and their smallest unit">
+          {currencies.data.map((c) => (
+            <Row
+              key={c.code}
+              title={
+                <span className={c.archived ? 'k-muted' : undefined}>
+                  <b className="k-code">{c.code}</b>
+                  {c.name && ` ${c.name}`}
+                </span>
+              }
+              sub={[c.role, c.archived && 'archived'].filter(Boolean).join(' · ') || undefined}
+              right={
+                <span className="k-muted" data-num-ok>
+                  {smallestUnit(c)}
+                </span>
+              }
+            >
+              <span className="k-actions">
+                <button type="button" className="k-link" onClick={() => setOpen(c)}>
+                  Edit
                 </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+              </span>
+            </Row>
+          ))}
+        </Group>
+      )}
       {open && (
         <Modal onClose={() => setOpen(null)} className="max-w-xl">
           <CurrencyForm currency={open === 'new' ? null : open} onClose={() => setOpen(null)} />

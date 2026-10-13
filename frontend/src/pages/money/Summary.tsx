@@ -10,9 +10,8 @@ import {
   rateText,
   signed,
 } from '@/lib/networth';
-import { cn } from '@/lib/utils';
 
-import { cardClass } from '../workout/styles';
+import { Facts, Group, Num, Row } from '@/shell/kit';
 import { LoadError, MoneyFrame, Placeholder } from './frame';
 
 const CURRENCY_KEY = 'money:summary:currency';
@@ -56,23 +55,14 @@ function Segmented<T extends string | number>({
   text: (v: T) => string;
 }) {
   return (
-    <div
-      role="group"
-      aria-label={label}
-      className="inline-flex gap-0.5 rounded-full border border-gray-200 p-0.5 dark:border-white/15"
-    >
+    <div role="group" aria-label={label} className="k-seg">
       {options.map((o) => (
         <button
           key={String(o)}
           type="button"
           aria-pressed={o === value}
           onClick={() => onChange(o)}
-          className={cn(
-            'rounded-full px-2.5 py-0.5 text-theme-xs',
-            o === value
-              ? 'bg-gray-800 text-white dark:bg-white/90 dark:text-gray-900'
-              : 'text-gray-500 dark:text-gray-400',
-          )}
+          className={o === value ? 'k-seg-on' : undefined}
         >
           {text(o)}
         </button>
@@ -137,6 +127,7 @@ function Trend({
               strokeOpacity="0.08"
             />
             <text
+              className="num"
               x={box.left - 8}
               y={t.y + 4}
               textAnchor="end"
@@ -225,148 +216,101 @@ export function MoneySummaryPage() {
   };
   const d = q.data;
   return (
-    <MoneyFrame title="Money">
+    <MoneyFrame
+      title="Summary"
+      actions={
+        <>
+          <Segmented
+            label="Currency"
+            options={SUMMARY_CURRENCIES}
+            value={currency as (typeof SUMMARY_CURRENCIES)[number]}
+            onChange={setCurrency}
+            text={(c) => c}
+          />
+          <span className="k-grow" />
+          <Segmented
+            label="Period"
+            options={SUMMARY_PERIODS}
+            value={days as (typeof SUMMARY_PERIODS)[number]}
+            onChange={setDays}
+            text={(p) => `${p} days`}
+          />
+        </>
+      }
+    >
       {q.error ? (
         <LoadError error={q.error} onRetry={() => q.refetch()} />
       ) : !d ? (
-        <Placeholder className="h-64" />
+        <Placeholder />
       ) : (
         <>
-          <section className={cardClass} aria-labelledby="nw-total">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2
-                id="nw-total"
-                className="text-theme-xs font-medium tracking-widest text-gray-500 uppercase"
+          <Facts
+            items={[
+              {
+                label: `In ${days} days`,
+                value: (
+                  <Num className={d.change.total >= 0 ? 'k-pos' : undefined}>
+                    {signed(d.change.total)} {d.currency}
+                  </Num>
+                ),
+              },
+              { label: 'From the ledger', value: <Num>{signed(d.change.ledger)}</Num> },
+              { label: 'From the rates', value: <Num>{signed(d.change.rates)}</Num> },
+            ]}
+          />
+          <Group label="By day">
+            <Trend days={d.days} currency={d.currency} />
+          </Group>
+          <Group
+            label="Accounts"
+            total={
+              <Num>
+                {formatTotal(d.total)} {d.currency}
+              </Num>
+            }
+          >
+            {d.accounts.map((a) => (
+              <Row
+                key={a.id}
+                title={a.name}
+                sub={<span className="k-cap">{a.kind}</span>}
+                right={
+                  <Num>
+                    {formatTotal(a.value)} {d.currency}
+                  </Num>
+                }
               >
-                All accounts
-              </h2>
-              <Segmented
-                label="Currency"
-                options={SUMMARY_CURRENCIES}
-                value={currency as (typeof SUMMARY_CURRENCIES)[number]}
-                onChange={setCurrency}
-                text={(c) => c}
-              />
-            </div>
-            <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-              <span className="num text-5xl font-light tracking-tight tabular-nums text-gray-800 dark:text-white">
-                {formatTotal(d.total)} <span className="text-2xl">{d.currency}</span>
-              </span>
-              <span
-                className={cn(
-                  'num text-theme-sm tabular-nums',
-                  d.change.total >= 0 ? 'text-success-600 dark:text-success-500' : 'text-error-500',
-                )}
-              >
-                {d.change.total >= 0 ? '▲' : '▼'} {signed(d.change.total)} {d.currency}{' '}
-                <span className="text-gray-500">in {days} days</span>
-              </span>
-            </div>
-            <dl className="mt-4 grid gap-x-6 gap-y-2 text-theme-sm sm:grid-cols-2">
-              <div className="flex justify-between gap-3 border-t border-gray-100 pt-2 dark:border-white/10">
-                <dt className="text-gray-500">From the ledger (income − spending)</dt>
-                <dd className="num font-medium tabular-nums">{signed(d.change.ledger)}</dd>
-              </div>
-              <div className="flex justify-between gap-3 border-t border-gray-100 pt-2 dark:border-white/10">
-                <dt className="text-gray-500">From the rates</dt>
-                <dd className="num font-medium tabular-nums">{signed(d.change.rates)}</dd>
-              </div>
-            </dl>
-            <p className="mt-3 text-theme-xs text-gray-500">
-              Converted at the rates of {rateDay(d.rate_date, d.date)}, daily quotes against the US
-              dollar.
-              {d.partial && ' Partial: some money has no rate and is listed below.'}
-              {d.change.partial &&
-                ` The change leaves out money without a rate on ${rateDay(d.change.from, d.date)} or ${rateDay(d.date, d.date)}.`}
+                <span>
+                  Balance{' '}
+                  <Num>
+                    {formatTotal(a.balance)} {a.currency}
+                  </Num>
+                </span>
+                <span>
+                  Rate <Num>{rateText(a.rate, a.currency, d.currency)}</Num> on{' '}
+                  {rateDay(a.rate_date, d.date)}
+                </span>
+                <span>
+                  Share <Num>{d.total > 0 ? Math.round((a.value / d.total) * 100) : 0}%</Num>
+                </span>
+              </Row>
+            ))}
+          </Group>
+          {d.not_converted.length > 0 && (
+            <p className="k-sub k-warn-text">
+              Not converted (no rate):{' '}
+              <Num>
+                {d.not_converted.map((n) => `${formatTotal(n.amount)} ${n.currency}`).join(', ')}
+              </Num>
+              . The total leaves it out.
             </p>
-          </section>
-
-          <section className={cardClass} aria-labelledby="nw-days">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2
-                id="nw-days"
-                className="text-theme-xs font-medium tracking-widest text-gray-500 uppercase"
-              >
-                By day
-              </h2>
-              <Segmented
-                label="Period"
-                options={SUMMARY_PERIODS}
-                value={days as (typeof SUMMARY_PERIODS)[number]}
-                onChange={setDays}
-                text={(p) => `${p} days`}
-              />
-            </div>
-            <div className="mt-3">
-              <Trend days={d.days} currency={d.currency} />
-            </div>
-            <p className="mt-2 text-theme-xs text-gray-500">
-              Each day: the balances of that day at that day's rates.
-            </p>
-          </section>
-
-          <section className={cardClass} aria-labelledby="nw-accounts">
-            <h2
-              id="nw-accounts"
-              className="text-theme-xs font-medium tracking-widest text-gray-500 uppercase"
-            >
-              Accounts
-            </h2>
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[520px] text-theme-sm">
-                <thead>
-                  <tr className="text-theme-xs text-gray-500">
-                    <th className="pb-2 text-start font-medium">Account</th>
-                    <th className="pb-2 text-end font-medium">Balance</th>
-                    <th className="pb-2 text-end font-medium">Rate</th>
-                    <th className="pb-2 text-end font-medium">In {d.currency}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-white/10">
-                  {d.accounts.map((a) => (
-                    <tr key={a.id}>
-                      <td className="py-2">
-                        {a.name}
-                        <span className="block text-theme-xs text-gray-500 capitalize">
-                          {a.kind}
-                        </span>
-                      </td>
-                      <td className="num py-2 text-end tabular-nums">
-                        {formatTotal(a.balance)} {a.currency}
-                      </td>
-                      <td className="py-2 text-end tabular-nums">
-                        <span className="num">{rateText(a.rate, a.currency, d.currency)}</span>
-                        <span className="block text-theme-xs text-gray-500">
-                          {rateDay(a.rate_date, d.date)}
-                        </span>
-                      </td>
-                      <td className="num py-2 text-end tabular-nums">
-                        {formatTotal(a.value)} {d.currency}
-                        <span className="block text-theme-xs text-gray-500">
-                          {d.total > 0 ? Math.round((a.value / d.total) * 100) : 0}%
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="font-semibold">
-                    <td className="py-2">All accounts</td>
-                    <td />
-                    <td />
-                    <td className="num py-2 text-end tabular-nums">
-                      {formatTotal(d.total)} {d.currency}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            {d.not_converted.length > 0 && (
-              <p className="mt-3 text-theme-xs text-warning-600 dark:text-warning-400">
-                Not converted (no rate):{' '}
-                {d.not_converted.map((n) => `${formatTotal(n.amount)} ${n.currency}`).join(', ')}.
-                The total leaves it out.
-              </p>
-            )}
-          </section>
+          )}
+          <p className="k-sub">
+            Converted at the rates of {rateDay(d.rate_date, d.date)}, daily quotes against the US
+            dollar. Each day of the line: that day's balances at that day's rates.
+            {d.change.partial &&
+              ` The change leaves out money without a rate on ${rateDay(d.change.from, d.date)} or ${rateDay(d.date, d.date)}.`}
+          </p>
         </>
       )}
     </MoneyFrame>
