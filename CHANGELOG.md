@@ -6,6 +6,12 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-10-13
+
+### Added
+- Day counters take a calendar-year window (January 1 to the date), the way
+  Russian tax residency sets the final status for a year's income.
+
 ## [1.23.1] - 2026-10-13
 
 ### Security
