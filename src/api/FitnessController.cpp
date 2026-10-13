@@ -264,6 +264,10 @@ void FitnessController::probe(const HttpRequestPtr& req, std::function<void(cons
         spdlog::warn("fitness probe protocol failure: {}", e.what());
         callback(ErrorResponse::service_unavailable("upstream_protocol",
                                                     "Xiaomi response did not match the expected format"));
+    } catch (const std::exception& e) {
+        // The database or the transport failed some other way: still an answer, not a dropped request.
+        spdlog::warn("fitness probe failed: {}", e.what());
+        callback(ErrorResponse::service_unavailable("upstream_unavailable", "the probe could not reach its data now"));
     }
 }
 

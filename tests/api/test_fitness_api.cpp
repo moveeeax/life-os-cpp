@@ -213,6 +213,19 @@ TEST_F(XiaomiProbeTest, UpstreamAuthFailureIsReported) {
     EXPECT_TRUE((*accounts.status(kTestUserId))["last_error"].is_null());
 }
 
+// Any other failure (here the transport throws a plain runtime_error, as a
+// broken database or an unexpected library error would) is a JSON 503, not an
+// exception out of the handler.
+TEST_F(XiaomiProbeTest, AnUnexpectedFailureIsAJson503) {
+    seed_credentials();  // no replies queued: the first request throws
+
+    HttpResponsePtr resp;
+    ASSERT_NO_THROW(resp = probe("steps", "2026-09-22", "2026-09-22"));
+    ASSERT_NE(resp, nullptr);
+    EXPECT_EQ(resp->statusCode(), k503ServiceUnavailable);
+    EXPECT_EQ(json::parse(std::string(resp->body()))["error"], "upstream_unavailable");
+}
+
 // Phase 3 Global Constraint: probe and sync never run at the same time, both
 // log in, and login rotates the token. While a running row is alive, probe
 // answers 409 without going to the cloud.
