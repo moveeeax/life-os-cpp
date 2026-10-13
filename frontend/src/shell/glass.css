@@ -165,6 +165,13 @@
 .hide-numbers .glass .num {
   filter: blur(7px);
 }
+/* Charts: their series, value labels and tooltips are numbers too. */
+.hide-numbers
+  .glass
+  .num-chart
+  :is(.apexcharts-series, .apexcharts-yaxis-label, .apexcharts-datalabels, .apexcharts-tooltip) {
+  filter: blur(7px);
+}
 .hide-numbers .glass [data-legacy-sheet] {
   filter: blur(7px);
 }

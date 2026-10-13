@@ -6,13 +6,16 @@ import '@fontsource-variable/outfit';
 import { Backdrop } from './Backdrop';
 import { GlassAccountMenu } from './GlassAccountMenu';
 import { GlassNav } from './GlassNav';
+import { isCalm } from './calm';
 import { HideNumbersButton } from './HideNumbersButton';
 import './glass.css';
+import './kit/kit.css';
 
 /**
  * The signed-in app: one picture behind every screen (open on Now, dimmed
- * elsewhere), the glass pill nav, and the screen. A section not redesigned
- * yet sits on one large glass sheet in its dark look.
+ * elsewhere), the glass pill nav, and the screen. A section on the calm
+ * sheet (calm.ts) renders its own column; one not moved yet sits on one large
+ * glass sheet in its dark look.
  */
 export function GlassShell() {
   const { pathname } = useLocation();
@@ -35,6 +38,10 @@ export function GlassShell() {
         <Suspense fallback={null}>
           {onNow ? (
             <Outlet />
+          ) : isCalm(pathname) ? (
+            <div className="g-page">
+              <Outlet />
+            </div>
           ) : (
             <div className="g-page">
               <div className="g-sheet g-legacy" data-legacy-sheet>
@@ -44,6 +51,8 @@ export function GlassShell() {
           )}
         </Suspense>
       </main>
+      {/* Dialogs land here: inside .glass, outside the sheets and their filters. */}
+      <div id="g-portal" />
       <HideNumbersButton />
     </div>
   );
