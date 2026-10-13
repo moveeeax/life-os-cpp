@@ -228,6 +228,29 @@ components:
       required: [focus, errors]
       description: 'A section key is absent when its module is off, the caller has nothing there, or it failed (then it is in errors)'
       properties:
+        travel:
+          type: object
+          required: [next_trip, near]
+          description: The next trip and the day counters near their threshold (within 14 days)
+          properties:
+            next_trip:
+              oneOf:
+                - type: object
+                  required: [id, name, start_date, days_to]
+                  properties:
+                    id: { type: string, format: uuid }
+                    name: { type: string }
+                    start_date: { type: string, format: date }
+                    days_to: { type: integer }
+                - { type: 'null' }
+            near:
+              type: array
+              items:
+                type: object
+                required: [rule, left]
+                properties:
+                  rule: { type: string }
+                  left: { type: integer, description: Days left, or days until an over threshold is met }
         tasks:
           type: object
           required: [late_count, first_late, today, inbox_count]

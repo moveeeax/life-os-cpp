@@ -38,6 +38,8 @@
 #include "repositories/now/FocusRepository.hpp"
 #include "repositories/tasks/NoteRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
+#include "repositories/travel/Counters.hpp"
+#include "repositories/travel/TripRepository.hpp"
 #include "security/Auth.hpp"
 #include "tasks/Agenda.hpp"
 #include "utils/Date.hpp"
@@ -243,6 +245,14 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
             {"food", Core::food_enabled(), [&] { return food_part(owner, date); }},
             {"money", Core::money_enabled(), [&] { return money_part(owner, date); }},
             {"health", Core::fitness_enabled() && fitness_read, [&] { return health_part(owner, date); }},
+            {"travel",
+             Core::travel_enabled(),
+             [&] {
+                 return ::Now::Today::travel_block(
+                     Repositories::Travel::TripRepository().next(owner, date).value_or(json()),
+                     Repositories::Travel::counters_json(owner, date),
+                     date);
+             }},
         };
         const auto focus = FocusRepository().get(owner, date);
         json data = ::Now::Today::assemble(parts, focus ? focus_out(owner, *focus) : json());

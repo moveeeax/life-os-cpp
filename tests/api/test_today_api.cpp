@@ -102,6 +102,7 @@ protected:
         cfg["goals"]["enabled"] = true;
         cfg["food"]["enabled"] = true;
         cfg["money"]["enabled"] = true;
+        cfg["travel"]["enabled"] = true;
     }
 
     void SetUp() override {
@@ -110,6 +111,12 @@ protected:
             return;
         Database::get().execute_write([](auto& txn) {
             txn.exec("TRUNCATE TABLE day_focus, task_parse_jobs, task_notes, task_items, goal_items CASCADE");
+            txn.exec(
+                "DELETE FROM travel_trips WHERE owner_id IN ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaae7', "
+                "'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbe7')");
+            txn.exec(
+                "DELETE FROM travel_rules WHERE owner_id IN ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaae7', "
+                "'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbe7')");
             txn.exec(
                 "DELETE FROM money_transactions WHERE owner_id IN ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaae7', "
                 "'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbe7')");
@@ -352,4 +359,19 @@ TEST_F(TodayApiTest, TheDigestCarriesTheCornerDetails) {
 TEST_F(TodayApiTest, ASpendOfSomeoneElseStaysTheirs) {
     insert_spend(kBoris, "Boris's lunch", 3000);
     EXPECT_FALSE(today()["money"].is_object() && !today()["money"]["spends_today"].empty());
+}
+
+TEST_F(TodayApiTest, TheNextTripCountsDown) {
+    Database::get().execute_write([](auto& txn) {
+        txn.exec_params(
+            "INSERT INTO travel_trips (owner_id, name, start_date, end_date) VALUES ($1::uuid, 'Thailand', "
+            "'2026-10-31', '2026-11-20')",
+            std::string(kAnna));
+        return true;
+    });
+    const json d = today();
+    ASSERT_TRUE(d.contains("travel")) << d.dump();
+    EXPECT_EQ(d["travel"]["next_trip"]["name"], "Thailand");
+    EXPECT_EQ(d["travel"]["next_trip"]["days_to"], 19) << "from Oct 12 to Oct 31";
+    EXPECT_FALSE(today(kBoris).contains("travel")) << "nothing to show for Boris";
 }

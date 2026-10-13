@@ -786,6 +786,68 @@
     ],
     "description": "A section key is absent when its module is off, the caller has nothing there, or it failed (then it is in errors)",
     "properties": {
+     "travel": {
+      "type": "object",
+      "required": [
+       "next_trip",
+       "near"
+      ],
+      "description": "The next trip and the day counters near their threshold (within 14 days)",
+      "properties": {
+       "next_trip": {
+        "oneOf": [
+         {
+          "type": "object",
+          "required": [
+           "id",
+           "name",
+           "start_date",
+           "days_to"
+          ],
+          "properties": {
+           "id": {
+            "type": "string",
+            "format": "uuid"
+           },
+           "name": {
+            "type": "string"
+           },
+           "start_date": {
+            "type": "string",
+            "format": "date"
+           },
+           "days_to": {
+            "type": "integer"
+           }
+          }
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "near": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "required": [
+          "rule",
+          "left"
+         ],
+         "properties": {
+          "rule": {
+           "type": "string"
+          },
+          "left": {
+           "type": "integer",
+           "description": "Days left",
+           "or days until an over threshold is met": null
+          }
+         }
+        }
+       }
+      }
+     },
      "tasks": {
       "type": "object",
       "required": [
@@ -24581,7 +24643,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 360719,
-  "source_fnv1a64": "f6f09f9c47896f4a"
+  "source_bytes": 361630,
+  "source_fnv1a64": "0091b7169950f0e2"
  }
 }
