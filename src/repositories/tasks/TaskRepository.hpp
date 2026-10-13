@@ -36,6 +36,7 @@ public:
         std::string status = "open";
         std::optional<std::string> goal_id;
         std::optional<std::string> goal_section_id;
+        std::optional<std::string> trip_id;
     };
 
     struct Patch {
@@ -50,6 +51,7 @@ public:
         std::optional<std::optional<std::string>> source_ref;
         std::optional<std::optional<std::string>> goal_id;
         std::optional<std::optional<std::string>> goal_section_id;
+        std::optional<std::optional<std::string>> trip_id;
     };
 
     struct Filter {
@@ -60,6 +62,7 @@ public:
         std::string done_since;  // "" or YYYY-MM-DD (completed_at >= that day, UTC)
         int limit = 50;
         int offset = 0;
+        std::string trip;  // "" any, or a trip id: that trip's tasks (packing)
     };
 
     nlohmann::json create(const std::string& owner, const Input& in) {
@@ -75,9 +78,9 @@ public:
     static std::string create_in(Txn& txn, const std::string& owner, const Input& in) {
         auto r = txn.exec_params(
             "INSERT INTO task_items (owner_id, title, area, effort, due, next_step, note, status, completed_at, "
-            " source_kind, source_ref, external_id, goal_id, goal_section_id) "
+            " source_kind, source_ref, external_id, goal_id, goal_section_id, trip_id) "
             "VALUES ($1::uuid, $2, $3, $4, $5::date, $6, $7, $8, CASE WHEN $8 = 'done' THEN now() END, $9, $10, $11, "
-            " $12::uuid, $13::uuid) "
+            " $12::uuid, $13::uuid, $14::uuid) "
             "RETURNING id::text",
             owner,
             in.title,
@@ -91,7 +94,8 @@ public:
             in.source_ref,
             in.external_id,
             in.goal_id,
-            in.goal_section_id);
+            in.goal_section_id,
+            in.trip_id);
         return r[0][0].template as<std::string>();
     }
 
@@ -116,6 +120,7 @@ public:
                         " source_ref = CASE WHEN $14::boolean THEN $15 ELSE source_ref END, "
                         " goal_id = CASE WHEN $16::boolean THEN $17::uuid ELSE goal_id END, "
                         " goal_section_id = CASE WHEN $18::boolean THEN $19::uuid ELSE goal_section_id END, "
+                        " trip_id = CASE WHEN $20::boolean THEN $21::uuid ELSE trip_id END, "
                         " updated_at = now() "
                         "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
                         owner,
@@ -136,7 +141,9 @@ public:
                         p.goal_id.has_value(),
                         p.goal_id.has_value() ? *p.goal_id : std::optional<std::string>(),
                         p.goal_section_id.has_value(),
-                        p.goal_section_id.has_value() ? *p.goal_section_id : std::optional<std::string>());
+                        p.goal_section_id.has_value() ? *p.goal_section_id : std::optional<std::string>(),
+                        p.trip_id.has_value(),
+                        p.trip_id.has_value() ? *p.trip_id : std::optional<std::string>());
                     if (r.empty()) {
                         throw NotFound("task");
                     }
@@ -164,10 +171,19 @@ public:
                 " AND ($4 = '' OR title ILIKE '%' || $4 || '%' ESCAPE '\\' OR next_step ILIKE '%' || $4 || '%' ESCAPE "
                 "'\\') "
                 " AND ($5 = '' OR due <= $5::date) AND ($6 = '' OR completed_at >= ($6::date::timestamp AT TIME ZONE "
-                "'UTC')) ";
+                "'UTC')) AND ($9 = '' OR trip_id = NULLIF($9, '')::uuid) ";
             const std::string q = escape_like(f.q);
-            auto total = txn.exec_params(
-                "SELECT count(*) FROM task_items" + where, owner, f.status, f.area, q, f.due_to, f.done_since);
+            auto total =
+                txn.exec_params("SELECT count(*) FROM task_items" + where + " AND $7::int >= 0 AND $8::int >= 0",
+                                owner,
+                                f.status,
+                                f.area,
+                                q,
+                                f.due_to,
+                                f.done_since,
+                                f.limit,
+                                f.offset,
+                                f.trip);
             auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
                                          " FROM task_items" + where + " ORDER BY created_at DESC LIMIT $7 OFFSET $8) t",
                                      owner,
@@ -177,7 +193,8 @@ public:
                                      f.due_to,
                                      f.done_since,
                                      f.limit,
-                                     f.offset);
+                                     f.offset,
+                                     f.trip);
             return nlohmann::json{{"data", nlohmann::json::parse(r[0][0].template as<std::string>())},
                                   {"total", total[0][0].template as<long>()}};
         });
@@ -258,7 +275,7 @@ public:
     static constexpr const char* kColumns =
         "id, title, area, effort, to_char(due, 'YYYY-MM-DD') AS due, next_step, note, status, "
         " to_char(completed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS completed_at, "
-        " source_kind, source_ref, external_id, goal_id, goal_section_id, "
+        " source_kind, source_ref, external_id, goal_id, goal_section_id, trip_id, "
         " (SELECT g.title FROM goal_items g WHERE g.id = task_items.goal_id) AS goal_title, "
         " to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
         " to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";

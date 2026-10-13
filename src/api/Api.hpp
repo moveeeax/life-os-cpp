@@ -42,6 +42,7 @@
 #include "api/SoundsController.hpp"
 #include "api/TasksController.hpp"
 #include "api/TodayController.hpp"
+#include "api/TravelController.hpp"
 #include "api/WallpapersController.hpp"
 #include "api/WorkoutController.hpp"
 
