@@ -172,7 +172,8 @@
   :is(.apexcharts-series, .apexcharts-yaxis-label, .apexcharts-datalabels, .apexcharts-tooltip) {
   filter: blur(7px);
 }
-.hide-numbers .glass [data-legacy-sheet] {
+.hide-numbers .glass [data-legacy-sheet],
+.hide-numbers .glass #g-portal[data-legacy] :is([role='dialog'], [role='alertdialog']) {
   filter: blur(7px);
 }
 

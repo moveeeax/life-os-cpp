@@ -51,8 +51,9 @@ export function GlassShell() {
           )}
         </Suspense>
       </main>
-      {/* Dialogs land here: inside .glass, outside the sheets and their filters. */}
-      <div id="g-portal" />
+      {/* Dialogs land here: inside .glass, outside the sheets and their filters.
+          A page not moved yet marks it, so Hide numbers still blurs its dialogs whole. */}
+      <div id="g-portal" data-legacy={!onNow && !isCalm(pathname) ? '' : undefined} />
       <HideNumbersButton />
     </div>
   );
