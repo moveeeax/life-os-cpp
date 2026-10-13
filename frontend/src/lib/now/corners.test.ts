@@ -385,3 +385,21 @@ describe('goalPace', () => {
     expect(goalPace(g).text).toBe('not updated');
   });
 });
+
+describe('travel on Now', () => {
+  it('the next trip joins the countdowns', () => {
+    const t: Today = {
+      ...base,
+      travel: { next_trip: { id: 't1', name: 'Thailand', start_date: '2026-11-01', days_to: 19 }, near: [] },
+    };
+    const c = countdowns(t, '2026-10-13');
+    expect(c.map((x) => x.title)).toContain('Thailand');
+    expect(c.find((x) => x.title === 'Thailand')?.words).toBe('in 19 days');
+  });
+  it('a near threshold sets the dot and leads the small line', () => {
+    const t: Today = { ...base, travel: { next_trip: null, near: [{ rule: 'Schengen', left: 6 }] } };
+    const goals = chips(t, 10, '2026-10-13')[1];
+    expect(goals.dot).toBe('warn');
+    expect(text(goals.small)).toBe('Schengen: 6 days left');
+  });
+});
