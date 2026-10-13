@@ -92,8 +92,10 @@ export function EntryEditor({ entry, onClose }: { entry: FoodEntry; onClose: () 
           {entry.name}
         </h2>
         <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">
-          {formatKcal(entry.kcal)} kcal · P {formatGrams(entry.protein_g)} · F{' '}
-          {formatGrams(entry.fat_g)} · C {formatGrams(entry.carbs_g)}
+          <span className="num">
+            {formatKcal(entry.kcal)} kcal · P {formatGrams(entry.protein_g)} · F{' '}
+            {formatGrams(entry.fat_g)} · C {formatGrams(entry.carbs_g)}
+          </span>
           {entry.item_id === null && ' · the numbers of this entry are fixed'}
         </p>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">

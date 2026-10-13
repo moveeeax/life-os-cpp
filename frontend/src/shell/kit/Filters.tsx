@@ -17,7 +17,13 @@ export function Filters({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className="k-btn" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className="k-btn"
+        aria-haspopup="dialog"
+        data-num-ok
+        onClick={() => setOpen(true)}
+      >
         Filter{active > 0 ? ` · ${active}` : ''}
       </button>
       {open && (

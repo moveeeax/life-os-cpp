@@ -80,7 +80,7 @@ function SetForm({
               onFocus={(e) => e.target.select()}
               aria-invalid={errors[field] ? true : undefined}
               aria-describedby={errors[field] ? `${id(field)}-error` : undefined}
-              className="k-input k-big num"
+              className="k-input k-big"
             />
             {errors[field] && (
               <p id={`${id(field)}-error`} className="mt-1 text-theme-xs k-error-text">

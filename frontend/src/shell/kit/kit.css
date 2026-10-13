@@ -1005,3 +1005,8 @@ select.k-input option {
 .k-check-ring:hover {
   border-color: var(--g-ink);
 }
+
+/* The advisor's review is written around amounts: it blurs whole under Hide numbers. */
+.hide-numbers .glass .k-review {
+  filter: blur(7px);
+}
