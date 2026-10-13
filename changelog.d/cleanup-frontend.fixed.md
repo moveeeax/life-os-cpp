@@ -1,0 +1,1 @@
+Now refreshes after a change in Goals, Food, Money or a band sync; failed goal and task actions say so; Tasks and Goals name their own module when it is switched off; dialogs are announced by their heading; the goal gap on Now blurs under Hide numbers. In production login is throttled, cookie sessions use a CSRF token and retried requests are answered once.

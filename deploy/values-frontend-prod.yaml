@@ -1,5 +1,5 @@
 # Production values of the frontend (chart helm/cpp-frontend) in cluster
-# talos-nbg1-tarassov-me, namespace life-os, release name life-os-cpp-frontend.
+# oci-k3s, namespace life-os, release name life-os-cpp-frontend.
 #
 # The frontend is the public entry point of life-os.tarassov.me: nginx serves
 # the SPA and proxies /api/ to the API Service. See docs/ARCHITECTURE.md §6.

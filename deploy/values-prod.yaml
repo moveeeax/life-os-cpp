@@ -1,4 +1,4 @@
-# Production values of life-os-cpp in cluster talos-nbg1-tarassov-me,
+# Production values of life-os-cpp in cluster oci-k3s,
 # namespace life-os. No secrets here: everything sensitive lives in the
 # Secret life-os-app and arrives via extraEnvFrom.
 
@@ -44,7 +44,8 @@ externalDatabase:
   password: ""
   poolSize: 5
   replicaHost: postgresql-ro.db.svc.cluster.local
-  migrationsEnabled: true
+  # Migrations run once, in the init container below, not again at app start.
+  migrationsEnabled: false
 
 migrations:
   runAsInitContainer: true
@@ -70,6 +71,22 @@ auth:
     # depend on the flag.
     enabled: true
     secure: true
+  # Double-submit token for cookie sessions; the SPA echoes the csrf-token
+  # cookie on every mutating request (frontend/src/lib/api/client.ts).
+  csrf:
+    enabled: true
+
+# Login throttling and the API limit. Traefik (externalTrafficPolicy Cluster)
+# does not keep the client address, so the IP seen here is a node's: signed-in
+# requests are limited per user, the login per that IP.
+rateLimit:
+  enabled: true
+  trustProxy: true
+  trustedProxyCount: 2
+
+# Retried mutating requests with an Idempotency-Key are answered once.
+idempotency:
+  enabled: true
 
 # Enqueueing sync jobs requires an initialized queue on the API side too;
 # the jobs themselves are executed by the worker.
