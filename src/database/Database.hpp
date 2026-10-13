@@ -438,7 +438,6 @@ public:
     virtual ~DatabaseManager() = default;
 
     void set_retry_policy(const Retry::Policy& p) { retry_policy_ = p; }
-    const Retry::Policy& retry_policy() const { return retry_policy_; }
 
     void initialize(const std::string& primary_conn,
                     const std::vector<std::string>& replica_conns = {},

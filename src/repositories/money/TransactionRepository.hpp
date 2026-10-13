@@ -310,19 +310,6 @@ public:
         });
     }
 
-    std::optional<nlohmann::json> by_external_id(const std::string& owner, const std::string& external_id) {
-        return Database::get().execute_read([&](auto& txn) -> std::optional<nlohmann::json> {
-            auto r = txn.exec_params(
-                "SELECT id::text FROM money_transactions WHERE owner_id = $1::uuid AND external_id = $2",
-                owner,
-                external_id);
-            if (r.empty()) {
-                return std::nullopt;
-            }
-            return find_in(txn, owner, r[0][0].template as<std::string>());
-        });
-    }
-
     /// The rows a report needs: date, currency, type, category, flexibility, merchant, amount.
     nlohmann::json report_rows(const std::string& owner, const std::string& from, const std::string& to) {
         return Database::get().execute_read([&](auto& txn) {
