@@ -3103,7 +3103,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description Not configured, upstream refused authentication, or protocol mismatch */
+                /** @description Not configured, upstream refused authentication, protocol mismatch, or upstream_unavailable (any other failure) */
                 503: {
                     headers: {
                         [name: string]: unknown;
