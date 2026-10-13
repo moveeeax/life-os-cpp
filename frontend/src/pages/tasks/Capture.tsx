@@ -16,7 +16,7 @@ import {
   type TaskParseLine,
 } from '@/lib/tasks';
 
-const PLACEHOLDER = 'завтра написать в Kaspi про списание 2790';
+const PLACEHOLDER = 'Call the dentist tomorrow';
 
 function lineMeta(line: TaskParseLine, today: string): string {
   const parts: string[] = [areaOf(line.area).label];
