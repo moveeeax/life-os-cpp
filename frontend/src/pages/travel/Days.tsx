@@ -10,6 +10,7 @@ import {
   type TravelCrossing,
   shortDay,
   todayLocal,
+  whereNow,
 } from '@/lib/travel';
 import { Group, Meter, Num, Row } from '@/shell/kit';
 
@@ -69,15 +70,15 @@ export function TravelDaysPage() {
   const [editing, setEditing] = useState<TravelCrossing | 'new' | null>(null);
   const remove = useDeleteCrossing();
   useErrorToast(remove.error);
-  const last = (crossings.data ?? [])[0];
   const here = counters.data?.current_country ?? [];
+  const now = whereNow(crossings.data ?? [], here, today);
   return (
     <TravelFrame
       title="Days"
       headline={
-        last ? (
+        now?.since ? (
           <>
-            In {countryName(last.to_country)} since {shortDay(last.date, today)}
+            In {countryName(now.country)} since {shortDay(now.since, today)}
           </>
         ) : here.length ? (
           `In ${here.map(countryName).join(', ')}`

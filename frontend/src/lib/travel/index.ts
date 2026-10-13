@@ -75,3 +75,19 @@ export function todayLocal(): string {
   const day = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}-${m}-${day}`;
 }
+
+/**
+ * The one country of today and the day of the last crossing into it (null if none
+ * recorded); null on a crossing day or with no country at all.
+ */
+export function whereNow(
+  crossings: TravelCrossing[],
+  here: string[],
+  today: string,
+): { country: string; since: string | null } | null {
+  if (here.length !== 1) return null;
+  const into = crossings
+    .filter((c) => c.date <= today && c.to_country === here[0])
+    .reduce<string | null>((a, c) => (a && a > c.date ? a : c.date), null);
+  return { country: here[0], since: into };
+}
