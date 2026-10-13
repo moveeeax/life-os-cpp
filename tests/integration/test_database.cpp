@@ -11,7 +11,7 @@ class ConnectionPoolTest : public ::testing::Test {
 protected:
     void SetUp() override {
         if (!TestHelpers::is_postgres_available()) {
-            GTEST_SKIP() << "PostgreSQL not available";
+            return TestHelpers::skip_or_fail_without_infra("PostgreSQL");
         }
     }
 
@@ -86,7 +86,7 @@ class DatabaseLifecycleTest : public ::testing::Test {
 protected:
     void SetUp() override {
         if (!TestHelpers::is_postgres_available()) {
-            GTEST_SKIP() << "PostgreSQL not available";
+            return TestHelpers::skip_or_fail_without_infra("PostgreSQL");
         }
     }
 

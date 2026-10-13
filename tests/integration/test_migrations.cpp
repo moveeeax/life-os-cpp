@@ -31,7 +31,7 @@ protected:
 
     void SetUp() override {
         if (!TestHelpers::is_postgres_available())
-            GTEST_SKIP() << "PostgreSQL not available";
+            return TestHelpers::skip_or_fail_without_infra("PostgreSQL");
         TestHelpers::reset_all_globals();
         Database::initialize(TestHelpers::pg_conn_string(), {}, 2);
 

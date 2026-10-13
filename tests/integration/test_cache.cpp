@@ -14,7 +14,7 @@ protected:
 
     void SetUp() override {
         if (!TestHelpers::is_redis_available()) {
-            GTEST_SKIP() << "Redis not available";
+            return TestHelpers::skip_or_fail_without_infra("Redis");
         }
     }
 
