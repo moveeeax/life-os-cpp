@@ -80,6 +80,7 @@ public:
             items_.push_back({day_of(c.date), c.from, c.to});
         }
         std::stable_sort(items_.begin(), items_.end(), [](const Item& a, const Item& b) { return a.day < b.day; });
+        chain_each_day();
     }
 
     /// The country at the end of @p d: the destination of the last crossing on or before it, else home.
@@ -126,6 +127,24 @@ private:
         std::string from;
         std::string to;
     };
+
+    /// Orders the crossings of one day as a journey: each next one leaves the country the
+    /// previous one entered, starting from where the day began; the stored order breaks ties.
+    void chain_each_day() {
+        std::string at = home_;
+        for (auto first = items_.begin(); first != items_.end();) {
+            const auto last = std::find_if(first, items_.end(), [&](const Item& i) { return i.day != first->day; });
+            for (auto it = first; it != last; ++it) {
+                const auto next = std::find_if(it, last, [&](const Item& i) { return i.from == at; });
+                if (next != last) {
+                    std::rotate(it, next, next + 1);
+                }
+                at = it->to;
+            }
+            first = last;
+        }
+    }
+
     std::string home_;
     std::vector<Item> items_;
 };
