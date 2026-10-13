@@ -10,7 +10,15 @@ import {
 } from '@/lib/food';
 import { cn } from '@/lib/utils';
 
-import { cardClass, inputClass, labelClass, primaryButton, textareaClass } from '../workout/styles';
+import {
+  cardClass,
+  inputClass,
+  labelClass,
+  primaryButton,
+  textareaClass,
+} from '@/shell/kit/styles';
+import { Num } from '@/shell/kit';
+
 import { FoodFrame, LoadError, Placeholder } from './frame';
 
 const ACTIVITY: { value: FoodGoalsProfile['activity']; label: string }[] = [
@@ -123,9 +131,9 @@ function Computed({ goals }: { goals: FoodGoals }) {
     );
   }
   const row = (label: string, value: string) => (
-    <div className="flex justify-between gap-3 text-theme-sm">
-      <span className="text-gray-500 dark:text-gray-400">{label}</span>
-      <span className="text-gray-800 tabular-nums dark:text-white/90">{value}</span>
+    <div className="k-kv">
+      <span className="k-muted">{label}</span>
+      <span className="num">{value}</span>
     </div>
   );
   return (
@@ -143,12 +151,12 @@ function Computed({ goals }: { goals: FoodGoals }) {
         row('Daily deficit for the pace', `${formatKcal(c.deficit)} kcal`)}
       {c.kcal !== undefined && row('Computed goal', `${formatKcal(c.kcal)} kcal`)}
       {c.floored && (
-        <p className="text-theme-xs text-warning-600 dark:text-orange-400">
+        <p className="k-sub k-warn-text" data-num-ok>
           The pace asks for less than 1,200 kcal a day; the goal is held at 1,200.
         </p>
       )}
       {c.below_bmr && (
-        <p className="text-theme-xs text-warning-600 dark:text-orange-400">
+        <p className="k-sub k-warn-text" data-num-ok>
           The goal is below your BMR. A slower pace is easier to keep.
         </p>
       )}
@@ -202,8 +210,9 @@ function GoalsForm({ goals }: { goals: FoodGoals }) {
       <label htmlFor={`goals-${key}`} className={labelClass}>
         {label}
         {computed !== undefined && (
-          <span className="ms-1 font-normal text-gray-500">
-            computed {unit === 'kcal' ? formatKcal(computed) : formatGrams(computed)}
+          <span className="k-muted">
+            {' '}
+            computed <Num>{unit === 'kcal' ? formatKcal(computed) : formatGrams(computed)}</Num>
           </span>
         )}
       </label>
@@ -219,9 +228,9 @@ function GoalsForm({ goals }: { goals: FoodGoals }) {
   );
 
   return (
-    <form onSubmit={submit} className="grid gap-4 md:grid-cols-2 md:gap-6">
+    <form onSubmit={submit} className="k-form">
       <section className={cardClass} aria-labelledby="goals-profile">
-        <h2 id="goals-profile" className="text-base font-semibold text-gray-800 dark:text-white/90">
+        <h2 id="goals-profile" className="k-group-label">
           Profile
         </h2>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -271,7 +280,7 @@ function GoalsForm({ goals }: { goals: FoodGoals }) {
             </select>
           </div>
           {field('target_weight_kg', 'Target weight, kg')}
-          {field('pace_kg_per_week', 'Pace, kg a week (0 keeps, below 0 gains)')}
+          {field('pace_kg_per_week', 'Pace, kg a week (zero keeps, below zero gains)')}
           {goals.weight.source !== 'scale' && field('manual_weight_kg', 'Current weight, kg')}
           <div className="sm:col-span-2">
             <label htmlFor="goals-profile_note" className={labelClass}>
@@ -288,12 +297,9 @@ function GoalsForm({ goals }: { goals: FoodGoals }) {
           </div>
         </div>
       </section>
-      <div className="flex flex-col gap-4 md:gap-6">
+      <>
         <section className={cardClass} aria-labelledby="goals-computed">
-          <h2
-            id="goals-computed"
-            className="text-base font-semibold text-gray-800 dark:text-white/90"
-          >
+          <h2 id="goals-computed" className="k-group-label">
             Computed
           </h2>
           <div className="mt-3">
@@ -301,10 +307,7 @@ function GoalsForm({ goals }: { goals: FoodGoals }) {
           </div>
         </section>
         <section className={cardClass} aria-labelledby="goals-targets">
-          <h2
-            id="goals-targets"
-            className="text-base font-semibold text-gray-800 dark:text-white/90"
-          >
+          <h2 id="goals-targets" className="k-group-label">
             Daily targets
           </h2>
           <p className="mt-1 text-theme-xs text-gray-500">
@@ -317,10 +320,11 @@ function GoalsForm({ goals }: { goals: FoodGoals }) {
             {target('carbs_override_g', 'Carbs, g', c?.carbs_g, 'g')}
           </div>
           {goals.targets && (
-            <p className="mt-3 text-theme-sm text-gray-800 tabular-nums dark:text-white/90">
-              In force: {formatKcal(goals.targets.kcal)} kcal · P{' '}
-              {formatGrams(goals.targets.protein_g)} · F {formatGrams(goals.targets.fat_g)} · C{' '}
-              {formatGrams(goals.targets.carbs_g)}
+            <p className="k-sub">
+              In force: <Num>{formatKcal(goals.targets.kcal)}</Num> kcal · P{' '}
+              <Num>{formatGrams(goals.targets.protein_g)}</Num> · F{' '}
+              <Num>{formatGrams(goals.targets.fat_g)}</Num> · C{' '}
+              <Num>{formatGrams(goals.targets.carbs_g)}</Num>
             </p>
           )}
         </section>
@@ -335,7 +339,7 @@ function GoalsForm({ goals }: { goals: FoodGoals }) {
             {save.isPending ? 'Saving…' : 'Save'}
           </button>
         </div>
-      </div>
+      </>
     </form>
   );
 }

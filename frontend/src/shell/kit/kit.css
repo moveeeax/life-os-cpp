@@ -2,6 +2,11 @@
    one sheet in the 760 px column, rows with details on click, facts on one
    line, dialogs from #g-portal. Colours only from the glass tokens. */
 
+/* Dialogs sit over busy rows: nearly opaque so their fields read. */
+.glass {
+  --k-dlg-bg: rgba(17, 22, 40, 0.94);
+}
+
 .k-sheet {
   background: var(--g-glass);
   border: 1px solid var(--g-glass-line);
@@ -414,7 +419,7 @@ button.k-row-head {
   padding: 16px 18px 18px;
   border-radius: 18px;
   border: 1px solid var(--g-glass-line);
-  background: var(--g-glass-strong);
+  background: var(--k-dlg-bg);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   color: var(--g-ink);
@@ -556,7 +561,7 @@ select.k-input option {
   padding: 16px 18px 18px;
   border-radius: 18px;
   border: 1px solid var(--g-glass-line);
-  background: var(--g-glass-strong);
+  background: var(--k-dlg-bg);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   color: var(--g-ink);
@@ -711,4 +716,70 @@ select.k-input option {
 }
 .k-sub .k-totals {
   justify-content: flex-start;
+}
+
+/* The five numbers of a food line in two rows: grams and kcal, then P, F, C. */
+.k-macros-in {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.k-macros-in > :nth-child(-n + 2) {
+  grid-column: span 3;
+}
+.k-macros-in > :nth-child(n + 3) {
+  grid-column: span 2;
+}
+.k-field-mini {
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--g-ink-faint);
+}
+
+.k-macros {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 10px 0 2px;
+}
+.k-capture {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin: 12px 0 4px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--g-glass-line);
+  background: var(--g-ink-ghost);
+  color: var(--g-ink-faint);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: text;
+}
+.k-capture span {
+  color: var(--g-ink);
+  font-size: 18px;
+}
+.k-link.k-add {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  margin-left: 6px;
+}
+.k-input.k-search {
+  width: min(240px, 100%);
+  padding: 4px 10px;
+  font-size: 13px;
+}
+.k-strike {
+  text-decoration: line-through;
+}
+.k-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
 }
