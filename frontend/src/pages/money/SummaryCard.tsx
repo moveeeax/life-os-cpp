@@ -1,7 +1,7 @@
 import { Link } from 'react-router';
 
 import { useMoneySummary } from '@/hooks/useMoney';
-import { formatTotal, rateDay, signed } from '@/lib/networth';
+import { cardCurrency, formatTotal, rateDay, signed } from '@/lib/networth';
 import { cn } from '@/lib/utils';
 
 import { cardClass } from '../workout/styles';
@@ -16,8 +16,12 @@ function currency(): string {
 
 /** All accounts in one currency and the 30-day change, on top of the Ledger; links to Summary. */
 export function SummaryCard() {
-  const q = useMoneySummary(currency(), 30);
-  const d = q.data;
+  const remembered = currency();
+  const first = useMoneySummary(remembered, 30);
+  const shown = cardCurrency(remembered, first.isError);
+  // The remembered currency lost its rate: the card shows USD instead of going away.
+  const fallback = useMoneySummary(shown, 30, shown !== remembered);
+  const d = shown === remembered ? first.data : fallback.data;
   if (!d || (d.accounts.length === 0 && d.not_converted.length === 0)) return null;
   return (
     <Link
