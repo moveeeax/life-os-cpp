@@ -48,10 +48,41 @@ protected:
     std::string config_file_name() const override { return "money_summary_api_test_config.json"; }
     void config_overrides(nlohmann::json& cfg) override { cfg["money"]["enabled"] = true; }
 
+    // Quotes are shared by every owner: the suite needs KZT, EUR and THB to hold
+    // only its own rows, so it keeps the rows it found and puts them back after.
+    std::vector<std::vector<std::string>> saved_quotes_;
+
+    void TearDown() override {
+        if (!::testing::Test::IsSkipped()) {
+            Database::get().execute_write([&](auto& txn) {
+                txn.exec("DELETE FROM money_fx_rates WHERE quote IN ('KZT', 'EUR', 'THB')");
+                for (const auto& q : saved_quotes_) {
+                    txn.exec_params(
+                        "INSERT INTO money_fx_rates (date, quote, per_usd) VALUES ($1::date, $2, $3::numeric)",
+                        q[0],
+                        q[1],
+                        q[2]);
+                }
+                return true;
+            });
+        }
+        TestHelpers::CoreBackedTest::TearDown();
+    }
+
     void SetUp() override {
         TestHelpers::CoreBackedTest::SetUp();
         if (::testing::Test::IsSkipped())
             return;
+        saved_quotes_ = Database::get().execute_read([](auto& txn) {
+            std::vector<std::vector<std::string>> rows;
+            for (const auto& r : txn.exec("SELECT date::text, quote, per_usd::text FROM money_fx_rates WHERE quote IN "
+                                          "('KZT', 'EUR', 'THB')")) {
+                rows.push_back({r[0].template as<std::string>(),
+                                r[1].template as<std::string>(),
+                                r[2].template as<std::string>()});
+            }
+            return rows;
+        });
         Database::get().execute_write([](auto& txn) {
             const std::string o = kOwner;
             txn.exec_params("DELETE FROM money_transfers WHERE owner_id = $1::uuid", o);
