@@ -15083,7 +15083,7 @@ export interface components {
             /** @description ISO codes or the group key SCHENGEN */
             countries: string[];
             /** @enum {string} */
-            window_kind: "rolling_days" | "rolling_12_months_in_year" | "since_last_entry";
+            window_kind: "rolling_days" | "rolling_12_months_in_year" | "calendar_year" | "since_last_entry";
             window_days: number | null;
             threshold_days: number;
             /** @enum {string} */
@@ -15096,7 +15096,7 @@ export interface components {
             name: string;
             countries: string[];
             /** @enum {string} */
-            window_kind: "rolling_days" | "rolling_12_months_in_year" | "since_last_entry";
+            window_kind: "rolling_days" | "rolling_12_months_in_year" | "calendar_year" | "since_last_entry";
             window_days?: number | null;
             threshold_days: number;
             /** @enum {string} */

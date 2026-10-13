@@ -54,7 +54,8 @@ using Repositories::Travel::TripRepository;
 constexpr int kDaysMax = 800;
 constexpr int kLinkMax = 500;
 
-const std::vector<std::string> kWindows = {"rolling_days", "rolling_12_months_in_year", "since_last_entry"};
+const std::vector<std::string> kWindows = {
+    "rolling_days", "rolling_12_months_in_year", "calendar_year", "since_last_entry"};
 const std::vector<std::string> kThresholds = {"at_most", "over"};
 const std::vector<std::string> kItemKinds = {"flight", "stay", "booking", "note"};
 

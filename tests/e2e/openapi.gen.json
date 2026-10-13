@@ -2034,6 +2034,7 @@
       "enum": [
        "rolling_days",
        "rolling_12_months_in_year",
+       "calendar_year",
        "since_last_entry"
       ]
      },
@@ -2091,6 +2092,7 @@
       "enum": [
        "rolling_days",
        "rolling_12_months_in_year",
+       "calendar_year",
        "since_last_entry"
       ]
      },
@@ -24687,7 +24689,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 362522,
-  "source_fnv1a64": "dace36f644d17adc"
+  "source_bytes": 362552,
+  "source_fnv1a64": "4647890d172c52f0"
  }
 }

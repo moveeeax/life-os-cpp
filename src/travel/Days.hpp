@@ -49,7 +49,7 @@ struct Crossing {
     std::string to;
 };
 
-enum class Window { RollingDays, Rolling12MonthsInYear, SinceLastEntry };
+enum class Window { RollingDays, Rolling12MonthsInYear, CalendarYear, SinceLastEntry };
 enum class Threshold { AtMost, Over };
 
 struct Rule {
@@ -222,6 +222,9 @@ inline Day window_start(const Rule& rule, Day end) {
     if (rule.window == Window::RollingDays) {
         return end - std::chrono::days{rule.window_days - 1};
     }
+    if (rule.window == Window::CalendarYear) {
+        return Day{std::chrono::year_month_day{end}.year() / std::chrono::January / 1};
+    }
     return twelve_months_before(end);
 }
 
@@ -236,6 +239,9 @@ inline Day earliest(const Rule& rule, Day today) {
         return today - std::chrono::days{rule.window_days};
     }
     const std::chrono::year_month_day ymd{today};
+    if (rule.window == Window::CalendarYear) {
+        return Day{ymd.year() / std::chrono::January / 1};
+    }
     return Day{(ymd.year() - std::chrono::years{1}) / std::chrono::January / 1};
 }
 
@@ -303,7 +309,7 @@ inline Count count(const Rule& rule, const std::vector<Crossing>& crossings, con
     }
 
     const detail::Presence p(rule, t, detail::earliest(rule, today), today);
-    if (rule.window == Window::RollingDays) {
+    if (rule.window == Window::RollingDays || rule.window == Window::CalendarYear) {
         out.used = p.between(detail::window_start(rule, today), today, After::Outside);
     } else {
         // The largest 12-month count among the windows ending on a day of this year so far.
@@ -316,7 +322,7 @@ inline Count count(const Rule& rule, const std::vector<Crossing>& crossings, con
 
     if (inside) {
         Day last = today + std::chrono::days{detail::kHorizonDays};
-        if (rule.window == Window::Rolling12MonthsInYear) {
+        if (rule.window == Window::Rolling12MonthsInYear || rule.window == Window::CalendarYear) {
             last = Day{std::chrono::year_month_day{today}.year() / std::chrono::December / 31};
         }
         for (Day k = today; k <= last; k += std::chrono::days{1}) {
