@@ -17,8 +17,9 @@ import type {
 // path templates); the response types come from the same OpenAPI schemas.
 const BASE = '/api/v1/goals';
 
-/** A goal write moves its tasks too (and a task write moves its goal). */
-const ALL = [qk.goals.all(), qk.tasks.all()] as const;
+/** A goal write moves its tasks too (and a task write moves its goal), and Now's digest. */
+export const GOAL_WRITES = [qk.goals.all(), qk.tasks.all(), qk.now.all()] as const;
+const ALL = GOAL_WRITES;
 
 /** Whether the goals module answers at all (404 while switched off). */
 export function useGoalsEnabled(signedIn: boolean): boolean {

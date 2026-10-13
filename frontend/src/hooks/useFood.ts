@@ -118,7 +118,14 @@ export function useFoodEnabled(canRead: boolean): boolean {
 
 // ── diary writes ───────────────────────────────────────────────────────────
 
-const DIARY = [qk.food.diary(), qk.food.weeks(), qk.food.recent()] as const;
+/** A diary write moves the day, the week, the recent list and Now's digest. */
+export const FOOD_DIARY_WRITES = [
+  qk.food.diary(),
+  qk.food.weeks(),
+  qk.food.recent(),
+  qk.now.all(),
+] as const;
+const DIARY = FOOD_DIARY_WRITES;
 
 export function useCreateEntry(onSuccess?: (entry: FoodEntry) => void) {
   return useApiMutation(
