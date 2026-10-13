@@ -226,21 +226,6 @@ public:
         });
     }
 
-    std::vector<Domain::Payment> list_by_status(const std::string& status, int limit, int offset) {
-        return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params(std::string("SELECT ") + kColumns +
-                                         " FROM payments WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
-                                     status,
-                                     limit,
-                                     offset);
-            std::vector<Domain::Payment> out;
-            out.reserve(r.size());
-            for (const auto& row : r)
-                out.push_back(Domain::Payment::from_row(row));
-            return out;
-        });
-    }
-
     // ── Admin listing ─────────────────────────────────────────────────────
     // Mirrors AuditRepository::list_filtered's "$N::type IS NULL means no
     // constraint" shape — one fixed, parameter-bound query covers every

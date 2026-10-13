@@ -31,7 +31,6 @@
 #include <type_traits>
 
 #include <spdlog/spdlog.h>
-#include <sw/redis++/redis++.h>
 
 namespace Retry {
 
@@ -180,22 +179,6 @@ inline bool is_transient_pqxx_write(const std::exception& e) {
         if (ss == "40001" || ss == "40P01")
             return true;
     }
-    return false;
-}
-
-/**
- * @brief True if an exception from redis-plus-plus is transient.
- */
-inline bool is_transient_redis(const std::exception& e) {
-    using namespace sw::redis;
-    if (dynamic_cast<const TimeoutError*>(&e) != nullptr)
-        return true;
-    if (dynamic_cast<const IoError*>(&e) != nullptr)
-        return true;
-    if (dynamic_cast<const ClosedError*>(&e) != nullptr)
-        return true;
-    // Other sw::redis::Error subclasses (ReplyError, WrongTypeError, ...) are
-    // logical errors — not worth retrying.
     return false;
 }
 
