@@ -253,7 +253,25 @@ public:
     }
 
     /**
-     * @brief Delete a user. Throws UserNotFound if it doesn't exist,
+     * @brief The per-user tables of the modules, in an order their foreign
+     *        keys accept. Their owner_id carries no foreign key to users
+     *        (migration 017), so a user delete removes these rows itself.
+     *        Child tables with ON DELETE CASCADE (session_exercises,
+     *        workout_sets, routine_exercises) go with their parents;
+     *        mi_accounts cascades from users.
+     */
+    static constexpr const char* kOwnedTables[] = {
+        "workout_sessions", "routines",        "exercises",        "money_transactions",
+        "money_transfers",  "money_merchants", "money_categories", "money_accounts",
+        "money_currencies", "money_settings",  "money_parse_jobs", "money_advisor_reports",
+        "task_parse_jobs",  "task_notes",      "task_items",       "goal_checkins",
+        "goal_milestones",  "goal_sections",   "goal_items",       "food_entries",
+        "food_items",       "food_goals",      "food_parse_jobs",  "day_focus",
+    };
+
+    /**
+     * @brief Delete a user and every module row they own, in one transaction.
+     *        Throws UserNotFound if it doesn't exist,
      *        UserHasBillingHistory on FK violation (SQLSTATE 23503) — a
      *        payment or wallet_entries/wallet_balances row still references
      *        this user (ON DELETE RESTRICT, migration 007). Without this
@@ -264,6 +282,9 @@ public:
         detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
+                    for (const char* table : kOwnedTables) {
+                        txn.exec_params(std::string("DELETE FROM ") + table + " WHERE owner_id = $1::uuid", id);
+                    }
                     auto r = txn.exec_params("DELETE FROM users WHERE id = $1 RETURNING id", id);
                     if (r.empty())
                         throw UserNotFound{};
