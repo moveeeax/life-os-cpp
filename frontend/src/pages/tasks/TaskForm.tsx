@@ -3,15 +3,8 @@ import { useState, type FormEvent } from 'react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useGoal, useGoals } from '@/hooks/useGoals';
 import { useDeleteTask, useUpdateTask } from '@/hooks/useTasks';
-import {
-  AREAS,
-  EFFORT_LABEL,
-  localToday,
-  type Area,
-  type Effort,
-  type Task,
-  type TaskPatch,
-} from '@/lib/tasks';
+import { AREAS, EFFORT_LABEL, localToday, type Area, type Effort, type Task } from '@/lib/tasks';
+import { taskPatch } from '@/lib/tasks/bodies';
 
 import {
   dangerButton,
@@ -52,19 +45,17 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!ok) return;
-    const patch: TaskPatch = {};
-    if (title.trim() !== task.title) patch.title = title.trim();
-    if (area !== task.area) patch.area = area;
-    if ((effort || null) !== task.effort) patch.effort = effort || null;
-    if ((due || null) !== task.due) patch.due = due || null;
-    if (next.trim() !== task.next_step) patch.next_step = next.trim();
-    if (note !== task.note) patch.note = note;
-    if (status !== task.status) patch.status = status;
-    if ((goalId || null) !== task.goal_id || (sectionId || null) !== task.goal_section_id) {
-      // A section travels with its goal (the API checks the pair).
-      patch.goal_id = goalId || null;
-      patch.goal_section_id = goalId && sectionId ? sectionId : null;
-    }
+    const patch = taskPatch(task, {
+      title,
+      area,
+      effort: effort ?? '',
+      due,
+      next,
+      note,
+      status,
+      goalId,
+      sectionId,
+    });
     if (Object.keys(patch).length === 0) {
       onClose();
       return;
