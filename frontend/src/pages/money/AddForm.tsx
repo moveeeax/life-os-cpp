@@ -27,6 +27,7 @@ import {
   type Category,
   type DraftLine,
 } from '@/lib/ledger';
+import { manualBody, transferBody } from '@/lib/ledger/bodies';
 import { cn } from '@/lib/utils';
 
 import {
@@ -190,20 +191,21 @@ function ManualTab({
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!ok) return;
-    create.mutate({
-      type,
-      date,
-      account_id: account,
-      amount: a!,
-      merchant: merchant.trim(),
-      name: (name.trim() || merchant.trim()).slice(0, 200),
-      category_id: category,
-      receipt_amount: receiptAmount.trim() ? ra : null,
-      receipt_currency: receiptCurrency.trim() || null,
-      note,
-      source: 'manual',
-      status: 'posted',
-    });
+    create.mutate(
+      manualBody({
+        type,
+        date,
+        account,
+        amount: a!,
+        merchant,
+        name,
+        category,
+        receiptAmount,
+        receiptCurrency,
+        ra,
+        note,
+      }),
+    );
   };
 
   return (
@@ -649,16 +651,21 @@ function TransferTab({ onDone, accounts }: { onDone: () => void; accounts: Accou
     if (!ok) return;
     const fromName = accounts.find((a) => a.id === from)?.name ?? '';
     const toName = accounts.find((a) => a.id === to)?.name ?? '';
-    create.mutate({
-      date,
-      from_account_id: from,
-      to_account_id: to,
-      amount_sent: s!,
-      amount_received: needsReceived ? r : null,
-      fee: fee.trim() === '' ? null : f,
-      name: `${fromName} → ${toName}`.slice(0, 200),
-      note,
-    });
+    create.mutate(
+      transferBody({
+        date,
+        from,
+        to,
+        sent: s!,
+        received: r,
+        needsReceived,
+        fee,
+        f,
+        fromName,
+        toName,
+        note,
+      }),
+    );
   };
 
   return (
