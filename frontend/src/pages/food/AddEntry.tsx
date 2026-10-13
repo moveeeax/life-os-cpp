@@ -26,6 +26,7 @@ import {
   type OffProduct,
   type ParseDraftLine,
 } from '@/lib/food';
+import { pickBody, quickBody } from '@/lib/food/bodies';
 import { cn } from '@/lib/utils';
 
 import {
@@ -299,14 +300,16 @@ function GramsStep({
   const g = parseNumber(grams) ?? 0;
   const create = useCreateEntry(onDone);
   // An Open Food Facts product is copied into own products first, then logged.
-  const copy = useItemFromOff((item) => create.mutate({ date, meal, item_id: item.id, grams: g }));
+  const copy = useItemFromOff((item) =>
+    create.mutate(pickBody({ date, meal, itemId: item.id, grams: g })),
+  );
   const preview = scaled(pick, g);
   const busy = create.isPending || copy.isPending;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (g <= 0) return;
-    if (pick.item) create.mutate({ date, meal, item_id: pick.item.id, grams: g });
+    if (pick.item) create.mutate(pickBody({ date, meal, itemId: pick.item.id, grams: g }));
     else if (pick.off) copy.mutate(pick.off.code);
   };
 
@@ -536,15 +539,7 @@ function QuickTab({ date, meal, onDone }: TabProps) {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!ok) return;
-    create.mutate({
-      date,
-      meal,
-      name: name.trim(),
-      kcal: k,
-      protein_g: parseNumber(protein) ?? 0,
-      fat_g: parseNumber(fat) ?? 0,
-      carbs_g: parseNumber(carbs) ?? 0,
-    });
+    create.mutate(quickBody({ date, meal, name, kcal: k!, protein, fat, carbs }));
   };
 
   const num = (id: string, label: string, value: string, set: (v: string) => void) => (
