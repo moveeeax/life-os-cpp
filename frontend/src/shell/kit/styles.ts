@@ -1,5 +1,5 @@
-// The class names of pages/workout/styles.ts for pages on the calm sheet: the
-// same names, the kit's look, so a page moves by swapping its import.
+// The class names the section pages used before the calm sheet, with the kit's
+// look: forms and buttons inside the moved pages keep their names.
 export const cardClass = 'k-card';
 export const inputClass = 'k-input';
 export const textareaClass = 'k-input k-textarea';
