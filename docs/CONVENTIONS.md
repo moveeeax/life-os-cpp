@@ -134,7 +134,9 @@ Per handler:
   from `src/lib/api/queryKeys.ts` (never inline string tuples).
 - Page: `src/pages/admin/<Entity>.tsx` — `usePagedQuery` + `PaginationFooter`
   + `<DataTable>` for the list, `useApiMutation` for create/update/delete.
-- Route: add under `<RequireAdmin>` in `src/App.tsx`.
+- Route: add an entry with `guard: 'admin'` to `src/routes/manifest.tsx`.
+  `src/App.tsx` renders every route from that manifest, grouped by guard, so
+  it needs no edit.
 
 ## 7. Tests
 
@@ -165,9 +167,9 @@ These don't fall out of reading the code; they were learned the hard way.
 2. **`Api::get_endpoints()` (`src/api/Endpoints.hpp`) is the single source of truth for routes.** After an `ADD_METHOD_TO(...)`, add the matching line there, or `scripts/check-openapi-drift.sh` fails CI and `--print-routes` won't show it. Controllers include `api/Guards.hpp` + `api/RequestUtils.hpp` but NOT `api/Api.hpp` (cycle).
 3. **JSON: nlohmann::json only, never jsoncpp.** Drogon uses jsoncpp internally, but project code is all nlohmann. Parse with `json::parse(req->body())`, respond with `data.dump()` + `CT_APPLICATION_JSON`. **Never call `req->getJsonObject()`.**
 4. **`AUTH_MODE=none` by default** — every endpoint public. On any mutating endpoint add a guard from `api/Guards.hpp` (`API_REQUIRE_ADMIN` / `API_REQUIRE_PRINCIPAL`) or `Security::Auth::require_role(...)`, or document why it's public.
-5. **`Core::initialize()` has a strict init order:** Config → Observability → Database → Migrations → Cache → Storage → Messaging → Tasks → Security → Jobs → Mailer; shutdown is the reverse. Don't reorder (Cache uses Observability metrics; Database depends on Config).
+5. **`Core::initialize()` has a strict init order (`docs/ARCHITECTURE.md` §5):** Config → Observability → config validation → Database → Migrations → Cache → Messaging and Tasks (server only) → Security (Auth, RateLimit, Idempotency) → Jobs → Email → Billing; shutdown is the reverse. `InitMode::Worker` skips Messaging and Tasks, `InitMode::MigrateOnly` stops after Migrations. Don't reorder (Cache uses Observability metrics; Database depends on Config; Billing enqueues emails).
 6. **`req->attributes()->get<T>(key)` on a miss returns a default-constructed `T`** (older Drogon threw `std::out_of_range` — both exist). Never rely on the throw: `find(key)` first, then `get<T>` — see `Security::Auth::principal_of`. An empty principal reaching SQL as a uuid has crashed a handler before.
-7. **Every Redis call is fail-open** — except counters. `CacheManager` methods swallow `sw::redis::Error` (via the private `guarded_` wrapper) and log a warn; but `incr`/`decr` log and RETHROW (a counter silently stuck at a default would corrupt rate accounting). Wrap direct `get_client()` calls in try/catch. See `docs/adr/`.
+7. **Every Redis call is fail-open** — except counters. `CacheManager` methods swallow `sw::redis::Error` (via the private `guarded_` wrapper) and log a warn; but `incr`/`decr` log and RETHROW (a counter silently stuck at a default would corrupt rate accounting). Wrap direct `get_client()` calls in try/catch.
 8. **Drogon's log level is hardcoded in `main.cpp` (`Logger::kInfo`).** `LOG_LEVEL` only affects spdlog. For Drogon debug, edit `setLogLevel` in `main.cpp`.
 9. **`callback(...)` exactly once on every path** — including exceptions and early returns — or the client hangs until timeout.
 10. **Tests don't call controller methods directly with a fake `req`** — use `tests/test_helpers.hpp` (`make_request(...)`).

@@ -2,7 +2,7 @@
 # release.sh <version> — bump every version point of a release in one command.
 #
 # Three releases in a row shipped with project(VERSION ...) still on 1.4.0,
-# and values-stage.yaml carried image pins for GHCR tags that never existed:
+# and a stage overlay carried image pins for GHCR tags that never existed:
 # the release version lives in too many files to bump by hand. This script
 # edits all of them, verifies the result with check-version-sync.sh, and
 # leaves the commit to the human.
@@ -19,7 +19,9 @@
 #     CMakeLists.txt                   project(VERSION ...) — the baked version
 #                                      Core::version() / GET /health report
 #     helm/cpp-env/values.yaml         3 image-tag pins (api, worker, frontend)
-#     helm/cpp-env/values-stage.yaml   3 image-tag pins
+#     deploy/values-prod.yaml          1 image-tag pin each: the prod releases
+#     deploy/values-worker-prod.yaml   life-os-cpp, life-os-cpp-worker and
+#     deploy/values-frontend-prod.yaml life-os-cpp-frontend
 #     helm/{life-os-cpp,life-os-cpp-worker,cpp-frontend,cpp-env}/Chart.yaml
 #                                      appVersion (default tag for standalone
 #                                      installs + app.kubernetes.io/version)
@@ -134,10 +136,14 @@ bump CMakeLists.txt \
     '(?m)^(project\(.*VERSION[ \t]+)[0-9][0-9.]*' "\\g<1>$new_version" 1
 echo "  bumped CMakeLists.txt        project(VERSION $new_version)"
 
-for overlay in values.yaml values-stage.yaml; do
-    bump "helm/cpp-env/$overlay" \
-        '(?m)^([ \t]*tag:[ \t]*")[0-9][0-9.]*(")' "\\g<1>$new_version\\g<2>" 3
-    echo "  bumped helm/cpp-env/$overlay  3 image-tag pins -> $new_version"
+bump helm/cpp-env/values.yaml \
+    '(?m)^([ \t]*tag:[ \t]*")[0-9][0-9.]*(")' "\\g<1>$new_version\\g<2>" 3
+echo "  bumped helm/cpp-env/values.yaml  3 image-tag pins -> $new_version"
+
+for values in values-prod.yaml values-worker-prod.yaml values-frontend-prod.yaml; do
+    bump "deploy/$values" \
+        '(?m)^([ \t]*tag:[ \t]*")[0-9][0-9.]*(")' "\\g<1>$new_version\\g<2>" 1
+    echo "  bumped deploy/$values  image-tag pin -> $new_version"
 done
 
 for chart in life-os-cpp life-os-cpp-worker cpp-frontend cpp-env; do
@@ -153,7 +159,7 @@ echo ""
 # --- show the human what happened and what is next ---------------------------
 echo ""
 git -C "$REPO" --no-pager diff --stat -- \
-    CHANGELOG.md changelog.d CMakeLists.txt helm/cpp-env \
+    CHANGELOG.md changelog.d CMakeLists.txt helm/cpp-env deploy \
     helm/life-os-cpp/Chart.yaml helm/life-os-cpp-worker/Chart.yaml helm/cpp-frontend/Chart.yaml
 cat <<EOF
 

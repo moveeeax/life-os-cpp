@@ -241,7 +241,7 @@ helm-lint:         ## helm lint + helm template render for both charts
 	done
 	@echo "==> helm-lint: all charts pass"
 
-helm-validate:     ## Render the cpp-env umbrella + assert deploy-path invariants (port/host/mail)
+helm-validate:     ## Render the cpp-env umbrella + deploy/ prod values, assert deploy invariants and the prod security floor
 	@./scripts/check-helm-render.sh
 
 tidy:              ## Run clang-tidy via the builder image (CI-parity)

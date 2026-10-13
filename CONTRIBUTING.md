@@ -140,7 +140,8 @@ one edit can reach by hand (that is how three releases shipped with a stale
    accepted too; an empty `[Unreleased]` with no fragments aborts — write
    the notes first), and bumps every remaining version point in one command:
    `CMakeLists.txt project(VERSION …)`, the image-tag pins in
-   `helm/cpp-env/values{,-stage}.yaml`, and the `Chart.yaml`
+   `helm/cpp-env/values.yaml` and in the prod values
+   `deploy/values-{,worker-,frontend-}prod.yaml`, and the `Chart.yaml`
    `appVersion` fields. It re-runs `scripts/check-version-sync.sh` (which
    gates all of those in CI) and prints the diff. It commits nothing; the
    changelog *content* stays human-written — the script only moves it.

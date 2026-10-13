@@ -1,22 +1,39 @@
 # Testing
 
 What the test suite does and does not cover, and how to run each part. The goal
-is that "the suite is green" means something specific — not "451 passed, 171 of
-them skipped."
+is that "the suite is green" means something specific — not "all passed, a
+third of them skipped."
 
 ## Buckets
 
-| Bucket | Count | Needs | Runs with | What it covers |
-|---|---:|---|---|---|
-| **unit** | 265 | nothing (sidecar-free) | `make test-unit` | Pure logic: validation, tokens, JWT, password hashing, rate-limit math, serialization, the permission bitmask, retry/backoff, templates. |
-| **integration** | 151 | Postgres + Redis | `make test` | Repositories against a real Postgres, cache + rate limiter against a real Redis, migrations, the account/admin/audit/auth flows, job dispatch + DLQ. |
-| **api** | 20 | Postgres + Redis | `make test` | Controller request/response behavior wired through the real handler stack. |
-| **e2e** | 15 | Postgres + Redis | `make test-e2e` | A real Drogon server + client on the wire: auth gate, cookie sessions, refresh rotation/revocation, Idempotency-Key replay, tracing headers. |
+| Bucket | Needs | Runs with | What it covers |
+|---|---|---|---|
+| **unit** | nothing (sidecar-free) | `make test-unit` | Pure logic: validation, tokens, JWT, password hashing, rate-limit math, serialization, the permission bitmask, retry/backoff, templates, the per-module parsers and normalizers. |
+| **integration** | Postgres + Redis | `make test` | Repositories against a real Postgres, cache + rate limiter against a real Redis, migrations, the account/admin/audit/auth flows, job dispatch + DLQ, the module jobs. |
+| **api** | Postgres + Redis | `make test` | Controller request/response behavior wired through the real handler stack. |
+| **e2e** | Postgres + Redis | `make test-e2e` | A real Drogon server + client on the wire: auth gate, cookie sessions, refresh rotation/revocation, Idempotency-Key replay, tracing headers, response bodies checked against `docs/openapi.yaml`. |
 
-Total: **451** test cases. `make test-unit` is the fast, dependency-free loop;
+No counts here on purpose: they went stale with every module. The gtest output
+of a CI run is the current number. `make test-unit` is the fast, dependency-free loop;
 `make test` brings up sidecars and runs unit + integration + api, then the e2e
 binary; `make test-e2e` runs just the wire-level suite. `make ci-local` runs
 the lot the way CI does.
+
+## Which database the suites use, and what they wipe
+
+The integration, api and e2e suites connect to
+`postgresql://postgres:postgres@<TEST_PG_HOST>:<TEST_PG_PORT>/appdb` (defaults
+`localhost:5432`) and Redis at `<TEST_REDIS_HOST>:<TEST_REDIS_PORT>` (defaults
+`127.0.0.1:6379`); see `tests/test_helpers.hpp`. Many fixtures `TRUNCATE`
+shared tables (`users ... CASCADE`, `audit_log`, the module tables) in
+`SetUp`/`TearDown`.
+
+- `make test` and CI point them at the compose `test`-profile containers
+  (`test-postgres`, no volume, port not published), so nothing else is touched.
+- `make test-local` against `make up` uses the dev stack's Postgres on
+  `localhost:5432/appdb`. Running the integration binary there wipes your dev
+  users and module data. Use a throwaway database or set `TEST_PG_HOST` /
+  `TEST_PG_PORT` to one before running it.
 
 ## Day-to-day loops — which target when
 
@@ -118,8 +135,12 @@ the curl TU), and anything needing Drogon types.
   exercised through the jobs path, not against a real SMTP server), or Postgres
   streaming replication. These have lifecycle/health guards only — wiring, not
   behavior.
-- **Frontend** has unit tests for the session-refresh machinery and the
-  permission mirror, but no component/route tests for the admin/auth UI.
+- **Frontend** has vitest unit tests (`*.test.ts` under `frontend/src`, run by
+  `npm test` in the CI `frontend` job) for the pure logic: the API client and
+  session refresh, the permission mirror, the section and route helpers, and
+  the per-module libraries in `frontend/src/lib/` (now, ledger, food, workout,
+  tasks, goals, health and others). There are no rendered component or
+  browser tests; visual changes are checked by hand.
 - **Sanitizers (ASan/UBSan and TSan)** cover the **unit** and
   **integration/api** buckets: the CI `sanitizers` and `tsan` jobs build both
   test binaries and run the integration one against the compose `test`-profile
@@ -134,9 +155,11 @@ the curl TU), and anything needing Drogon types.
 
 `tests/integration/test_jobs.cpp` contains
 `DISABLED_CancelIsAtomicUnderContention`. It is **disabled because it documents
-an unfixed race**, not because it is flaky: two concurrent callers of a job's
-`cancel()` can both observe the not-yet-cancelled state and both write a terminal
-status (a TOCTOU on the job row). Re-enable it once `cancel()` does a single
-conditional state transition (e.g. an `UPDATE ... WHERE status = 'pending'`
-guard) instead of read-then-write. Until then, treat single-cancel as supported
-and concurrent-cancel as undefined.
+an unfixed race**, not because it is flaky: jobs live in Redis, and
+`JobQueue::cancel()` (`src/jobs/Jobs.cpp`) loads the job blob, checks its
+status and then writes `failed` back with a plain `SETEX`. Two concurrent
+callers can both observe the not-yet-cancelled state and both report success
+(a TOCTOU on the job key). Re-enable it once `cancel()` makes the
+check-and-write atomic in Redis (a `WATCH`/`MULTI`/`EXEC` transaction on the
+job key, or a Lua script). Until then, treat single-cancel as supported and
+concurrent-cancel as undefined.

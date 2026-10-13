@@ -342,18 +342,18 @@ with open(path, "w", encoding="utf-8") as fh:
 PY
 }
 
-# 8b. One helm image pin left behind on the release bump — the values-stage
-#     failure mode that shipped GHCR pins for tags that never existed through
-#     two releases. Flips ONE of the three pins in values-stage.yaml.
+# 8b. One image pin left behind on the release bump — the failure mode that
+#     once shipped GHCR pins for tags that never existed through two releases.
+#     Flips the single pin of the prod worker release (deploy/values-worker-prod.yaml).
 break_helm_tag_drift() {
-    python3 - "$1/helm/cpp-env/values-stage.yaml" <<'PY'
+    python3 - "$1/deploy/values-worker-prod.yaml" <<'PY'
 import re, sys
 path = sys.argv[1]
 with open(path, encoding="utf-8") as fh:
     text = fh.read()
 pat = re.compile(r'(?m)^([ \t]*tag:[ \t]*")[0-9][0-9.]*(")')
-if len(pat.findall(text)) != 3:
-    sys.exit("break_helm_tag_drift: expected exactly 3 pinned image tags in %s, found %d"
+if len(pat.findall(text)) != 1:
+    sys.exit("break_helm_tag_drift: expected exactly 1 pinned image tag in %s, found %d"
              % (path, len(pat.findall(text))))
 text, n = pat.subn(r"\g<1>9.9.9\g<2>", text, count=1)
 if n != 1:
@@ -415,17 +415,21 @@ with open(path, "w", encoding="utf-8") as fh:
 PY
 }
 
-# 11. The prod overlay's rate limiter flipped to fail-open: a Redis blip
-#     would silently disable the login brute-force throttle.
+# 11. The real prod values' rate limiter flipped to fail-open: a Redis blip
+#     would silently disable the login brute-force throttle. Flips an explicit
+#     rateLimit.failOpen in deploy/values-prod.yaml; if the key is absent
+#     (inherited chart default), plants it under the top-level rateLimit block.
 break_helm_fail_open() {
-    python3 - "$1/helm/life-os-cpp/values-prod.example.yaml" <<'PY'
+    python3 - "$1/deploy/values-prod.yaml" <<'PY'
 import re, sys
 path = sys.argv[1]
 with open(path, encoding="utf-8") as fh:
     text = fh.read()
-text, n = re.subn(r"(?m)^(\s*)failOpen: false\b", r"\1failOpen: true", text)
+text, n = re.subn(r"(?m)^(\s+)failOpen: false\b", r"\1failOpen: true", text)
+if n == 0 and re.search(r"(?m)^\s+failOpen:", text) is None:
+    text, n = re.subn(r"(?m)^rateLimit:[ \t]*\n", "rateLimit:\n  failOpen: true\n", text)
 if n != 1:
-    sys.exit("break_helm_fail_open: flipped %d failOpen key(s) in %s — expected exactly 1"
+    sys.exit("break_helm_fail_open: set %d failOpen key(s) in %s — expected exactly 1"
              % (n, path))
 with open(path, "w", encoding="utf-8") as fh:
     fh.write(text)
@@ -590,21 +594,21 @@ run_case bucket-dup-api check-test-buckets.sh break_bucket_dup_api \
     'Base64Test'
 
 run_case changelog-phantom-release check-version-sync.sh break_changelog_phantom_release \
-    "CMakeLists.txt CHANGELOG.md helm project.env" \
+    "CMakeLists.txt CHANGELOG.md helm deploy project.env" \
     'version drift' \
     'newest release heading [99.99.99]'
 
 run_case changelog-heading-format check-version-sync.sh break_changelog_heading_format \
-    "CMakeLists.txt CHANGELOG.md helm project.env" \
+    "CMakeLists.txt CHANGELOG.md helm deploy project.env" \
     "could not parse a released '## [x.y.z]' heading"
 
 run_case helm-tag-drift check-version-sync.sh break_helm_tag_drift \
-    "CMakeLists.txt CHANGELOG.md helm project.env" \
-    'helm image tag drift: helm/cpp-env/values-stage.yaml pins tag "9.9.9"' \
+    "CMakeLists.txt CHANGELOG.md helm deploy project.env" \
+    'helm image tag drift: deploy/values-worker-prod.yaml pins tag "9.9.9"' \
     'A stale pin deploys an old image'
 
 run_case chart-appversion-drift check-version-sync.sh break_chart_appversion_drift \
-    "CMakeLists.txt CHANGELOG.md helm project.env" \
+    "CMakeLists.txt CHANGELOG.md helm deploy project.env" \
     'appVersion drift: helm/life-os-cpp/Chart.yaml has appVersion "0.0.1"'
 
 run_case nginx-location-drift check-frontend-nginx-sync.sh break_nginx_location_drift \
@@ -619,12 +623,12 @@ run_case nginx-body-cap check-frontend-nginx-sync.sh break_nginx_body_cap \
     'will 413 in one environment only'
 
 run_case helm-fail-open check-helm-render.sh break_helm_fail_open \
-    "helm" \
+    "helm deploy" \
     'rate limiter is fail-OPEN' \
     'Set rateLimit.failOpen=false.'
 
 run_case helm-committed-jwt check-helm-render.sh break_helm_committed_jwt \
-    "helm" \
+    "helm deploy" \
     'rendered Secret carries a committed credential (jwt-secret)'
 
 run_case module-dep-cycle-edge check-module-deps.sh break_module_dep_cycle_edge \

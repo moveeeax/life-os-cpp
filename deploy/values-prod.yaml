@@ -83,6 +83,9 @@ rateLimit:
   enabled: true
   trustProxy: true
   trustedProxyCount: 2
+  # Redis down → refuse rather than let the login go unthrottled; sessions live
+  # in Redis too, so without it signing in fails either way.
+  failOpen: false
 
 # Retried mutating requests with an Idempotency-Key are answered once.
 idempotency:

@@ -1,7 +1,7 @@
 name: Gates nightly
 
 # Rot insurance for the check-* gates. In per-PR CI the gate-selftest job is
-# self-scoped to scripts/**, .github/workflows/**, helm/** — this nightly run
+# self-scoped to scripts/**, .github/workflows/**, helm/**, deploy/** — this nightly run
 # is the unconditional backstop that proves the gates still BITE even when
 # nobody has touched them for weeks (a gate only ever run against healthy
 # trees is indistinguishable from `exit 0`).

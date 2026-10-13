@@ -17670,9 +17670,7 @@
        "type": "string",
        "format": "date"
       },
-      "description": "A day of the period (week",
-      "month": null,
-      "quarter); defaults to today": null
+      "description": "A day of the period (week, month, quarter); defaults to today"
      },
      {
       "name": "from",
@@ -22029,7 +22027,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 324792,
-  "source_fnv1a64": "ee65ad28860c78cc"
+  "source_bytes": 324794,
+  "source_fnv1a64": "b29d9c1c17c6282c"
  }
 }

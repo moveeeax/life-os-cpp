@@ -1,7 +1,8 @@
 # Wallpapers and sounds: the bucket behind every screen
 
 Life OS shows a random wallpaper behind every screen: a video on a desktop,
-an image on a phone. The admin uploads them on `/admin/wallpapers`; the files
+an image on a phone. The admin uploads them on `/admin/library` (the old
+`/admin/wallpapers` address redirects there); the files
 live in an S3-compatible bucket, the rows in the `wallpapers` table
 (migration 031). The browser uploads straight to the bucket through a
 presigned PUT, so the API never carries the bytes, and reads the files from a
@@ -57,8 +58,9 @@ CORS, so the app's origin can PUT and anyone can read:
 ]
 ```
 
-Public read on the wallpapers prefix only. AWS-style policy (stores differ:
-some take this policy, some only an ACL per bucket; check yours):
+Public read on the wallpapers and sounds prefixes only. AWS-style policy
+(stores differ: some take this policy, some only an ACL per bucket; check
+yours):
 
 ```json
 {
@@ -68,14 +70,18 @@ some take this policy, some only an ACL per bucket; check yours):
       "Effect": "Allow",
       "Principal": "*",
       "Action": ["s3:GetObject"],
-      "Resource": ["arn:aws:s3:::<bucket>/life-os/wallpapers/*"]
+      "Resource": [
+        "arn:aws:s3:::<bucket>/life-os/wallpapers/*",
+        "arn:aws:s3:::<bucket>/life-os/sounds/*"
+      ]
     }
   ]
 }
 ```
 
 The access key needs `s3:PutObject`, `s3:GetObject` (HEAD) and
-`s3:DeleteObject` on `<bucket>/life-os/wallpapers/*` and nothing else.
+`s3:DeleteObject` on `<bucket>/life-os/wallpapers/*` and
+`<bucket>/life-os/sounds/*` and nothing else.
 
 ## Files
 
@@ -92,8 +98,7 @@ The access key needs `s3:PutObject`, `s3:GetObject` (HEAD) and
 
 Focus sounds (rain, cafe, quiet music) live in the same bucket under
 `<prefix>sounds/<id>/`, uploaded on `/admin/library`: MP3, AAC/M4A or Ogg, up
-to 30 MB. They need the same public read and the same key rights as the
-wallpapers, on that prefix too.
+to 30 MB. The policy and key rights above already cover that prefix.
 
 ## Prod
 
@@ -106,7 +111,7 @@ CORS rule is set there. Region `us-east-1` (MinIO's default).
 
 ## Check
 
-1. Upload one desktop video and one phone image on `/admin/wallpapers`.
+1. Upload one desktop video and one phone image on `/admin/library`.
 2. Open `/now` on a desktop: the video plays behind the clock.
 3. Open `/now` on a phone (or a window 768 px wide or less): the image shows.
 4. A row stuck as "not finished" is an upload that did not complete; delete
