@@ -298,6 +298,12 @@ TEST(NowToday, TravelBlockListsRulesNearTheirThreshold) {
     EXPECT_EQ(b["near"][1]["left"], 7) << "days until the threshold day";
 }
 
+TEST(NowToday, AReachedOverRuleIsNotNear) {
+    // Living at home with the tax rule: 365 days used, the threshold met long ago.
+    const json counters = {{{"name", "KZ tax"}, {"threshold_kind", "over"}, {"left", 0}, {"reached_on", "2026-10-13"}}};
+    EXPECT_TRUE(Now::Today::travel_block(nullptr, counters, "2026-10-13").is_null());
+}
+
 TEST(NowToday, TravelBlockIsNullWhenThereIsNothing) {
     EXPECT_TRUE(Now::Today::travel_block(nullptr, json::array(), "2026-10-13").is_null());
 }
