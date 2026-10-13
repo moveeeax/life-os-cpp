@@ -13671,6 +13671,10 @@ export interface paths {
                     content: {
                         "application/json": {
                             data: components["schemas"]["TravelCounter"][];
+                            /** Format: date */
+                            date: string;
+                            /** @description The countries of the date (two on a crossing day); null with no home and no crossings */
+                            current_country: string[] | null;
                         };
                     };
                 };
@@ -13953,6 +13957,8 @@ export interface paths {
             parameters: {
                 query?: {
                     currency?: string;
+                    /** @description Today in UTC by default */
+                    date?: string;
                 };
                 header?: never;
                 path: {
@@ -15194,6 +15200,11 @@ export interface components {
                 total: number;
             };
             spends: components["schemas"]["TravelSpends"];
+            /** @description GET of one trip only, coming trips: how many days in a row a stay from the start may last under each rolling "at most" rule counting one of its countries */
+            allowed?: {
+                rule: string;
+                days: number;
+            }[];
             items?: components["schemas"]["TravelTripItem"][];
             spend_rows?: components["schemas"]["TravelSpend"][];
         };

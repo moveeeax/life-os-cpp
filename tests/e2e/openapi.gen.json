@@ -2451,6 +2451,25 @@
      "spends": {
       "$ref": "#/components/schemas/TravelSpends"
      },
+     "allowed": {
+      "type": "array",
+      "description": "GET of one trip only, coming trips: how many days in a row a stay from the start may last under each rolling \"at most\" rule counting one of its countries",
+      "items": {
+       "type": "object",
+       "required": [
+        "rule",
+        "days"
+       ],
+       "properties": {
+        "rule": {
+         "type": "string"
+        },
+        "days": {
+         "type": "integer"
+        }
+       }
+      }
+     },
      "items": {
       "type": "array",
       "items": {
@@ -23612,13 +23631,29 @@
         "schema": {
          "type": "object",
          "required": [
-          "data"
+          "data",
+          "date",
+          "current_country"
          ],
          "properties": {
           "data": {
            "type": "array",
            "items": {
             "$ref": "#/components/schemas/TravelCounter"
+           }
+          },
+          "date": {
+           "type": "string",
+           "format": "date"
+          },
+          "current_country": {
+           "type": [
+            "array",
+            "null"
+           ],
+           "description": "The countries of the date (two on a crossing day); null with no home and no crossings",
+           "items": {
+            "type": "string"
            }
           }
          }
@@ -23978,6 +24013,15 @@
        "type": "string",
        "default": "USD"
       }
+     },
+     {
+      "name": "date",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "Today in UTC by default"
      }
     ],
     "responses": {
@@ -24643,7 +24687,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 361694,
-  "source_fnv1a64": "0fb3d9e5511649f0"
+  "source_bytes": 362522,
+  "source_fnv1a64": "dace36f644d17adc"
  }
 }

@@ -16,6 +16,7 @@ import type {
   TravelTripItem,
   TravelTripItemInput,
 } from '@/lib/travel';
+import { todayLocal } from '@/lib/travel';
 
 const BASE = '/api/v1/travel';
 
@@ -128,7 +129,8 @@ export function useTrip(id: string, currency = 'USD') {
     queryFn: async ({ signal }) =>
       (
         await api.getJson<{ data: TravelTrip }>(`${BASE}/trips/${id}`, {
-          query: { currency },
+          // The local day: how long a coming stay may last is counted from it.
+          query: { currency, date: todayLocal() },
           signal,
         })
       ).data,
