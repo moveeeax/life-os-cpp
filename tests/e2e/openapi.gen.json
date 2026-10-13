@@ -2294,7 +2294,8 @@
      },
      "link": {
       "type": "string",
-      "maxLength": 500
+      "maxLength": 500,
+      "description": "A web address (https:// or http://), or empty"
      },
      "note": {
       "type": "string",
@@ -24642,7 +24643,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 361632,
-  "source_fnv1a64": "291dd226fbcca2b2"
+  "source_bytes": 361694,
+  "source_fnv1a64": "0fb3d9e5511649f0"
  }
 }
