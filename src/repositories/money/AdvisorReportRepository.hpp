@@ -25,7 +25,9 @@ public:
 
     /**
      * The owner's review of the period, created queued when there is none.
-     * A failed one is queued again (a "Run now" after a provider outage).
+     * A failed one is queued again (a "Run now" after a provider outage), and
+     * so is a done one written before its period ended (finished on or before
+     * period_end, UTC): the week has more rows now.
      * @returns {row, true} when this call queued it (created or re-queued).
      */
     std::pair<nlohmann::json, bool> create_or_get(const std::string& owner,
@@ -40,6 +42,8 @@ public:
                         "VALUES ($1::uuid, $2, $3::date, $4::date) "
                         "ON CONFLICT (owner_id, period, period_start) DO UPDATE SET status = 'queued', attempts = 0, "
                         " error = NULL, finished_at = NULL WHERE money_advisor_reports.status = 'failed' "
+                        " OR (money_advisor_reports.status = 'done' AND money_advisor_reports.period_end >= "
+                        "  (money_advisor_reports.finished_at AT TIME ZONE 'UTC')::date) "
                         "RETURNING id::text",
                         owner,
                         period,
