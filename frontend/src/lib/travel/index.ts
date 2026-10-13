@@ -57,3 +57,21 @@ export function daysBetween(today: string, date: string): number {
     (Date.parse(`${date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000,
   );
 }
+
+/** "Nov 1" for a day of this year, "Nov 1, 2025" otherwise. */
+export function shortDay(iso: string, today: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(iso.slice(0, 4) === today.slice(0, 4) ? {} : { year: 'numeric' }),
+    timeZone: 'UTC',
+  });
+}
+
+export function todayLocal(): string {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+}

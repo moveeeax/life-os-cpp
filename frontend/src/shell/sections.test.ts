@@ -14,6 +14,7 @@ describe('glassNav', () => {
       ['Now', '/now'],
       ['Tasks', '/tasks'],
       ['Goals', '/goals'],
+      ['Travel', '/travel'],
       ['Money', '/money'],
       ['Food', '/food'],
       ['Body', '/health'],
@@ -26,6 +27,7 @@ describe('glassNav', () => {
       'Now',
       'Tasks',
       'Goals',
+      'Travel',
       'Money',
       'Food',
     ]);
@@ -37,12 +39,12 @@ describe('glassNav', () => {
 
   it('leaves out a section whose module is off', () => {
     const list = glassNav(user(Permission.General), new Set(['goals']));
-    expect(list.map((s) => s.label)).toEqual(['Now', 'Tasks', 'Money', 'Food']);
+    expect(list.map((s) => s.label)).toEqual(['Now', 'Tasks', 'Travel', 'Money', 'Food']);
   });
 
   it('leaves Now out too when its module is off', () => {
     const list = glassNav(user(Permission.General), new Set(['now']));
-    expect(list.map((s) => s.label)).toEqual(['Tasks', 'Goals', 'Money', 'Food']);
+    expect(list.map((s) => s.label)).toEqual(['Tasks', 'Goals', 'Travel', 'Money', 'Food']);
   });
 
   it('gives no user only Now', () => {
