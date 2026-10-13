@@ -250,7 +250,7 @@ components:
                 required: [rule, left]
                 properties:
                   rule: { type: string }
-                  left: { type: integer, description: Days left, or days until an over threshold is met }
+                  left: { type: integer, description: "Days left, or days until an over threshold is met" }
         tasks:
           type: object
           required: [late_count, first_late, today, inbox_count]

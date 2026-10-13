@@ -840,8 +840,7 @@
           },
           "left": {
            "type": "integer",
-           "description": "Days left",
-           "or days until an over threshold is met": null
+           "description": "Days left, or days until an over threshold is met"
           }
          }
         }
@@ -24643,7 +24642,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 361630,
-  "source_fnv1a64": "0091b7169950f0e2"
+  "source_bytes": 361632,
+  "source_fnv1a64": "291dd226fbcca2b2"
  }
 }

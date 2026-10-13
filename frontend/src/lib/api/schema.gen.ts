@@ -14749,7 +14749,7 @@ export interface components {
                 } | null;
                 near: {
                     rule: string;
-                    /** @description Days left */
+                    /** @description Days left, or days until an over threshold is met */
                     left: number;
                 }[];
             };
