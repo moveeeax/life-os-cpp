@@ -37,8 +37,9 @@ import type {
 // path templates); the response types come from the same OpenAPI schemas.
 const BASE = '/api/v1/money';
 
-/** Every write invalidates the whole section: balances, totals and reports all move. */
-const ALL = [qk.money.all()] as const;
+/** Every write invalidates the whole section (balances, totals, reports) and Now's digest. */
+export const MONEY_WRITES = [qk.money.all(), qk.now.all()] as const;
+const ALL = MONEY_WRITES;
 
 export const PARSE_POLL_MS = 2000;
 /** The provider call is capped at MONEY_LLM_TIMEOUT_SECONDS; a job unfinished after this is stuck. */

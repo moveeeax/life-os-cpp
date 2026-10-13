@@ -88,7 +88,10 @@ export function useSyncRun(id: number | null) {
     queryFn: async () => {
       const path: string = `${BASE}/sync/${id}`;
       const run = (await api.getJson<{ data: SyncRun }>(path)).data;
-      if (isFinalStatus(run.status)) void qc.invalidateQueries({ queryKey: qk.health.all() });
+      if (isFinalStatus(run.status)) {
+        void qc.invalidateQueries({ queryKey: qk.health.all() });
+        void qc.invalidateQueries({ queryKey: qk.now.all() });
+      }
       return run;
     },
     retry: false,
