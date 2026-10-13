@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 
+import { captureBody } from '@/lib/tasks/bodies';
 import {
   useAcceptTasksParse,
   useCreateTask,
@@ -79,13 +80,7 @@ export function Capture({
   }, [autoStart, initial, noteId, start, status?.llm_available]);
 
   const asTyped = () => {
-    const t = text.trim();
-    if (t)
-      create.mutate({
-        title: t.slice(0, 200),
-        area: 'projects',
-        ...(defaultDue ? { due: defaultDue } : {}),
-      });
+    if (text.trim()) create.mutate(captureBody(text, defaultDue));
   };
 
   const submit = (e: FormEvent) => {
