@@ -5,14 +5,11 @@ import { apiErrorMessage } from '@/lib/api/client';
 import { rangeForDays, today } from '@/lib/health';
 import { SYNC_DATA_TYPES } from '@/lib/health/types';
 
-import { cardClass } from './ChartCard';
+import { Num, Row } from '@/shell/kit';
 
-const inputClass =
-  'h-11 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:ring-3 focus:ring-brand-500/20 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90';
-const primaryButton =
-  'inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-3 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-brand-300';
-const secondaryButton =
-  'inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5';
+const inputClass = 'k-input';
+const primaryButton = 'k-btn k-solid';
+const secondaryButton = 'k-btn';
 
 const label = (type: string) => type.replace(/_/g, ' ');
 
@@ -33,43 +30,17 @@ function CoverageTable() {
   }
   const rows = Object.entries(q.data ?? {}).sort(([a], [b]) => (a < b ? -1 : 1));
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-theme-sm">
-        <thead>
-          <tr className="border-b border-gray-200 text-theme-xs text-gray-500 uppercase dark:border-gray-800 dark:text-gray-400">
-            <th scope="col" className="py-2 pe-4 font-medium">
-              Type
-            </th>
-            <th scope="col" className="py-2 pe-4 font-medium">
-              First date
-            </th>
-            <th scope="col" className="py-2 pe-4 font-medium">
-              Last date
-            </th>
-            <th scope="col" className="py-2 pe-4 text-right font-medium">
-              Records
-            </th>
-            <th scope="col" className="py-2 font-medium">
-              Last sync
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(([type, c]) => (
-            <tr key={type} className="border-b border-gray-100 last:border-0 dark:border-gray-800">
-              <td className="py-2 pe-4 text-gray-800 dark:text-white/90">{label(type)}</td>
-              <td className="py-2 pe-4 text-gray-500 dark:text-gray-400">{c.first_date ?? '–'}</td>
-              <td className="py-2 pe-4 text-gray-500 dark:text-gray-400">{c.last_date ?? '–'}</td>
-              <td className="py-2 pe-4 text-right text-gray-800 tabular-nums dark:text-white/90">
-                {c.records.toLocaleString('en-US')}
-              </td>
-              <td className="py-2 text-gray-500 dark:text-gray-400">
-                {c.last_sync_at ? new Date(c.last_sync_at).toLocaleString() : '–'}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="k-group-rows">
+      {rows.map(([type, c]) => (
+        <div key={type} className="k-kv k-cov">
+          <span>{label(type)}</span>
+          <span className="k-muted">
+            {c.first_date ?? '–'} – {c.last_date ?? '–'} ·{' '}
+            <Num>{c.records.toLocaleString('en-US')}</Num> records
+            {c.last_sync_at && <> · synced {new Date(c.last_sync_at).toLocaleString()}</>}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -122,12 +93,7 @@ export function SyncPanel() {
   };
 
   return (
-    <section className={cardClass} aria-label="Sync">
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Sync</h2>
-      <p className="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">
-        What is stored per data type, and a manual sync from the Xiaomi cloud.
-      </p>
-
+    <Row title="Sync" sub="What is stored per data type, and a manual sync from the Xiaomi cloud">
       <div className="mt-4">
         <CoverageTable />
       </div>
@@ -135,10 +101,7 @@ export function SyncPanel() {
       <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
         <div className="flex flex-wrap items-end gap-4">
           <div>
-            <label
-              htmlFor="sync-from"
-              className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
-            >
+            <label htmlFor="sync-from" className="k-label">
               From
             </label>
             <input
@@ -151,10 +114,7 @@ export function SyncPanel() {
             />
           </div>
           <div>
-            <label
-              htmlFor="sync-to"
-              className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
-            >
+            <label htmlFor="sync-to" className="k-label">
               To
             </label>
             <input
@@ -169,15 +129,10 @@ export function SyncPanel() {
         </div>
 
         <fieldset>
-          <legend className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-400">
-            Data types
-          </legend>
+          <legend className="k-label">Data types</legend>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             {SYNC_DATA_TYPES.map((type) => (
-              <label
-                key={type}
-                className="flex items-center gap-2 text-theme-sm text-gray-700 dark:text-gray-300"
-              >
+              <label key={type} className="k-check">
                 <input
                   type="checkbox"
                   checked={types.includes(type)}
@@ -243,7 +198,7 @@ export function SyncPanel() {
           </p>
         )}
         {run.data && (
-          <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <div className="k-banner k-col">
             <p className="text-gray-800 dark:text-white/90">
               Run #{run.data.id}: <span className="font-medium">{run.data.status}</span>
               {run.data.finished_at === null && ' …'}
@@ -267,6 +222,6 @@ export function SyncPanel() {
           </p>
         )}
       </div>
-    </section>
+    </Row>
   );
 }

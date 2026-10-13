@@ -14,23 +14,10 @@ interface LinkMiNoticeProps {
  */
 export function LinkMiNotice({ purpose, compact }: LinkMiNoticeProps) {
   return (
-    <div
-      className={
-        compact
-          ? 'flex flex-wrap items-center gap-3'
-          : 'flex flex-wrap items-center gap-4 rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 dark:border-gray-800 dark:bg-white/3'
-      }
-    >
-      <Watch className="size-6 shrink-0 text-brand-500" aria-hidden="true" />
-      <p className="min-w-0 flex-1 text-theme-sm text-gray-700 dark:text-gray-300">
-        Link your Mi account {purpose}.
-      </p>
-      <Link
-        to="/account"
-        className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600"
-      >
-        Link in profile
-      </Link>
+    <div className={compact ? 'flex flex-wrap items-center gap-3' : 'k-banner'}>
+      <Watch className="k-inline-icon" aria-hidden="true" />
+      <span className="k-grow">Link your Mi account {purpose}.</span>
+      <Link to="/account">Link in profile →</Link>
     </div>
   );
 }
