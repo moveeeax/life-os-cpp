@@ -3,7 +3,7 @@
  * @brief Refresh-token revocation store (Redis), shared by the auth and
  *        account controllers.
  * @details Each issued refresh token has a JTI written to
- *          `<prefix><jti> = "1"` with the refresh TTL; /refresh checks it,
+ *          `<prefix><jti> = "1"` with the refresh TTL; /refresh consumes it,
  *          logout deletes it. To support "log out everywhere" on a password
  *          change/reset we ALSO index every JTI in a per-user set
  *          `<prefix>user:<sub>` so revoke_all() can sweep them.
@@ -54,11 +54,17 @@ inline bool record(const Auth::CookieConfig& cfg, const std::string& sub, const 
     return true;
 }
 
-inline bool is_live(const Auth::CookieConfig& cfg, const std::string& jti) {
+/**
+ * @brief Take a live refresh JTI out of the store, atomically: true only for
+ *        the one caller whose delete removed it. A replay, or a second refresh
+ *        racing with the same token, gets false. Fails closed (false) when
+ *        the cache is down.
+ */
+inline bool consume(const Auth::CookieConfig& cfg, const std::string& jti) {
     try {
         if (!Cache::is_initialized())
             return false;
-        return Cache::get().get(jti_key(cfg, jti)).has_value();
+        return Cache::get().del(jti_key(cfg, jti)) > 0;
     } catch (...) {
         return false;
     }
