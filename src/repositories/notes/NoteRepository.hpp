@@ -222,7 +222,7 @@ private:
         if (sqlstate == "23505") {  // unique_violation: (owner, slug)
             throw SlugTaken();
         }
-        if (sqlstate == "23514" || detail::is_fk_violation(sqlstate)) {  // check, foreign key
+        if (sqlstate == "23514" || Repositories::detail::is_fk_violation(sqlstate)) {  // check, foreign key
             throw Invariant();
         }
     }

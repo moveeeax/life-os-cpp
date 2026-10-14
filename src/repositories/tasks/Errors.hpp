@@ -47,7 +47,7 @@ inline void translate(std::string_view sqlstate) {
     if (sqlstate == "23514") {  // check_violation
         throw Invariant("the row breaks a rule of the tasks model");
     }
-    if (detail::is_fk_violation(sqlstate)) {  // foreign_key_violation, restrict_violation
+    if (Repositories::detail::is_fk_violation(sqlstate)) {  // foreign_key_violation, restrict_violation
         throw Invariant("the row refers to a task or note that is not there");
     }
     if (sqlstate == "23505") {  // unique_violation: only external_id is unique among user-written columns
