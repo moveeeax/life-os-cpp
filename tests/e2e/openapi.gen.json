@@ -6712,7 +6712,7 @@
       "type": "string",
       "enum": [
        "custom",
-       false,
+       "off",
        "ai"
       ]
      },
@@ -27383,7 +27383,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 401473,
-  "source_fnv1a64": "2aac0c1be367e8b6"
+  "source_bytes": 401475,
+  "source_fnv1a64": "63c9321e0be44270"
  }
 }
