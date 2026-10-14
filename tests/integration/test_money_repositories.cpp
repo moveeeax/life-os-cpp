@@ -444,12 +444,10 @@ std::thread insert_late(const std::string& owner,
     return std::thread([=, &inserted] {
         pqxx::connection conn(TestHelpers::pg_conn_string());
         pqxx::work w(conn);
-        w.exec_params(
+        w.exec(
             "INSERT INTO money_transactions (owner_id, type, date, account_id, amount, name, category_id) "
             "VALUES ($1::uuid, 'expense', '2026-10-05', $2::uuid, 10, 'Late', $3::uuid)",
-            owner,
-            account,
-            category);
+            pqxx::params{owner, account, category});
         inserted.set_value();
         std::this_thread::sleep_for(hold);
         w.commit();
