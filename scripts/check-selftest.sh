@@ -953,7 +953,7 @@ run_case module-dep-cycle-edge check-module-deps.sh break_module_dep_cycle_edge 
 run_case module-dep-core-hub check-module-deps.sh break_module_dep_core_hub \
     "$MODULE_DEPS_PATHS" \
     'forbidden include of the composition root: src/api/Guards.hpp includes "core/Core.hpp"' \
-    'include "core/Modules.hpp"'
+    'include "utils/Modules.hpp"'
 
 run_case module-dep-declared-cycle check-module-deps.sh break_module_dep_declared_cycle \
     "$MODULE_DEPS_PATHS" \

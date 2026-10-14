@@ -1,17 +1,18 @@
 # module-cycles-allowlist.txt — include cycles between src/ directories that
-# scripts/check-module-deps.sh tolerates while they are being dismantled.
+# scripts/check-module-deps.sh tolerates.
 #
 # One cycle per line: its member directories sorted and joined with commas,
-# a comment per line saying who is removing it. The gate computes the
-# strongly connected components of the declared graph (docs/module-deps.txt)
-# and fails on any component of size > 1 that is not a subset of a line
-# here. A cycle that shrinks keeps passing; one that grows, or a new one,
-# fails. When the gate reports a line as no longer needed, delete it; when
-# the file is empty, delete the file.
+# a comment per line saying why it is there. The gate computes the strongly
+# connected components of the declared graph (docs/module-deps.txt) and
+# fails on any component of size > 1 that is not a subset of a line here.
+# A cycle that shrinks keeps passing; one that grows, or a new one, fails.
+# When the gate reports a line as no longer needed, delete it; when the
+# file is empty, delete the file.
 
-# email -> jobs (src/email/AccountEmails.cpp), jobs -> email (src/jobs/BuiltinHandlers.cpp),
-# jobs -> core (FitnessSyncHandler.hpp via core/Modules.hpp), core -> jobs (src/core/Core.cpp),
-# plus api -> core -> root -> api through main.cpp and version.hpp. Review
-# 2026-10-14 finding 4; removed by the handler move; delete this line when
-# check-module-deps passes without it.
-api,core,email,jobs,root
+# The composition root: root -> api is main.cpp wiring the controllers,
+# api -> core is api/HealthController.hpp including core/Core.hpp (rule 2
+# allows exactly that file), and core -> root is src/core/Core.cpp including
+# the generated version.hpp, which the gate attributes to the top-level
+# pseudo-directory `root`. Not a layering fault; the version header is the
+# only non-entry-point file in `root`. Review 2026-10-14 finding 4.
+api,core,root

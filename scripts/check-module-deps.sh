@@ -12,7 +12,7 @@
 #   1. utils/ includes nothing outside utils/ (it is the bottom layer).
 #   2. core/Core.hpp (the composition root that pulls every subsystem) is
 #      included only by the binary entry points and api/HealthController.hpp
-#      — everyone else uses the tiny core/Modules.hpp.
+#      — everyone else uses the tiny utils/Modules.hpp.
 #   3. webhooks -> email is dead (it closed the email/jobs/webhooks cycle).
 #
 # Pure bash+grep, runs in well under a second, no build needed.
@@ -32,7 +32,7 @@ DEPS="$REPO/docs/module-deps.txt"
 }
 
 # Files (relative to src/) that may include the composition root. Everything
-# else must use core/Modules.hpp for the module switches / shutdown flag.
+# else must use utils/Modules.hpp for the module switches / shutdown flag.
 # core/Core.cpp is Core.hpp's own body file (de-inlined into app_core).
 CORE_HPP_ALLOWED="main.cpp worker_main.cpp api/HealthController.hpp core/Core.cpp"
 
@@ -94,7 +94,7 @@ while IFS='|' read -r file edge inc; do
         if [ "$ok" -eq 0 ]; then
             echo "ERROR: forbidden include of the composition root: $file includes \"core/Core.hpp\"" >&2
             echo "  Only these may include Core.hpp: $(echo "$CORE_HPP_ALLOWED" | sed 's/[^ ]*/src\/&/g')." >&2
-            echo "  For Core::<module>_enabled() / Core::is_shutting_down() include \"core/Modules.hpp\"." >&2
+            echo "  For Core::<module>_enabled() / Core::is_shutting_down() include \"utils/Modules.hpp\"." >&2
             fail=1
             continue
         fi
