@@ -2,7 +2,7 @@
  * @file Core.cpp
  * @brief Bodies for src/core/Core.hpp — compiled once into app_core. This is
  *        the only core TU that sees the 13 subsystem headers (database/pqxx,
- *        cache, jobs, Kafka, PayPal, mailer, storage, OTel/prometheus, ...);
+ *        cache, jobs, PayPal, mailer, storage, OTel/prometheus, ...);
  *        the header no longer exposes them to including TUs. Every contract
  *        is documented on the declarations in the header; the comments here
  *        explain the boot/teardown mechanics in place.
@@ -35,7 +35,6 @@
 #include "jobs/MoneyAdvisorHandler.hpp"
 #include "jobs/MoneyRatesHandler.hpp"
 #include "jobs/Outbox.hpp"
-#include "messaging/Messaging.hpp"
 #include "observability/Observability.hpp"
 #include "security/Auth.hpp"
 #include "security/Idempotency.hpp"
@@ -104,7 +103,6 @@ void Application::initialize(const std::string& config_path, InitMode mode) {
 
         init_cache_(cfg);
         if (mode != InitMode::Worker) {
-            init_messaging_(cfg);
             Tasks::initialize();
             register_token_reaper_();
             register_db_pool_metric_(cfg);
@@ -381,32 +379,6 @@ void Application::init_cache_(Config::AppConfig& cfg) {
     }
 }
 
-std::vector<std::string> Application::read_kafka_topics_(Config::AppConfig& cfg) {
-    std::vector<std::string> topics;
-    if (!read_string_array_(cfg, {"messaging", "kafka", "consumer", "topics"}, topics))
-        topics.push_back("default_topic");
-    return topics;
-}
-
-void Application::init_messaging_(Config::AppConfig& cfg) {
-    if (!cfg.get<bool>("messaging.enabled", "MESSAGING_ENABLED", false))
-        return;
-
-    Messaging::initialize();
-    auto brokers = cfg.get<std::string>("messaging.kafka.brokers", "KAFKA_BROKERS", "localhost:9092");
-
-    if (cfg.get<bool>("messaging.kafka.producer.enabled", "KAFKA_PRODUCER_ENABLED", false)) {
-        auto producer_id =
-            cfg.get<std::string>("messaging.kafka.producer.client_id", "KAFKA_PRODUCER_ID", "life_os_cpp_producer");
-        Messaging::get().initialize_producer(brokers, producer_id);
-    }
-    if (cfg.get<bool>("messaging.kafka.consumer.enabled", "KAFKA_CONSUMER_ENABLED", false)) {
-        auto group_id =
-            cfg.get<std::string>("messaging.kafka.consumer.group_id", "KAFKA_GROUP_ID", "cpp_consumer_group");
-        Messaging::get().initialize_consumer(brokers, group_id, read_kafka_topics_(cfg));
-    }
-}
-
 void Application::init_security_() {
     Security::Auth::initialize();
     Security::RateLimit::initialize();
@@ -578,12 +550,10 @@ void Application::register_default_health_checks_() {
     if (Jobs::is_initialized()) {
         register_health_check("jobs", [] { return Jobs::get().health_check(); });
     }
-    // Optional dependencies (SMTP, object storage, Kafka) belong here as
-    // DEGRADED probes — their outage should show in /health but must NOT
-    // pull the pod out of rotation via /ready. Register them once those
-    // modules expose a cheap connectivity check, e.g.:
-    //   if (Messaging::is_initialized())
-    //       register_health_check("kafka", [] { return Messaging::get().health_check(); }, /*critical=*/false);
+    // Optional dependencies (SMTP, object storage) belong here as DEGRADED
+    // probes — their outage should show in /health but must NOT pull the pod
+    // out of rotation via /ready. Register them with critical=false once those
+    // modules expose a cheap connectivity check.
 }
 
 void Application::init_jobs_(Config::AppConfig& cfg) {
@@ -768,8 +738,6 @@ void Application::shutdown() {
         Security::Auth::shutdown();
     if (Tasks::is_initialized())
         Tasks::shutdown();
-    if (Messaging::is_initialized())
-        Messaging::shutdown();
     if (Cache::is_initialized())
         Cache::shutdown();
     if (Migrations::is_initialized())

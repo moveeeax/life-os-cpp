@@ -170,17 +170,6 @@ handlers **plus** the worker, even when replicas absorb the bulk of reads.
 
 For URL components: `REDIS_HOST`, `REDIS_PORT`.
 
-## Messaging (Kafka)
-
-| Env | JSON key | Type | Default | Notes |
-|---|---|---|---|---|
-| `MESSAGING_ENABLED` | `messaging.enabled` | bool | `false` | Parent switch |
-| `KAFKA_BROKERS` | `messaging.kafka.brokers` | string | `localhost:9092` | |
-| `KAFKA_PRODUCER_ENABLED` | `messaging.kafka.producer.enabled` | bool | `false` | |
-| `KAFKA_PRODUCER_ID` | `messaging.kafka.producer.client_id` | string | `life_os_cpp_producer` | |
-| `KAFKA_CONSUMER_ENABLED` | `messaging.kafka.consumer.enabled` | bool | `false` | |
-| `KAFKA_GROUP_ID` | `messaging.kafka.consumer.group_id` | string | `cpp_consumer_group` | |
-
 ## Jobs
 
 | Env | JSON key | Type | Default | Notes |

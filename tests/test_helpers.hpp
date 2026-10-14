@@ -20,7 +20,6 @@
 #include "database/Database.hpp"
 #include "database/Migrations.hpp"
 #include "jobs/Jobs.hpp"
-#include "messaging/Messaging.hpp"
 #include "observability/Observability.hpp"
 #include "security/Auth.hpp"
 #include "tasks/Tasks.hpp"
@@ -150,9 +149,6 @@ inline std::string minimal_config() {
         "pool_size": 2,
         "use_sentinel": false
     },
-    "messaging": {
-        "enabled": false
-    },
     "jobs": {
         "retry_backoff_base_ms": 0
     }
@@ -232,9 +228,6 @@ inline void reset_all_globals() {
     } catch (...) {}
     try {
         Tasks::shutdown();
-    } catch (...) {}
-    try {
-        Messaging::shutdown();
     } catch (...) {}
     try {
         Cache::shutdown();

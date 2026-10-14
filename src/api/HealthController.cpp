@@ -61,7 +61,7 @@ void HealthController::health(const HttpRequestPtr&, std::function<void(const Ht
     } else {
         critical_ok = false;
     }
-    // A degraded optional dependency (SMTP/storage/Kafka) reports "degraded"
+    // A degraded optional dependency (SMTP/storage) reports "degraded"
     // but stays 200 — only a critical-component failure returns 503, matching
     // what /ready (Core::health_check) gates on.
     const char* status = !critical_ok ? "unhealthy" : (any_degraded_down ? "degraded" : "healthy");

@@ -5,7 +5,7 @@
  *          consult per-request. Kept separate from Core.hpp so including a
  *          module switch costs only utils/Config.hpp — Core.hpp is the
  *          composition root and transitively pulls every subsystem
- *          (database, cache, Kafka, PayPal, OTel, ...), which made every
+ *          (database, cache, PayPal, OTel, ...), which made every
  *          controller recompile whenever any subsystem header changed.
  *          Core.hpp includes this header, so the names below stay usable as
  *          Core::* from either include.

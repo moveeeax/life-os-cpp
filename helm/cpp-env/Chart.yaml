@@ -2,7 +2,7 @@ apiVersion: v2
 name: cpp-env
 description: >-
   One-namespace ephemeral test environment: life-os-cpp + worker + frontend wired to
-  a per-env CloudNativePG cluster (rw/ro), Redis Sentinel, optional Kafka, Mailpit
+  a per-env CloudNativePG cluster (rw/ro), Redis Sentinel, Mailpit
   and Jaeger — auto-configured, with *.<env>.example.com ingress.
 type: application
 version: 0.1.0
@@ -10,7 +10,7 @@ appVersion: "1.26.0"
 maintainers:
   - name: life-os-cpp-team
 # Subcharts are wired entirely from this chart's values (fixed in-namespace
-# service names + per-env domain). Infra (Postgres/Redis/Kafka/Mailpit/Jaeger)
+# service names + per-env domain). Infra (Postgres/Redis/Mailpit/Jaeger)
 # is templated here, so no external chart repos are needed.
 dependencies:
   - name: life-os-cpp

@@ -13,7 +13,7 @@
  *
  *          Full OTel SDK context propagation (injecting into a Span's
  *          parent context) is a natural follow-up — the skeleton here is
- *          enough for log correlation and for downstream HTTP/Kafka
+ *          enough for log correlation and for downstream HTTP
  *          carriers to forward the same trace ID.
  *
  *          Bodies (the parser, hex/random helpers and the thread-local
