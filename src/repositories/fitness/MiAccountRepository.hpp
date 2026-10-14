@@ -26,6 +26,7 @@
 #include "fitness/xiaomi/Credentials.hpp"
 #include "fitness/xiaomi/Crypto.hpp"
 #include "fitness/xiaomi/Regions.hpp"
+#include "repositories/FitnessData.hpp"
 #include "repositories/RepoErrors.hpp"
 
 namespace Repositories {
@@ -270,19 +271,7 @@ public:
             if (!delete_data) {
                 return true;
             }
-            const std::string xiaomi_id = r[0][0].template as<std::string>();
-            for (const char* table : {"daily_activity",
-                                      "sleep_sessions",
-                                      "workouts",
-                                      "body_measurements",
-                                      "heart_rate_samples",
-                                      "spo2_samples",
-                                      "stress_samples",
-                                      "abnormal_heart_beat_events"}) {
-                txn.exec_params(std::string("DELETE FROM ") + table + " WHERE user_id = $1", xiaomi_id);
-            }
-            txn.exec_params("DELETE FROM sync_runs WHERE xiaomi_user_id = $1", xiaomi_id);
-            txn.exec_params("DELETE FROM sync_state WHERE xiaomi_user_id = $1", xiaomi_id);
+            FitnessData::delete_in(txn, r[0][0].template as<std::string>());
             // The band data of finished workouts came from the deleted rows.
             txn.exec_params(
                 "UPDATE workout_sessions SET health_status = 'pending', hr_avg = NULL, hr_max = NULL, "

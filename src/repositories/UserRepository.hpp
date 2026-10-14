@@ -15,11 +15,13 @@
 #include <optional>
 #include <pqxx/pqxx>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "database/Database.hpp"
 #include "domain/Role.hpp"
 #include "domain/User.hpp"
+#include "repositories/FitnessData.hpp"
 #include "repositories/RepoErrors.hpp"
 #include "repositories/SqlErrors.hpp"
 
@@ -319,32 +321,56 @@ public:
         "projects",
     };
 
+    /// The foreign keys of the billing tables (migration 007, ON DELETE
+    /// RESTRICT) that keep a user with payment or wallet history.
+    static constexpr const char* kBillingConstraints[] = {
+        "payments_user_id_fkey",
+        "wallet_entries_user_id_fkey",
+        "wallet_balances_user_id_fkey",
+    };
+
+    /// Whether a foreign-key violation names one of kBillingConstraints
+    /// (PostgreSQL quotes the constraint name in the message).
+    static bool is_billing_violation(const std::string& message) {
+        for (const char* name : kBillingConstraints) {
+            if (message.find(std::string("\"") + name + "\"") != std::string::npos) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
-     * @brief Delete a user and every module row they own, in one transaction.
-     *        Throws UserNotFound if it doesn't exist,
-     *        UserHasBillingHistory on FK violation (SQLSTATE 23503) — a
-     *        payment or wallet_entries/wallet_balances row still references
-     *        this user (ON DELETE RESTRICT, migration 007). Without this
-     *        translation the raw pqxx::sql_error would surface as a bare 500
-     *        instead of a 409 the admin API can act on.
+     * @brief Delete a user and every module row they own, in one transaction:
+     *        the fitness rows of the Xiaomi account the user linked (keyed by
+     *        the Xiaomi id, not by owner_id), the owned module tables, and the
+     *        user row (mi_accounts cascades from it).
+     *        Throws UserNotFound if it doesn't exist, UserHasBillingHistory
+     *        when a payment or wallet_entries/wallet_balances row still
+     *        references this user (ON DELETE RESTRICT, migration 007). Any
+     *        other foreign-key violation is rethrown unchanged: it means a
+     *        table is missing from kOwnedTables, not billing history.
      */
     void remove(const std::string& id) {
-        detail::translate_sql(
-            [&] {
-                return Database::get().execute_write([&](auto& txn) {
-                    for (const char* table : kOwnedTables) {
-                        txn.exec_params(std::string("DELETE FROM ") + table + " WHERE owner_id = $1::uuid", id);
-                    }
-                    auto r = txn.exec_params("DELETE FROM users WHERE id = $1 RETURNING id", id);
-                    if (r.empty())
-                        throw UserNotFound{};
-                    return 0;
-                });
-            },
-            [](std::string_view ss) {
-                if (ss == "23503")
-                    throw UserHasBillingHistory{};
+        try {
+            Database::get().execute_write([&](auto& txn) {
+                auto linked = txn.exec_params("SELECT xiaomi_user_id FROM mi_accounts WHERE owner_id = $1::uuid", id);
+                if (!linked.empty()) {
+                    FitnessData::delete_in(txn, linked[0][0].template as<std::string>());
+                }
+                for (const char* table : kOwnedTables) {
+                    txn.exec_params(std::string("DELETE FROM ") + table + " WHERE owner_id = $1::uuid", id);
+                }
+                auto r = txn.exec_params("DELETE FROM users WHERE id = $1 RETURNING id", id);
+                if (r.empty())
+                    throw UserNotFound{};
+                return 0;
             });
+        } catch (const pqxx::sql_error& e) {
+            if (std::string_view(e.sqlstate()) == "23503" && is_billing_violation(e.what()))
+                throw UserHasBillingHistory{};
+            throw;
+        }
     }
 
     /**
