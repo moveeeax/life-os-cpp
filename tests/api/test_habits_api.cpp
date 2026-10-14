@@ -48,9 +48,7 @@ Security::Auth::AuthPrincipal reader(const char* who) {
     return user(who, Domain::Permission::kGeneral | Domain::Permission::kFitnessRead);
 }
 
-json body_of(const HttpResponsePtr& resp) {
-    return json::parse(std::string(resp->body()));
-}
+using TestHelpers::body_of;
 
 /// Today in UTC and a day @p shift days from it, as the server computes them (now() in the database).
 std::string utc_day(int shift = 0) {

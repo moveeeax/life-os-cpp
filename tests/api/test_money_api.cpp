@@ -33,16 +33,9 @@ constexpr const char* kAnna = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7";
 constexpr const char* kBoris = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb7";
 constexpr const char* kMissingId = "55555555-5555-4555-8555-555555555555";
 
-Security::Auth::AuthPrincipal user(const std::string& id) {
-    Security::Auth::AuthPrincipal p;
-    p.subject = id;
-    p.raw_claims = json{{"sub", id}, {"permissions", Domain::Permission::kGeneral}};
-    return p;
-}
+using TestHelpers::user;
 
-json body_of(const HttpResponsePtr& resp) {
-    return json::parse(std::string(resp->body()));
-}
+using TestHelpers::body_of;
 
 class MoneyApiTest : public TestHelpers::CoreBackedTest {
 protected:

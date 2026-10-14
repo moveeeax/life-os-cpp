@@ -37,9 +37,7 @@ Security::Auth::AuthPrincipal principal(const char* who) {
     return p;
 }
 
-json body_of(const HttpResponsePtr& resp) {
-    return json::parse(std::string(resp->body()));
-}
+using TestHelpers::body_of;
 
 class TravelApiTest : public TestHelpers::CoreBackedTest {
 protected:

@@ -47,9 +47,7 @@ Security::Auth::AuthPrincipal user() {
     return principal(kUser, Domain::Permission::kGeneral);
 }
 
-json body_of(const HttpResponsePtr& resp) {
-    return json::parse(std::string(resp->body()));
-}
+using TestHelpers::body_of;
 
 /// The bucket as a map key → size; uploads are "done" by writing the map.
 class FakeStore : public Storage::ObjectStore {
