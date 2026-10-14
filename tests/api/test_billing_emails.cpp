@@ -103,7 +103,6 @@ void billing_email_test_config_overrides(json& cfg) {
     cfg["database"]["migrations_enabled"] = true;
     cfg["database"]["migrations_dir"] = "migrations";
     cfg["billing"]["enabled"] = true;
-    cfg["billing"]["provider"] = "paypal";
     cfg["billing"]["currency"] = "USD";
     cfg["billing"]["credits_per_unit"] = 100;
     cfg["billing"]["min_amount_cents"] = 100;

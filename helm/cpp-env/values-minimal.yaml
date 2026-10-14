@@ -1,5 +1,5 @@
 # Lighter preset for the cpp-env umbrella — the "I just want it running" path.
-# Drops the optional heavy services (Kafka, Jaeger/OTel) and the Postgres read
+# Drops the optional heavy services (Jaeger/OTel) and the Postgres read
 # replica, leaving: app + worker + Postgres(single) + Redis + Mailpit + frontend.
 #
 # Layer it on top of the per-env --set flags:
@@ -9,15 +9,11 @@
 #
 # NOT a security/prod config — credentials are still TEST defaults. Redis still
 # runs as Sentinel (true single-node Redis templating is a follow-up). For zero-operator LOCAL dev use `make up` instead.
-kafka:
-  enabled: false
 jaeger:
   enabled: false
 postgres:
   instances: 1 # single primary, no read replica
 life-os-cpp:
-  externalKafka:
-    enabled: false
   tracing:
     enabled: false # no Jaeger to export to
 life-os-cpp-worker:

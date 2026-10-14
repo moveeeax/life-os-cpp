@@ -45,17 +45,8 @@ using json = nlohmann::json;
 
 namespace {
 
-constexpr long kDefaultLimit = 1000;
-constexpr long kMaxLimit = 10000;
-
-/// Rows belong to an app user; a static-bearer principal has no user id.
-bool require_user(const std::string& owner, const std::function<void(const HttpResponsePtr&)>& callback) {
-    if (is_valid_uuid(owner)) {
-        return true;
-    }
-    callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
-    return false;
-}
+constexpr long kSampleDefaultLimit = 1000;
+constexpr long kSampleMaxLimit = 10000;
 
 /// The Xiaomi id of the caller's linked account into @p account; empty when
 /// nothing is linked, which reads as "no rows". False (and a 503) when the
@@ -108,33 +99,14 @@ json account_status_body(const std::string& owner) {
 
 }  // namespace
 
-// Guards. Order: module -> permission -> parameters. The Guards.hpp macros
-// return from the method themselves, so they are invoked in the method body, not in a helper.
-#define FITNESS_GUARD(req, callback, perm)           \
-    do {                                             \
-        if (!require_enabled(callback))              \
-            return;                                  \
-        API_REQUIRE_PERMISSION(req, callback, perm); \
-    } while (0)
-
 // A data route works on the caller's own account: module -> permission -> a
 // user account -> the Xiaomi id of their link (empty without one). Declares
 // `owner` and `account` in the method body, hence no do/while.
-#define FITNESS_ACCOUNT_GUARD(req, callback, perm)  \
-    FITNESS_GUARD(req, callback, perm);             \
-    API_REQUIRE_OWNER(req, callback, owner);        \
-    if (!require_user(owner, callback))             \
-        return;                                     \
-    std::string account;                            \
-    if (!resolve_account(owner, account, callback)) \
+#define FITNESS_ACCOUNT_GUARD(req, callback, perm)                                                    \
+    API_MODULE_PERMISSION_USER_GUARD(Core::fitness_enabled(), "fitness", req, callback, perm, owner); \
+    std::string account;                                                                              \
+    if (!resolve_account(owner, account, callback))                                                   \
     return
-
-bool FitnessController::require_enabled(const std::function<void(const HttpResponsePtr&)>& callback) {
-    if (Core::fitness_enabled())
-        return true;
-    callback(ErrorResponse::not_found("fitness"));
-    return false;
-}
 
 bool FitnessController::parse_query(const HttpRequestPtr& req,
                                     Query& query,
@@ -153,7 +125,7 @@ bool FitnessController::parse_query(const HttpRequestPtr& req,
                                             "from and to must be YYYY-MM-DD and from must not be after to"));
         return false;
     }
-    query.limit = kDefaultLimit;
+    query.limit = kSampleDefaultLimit;
     query.offset = 0;
     const std::string limit = req->getParameter("limit");
     const std::string offset = req->getParameter("offset");
@@ -168,7 +140,7 @@ bool FitnessController::parse_query(const HttpRequestPtr& req,
         callback(ErrorResponse::bad_request("invalid_pagination", "limit and offset must be integers"));
         return false;
     }
-    if (query.limit < 1 || query.limit > kMaxLimit || query.offset < 0) {
+    if (query.limit < 1 || query.limit > kSampleMaxLimit || query.offset < 0) {
         callback(
             ErrorResponse::bad_request("invalid_pagination", "limit must be 1..10000 and offset must not be negative"));
         return false;
@@ -280,16 +252,11 @@ void FitnessController::probe(const HttpRequestPtr& req, std::function<void(cons
 // ── account ──────────────────────────────────────────────────────────────────
 
 // The Mi account routes act on the caller's own link: module -> fitness:sync
-// -> a user account. API_REQUIRE_OWNER declares `owner`, hence no do/while.
-#define ACCOUNT_GUARD(req, callback, owner)                         \
-    FITNESS_GUARD(req, callback, Domain::Permission::kFitnessSync); \
-    API_REQUIRE_OWNER(req, callback, owner);                        \
-    if (!require_user(owner, callback))                             \
-    return
-
+// -> a user account.
 void FitnessController::accountStatus(const HttpRequestPtr& req,
                                       std::function<void(const HttpResponsePtr&)>&& callback) {
-    ACCOUNT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::fitness_enabled(), "fitness", req, callback, Domain::Permission::kFitnessSync, owner);
     with_repo_errors(callback, "fitness.accountStatus", [&] {
         callback(Response::ok(json{{"data", account_status_body(owner)}}));
     });
@@ -297,7 +264,8 @@ void FitnessController::accountStatus(const HttpRequestPtr& req,
 
 void FitnessController::accountLinkStart(const HttpRequestPtr& req,
                                          std::function<void(const HttpResponsePtr&)>&& callback) {
-    ACCOUNT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::fitness_enabled(), "fitness", req, callback, Domain::Permission::kFitnessSync, owner);
     try {
         const auto started = Fitness::Link::start(owner);
         callback(Response::created(json{{"data",
@@ -321,7 +289,8 @@ void FitnessController::accountLinkStart(const HttpRequestPtr& req,
 void FitnessController::accountLinkStep(const HttpRequestPtr& req,
                                         std::function<void(const HttpResponsePtr&)>&& callback,
                                         const std::string& link_id) {
-    ACCOUNT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::fitness_enabled(), "fitness", req, callback, Domain::Permission::kFitnessSync, owner);
     try {
         const auto step = Fitness::Link::step(owner, link_id);
         json data{{"state", "pending"}};
@@ -355,7 +324,8 @@ void FitnessController::accountLinkStep(const HttpRequestPtr& req,
 
 void FitnessController::accountUnlink(const HttpRequestPtr& req,
                                       std::function<void(const HttpResponsePtr&)>&& callback) {
-    ACCOUNT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::fitness_enabled(), "fitness", req, callback, Domain::Permission::kFitnessSync, owner);
     // The body is optional; without it the data stays.
     bool delete_data = false;
     if (!req->body().empty()) {
@@ -385,7 +355,8 @@ void FitnessController::accountUnlink(const HttpRequestPtr& req,
 
 void FitnessController::accountPatch(const HttpRequestPtr& req,
                                      std::function<void(const HttpResponsePtr&)>&& callback) {
-    ACCOUNT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::fitness_enabled(), "fitness", req, callback, Domain::Permission::kFitnessSync, owner);
     const json body = json::parse(std::string(req->body()), nullptr, /*allow_exceptions=*/false);
     if (body.is_discarded() || !body.is_object() || !body.contains("region") || !body["region"].is_string()) {
         callback(ErrorResponse::bad_request("invalid_body", "body must carry region"));
@@ -408,7 +379,8 @@ void FitnessController::accountPatch(const HttpRequestPtr& req,
 
 void FitnessController::accountDetectRegion(const HttpRequestPtr& req,
                                             std::function<void(const HttpResponsePtr&)>&& callback) {
-    ACCOUNT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::fitness_enabled(), "fitness", req, callback, Domain::Permission::kFitnessSync, owner);
     const std::string token_key = Xiaomi::Service::token_key_b64();
     if (token_key.empty()) {
         callback(ErrorResponse::service_unavailable("not_configured", "MI_FITNESS_TOKEN_KEY is not set"));
@@ -725,6 +697,5 @@ void FitnessController::exportData(const HttpRequestPtr& req, std::function<void
 }
 
 #undef FITNESS_ACCOUNT_GUARD
-#undef FITNESS_GUARD
 
 }  // namespace Api

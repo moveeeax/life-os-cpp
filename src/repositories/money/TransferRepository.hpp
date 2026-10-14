@@ -14,6 +14,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 #include "repositories/money/AccountRepository.hpp"
 #include "repositories/money/CurrencyRepository.hpp"
 #include "repositories/money/Errors.hpp"
@@ -177,8 +178,8 @@ private:
         " CASE WHEN x.amount_received IS NULL OR x.amount_received = 0 THEN NULL "
         "      ELSE x.amount_sent / x.amount_received END AS cost_rate, "
         " x.name, x.note, x.external_id, "
-        " to_char(x.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-        " to_char(x.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at "
+        " " SQL_ISO_UTC("x.created_at") " AS created_at, "
+        " " SQL_ISO_UTC("x.updated_at") " AS updated_at "
         "FROM money_transfers x JOIN money_accounts f ON f.id = x.from_account_id "
         " JOIN money_accounts g ON g.id = x.to_account_id";
 

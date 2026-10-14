@@ -14,6 +14,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 #include "repositories/tasks/Errors.hpp"
 
 namespace Repositories::Tasks {
@@ -162,8 +163,8 @@ private:
         " (SELECT json_build_object('id', t.id, 'title', t.title, 'due', to_char(t.due, 'YYYY-MM-DD')) "
         "   FROM task_items t WHERE t.project_id = p.id AND t.status <> 'done' "
         "   ORDER BY t.due NULLS LAST, t.created_at LIMIT 1) AS next, "
-        " to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-        " to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";
+        " " SQL_ISO_UTC("p.created_at") " AS created_at, "
+        " " SQL_ISO_UTC("p.updated_at") " AS updated_at";
 
     static void translate(std::string_view sqlstate) {
         if (sqlstate == "23505") {  // unique_violation: the (owner, code) index

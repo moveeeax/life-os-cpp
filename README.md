@@ -160,7 +160,7 @@ note is in `docs/fitness/`.
 ```
 src/            api/ (controllers, Endpoints.hpp registry, middleware), core/ (init, Modules.hpp
                 switches), database/, cache/, repositories/, domain/, security/, jobs/, llm/,
-                net/, storage/, email/, webhooks/, messaging/, observability/, utils/,
+                net/, storage/, email/, webhooks/, observability/, utils/,
                 module code: billing/, fitness/, food/, money/, tasks/, goals/, now/, travel/,
                 habits/, notes/ (workout and projects live in api/ + repositories/),
                 main.cpp, worker_main.cpp

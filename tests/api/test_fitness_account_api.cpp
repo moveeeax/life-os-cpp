@@ -49,9 +49,7 @@ Security::Auth::AuthPrincipal user(const std::string& id, std::uint32_t extra = 
     return p;
 }
 
-json body_of(const HttpResponsePtr& resp) {
-    return json::parse(std::string(resp->body()));
-}
+using TestHelpers::body_of;
 
 class MiAccountApiTest : public TestHelpers::CoreBackedTest {
 protected:

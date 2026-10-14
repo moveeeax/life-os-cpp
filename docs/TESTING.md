@@ -131,7 +131,7 @@ the curl TU), and anything needing Drogon types.
 
 ## Known gaps (be honest about these before you rely on them)
 
-- **No behavioral coverage** for Kafka messaging, SMTP delivery (the Mailer is
+- **No behavioral coverage** for SMTP delivery (the Mailer is
   exercised through the jobs path, not against a real SMTP server), or Postgres
   streaming replication. These have lifecycle/health guards only — wiring, not
   behavior.
@@ -150,16 +150,3 @@ the curl TU), and anything needing Drogon types.
   under ASan OOM'd an 8 GB build VM back when every heavy body was header-only;
   the `app_core` STATIC extraction (`ARCHITECTURE.md` §4) compiles those bodies
   once and removed the blocker.
-
-## A disabled test that marks a real bug
-
-`tests/integration/test_jobs.cpp` contains
-`DISABLED_CancelIsAtomicUnderContention`. It is **disabled because it documents
-an unfixed race**, not because it is flaky: jobs live in Redis, and
-`JobQueue::cancel()` (`src/jobs/Jobs.cpp`) loads the job blob, checks its
-status and then writes `failed` back with a plain `SETEX`. Two concurrent
-callers can both observe the not-yet-cancelled state and both report success
-(a TOCTOU on the job key). Re-enable it once `cancel()` makes the
-check-and-write atomic in Redis (a `WATCH`/`MULTI`/`EXEC` transaction on the
-job key, or a Lua script). Until then, treat single-cancel as supported and
-concurrent-cancel as undefined.

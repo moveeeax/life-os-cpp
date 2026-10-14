@@ -16,6 +16,7 @@
 
 #include "database/Database.hpp"
 #include "goals/Progress.hpp"
+#include "repositories/SqlTime.hpp"
 #include "repositories/goals/Errors.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
 
@@ -415,10 +416,10 @@ public:
     static constexpr const char* kColumns =
         "id, title, area, kind, why, to_char(start_date, 'YYYY-MM-DD') AS start_date, "
         " to_char(due, 'YYYY-MM-DD') AS due, status, "
-        " to_char(completed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS completed_at, "
+        " " SQL_ISO_UTC("completed_at") " AS completed_at, "
         " unit, start_value::float8 AS start_value, target_value::float8 AS target_value, target_count, result, "
-        " to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-        " to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";
+        " " SQL_ISO_UTC("created_at") " AS created_at, "
+        " " SQL_ISO_UTC("updated_at") " AS updated_at";
     static constexpr const char* kCheckinColumns =
         "id, to_char(date, 'YYYY-MM-DD') AS date, value::float8 AS value, note";
     static constexpr const char* kSectionColumns = "id, name, position";

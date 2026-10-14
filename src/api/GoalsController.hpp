@@ -51,9 +51,6 @@ public:
                          Callback&& callback,
                          const std::string& id,
                          const std::string& child);
-
-private:
-    static bool require_enabled(const Callback& callback);
 };
 
 }  // namespace Api

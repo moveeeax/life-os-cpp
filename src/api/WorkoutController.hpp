@@ -81,10 +81,6 @@ public:
     void readiness(const HttpRequestPtr& req, Callback&& callback);
     /// Needs fitness:sync on top of the common guards.
     void reconcile(const HttpRequestPtr& req, Callback&& callback);
-
-private:
-    /// 404 while the module is off; the routes stay registered.
-    static bool require_enabled(const Callback& callback);
 };
 
 }  // namespace Api

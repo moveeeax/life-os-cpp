@@ -24,6 +24,7 @@
 #include "domain/Role.hpp"
 #include "net/Http.hpp"
 #include "now/Weather.hpp"
+#include "repositories/now/NoteRepository.hpp"
 #include "test_helpers.hpp"
 
 using json = nlohmann::json;
@@ -35,16 +36,9 @@ constexpr const char* kAnna = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaf1";
 constexpr const char* kBoris = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbf2";
 constexpr const char* kDay = "2026-10-14";
 
-Security::Auth::AuthPrincipal user(const std::string& id) {
-    Security::Auth::AuthPrincipal p;
-    p.subject = id;
-    p.raw_claims = json{{"sub", id}, {"permissions", Domain::Permission::kGeneral}};
-    return p;
-}
+using TestHelpers::user;
 
-json body_of(const HttpResponsePtr& resp) {
-    return json::parse(std::string(resp->body()));
-}
+using TestHelpers::body_of;
 
 /// Open-Meteo as the tests want it: a known city, an unknown one, a failing mode.
 class FakeOpenMeteo : public Net::Http::Transport {
@@ -212,22 +206,18 @@ TEST_F(NowSettingsApiTest, TheWeatherDownIsA503AndIsNotAskedAgainAtOnce) {
     }
 }
 
-TEST_F(NowSettingsApiTest, TheNoteOfADayAndTheDayBefore) {
+TEST_F(NowSettingsApiTest, TheNoteOfADayIsStoredButNotOnToday) {
     EXPECT_EQ(call(&Api::TodayController::putNote, Put, {{"date", kDay}, {"text", ""}})->statusCode(), k400BadRequest);
-    ASSERT_EQ(
-        call(&Api::TodayController::putNote, Put, {{"date", "2026-10-13"}, {"text", "Call the bank"}})->statusCode(),
-        k200OK);
     ASSERT_EQ(call(&Api::TodayController::putNote, Put, {{"date", kDay}, {"text", "Pack"}})->statusCode(), k200OK);
     ASSERT_EQ(call(&Api::TodayController::putNote, Put, {{"date", kDay}, {"text", "Pack the adapter"}})->statusCode(),
               k200OK)
         << "a second save replaces";
+    EXPECT_EQ(Repositories::Now::NoteRepository().get(kAnna, kDay), std::optional<std::string>("Pack the adapter"));
+    EXPECT_FALSE(Repositories::Now::NoteRepository().get(kBoris, kDay)) << "the note is the owner's only";
     auto t = call(&Api::TodayController::today, Get, json::object(), {{"date", kDay}, {"tz", "Asia/Almaty"}});
     ASSERT_EQ(t->statusCode(), k200OK) << std::string(t->body());
-    const auto note = body_of(t)["data"]["note"];
-    EXPECT_EQ(note["today"], "Pack the adapter");
-    EXPECT_EQ(note["yesterday"], "Call the bank");
-    auto boris = call(&Api::TodayController::today, Get, json::object(), {{"date", kDay}}, kBoris);
-    EXPECT_TRUE(body_of(boris)["data"]["note"]["today"].is_null());
+    EXPECT_FALSE(body_of(t)["data"].contains("note")) << "the Now screen no longer reads the note";
     EXPECT_EQ(call(&Api::TodayController::deleteNote, Delete, json::object(), {{"date", kDay}})->statusCode(),
               k204NoContent);
+    EXPECT_FALSE(Repositories::Now::NoteRepository().get(kAnna, kDay));
 }

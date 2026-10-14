@@ -22,9 +22,6 @@ Wiring (all in-namespace, fixed names):
 {{- if .Values.redis.enabled }}
   Redis      sentinel redis-sentinel:26379 (master "mymaster" → redis:6379)
 {{- end }}
-{{- if .Values.kafka.enabled }}
-  Kafka      kafka:9092
-{{- end }}
 
 Create an admin once Postgres is ready:
   kubectl -n {{ .Release.Namespace }} exec deploy/api -c life-os-cpp -- \

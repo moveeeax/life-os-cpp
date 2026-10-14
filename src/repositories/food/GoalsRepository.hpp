@@ -12,6 +12,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 
 namespace Repositories {
 
@@ -113,8 +114,8 @@ public:
 private:
     inline static const std::string kColumns =
         "height_cm, birth_date::text, sex, activity, target_weight_kg, pace_kg_per_week, manual_weight_kg, "
-        "profile_note, kcal_override, protein_override_g, fat_override_g, carbs_override_g, "
-        "to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";
+        "profile_note, kcal_override, protein_override_g, fat_override_g, carbs_override_g,"
+        " " SQL_ISO_UTC("updated_at") " AS updated_at";
 };
 
 }  // namespace Repositories

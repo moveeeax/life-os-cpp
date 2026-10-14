@@ -89,9 +89,6 @@ private:
         long offset = 0;
     };
 
-    /// 404 when the module is disabled. Returns false after responding.
-    static bool require_enabled(const std::function<void(const HttpResponsePtr&)>& callback);
-
     /// Parse from/to/limit/offset. On error responds 400 and returns false.
     static bool parse_query(const HttpRequestPtr& req,
                             Query& query,

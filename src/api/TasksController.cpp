@@ -29,7 +29,7 @@
 #include "repositories/Zones.hpp"
 #include "repositories/goals/GoalRepository.hpp"
 #include "repositories/tasks/Errors.hpp"
-#include "repositories/tasks/NoteRepository.hpp"
+#include "repositories/tasks/InboxRepository.hpp"
 #include "repositories/tasks/ParseJobRepository.hpp"
 #include "repositories/tasks/ProjectRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
@@ -51,8 +51,6 @@ using Api::Fields::is_calendar_date;
 using Api::Fields::text_length;
 using Api::Fields::today_utc;
 
-constexpr int kDefaultLimit = 50;
-constexpr int kMaxLimit = 200;
 constexpr std::size_t kSourceRefMax = 2000;
 constexpr std::size_t kExternalIdMax = 100;
 const std::vector<std::string> kStatuses = {"open", "in_progress", "done"};
@@ -65,27 +63,6 @@ std::vector<std::string> listed(const auto& values) {
 
 const std::vector<std::string> kAreas = listed(::Tasks::Fields::kAreas);
 const std::vector<std::string> kEfforts = listed(::Tasks::Fields::kEfforts);
-
-/// The JSON body, which must be an object: an array or a scalar answers 400, not 500.
-bool parse_object(const HttpRequestPtr& req, json& body, TasksController::Callback& callback) {
-    if (!Validation::parse_body(req, body, callback)) {
-        return false;
-    }
-    if (!body.is_object()) {
-        callback(ErrorResponse::bad_request("invalid_body", "the body must be a JSON object"));
-        return false;
-    }
-    return true;
-}
-
-/// Rows belong to an app user; a static-bearer principal has no user id.
-bool require_user(const std::string& owner, const TasksController::Callback& callback) {
-    if (is_valid_uuid(owner)) {
-        return true;
-    }
-    callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
-    return false;
-}
 
 /// A field that may be null; when present and not null it must be one of @p allowed.
 void nullable_one_of(Validation::Errors& errs,
@@ -234,30 +211,15 @@ Repo::TaskRepository::Input task_input(const json& body) {
 
 }  // namespace
 
-#define TASKS_GUARD(req, callback, owner)    \
-    if (!require_enabled(callback))          \
-        return;                              \
-    API_REQUIRE_OWNER(req, callback, owner); \
-    if (!require_user(owner, callback))      \
-    return
-
-bool TasksController::require_enabled(const Callback& callback) {
-    if (Core::tasks_enabled()) {
-        return true;
-    }
-    callback(ErrorResponse::not_found("tasks"));
-    return false;
-}
-
 void TasksController::status(const HttpRequestPtr& req, Callback&& callback) {
-    TASKS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     callback(Response::ok(json{{"data", {{"llm_available", ::Tasks::Llm::parse_settings().has_value()}}}}));
 }
 
 // ── items ───────────────────────────────────────────────────────────────────
 
 void TasksController::listItems(const HttpRequestPtr& req, Callback&& callback) {
-    TASKS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     Repo::TaskRepository::Filter f;
     f.status = req->getParameter("status");
     f.area = req->getParameter("area");
@@ -286,7 +248,7 @@ void TasksController::listItems(const HttpRequestPtr& req, Callback&& callback) 
 }
 
 void TasksController::createItem(const HttpRequestPtr& req, Callback&& callback) {
-    TASKS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -316,7 +278,7 @@ void TasksController::createItem(const HttpRequestPtr& req, Callback&& callback)
 }
 
 void TasksController::getItem(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TASKS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -331,7 +293,7 @@ void TasksController::getItem(const HttpRequestPtr& req, Callback&& callback, co
 }
 
 void TasksController::updateItem(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TASKS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -382,22 +344,20 @@ void TasksController::updateItem(const HttpRequestPtr& req, Callback&& callback,
 }
 
 void TasksController::deleteItem(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TASKS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
     with_repo_errors(callback, "tasks.deleteItem", [&] {
         Repo::TaskRepository().remove(owner, id);
-        auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(k204NoContent);
-        callback(resp);
+        no_content(callback);
     });
 }
 
 // ── agenda ──────────────────────────────────────────────────────────────────
 
 void TasksController::agenda(const HttpRequestPtr& req, Callback&& callback) {
-    TASKS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     const std::string date = request_day(req, &Repositories::Zones::today_in, today_utc());
     const std::string tz = req->getParameter("tz").empty() ? "UTC" : req->getParameter("tz");
     if (!is_calendar_date(date)) {
@@ -425,20 +385,20 @@ void TasksController::agenda(const HttpRequestPtr& req, Callback&& callback) {
 // ── notes ───────────────────────────────────────────────────────────────────
 
 void TasksController::listNotes(const HttpRequestPtr& req, Callback&& callback) {
-    TASKS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     const std::string status = req->getParameter("status").empty() ? "inbox" : req->getParameter("status");
     if (std::find(kNoteStatuses.begin(), kNoteStatuses.end(), status) == kNoteStatuses.end()) {
         callback(ErrorResponse::bad_request("invalid_query", "status must be inbox or archived"));
         return;
     }
     with_repo_errors(callback, "tasks.listNotes", [&] {
-        const json rows = Repo::NoteRepository().list(owner, status);
+        const json rows = Repo::InboxRepository().list(owner, status);
         callback(Response::ok(json{{"data", rows}, {"count", rows.size()}}));
     });
 }
 
 void TasksController::createNote(const HttpRequestPtr& req, Callback&& callback) {
-    TASKS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -452,12 +412,12 @@ void TasksController::createNote(const HttpRequestPtr& req, Callback&& callback)
     }
     with_repo_errors(callback, "tasks.createNote", [&] {
         callback(
-            Response::created(json{{"data", Repo::NoteRepository().create(owner, body["text"].get<std::string>())}}));
+            Response::created(json{{"data", Repo::InboxRepository().create(owner, body["text"].get<std::string>())}}));
     });
 }
 
 void TasksController::updateNote(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TASKS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -477,28 +437,26 @@ void TasksController::updateNote(const HttpRequestPtr& req, Callback&& callback,
     with_repo_errors(callback, "tasks.updateNote", [&] {
         callback(Response::ok(
             json{{"data",
-                  Repo::NoteRepository().update(
+                  Repo::InboxRepository().update(
                       owner, id, Validation::opt_string(body, "text"), Validation::opt_string(body, "status"))}}));
     });
 }
 
 void TasksController::deleteNote(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TASKS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
     with_repo_errors(callback, "tasks.deleteNote", [&] {
-        Repo::NoteRepository().remove(owner, id);
-        auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(k204NoContent);
-        callback(resp);
+        Repo::InboxRepository().remove(owner, id);
+        no_content(callback);
     });
 }
 
 // ── parse ───────────────────────────────────────────────────────────────────
 
 void TasksController::parse(const HttpRequestPtr& req, Callback&& callback) {
-    TASKS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -571,7 +529,7 @@ void TasksController::parse(const HttpRequestPtr& req, Callback&& callback) {
 }
 
 void TasksController::parseStatus(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TASKS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -586,7 +544,7 @@ void TasksController::parseStatus(const HttpRequestPtr& req, Callback&& callback
 }
 
 void TasksController::parseAccept(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TASKS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }

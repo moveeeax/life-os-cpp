@@ -18,6 +18,7 @@
 #include "database/Database.hpp"
 #include "repositories/LikePattern.hpp"
 #include "repositories/RepoErrors.hpp"
+#include "repositories/SqlTime.hpp"
 
 namespace Repositories {
 
@@ -259,9 +260,7 @@ public:
 
     static constexpr const char* kColumnsRaw =
         "id, source, off_code, name, brand, per, kcal, protein_g, fat_g, carbs_g, fiber_g, sugar_g, salt_g, "
-        "servings, archived, "
-        "to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-        "to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";
+        "servings, archived, " SQL_ISO_UTC("created_at") " AS created_at, " SQL_ISO_UTC("updated_at") " AS updated_at";
 
 private:
     inline static const std::string kColumns = kColumnsRaw;

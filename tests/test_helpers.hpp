@@ -19,8 +19,8 @@
 #include "core/Core.hpp"
 #include "database/Database.hpp"
 #include "database/Migrations.hpp"
+#include "domain/Role.hpp"
 #include "jobs/Jobs.hpp"
-#include "messaging/Messaging.hpp"
 #include "observability/Observability.hpp"
 #include "security/Auth.hpp"
 #include "tasks/Tasks.hpp"
@@ -150,9 +150,6 @@ inline std::string minimal_config() {
         "pool_size": 2,
         "use_sentinel": false
     },
-    "messaging": {
-        "enabled": false
-    },
     "jobs": {
         "retry_backoff_base_ms": 0
     }
@@ -232,9 +229,6 @@ inline void reset_all_globals() {
     } catch (...) {}
     try {
         Tasks::shutdown();
-    } catch (...) {}
-    try {
-        Messaging::shutdown();
     } catch (...) {}
     try {
         Cache::shutdown();
@@ -454,6 +448,20 @@ inline drogon::HttpRequestPtr authed_json(const Security::Auth::AuthPrincipal& p
                                           const nlohmann::json& body,
                                           drogon::HttpMethod method = drogon::Post) {
     return with_principal(make_request(method, body), p);
+}
+
+/// A signed-in app user (sub = @p id) holding the general permission: the
+/// principal the module API suites sign their requests with.
+inline Security::Auth::AuthPrincipal user(const std::string& id) {
+    Security::Auth::AuthPrincipal p;
+    p.subject = id;
+    p.raw_claims = nlohmann::json{{"sub", id}, {"permissions", Domain::Permission::kGeneral}};
+    return p;
+}
+
+/// The JSON body of a handler's response.
+inline nlohmann::json body_of(const drogon::HttpResponsePtr& resp) {
+    return nlohmann::json::parse(std::string(resp->body()));
 }
 
 // ---------------------------------------------------------------------------

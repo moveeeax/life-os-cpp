@@ -13,6 +13,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 #include "repositories/money/CurrencyRepository.hpp"
 #include "repositories/money/Errors.hpp"
 
@@ -168,9 +169,8 @@ public:
     }
 
     static constexpr const char* kColumnsRaw =
-        "id, name, kind, flexibility, budget_max, budget_currency, archived, position, "
-        "to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-        "to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";
+        "id, name, kind, flexibility, budget_max, budget_currency, archived, position,"
+        " " SQL_ISO_UTC("created_at") " AS created_at, " SQL_ISO_UTC("updated_at") " AS updated_at";
 
 private:
     inline static const std::string kColumns = kColumnsRaw;

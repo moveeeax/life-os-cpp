@@ -282,13 +282,6 @@ components:
       required: [focus, errors]
       description: 'A section key is absent when its module is off, the caller has nothing there, or it failed (then it is in errors)'
       properties:
-        note:
-          type: object
-          required: [today, yesterday]
-          description: The note of the day and of the day before
-          properties:
-            today: { type: [string, 'null'] }
-            yesterday: { type: [string, 'null'] }
         travel:
           type: object
           required: [next_trip, near]

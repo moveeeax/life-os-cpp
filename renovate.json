@@ -17,7 +17,7 @@
       "automerge": true
     },
     {
-      "description": "Infra images (Postgres/Redis/Kafka) — majors need a human",
+      "description": "Infra images (Postgres/Redis) — majors need a human",
       "matchDatasources": ["docker"],
       "matchUpdateTypes": ["major"],
       "automerge": false,

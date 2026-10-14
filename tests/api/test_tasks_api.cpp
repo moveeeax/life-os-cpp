@@ -31,16 +31,9 @@ namespace {
 constexpr const char* kAnna = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaab2";
 constexpr const char* kBoris = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbc2";
 
-Security::Auth::AuthPrincipal user(const std::string& id) {
-    Security::Auth::AuthPrincipal p;
-    p.subject = id;
-    p.raw_claims = json{{"sub", id}, {"permissions", Domain::Permission::kGeneral}};
-    return p;
-}
+using TestHelpers::user;
 
-json body_of(const HttpResponsePtr& resp) {
-    return json::parse(std::string(resp->body()));
-}
+using TestHelpers::body_of;
 
 class TasksApiTest : public TestHelpers::CoreBackedTest {
 protected:

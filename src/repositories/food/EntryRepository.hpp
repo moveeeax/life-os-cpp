@@ -20,6 +20,7 @@
 #include "database/Database.hpp"
 #include "repositories/RepoErrors.hpp"
 #include "repositories/SqlErrors.hpp"
+#include "repositories/SqlTime.hpp"
 
 namespace Repositories {
 
@@ -206,8 +207,7 @@ public:
 private:
     inline static const std::string kColumns =
         "id, date::text, meal, item_id, name, grams, kcal, protein_g, fat_g, carbs_g, fiber_g, sugar_g, salt_g, "
-        "estimated, note, position, "
-        "to_char(logged_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS logged_at";
+        "estimated, note, position, " SQL_ISO_UTC("logged_at") " AS logged_at";
 
     /// A malformed date reaches Postgres as 22007/22008.
     static void translate(std::string_view sqlstate) {

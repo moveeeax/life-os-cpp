@@ -39,9 +39,6 @@ public:
     void archive(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void putCheck(const HttpRequestPtr& req, Callback&& callback, const std::string& id, const std::string& date);
     void deleteCheck(const HttpRequestPtr& req, Callback&& callback, const std::string& id, const std::string& date);
-
-private:
-    static bool require_enabled(const Callback& callback);
 };
 
 }  // namespace Api

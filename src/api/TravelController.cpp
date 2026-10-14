@@ -71,25 +71,6 @@ bool is_time(const std::string& s) {
     return std::regex_match(s, re);
 }
 
-bool parse_object(const HttpRequestPtr& req, json& body, TravelController::Callback& callback) {
-    if (!Validation::parse_body(req, body, callback)) {
-        return false;
-    }
-    if (!body.is_object()) {
-        callback(ErrorResponse::bad_request("invalid_body", "the body must be a JSON object"));
-        return false;
-    }
-    return true;
-}
-
-bool require_user(const std::string& owner, const TravelController::Callback& callback) {
-    if (is_valid_uuid(owner)) {
-        return true;
-    }
-    callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
-    return false;
-}
-
 /// ?date=, today in UTC by default; nullopt (answered) when bad.
 std::optional<std::string> at_date(const HttpRequestPtr& req, const TravelController::Callback& callback) {
     const std::string date = request_day(req, &Repositories::Zones::today_in, today_utc());
@@ -351,35 +332,12 @@ json trip_view(TripRepository& repo, const std::string& owner, json row, const s
 
 }  // namespace
 
-#define TRAVEL_GUARD(req, callback, owner)   \
-    if (!require_enabled(callback))          \
-        return;                              \
-    API_REQUIRE_OWNER(req, callback, owner); \
-    if (!require_user(owner, callback))      \
-    return
-
-bool TravelController::require_enabled(const Callback& callback) {
-    if (Core::travel_enabled()) {
-        return true;
-    }
-    callback(ErrorResponse::not_found("travel"));
-    return false;
-}
-
-namespace {
-
-void no_content(const TravelController::Callback& callback) {
-    auto resp = HttpResponse::newHttpResponse();
-    resp->setStatusCode(k204NoContent);
-    callback(resp);
-}
-
-}  // namespace
+namespace {}  // namespace
 
 // ── settings ────────────────────────────────────────────────────────────────
 
 void TravelController::getSettings(const HttpRequestPtr& req, Callback&& callback) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     with_repo_errors(callback, "travel.settings", [&] {
         const auto home = SettingsRepository().home(owner);
         callback(Response::ok(json{{"data", {{"home_country", home ? json(*home) : json()}}}}));
@@ -387,7 +345,7 @@ void TravelController::getSettings(const HttpRequestPtr& req, Callback&& callbac
 }
 
 void TravelController::putSettings(const HttpRequestPtr& req, Callback&& callback) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -408,7 +366,7 @@ void TravelController::putSettings(const HttpRequestPtr& req, Callback&& callbac
 // ── crossings ───────────────────────────────────────────────────────────────
 
 void TravelController::listCrossings(const HttpRequestPtr& req, Callback&& callback) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     const auto page = parse_page_params(req, 100, 500);
     with_repo_errors(callback, "travel.crossings", [&] {
         CrossingRepository repo;
@@ -420,7 +378,7 @@ void TravelController::listCrossings(const HttpRequestPtr& req, Callback&& callb
 }
 
 void TravelController::createCrossing(const HttpRequestPtr& req, Callback&& callback) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -435,7 +393,7 @@ void TravelController::createCrossing(const HttpRequestPtr& req, Callback&& call
 }
 
 void TravelController::updateCrossing(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -453,7 +411,7 @@ void TravelController::updateCrossing(const HttpRequestPtr& req, Callback&& call
 }
 
 void TravelController::deleteCrossing(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -466,14 +424,14 @@ void TravelController::deleteCrossing(const HttpRequestPtr& req, Callback&& call
 // ── rules ───────────────────────────────────────────────────────────────────
 
 void TravelController::listRules(const HttpRequestPtr& req, Callback&& callback) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     with_repo_errors(callback, "travel.rules", [&] {
         callback(Response::ok(json{{"data", RuleRepository().list(owner)}}));
     });
 }
 
 void TravelController::createRule(const HttpRequestPtr& req, Callback&& callback) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -488,7 +446,7 @@ void TravelController::createRule(const HttpRequestPtr& req, Callback&& callback
 }
 
 void TravelController::addTemplate(const HttpRequestPtr& req, Callback&& callback, const std::string& key) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     const auto in = RuleRepository::template_of(key);
     if (!in) {
         callback(ErrorResponse::not_found("template"));
@@ -500,7 +458,7 @@ void TravelController::addTemplate(const HttpRequestPtr& req, Callback&& callbac
 }
 
 void TravelController::updateRule(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -518,7 +476,7 @@ void TravelController::updateRule(const HttpRequestPtr& req, Callback&& callback
 }
 
 void TravelController::deleteRule(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -531,7 +489,7 @@ void TravelController::deleteRule(const HttpRequestPtr& req, Callback&& callback
 // ── counters and days ───────────────────────────────────────────────────────
 
 void TravelController::counters(const HttpRequestPtr& req, Callback&& callback) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     const auto date = at_date(req, callback);
     if (!date) {
         return;
@@ -555,7 +513,7 @@ void TravelController::counters(const HttpRequestPtr& req, Callback&& callback) 
 }
 
 void TravelController::days(const HttpRequestPtr& req, Callback&& callback) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     const std::string from = req->getParameter("from");
     const std::string to = req->getParameter("to");
     if (!is_calendar_date(from) || !is_calendar_date(to) || to < from) {
@@ -588,7 +546,7 @@ void TravelController::days(const HttpRequestPtr& req, Callback&& callback) {
 // ── trips ───────────────────────────────────────────────────────────────────
 
 void TravelController::listTrips(const HttpRequestPtr& req, Callback&& callback) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     const auto currency = target_currency(req, callback);
     if (!currency) {
         return;
@@ -604,7 +562,7 @@ void TravelController::listTrips(const HttpRequestPtr& req, Callback&& callback)
 }
 
 void TravelController::createTrip(const HttpRequestPtr& req, Callback&& callback) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     const auto currency = target_currency(req, callback);
     if (!currency) {
         return;
@@ -642,7 +600,7 @@ void TravelController::createTrip(const HttpRequestPtr& req, Callback&& callback
 }
 
 void TravelController::getTrip(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -670,7 +628,7 @@ void TravelController::getTrip(const HttpRequestPtr& req, Callback&& callback, c
 }
 
 void TravelController::updateTrip(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -705,7 +663,7 @@ void TravelController::updateTrip(const HttpRequestPtr& req, Callback&& callback
 }
 
 void TravelController::deleteTrip(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -716,7 +674,7 @@ void TravelController::deleteTrip(const HttpRequestPtr& req, Callback&& callback
 }
 
 void TravelController::addItem(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -737,7 +695,7 @@ void TravelController::updateItem(const HttpRequestPtr& req,
                                   Callback&& callback,
                                   const std::string& id,
                                   const std::string& child) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     if (!require_valid_uuid(id, callback) || !require_valid_uuid(child, callback)) {
         return;
     }
@@ -758,7 +716,7 @@ void TravelController::deleteItem(const HttpRequestPtr& req,
                                   Callback&& callback,
                                   const std::string& id,
                                   const std::string& child) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     if (!require_valid_uuid(id, callback) || !require_valid_uuid(child, callback)) {
         return;
     }
@@ -769,7 +727,7 @@ void TravelController::deleteItem(const HttpRequestPtr& req,
 }
 
 void TravelController::candidateSpends(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -783,7 +741,7 @@ void TravelController::candidateSpends(const HttpRequestPtr& req, Callback&& cal
 }
 
 void TravelController::linkSpends(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -833,14 +791,14 @@ void TravelController::linkSpends(const HttpRequestPtr& req, Callback&& callback
 // ── documents ───────────────────────────────────────────────────────────────
 
 void TravelController::listDocuments(const HttpRequestPtr& req, Callback&& callback) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     with_repo_errors(callback, "travel.documents", [&] {
         callback(Response::ok(json{{"data", Repositories::Travel::DocumentRepository().list(owner)}}));
     });
 }
 
 void TravelController::createDocument(const HttpRequestPtr& req, Callback&& callback) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -855,7 +813,7 @@ void TravelController::createDocument(const HttpRequestPtr& req, Callback&& call
 }
 
 void TravelController::updateDocument(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -873,7 +831,7 @@ void TravelController::updateDocument(const HttpRequestPtr& req, Callback&& call
 }
 
 void TravelController::deleteDocument(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    TRAVEL_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }

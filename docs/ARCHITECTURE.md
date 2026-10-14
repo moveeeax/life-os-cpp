@@ -120,10 +120,10 @@ void shutdown();
 and fixes the order:
 
 Config, Observability, config validation, Database, Migrations, Cache,
-Messaging and Tasks (server only), Security (Auth, RateLimit, Idempotency),
+Tasks (server only), Security (Auth, RateLimit, Idempotency),
 Jobs, Email, Billing.
 
-`InitMode::Worker` skips Messaging and Tasks. `InitMode::MigrateOnly` stops
+`InitMode::Worker` skips Tasks. `InitMode::MigrateOnly` stops
 after Migrations. `Core::shutdown()` tears the same list down in reverse.
 
 Handlers reach a subsystem in one line (`Database::get().execute_read(...)`),

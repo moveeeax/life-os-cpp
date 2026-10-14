@@ -95,13 +95,16 @@ Per handler:
 1. First line: a guard from `Guards.hpp` —
    `API_REQUIRE_ADMIN(req, callback)` or `API_REQUIRE_PRINCIPAL(req, callback, p)`.
    Every mutating endpoint needs one (under `AUTH_MODE=none` it's a no-op, so
-   it never gets in the way during dev — but it's there for prod). Handlers of
-   a toggleable feature module gate first with
-   `if (!require_enabled(callback)) return;` (see `FitnessController`;
-   `new-module.sh` scaffolds the flag).
+   it never gets in the way during dev — but it's there for prod). A per-user
+   route of a toggleable feature module opens with
+   `API_MODULE_USER_GUARD(Core::notes_enabled(), "notes", req, callback, owner);`
+   (404 while the module is off, then 401 without an identity, then 403
+   `no_user_account` for a principal with no user id; see `NotesController`).
+   `API_MODULE_PERMISSION_USER_GUARD` adds a permission check after the switch.
 2. UUID path params: `if (!require_valid_uuid(id, callback)) return;`
    (`Guards.hpp`) — don't hand-roll the `is_valid_uuid` + 400 pair.
-3. Parse + validate: `Validation::parse_body(req, body, callback)` then
+3. Parse + validate: `parse_object(req, body, callback)` (`HandlerSupport.hpp`:
+   `Validation::parse_body` plus "the body is an object") then
    `Validation::require/email/string_length`, accumulate into
    `Validation::Errors`, bail with `Validation::response_400(errs)`.
 4. Repository call inside `with_repo_errors(callback, "op", [&]{ … })`
@@ -110,8 +113,8 @@ Per handler:
 5. List endpoints: `parse_page_params(req, default, max)` →
    `Response::paginated(to_json_array(items), total, page.limit, page.offset)`
    (see `AdminController::listUsers`).
-6. Success: `Response::ok(...)` / `Response::created(...)` — never build the
-   `HttpResponse` by hand.
+6. Success: `Response::ok(...)` / `Response::created(...)`, or
+   `no_content(callback)` for a 204 — never build the `HttpResponse` by hand.
 7. **`callback(...)` exactly once on every path**, including early returns and
    the guard expansions.
 
@@ -167,7 +170,7 @@ These don't fall out of reading the code; they were learned the hard way.
 2. **`Api::get_endpoints()` (`src/api/Endpoints.hpp`) is the single source of truth for routes.** After an `ADD_METHOD_TO(...)`, add the matching line there, or `scripts/check-openapi-drift.sh` fails CI and `--print-routes` won't show it. Controllers include `api/Guards.hpp` + `api/RequestUtils.hpp` but NOT `api/Api.hpp` (cycle).
 3. **JSON: nlohmann::json only, never jsoncpp.** Drogon uses jsoncpp internally, but project code is all nlohmann. Parse with `json::parse(req->body())`, respond with `data.dump()` + `CT_APPLICATION_JSON`. **Never call `req->getJsonObject()`.**
 4. **`AUTH_MODE=none` by default** — every endpoint public. On any mutating endpoint add a guard from `api/Guards.hpp` (`API_REQUIRE_ADMIN` / `API_REQUIRE_PRINCIPAL`) or `Security::Auth::require_role(...)`, or document why it's public.
-5. **`Core::initialize()` has a strict init order (`docs/ARCHITECTURE.md` §5):** Config → Observability → config validation → Database → Migrations → Cache → Messaging and Tasks (server only) → Security (Auth, RateLimit, Idempotency) → Jobs → Email → Billing; shutdown is the reverse. `InitMode::Worker` skips Messaging and Tasks, `InitMode::MigrateOnly` stops after Migrations. Don't reorder (Cache uses Observability metrics; Database depends on Config; Billing enqueues emails).
+5. **`Core::initialize()` has a strict init order (`docs/ARCHITECTURE.md` §5):** Config → Observability → config validation → Database → Migrations → Cache → Tasks (server only) → Security (Auth, RateLimit, Idempotency) → Jobs → Email → Billing; shutdown is the reverse. `InitMode::Worker` skips Tasks, `InitMode::MigrateOnly` stops after Migrations. Don't reorder (Cache uses Observability metrics; Database depends on Config; Billing enqueues emails).
 6. **`req->attributes()->get<T>(key)` on a miss returns a default-constructed `T`** (older Drogon threw `std::out_of_range` — both exist). Never rely on the throw: `find(key)` first, then `get<T>` — see `Security::Auth::principal_of`. An empty principal reaching SQL as a uuid has crashed a handler before.
 7. **Every Redis call is fail-open** — except counters. `CacheManager` methods swallow `sw::redis::Error` (via the private `guarded_` wrapper) and log a warn; but `incr`/`decr` log and RETHROW (a counter silently stuck at a default would corrupt rate accounting). Wrap direct `get_client()` calls in try/catch.
 8. **Drogon's log level is hardcoded in `main.cpp` (`Logger::kInfo`).** `LOG_LEVEL` only affects spdlog. For Drogon debug, edit `setLogLevel` in `main.cpp`.

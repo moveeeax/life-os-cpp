@@ -15,7 +15,7 @@
 
 #include "database/Database.hpp"
 #include "repositories/tasks/Errors.hpp"
-#include "repositories/tasks/NoteRepository.hpp"
+#include "repositories/tasks/InboxRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
 #include "test_helpers.hpp"
 
@@ -102,7 +102,7 @@ TEST_F(TasksRepositoryTest, TheSourceNeedsItsRefAndExternalIdIsUnique) {
 }
 
 TEST_F(TasksRepositoryTest, ANoteBelongsToItsOwner) {
-    Repositories::Tasks::NoteRepository notes;
+    Repositories::Tasks::InboxRepository notes;
     const json n = notes.create(kAnna, "Coworking day passes");
     EXPECT_EQ(n["status"], "inbox");
     EXPECT_EQ(notes.list(kAnna, "inbox").size(), 1u);
@@ -112,7 +112,7 @@ TEST_F(TasksRepositoryTest, ANoteBelongsToItsOwner) {
 }
 
 TEST_F(TasksRepositoryTest, TheInboxIsCountedPerOwnerAndStatus) {
-    Repositories::Tasks::NoteRepository notes;
+    Repositories::Tasks::InboxRepository notes;
     EXPECT_EQ(notes.count(kAnna, "inbox"), 0);
     notes.create(kAnna, "Coworking day passes");
     const json second = notes.create(kAnna, "Renew the domain");

@@ -69,7 +69,6 @@ nullports="$(q 'select(.kind=="Service") | .spec.ports[] | select(.port == null)
 echo "==> helm template (minimal preset)"
 MINIMAL="$(helm template ci-smoke "$CHART" -f "$VALUES" -f "$CHART/values-minimal.yaml")"
 workloads="$(printf '%s' "$MINIMAL" | yq 'select(.kind=="Deployment" or .kind=="StatefulSet") | .metadata.name')"
-printf '%s' "$workloads" | grep -qi kafka && fail "values-minimal still renders a Kafka workload"
 printf '%s' "$workloads" | grep -qi jaeger && fail "values-minimal still renders a Jaeger workload"
 
 # 7. Production security floor. prod-check.sh validates the JSON app-config, but

@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
 #
-# Scaffold a feature-module master switch end to end, following the content
-# module's on/off pattern (Core::content_enabled() + CONTENT_ENABLED):
+# Scaffold a feature-module master switch end to end, the way the habits and
+# notes modules are wired:
 #
-#   config/config.json + config.sample.json  {"<name>": {"enabled": "${<NAME>_ENABLED:-false}"}}
-#   src/core/Modules.hpp                     Core::<name>_enabled() beside content_enabled()
-#   docker/docker-compose.yml                <NAME>_ENABLED on the app service
-#   helm/life-os-cpp                             values key + configmap fragment + deployment env
-#   helm/life-os-cpp-worker                          values key + configmap fragment + deployment env
-#   docs/CONFIG.md                           a "<Name> module" table section
-#   src/<name>/<Name>.hpp                    empty namespace header for the module's code
+#   config/config.json + config.sample.json   {"<name>": {"enabled": "${<NAME>_ENABLED:-false}"}}
+#   src/core/Modules.hpp                      Core::<name>_enabled()
+#   docker/docker-compose.yml                 <NAME>_ENABLED on the app and worker services
+#   helm/life-os-cpp                          values key + deployment env
+#   helm/life-os-cpp-worker                   values key + deployment env
+#   docs/CONFIG.md                            a row in the module switch table
 #
-# The switch ships OFF everywhere (same as CONTENT_ENABLED / JOBS_ENABLED):
-# routes stay statically registered; handlers consult Core::<name>_enabled()
-# per request and 404 while the module is off (see PostsController).
+# The switch ships OFF everywhere. Routes stay statically registered; every
+# handler of the module opens with
 #
-# Motivation: the billing module needed hand-wiring in
-# 7+ infra spots (config, compose, both charts, docs) — every one forgettable,
-# several forgotten on the first pass. This script owns that checklist.
+#   API_MODULE_USER_GUARD(Core::<name>_enabled(), "<name>", req, callback, owner);
 #
-# Safe to re-run: every patch is anchor-checked, verified after insertion, and
-# skipped when already present.
+# (api/Guards.hpp): 404 "<name>" while the module is off, then 401 without an
+# identity, then 403 no_user_account for a principal that is not a user.
+# config/config.production.json and the deploy/ overlays are not touched:
+# turn the module on there when it is ready.
+#
+# Safe to re-run: every patch is anchor-checked and skipped when present.
 #
 # Usage:
-#   ./scripts/new-module.sh <name>       # lower snake_case, e.g. billing
+#   ./scripts/new-module.sh <name>       # lower snake_case, e.g. reading
 set -euo pipefail
 
 die() {
@@ -32,300 +32,154 @@ die() {
 }
 
 if [[ $# -ne 1 || "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-    echo "Usage: $0 <name>   (lower snake_case, e.g. billing)" >&2
+    echo "Usage: $0 <name>   (lower snake_case, e.g. reading)" >&2
     exit 2
 fi
 
 NAME="$1"
 [[ "$NAME" =~ ^[a-z][a-z0-9_]*$ ]] || die "module name must be lower snake_case [a-z0-9_], got '$NAME'"
 
-# Reserved: existing top-level config blocks — a module by these names would
-# collide with (or shadow) an existing subsystem's config.
-case "$NAME" in
-app | server | logging | observability | database | cache | messaging | api | docs | security | auth | cors | mail | storage | rate_limit | idempotency | jobs | content | worker | shutdown)
-    die "'$NAME' is a reserved top-level config key — pick another module name"
-    ;;
-esac
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# A module may not reuse a top-level config key: it would shadow that
+# subsystem's settings.
+if python3 - "$ROOT/config/config.json" "$NAME" <<'PY'; then
+import json, sys
+sys.exit(0 if sys.argv[2] in json.load(open(sys.argv[1], encoding="utf-8")) else 1)
+PY
+    if grep -qF "inline bool ${NAME}_enabled()" "$ROOT/src/core/Modules.hpp"; then
+        echo "==> '${NAME}' is already a module; re-checking its wiring"
+    else
+        die "'$NAME' is already a top-level key in config/config.json — pick another module name"
+    fi
+fi
 
 NAME_UPPER="$(printf '%s' "$NAME" | tr '[:lower:]' '[:upper:]')"
 PASCAL=""
 for part in ${NAME//_/ }; do
-    # PascalCase each part (portable: bash 3.2 lacks ${part^}).
     first="$(printf '%s' "$part" | cut -c1 | tr '[:lower:]' '[:upper:]')"
     rest="$(printf '%s' "$part" | cut -c2-)"
     PASCAL+="${first}${rest}"
 done
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+python3 - "$ROOT" "$NAME" "$NAME_UPPER" "$PASCAL" <<'PY'
+import pathlib
+import re
+import sys
 
-# ── 1. config/config.json + config/config.sample.json ────────────────────
-patch_config() {
-    local f="$1"
-    [[ -f "$f" ]] || die "$f not found"
-    if grep -qF "\"${NAME}\": {" "$f"; then
-        echo "==> $(basename "$f") already has a \"${NAME}\" block — skipped"
-        return 0
-    fi
-    grep -qF '  "worker": {' "$f" || die "anchor '\"worker\": {' not found in $f — add the ${NAME} block by hand"
-    awk -v name="$NAME" -v upper="$NAME_UPPER" '
-        /^  "worker": \{/ && !done {
-            print "  \"" name "\": {"
-            print "    \"enabled\": \"${" upper "_ENABLED:-false}\""
-            print "  },"
-            done=1
-        }
-        { print }
-    ' "$f" >"$f.tmp" && mv "$f.tmp" "$f"
-    grep -qF "\"${NAME}\": {" "$f" || die "failed to insert the ${NAME} block into $f"
-    echo "==> Patched $f"
-}
-patch_config "$ROOT/config/config.json"
-patch_config "$ROOT/config/config.sample.json"
-# config/config.production.json is deliberately NOT touched — modules ship
-# gated off in prod until you opt in there explicitly (make prod-check).
+root, name, upper, pascal = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
 
-# ── 2. Core::<name>_enabled() ────────────────────────────────────────────
-# The switch lives in core/Modules.hpp (NOT Core.hpp): controllers include
-# only that tiny header, so a new module switch doesn't drag the whole
-# composition root into every controller TU.
-CORE="$ROOT/src/core/Modules.hpp"
-if grep -qF "inline bool ${NAME}_enabled()" "$CORE"; then
-    echo "==> Core::${NAME}_enabled() already exists — skipped"
-else
-    grep -qF '}  // namespace Core' "$CORE" || die "anchor '}  // namespace Core' not found in $CORE"
-    awk -v name="$NAME" -v upper="$NAME_UPPER" -v pascal="$PASCAL" '
-        /^\}  \/\/ namespace Core$/ && !done {
-            print "/// " pascal " module master switch — generated by scripts/new-module.sh; same"
-            print "/// pattern (and same Config::is_initialized() guard) as content_enabled()"
-            print "/// above: routes are statically registered, handlers consult this"
-            print "/// per-request and 404 while the module is off."
-            print "inline bool " name "_enabled() {"
-            print "    if (!Config::is_initialized())"
-            print "        return false;"
-            print "    return Config::get().get<bool>(\"" name ".enabled\", \"" upper "_ENABLED\", false);"
-            print "}"
-            print ""
-            done=1
-        }
-        { print }
-    ' "$CORE" >"$CORE.tmp" && mv "$CORE.tmp" "$CORE"
-    grep -qF "inline bool ${NAME}_enabled()" "$CORE" || die "failed to insert ${NAME}_enabled() into $CORE"
-    echo "==> Added Core::${NAME}_enabled() to $CORE"
-fi
 
-# ── 3. docker-compose: env on the app service (same slot as CONTENT_ENABLED) ─
-COMPOSE="$ROOT/docker/docker-compose.yml"
-if grep -qF "${NAME_UPPER}_ENABLED:" "$COMPOSE"; then
-    echo "==> docker-compose already wires ${NAME_UPPER}_ENABLED — skipped"
-else
-    grep -qF 'CONTENT_ENABLED: ${CONTENT_ENABLED:-false}' "$COMPOSE" || die "CONTENT_ENABLED anchor not found in $COMPOSE"
-    awk -v upper="$NAME_UPPER" '
-        { print }
-        /^      CONTENT_ENABLED: \$\{CONTENT_ENABLED:-false\}$/ && !done {
-            print "      " upper "_ENABLED: ${" upper "_ENABLED:-false}"
-            done=1
-        }
-    ' "$COMPOSE" >"$COMPOSE.tmp" && mv "$COMPOSE.tmp" "$COMPOSE"
-    grep -qF "${NAME_UPPER}_ENABLED:" "$COMPOSE" || die "failed to insert ${NAME_UPPER}_ENABLED into $COMPOSE"
-    echo "==> Patched $COMPOSE (app service)"
-fi
+def die(msg):
+    sys.exit(f"ERROR: {msg}")
 
-# ── 4a. helm/life-os-cpp/values.yaml ─────────────────────────────────────────
-API_VALUES="$ROOT/helm/life-os-cpp/values.yaml"
-if grep -qE "^${NAME}:" "$API_VALUES"; then
-    echo "==> life-os-cpp values already has a '${NAME}:' block — skipped"
-else
-    grep -qE '^content:$' "$API_VALUES" || die "anchor 'content:' not found in $API_VALUES"
-    awk -v name="$NAME" -v upper="$NAME_UPPER" '
-        { print }
-        /^content:$/ { in_content=1 }
-        in_content && /^  enabled: false$/ && !done {
-            print ""
-            print "# ---------------------------------------------------------------"
-            print "# " name " module — generated by scripts/new-module.sh; same on/off"
-            print "# pattern as Content above. Env var set: " upper "_ENABLED"
-            print "# ---------------------------------------------------------------"
-            print name ":"
-            print "  enabled: false"
-            done=1
-            in_content=0
-        }
-    ' "$API_VALUES" >"$API_VALUES.tmp" && mv "$API_VALUES.tmp" "$API_VALUES"
-    grep -qE "^${NAME}:" "$API_VALUES" || die "failed to insert '${NAME}:' into $API_VALUES"
-    echo "==> Patched $API_VALUES"
-fi
 
-# ── 4b. helm/life-os-cpp/templates/deployment.yaml ───────────────────────────
-API_DEPLOY="$ROOT/helm/life-os-cpp/templates/deployment.yaml"
-if grep -qF "name: ${NAME_UPPER}_ENABLED" "$API_DEPLOY"; then
-    echo "==> life-os-cpp deployment already wires ${NAME_UPPER}_ENABLED — skipped"
-else
-    grep -qF 'value: {{ .Values.content.enabled | quote }}' "$API_DEPLOY" || die "content.enabled anchor not found in $API_DEPLOY"
-    awk -v name="$NAME" -v upper="$NAME_UPPER" '
-        { print }
-        /^              value: \{\{ \.Values\.content\.enabled \| quote \}\}$/ && !done {
-            print "            # " name " module — generated by scripts/new-module.sh"
-            print "            - name: " upper "_ENABLED"
-            print "              value: {{ .Values." name ".enabled | quote }}"
-            done=1
-        }
-    ' "$API_DEPLOY" >"$API_DEPLOY.tmp" && mv "$API_DEPLOY.tmp" "$API_DEPLOY"
-    grep -qF "name: ${NAME_UPPER}_ENABLED" "$API_DEPLOY" || die "failed to insert ${NAME_UPPER}_ENABLED into $API_DEPLOY"
-    echo "==> Patched $API_DEPLOY"
-fi
+def patch(rel, present, edit):
+    path = root / rel
+    if not path.exists():
+        die(f"{rel} not found")
+    text = path.read_text(encoding="utf-8")
+    if present in text:
+        print(f"==> {rel}: already wired, skipped")
+        return
+    new = edit(text)
+    if new is None or present not in new:
+        die(f"{rel}: the anchor is gone; wire {upper}_ENABLED there by hand")
+    path.write_text(new, encoding="utf-8")
+    print(f"==> {rel}: patched")
 
-# ── 4c. helm/life-os-cpp/templates/configmap.yaml ────────────────────────────
-API_CM="$ROOT/helm/life-os-cpp/templates/configmap.yaml"
-if grep -qF "\"${NAME}\": {" "$API_CM"; then
-    echo "==> life-os-cpp configmap already has a \"${NAME}\" block — skipped"
-else
-    grep -qF '      "rate_limit": {' "$API_CM" || die "anchor '\"rate_limit\": {' not found in $API_CM"
-    awk -v name="$NAME" '
-        /^      "rate_limit": \{$/ && !done {
-            print "      \"" name "\": {"
-            print "        \"enabled\": {{ .Values." name ".enabled }}"
-            print "      },"
-            done=1
-        }
-        { print }
-    ' "$API_CM" >"$API_CM.tmp" && mv "$API_CM.tmp" "$API_CM"
-    grep -qF "\"${NAME}\": {" "$API_CM" || die "failed to insert the ${NAME} block into $API_CM"
-    echo "==> Patched $API_CM"
-fi
 
-# ── 5a. helm/life-os-cpp-worker/values.yaml ──────────────────────────────────────
-WRK_VALUES="$ROOT/helm/life-os-cpp-worker/values.yaml"
-if grep -qE "^${NAME}:" "$WRK_VALUES"; then
-    echo "==> life-os-cpp-worker values already has a '${NAME}:' block — skipped"
-else
-    grep -qE '^  maxRetries: 3$' "$WRK_VALUES" || die "jobs.maxRetries anchor not found in $WRK_VALUES"
-    awk -v name="$NAME" -v upper="$NAME_UPPER" '
-        { print }
-        /^  maxRetries: 3$/ && !done {
-            print ""
-            print "# ---------------------------------------------------------------"
-            print "# " name " module — generated by scripts/new-module.sh; keep in sync"
-            print "# with the life-os-cpp chart. Env var set: " upper "_ENABLED"
-            print "# ---------------------------------------------------------------"
-            print name ":"
-            print "  enabled: false"
-            done=1
-        }
-    ' "$WRK_VALUES" >"$WRK_VALUES.tmp" && mv "$WRK_VALUES.tmp" "$WRK_VALUES"
-    grep -qE "^${NAME}:" "$WRK_VALUES" || die "failed to insert '${NAME}:' into $WRK_VALUES"
-    echo "==> Patched $WRK_VALUES"
-fi
+def before(anchor, block, count=1):
+    def edit(text):
+        if anchor not in text:
+            return None
+        return text.replace(anchor, block + anchor, count)
+    return edit
 
-# ── 5b. helm/life-os-cpp-worker/templates/deployment.yaml ────────────────────────
-WRK_DEPLOY="$ROOT/helm/life-os-cpp-worker/templates/deployment.yaml"
-if grep -qF "name: ${NAME_UPPER}_ENABLED" "$WRK_DEPLOY"; then
-    echo "==> life-os-cpp-worker deployment already wires ${NAME_UPPER}_ENABLED — skipped"
-else
-    grep -qE '^            # Worker$' "$WRK_DEPLOY" || die "'# Worker' anchor not found in $WRK_DEPLOY"
-    awk -v name="$NAME" -v upper="$NAME_UPPER" '
-        /^            # Worker$/ && !done {
-            print "            # " name " module — generated by scripts/new-module.sh"
-            print "            - name: " upper "_ENABLED"
-            print "              value: {{ .Values." name ".enabled | quote }}"
-            done=1
-        }
-        { print }
-    ' "$WRK_DEPLOY" >"$WRK_DEPLOY.tmp" && mv "$WRK_DEPLOY.tmp" "$WRK_DEPLOY"
-    grep -qF "name: ${NAME_UPPER}_ENABLED" "$WRK_DEPLOY" || die "failed to insert ${NAME_UPPER}_ENABLED into $WRK_DEPLOY"
-    echo "==> Patched $WRK_DEPLOY"
-fi
 
-# ── 5c. helm/life-os-cpp-worker/templates/configmap.yaml ─────────────────────────
-WRK_CM="$ROOT/helm/life-os-cpp-worker/templates/configmap.yaml"
-if grep -qF "\"${NAME}\": {" "$WRK_CM"; then
-    echo "==> life-os-cpp-worker configmap already has a \"${NAME}\" block — skipped"
-else
-    grep -qF '      "worker": {' "$WRK_CM" || die "anchor '\"worker\": {' not found in $WRK_CM"
-    awk -v name="$NAME" '
-        /^      "worker": \{$/ && !done {
-            print "      \"" name "\": {"
-            print "        \"enabled\": {{ .Values." name ".enabled }}"
-            print "      },"
-            done=1
-        }
-        { print }
-    ' "$WRK_CM" >"$WRK_CM.tmp" && mv "$WRK_CM.tmp" "$WRK_CM"
-    grep -qF "\"${NAME}\": {" "$WRK_CM" || die "failed to insert the ${NAME} block into $WRK_CM"
-    echo "==> Patched $WRK_CM"
-fi
+def before_each_line(pattern, make):
+    rx = re.compile(pattern, re.M)
 
-# ── 6. docs/CONFIG.md ────────────────────────────────────────────────────
-CONFIG_MD="$ROOT/docs/CONFIG.md"
-if grep -qF "\`${NAME_UPPER}_ENABLED\`" "$CONFIG_MD"; then
-    echo "==> docs/CONFIG.md already documents ${NAME_UPPER}_ENABLED — skipped"
-else
-    grep -qF '## Mail (SMTP)' "$CONFIG_MD" || die "anchor '## Mail (SMTP)' not found in $CONFIG_MD"
-    awk -v name="$NAME" -v upper="$NAME_UPPER" -v pascal="$PASCAL" '
-        $0 == "## Mail (SMTP)" && !done {
-            print "## " pascal " module"
-            print ""
-            print "| Env | JSON key | Type | Default | Notes |"
-            print "|---|---|---|---|---|"
-            print "| `" upper "_ENABLED` | `" name ".enabled` | bool | `false` | Master switch for the " name " module (`Core::" name "_enabled()`) — same on/off pattern as `CONTENT_ENABLED`; routes stay registered, handlers 404 while off. Generated by `scripts/new-module.sh`. |"
-            print ""
-            done=1
-        }
-        { print }
-    ' "$CONFIG_MD" >"$CONFIG_MD.tmp" && mv "$CONFIG_MD.tmp" "$CONFIG_MD"
-    grep -qF "\`${NAME_UPPER}_ENABLED\`" "$CONFIG_MD" || die "failed to insert the ${NAME} section into $CONFIG_MD"
-    echo "==> Patched $CONFIG_MD"
-fi
+    def edit(text):
+        if not rx.search(text):
+            return None
+        return rx.sub(lambda m: make(m.group("ind")) + m.group(0), text)
+    return edit
 
-# ── 7. Module namespace header ───────────────────────────────────────────
-MOD_DIR="$ROOT/src/${NAME}"
-MOD_HPP="$MOD_DIR/${PASCAL}.hpp"
-if [[ -e "$MOD_HPP" ]]; then
-    echo "==> $MOD_HPP already exists — skipped"
-else
-    mkdir -p "$MOD_DIR"
-    cat >"$MOD_HPP" <<EOF
-/**
- * @file ${PASCAL}.hpp
- * @brief ${PASCAL} module — generated by scripts/new-module.sh.
- * @details Module code lives under this namespace (docs/ARCHITECTURE.md §4).
- *          The master switch is Core::${NAME}_enabled() (config key
- *          "${NAME}.enabled" / env ${NAME_UPPER}_ENABLED, off by default).
- *          Gate every HTTP handler of this module on its FIRST line, before
- *          any auth guard — same idiom as PostsController:
- *
- *              if (!Core::${NAME}_enabled()) {
- *                  callback(ErrorResponse::not_found("${NAME}"));
- *                  return;
- *              }
- */
 
-#pragma once
+def before_yaml_block(heading, block):
+    """Insert @p block before the '# ---' separator that opens @p heading."""
+    def edit(text):
+        at = text.find("\n" + heading)
+        if at < 0:
+            return None
+        sep = text.rfind("\n# ---", 0, at)
+        if sep < 0:
+            return None
+        return text[: sep + 1] + block + text[sep + 1 :]
+    return edit
 
-namespace ${PASCAL} {
 
-// Module implementation goes here.
+# 1. config skeletons: before the worker block.
+for rel in ("config/config.json", "config/config.sample.json"):
+    patch(rel, f'"{name}": {{',
+          before('  "worker": {', f'  "{name}": {{\n    "enabled": "${{{upper}_ENABLED:-false}}"\n  }},\n'))
 
-}  // namespace ${PASCAL}
-EOF
-    echo "==> Created $MOD_HPP"
-fi
+# 2. Core::<name>_enabled() at the end of core/Modules.hpp.
+patch("src/core/Modules.hpp", f"inline bool {name}_enabled()",
+      before("}  // namespace Core",
+             f"/// {pascal} module master switch — same pattern as notes_enabled().\n"
+             f"inline bool {name}_enabled() {{\n"
+             f"    if (!Config::is_initialized())\n"
+             f"        return false;\n"
+             f'    return Config::get().get<bool>("{name}.enabled", "{upper}_ENABLED", false);\n'
+             f"}}\n\n"))
 
-# ── 8. What's next ───────────────────────────────────────────────────────
+# 3. docker-compose: the app and the worker service, beside the other switches.
+patch("docker/docker-compose.yml", f"{upper}_ENABLED:",
+      before_each_line(r"^(?P<ind>[ ]+)REGISTRATION_OPEN: \$\{REGISTRATION_OPEN:-true\}$",
+                       lambda ind: f"{ind}{upper}_ENABLED: ${{{upper}_ENABLED:-false}}\n"))
+
+# 4. Both charts: the values key and the deployment env.
+values_block = ("# ---------------------------------------------------------------\n"
+                f"# {name} module. Env var set: {upper}_ENABLED\n"
+                "# ---------------------------------------------------------------\n"
+                f"{name}:\n  enabled: false\n\n")
+for chart in ("life-os-cpp", "life-os-cpp-worker"):
+    patch(f"helm/{chart}/values.yaml", f"\n{name}:\n", before_yaml_block("# Self sign-up", values_block))
+    patch(f"helm/{chart}/templates/deployment.yaml", f"name: {upper}_ENABLED",
+          before_each_line(r"^(?P<ind>[ ]+)# self sign-up: false = invite-only$",
+                           lambda ind: f"{ind}# {name} module — master switch\n"
+                                       f"{ind}- name: {upper}_ENABLED\n"
+                                       f"{ind}  value: {{{{ .Values.{name}.enabled | quote }}}}\n"))
+
+# 5. docs/CONFIG.md: after the last module switch row before the mail section.
+def config_row(text):
+    mail = text.find("## Mail (SMTP)")
+    if mail < 0:
+        return None
+    rows = [m for m in re.finditer(r"^\| `[A-Z_]+_ENABLED` \|[^\n]*Master switch for the [^\n]*\n", text[:mail], re.M)]
+    if not rows:
+        return None
+    end = rows[-1].end()
+    row = (f"| `{upper}_ENABLED` | `{name}.enabled` | bool | `false` | Master switch for the {name} module "
+           f"(`Core::{name}_enabled()`). Routes stay registered, handlers 404 while off. |\n")
+    return text[:end] + row + text[end:]
+
+
+patch("docs/CONFIG.md", f"`{upper}_ENABLED`", config_row)
+PY
+
 cat <<EOF
 
-==> Module '${NAME}' scaffolded. Next steps:
-  1. Endpoints:  ./scripts/new-endpoint.sh ${PASCAL}Controller Get /api/v1/${NAME} --with-test
-  2. In every handler of the module, FIRST line (before auth guards), as in
-     PostsController:
-         if (!Core::${NAME}_enabled()) {
-             callback(ErrorResponse::not_found("${NAME}"));
-             return;
-         }
-  3. Auth-public routes of the module go into api.public_paths_extra
-     (ADDITIVE) — never by overriding api.public_paths.
-  4. Enable locally:  ${NAME_UPPER}_ENABLED=true make up
-     Enable in helm:  --set ${NAME}.enabled=true (both charts if the worker
-     needs it).
-  5. Unit-test the guard (see tests/unit/test_module_guards.cpp for the
-     pattern) and run checks (make fmt, ./scripts/check-*.sh) before pushing.
+==> Module '${NAME}' switched in (off everywhere). Next steps:
+  1. Endpoints: ./scripts/new-endpoint.sh ${PASCAL}Controller Get /api/v1/${NAME} --with-test
+  2. First line of every handler of the module (api/Guards.hpp):
+         API_MODULE_USER_GUARD(Core::${NAME}_enabled(), "${NAME}", req, callback, owner);
+     Request bodies: parse_object(req, body, callback); deletes: no_content(callback)
+     (api/HandlerSupport.hpp).
+  3. Enable locally: ${NAME_UPPER}_ENABLED=true make up
+     Enable on prod: ${NAME}.enabled: true in deploy/values-prod.yaml (and
+     deploy/values-worker-prod.yaml if the worker runs its jobs).
+  4. Run ./scripts/check-config-sync.sh and ./scripts/check-helm-render.sh.
 EOF

@@ -44,9 +44,7 @@ Security::Auth::AuthPrincipal admin() {
 Security::Auth::AuthPrincipal user() {
     return principal(kUser, Domain::Permission::kGeneral);
 }
-json body_of(const HttpResponsePtr& resp) {
-    return json::parse(std::string(resp->body()));
-}
+using TestHelpers::body_of;
 
 class FakeStore : public Storage::ObjectStore {
 public:

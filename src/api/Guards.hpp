@@ -91,6 +91,41 @@
         }                                                               \
     } while (0)
 
+/// Reject with 404 `<module_name>` while a feature module is switched off: its
+/// routes stay registered, the module reads as absent.
+#define API_REQUIRE_MODULE(flag_expr, module_name, callback) \
+    do {                                                     \
+        if (!(flag_expr)) {                                  \
+            callback(ErrorResponse::not_found(module_name)); \
+            return;                                          \
+        }                                                    \
+    } while (0)
+
+/// API_REQUIRE_OWNER, then 403 no_user_account unless `owner` is an app user
+/// id: a static-bearer principal has no user, and per-user rows need one.
+/// Declares `owner` in the method body, hence no do/while around it.
+#define API_REQUIRE_USER(req, callback, owner)       \
+    API_REQUIRE_OWNER(req, callback, owner);         \
+    do {                                             \
+        if (!::Api::require_user(owner, callback)) { \
+            return;                                  \
+        }                                            \
+    } while (0)
+
+/// The entry of a per-user module route: 404 `<module_name>` while the module
+/// is off, then API_REQUIRE_OWNER (401), then the no_user_account 403.
+#define API_MODULE_USER_GUARD(flag_expr, module_name, req, callback, owner) \
+    API_REQUIRE_MODULE(flag_expr, module_name, callback);                   \
+    API_REQUIRE_USER(req, callback, owner)
+
+/// API_MODULE_USER_GUARD with a permission check between the module switch
+/// and the identity (fitness, workout): 404, then 403 on `perm`, then 401,
+/// then the no_user_account 403.
+#define API_MODULE_PERMISSION_USER_GUARD(flag_expr, module_name, req, callback, perm, owner) \
+    API_REQUIRE_MODULE(flag_expr, module_name, callback);                                    \
+    API_REQUIRE_PERMISSION(req, callback, perm);                                             \
+    API_REQUIRE_USER(req, callback, owner)
+
 /// Reject with 503 when the job queue is disabled. The includer must also
 /// include jobs/Jobs.hpp — the macro expands Jobs:: at the use site.
 #define API_REQUIRE_JOBS_READY(callback)                                                            \
@@ -102,6 +137,17 @@
     } while (0)
 
 namespace Api {
+
+/// 403 no_user_account unless @p owner is an app user id (a static-bearer
+/// principal has none). Returns false after responding.
+inline bool require_user(const std::string& owner,
+                         const std::function<void(const drogon::HttpResponsePtr&)>& callback) {
+    if (is_valid_uuid(owner)) {
+        return true;
+    }
+    callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
+    return false;
+}
 
 /// Reject a path-parameter id that isn't a canonical 8-4-4-4-12 UUID with the
 /// shared 400 shape. Returns false after responding — callers

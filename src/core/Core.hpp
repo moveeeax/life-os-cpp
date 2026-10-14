@@ -6,7 +6,7 @@
  * Declarations only — the bodies live in Core.cpp (compiled once into
  * app_core; docs/ARCHITECTURE.md §4): including this header no
  * longer pulls the 13 subsystem headers (database/pqxx, cache/redis++,
- * jobs, Kafka, PayPal, mailer, storage, OTel/prometheus, ...) into the
+ * jobs, PayPal, mailer, storage, OTel/prometheus, ...) into the
  * including TU — those includes moved to Core.cpp. Only the binary entry
  * points and api/HealthController.hpp may include this header
  * (check-module-deps rule 2); everyone else consults the tiny
@@ -49,7 +49,7 @@ void check_password_safety(const std::string& url);
  */
 enum class InitMode {
     Full,        // API server: all subsystems
-    Worker,      // Worker process: skip Tasks, skip Messaging
+    Worker,      // Worker process: skip Tasks
     MigrateOnly  // Run migrations only: Config + Observability + Database + Migrations
 };
 
@@ -84,11 +84,9 @@ private:
 
     static void init_observability_(Config::AppConfig& cfg);
 
-    // Shared JSON fallback for the env-first string lists (replica URLs,
-    // Kafka topics): walk @p path segments with at() so ANY missing segment
-    // lands in the same catch. Returns false when the walk/conversion threw,
-    // so callers can apply their own default. (read_sentinels_ stays
-    // separate: it reads host/port PAIRS, not strings.)
+    // JSON fallback for the env-first string lists (replica URLs): walk @p path segments with at() so ANY missing
+    // segment lands in the same catch. Returns false when the walk/conversion threw, so callers can apply their own
+    // default. (read_sentinels_ stays separate: it reads host/port PAIRS, not strings.)
     static bool read_string_array_(Config::AppConfig& cfg,
                                    std::initializer_list<const char*> path,
                                    std::vector<std::string>& out);
@@ -104,10 +102,6 @@ private:
     static std::vector<std::pair<std::string, int>> read_sentinels_(Config::AppConfig& cfg);
 
     static void init_cache_(Config::AppConfig& cfg);
-
-    static std::vector<std::string> read_kafka_topics_(Config::AppConfig& cfg);
-
-    static void init_messaging_(Config::AppConfig& cfg);
 
     // Throws if auth.mode=jwt and no secret is set — refuse to silently start
     // a service that would accept unauthenticated traffic.
@@ -183,8 +177,8 @@ public:
      * @param critical When true (default) a failing probe makes /ready report
      *        NotReady (kube pulls the pod from rotation). When false the probe
      *        is "degraded": still surfaced in /health, but a failure does NOT
-     *        fail readiness — for optional dependencies (SMTP, object storage,
-     *        Kafka) whose outage shouldn't take the whole service out of
+     *        fail readiness — for optional dependencies (SMTP, object
+     *        storage) whose outage shouldn't take the whole service out of
      *        rotation. Thread-safe; typically called once during subsystem init.
      */
     void register_health_check(std::string name, HealthFn probe, bool critical = true);

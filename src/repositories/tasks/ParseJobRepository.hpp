@@ -15,8 +15,9 @@
 
 #include "database/Database.hpp"
 #include "repositories/JobRows.hpp"
+#include "repositories/SqlTime.hpp"
 #include "repositories/tasks/Errors.hpp"
-#include "repositories/tasks/NoteRepository.hpp"
+#include "repositories/tasks/InboxRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
 
 namespace Repositories::Tasks {
@@ -33,7 +34,7 @@ public:
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
-                    if (note_id.has_value() && !NoteRepository::exists_in(txn, owner, *note_id)) {
+                    if (note_id.has_value() && !InboxRepository::exists_in(txn, owner, *note_id)) {
                         throw NotFound("task_note");
                     }
                     auto r = txn.exec_params(
@@ -137,7 +138,7 @@ public:
                         out.push_back(*TaskRepository::find_in(txn, owner, TaskRepository::create_in(txn, owner, in)));
                     }
                     if (const auto note = note_in(txn, owner, id); note.has_value() && !out.empty()) {
-                        NoteRepository::archive_in(txn, owner, *note, out[0]["id"].get<std::string>());
+                        InboxRepository::archive_in(txn, owner, *note, out[0]["id"].get<std::string>());
                     }
                     return out;
                 });
@@ -170,9 +171,9 @@ private:
                 " AS status, text, hint_date::text AS hint_date, note_id, result, " + JobRows::shown_error() +
                 " AS"
                 " error, model, prompt_tokens, completion_tokens, "
-                " to_char(accepted_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS accepted_at, "
-                " to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-                " to_char(finished_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS finished_at "
+                " " SQL_ISO_UTC("accepted_at") " AS accepted_at, "
+                " " SQL_ISO_UTC("created_at") " AS created_at, "
+                " " SQL_ISO_UTC("finished_at") " AS finished_at "
                 " FROM task_parse_jobs WHERE owner_id = $1::uuid AND id = $2::uuid) t",
             owner,
             id);

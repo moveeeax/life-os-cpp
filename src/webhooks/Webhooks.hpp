@@ -6,8 +6,8 @@
  *        verify authenticity.
  *
  * This is the DELIVERY seam. WHICH urls receive WHICH events is app-specific —
- * add a subscriptions table + controller (mirror the api_keys feature) and call
- * Webhooks::send() for each subscriber.
+ * add a subscriptions table + controller (mirror the api_keys feature) and
+ * submit a kJobType job ({url, event, body, secret?}) for each subscriber.
  */
 
 #pragma once
@@ -24,12 +24,10 @@
 #include <curl/curl.h>
 #include <netdb.h>
 #include <netinet/in.h>
-#include <spdlog/spdlog.h>
 #include <sys/socket.h>
 
 #include <nlohmann/json.hpp>
 
-#include "jobs/Jobs.hpp"
 #include "utils/Crypto.hpp"
 #include "utils/CurlInit.hpp"
 
@@ -327,26 +325,6 @@ inline json process_job(const json& payload) {
         throw std::runtime_error("webhook: non-2xx response (" + std::to_string(status) + ") from " + host);
 
     return json{{"delivered", true}, {"status", status}, {"event", event}};
-}
-
-/**
- * @brief App-facing: enqueue a webhook for delivery. Best-effort — never throws.
- *        Webhooks REQUIRE the job queue (async retry/DLQ); if Jobs is down the
- *        event is dropped with a warning rather than blocking the caller.
- */
-inline void send(const std::string& url, const std::string& event, const json& body, const std::string& secret = "") {
-    if (!Jobs::is_initialized()) {
-        spdlog::warn("webhook: jobs not initialized; dropping {} -> {}", event, detail::redact_url(url));
-        return;
-    }
-    try {
-        json payload = {{"url", url}, {"event", event}, {"body", body}};
-        if (!secret.empty())
-            payload["secret"] = secret;
-        Jobs::get().submit(kJobType, payload);
-    } catch (const std::exception& e) {
-        spdlog::warn("webhook: enqueue {} -> {} failed ({})", event, detail::redact_url(url), e.what());
-    }
 }
 
 }  // namespace Webhooks

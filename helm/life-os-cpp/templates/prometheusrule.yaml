@@ -162,7 +162,7 @@ spec:
           annotations:
             runbook_url: "https://gitlab.com/tarassov.me/life-os-cpp/-/blob/master/docs/RUNBOOK.md#retries"
             summary: "Retries frequently exhausted"
-            description: "Downstream is likely degraded — investigate database / cache / messaging health."
+            description: "Downstream is likely degraded — investigate database / cache health."
 
         {{- if .Values.monitoring.jobsAlerts }}
         - alert: CppApiJobsDlqGrowing

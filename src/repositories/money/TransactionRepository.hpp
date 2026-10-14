@@ -19,6 +19,7 @@
 #include "database/Database.hpp"
 #include "money/Merchant.hpp"
 #include "repositories/LikePattern.hpp"
+#include "repositories/SqlTime.hpp"
 #include "repositories/money/AccountRepository.hpp"
 #include "repositories/money/CategoryRepository.hpp"
 #include "repositories/money/CurrencyRepository.hpp"
@@ -363,8 +364,8 @@ private:
         " COALESCE((SELECT json_agg(json_build_object('id', j.id, 'date', to_char(j.date, 'YYYY-MM-DD'), "
         "   'amount', j.amount, 'note', j.note, 'status', j.status) ORDER BY j.date, j.created_at) "
         "   FROM money_transactions j WHERE j.adjusts_id = t.id), '[]'::json) AS adjustments, "
-        " to_char(t.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-        " to_char(t.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";
+        " " SQL_ISO_UTC("t.created_at") " AS created_at, "
+        " " SQL_ISO_UTC("t.updated_at") " AS updated_at";
     inline static const std::string kFrom = " FROM money_transactions t JOIN money_accounts a ON a.id = t.account_id";
     inline static const std::string kSelect = "SELECT " + kColumns + kFrom;
 

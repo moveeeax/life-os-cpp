@@ -469,38 +469,55 @@ bool JobQueue::cancel(const std::string& id) {
     check_initialized();
     auto& redis = Cache::get().get_client();
 
-    auto loaded = load_job_(redis, id);
-    if (!loaded) {
-        return false;
+    // Compare-and-set on the job blob: the write lands only if the blob is
+    // still the one the status was decided on, so of two concurrent
+    // cancellers (or a canceller racing a worker's complete/fail) exactly one
+    // transition wins and the other re-reads the new state. The new blob is
+    // built here rather than in Lua so its JSON keeps Job::to_json's shape.
+    static constexpr const char* kCompareAndSet =
+        "if redis.call('GET', KEYS[1]) == ARGV[1] then "
+        "redis.call('SETEX', KEYS[1], ARGV[3], ARGV[2]) return 1 else return 0 end";
+    constexpr int kAttempts = 8;
+    const std::string key = job_key(id);
+    const std::string ttl = std::to_string(result_ttl_);
+
+    for (int attempt = 0; attempt < kAttempts; ++attempt) {
+        const auto raw = redis.get(key);
+        if (!raw) {
+            return false;
+        }
+        auto job = Job::from_json(json::parse(*raw));
+        // Terminal states can't be cancelled. The real vocabulary is
+        // pending/processing/completed/dead (+ "failed", which only cancel()
+        // itself sets). The old guard checked "failed" but not "dead", so a DLQ
+        // ("dead") job could be cancelled — that TTL-expired its blob while the
+        // id stayed indexed in the DLQ set, leaving a dangling entry.
+        if (job.status == "completed" || job.status == "dead" || job.status == "failed") {
+            return false;
+        }
+
+        const bool was_processing = (job.status == "processing");
+        job.status = "failed";
+        job.error = "cancelled";
+        job.updated_at = now_epoch();
+
+        if (redis.eval<long long>(kCompareAndSet, {key}, {*raw, job.to_json().dump(), ttl}) == 0) {
+            continue;  // the blob changed after the read: decide again on the new state
+        }
+
+        // Drop it from wherever it currently lives: the pending queue, or — if a
+        // worker already claimed it — that worker's processing list, so crash
+        // recovery won't resurrect a cancelled job.
+        redis.lrem(queue_key(job.type), 0, id);
+        if (was_processing && !job.worker_id.empty())
+            redis.lrem(processing_key(job.worker_id), 0, id);
+        clear_lease_(redis, id);
+
+        spdlog::debug("Job cancelled: id={}", id);
+        return true;
     }
-
-    auto job = std::move(*loaded);
-    // Terminal states can't be cancelled. The real vocabulary is
-    // pending/processing/completed/dead (+ "failed", which only cancel()
-    // itself sets). The old guard checked "failed" but not "dead", so a DLQ
-    // ("dead") job could be cancelled — that TTL-expired its blob while the
-    // id stayed indexed in the DLQ set, leaving a dangling entry.
-    if (job.status == "completed" || job.status == "dead" || job.status == "failed") {
-        return false;
-    }
-
-    const bool was_processing = (job.status == "processing");
-    job.status = "failed";
-    job.error = "cancelled";
-    job.updated_at = now_epoch();
-
-    redis.setex(job_key(id), result_ttl_, job.to_json().dump());
-
-    // Drop it from wherever it currently lives: the pending queue, or — if a
-    // worker already claimed it — that worker's processing list, so crash
-    // recovery won't resurrect a cancelled job.
-    redis.lrem(queue_key(job.type), 0, id);
-    if (was_processing && !job.worker_id.empty())
-        redis.lrem(processing_key(job.worker_id), 0, id);
-    clear_lease_(redis, id);
-
-    spdlog::debug("Job cancelled: id={}", id);
-    return true;
+    spdlog::warn("Job cancel gave up after {} contended attempts: id={}", kAttempts, id);
+    return false;
 }
 
 JobQueue::JobPage JobQueue::list_paged(const std::string& type, int limit, int offset) {

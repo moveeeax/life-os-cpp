@@ -26,15 +26,47 @@
 #include <functional>
 #include <utility>
 
+#include <drogon/HttpRequest.h>
 #include <drogon/HttpResponse.h>
 #include <spdlog/spdlog.h>
 
 #include <nlohmann/json.hpp>
 
+#include "api/Validation.hpp"
 #include "repositories/RepoErrors.hpp"
 #include "utils/ErrorResponse.hpp"
 
 namespace Api {
+
+/// Page bounds of the module list endpoints (notes, tasks, money, food,
+/// workout): `?limit=` defaults to 50 and clamps to 200.
+inline constexpr int kDefaultLimit = 50;
+inline constexpr int kMaxLimit = 200;
+
+/**
+ * @brief Validation::parse_body plus "the body is a JSON object": an array or
+ *        a scalar answers 400 invalid_body instead of a 500 from the first
+ *        `body["field"]`. Returns false after responding.
+ */
+inline bool parse_object(const drogon::HttpRequestPtr& req,
+                         nlohmann::json& body,
+                         std::function<void(const drogon::HttpResponsePtr&)>& cb) {
+    if (!Validation::parse_body(req, body, cb)) {
+        return false;
+    }
+    if (!body.is_object()) {
+        cb(ErrorResponse::bad_request("invalid_body", "the body must be a JSON object"));
+        return false;
+    }
+    return true;
+}
+
+/// Answer an empty 204 No Content (a delete that worked).
+inline void no_content(const std::function<void(const drogon::HttpResponsePtr&)>& cb) {
+    auto resp = drogon::HttpResponse::newHttpResponse();
+    resp->setStatusCode(drogon::k204NoContent);
+    cb(resp);
+}
 
 /**
  * @brief Collect a range of json-convertible items into a JSON array — the

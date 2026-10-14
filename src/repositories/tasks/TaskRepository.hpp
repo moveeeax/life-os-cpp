@@ -16,6 +16,7 @@
 
 #include "database/Database.hpp"
 #include "repositories/LikePattern.hpp"
+#include "repositories/SqlTime.hpp"
 #include "repositories/Zones.hpp"
 #include "repositories/tasks/Errors.hpp"
 #include "tasks/Agenda.hpp"
@@ -274,13 +275,13 @@ public:
 
     static constexpr const char* kColumns =
         "id, title, area, effort, to_char(due, 'YYYY-MM-DD') AS due, next_step, note, status, "
-        " to_char(completed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS completed_at, "
+        " " SQL_ISO_UTC("completed_at") " AS completed_at, "
         " source_kind, source_ref, external_id, goal_id, goal_section_id, trip_id, project_id, "
         " (SELECT g.title FROM goal_items g WHERE g.id = task_items.goal_id) AS goal_title, "
         " (SELECT p.name FROM projects p WHERE p.id = task_items.project_id) AS project_title, "
         " (SELECT p.kind FROM projects p WHERE p.id = task_items.project_id) AS project_kind, "
-        " to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-        " to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";
+        " " SQL_ISO_UTC("created_at") " AS created_at, "
+        " " SQL_ISO_UTC("updated_at") " AS updated_at";
 
     /// The task as the API shows it; public for the parse accept, which creates tasks in its own transaction.
     template <typename Txn>

@@ -13,6 +13,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 #include "repositories/money/Errors.hpp"
 
 namespace Repositories::Money {
@@ -91,7 +92,7 @@ public:
 private:
     inline static const std::string kColumns =
         "view_currency, advisor_enabled, advisor_weekday, to_json(advisor_currencies) AS advisor_currencies, "
-        "advisor_note, to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";
+        "advisor_note, " SQL_ISO_UTC("updated_at") " AS updated_at";
 };
 
 }  // namespace Repositories::Money

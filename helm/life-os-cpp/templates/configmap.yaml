@@ -76,7 +76,6 @@ data:
       },
       "billing": {
         "enabled": {{ .Values.billing.enabled }},
-        "provider": {{ .Values.billing.provider | quote }},
         "currency": {{ .Values.billing.currency | quote }},
         "credits_per_unit": {{ .Values.billing.creditsPerUnit }},
         "min_amount_cents": {{ .Values.billing.minAmountCents }},
@@ -119,20 +118,5 @@ data:
         "from_name": {{ .Values.mail.fromName | quote }},
         "subject_prefix": {{ .Values.mail.subjectPrefix | quote }},
         "timeout_sec": 30
-      },
-      "messaging": {
-        "enabled": {{ .Values.externalKafka.enabled }},
-        "kafka": {
-          "brokers": {{ .Values.externalKafka.brokers | quote }},
-          "producer": {
-            "enabled": {{ .Values.externalKafka.producerEnabled }},
-            "client_id": {{ .Values.externalKafka.producerId | quote }}
-          },
-          "consumer": {
-            "enabled": {{ .Values.externalKafka.consumerEnabled }},
-            "group_id": {{ .Values.externalKafka.consumerGroupId | quote }},
-            "topics": ["default_topic"]
-          }
-        }
       }
     }

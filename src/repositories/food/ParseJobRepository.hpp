@@ -17,6 +17,7 @@
 
 #include "database/Database.hpp"
 #include "repositories/JobRows.hpp"
+#include "repositories/SqlTime.hpp"
 
 namespace Repositories {
 
@@ -118,8 +119,8 @@ private:
                 " AS status, text, meal, date::text, result, " + JobRows::shown_error() +
                 " AS error, model, "
                 " prompt_tokens, completion_tokens, "
-                " to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-                " to_char(finished_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS finished_at "
+                " " SQL_ISO_UTC("created_at") " AS created_at, "
+                " " SQL_ISO_UTC("finished_at") " AS finished_at "
                 " FROM food_parse_jobs WHERE owner_id = $1::uuid AND id = $2::uuid) t",
             owner,
             id);

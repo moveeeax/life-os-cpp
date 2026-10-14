@@ -56,9 +56,7 @@ Security::Auth::AuthPrincipal plain_user() {
     return principal_with(Domain::Permission::kGeneral);
 }
 
-json body_of(const HttpResponsePtr& resp) {
-    return json::parse(std::string(resp->body()));
-}
+using TestHelpers::body_of;
 
 /// The test user with a linked Mi account of this Xiaomi id. Reads filter by
 /// the link; the token is not needed for them, so the row carries a dummy.

@@ -28,6 +28,7 @@
 #include "fitness/xiaomi/Regions.hpp"
 #include "repositories/FitnessData.hpp"
 #include "repositories/RepoErrors.hpp"
+#include "repositories/SqlTime.hpp"
 
 namespace Repositories {
 
@@ -294,11 +295,11 @@ public:
                 "SELECT json_build_object("
                 " 'status', a.status, 'xiaomi_user_id', a.xiaomi_user_id, 'region', a.region, "
                 " 'region_detected', a.region_detected, "
-                " 'linked_at', to_char(a.linked_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"'), "
-                " 'last_ok_at', to_char(a.last_ok_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"'), "
+                " 'linked_at', " SQL_ISO_UTC("a.linked_at") ", "
+                " 'last_ok_at', " SQL_ISO_UTC("a.last_ok_at") ", "
                 " 'last_error', a.last_error, "
                 " 'last_sync', (SELECT json_build_object('id', s.id, 'status', s.status, 'finished_at', "
-                "    to_char(s.finished_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"')) "
+                "    " SQL_ISO_UTC("s.finished_at") ") "
                 "   FROM sync_runs s WHERE s.xiaomi_user_id = a.xiaomi_user_id AND s.finished_at IS NOT NULL "
                 "   ORDER BY s.id DESC LIMIT 1)) "
                 "FROM mi_accounts a WHERE a.owner_id = $1::uuid",

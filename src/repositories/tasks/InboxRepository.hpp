@@ -1,5 +1,5 @@
 /**
- * @file NoteRepository.hpp
+ * @file InboxRepository.hpp
  * @brief task_notes: the inbox of thoughts and links that are not tasks yet.
  *        A note that became a task is archived with the task's id.
  */
@@ -12,11 +12,12 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 #include "repositories/tasks/Errors.hpp"
 
 namespace Repositories::Tasks {
 
-class NoteRepository {
+class InboxRepository {
 public:
     nlohmann::json create(const std::string& owner, const std::string& text) {
         return detail::translate_sql(
@@ -109,8 +110,8 @@ public:
 
     static constexpr const char* kColumns =
         "id, text, status, task_id, "
-        " to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-        " to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";
+        " " SQL_ISO_UTC("created_at") " AS created_at, "
+        " " SQL_ISO_UTC("updated_at") " AS updated_at";
 
 private:
     template <typename Txn>

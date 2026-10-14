@@ -24,11 +24,11 @@ COMPOSE_BIN := $(shell docker compose version >/dev/null 2>&1 && echo docker com
 COMPOSE := $(COMPOSE_BIN) -f docker/docker-compose.yml
 # Every optional profile — for targets that must see the WHOLE stack
 # (down/ps/up-everything). Keep in sync with docker-compose.yml profiles.
-ALL_PROFILES := --profile with-replica --profile with-sentinel --profile with-kafka \
+ALL_PROFILES := --profile with-replica --profile with-sentinel \
                 --profile with-worker --profile with-frontend --profile with-monitoring
 ENV     := --env-file docker/.env
 
-.PHONY: up up-pull up-replica up-sentinel up-kafka up-worker up-full up-monitoring \
+.PHONY: up up-pull up-replica up-sentinel up-worker up-full up-monitoring \
         up-everything up-dev quickstart dev down down-v dev-reset \
         test test-unit test-quick test-rerun test-e2e test-local test-unit-local test-integration-local test-watch \
         build build-worker build-all build-local warm-cache configure-local compile-commands \
@@ -45,7 +45,7 @@ ENV     := --env-file docker/.env
 
 # up-* targets PULL the prebuilt public images (app/worker/frontend) that
 # CI publishes on master, then start — no local compile on your mac.
-# Infra images (postgres/redis/kafka) pull as usual; the app uses `--pull
+# Infra images (postgres/redis) pull as usual; the app uses `--pull
 # missing` so a locally built (or renamed) image isn't clobbered by the
 # published `:latest` — and a fresh clone gets a clear "build it" error rather
 # than silently running a stale binary. `make up-pull` force-refreshes the
@@ -62,11 +62,8 @@ up-replica:        ## + PostgreSQL streaming read replica
 up-sentinel:       ## + Redis Sentinel (3-node HA)
 	$(COMPOSE) --profile with-sentinel --env-file docker/.env.sentinel up -d --pull missing
 
-up-kafka:          ## + Kafka + Zookeeper
-	$(COMPOSE) --profile with-kafka --env-file docker/.env.kafka up -d --pull missing
-
-up-full:           ## Full stack (replica + sentinel + kafka)
-	$(COMPOSE) --profile with-replica --profile with-sentinel --profile with-kafka \
+up-full:           ## Full stack (replica + sentinel)
+	$(COMPOSE) --profile with-replica --profile with-sentinel \
 		--env-file docker/.env.full up -d --pull missing
 
 up-worker:         ## + Background job worker
@@ -75,7 +72,7 @@ up-worker:         ## + Background job worker
 up-monitoring:     ## + Prometheus + Grafana + Jaeger
 	$(COMPOSE) --env-file docker/.env.monitoring --profile with-monitoring up -d --pull missing
 
-up-everything:     ## Replica + Sentinel + Kafka + Worker + Frontend + monitoring — pulls public images
+up-everything:     ## Replica + Sentinel + Worker + Frontend + monitoring — pulls public images
 	@# AUTH_MODE=jwt needs a secret; the committed env file deliberately ships
 	@# it empty. Generate a per-clone dev secret once (gitignored) — shell env
 	@# always wins over --env-file in compose substitution, incl. an explicit

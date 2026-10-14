@@ -49,8 +49,6 @@ using json = nlohmann::json;
 
 namespace {
 
-constexpr int kDefaultLimit = 50;
-constexpr int kMaxLimit = 200;
 constexpr int kRecentLimit = 30;
 constexpr std::size_t kNameMax = 200;
 constexpr std::size_t kNoteMax = 500;
@@ -77,15 +75,6 @@ using Api::Fields::opt_int;
 using Api::Fields::opt_number;
 using Api::Fields::text_length;
 using Api::Fields::today_utc;
-
-/// Rows belong to an app user; a static-bearer principal has no user id.
-bool require_user(const std::string& owner, const FoodController::Callback& callback) {
-    if (is_valid_uuid(owner)) {
-        return true;
-    }
-    callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
-    return false;
-}
 
 /// `[{label, grams}]`, at most kServingsMax entries; returns the normalized JSON text.
 std::optional<std::string> servings_json(Validation::Errors& errs, const json& body) {
@@ -219,33 +208,17 @@ bool entry_input(Validation::Errors& errs,
 
 }  // namespace
 
-// Guards. Order: module -> identity. API_REQUIRE_OWNER declares `owner`.
-#define FOOD_GUARD(req, callback, owner)     \
-    if (!require_enabled(callback))          \
-        return;                              \
-    API_REQUIRE_OWNER(req, callback, owner); \
-    if (!require_user(owner, callback))      \
-    return
-
-bool FoodController::require_enabled(const Callback& callback) {
-    if (Core::food_enabled()) {
-        return true;
-    }
-    callback(ErrorResponse::not_found("food"));
-    return false;
-}
-
 // ── goals ────────────────────────────────────────────────────────────────────
 
 void FoodController::getGoals(const HttpRequestPtr& req, Callback&& callback) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     with_repo_errors(callback, "food.getGoals", [&] {
         callback(Response::ok(json{{"data", Repositories::food_goals_body(owner, today_utc())}}));
     });
 }
 
 void FoodController::putGoals(const HttpRequestPtr& req, Callback&& callback) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     json body;
     if (!Validation::parse_body(req, body, callback)) {
         return;
@@ -304,7 +277,7 @@ void FoodController::putGoals(const HttpRequestPtr& req, Callback&& callback) {
 // ── items ────────────────────────────────────────────────────────────────────
 
 void FoodController::listItems(const HttpRequestPtr& req, Callback&& callback) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     const std::string q = req->getParameter("q");
     if (q.size() > kNameMax) {
         callback(ErrorResponse::bad_request("invalid_query", "q is too long"));
@@ -319,7 +292,7 @@ void FoodController::listItems(const HttpRequestPtr& req, Callback&& callback) {
 }
 
 void FoodController::createItem(const HttpRequestPtr& req, Callback&& callback) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     json body;
     if (!Validation::parse_body(req, body, callback)) {
         return;
@@ -358,7 +331,7 @@ void FoodController::createItem(const HttpRequestPtr& req, Callback&& callback) 
 }
 
 void FoodController::updateItem(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -413,7 +386,7 @@ void FoodController::updateItem(const HttpRequestPtr& req, Callback&& callback, 
 }
 
 void FoodController::deleteItem(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -425,7 +398,7 @@ void FoodController::deleteItem(const HttpRequestPtr& req, Callback&& callback, 
 }
 
 void FoodController::recentItems(const HttpRequestPtr& req, Callback&& callback) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     with_repo_errors(callback, "food.recentItems", [&] {
         const auto rows = Repositories::ItemRepository().recent(owner, kRecentLimit);
         callback(Response::ok(json{{"data", rows}, {"count", rows.size()}, {"total", rows.size()}}));
@@ -435,7 +408,7 @@ void FoodController::recentItems(const HttpRequestPtr& req, Callback&& callback)
 // ── Open Food Facts ──────────────────────────────────────────────────────────
 
 void FoodController::offSearch(const HttpRequestPtr& req, Callback&& callback) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     std::string q = req->getParameter("q");
     if (q.empty() || q.size() > Food::Off::kMaxQueryLength) {
         callback(ErrorResponse::bad_request("invalid_query", "q must be 1..80 characters"));
@@ -471,7 +444,7 @@ void FoodController::offSearch(const HttpRequestPtr& req, Callback&& callback) {
 }
 
 void FoodController::itemFromOff(const HttpRequestPtr& req, Callback&& callback) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     json body;
     if (!Validation::parse_body(req, body, callback)) {
         return;
@@ -523,7 +496,7 @@ void FoodController::itemFromOff(const HttpRequestPtr& req, Callback&& callback)
 // ── diary ────────────────────────────────────────────────────────────────────
 
 void FoodController::day(const HttpRequestPtr& req, Callback&& callback) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     const std::string date = req->getParameter("date").empty() ? today_utc() : req->getParameter("date");
     if (!is_calendar_date(date)) {
         callback(ErrorResponse::bad_request("invalid_date", "date must be a calendar day as YYYY-MM-DD"));
@@ -539,7 +512,7 @@ void FoodController::day(const HttpRequestPtr& req, Callback&& callback) {
 }
 
 void FoodController::week(const HttpRequestPtr& req, Callback&& callback) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     const std::string from = req->getParameter("from");
     if (!is_calendar_date(from)) {
         callback(ErrorResponse::bad_request("invalid_date", "from must be a calendar day as YYYY-MM-DD"));
@@ -554,7 +527,7 @@ void FoodController::week(const HttpRequestPtr& req, Callback&& callback) {
 }
 
 void FoodController::createEntry(const HttpRequestPtr& req, Callback&& callback) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     json body;
     if (!Validation::parse_body(req, body, callback)) {
         return;
@@ -571,7 +544,7 @@ void FoodController::createEntry(const HttpRequestPtr& req, Callback&& callback)
 }
 
 void FoodController::createEntries(const HttpRequestPtr& req, Callback&& callback) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     json body;
     if (!Validation::parse_body(req, body, callback)) {
         return;
@@ -602,7 +575,7 @@ void FoodController::createEntries(const HttpRequestPtr& req, Callback&& callbac
 }
 
 void FoodController::updateEntry(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -634,7 +607,7 @@ void FoodController::updateEntry(const HttpRequestPtr& req, Callback&& callback,
 }
 
 void FoodController::deleteEntry(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -647,7 +620,7 @@ void FoodController::deleteEntry(const HttpRequestPtr& req, Callback&& callback,
 // ── parse ────────────────────────────────────────────────────────────────────
 
 void FoodController::parseStart(const HttpRequestPtr& req, Callback&& callback) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     json body;
     if (!Validation::parse_body(req, body, callback)) {
         return;
@@ -709,7 +682,7 @@ void FoodController::parseStart(const HttpRequestPtr& req, Callback&& callback) 
 }
 
 void FoodController::parseStatus(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    FOOD_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -722,7 +695,5 @@ void FoodController::parseStatus(const HttpRequestPtr& req, Callback&& callback,
         callback(Response::ok(json{{"data", *job}}));
     });
 }
-
-#undef FOOD_GUARD
 
 }  // namespace Api

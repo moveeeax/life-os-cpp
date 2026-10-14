@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 #include <opentelemetry/trace/tracer.h>
+#include <prometheus/client_metric.h>
 
 #include "observability/Observability.hpp"
 #include "test_helpers.hpp"
@@ -116,7 +117,24 @@ TEST_F(MetricsTest, CreateHistogram) {
     auto& hist_family = metrics.create_histogram("test_histogram", "A test histogram");
     auto& hist = hist_family.Add({{"label", "value"}}, prometheus::Histogram::BucketBoundaries{0.1, 1.0, 10.0});
     hist.Observe(0.5);
-    // No crash is the success criterion
+
+    // The sample lands in the buckets the scrape would serialize: none at or
+    // below 0.1, one at or below 1 and 10 (cumulative), and the +Inf bucket.
+    const prometheus::ClientMetric collected = hist.Collect();
+    EXPECT_EQ(collected.histogram.sample_count, 1U);
+    EXPECT_DOUBLE_EQ(collected.histogram.sample_sum, 0.5);
+    ASSERT_EQ(collected.histogram.bucket.size(), 4U);
+    EXPECT_EQ(collected.histogram.bucket[0].cumulative_count, 0U);
+    EXPECT_EQ(collected.histogram.bucket[1].cumulative_count, 1U);
+    EXPECT_EQ(collected.histogram.bucket[2].cumulative_count, 1U);
+    EXPECT_EQ(collected.histogram.bucket[3].cumulative_count, 1U);
+
+    // And the family is in the registry the exposer scrapes.
+    bool registered = false;
+    for (const auto& family : metrics.get_registry()->Collect()) {
+        registered = registered || family.name == "test_histogram";
+    }
+    EXPECT_TRUE(registered);
     metrics.shutdown();
 }
 

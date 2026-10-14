@@ -2,12 +2,11 @@
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/scripts/vcpkg.schema.json",
   "name": "life-os-cpp",
   "version": "1.4.0",
-  "description": "Life OS backend: C++20 REST API on Drogon + libpqxx + redis-plus-plus + Kafka, with observability built in",
+  "description": "Life OS backend: C++20 REST API on Drogon + libpqxx + redis-plus-plus, with observability built in",
   "dependencies": [
     "drogon",
     "libpqxx",
     "redis-plus-plus",
-    "librdkafka",
     "spdlog",
     "prometheus-cpp",
     {

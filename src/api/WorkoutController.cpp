@@ -33,9 +33,6 @@ using json = nlohmann::json;
 
 namespace {
 
-constexpr int kDefaultLimit = 50;
-constexpr int kMaxLimit = 200;
-
 constexpr std::size_t kNameMax = 120;
 constexpr std::size_t kNoteMax = 2000;
 constexpr std::size_t kListMax = 30;
@@ -52,15 +49,6 @@ const std::regex kTimestampRe(R"(^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})
 const std::regex kDateRe(R"(^\d{4}-\d{2}-\d{2}$)");
 
 const std::vector<std::string> kTrackingModes = {"weight_reps", "bodyweight_reps", "duration", "distance_duration"};
-
-/// Rows belong to an app user; a static-bearer principal has no user id.
-bool require_user(const std::string& owner, const WorkoutController::Callback& callback) {
-    if (is_valid_uuid(owner)) {
-        return true;
-    }
-    callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
-    return false;
-}
 
 /// Optional field: a JSON array of at most kListMax strings. Absent is fine.
 void string_list(Validation::Errors& errs, const json& body, const std::string& field) {
@@ -147,29 +135,11 @@ std::optional<int> opt_int(const json& body, const std::string& field) {
 
 }  // namespace
 
-// Guards. Order: module -> permission -> identity. The Guards.hpp macros
-// return from the method themselves, so this expands in the method body.
-// API_REQUIRE_OWNER declares `owner`, hence no do/while wrapper.
-#define WORKOUT_GUARD(req, callback, owner)                                  \
-    if (!require_enabled(callback))                                          \
-        return;                                                              \
-    API_REQUIRE_PERMISSION(req, callback, Domain::Permission::kFitnessRead); \
-    API_REQUIRE_OWNER(req, callback, owner);                                 \
-    if (!require_user(owner, callback))                                      \
-    return
-
-bool WorkoutController::require_enabled(const Callback& callback) {
-    if (Core::workout_enabled()) {
-        return true;
-    }
-    callback(ErrorResponse::not_found("workout"));
-    return false;
-}
-
 // ── exercises ────────────────────────────────────────────────────────────────
 
 void WorkoutController::listExercises(const HttpRequestPtr& req, Callback&& callback) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
 
     Repositories::ExerciseRepository::Filter filter;
     filter.q = req->getParameter("q");
@@ -195,7 +165,8 @@ void WorkoutController::listExercises(const HttpRequestPtr& req, Callback&& call
 }
 
 void WorkoutController::getExercise(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
 
     with_repo_errors(callback, "workout.getExercise", [&] {
         const auto found = Repositories::ExerciseRepository().find(owner, id);
@@ -207,7 +178,8 @@ void WorkoutController::getExercise(const HttpRequestPtr& req, Callback&& callba
 }
 
 void WorkoutController::createExercise(const HttpRequestPtr& req, Callback&& callback) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
 
     json body;
     if (!Validation::parse_body(req, body, callback)) {
@@ -247,7 +219,8 @@ void WorkoutController::createExercise(const HttpRequestPtr& req, Callback&& cal
 }
 
 void WorkoutController::updateExercise(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
 
     json body;
     if (!Validation::parse_body(req, body, callback)) {
@@ -300,7 +273,8 @@ void WorkoutController::updateExercise(const HttpRequestPtr& req, Callback&& cal
 // ── routines ─────────────────────────────────────────────────────────────────
 
 void WorkoutController::listRoutines(const HttpRequestPtr& req, Callback&& callback) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
 
     with_repo_errors(callback, "workout.listRoutines", [&] {
         const auto rows = Repositories::RoutineRepository().list(owner);
@@ -309,7 +283,8 @@ void WorkoutController::listRoutines(const HttpRequestPtr& req, Callback&& callb
 }
 
 void WorkoutController::getRoutine(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -324,7 +299,8 @@ void WorkoutController::getRoutine(const HttpRequestPtr& req, Callback&& callbac
 }
 
 void WorkoutController::putRoutine(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -405,7 +381,8 @@ void WorkoutController::putRoutine(const HttpRequestPtr& req, Callback&& callbac
 }
 
 void WorkoutController::deleteRoutine(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -419,7 +396,8 @@ void WorkoutController::deleteRoutine(const HttpRequestPtr& req, Callback&& call
 // ── sessions ─────────────────────────────────────────────────────────────────
 
 void WorkoutController::startSession(const HttpRequestPtr& req, Callback&& callback) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
 
     // The body is optional: no body starts an empty session.
     json body = json::object();
@@ -442,7 +420,8 @@ void WorkoutController::startSession(const HttpRequestPtr& req, Callback&& callb
 }
 
 void WorkoutController::listSessions(const HttpRequestPtr& req, Callback&& callback) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
     const auto page = parse_page_params(req, kHistoryDefaultLimit, kHistoryMaxLimit);
 
     with_repo_errors(callback, "workout.listSessions", [&] {
@@ -452,7 +431,8 @@ void WorkoutController::listSessions(const HttpRequestPtr& req, Callback&& callb
 }
 
 void WorkoutController::activeSession(const HttpRequestPtr& req, Callback&& callback) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
 
     with_repo_errors(callback, "workout.activeSession", [&] {
         // No active session is a normal state, not an error: data is null.
@@ -462,7 +442,8 @@ void WorkoutController::activeSession(const HttpRequestPtr& req, Callback&& call
 }
 
 void WorkoutController::getSession(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -477,7 +458,8 @@ void WorkoutController::getSession(const HttpRequestPtr& req, Callback&& callbac
 }
 
 void WorkoutController::patchSession(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -516,7 +498,8 @@ void WorkoutController::patchSession(const HttpRequestPtr& req, Callback&& callb
 }
 
 void WorkoutController::deleteSession(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -528,7 +511,8 @@ void WorkoutController::deleteSession(const HttpRequestPtr& req, Callback&& call
 }
 
 void WorkoutController::addSessionExercise(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -556,7 +540,8 @@ void WorkoutController::removeSessionExercise(const HttpRequestPtr& req,
                                               Callback&& callback,
                                               const std::string& id,
                                               const std::string& eid) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
     if (!require_valid_uuid(id, callback) || !require_valid_uuid(eid, callback)) {
         return;
     }
@@ -567,7 +552,8 @@ void WorkoutController::removeSessionExercise(const HttpRequestPtr& req,
 }
 
 void WorkoutController::sessionHeartRate(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -580,7 +566,8 @@ void WorkoutController::sessionHeartRate(const HttpRequestPtr& req, Callback&& c
 // ── sets ─────────────────────────────────────────────────────────────────────
 
 void WorkoutController::putSet(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -628,7 +615,8 @@ void WorkoutController::putSet(const HttpRequestPtr& req, Callback&& callback, c
 }
 
 void WorkoutController::deleteSet(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -642,7 +630,8 @@ void WorkoutController::deleteSet(const HttpRequestPtr& req, Callback&& callback
 // ── health links ─────────────────────────────────────────────────────────────
 
 void WorkoutController::readiness(const HttpRequestPtr& req, Callback&& callback) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
 
     with_repo_errors(callback, "workout.readiness", [&] {
         callback(Response::ok(json{{"data", Repositories::SessionRepository().readiness(owner)}}));
@@ -650,7 +639,8 @@ void WorkoutController::readiness(const HttpRequestPtr& req, Callback&& callback
 }
 
 void WorkoutController::reconcile(const HttpRequestPtr& req, Callback&& callback) {
-    WORKOUT_GUARD(req, callback, owner);
+    API_MODULE_PERMISSION_USER_GUARD(
+        Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
     API_REQUIRE_PERMISSION(req, callback, Domain::Permission::kFitnessSync);
 
     json body;
