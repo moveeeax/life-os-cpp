@@ -26,7 +26,9 @@ export function FocusLine({ focus, onChange }: { focus: Focus; onChange: () => v
           disabled={focus.missing || done.isPending}
           onClick={toggle}
         />
-        <span className="n-text">{focus.text}</span>
+        <span className="n-text" data-num-ok>
+          {focus.text}
+        </span>
       </div>
       {focus.missing && (
         <span className="n-gone">This {focus.kind} is gone. Pick another focus.</span>

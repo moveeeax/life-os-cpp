@@ -32,7 +32,7 @@ export function GoalsPanel({ today, date }: { today: Today; date: string }) {
         const f = countdownFigure(c.days);
         return (
           <div key={c.id} className="c-count">
-            <span>{c.title}</span>
+            <span data-num-ok>{c.title}</span>
             {f.figure !== null && <span className="c-n num">{f.figure}</span>}
             <span className="c-d">
               {new Date(`${c.due}T00:00:00Z`).toLocaleDateString('en-GB', {

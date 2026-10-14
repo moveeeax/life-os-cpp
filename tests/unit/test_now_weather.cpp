@@ -40,6 +40,45 @@ TEST(NowWeather, ThePlaceOfAGeocoderAnswer) {
     EXPECT_FALSE(Now::Weather::place_of(json::parse(R"({"results":[{"name":"X"}]})")).has_value()) << "no coordinates";
 }
 
+// Odd answers must read as "no match" or "no forecast", never throw a json type error.
+TEST(NowWeather, AnOddGeocoderAnswerIsNoMatch) {
+    using Now::Weather::place_of;
+    EXPECT_FALSE(place_of(json::parse(R"({"results":[{"name":"","latitude":1,"longitude":2}]})"))) << "empty name";
+    EXPECT_FALSE(place_of(json::parse(R"({"results":[{"name":"X","latitude":91,"longitude":2}]})"))) << "latitude";
+    EXPECT_FALSE(place_of(json::parse(R"({"results":[{"name":"X","latitude":1,"longitude":181}]})"))) << "longitude";
+    const auto p = place_of(
+        json::parse(R"({"results":[{"name":"X","latitude":1,"longitude":2,"country_code":null,"timezone":7}]})"));
+    ASSERT_TRUE(p.has_value()) << "wrong types of the optional fields only drop them";
+    EXPECT_EQ(p->country_code, "");
+    EXPECT_EQ(p->timezone, "");
+    EXPECT_EQ(place_of(json::parse(R"({"results":[{"name":"X","latitude":1,"longitude":2,"country_code":"kz"}]})"))
+                  ->country_code,
+              "")
+        << "a code the table refuses is dropped";
+}
+
+TEST(NowWeather, ALongCityNameIsCutOnACharacter) {
+    std::string name;
+    for (int i = 0; i < 70; ++i) {
+        name += "\xD0\x90";  // Cyrillic A: two bytes each, 140 bytes in all
+    }
+    const auto p = Now::Weather::place_of(
+        json{{"results", json::array({json{{"name", name}, {"latitude", 1}, {"longitude", 2}}})}});
+    ASSERT_TRUE(p.has_value());
+    EXPECT_EQ(p->city.size(), 120U) << "60 whole characters, no half of one";
+}
+
+TEST(NowWeather, AnOddForecastHasNoBlockOrDefaults) {
+    using Now::Weather::block_of;
+    const auto b = block_of(
+        json::parse(R"({"current":{"temperature_2m":5.0,"weather_code":3,"is_day":null,"time":null},"daily":null})"),
+        "X");
+    ASSERT_TRUE(b.has_value());
+    EXPECT_EQ((*b)["is_day"], true);
+    EXPECT_EQ((*b)["time"], "");
+    EXPECT_TRUE((*b)["min"].is_null());
+}
+
 TEST(NowWeather, TheBlockOfAForecast) {
     // The shape api.open-meteo.com/v1/forecast answered for Almaty on 2026-10-14.
     const json forecast = json::parse(R"({"timezone":"Asia/Almaty",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Chip } from './corners';
-import { DEFAULT_CORNERS, placeChips, weatherLine } from './settings';
+import { DEFAULT_CORNERS, cleanCorners, placeChips, weatherGlyph, weatherLine } from './settings';
 
 const chip = (key: Chip['key']): Chip => ({ key, title: key, main: [], small: [], dot: null });
 const all = [chip('body'), chip('goals'), chip('day'), chip('tasks')];
@@ -52,5 +52,35 @@ describe('weatherLine', () => {
       time: '',
     };
     expect(weatherLine(w).degrees).toBe('0°');
+  });
+});
+
+describe('cleanCorners', () => {
+  it('turns a chip this client does not know into an empty corner', () => {
+    expect(
+      cleanCorners({
+        tl: 'body',
+        tr: 'weather',
+        bl: 'day',
+        br: 'tasks',
+      } as unknown as typeof DEFAULT_CORNERS),
+    ).toEqual({ tl: 'body', tr: null, bl: 'day', br: 'tasks' });
+  });
+  it('keeps a known layout as it is', () => {
+    expect(cleanCorners(DEFAULT_CORNERS)).toEqual(DEFAULT_CORNERS);
+  });
+});
+
+describe('weatherGlyph', () => {
+  it('draws the weather in text glyphs, the moon at a clear night', () => {
+    expect(weatherGlyph(0, true)).toBe('☀\uFE0E');
+    expect(weatherGlyph(1, false)).toBe('☾');
+    expect(weatherGlyph(3, true)).toBe('☁\uFE0E');
+    expect(weatherGlyph(45, true)).toBe('≋');
+    expect(weatherGlyph(63, true)).toBe('☂\uFE0E');
+    expect(weatherGlyph(81, false)).toBe('☂\uFE0E');
+    expect(weatherGlyph(73, true)).toBe('❄\uFE0E');
+    expect(weatherGlyph(95, true)).toBe('ϟ');
+    expect(weatherGlyph(42, true)).toBe('');
   });
 });

@@ -5,6 +5,7 @@ import {
   CHIP_LABEL,
   CORNER_KEYS,
   CORNER_LABEL,
+  cleanCorners,
   type Chip,
   type NowCorners,
   type NowSettings,
@@ -22,7 +23,8 @@ export function ArrangeSheet({
   onClose: () => void;
 }) {
   const [city, setCity] = useState(settings.city ?? '');
-  const [corners, setCorners] = useState<NowCorners>(settings.corners);
+  // A chip an older or newer client saved, unknown here, is offered as an empty corner.
+  const [corners, setCorners] = useState<NowCorners>(() => cleanCorners(settings.corners));
   const save = useSaveNowSettings(onClose);
   // Picking a chip already in another corner moves it: that corner turns empty.
   const pick = (corner: (typeof CORNER_KEYS)[number], value: string) => {

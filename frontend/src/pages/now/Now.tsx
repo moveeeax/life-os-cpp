@@ -3,7 +3,7 @@ import { Navigate } from 'react-router';
 
 import { useMe } from '@/hooks/useMe';
 import { useNowSettings, useSounds, useToday, useWeather } from '@/hooks/useNow';
-import { FOCUS_LENGTHS, greeting, localDate, weatherLine } from '@/lib/now';
+import { FOCUS_LENGTHS, greeting, localDate, weatherGlyph, weatherLine } from '@/lib/now';
 import { homeOf } from '@/shell/sections';
 import { useGlassNav } from '@/shell/useGlassNav';
 
@@ -41,7 +41,7 @@ function FocusStart({ onStart }: { onStart: (minutes: number) => void }) {
       <button type="button" className="n-start" onClick={() => onStart(minutes)}>
         Focus
       </button>
-      <span className="n-lengths" role="group" aria-label="Focus length">
+      <span className="n-lengths" role="group" aria-label="Focus length" data-num-ok>
         {FOCUS_LENGTHS.map((m) => (
           <button key={m} type="button" aria-pressed={m === minutes} onClick={() => pick(m)}>
             {m} min
@@ -95,7 +95,7 @@ function NowScreen() {
       ),
     ) % 24;
   const today = useToday(me?.id ?? null, date, tz);
-  const settings = useNowSettings(me !== null);
+  const settings = useNowSettings(me?.id ?? null);
   const weather = useWeather(Boolean(settings.data?.city));
   const [arranging, setArranging] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -112,14 +112,26 @@ function NowScreen() {
   return (
     <div className="n-now">
       <div className="n-where">
-        {tz.replace(/_/g, ' ')}
-        {weather.data && (
+        {weather.data ? (
+          // The weather takes the place of the zone: the city says where.
           <span className="n-weather">
-            {' · '}
             {weatherLine(weather.data).place}{' '}
             <span className="num">{weatherLine(weather.data).degrees}</span>{' '}
-            {weatherLine(weather.data).words}
+            {weatherGlyph(weather.data.code, weather.data.is_day) ? (
+              <span
+                className="n-glyph"
+                role="img"
+                aria-label={weather.data.words}
+                title={weather.data.words}
+              >
+                {weatherGlyph(weather.data.code, weather.data.is_day)}
+              </span>
+            ) : (
+              weather.data.words
+            )}
           </span>
+        ) : (
+          tz.replace(/_/g, ' ')
         )}
         {settings.data && (
           <button type="button" className="n-arrange" onClick={() => setArranging(true)}>

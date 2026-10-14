@@ -6,6 +6,8 @@ export interface LinePart {
   text: string;
   /** A number Hide numbers blurs. */
   num?: true;
+  /** A title the user wrote: text, never blurred, whatever digits it holds. */
+  title?: true;
 }
 
 export interface QuietLine {

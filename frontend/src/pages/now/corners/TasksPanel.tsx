@@ -31,7 +31,9 @@ function TickRow({
         disabled={update.isPending}
         onClick={() => update.mutate({ status: done ? 'open' : 'done' })}
       />
-      <span className="c-t">{title}</span>
+      <span className="c-t" data-num-ok>
+        {title}
+      </span>
       <span className={late ? 'c-r c-late-text' : 'c-r'}>{right}</span>
     </div>
   );

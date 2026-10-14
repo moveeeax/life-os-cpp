@@ -9,6 +9,10 @@ export function Parts({ parts }: { parts: LinePart[] }) {
           <span key={i} className="num">
             {p.text}
           </span>
+        ) : p.title ? (
+          <span key={i} data-num-ok>
+            {p.text}
+          </span>
         ) : (
           <span key={i}>{p.text}</span>
         ),
@@ -32,7 +36,9 @@ export function Meter({
   const width = `${Math.round(Math.max(0, Math.min(1, share)) * 100)}%`;
   return (
     <div className="c-meter">
-      <span className="c-l">{label}</span>
+      <span className="c-l" data-num-ok>
+        {label}
+      </span>
       <span className="c-track">
         <span className={tone ? `c-${tone}` : undefined} style={{ width }} />
       </span>

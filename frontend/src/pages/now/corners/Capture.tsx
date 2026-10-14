@@ -1,15 +1,16 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
 import { useCreateEntries, useParseJob } from '@/hooks/useFood';
-import { useAcceptParse, useMoneyParse } from '@/hooks/useMoney';
+import { useAccounts, useAcceptParse, useMoneyParse } from '@/hooks/useMoney';
 import { qk } from '@/lib/api/queryKeys';
 import {
   draftFromJob as foodDraft,
   draftProblem as foodProblem,
   linesToEntries,
   mealByHour,
+  parseErrorText as foodErrorText,
 } from '@/lib/food';
 import {
   draftFromJob as moneyDraft,
@@ -17,6 +18,7 @@ import {
   linesToAccept,
   parseErrorText,
 } from '@/lib/ledger';
+import { spendFacts } from '@/lib/now';
 
 type Kind = 'meal' | 'spend';
 
@@ -30,6 +32,8 @@ export function Capture({ date, hour }: { date: string; hour: number }) {
   const [text, setText] = useState('');
   const food = useParseJob();
   const money = useMoneyParse();
+  const accounts = useAccounts().data ?? [];
+  const input = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const refresh = () => {
     setText('');
@@ -43,6 +47,10 @@ export function Capture({ date, hour }: { date: string; hour: number }) {
 
   const parse = kind === 'meal' ? food : money;
   const busy = parse.state === 'starting' || parse.state === 'running';
+  // The field is disabled while the parse reads; the focus comes back when it answers.
+  useEffect(() => {
+    if (!busy) input.current?.focus({ preventScroll: true });
+  }, [busy]);
 
   const submit = () => {
     const t = text.trim();
@@ -67,18 +75,18 @@ export function Capture({ date, hour }: { date: string; hour: number }) {
         ? 'The parse took too long. Try again or use the full form.'
         : kind === 'spend'
           ? parseErrorText(parse.error)
-          : (parse.error ?? 'The parse failed.')
+          : foodErrorText(parse.error)
       : null;
+  const nothing = parse.state === 'done' && mealLines.length === 0 && spendLines.length === 0;
 
   return (
     <div className="c-capture">
-      <div className="c-capture-kind" role="radiogroup" aria-label="What to add">
+      <div className="c-capture-kind" role="group" aria-label="What to add">
         {(['meal', 'spend'] as const).map((k) => (
           <button
             key={k}
             type="button"
-            role="radio"
-            aria-checked={kind === k}
+            aria-pressed={kind === k}
             className={kind === k ? 'c-on' : undefined}
             onClick={() => switchTo(k)}
           >
@@ -87,6 +95,7 @@ export function Capture({ date, hour }: { date: string; hour: number }) {
         ))}
       </div>
       <input
+        ref={input}
         className="c-capture-input"
         aria-label={kind === 'meal' ? 'Describe a meal' : 'Describe a spend'}
         placeholder={kind === 'meal' ? 'Omelette and a toast' : 'Coffee 2500'}
@@ -102,6 +111,7 @@ export function Capture({ date, hour }: { date: string; hour: number }) {
         }}
       />
       {busy && <p className="c-empty">Reading…</p>}
+      {nothing && <p className="c-empty">Nothing recognised in that line. Try more words.</p>}
       {failure && (
         <p role="alert" className="c-warn-text">
           {failure}
@@ -115,12 +125,17 @@ export function Capture({ date, hour }: { date: string; hour: number }) {
           </span>
         </div>
       ))}
-      {spendLines.map((l) => (
-        <div key={l.key} className="c-row c-plain">
-          <span className="c-t">{l.name || l.merchant}</span>
-          <span className="c-r num">{l.amount}</span>
-        </div>
-      ))}
+      {spendLines.map((l) => {
+        const facts = spendFacts(l, accounts);
+        return (
+          <div key={l.key} className="c-row c-plain">
+            <span className="c-t">{l.name || l.merchant}</span>
+            <span className="c-r">
+              <span className="num">{facts.amount}</span> · {facts.account}
+            </span>
+          </div>
+        );
+      })}
       {mealLines.length > 0 &&
         (mealBlocked ? (
           <p className="c-warn-text">{mealBlocked}</p>
