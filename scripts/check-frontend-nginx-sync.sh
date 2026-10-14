@@ -53,4 +53,15 @@ if [ "$dev_body" != "$helm_body" ]; then
     exit 1
 fi
 
-echo "✓ frontend nginx configs in sync ($(printf '%s\n' "$dev_locs" | grep -c .) locations, body cap $dev_body)"
+# 3. Hardening both copies must carry: no version leak, compressed text
+#    assets, and a CSP that pins form targets to the origin.
+for pattern in 'server_tokens[[:space:]]+off;' 'gzip[[:space:]]+on;' "form-action 'self'"; do
+    for conf in "$DEV_CONF" "$HELM_CONF"; do
+        grep -qE "$pattern" "$conf" || {
+            echo "✗ ${conf#"$REPO"/} lacks '$pattern' — both frontend nginx copies must carry it" >&2
+            exit 1
+        }
+    done
+done
+
+echo "✓ frontend nginx configs in sync ($(printf '%s\n' "$dev_locs" | grep -c .) locations, body cap $dev_body, hardening present)"

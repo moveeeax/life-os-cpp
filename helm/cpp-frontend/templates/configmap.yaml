@@ -17,6 +17,19 @@ data:
         listen       8080;
         server_name  _;
 
+        # No nginx version in the Server header or on error pages.
+        server_tokens off;
+
+        # Compress the text the SPA is made of (index.html is always in
+        # gzip_types). gzip_proxied any: every request arrives through the
+        # ingress, and API JSON from the backend is compressed here too.
+        gzip            on;
+        gzip_vary       on;
+        gzip_proxied    any;
+        gzip_comp_level 5;
+        gzip_min_length 1024;
+        gzip_types      text/plain text/css application/javascript application/json image/svg+xml;
+
         location = /healthz { return 200 'ok'; add_header Content-Type text/plain; }
 
         # Runtime trace-UI config for the SPA: the image is built once and
@@ -50,7 +63,7 @@ data:
             # videos and the admin's direct upload); docs/wallpapers.md. blob: lets
             # the upload page read the picked file for its poster and size.
             {{- $storage := join " " .Values.csp.storageHosts }}
-            add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: {{ $storage }}; media-src 'self' blob: {{ $storage }}; font-src 'self'; connect-src 'self' {{ $storage }}; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" always;
+            add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: {{ $storage }}; media-src 'self' blob: {{ $storage }}; font-src 'self'; connect-src 'self' {{ $storage }}; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
         }
 
         location /assets/ {
