@@ -125,7 +125,8 @@ then throws — surfacing as 5xx and high p99.
 
 ## Job types {#job-types}
 
-The nine types a worker registers (`src/jobs/BuiltinHandlers.cpp`), what
+The nine types a worker registers (`src/core/JobHandlers.cpp` calls each
+module's `register_jobs()`), what
 puts them on the queue and what a second delivery of the same job does.
 Every handler runs at least once: the queue retries a thrown exception with
 backoff up to `JOBS_MAX_RETRIES` (3) and then dead-letters it, the lease

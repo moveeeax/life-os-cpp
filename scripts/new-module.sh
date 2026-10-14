@@ -4,6 +4,7 @@
 # notes modules are wired:
 #
 #   config/config.json + config.sample.json   {"<name>": {"enabled": "${<NAME>_ENABLED:-false}"}}
+#   src/utils/ConfigKeys.hpp                  Config::Keys::<name>_enabled (the key registry)
 #   src/utils/Modules.hpp                     Core::<name>_enabled()
 #   docker/docker-compose.yml                 <NAME>_ENABLED on the app and worker services
 #   helm/life-os-cpp                          values key + deployment env
@@ -125,14 +126,25 @@ for rel in ("config/config.json", "config/config.sample.json"):
     patch(rel, f'"{name}": {{',
           before('  "worker": {', f'  "{name}": {{\n    "enabled": "${{{upper}_ENABLED:-false}}"\n  }},\n'))
 
-# 2. Core::<name>_enabled() at the end of utils/Modules.hpp.
+# 2. The key in the registry (utils/ConfigKeys.hpp, one section per top-level
+#    key, sorted) and Core::<name>_enabled() at the end of utils/Modules.hpp.
+def registry_entry(text):
+    entry = (f"// --- {name} ---\n"
+             f'inline constexpr ConfigKey {name}_enabled{{"{name}.enabled", "{upper}_ENABLED"}};\n\n')
+    for m in re.finditer(r"^// --- ([a-z_()-]+) ---\n", text, re.M):
+        if m.group(1) > name:
+            return text[: m.start()] + entry + text[m.start():]
+    end = "}  // namespace Keys"
+    if end not in text:
+        return None
+    return text.replace(end, entry + end, 1)
+
+
+patch("src/utils/ConfigKeys.hpp", f"ConfigKey {name}_enabled{{", registry_entry)
 patch("src/utils/Modules.hpp", f"inline bool {name}_enabled()",
       before("}  // namespace Core",
-             f"/// {pascal} module master switch — same pattern as notes_enabled().\n"
              f"inline bool {name}_enabled() {{\n"
-             f"    if (!Config::is_initialized())\n"
-             f"        return false;\n"
-             f'    return Config::get().get<bool>("{name}.enabled", "{upper}_ENABLED", false);\n'
+             f"    return module_enabled(Config::Keys::{name}_enabled);\n"
              f"}}\n\n"))
 
 # 3. docker-compose: the app and the worker service, beside the other switches.

@@ -90,10 +90,17 @@ Get | Post | Put | Delete | Patch) ;;
     ;;
 esac
 
-# Derive a handler name: OrdersController+Get → listOrders; Post → createOrders.
+# Derive a handler name: OrdersController+Get → listOrders (getOrder with a
+# path placeholder); Post → createOrder.
 HANDLER_STEM="$(printf '%s' "$NAME" | sed -E 's/Controller$//')"
 case "$METHOD" in
-Get) HANDLER="list${HANDLER_STEM}" ;;
+Get)
+    if printf '%s' "$ROUTE" | grep -qE '\{[0-9]+\}'; then
+        HANDLER="get$(printf '%s' "$HANDLER_STEM" | sed 's/s$//')"
+    else
+        HANDLER="list${HANDLER_STEM}"
+    fi
+    ;;
 Post) HANDLER="create$(printf '%s' "$HANDLER_STEM" | sed 's/s$//')" ;;
 Put) HANDLER="update$(printf '%s' "$HANDLER_STEM" | sed 's/s$//')" ;;
 Delete) HANDLER="delete$(printf '%s' "$HANDLER_STEM" | sed 's/s$//')" ;;

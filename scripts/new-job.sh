@@ -85,8 +85,10 @@ if [[ -e "$FILE" ]]; then
     echo "ERROR: $FILE already exists" >&2
     exit 3
 fi
-if grep -rqF "\"${JOB_TYPE}\"" "$ROOT/src" --include='*.hpp' --include='*.cpp'; then
-    echo "ERROR: the job type \"${JOB_TYPE}\" is already named in src/ — job types are wire contracts, pick another" >&2
+# A job type is a wire contract: refuse one a handler already owns (the
+# kJobType constants and the inline built-ins of jobs/BuiltinHandlers.cpp).
+if grep -rqE "kJobType = \"${JOB_TYPE}\"|register_handler\(\"${JOB_TYPE}\"" "$ROOT/src" --include='*.hpp' --include='*.cpp'; then
+    echo "ERROR: a handler for the job type \"${JOB_TYPE}\" already exists in src/ — pick another type" >&2
     exit 3
 fi
 mkdir -p "$DIR"
@@ -225,15 +227,21 @@ else
     else
         BODY_TMP="$(mktemp)"
         printf '%s\n' "$HANDLER_LINE" >"$BODY_TMP"
+        # The call goes right after the function's opening line, or after a
+        # `using` line that follows it, so the existing calls keep their order.
         awk -v inc="$INCLUDE_LINE" -v bodyfile="$BODY_TMP" '
-            /^#include "jobs\/Dispatcher.hpp"$/ && !inc_done { print; print inc; inc_done=1; next }
-            /^void register_jobs\(Jobs::Dispatcher& d\) \{$/ && !call_done {
-                print
+            function emit_body() {
                 while ((getline bline < bodyfile) > 0) print bline
                 close(bodyfile)
                 call_done=1
-                next
             }
+            /^#include "jobs\/Dispatcher.hpp"$/ && !inc_done { print; print inc; inc_done=1; next }
+            pending && !call_done {
+                pending=0
+                if ($0 ~ /^    using /) { print; emit_body(); next }
+                emit_body()
+            }
+            /^void register_jobs\(Jobs::Dispatcher& d\) \{$/ && !call_done { print; pending=1; next }
             { print }
         ' "$REG_CPP" >"$REG_CPP.tmp" && mv "$REG_CPP.tmp" "$REG_CPP"
         rm -f "$BODY_TMP"
