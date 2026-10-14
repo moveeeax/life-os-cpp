@@ -9,6 +9,7 @@ import {
   weatherGlyph,
   weatherLine,
   withChip,
+  withoutChip,
 } from './settings';
 
 const chip = (key: Chip['key']): Chip => ({ key, title: key, main: [], small: [], dot: null });
@@ -52,6 +53,11 @@ describe('the Habits plate', () => {
     expect(withChip({ tl: 'body', tr: null, bl: 'day', br: 'tasks' }, 'habits').tr).toBe('habits');
     const placed = { tl: 'habits', tr: null, bl: null, br: null } as const;
     expect(withChip(placed, 'habits')).toBe(placed);
+  });
+  it('empties the corner of a chip whose module is off', () => {
+    const placed = { tl: 'body', tr: 'habits', bl: 'day', br: 'tasks' } as const;
+    expect(withoutChip(placed, 'habits')).toEqual({ tl: 'body', tr: null, bl: 'day', br: 'tasks' });
+    expect(withoutChip(DEFAULT_CORNERS, 'habits')).toBe(DEFAULT_CORNERS);
   });
   it('is a chip this client knows', () => {
     const layout = { tl: 'body', tr: 'goals', bl: 'day', br: 'habits' } as const;

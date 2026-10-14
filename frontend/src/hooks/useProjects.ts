@@ -7,8 +7,8 @@ import type { Project, ProjectInput, Task } from '@/lib/tasks';
 
 const BASE = '/api/v1/tasks/projects';
 
-/** A project write changes task rows (their project name) and the counts. */
-const WRITES = [qk.tasks.all(), qk.now.all()] as const;
+/** A project write changes task and note rows (their project name) and the counts. */
+const WRITES = [qk.tasks.all(), qk.now.all(), qk.notes.all()] as const;
 
 /** Projects of a kind ("" both), in their order. */
 export function useProjects(kind: '' | 'project' | 'course' = '') {

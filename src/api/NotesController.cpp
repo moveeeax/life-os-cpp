@@ -28,6 +28,7 @@
 #include "repositories/tasks/ProjectRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Api {
 
@@ -99,7 +100,7 @@ std::optional<std::vector<std::string>> tags_field(Validation::Errors& errs, con
         const auto b = tag.find_first_not_of(" \t");
         const auto e = tag.find_last_not_of(" \t");
         tag = b == std::string::npos ? "" : tag.substr(b, e - b + 1);
-        if (tag.empty() || tag.size() > kTagMax || tag.find(',') != std::string::npos) {
+        if (tag.empty() || Utils::Utf8::length(tag) > kTagMax || tag.find(',') != std::string::npos) {
             errs.add("tags", "invalid", "each tag has 1 to 40 characters and no comma");
             return std::nullopt;
         }

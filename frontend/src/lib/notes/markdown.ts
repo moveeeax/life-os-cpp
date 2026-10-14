@@ -19,7 +19,7 @@ export type NoteBlock =
   | { kind: 'code'; lang: string; text: string };
 
 const INLINE =
-  /`([^`]+)`|\*\*(.+?)\*\*|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+)\]\(([^)\s]+)\)/g;
+  /`([^`]+)`|\*\*(.+?)\*\*|\*([^*\s][^*]*?)\*|(?<![\w])_([^_\s][^_]*?)_(?![\w])|\[([^\]]+)\]\(([^)\s]+)\)/g;
 
 /** The inline marks of one line of text. */
 export function spans(text: string): Span[] {

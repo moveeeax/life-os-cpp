@@ -156,16 +156,18 @@ TEST_F(TaskProjectsApiTest, CountsAndTheNextTask) {
     add_task(kAnna, json{{"project_id", p}, {"title", "Someday"}});
     add_task(kAnna, json{{"project_id", p}, {"title", "Due first"}, {"due", "2026-10-20"}});
     add_task(kAnna, json{{"project_id", p}, {"title", "Shipped"}, {"status", "done"}});
+    add_task(kAnna,
+             json{{"project_id", p}, {"title", "Working on it"}, {"status", "in_progress"}, {"due", "2026-10-18"}});
     add_task(kAnna, json{{"title", "No project"}});
     auto list = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.listProjects(req, std::move(cb)); });
     ASSERT_EQ(body_of(list)["data"].size(), 1U);
     const auto row = body_of(list)["data"][0];
-    EXPECT_EQ(row["open"], 2);
+    EXPECT_EQ(row["open"], 3) << "in progress counts as open";
     EXPECT_EQ(row["done"], 1);
-    EXPECT_EQ(row["next"]["title"], "Due first") << "the earliest due first";
+    EXPECT_EQ(row["next"]["title"], "Working on it") << "the earliest due first, in progress included";
     auto filtered = call(
         kAnna, Get, json::object(), [&](auto req, auto cb) { tasks.listItems(req, std::move(cb)); }, {{"project", p}});
-    EXPECT_EQ(body_of(filtered)["data"].size(), 3U);
+    EXPECT_EQ(body_of(filtered)["data"].size(), 4U);
     EXPECT_EQ(body_of(filtered)["data"][0]["project_title"], "Life OS");
 }
 

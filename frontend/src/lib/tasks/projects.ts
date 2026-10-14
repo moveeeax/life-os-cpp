@@ -25,7 +25,9 @@ export function takeProjectCode(
       return lead;
     },
   );
-  return { text: out.replace(/\s{2,}/g, ' ').trim(), projectId };
+  const rest = out.replace(/\s{2,}/g, ' ').trim();
+  // A phrase that is only a code stays the title as typed, with no project.
+  return rest ? { text: rest, projectId } : { text: text.trim(), projectId: null };
 }
 
 /** Done steps of all the steps of a course; null when it has none yet. */

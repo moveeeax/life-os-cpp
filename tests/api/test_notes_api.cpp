@@ -151,6 +151,13 @@ TEST_F(NotesApiTest, BadFieldsAreRefused) {
     }
     EXPECT_EQ(add(kAnna, json{{"title", "x"}, {"tags", many}})->statusCode(), k400BadRequest) << "21 tags";
     EXPECT_EQ(add(kAnna, json{{"title", "x"}, {"status", "published"}})->statusCode(), k400BadRequest) << "not yet";
+    std::string cyrillic;
+    for (int i = 0; i < 40; ++i) {
+        cyrillic += "ж";
+    }
+    EXPECT_EQ(add(kAnna, json{{"title", "x"}, {"tags", {cyrillic}}})->statusCode(), k201Created)
+        << "40 letters, 80 bytes";
+    EXPECT_EQ(add(kAnna, json{{"title", "y"}, {"tags", {cyrillic + "ж"}}})->statusCode(), k400BadRequest);
 }
 
 TEST_F(NotesApiTest, SearchFiltersAndFacets) {

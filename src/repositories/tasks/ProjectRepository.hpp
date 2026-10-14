@@ -151,15 +151,16 @@ public:
     }
 
 private:
-    /// The columns of a project, its task counts and the next open task (the earliest due, then the oldest).
+    /// The columns of a project, its task counts and the next open task (the earliest due, then the oldest);
+    /// open means not done, so a task in progress counts.
     static constexpr const char* kColumns =
         "p.id, p.kind, p.name, p.code, p.description, p.link, p.status, p.platform, "
         " to_char(p.starts_on, 'YYYY-MM-DD') AS starts_on, to_char(p.ends_on, 'YYYY-MM-DD') AS ends_on, "
         " p.certificate, p.position, "
-        " (SELECT count(*) FROM task_items t WHERE t.project_id = p.id AND t.status = 'open') AS open, "
+        " (SELECT count(*) FROM task_items t WHERE t.project_id = p.id AND t.status <> 'done') AS open, "
         " (SELECT count(*) FROM task_items t WHERE t.project_id = p.id AND t.status = 'done') AS done, "
         " (SELECT json_build_object('id', t.id, 'title', t.title, 'due', to_char(t.due, 'YYYY-MM-DD')) "
-        "   FROM task_items t WHERE t.project_id = p.id AND t.status = 'open' "
+        "   FROM task_items t WHERE t.project_id = p.id AND t.status <> 'done' "
         "   ORDER BY t.due NULLS LAST, t.created_at LIMIT 1) AS next, "
         " to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
         " to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";

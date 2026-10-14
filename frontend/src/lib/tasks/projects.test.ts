@@ -27,6 +27,9 @@ describe('takeProjectCode', () => {
       projectId: null,
     });
   });
+  it('keeps a phrase that is only a code as the text, with no project', () => {
+    expect(takeProjectCode('#small', projects)).toEqual({ text: '#small', projectId: null });
+  });
 });
 
 describe('courseProgress', () => {

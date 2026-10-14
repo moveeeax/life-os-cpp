@@ -25,6 +25,10 @@ describe('spans', () => {
       { kind: 'text', text: '<script>alert(1)</script>' },
     ]);
   });
+  it('leaves the underscores of snake_case alone', () => {
+    expect(spans('call my_var_name now')).toEqual([{ kind: 'text', text: 'call my_var_name now' }]);
+    expect(spans('an _aside_ here')[1]).toEqual({ kind: 'italic', text: 'aside' });
+  });
   it('code wins over the marks inside it', () => {
     expect(spans('`**not bold**`')).toEqual([{ kind: 'code', text: '**not bold**' }]);
   });
