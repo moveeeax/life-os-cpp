@@ -35,7 +35,7 @@ protected:
         if (::testing::Test::IsSkipped())
             return;
         Database::get().execute_write([](auto& txn) {
-            txn.exec("TRUNCATE TABLE task_parse_jobs, task_notes, task_items");
+            txn.exec("TRUNCATE TABLE notes, task_parse_jobs, task_notes, task_items");
             for (const char* id : {kAnna, kBoris}) {
                 txn.exec_params(
                     "INSERT INTO users (id, email, confirmed, role_id) "
