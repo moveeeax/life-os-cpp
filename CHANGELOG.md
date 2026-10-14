@@ -6,6 +6,28 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.25.1] - 2026-10-14
+
+### Changed
+- The image's own nginx config no longer reads X-Forwarded-For (added in 1.25.0
+  on a wrong diagnosis); the cluster uses the chart's config and never changed.
+
+### Removed
+- The note of the day is off the Now page: it crowded it. The note routes stay
+  in the API.
+
+### Fixed
+- Now: with a city set, the top line is the place, the degrees and a text glyph
+  for the weather (the word in its tooltip), without the time zone; Arrange moved
+  from that line into the account menu (on Now only); Hide numbers
+  leaves task and goal titles readable, as on Tasks; the corner layout paints
+  from the last answer, so a moved corner does not flash. Capture: a spend line
+  shows its currency and account, an empty parse says so, a meal parse error is
+  readable, the Meal/Spend switch is a pair of toggle buttons and the field takes
+  the focus back. Travel: deleting a document asks first. Arrange drops a chip it
+  does not know. An odd answer of the geocoder or the weather service no longer
+  gives a 500.
+
 ## [1.25.0] - 2026-10-14
 
 ### Added
