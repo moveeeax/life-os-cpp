@@ -26,6 +26,7 @@ import type {
   MessageResponse,
   Payment,
 } from '@/lib/api/types';
+import { formatDateTime } from '@/lib/dates';
 import { dollarsToCents, formatCents } from '@/lib/money';
 import { AdjustDialog } from '@/pages/admin/billing/AdjustDialog';
 
@@ -41,9 +42,8 @@ const PER_PAGE = 20;
  * on a charting dependency. GET /api/v1/admin/billing/metrics already
  * serves everything a dashboard needs (BillingMetricsResponse in
  * docs/openapi.yaml: windowed revenue/conversion/refunds, an outstanding-credits snapshot, and a
- * zero-filled time series), qk.admin.billing.metrics(period) is the ready
- * query key, and lib/billingMetrics.ts holds the tested pure formatting
- * helpers — bring your own charting library and add the tab.
+ * zero-filled time series) and qk.admin.billing.metrics(period) is the ready
+ * query key — bring your own charting library and add the tab.
  */
 const PAYMENT_STATUS_STYLES: Record<Payment['status'], string> = {
   created:
@@ -66,14 +66,6 @@ function PaymentStatusBadge({ status }: { status: Payment['status'] }) {
       {status}
     </span>
   );
-}
-
-function fmtDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
 }
 
 export function AdminBillingPage() {
@@ -395,7 +387,7 @@ function PaymentsTab() {
     {
       header: 'Created',
       className: 'whitespace-nowrap text-xs',
-      cell: (p) => fmtDate(p.created_at),
+      cell: (p) => formatDateTime(p.created_at),
     },
   ];
 

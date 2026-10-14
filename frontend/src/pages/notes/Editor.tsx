@@ -1,33 +1,13 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useBlocker, useNavigate, useParams } from 'react-router';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useDeleteNote, useNote, useSaveNote } from '@/hooks/useNotes';
 import { useProjects } from '@/hooks/useProjects';
-import { tagsFrom, type Note } from '@/lib/notes';
+import { draftOf, isDirty, mergeSaved, tagsFrom, type Draft, type Note } from '@/lib/notes';
 
 import { LoadError, NotesFrame, Placeholder } from './frame';
 import { NoteView } from './NoteView';
-
-interface Draft {
-  title: string;
-  topic: string;
-  tags: string;
-  summary: string;
-  slug: string;
-  project: string;
-  body: string;
-}
-
-const draftOf = (n: Note): Draft => ({
-  title: n.title,
-  topic: n.topic,
-  tags: n.tags.join(', '),
-  summary: n.summary,
-  slug: n.slug,
-  project: n.project_id ?? '',
-  body: n.body ?? '',
-});
 
 /** One note: the fields of a blog post, the Markdown source and its preview side by side. */
 export function NoteEditorPage() {
@@ -43,7 +23,11 @@ export function NoteEditorPage() {
   if (note.isError || !note.data) {
     return (
       <NotesFrame headline="Note">
-        <LoadError error={note.error} onRetry={() => void note.refetch()} />
+        <LoadError
+          error={note.error}
+          onRetry={() => void note.refetch()}
+          notFound="This note is not here: it may have been deleted."
+        />
       </NotesFrame>
     );
   }
@@ -58,22 +42,41 @@ function Editor({ note }: { note: Note }) {
   const projects = (useProjects().data ?? []).filter(
     (p) => p.status !== 'done' || p.id === note.project_id,
   );
-  const save = useSaveNote(note.id, (n) => setD(draftOf(n)));
-  const remove = useDeleteNote(() => navigate('/notes'));
-  const saved = draftOf(note);
-  const dirty = (Object.keys(d) as (keyof Draft)[]).some((k) => d[k] !== saved[k]);
+  // The last version the server confirmed: what "unsaved" compares against.
+  const [base, setBase] = useState<Draft>(() => draftOf(note));
+  // What the save in flight sent, so words typed meanwhile survive its answer.
+  const sent = useRef<Draft | null>(null);
+  const save = useSaveNote(note.id, (n) => {
+    const saved = draftOf(n);
+    const submitted = sent.current;
+    setBase(saved);
+    setD((cur) => (submitted ? mergeSaved(cur, submitted, saved) : saved));
+  });
+  // Deleting leaves on purpose; the blocker must not ask about the draft.
+  const leaving = useRef(false);
+  const remove = useDeleteNote(() => {
+    leaving.current = true;
+    navigate('/notes');
+  });
+  const dirty = isDirty(d, base);
   const set = (k: keyof Draft) => (e: { target: { value: string } }) =>
-    setD({ ...d, [k]: e.target.value });
+    setD((cur) => ({ ...cur, [k]: e.target.value }));
 
-  // Leaving the page with unsaved words asks first.
+  // Leaving the page with unsaved words asks first: the tab closing through
+  // the browser's prompt, a move inside the app through the kit confirm.
   useEffect(() => {
     if (!dirty) return;
     const warn = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      dirty && !leaving.current && currentLocation.pathname !== nextLocation.pathname,
+  );
 
-  const submit = () =>
+  const submit = () => {
+    sent.current = d;
     save.mutate({
       title: d.title.trim(),
       topic: d.topic.trim(),
@@ -81,8 +84,9 @@ function Editor({ note }: { note: Note }) {
       summary: d.summary.trim(),
       body: d.body,
       project_id: d.project || null,
-      ...(d.slug.trim() && d.slug.trim() !== note.slug ? { slug: d.slug.trim() } : {}),
+      ...(d.slug.trim() && d.slug.trim() !== base.slug ? { slug: d.slug.trim() } : {}),
     });
+  };
 
   return (
     <NotesFrame
@@ -220,6 +224,16 @@ function Editor({ note }: { note: Note }) {
           busy={remove.isPending}
           onConfirm={() => remove.mutate(note.id)}
           onClose={() => setConfirm(false)}
+        />
+      )}
+      {blocker.state === 'blocked' && (
+        <ConfirmDialog
+          title="Leave without saving?"
+          description="The changes to this note are not saved yet."
+          confirmLabel="Leave"
+          destructive
+          onConfirm={() => blocker.proceed()}
+          onClose={() => blocker.reset()}
         />
       )}
     </NotesFrame>

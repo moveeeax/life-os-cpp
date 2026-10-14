@@ -14,12 +14,17 @@ export function TasksInboxPage() {
   const { notes, counts } = useTasksDay();
   const [text, setText] = useState('');
   const [turning, setTurning] = useState<TaskNote | null>(null);
-  const add = useCreateNote(() => setText(''));
+  const add = useCreateNote();
   const update = useUpdateNote();
 
+  // The input clears at once, so a second Enter has nothing to post; a
+  // failed post puts the words back unless something new was typed.
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (text.trim()) add.mutate(text.trim());
+    const t = text.trim();
+    if (!t || add.isPending) return;
+    setText('');
+    add.mutate(t, { onError: () => setText((cur) => cur || t) });
   };
 
   return (

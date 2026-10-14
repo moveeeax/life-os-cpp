@@ -39,7 +39,8 @@ export type GuardDecision =
  * tested without rendering a React tree (no @testing-library in the stack).
  *
  * The critical invariant the round-2 audit cares about:
- *   - isError  → 'error' (show retry), NEVER a /login redirect
+ *   - isError with no cached user → 'error' (show retry), NEVER a /login redirect
+ *   - isError with a cached user → decide on the cached user
  *   - data===null (401) → redirect to /login
  */
 export function guardDecision(
@@ -48,11 +49,12 @@ export function guardDecision(
   hasPermission: (user: NonNullable<GuardSessionState['data']>, bit: number) => boolean,
 ): GuardDecision {
   if (me.isPending) return { kind: 'loading' };
+  // A cached user wins over a failed background refetch: a blip while the
+  // tab revalidates must not replace the page with the error state.
+  const user = me.data ?? null;
   // A thrown error is a *real* failure (network / 5xx); 401 resolves to
   // null instead. Never bounce a possibly-logged-in user to /login here.
-  if (me.isError) return { kind: 'error' };
-
-  const user = me.data ?? null;
+  if (!user && me.isError) return { kind: 'error' };
   if (!user) return { kind: 'redirect', to: '/login' };
   if (opts.requireConfirmed && !user.confirmed) return { kind: 'redirect', to: '/unconfirmed' };
   if (opts.requirePermission !== undefined && !hasPermission(user, opts.requirePermission)) {
@@ -70,14 +72,16 @@ export function guardDecision(
  * Reads the user directly from the useMe() query — the TanStack Query
  * cache is the single source of truth for the session.
  */
-export function ProtectedRoute({ children, requirePermission, requireConfirmed }: ProtectedRouteProps) {
+export function ProtectedRoute({
+  children,
+  requirePermission,
+  requireConfirmed,
+}: ProtectedRouteProps) {
   const location = useLocation();
   const me = useMe();
 
-  const decision = guardDecision(
-    me,
-    { requirePermission, requireConfirmed },
-    (user, bit) => userCan(user, bit),
+  const decision = guardDecision(me, { requirePermission, requireConfirmed }, (user, bit) =>
+    userCan(user, bit),
   );
 
   switch (decision.kind) {

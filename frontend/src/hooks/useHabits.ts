@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
+import { useModuleProbe } from '@/hooks/useModuleProbe';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import type { Habit, HabitCheck, HabitDays, HabitInput } from '@/lib/habits';
@@ -85,17 +86,10 @@ export function useTickHabit(onSuccess?: () => void) {
   );
 }
 
+/** [query key, url] of the probe that says whether the module is on. */
+export const HABITS_PROBE = [qk.habits.enabled(), BASE] as const;
+
 /** Whether the habits module answers (it is 404 while switched off); true until known. */
 export function useHabitsEnabled(signedIn: boolean): boolean {
-  const probe = useQuery({
-    queryKey: qk.habits.enabled(),
-    enabled: signedIn,
-    staleTime: Infinity,
-    retry: false,
-    queryFn: async ({ signal }) => {
-      const { error } = await api.GET(BASE as string, { signal });
-      return !(error && error.status === 404);
-    },
-  });
-  return probe.data ?? true;
+  return useModuleProbe(...HABITS_PROBE, signedIn) ?? true;
 }

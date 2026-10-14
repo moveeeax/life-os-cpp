@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
+import { useModuleProbe } from '@/hooks/useModuleProbe';
 import { ApiClientError, api, apiErrorMessage } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import {
@@ -153,24 +154,17 @@ export function useExercise(id: string, enabled: boolean) {
   });
 }
 
+/** [query key, url] of the probe that says whether the module is on. */
+export const WORKOUT_PROBE = [qk.workout.enabled(), `${BASE}/sessions/active`] as const;
+
 /**
  * Whether the workout module is on. The API answers 404 on every workout
- * route while it is off; the sidebar then keeps the item inactive. Unknown
+ * route while it is off; the nav then leaves the section out. Unknown
  * (loading, or a failure other than 404) counts as on, so a hiccup does not
  * hide the section.
  */
 export function useWorkoutEnabled(canRead: boolean): boolean {
-  const probe = useQuery({
-    queryKey: qk.workout.enabled(),
-    enabled: canRead,
-    staleTime: Infinity,
-    retry: false,
-    queryFn: async ({ signal }) => {
-      const { error } = await api.GET(`${BASE}/sessions/active` as string, { signal });
-      return !(error && error.status === 404);
-    },
-  });
-  return probe.data ?? true;
+  return useModuleProbe(...WORKOUT_PROBE, canRead) ?? true;
 }
 
 // ── session mutations ───────────────────────────────────────────────────────

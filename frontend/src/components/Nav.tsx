@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { LogOut, Menu, Moon, Sun, Wallet, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/toaster';
 import { BRAND } from '@/lib/brand';
 import { useLogout } from '@/hooks/useAuthMutations';
 import { useMe } from '@/hooks/useMe';
+import { useRegistrationOpen } from '@/hooks/useRegistration';
 import { useThemeToggle } from '@/hooks/useThemeToggle';
-import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
+import { useWalletSummary } from '@/hooks/useWallet';
 import { cn } from '@/lib/utils';
 import { userCan } from '@/lib/auth/permissions';
 import { routes, guardPermission, type RouteEntry } from '@/routes/manifest';
@@ -18,6 +18,7 @@ export function Nav() {
   const me = useMe();
   const user = me.data ?? null;
   const logout = useLogout();
+  const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -27,11 +28,7 @@ export function Nav() {
   // may be disabled (billing.enabled=false), in which case this call 404s.
   // That's expected, not an error to surface, so the indicator (the SPA's
   // only always-visible billing entry point) renders solely on isSuccess.
-  const walletQ = useQuery({
-    queryKey: qk.billing.wallet(),
-    queryFn: () => api.getJson('/api/v1/billing/wallet', { query: { limit: 1 } }),
-    enabled: !!user,
-  });
+  const walletQ = useWalletSummary(!!user);
 
   const { dark, toggleTheme } = useThemeToggle();
 
@@ -41,6 +38,8 @@ export function Nav() {
   // Register" while /me is still pending, and still never claims the user
   // is logged out on a 5xx/network error (isSuccess stays false then).
   const showAuthButtons = me.isSuccess && !user;
+  // Invite-only servers hide Register; unknown counts as open.
+  const registrationOpen = useRegistrationOpen(showAuthButtons);
 
   // Nav links come straight from the routes manifest — every route that
   // declares a navLabel, filtered by what this user is allowed to see.
@@ -59,8 +58,12 @@ export function Nav() {
       : location.pathname === path || location.pathname.startsWith(path + '/');
 
   const logoutAndRedirect = async () => {
-    await logout.mutateAsync();
-    navigate('/login');
+    try {
+      await logout.mutateAsync();
+      navigate('/login');
+    } catch {
+      toast.error('Could not sign out. Check the connection and try again.');
+    }
   };
 
   return (
@@ -137,9 +140,11 @@ export function Nav() {
                 <Button size="sm" variant="ghost" asChild>
                   <Link to="/login">Log in</Link>
                 </Button>
-                <Button size="sm" asChild>
-                  <Link to="/register">Register</Link>
-                </Button>
+                {registrationOpen && (
+                  <Button size="sm" asChild>
+                    <Link to="/register">Register</Link>
+                  </Button>
+                )}
               </>
             )}
           </div>
@@ -225,11 +230,13 @@ export function Nav() {
                     Log in
                   </Link>
                 </Button>
-                <Button asChild>
-                  <Link to="/register" onClick={() => setMenuOpen(false)}>
-                    Register
-                  </Link>
-                </Button>
+                {registrationOpen && (
+                  <Button asChild>
+                    <Link to="/register" onClick={() => setMenuOpen(false)}>
+                      Register
+                    </Link>
+                  </Button>
+                )}
               </div>
             )}
           </div>

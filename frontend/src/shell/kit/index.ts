@@ -1,4 +1,4 @@
-export { Amount, Num } from './Num';
+export { Num } from './Num';
 export { Banner } from './Banner';
 export { Facts } from './Facts';
 export { Filters } from './Filters';

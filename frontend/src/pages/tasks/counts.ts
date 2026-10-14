@@ -1,4 +1,4 @@
-import { useAgenda, useNotes } from '@/hooks/useTasks';
+import { useAgenda, useInbox } from '@/hooks/useTasks';
 import { localToday, localZone } from '@/lib/tasks';
 
 /** The agenda of today in this browser's zone and the tab counts every page shows. */
@@ -6,7 +6,7 @@ export function useTasksDay() {
   const today = localToday();
   const tz = localZone();
   const agenda = useAgenda(today, tz);
-  const notes = useNotes('inbox');
+  const notes = useInbox('inbox');
   const a = agenda.data;
   const counts = {
     today: a ? a.late.length + a.soon.length : 0,

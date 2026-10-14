@@ -1,3 +1,5 @@
+import { formatDay } from '@/lib/dates';
+
 import type {
   TravelCounter,
   TravelCrossing,
@@ -8,6 +10,7 @@ import type {
 } from './types';
 
 export type * from './types';
+export { daysBetween, todayLocal } from '@/lib/dates';
 
 let names: Intl.DisplayNames | null = null;
 
@@ -58,29 +61,9 @@ export function splitTrips<T extends Pick<TravelTrip, 'start_date' | 'end_date'>
   return { coming, past };
 }
 
-/** Whole days from @p today to @p date (both YYYY-MM-DD). */
-export function daysBetween(today: string, date: string): number {
-  return Math.round(
-    (Date.parse(`${date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000,
-  );
-}
-
 /** "Nov 1" for a day of this year, "Nov 1, 2025" otherwise. */
 export function shortDay(iso: string, today: string): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  return d.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    ...(iso.slice(0, 4) === today.slice(0, 4) ? {} : { year: 'numeric' }),
-    timeZone: 'UTC',
-  });
-}
-
-export function todayLocal(): string {
-  const d = new Date();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${m}-${day}`;
+  return formatDay(iso, { yearUnless: today });
 }
 
 /**

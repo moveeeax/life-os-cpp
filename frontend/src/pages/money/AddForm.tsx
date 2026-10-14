@@ -13,6 +13,7 @@ import {
   useNearbyRows,
 } from '@/hooks/useMoney';
 import {
+  LAST_ACCOUNT_KEY,
   RECEIPT_MAX_BYTES,
   draftFromJob,
   draftProblem,
@@ -48,17 +49,16 @@ const num = (v: string): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-const LAST_ACCOUNT = 'money:last-account';
 const readLast = (): string => {
   try {
-    return localStorage.getItem(LAST_ACCOUNT) ?? '';
+    return localStorage.getItem(LAST_ACCOUNT_KEY) ?? '';
   } catch {
     return '';
   }
 };
 const writeLast = (id: string) => {
   try {
-    localStorage.setItem(LAST_ACCOUNT, id);
+    localStorage.setItem(LAST_ACCOUNT_KEY, id);
   } catch {
     // a private window: the form just does not remember
   }

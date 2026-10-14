@@ -99,7 +99,12 @@ export function LearningCoursePage() {
       {course.isPending ? (
         <Placeholder />
       ) : course.isError ? (
-        <LoadError error={course.error} onRetry={() => void course.refetch()} module="tasks" />
+        <LoadError
+          error={course.error}
+          onRetry={() => void course.refetch()}
+          module="tasks"
+          notFound="This course is not here: it may have been deleted."
+        />
       ) : (
         <>
           {progress && <Meter value={progress.done} max={progress.total} />}

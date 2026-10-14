@@ -76,7 +76,11 @@ export function TasksProjectPage() {
       {project.isPending ? (
         <Placeholder />
       ) : project.isError ? (
-        <LoadError error={project.error} onRetry={() => void project.refetch()} />
+        <LoadError
+          error={project.error}
+          onRetry={() => void project.refetch()}
+          notFound="This project is not here: it may have been deleted."
+        />
       ) : (
         <>
           {p?.description && (

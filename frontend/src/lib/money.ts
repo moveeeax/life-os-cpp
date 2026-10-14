@@ -14,11 +14,11 @@
  * here, done ONLY at render/parse boundaries — nothing upstream should ever
  * do arithmetic on a formatted/float dollar amount.
  */
+import { formatAmount } from '@/lib/amounts';
 
 /** Integer cents → "12.34" for display. Never used for further arithmetic. */
-export function formatCents(cents: number): string {
-  return (cents / 100).toFixed(2);
-}
+export const formatCents = (cents: number): string =>
+  formatAmount(cents / 100, { grouping: false, trueMinus: false });
 
 /**
  * Parse a user-typed dollar string ("12.34") into integer cents (1234)

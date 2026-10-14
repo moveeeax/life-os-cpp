@@ -9,7 +9,7 @@ import {
   useFoodRecent,
   useItemFromOff,
   useOffSearch,
-  useParseJob,
+  useFoodParse,
 } from '@/hooks/useFood';
 import {
   draftFromJob,
@@ -376,7 +376,7 @@ function GramsStep({
 
 function DescribeTab({ date, meal, onDone }: TabProps) {
   const [text, setText] = useState('');
-  const parse = useParseJob();
+  const parse = useFoodParse();
   const [lines, setLines] = useState<ParseDraftLine[]>([]);
   const add = useCreateEntries(onDone);
 

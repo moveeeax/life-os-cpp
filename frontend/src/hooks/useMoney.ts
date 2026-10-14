@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
-import { ApiClientError, api, apiErrorMessage } from '@/lib/api/client';
+import { useModuleProbe } from '@/hooks/useModuleProbe';
+import { useParseJob } from '@/hooks/useParseJob';
+import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import type { components } from '@/lib/api/schema.gen';
 import { isDay, shiftDay, type AcceptLine } from '@/lib/ledger';
@@ -216,19 +217,12 @@ export function useMoneySettings() {
   });
 }
 
+/** [query key, url] of the probe that says whether the module is on. */
+export const MONEY_PROBE = [qk.money.enabled(), `${BASE}/settings`] as const;
+
 /** Whether the money module answers at all (404 while switched off). */
 export function useMoneyEnabled(signedIn: boolean): boolean {
-  const probe = useQuery({
-    queryKey: qk.money.enabled(),
-    enabled: signedIn,
-    staleTime: Infinity,
-    retry: false,
-    queryFn: async ({ signal }) => {
-      const { error } = await api.GET(`${BASE}/settings` as string, { signal });
-      return !(error && error.status === 404);
-    },
-  });
-  return probe.data ?? true;
+  return useModuleProbe(...MONEY_PROBE, signedIn) ?? true;
 }
 
 // ── writes ─────────────────────────────────────────────────────────────────
@@ -353,7 +347,7 @@ export function useSaveSettings(onSuccess?: () => void) {
 
 // ── the parse ──────────────────────────────────────────────────────────────
 
-export type ParseState = 'idle' | 'starting' | 'running' | 'done' | 'failed';
+export type { ParseState } from '@/hooks/useParseJob';
 
 export type ParseStart =
   | { kind: 'text'; text: string; hint_date?: string }
@@ -365,100 +359,22 @@ export type ParseStart =
  * drop the job: a reopened form starts clean.
  */
 export function useMoneyParse() {
-  const [state, setState] = useState<ParseState>('idle');
-  const [job, setJob] = useState<ParseJob | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const starting = useRef(false);
-  const generation = useRef(0);
-
-  const start = useCallback(async (body: ParseStart) => {
-    if (starting.current) return;
-    starting.current = true;
-    const mine = ++generation.current;
-    setState('starting');
-    setError(null);
-    setJob(null);
-    try {
+  return useParseJob({
+    enqueue: async (body: ParseStart) => {
       const path = body.kind === 'receipt' ? `${BASE}/parse/receipt` : `${BASE}/parse`;
       const payload =
         body.kind === 'receipt'
           ? { image: body.image, hint_date: body.hint_date }
           : { text: body.text, hint_date: body.hint_date };
       const { data } = await api.postJson<{ data: { id: string } }>(path, { body: payload });
-      if (generation.current !== mine) return;
-      setJob({ id: data.id, status: 'queued' } as ParseJob);
-      setState('running');
-    } catch (e) {
-      if (generation.current !== mine) return;
-      setError(
-        e instanceof ApiClientError && e.code === 'not_configured'
-          ? 'not_configured'
-          : apiErrorMessage(e),
-      );
-      setState('failed');
-    } finally {
-      starting.current = false;
-    }
-  }, []);
-
-  const cancel = useCallback(() => {
-    generation.current++;
-    starting.current = false;
-    setState('idle');
-    setJob(null);
-    setError(null);
-  }, []);
-
-  const jobId = state === 'running' ? job?.id : undefined;
-
-  useEffect(() => {
-    if (!jobId) return;
-    const mine = generation.current;
-    const deadline = Date.now() + PARSE_DEADLINE_MS;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const controller = new AbortController();
-    const tick = async () => {
-      if (generation.current !== mine) return;
-      if (Date.now() > deadline) {
-        setError('parse_timeout');
-        setState('failed');
-        return;
-      }
-      try {
-        const { data } = await api.getJson<{ data: ParseJob }>(`${BASE}/parse/${jobId}`, {
-          signal: controller.signal,
-        });
-        if (generation.current !== mine) return;
-        setJob(data);
-        if (data.status === 'done') {
-          setState('done');
-          return;
-        }
-        if (data.status === 'failed') {
-          setError(data.error);
-          setState('failed');
-          return;
-        }
-      } catch (e) {
-        if (generation.current !== mine || controller.signal.aborted) return;
-        if (e instanceof ApiClientError && e.status === 404) {
-          setError('The parse job is gone.');
-          setState('failed');
-          return;
-        }
-      }
-      timer = setTimeout(() => void tick(), PARSE_POLL_MS);
-    };
-    void tick();
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
-  }, [jobId]);
-
-  useEffect(() => () => void generation.current++, []);
-
-  return { state, job, error, start, cancel };
+      return { id: data.id, status: 'queued' } as ParseJob;
+    },
+    read: async (id, signal) =>
+      (await api.getJson<{ data: ParseJob }>(`${BASE}/parse/${id}`, { signal })).data,
+    pollMs: PARSE_POLL_MS,
+    deadlineMs: PARSE_DEADLINE_MS,
+    notConfigured: 'not_configured',
+  });
 }
 
 export function useAcceptParse(jobId: string | undefined, onSuccess?: () => void) {

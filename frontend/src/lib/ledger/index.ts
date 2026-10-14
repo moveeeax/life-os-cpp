@@ -1,5 +1,8 @@
 // Pure logic of the Money pages: formats, periods, per-currency totals, the
 // parse draft, small rules. Amounts of different currencies are never added.
+import { formatAmount } from '@/lib/amounts';
+import { shiftDays } from '@/lib/dates';
+
 import type {
   Currency,
   Merchant,
@@ -10,6 +13,10 @@ import type {
 } from './types';
 
 export * from './types';
+export { formatDay, isDay, todayLocal } from '@/lib/dates';
+
+/** The account the add form picked last, kept in the browser. */
+export const LAST_ACCOUNT_KEY = 'money:last-account';
 
 // ── formats ────────────────────────────────────────────────────────────────
 
@@ -24,19 +31,8 @@ export const decimalsOf = (currencies: Currency[] | undefined, code: string): nu
   currencies?.find((c) => c.code === code)?.decimals ?? 2;
 
 /** "₸13,275.61"-style text in the currency's own decimals. */
-export function formatMoney(amount: number, currency: string, decimals = 2): string {
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    }).format(amount);
-  } catch {
-    // An unknown code: the number and the code.
-    return `${amount.toFixed(decimals)} ${currency}`;
-  }
-}
+export const formatMoney = (amount: number, currency: string, decimals = 2): string =>
+  formatAmount(amount, { currency, symbol: true, digits: decimals });
 
 /** The amount as it moved the account: expenses negative, incomes positive. */
 export function signedAmount(row: Pick<Transaction, 'type' | 'amount'>): number {
@@ -57,8 +53,6 @@ function parse(date: string): Date | null {
   return d.getMonth() === Number(m[2]) - 1 && d.getDate() === Number(m[3]) ? d : null;
 }
 
-export const todayLocal = (now: Date = new Date()): string => text(now);
-
 export function periodFromSearch(
   search: URLSearchParams,
   today: string,
@@ -72,11 +66,7 @@ export function periodFromSearch(
 }
 
 /** The day `by` days from `date` (YYYY-MM-DD in, YYYY-MM-DD out). */
-export function shiftDay(date: string, by: number): string {
-  const d = parse(date) ?? new Date();
-  d.setDate(d.getDate() + by);
-  return text(d);
-}
+export const shiftDay = shiftDays;
 
 /**
  * A posted row the draft may repeat: the same account, type and amount within
@@ -156,13 +146,6 @@ export function shiftPeriod(kind: PeriodKind, date: string, by: number): string 
     start.setMonth(start.getMonth() + (kind === 'quarter' ? 3 : 1) * by);
   }
   return text(start);
-}
-
-export function formatDay(date: string): string {
-  const d = parse(date);
-  return d
-    ? d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-    : date;
 }
 
 // ── totals ─────────────────────────────────────────────────────────────────
@@ -388,4 +371,3 @@ export async function scaleImage(
 export const RECEIPT_MAX_BYTES = 4 * 1024 * 1024;
 
 /** A calendar day as YYYY-MM-DD, for the forms' date fields. */
-export const isDay = (date: string): boolean => parse(date) !== null;

@@ -39,6 +39,14 @@ export function TravelFrame({
 }
 
 /** A failed query of Travel (a 404 names the module). */
-export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
-  return <KitLoadError error={error} onRetry={onRetry} module="travel" />;
+export function LoadError({
+  error,
+  onRetry,
+  notFound,
+}: {
+  error: unknown;
+  onRetry: () => void;
+  notFound?: string;
+}) {
+  return <KitLoadError error={error} onRetry={onRetry} module="travel" notFound={notFound} />;
 }

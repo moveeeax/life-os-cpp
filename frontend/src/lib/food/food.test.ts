@@ -22,7 +22,7 @@ describe('todayLocal', () => {
   it('formats the local calendar date, not the UTC one', () => {
     // 23:30 local on the 5th; toISOString would be the 6th in a zone behind UTC.
     const now = new Date(2026, 9, 5, 23, 30);
-    expect(todayLocal(now)).toBe('2026-10-05');
+    expect(todayLocal(undefined, now)).toBe('2026-10-05');
   });
 });
 

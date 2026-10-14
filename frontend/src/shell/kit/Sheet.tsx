@@ -86,7 +86,7 @@ export function Sheet({
         {title && (
           <div className="k-dlg-head">
             <h2>{title}</h2>
-            <button type="button" className="k-x" aria-label="Close" onClick={onClose}>
+            <button type="button" className="k-x" aria-label="Close" onClick={requestClose}>
               ×
             </button>
           </div>

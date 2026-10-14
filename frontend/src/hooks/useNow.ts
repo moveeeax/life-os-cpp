@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
+import { useModuleProbe } from '@/hooks/useModuleProbe';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import {
   cacheKey,
+  pruneDays,
   readCache,
   writeCache,
   type AdminSound,
@@ -35,22 +37,15 @@ async function del(path: string, query?: Record<string, string>): Promise<void> 
 /** The focus moves a task, so a focus write refreshes Tasks too. */
 const AFTER_FOCUS = [qk.now.all(), qk.tasks.all()] as const;
 
+/** [query key, url] of the probe that says whether the module is on. */
+export const NOW_PROBE = [qk.now.enabled(), '/api/v1/wallpapers?device=desktop'] as const;
+
 /**
  * Whether the now module answers at all: the wallpaper list is 404 only while
  * the module is off (503 means on, without storage). Undefined while asking.
  */
 export function useNowEnabled(signedIn: boolean): boolean | undefined {
-  const probe = useQuery({
-    queryKey: qk.now.enabled(),
-    enabled: signedIn,
-    staleTime: Infinity,
-    retry: false,
-    queryFn: async ({ signal }) => {
-      const { error } = await api.GET('/api/v1/wallpapers?device=desktop' as string, { signal });
-      return !(error && error.status === 404);
-    },
-  });
-  return probe.data;
+  return useModuleProbe(...NOW_PROBE, signedIn);
 }
 
 /**
@@ -68,7 +63,10 @@ export function useToday(userId: string | null, date: string, tz: string) {
     queryFn: async ({ signal }) => {
       const data = (await api.getJson<{ data: Today }>(TODAY, { query: { date, tz }, signal }))
         .data;
-      if (key) writeCache(key, data);
+      if (key && userId) {
+        writeCache(key, data);
+        pruneDays(userId, date);
+      }
       return data;
     },
   });

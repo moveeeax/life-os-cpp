@@ -11,6 +11,7 @@ import {
   type GoalKind,
   type Tone,
 } from '@/lib/goals';
+import { formatDay } from '@/lib/dates';
 import { goalBody } from '@/lib/goals/bodies';
 import { AREAS, areaOf, localToday, type Area } from '@/lib/tasks';
 import { cn } from '@/lib/utils';
@@ -37,12 +38,7 @@ const TONE: Record<Tone, string> = {
   fail: 'k-error-text',
 };
 const shortDate = (s: string, today: string) =>
-  new Date(`${s}T12:00:00Z`).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: s.slice(0, 4) === today.slice(0, 4) ? undefined : 'numeric',
-    timeZone: 'UTC',
-  });
+  formatDay(s, { locale: 'en-GB', yearUnless: today });
 
 /** Three numbers where they say something: now, expected today, the pace to make it. */
 function Facts({ goal }: { goal: Goal }) {

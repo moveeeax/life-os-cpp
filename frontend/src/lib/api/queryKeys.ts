@@ -8,6 +8,8 @@
  */
 export const qk = {
   me: () => ['me'] as const,
+  /** Whether sign-up is open (public probe). */
+  registration: () => ['registration'] as const,
   billing: {
     packages: () => ['billing', 'packages'] as const,
     /** Own wallet balance + ledger page. usePagedQuery-style: page appended by callers. */
@@ -93,7 +95,8 @@ export const qk = {
   tasks: {
     all: () => ['tasks'] as const,
     agenda: (date: string, tz: string) => ['tasks', 'agenda', date, tz] as const,
-    notes: (status: string) => ['tasks', 'notes', status] as const,
+    /** The inbox of Tasks (thoughts that are not tasks yet); the API calls them notes. */
+    inbox: (status: string) => ['tasks', 'inbox', status] as const,
     status: () => ['tasks', 'status'] as const,
     projects: (kind: string) => ['tasks', 'projects', kind] as const,
     project: (id: string) => ['tasks', 'project', id] as const,
@@ -132,6 +135,8 @@ export const qk = {
     candidates: (id: string) => ['travel', 'candidates', id] as const,
     packing: (id: string) => ['travel', 'packing', id] as const,
     documents: () => ['travel', 'documents'] as const,
+    /** Outside ['travel'], so a write in travel does not re-run the probe. */
+    enabled: () => ['travel-enabled'] as const,
   },
   /** Habits section. */
   habits: {
