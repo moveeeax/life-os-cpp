@@ -369,6 +369,51 @@ TEST(HttpE2E, LogoutRevokesRefreshToken) {
     expect_matches_schema(denied, "POST", "/api/v1/auth/refresh");
 }
 
+TEST(HttpE2E, LogoutWorksAfterTheAccessCookieExpired) {
+    // The browser drops an expired access cookie, so a late sign-out carries
+    // only the refresh cookie. Logout must still reach its handler (it is
+    // auth-public) and revoke the refresh JTI; behind the auth gate it got a
+    // 401 and the refresh token stayed usable for its whole TTL.
+    REQUIRE_E2E_ENV();
+    auto sc = register_and_login("e2e-late-logout@example.com", "password-e2e-1");
+    SessionCookies refresh_only;
+    refresh_only.refresh = sc.refresh;
+
+    auto logout = HttpRequest::newHttpRequest();
+    logout->setMethod(Post);
+    logout->setPath("/api/v1/auth/logout");
+    attach_session(logout, refresh_only);
+    auto logout_resp = send(logout);
+    ASSERT_EQ(logout_resp->statusCode(), k200OK) << logout_resp->getBody();
+    expect_matches_schema(logout_resp, "POST", "/api/v1/auth/logout");
+
+    auto refresh = HttpRequest::newHttpRequest();
+    refresh->setMethod(Post);
+    refresh->setPath("/api/v1/auth/refresh");
+    attach_session(refresh, refresh_only);
+    auto denied = send(refresh);
+    EXPECT_EQ(denied->statusCode(), k401Unauthorized);
+}
+
+TEST(HttpE2E, LogoutWithoutAnySessionStillSucceeds) {
+    REQUIRE_E2E_ENV();
+    auto logout = HttpRequest::newHttpRequest();
+    logout->setMethod(Post);
+    logout->setPath("/api/v1/auth/logout");
+    auto resp = send(logout);
+    EXPECT_EQ(resp->statusCode(), k200OK) << resp->getBody();
+}
+
+TEST(HttpE2E, RegistrationProbeIsPublic) {
+    REQUIRE_E2E_ENV();
+    auto req = HttpRequest::newHttpRequest();
+    req->setPath("/api/v1/auth/registration");
+    auto resp = send(req);
+    ASSERT_EQ(resp->statusCode(), k200OK) << resp->getBody();
+    EXPECT_EQ(body_of(resp)["data"]["open"], true);
+    expect_matches_schema(resp, "GET", "/api/v1/auth/registration");
+}
+
 TEST(HttpE2E, IdempotencyKeyReplaysResponse) {
     REQUIRE_E2E_ENV();
     const json body = {{"email", "e2e-idem@example.com"}, {"password", "password-e2e-1"}};

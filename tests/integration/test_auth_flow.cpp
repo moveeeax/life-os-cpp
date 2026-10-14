@@ -29,8 +29,11 @@
 #include "api/AuthController.hpp"
 #include "database/Database.hpp"
 #include "repositories/UserRepository.hpp"
+#include "security/Jwt.hpp"
 #include "security/Password.hpp"
+#include "security/SessionStore.hpp"
 #include "test_helpers.hpp"
+#include "utils/Time.hpp"
 
 using json = nlohmann::json;
 using namespace drogon;
@@ -209,6 +212,35 @@ TEST_F(AuthFlowTest, meRefuses401WhenNoPrincipal) {
     controller.me(req, [&](const HttpResponsePtr& r) { resp = r; });
     ASSERT_NE(resp, nullptr);
     EXPECT_EQ(resp->statusCode(), k401Unauthorized);
+}
+
+TEST_F(AuthFlowTest, refreshRefusesAnExpiredTokenEvenWithALiveJti) {
+    auto reg = make_post({{"email", "frank@example.com"}, {"password", "rightpassword"}});
+    HttpResponsePtr regr;
+    controller.registerUser(reg, [&](const HttpResponsePtr& r) { regr = r; });
+    ASSERT_EQ(regr->statusCode(), k201Created);
+    Repositories::UserRepository repo;
+    auto user = repo.find_by_email("frank@example.com");
+    ASSERT_TRUE(user.has_value());
+
+    // A signed refresh token that expired an hour ago, whose JTI marker is
+    // still in Redis: the marker alone must not keep the session alive.
+    const auto& cfg = Security::Auth::get().config();
+    const auto now = Utils::Time::now_epoch_seconds();
+    const std::string jti = "expired-refresh-jti-1";
+    const json claims = {{"sub", user->id}, {"iat", now - 7200}, {"exp", now - 3600}, {"typ", "refresh"}, {"jti", jti}};
+    const auto token = Security::Auth::issue_hs256_jwt(claims, kSecret);
+    ASSERT_TRUE(Security::Sessions::record(cfg.cookies, user->id, jti, 600));
+
+    auto req = HttpRequest::newHttpRequest();
+    req->setMethod(Post);
+    req->addCookie(cfg.cookies.refresh_name, token);
+    HttpResponsePtr resp;
+    controller.refresh(req, [&](const HttpResponsePtr& r) { resp = r; });
+    ASSERT_NE(resp, nullptr);
+    EXPECT_EQ(resp->statusCode(), k401Unauthorized);
+    auto body = json::parse(std::string(resp->body()));
+    EXPECT_EQ(body["error"].get<std::string>(), "token_expired");
 }
 
 }  // namespace

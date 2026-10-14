@@ -36,7 +36,7 @@ Set `CONFIG_FILE` to point at a different JSON file (e.g.
 
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
-| `API_PUBLIC_PATHS` | `api.public_paths` | csv | `/`, the probes (`/healthz,/ready,/health,/metrics`), `/api/v1/docs`, `/api/v1/openapi.yaml`, `/api/v1/auth/{login,register,refresh}`, `/api/v1/account/confirm/*`, `/api/v1/account/reset-password-request`, `/api/v1/account/reset-password/*`, `/api/v1/account/change-email/*`, `/api/v1/account/join-from-invite/*` (`Utils::Strings::kDefaultPublicPathsCsv`) | Paths that bypass auth. Exact-match; a trailing `*` is a prefix match (used for the token-bearing account routes). FULL OVERRIDE of the built-in default — prefer the extra key below for additions. |
+| `API_PUBLIC_PATHS` | `api.public_paths` | csv | `/`, the probes (`/healthz,/ready,/health,/metrics`), `/api/v1/docs`, `/api/v1/openapi.yaml`, `/api/v1/auth/{login,register,refresh,logout,registration}`, `/api/v1/account/confirm/*`, `/api/v1/account/reset-password-request`, `/api/v1/account/reset-password/*`, `/api/v1/account/change-email/*`, `/api/v1/account/join-from-invite/*` (`Utils::Strings::kDefaultPublicPathsCsv`) | Paths that bypass auth. Exact-match; a trailing `*` is a prefix match (used for the token-bearing account routes). FULL OVERRIDE of the built-in default — prefer the extra key below for additions. |
 | `API_PUBLIC_PATHS_EXTRA` | `api.public_paths_extra` | csv | — | ADDITIVE companion to `API_PUBLIC_PATHS`: entries are appended to the resolved public-paths set (built-in default or override), same matching rules. Use it to open extra routes (a payment-provider webhook, a public feed) without re-listing — and risking silently dropping — the default set. |
 | `CORS_ALLOWED_ORIGINS` | `cors.allowed_origins` | csv | — | Empty disables CORS |
 
@@ -46,6 +46,7 @@ Set `CONFIG_FILE` to point at a different JSON file (e.g.
 |---|---|---|---|---|
 | `AUTH_MODE` | `auth.mode` | enum | `none` | `none` \| `bearer` \| `jwt` |
 | `AUTH_BEARER_TOKEN` | `auth.bearer_token` | string | — | Required when `mode=bearer` |
+| `REGISTRATION_OPEN` | `auth.registration_open` | bool | `true` | Self sign-up. `false` makes the instance invite-only: `POST /api/v1/auth/register` answers 403 `registration_closed`, `GET /api/v1/auth/registration` reports `{"data":{"open":false}}`, and admin invites (`POST /api/v1/admin/invite` + `/api/v1/account/join-from-invite/{token}`) keep working. Read per request. Prod sets `false` (`deploy/values-prod.yaml`). |
 | `JWT_SECRET` | `auth.jwt.secret` | string | — | Required when `mode=jwt` |
 | `JWT_ISSUER` | `auth.jwt.issuer` | string | — | Checked if non-empty |
 | `JWT_AUDIENCE` | `auth.jwt.audience` | string | — | Checked if non-empty |

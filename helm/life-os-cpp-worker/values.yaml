@@ -225,6 +225,13 @@ habits:
   enabled: false
 
 # ---------------------------------------------------------------
+# Self sign-up — keep in sync with the life-os-cpp chart (the worker does not
+# serve /register; the knob is here so both charts carry the same env). Env var set: REGISTRATION_OPEN
+# ---------------------------------------------------------------
+registration:
+  open: true
+
+# ---------------------------------------------------------------
 # notes module — keep in sync with the life-os-cpp chart. Env var set: NOTES_ENABLED
 # ---------------------------------------------------------------
 notes:

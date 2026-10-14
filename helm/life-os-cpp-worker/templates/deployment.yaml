@@ -219,6 +219,9 @@ spec:
             # notes module — master switch
             - name: NOTES_ENABLED
               value: {{ .Values.notes.enabled | quote }}
+            # self sign-up: false = invite-only
+            - name: REGISTRATION_OPEN
+              value: {{ .Values.registration.open | quote }}
             # now module — master switch
             - name: NOW_ENABLED
               value: {{ .Values.now.enabled | quote }}

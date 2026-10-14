@@ -9699,6 +9699,16 @@
      "400": {
       "description": "Validation failed"
      },
+     "403": {
+      "description": "Self sign-up is closed (auth.registration_open = false): error registration_closed. Invited users redeem their link at /api/v1/account/join-from-invite/{token} instead.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
      "409": {
       "description": "Email already registered"
      },
@@ -9708,6 +9718,43 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/auth/registration": {
+   "get": {
+    "summary": "Whether self sign-up is open",
+    "description": "Auth-public. The sign-in page reads it to show or hide the sign-up link. Mirrors auth.registration_open (REGISTRATION_OPEN).",
+    "tags": [
+     "auth"
+    ],
+    "responses": {
+     "200": {
+      "description": "Registration status",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "open"
+           ],
+           "properties": {
+            "open": {
+             "type": "boolean"
+            }
+           }
+          }
+         }
         }
        }
       }
@@ -9788,13 +9835,9 @@
   "/api/v1/auth/logout": {
    "post": {
     "summary": "Log out (clears cookies + revokes refresh token)",
+    "description": "Auth-public: works with only the refresh cookie (an expired access cookie) and answers 200 even without a session.",
     "tags": [
      "auth"
-    ],
-    "security": [
-     {
-      "BearerAuth": []
-     }
     ],
     "responses": {
      "200": {
@@ -27223,7 +27266,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 396647,
-  "source_fnv1a64": "6813dcece824a053"
+  "source_bytes": 397720,
+  "source_fnv1a64": "66d6e3193c9b2c3c"
  }
 }

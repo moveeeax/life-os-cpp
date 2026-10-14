@@ -24,6 +24,7 @@
 #include "security/Password.hpp"
 #include "security/RateLimit.hpp"
 #include "security/SessionStore.hpp"
+#include "utils/Config.hpp"
 #include "utils/Crypto.hpp"
 #include "utils/ErrorResponse.hpp"
 #include "utils/Time.hpp"
@@ -31,6 +32,12 @@
 namespace Api {
 
 void AuthController::registerUser(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
+    // Invite-only mode: self sign-up is closed. Invited users never come
+    // through here (they redeem their link at /account/join-from-invite).
+    if (!registration_open()) {
+        callback(ErrorResponse::forbidden("registration_closed", "Sign-up is by invitation only"));
+        return;
+    }
     json body;
     if (!Validation::parse_body(req, body, callback))
         return;
@@ -75,6 +82,11 @@ void AuthController::registerUser(const HttpRequestPtr& req, std::function<void(
         callback(Response::created(
             {{"user", json(created)}, {"message", "Account created. Check your email for the confirmation link."}}));
     });
+}
+
+void AuthController::registration(const HttpRequestPtr& /*req*/,
+                                  std::function<void(const HttpResponsePtr&)>&& callback) {
+    callback(Response::ok({{"data", {{"open", registration_open()}}}}));
 }
 
 void AuthController::login(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
@@ -171,6 +183,13 @@ void AuthController::refresh(const HttpRequestPtr& req, std::function<void(const
         callback(ErrorResponse::unauthorized("malformed_claims"));
         return;
     }
+    // verify_hs256_jwt checks only shape and signature. The JTI marker in
+    // Redis carries the same TTL, but a marker that outlives its token (a
+    // TTL change, a restored snapshot) must not extend the session.
+    if (!refresh_unexpired(claims, cfg.jwt_leeway_sec)) {
+        callback(ErrorResponse::unauthorized("token_expired"));
+        return;
+    }
 
     // Revocation check and rotation in one step: the delete is atomic, so of
     // two refreshes racing with the same token only one gets past here.
@@ -210,6 +229,12 @@ void AuthController::me(const HttpRequestPtr& req, std::function<void(const Http
         return;
     }
     callback(Response::ok({{"user", *user}}));
+}
+
+bool AuthController::registration_open() {
+    if (!Config::is_initialized())
+        return true;
+    return Config::get().get<bool>("auth.registration_open", "REGISTRATION_OPEN", true);
 }
 
 std::string AuthController::make_jti() {
@@ -274,6 +299,13 @@ std::optional<AuthController::Session> AuthController::mint_session(const Domain
         return std::nullopt;
     }
     return s;
+}
+
+bool AuthController::refresh_unexpired(const json& claims, int leeway_sec) {
+    const auto it = claims.find("exp");
+    if (it == claims.end() || !it->is_number_integer())
+        return false;
+    return Utils::Time::now_epoch_seconds() <= it->get<std::int64_t>() + leeway_sec;
 }
 
 bool AuthController::consume_refresh(const Security::Auth::AuthConfig& cfg, const std::string& jti) {
