@@ -6,6 +6,28 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.26.0] - 2026-10-14
+
+### Added
+- Habits under `/api/v1/habits` (module switch `HABITS_ENABLED`, migration 037):
+  habits every day or N times a week with an optional goal, ticked by hand or
+  from data (sleep, steps and active kcal from Mi Fitness, a finished Training
+  session), evaluated on read on the caller's local day, with the current and
+  the best streak. A Habits section (Today and Week) and a Habits plate on Now
+  that Arrange can place; `/api/v1/today` gains the `habits` part.
+- Learning: courses are projects of kind course, with platform, dates, link and
+  certificate. The section lists them with progress by steps; a course page
+  holds its steps (tasks) and its notes. Shown when Tasks is on.
+- Notes: private Markdown notes with the fields of a tarassov.me post (slug,
+  title, summary, body, topic, tags), so a note can go to the blog later. A list
+  grouped by month with search and topic chips, an editor with a live preview
+  that never runs HTML, a note made from a task or for a project or course.
+  Switch `NOTES_ENABLED`.
+- Tasks: projects group tasks. A Projects tab lists them with open tasks and the
+  next step; a project page holds its tasks and a quick add filed under it; a
+  task row shows its project; the task form picks one; "#code" in a typed task
+  files it under that project. Courses of Learning are projects of kind course.
+
 ## [1.25.1] - 2026-10-14
 
 ### Changed
