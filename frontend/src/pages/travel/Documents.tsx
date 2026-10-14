@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useDeleteDocument, useDocuments } from '@/hooks/useTravel';
 import { useErrorToast } from '@/hooks/useErrorToast';
 import {
@@ -19,7 +20,8 @@ import { DocumentSheet } from './Sheets';
 export function TravelDocumentsPage() {
   const today = todayLocal();
   const docs = useDocuments();
-  const remove = useDeleteDocument();
+  const [deleting, setDeleting] = useState<TravelDocument | null>(null);
+  const remove = useDeleteDocument(() => setDeleting(null));
   useErrorToast(remove.error);
   const [editing, setEditing] = useState<TravelDocument | 'new' | null>(null);
   const list = docs.data ?? [];
@@ -84,7 +86,7 @@ export function TravelDocumentsPage() {
                   <button
                     type="button"
                     className="k-link k-error-text"
-                    onClick={() => remove.mutate(d.id)}
+                    onClick={() => setDeleting(d)}
                   >
                     Delete
                   </button>
@@ -93,6 +95,17 @@ export function TravelDocumentsPage() {
             );
           })}
         </Group>
+      )}
+      {deleting && (
+        <ConfirmDialog
+          title={`Delete ${deleting.holder}'s ${DOCUMENT_KIND[deleting.kind].toLowerCase()}?`}
+          description="Trips stop checking it. This cannot be undone."
+          confirmLabel="Delete"
+          destructive
+          busy={remove.isPending}
+          onConfirm={() => remove.mutate(deleting.id)}
+          onClose={() => setDeleting(null)}
+        />
       )}
       {editing && (
         <DocumentSheet

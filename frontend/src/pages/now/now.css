@@ -168,9 +168,13 @@
   }
 }
 
-/* The weather after the zone, and the Arrange link. */
+/* The weather in place of the zone, and the Arrange link. */
 .n-weather {
   color: var(--g-ink);
+}
+.n-glyph {
+  font-size: 15px;
+  line-height: 1;
 }
 .n-arrange {
   margin-left: 10px;

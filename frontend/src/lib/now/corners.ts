@@ -194,7 +194,7 @@ function tasksChip(t: Today): Chip {
   if (late) parts.push([{ text: String(late), num: true }, { text: ' late' }]);
   const main = parts.length ? joined(parts) : [{ text: 'Nothing for today' }];
   const small: LinePart[] = open.length
-    ? [{ text: `Next: ${open[0].title}` }]
+    ? [{ text: `Next: ${open[0].title}`, title: true }]
     : late && k?.first_late
       ? [{ text: `Oldest: ${k.first_late.title}` }]
       : [{ text: 'Nothing late' }];

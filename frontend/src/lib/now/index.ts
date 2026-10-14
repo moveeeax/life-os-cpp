@@ -8,3 +8,4 @@ export * from './cache';
 export * from './corners';
 export * from './focus';
 export * from './settings';
+export * from './capture';

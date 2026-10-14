@@ -137,7 +137,28 @@ inline std::string down_key(double latitude, double longitude) {
     return buf;
 }
 
-/// The first match of a geocoder answer, or nullopt when there is none or it lacks coordinates.
+/// The first @p max_bytes of UTF-8 @p text, never half a character.
+inline std::string utf8_prefix(const std::string& text, std::size_t max_bytes) {
+    if (text.size() <= max_bytes) {
+        return text;
+    }
+    std::size_t end = max_bytes;
+    // Step back over continuation bytes (10xxxxxx) to the start of a character.
+    while (end > 0 && (static_cast<unsigned char>(text[end]) & 0xC0) == 0x80) {
+        --end;
+    }
+    return text.substr(0, end);
+}
+
+/// A string field of @p obj, or "" when it is missing or of another type.
+inline std::string text_field(const nlohmann::json& obj, const char* key) {
+    const auto it = obj.find(key);
+    return it != obj.end() && it->is_string() ? it->get<std::string>() : std::string();
+}
+
+/// The first match of a geocoder answer, or nullopt when there is none, it has
+/// no name, or its coordinates are missing or out of range. Odd optional fields
+/// are dropped: the country code unless it is two capitals, a non-string zone.
 inline std::optional<Place> place_of(const nlohmann::json& answer) {
     if (!answer.is_object() || !answer.contains("results") || !answer["results"].is_array() ||
         answer["results"].empty()) {
@@ -149,14 +170,18 @@ inline std::optional<Place> place_of(const nlohmann::json& answer) {
         return std::nullopt;
     }
     Place p;
-    p.city = r["name"].get<std::string>().substr(0, 120);
-    p.country_code = r.value("country_code", std::string());
-    if (p.country_code.size() != 2) {
-        p.country_code.clear();
-    }
+    p.city = utf8_prefix(r["name"].get<std::string>(), 120);
     p.latitude = r["latitude"].get<double>();
     p.longitude = r["longitude"].get<double>();
-    p.timezone = r.value("timezone", std::string()).substr(0, 64);
+    if (p.city.empty() || p.latitude < -90 || p.latitude > 90 || p.longitude < -180 || p.longitude > 180) {
+        return std::nullopt;
+    }
+    p.country_code = text_field(r, "country_code");
+    const auto upper = [](char c) { return c >= 'A' && c <= 'Z'; };
+    if (p.country_code.size() != 2 || !upper(p.country_code[0]) || !upper(p.country_code[1])) {
+        p.country_code.clear();
+    }
+    p.timezone = utf8_prefix(text_field(r, "timezone"), 64);
     return p;
 }
 
@@ -176,8 +201,8 @@ inline std::optional<nlohmann::json> block_of(const nlohmann::json& forecast, co
         {"temperature", cur["temperature_2m"].get<double>()},
         {"code", cur["weather_code"].get<int>()},
         {"words", words(cur["weather_code"].get<int>())},
-        {"is_day", cur.value("is_day", 1) == 1},
-        {"time", cur.value("time", std::string())},
+        {"is_day", !(cur.contains("is_day") && cur["is_day"].is_number_integer() && cur["is_day"].get<int>() == 0)},
+        {"time", text_field(cur, "time")},
         {"min", nullptr},
         {"max", nullptr},
     };

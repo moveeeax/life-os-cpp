@@ -115,13 +115,24 @@ export function useFocusDone() {
 
 // ── settings and weather ───────────────────────────────────────────────────
 
-export function useNowSettings(enabled = true) {
+/**
+ * The Now settings of a user. The last answer paints first, so a moved or
+ * hidden corner does not flash in the default layout on a cold load.
+ */
+export function useNowSettings(userId: string | null) {
+  const key = userId ? `now:settings:${userId}` : null;
   return useQuery({
     queryKey: qk.now.settings(),
-    enabled,
+    enabled: userId !== null,
+    initialData: () => (key ? (readCache<NowSettings>(key) ?? undefined) : undefined),
+    initialDataUpdatedAt: 0,
     staleTime: 10 * 60_000,
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: NowSettings }>('/api/v1/now/settings', { signal })).data,
+    queryFn: async ({ signal }) => {
+      const data = (await api.getJson<{ data: NowSettings }>('/api/v1/now/settings', { signal }))
+        .data;
+      if (key) writeCache(key, data);
+      return data;
+    },
   });
 }
 

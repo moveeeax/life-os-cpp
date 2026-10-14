@@ -71,7 +71,7 @@ export function FocusPicker({
               disabled={set.isPending}
               onClick={() => set.mutate({ date, kind: p.kind, ref_id: p.id })}
             >
-              {p.title}
+              <span data-num-ok>{p.title}</span>
             </button>
           ))}
         </div>
