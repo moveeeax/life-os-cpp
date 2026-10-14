@@ -10,7 +10,7 @@ import { apiErrorMessage } from '@/lib/api/client';
  *
  * - `invalidate`: query-key prefixes invalidated after a successful
  *   mutation (each via invalidateQueries — prefix match, so paged keys
- *   are covered).
+ *   are covered). The mutation stays pending until those refetches end.
  * - `error`: the latest error message (or null), reset on each mutate.
  * - `clearError`: drop the banner manually (e.g. when opening a form).
  *
@@ -40,9 +40,12 @@ export function useApiMutation<TData, TVariables = void>(
     onMutate: () => {
       setError(null);
     },
+    // Returning the refetches keeps isPending (and mutateAsync) on until the
+    // lists show the write: a tick does not flash back to its old state.
     onSuccess: (data, vars) => {
-      invalidate?.forEach((queryKey) => qc.invalidateQueries({ queryKey }));
+      const refetches = (invalidate ?? []).map((queryKey) => qc.invalidateQueries({ queryKey }));
       onSuccess?.(data, vars);
+      return Promise.all(refetches);
     },
     onError: (e) => {
       const message = apiErrorMessage(e);
