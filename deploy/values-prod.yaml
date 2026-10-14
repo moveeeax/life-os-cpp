@@ -77,10 +77,10 @@ auth:
     enabled: true
 
 # Login throttling and the API limit. Two proxies stand in front: Traefik
-# (client address kept through proxy protocol from the balancer) and the
-# frontend nginx, which takes the client from X-Forwarded-For (real_ip) and
-# passes it on in X-Real-IP. Signed-in requests are limited per user, the
-# login per client address.
+# keeps the client address (proxy protocol from the balancer) and sets
+# X-Real-Ip; the frontend nginx of the cpp-frontend chart passes that header
+# through. The failed-login audit shows the client address, so the login is
+# limited per client; signed-in requests are limited per user.
 rateLimit:
   enabled: true
   trustProxy: true
