@@ -1,0 +1,1 @@
+Frontend cleanup: a data router (`createBrowserRouter`) built from the route manifest; one `lib/dates`, one `formatAmount`, one `useModuleProbe` and one `useParseJob` in place of the copies; the tasks inbox is `useInbox` / `qk.tasks.inbox`; the unused billing metrics helpers, kit `Amount`, TailAdmin tokens and direct typescript-eslint packages are gone.
