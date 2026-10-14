@@ -5,6 +5,7 @@ import { useToast } from '@/components/ui/toaster';
 import { useLogout } from '@/hooks/useAuthMutations';
 import { useMe } from '@/hooks/useMe';
 import { useNowSettings } from '@/hooks/useNow';
+import { useWalletSummary } from '@/hooks/useWallet';
 import { Permission, userCan } from '@/lib/auth/permissions';
 
 import { ArrangeSheet } from './ArrangeSheet';
@@ -20,6 +21,8 @@ export function GlassAccountMenu() {
   // Arrange belongs to Now: the weather city and the corners of that page.
   const onNow = useLocation().pathname === '/now';
   const settings = useNowSettings(onNow && user ? user.id : null);
+  // Billing shows only when the server has it on (the wallet answers).
+  const billingOn = useWalletSummary(user !== null).isSuccess;
   const ref = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -96,9 +99,11 @@ export function GlassAccountMenu() {
               Admin
             </Link>
           )}
-          <Link to="/billing" onClick={() => setOpen(false)}>
-            Billing
-          </Link>
+          {billingOn && (
+            <Link to="/billing" onClick={() => setOpen(false)}>
+              Billing
+            </Link>
+          )}
           <button type="button" onClick={signOut}>
             Sign out
           </button>

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { LogOut, Menu, Moon, Sun, Wallet, X } from 'lucide-react';
 
@@ -9,8 +8,7 @@ import { BRAND } from '@/lib/brand';
 import { useLogout } from '@/hooks/useAuthMutations';
 import { useMe } from '@/hooks/useMe';
 import { useThemeToggle } from '@/hooks/useThemeToggle';
-import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
+import { useWalletSummary } from '@/hooks/useWallet';
 import { cn } from '@/lib/utils';
 import { userCan } from '@/lib/auth/permissions';
 import { routes, guardPermission, type RouteEntry } from '@/routes/manifest';
@@ -29,11 +27,7 @@ export function Nav() {
   // may be disabled (billing.enabled=false), in which case this call 404s.
   // That's expected, not an error to surface, so the indicator (the SPA's
   // only always-visible billing entry point) renders solely on isSuccess.
-  const walletQ = useQuery({
-    queryKey: qk.billing.wallet(),
-    queryFn: () => api.getJson('/api/v1/billing/wallet', { query: { limit: 1 } }),
-    enabled: !!user,
-  });
+  const walletQ = useWalletSummary(!!user);
 
   const { dark, toggleTheme } = useThemeToggle();
 
