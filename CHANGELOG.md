@@ -6,6 +6,80 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.27.0] - 2026-10-14
+
+### Added
+- Invite-only registration: `auth.registration_open` / `REGISTRATION_OPEN`
+  (default `true`, `false` in prod) makes `POST /api/v1/auth/register` answer 403
+  `registration_closed` while admin invites keep working, and the public probe
+  `GET /api/v1/auth/registration` returns `{"data":{"open":bool}}` for the
+  sign-in page.
+
+### Changed
+- Controllers share one copy of their helpers: `parse_object`, `no_content` and
+  the 50/200 list limits in `api/HandlerSupport.hpp`, `require_user` and the
+  `API_MODULE_USER_GUARD` / `API_MODULE_PERMISSION_USER_GUARD` module guards in
+  `api/Guards.hpp` (same status codes and bodies), and `SQL_ISO_UTC` in
+  `repositories/SqlTime.hpp` for the timestamp SQL. The tasks inbox repository
+  is `InboxRepository`; `Jobs::cancel` is atomic under concurrent calls;
+  `scripts/new-module.sh` and `scripts/new-react-page.sh` scaffold today's
+  module switch and kit page.
+- Frontend cleanup: a data router (`createBrowserRouter`) built from the route manifest; one `lib/dates`, one `formatAmount`, one `useModuleProbe` and one `useParseJob` in place of the copies; the tasks inbox is `useInbox` / `qk.tasks.inbox`; the unused billing metrics helpers, kit `Amount`, TailAdmin tokens and direct typescript-eslint packages are gone.
+- Infra and CI: the worker pod waits in a `wait-for-schema` init container
+  until the database carries every migration of its version (API image,
+  `--verify-migrations`, 10-minute cap), and the upgrade order API, worker,
+  frontend is in `docs/RUNBOOK.md` and the `release.sh` next steps.
+  `release.yml` builds only a tag on `master` whose commit passed CI, refuses a
+  manual rebuild of a published version without `force`, signs before promote
+  and fails on fixable HIGH as well as CRITICAL. CI scopes a push by the whole
+  push and no longer cancels runs on `master`; helm and yq downloads are pinned
+  by sha256. The frontend nginx gzips text assets, hides its version and sends
+  `form-action 'self'`. `docs/openapi.yaml` and `frontend/package.json` carry
+  the app version (checked by `check-version-sync.sh`, bumped by `release.sh`);
+  the `values-prod.example.yaml` overlays are gone; README, ARCHITECTURE and
+  the RUNBOOK backup and restore section match the cluster.
+- Notes: the search, the topic switch and New note sit in one row under the
+  headline; the search is a quiet pill with a glyph (Food's search too); on a
+  phone the project of a note moves under its title instead of cutting it.
+
+### Removed
+- Unused code and config: the Kafka messaging subsystem (`src/messaging`,
+  librdkafka, the `messaging.*` config keys, the compose Kafka/Zookeeper/exporter
+  services, the cpp-env Kafka template, `make up-kafka`), `Webhooks::send`, the
+  `note` part of `GET /api/v1/today` (`PUT`/`DELETE /api/v1/today/note` stay),
+  the empty `src/billing/Billing.hpp`, `Repositories::safe_order_by` and the
+  unread `billing.provider` key.
+
+### Fixed
+- Security fixes from the review: logout works after the access cookie expired
+  and revokes the refresh token; `/refresh` refuses an expired token; emails
+  over 254 bytes fail validation before the regex; API keys lose the admin bit
+  and answer 401 `key_not_allowed` on `/api/v1/account/*` and `/api/v1/admin/*`
+  (path canonicalized first); the default role cannot hold the admin bit and the
+  last admin role cannot lose it; `POST /api/v1/jobs` takes only `echo`, `slow`,
+  `fail` and `money_rates`; webhook hosts are resolved and refused when any
+  address is internal; a used reset link invalidates the others; password
+  reset/change revoke API keys; admin delete or role change drops refresh
+  sessions; the shared HTTP client follows only http(s) and caps bodies at 16 MiB.
+- Data and job fixes from the 2026-10-14 review. Deleting a user now also
+  deletes the Mi Fitness rows of the Xiaomi account they linked, and only the
+  billing foreign keys are reported as `user_has_billing_history`. A parse or
+  advisor job whose row another delivery still holds waits until the row turns
+  stale instead of spending its retries; every write after the claim is fenced
+  by the attempt; a row whose worker died reads as `failed` (`worker_lost`), and
+  a row the queue gave up on is closed as `failed` (`queue_gave_up`). Queued
+  rows older than ten minutes no longer count toward `too_many_parses`. Retry
+  backoff is on by default (`JOBS_RETRY_BACKOFF_BASE_MS=2000`). A late Xiaomi
+  login can no longer overwrite a fresh re-link (writes fenced by `rotated_at`).
+  With `?tz=` and no date, Today, Tasks, Goals, Travel and the Money report and
+  parse take today in that zone instead of UTC. Habit streaks no longer lose
+  their newest days when an old range is viewed. A money account or category
+  delete that loses a race answers 409 `in_use`, not 500. Money amounts with
+  more than 15 significant digits are refused (`precision`). `/today` counts the
+  inbox instead of loading it, and three foreign keys got indexes (migration
+  040).
+- Frontend fixes from the review: a failed session refetch no longer replaces the page when a user is cached; the notes editor keeps words typed during a save and asks before leaving a dirty draft; the tasks inbox posts once per Enter; the sheet's close button asks like Escape; sign-out reports a failure and wipes the user's browser storage (the Now cache keeps only today); Notes shows while its probe runs and Now waits for every module probe before redirecting; detail pages say the record is gone on a 404; the pill nav keeps the current section in view; a mutation stays pending until its lists refetch; Billing in the account menu only when billing answers; the day panel compares rates with the local date; the sign-up links hide when `GET /api/v1/auth/registration` says closed.
+
 ## [1.26.0] - 2026-10-14
 
 ### Added

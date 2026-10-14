@@ -3,7 +3,7 @@
  "info": {
   "title": "life-os-cpp API",
   "description": "Infrastructure endpoints of life-os-cpp: health probes\nand a background-job API. Authentication is opt-in (auth.mode=jwt|bearer|none).\nRate-limiting and idempotency are driven by headers.\n",
-  "version": "1.26.0",
+  "version": "1.27.0",
   "contact": {
    "name": "Platform team"
   }
@@ -27265,6 +27265,6 @@
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
   "source_bytes": 398206,
-  "source_fnv1a64": "fc455f0d569fd375"
+  "source_fnv1a64": "b8475d46a921a0aa"
  }
 }
