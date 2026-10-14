@@ -159,7 +159,7 @@ export const WORKOUT_PROBE = [qk.workout.enabled(), `${BASE}/sessions/active`] a
 
 /**
  * Whether the workout module is on. The API answers 404 on every workout
- * route while it is off; the sidebar then keeps the item inactive. Unknown
+ * route while it is off; the nav then leaves the section out. Unknown
  * (loading, or a failure other than 404) counts as on, so a hiccup does not
  * hide the section.
  */

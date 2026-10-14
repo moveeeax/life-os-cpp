@@ -199,8 +199,8 @@ export interface RouteEntry {
   requirePermission?: number;
   /**
    * Which frame the page renders in. 'classic' (default): the top-nav Layout
-   * of the admin and account pages. 'shell': the dashboard shell with the
-   * sidebar. 'bare': no frame (the full-screen sign-in page).
+   * of the admin and account pages. 'shell': the glass shell with the pill
+   * nav. 'bare': no frame (the full-screen sign-in page).
    */
   layout?: RouteLayout;
 }
