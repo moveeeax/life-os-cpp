@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
+import { useModuleProbe } from '@/hooks/useModuleProbe';
 import { ApiClientError, api, apiErrorMessage } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import type { components } from '@/lib/api/schema.gen';
@@ -216,19 +217,12 @@ export function useMoneySettings() {
   });
 }
 
+/** [query key, url] of the probe that says whether the module is on. */
+export const MONEY_PROBE = [qk.money.enabled(), `${BASE}/settings`] as const;
+
 /** Whether the money module answers at all (404 while switched off). */
 export function useMoneyEnabled(signedIn: boolean): boolean {
-  const probe = useQuery({
-    queryKey: qk.money.enabled(),
-    enabled: signedIn,
-    staleTime: Infinity,
-    retry: false,
-    queryFn: async ({ signal }) => {
-      const { error } = await api.GET(`${BASE}/settings` as string, { signal });
-      return !(error && error.status === 404);
-    },
-  });
-  return probe.data ?? true;
+  return useModuleProbe(...MONEY_PROBE, signedIn) ?? true;
 }
 
 // ── writes ─────────────────────────────────────────────────────────────────

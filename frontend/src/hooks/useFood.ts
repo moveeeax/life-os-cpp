@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
+import { useModuleProbe } from '@/hooks/useModuleProbe';
 import { ApiClientError, api, apiErrorMessage } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import type {
@@ -101,19 +102,12 @@ export function useOffSearch(q: string, enabled: boolean) {
   });
 }
 
+/** [query key, url] of the probe that says whether the module is on. */
+export const FOOD_PROBE = [qk.food.enabled(), `${BASE}/goals`] as const;
+
 /** Whether the food module answers at all (404 while switched off). */
 export function useFoodEnabled(canRead: boolean): boolean {
-  const probe = useQuery({
-    queryKey: qk.food.enabled(),
-    enabled: canRead,
-    staleTime: Infinity,
-    retry: false,
-    queryFn: async ({ signal }) => {
-      const { error } = await api.GET(`${BASE}/goals` as string, { signal });
-      return !(error && error.status === 404);
-    },
-  });
-  return probe.data ?? true;
+  return useModuleProbe(...FOOD_PROBE, canRead) ?? true;
 }
 
 // ── diary writes ───────────────────────────────────────────────────────────

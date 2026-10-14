@@ -86,7 +86,9 @@ function useMinute(): Date {
  */
 export function NowPage() {
   const nav = useGlassNav();
-  if (nav.nowOn === false) return <Navigate to={homeOf(nav.items)} replace />;
+  // Now is off: go to the first section that is on, once every probe has
+  // answered (a module still asking would count as on and win the redirect).
+  if (nav.nowOn === false) return nav.settled ? <Navigate to={homeOf(nav.items)} replace /> : null;
   return <NowScreen />;
 }
 

@@ -132,6 +132,8 @@ export const qk = {
     candidates: (id: string) => ['travel', 'candidates', id] as const,
     packing: (id: string) => ['travel', 'packing', id] as const,
     documents: () => ['travel', 'documents'] as const,
+    /** Outside ['travel'], so a write in travel does not re-run the probe. */
+    enabled: () => ['travel-enabled'] as const,
   },
   /** Habits section. */
   habits: {

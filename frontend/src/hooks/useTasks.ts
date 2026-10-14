@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
+import { useModuleProbe } from '@/hooks/useModuleProbe';
 import { ApiClientError, api, apiErrorMessage } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import {
@@ -33,19 +34,12 @@ export const TASKS_PARSE_DEADLINE_MS = 3 * 60 * 1000;
 
 // ── reads ──────────────────────────────────────────────────────────────────
 
+/** [query key, url] of the probe that says whether the module is on. */
+export const TASKS_PROBE = [qk.tasks.enabled(), `${BASE}/status`] as const;
+
 /** Whether the tasks module answers at all (404 while switched off). */
 export function useTasksEnabled(signedIn: boolean): boolean {
-  const probe = useQuery({
-    queryKey: qk.tasks.enabled(),
-    enabled: signedIn,
-    staleTime: Infinity,
-    retry: false,
-    queryFn: async ({ signal }) => {
-      const { error } = await api.GET(`${BASE}/status` as string, { signal });
-      return !(error && error.status === 404);
-    },
-  });
-  return probe.data ?? true;
+  return useModuleProbe(...TASKS_PROBE, signedIn) ?? true;
 }
 
 export function useTasksStatus() {
