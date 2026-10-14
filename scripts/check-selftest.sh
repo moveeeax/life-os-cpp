@@ -9,10 +9,10 @@
 # with zero rules — green for months, checking nothing. So: for each of the nine
 # gate scripts, copy the subtree it reads into a scratch dir, plant a known
 # breakage, and require the gate to FAIL and to NAME what it found. Two planted
-# breakages per gate (four for check-version-sync.sh, which also guards the
-# helm image pins and Chart.yaml appVersions; one for
-# assemble-changelog.sh --check, the changelog-fragment format gate),
-# nineteen in all.
+# breakages per gate (five for check-version-sync.sh, which also guards the
+# helm image pins, Chart.yaml appVersions and the openapi.yaml / frontend
+# package versions; one for assemble-changelog.sh --check, the
+# changelog-fragment format gate), twenty-one in all.
 #
 # Every case follows the same discipline (borrowed from the cyber-accountant
 # service's check-render-selftest.sh, which learned it the expensive way):
@@ -183,7 +183,7 @@ run_case() {
     echo "SELFTEST OK   [$label]: $gate exit $status, named the planted breakage"
 }
 
-# --- the nineteen breakages --------------------------------------------------
+# --- the breakages -----------------------------------------------------------
 # Each mutator takes the copy root as $1, edits in place, and COUNTS. An
 # anchor that stops matching must fail the mutator loudly (see run_case), not
 # no-op — every anchor below is a real line in this repo today.
@@ -345,6 +345,23 @@ PY
 # 8b. One image pin left behind on the release bump — the failure mode that
 #     once shipped GHCR pins for tags that never existed through two releases.
 #     Flips the single pin of the prod worker release (deploy/values-worker-prod.yaml).
+# The OpenAPI spec's info.version left behind by a release (it sat at 1.0.0
+# for 26 releases before check-version-sync.sh learned to read it).
+break_openapi_version_drift() {
+    python3 - "$1/docs/openapi.yaml" <<'PY'
+import re, sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as fh:
+    text = fh.read()
+text, n = re.subn(r"(?m)^(  version:[ \t]*)[0-9][0-9.]*$", r"\g<1>9.9.9", text)
+if n != 1:
+    sys.exit("break_openapi_version_drift: flipped %d info.version line(s) in %s — expected exactly 1"
+             % (n, path))
+with open(path, "w", encoding="utf-8") as fh:
+    fh.write(text)
+PY
+}
+
 break_helm_tag_drift() {
     python3 - "$1/deploy/values-worker-prod.yaml" <<'PY'
 import re, sys
@@ -593,23 +610,31 @@ run_case bucket-dup-api check-test-buckets.sh break_bucket_dup_api \
     'appear in BOTH unit and integration buckets' \
     'Base64Test'
 
+# check-version-sync.sh reads these; every case copies all of them so the
+# control run on the untouched copy passes.
+VERSION_SYNC_PATHS="CMakeLists.txt CHANGELOG.md helm deploy project.env docs/openapi.yaml frontend/package.json frontend/package-lock.json"
+
 run_case changelog-phantom-release check-version-sync.sh break_changelog_phantom_release \
-    "CMakeLists.txt CHANGELOG.md helm deploy project.env" \
+    "$VERSION_SYNC_PATHS" \
     'version drift' \
     'newest release heading [99.99.99]'
 
 run_case changelog-heading-format check-version-sync.sh break_changelog_heading_format \
-    "CMakeLists.txt CHANGELOG.md helm deploy project.env" \
+    "$VERSION_SYNC_PATHS" \
     "could not parse a released '## [x.y.z]' heading"
 
 run_case helm-tag-drift check-version-sync.sh break_helm_tag_drift \
-    "CMakeLists.txt CHANGELOG.md helm deploy project.env" \
+    "$VERSION_SYNC_PATHS" \
     'helm image tag drift: deploy/values-worker-prod.yaml pins tag "9.9.9"' \
     'A stale pin deploys an old image'
 
 run_case chart-appversion-drift check-version-sync.sh break_chart_appversion_drift \
-    "CMakeLists.txt CHANGELOG.md helm deploy project.env" \
+    "$VERSION_SYNC_PATHS" \
     'appVersion drift: helm/life-os-cpp/Chart.yaml has appVersion "0.0.1"'
+
+run_case openapi-version-drift check-version-sync.sh break_openapi_version_drift \
+    "$VERSION_SYNC_PATHS" \
+    'version drift: docs/openapi.yaml info.version is "9.9.9"'
 
 run_case nginx-location-drift check-frontend-nginx-sync.sh break_nginx_location_drift \
     "frontend/nginx.conf helm/cpp-frontend/templates/configmap.yaml" \

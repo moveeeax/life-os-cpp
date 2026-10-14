@@ -42,7 +42,7 @@ jobs:
           sudo install -m 0755 /tmp/yq /usr/local/bin/yq
           helm version --short
           yq --version
-      - name: Gate selftest (20 planted breakages must be caught)
+      - name: Gate selftest (21 planted breakages must be caught)
         run: ./scripts/check-selftest.sh
       - name: Module dependency DAG gate
         run: ./scripts/check-module-deps.sh
