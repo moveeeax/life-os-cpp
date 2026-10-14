@@ -269,8 +269,7 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
              Core::tasks_enabled(),
              [&] {
                  const auto groups = ::Tasks::Agenda::group(TaskRepository().agenda_items(owner, date, tz), date);
-                 return ::Now::Today::tasks_block(
-                     groups, date, static_cast<long>(NoteRepository().list(owner, "inbox").size()));
+                 return ::Now::Today::tasks_block(groups, date, NoteRepository().count(owner, "inbox"));
              }},
             {"goals",
              Core::goals_enabled(),

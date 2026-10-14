@@ -44,6 +44,16 @@ public:
         });
     }
 
+    /// How many of the owner's notes have @p status, without loading them.
+    long count(const std::string& owner, const std::string& status) {
+        return Database::get().execute_read([&](auto& txn) {
+            return txn
+                .exec_params(
+                    "SELECT count(*) FROM task_notes WHERE owner_id = $1::uuid AND status = $2", owner, status)[0][0]
+                .template as<long>();
+        });
+    }
+
     /// @throws NotFound, Invariant.
     nlohmann::json update(const std::string& owner,
                           const std::string& id,
