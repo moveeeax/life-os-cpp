@@ -10,11 +10,12 @@ import { formatValue, shelf, type GoalDetail } from '@/lib/goals';
 import { dueLabel, type Task } from '@/lib/tasks';
 import { cn } from '@/lib/utils';
 import { Meter, Num } from '@/shell/kit';
+import { inputClass } from '@/shell/kit/styles';
 
 // Chart positions: an instant per day (noon, so a zone never shifts the day).
 const day = (s: string) => Date.parse(`${s}T12:00:00Z`);
 const shortDate = (s: string) => formatDay(s, { locale: 'en-GB' });
-const inputClass = 'k-input k-compact';
+const compactInput = `${inputClass} k-compact`;
 const ghost = 'k-link';
 const STATUS: Record<Task['status'], string> = {
   done: 'done',
@@ -142,14 +143,14 @@ export function NumberPart({ goal, today }: { goal: GoalDetail; today: string })
           inputMode="decimal"
           placeholder={goal.unit || 'value'}
           aria-label="Value"
-          className={inputClass}
+          className={compactInput}
         />
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
           aria-label="Date"
-          className={inputClass}
+          className={compactInput}
         />
         <button
           type="submit"
@@ -391,14 +392,14 @@ export function BinaryPart({ goal, today }: { goal: GoalDetail; today: string })
           onChange={(e) => setLabel(e.target.value)}
           placeholder="Milestone"
           aria-label="Milestone"
-          className={inputClass}
+          className={compactInput}
         />
         <input
           type="date"
           value={mdate}
           onChange={(e) => setMdate(e.target.value)}
           aria-label="Milestone date"
-          className={inputClass}
+          className={compactInput}
         />
         <button type="submit" disabled={addMilestone.isPending} className={ghost}>
           Add

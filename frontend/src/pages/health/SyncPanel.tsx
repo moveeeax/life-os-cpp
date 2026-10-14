@@ -6,10 +6,7 @@ import { rangeForDays, today } from '@/lib/health';
 import { SYNC_DATA_TYPES } from '@/lib/health/types';
 
 import { Num, Row } from '@/shell/kit';
-
-const inputClass = 'k-input';
-const primaryButton = 'k-btn k-solid';
-const secondaryButton = 'k-btn';
+import { inputClass, primaryButton, secondaryButton } from '@/shell/kit/styles';
 
 const label = (type: string) => type.replace(/_/g, ' ');
 
