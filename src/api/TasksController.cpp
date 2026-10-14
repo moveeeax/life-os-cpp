@@ -29,7 +29,7 @@
 #include "repositories/Zones.hpp"
 #include "repositories/goals/GoalRepository.hpp"
 #include "repositories/tasks/Errors.hpp"
-#include "repositories/tasks/NoteRepository.hpp"
+#include "repositories/tasks/InboxRepository.hpp"
 #include "repositories/tasks/ParseJobRepository.hpp"
 #include "repositories/tasks/ProjectRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
@@ -392,7 +392,7 @@ void TasksController::listNotes(const HttpRequestPtr& req, Callback&& callback) 
         return;
     }
     with_repo_errors(callback, "tasks.listNotes", [&] {
-        const json rows = Repo::NoteRepository().list(owner, status);
+        const json rows = Repo::InboxRepository().list(owner, status);
         callback(Response::ok(json{{"data", rows}, {"count", rows.size()}}));
     });
 }
@@ -412,7 +412,7 @@ void TasksController::createNote(const HttpRequestPtr& req, Callback&& callback)
     }
     with_repo_errors(callback, "tasks.createNote", [&] {
         callback(
-            Response::created(json{{"data", Repo::NoteRepository().create(owner, body["text"].get<std::string>())}}));
+            Response::created(json{{"data", Repo::InboxRepository().create(owner, body["text"].get<std::string>())}}));
     });
 }
 
@@ -437,7 +437,7 @@ void TasksController::updateNote(const HttpRequestPtr& req, Callback&& callback,
     with_repo_errors(callback, "tasks.updateNote", [&] {
         callback(Response::ok(
             json{{"data",
-                  Repo::NoteRepository().update(
+                  Repo::InboxRepository().update(
                       owner, id, Validation::opt_string(body, "text"), Validation::opt_string(body, "status"))}}));
     });
 }
@@ -448,7 +448,7 @@ void TasksController::deleteNote(const HttpRequestPtr& req, Callback&& callback,
         return;
     }
     with_repo_errors(callback, "tasks.deleteNote", [&] {
-        Repo::NoteRepository().remove(owner, id);
+        Repo::InboxRepository().remove(owner, id);
         no_content(callback);
     });
 }

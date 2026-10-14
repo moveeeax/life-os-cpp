@@ -1,5 +1,5 @@
 /**
- * @file NoteRepository.hpp
+ * @file InboxRepository.hpp
  * @brief task_notes: the inbox of thoughts and links that are not tasks yet.
  *        A note that became a task is archived with the task's id.
  */
@@ -17,7 +17,7 @@
 
 namespace Repositories::Tasks {
 
-class NoteRepository {
+class InboxRepository {
 public:
     nlohmann::json create(const std::string& owner, const std::string& text) {
         return detail::translate_sql(

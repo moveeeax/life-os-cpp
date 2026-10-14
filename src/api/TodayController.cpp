@@ -46,7 +46,7 @@
 #include "repositories/now/FocusRepository.hpp"
 #include "repositories/now/NoteRepository.hpp"
 #include "repositories/now/SettingsRepository.hpp"
-#include "repositories/tasks/NoteRepository.hpp"
+#include "repositories/tasks/InboxRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
 #include "repositories/travel/Counters.hpp"
 #include "repositories/travel/TripRepository.hpp"
@@ -64,7 +64,7 @@ using Api::Fields::is_calendar_date;
 using Api::Fields::today_utc;
 using Repositories::Goals::GoalRepository;
 using Repositories::Now::FocusRepository;
-using Repositories::Tasks::NoteRepository;
+using Repositories::Tasks::InboxRepository;
 using Repositories::Tasks::TaskRepository;
 
 constexpr std::size_t kTextMax = 200;
@@ -241,7 +241,7 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
              Core::tasks_enabled(),
              [&] {
                  const auto groups = ::Tasks::Agenda::group(TaskRepository().agenda_items(owner, date, tz), date);
-                 return ::Now::Today::tasks_block(groups, date, NoteRepository().count(owner, "inbox"));
+                 return ::Now::Today::tasks_block(groups, date, InboxRepository().count(owner, "inbox"));
              }},
             {"goals",
              Core::goals_enabled(),

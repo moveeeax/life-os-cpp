@@ -17,7 +17,7 @@
 #include "repositories/JobRows.hpp"
 #include "repositories/SqlTime.hpp"
 #include "repositories/tasks/Errors.hpp"
-#include "repositories/tasks/NoteRepository.hpp"
+#include "repositories/tasks/InboxRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
 
 namespace Repositories::Tasks {
@@ -34,7 +34,7 @@ public:
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
-                    if (note_id.has_value() && !NoteRepository::exists_in(txn, owner, *note_id)) {
+                    if (note_id.has_value() && !InboxRepository::exists_in(txn, owner, *note_id)) {
                         throw NotFound("task_note");
                     }
                     auto r = txn.exec_params(
@@ -138,7 +138,7 @@ public:
                         out.push_back(*TaskRepository::find_in(txn, owner, TaskRepository::create_in(txn, owner, in)));
                     }
                     if (const auto note = note_in(txn, owner, id); note.has_value() && !out.empty()) {
-                        NoteRepository::archive_in(txn, owner, *note, out[0]["id"].get<std::string>());
+                        InboxRepository::archive_in(txn, owner, *note, out[0]["id"].get<std::string>());
                     }
                     return out;
                 });
