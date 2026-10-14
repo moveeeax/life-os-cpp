@@ -39,6 +39,7 @@
 #include "money/Rates.hpp"
 #include "money/Reports.hpp"
 #include "repositories/JobRows.hpp"
+#include "repositories/Zones.hpp"
 #include "repositories/money/AccountRepository.hpp"
 #include "repositories/money/AdvisorReportRepository.hpp"
 #include "repositories/money/CategoryRepository.hpp"
@@ -1105,7 +1106,7 @@ void MoneyController::periodReport(const HttpRequestPtr& req, Callback&& callbac
         callback(ErrorResponse::bad_request("invalid_kind", "kind must be week, month, quarter or custom"));
         return;
     }
-    const std::string today = today_utc();
+    const std::string today = local_today(req, &Repositories::Zones::today_in, today_utc());
     const std::string anchor = req->getParameter("date").empty() ? today : req->getParameter("date");
     const std::string from = req->getParameter("from");
     const std::string to = req->getParameter("to");
@@ -1329,7 +1330,8 @@ void MoneyController::parseText(const HttpRequestPtr& req, Callback&& callback) 
         callback(Validation::response_400(errs));
         return;
     }
-    const std::string hint = Validation::opt_string(body, "hint_date").value_or(today_utc());
+    const auto given_hint = Validation::opt_string(body, "hint_date");
+    const std::string hint = given_hint ? *given_hint : local_today(req, &Repositories::Zones::today_in, today_utc());
     start_parse(owner, callback, [&](Repo::ParseJobRepository& repo) { return repo.create_text(owner, text, hint); });
 }
 
@@ -1353,7 +1355,8 @@ void MoneyController::parseReceipt(const HttpRequestPtr& req, Callback&& callbac
         callback(Validation::response_400(errs));
         return;
     }
-    const std::string hint = Validation::opt_string(body, "hint_date").value_or(today_utc());
+    const auto given_hint = Validation::opt_string(body, "hint_date");
+    const std::string hint = given_hint ? *given_hint : local_today(req, &Repositories::Zones::today_in, today_utc());
     start_parse(owner, callback, [&](Repo::ParseJobRepository& repo) {
         return repo.create_receipt(owner, image->payload, image->type, hint);
     });

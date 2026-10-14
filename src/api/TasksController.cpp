@@ -26,6 +26,7 @@
 #include "jobs/Jobs.hpp"
 #include "jobs/TasksParseHandler.hpp"
 #include "repositories/JobRows.hpp"
+#include "repositories/Zones.hpp"
 #include "repositories/goals/GoalRepository.hpp"
 #include "repositories/tasks/Errors.hpp"
 #include "repositories/tasks/NoteRepository.hpp"
@@ -397,7 +398,7 @@ void TasksController::deleteItem(const HttpRequestPtr& req, Callback&& callback,
 
 void TasksController::agenda(const HttpRequestPtr& req, Callback&& callback) {
     TASKS_GUARD(req, callback, owner);
-    const std::string date = req->getParameter("date").empty() ? today_utc() : req->getParameter("date");
+    const std::string date = request_day(req, &Repositories::Zones::today_in, today_utc());
     const std::string tz = req->getParameter("tz").empty() ? "UTC" : req->getParameter("tz");
     if (!is_calendar_date(date)) {
         callback(ErrorResponse::bad_request("invalid_query", "date must be a calendar day"));
@@ -521,7 +522,8 @@ void TasksController::parse(const HttpRequestPtr& req, Callback&& callback) {
         return;
     }
     const std::string text = body["text"].get<std::string>();
-    const std::string hint = Validation::opt_string(body, "hint_date").value_or(today_utc());
+    const auto given_hint = Validation::opt_string(body, "hint_date");
+    const std::string hint = given_hint ? *given_hint : local_today(req, &Repositories::Zones::today_in, today_utc());
     const auto note_id = Validation::opt_string(body, "note_id");
     Repo::ParseJobRepository repo;
     std::string id;

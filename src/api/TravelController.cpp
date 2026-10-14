@@ -26,6 +26,7 @@
 #include "api/Validation.hpp"
 #include "core/Modules.hpp"
 #include "money/Summary.hpp"
+#include "repositories/Zones.hpp"
 #include "repositories/money/SummaryRepository.hpp"
 #include "repositories/travel/Counters.hpp"
 #include "repositories/travel/CrossingRepository.hpp"
@@ -91,7 +92,7 @@ bool require_user(const std::string& owner, const TravelController::Callback& ca
 
 /// ?date=, today in UTC by default; nullopt (answered) when bad.
 std::optional<std::string> at_date(const HttpRequestPtr& req, const TravelController::Callback& callback) {
-    const std::string date = req->getParameter("date").empty() ? today_utc() : req->getParameter("date");
+    const std::string date = request_day(req, &Repositories::Zones::today_in, today_utc());
     if (!is_calendar_date(date)) {
         callback(ErrorResponse::bad_request("invalid_query", "date must be a calendar day"));
         return std::nullopt;

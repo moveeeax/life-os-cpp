@@ -6,6 +6,7 @@
  */
 
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -227,6 +228,26 @@ TEST_F(TasksApiTest, TheAgendaReadsTheDayInTheGivenZone) {
     EXPECT_EQ(get("Mars/Olympus")->statusCode(), k400BadRequest);
     EXPECT_EQ(call(&Api::TasksController::agenda, user(kAnna), Get, {{"date", "2026-02-30"}})->statusCode(),
               k400BadRequest);
+}
+
+TEST_F(TasksApiTest, WithoutADateTheAgendaIsTodayInTheGivenZone) {
+    // Kiritimati is UTC+14 and Pago Pago UTC-11: at any hour one of them is on another date than UTC.
+    const auto [zone, local, utc] = Database::get().execute_read([](auto& txn) {
+        auto r = txn.exec(
+            "SELECT z, to_char(now() AT TIME ZONE z, 'YYYY-MM-DD'), to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD') "
+            "FROM unnest(ARRAY['Pacific/Kiritimati', 'Pacific/Pago_Pago']) AS z "
+            "WHERE (now() AT TIME ZONE z)::date <> (now() AT TIME ZONE 'UTC')::date LIMIT 1");
+        return std::make_tuple(
+            r[0][0].template as<std::string>(), r[0][1].template as<std::string>(), r[0][2].template as<std::string>());
+    });
+    ASSERT_NE(local, utc);
+    EXPECT_EQ(body_of(call(&Api::TasksController::agenda, user(kAnna), Get, {{"tz", zone}}))["data"]["date"], local);
+    EXPECT_EQ(body_of(call(&Api::TasksController::agenda, user(kAnna), Get))["data"]["date"], utc) << "no tz: UTC";
+    EXPECT_EQ(
+        body_of(call(
+            &Api::TasksController::agenda, user(kAnna), Get, {{"tz", zone}, {"date", "2026-10-07"}}))["data"]["date"],
+        "2026-10-07")
+        << "a given date wins";
 }
 
 TEST_F(TasksApiTest, NotesAreTheInbox) {

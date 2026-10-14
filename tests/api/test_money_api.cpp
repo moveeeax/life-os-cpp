@@ -6,6 +6,7 @@
  */
 
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -811,6 +812,31 @@ std::string png_data_url(std::size_t payload_chars) {
 }
 
 }  // namespace
+
+TEST_F(MoneyParseApiTest, WithoutAHintDateTheParseTakesTodayInTheGivenZone) {
+    // Kiritimati is UTC+14 and Pago Pago UTC-11: at any hour one of them is on another date than UTC.
+    const auto [zone, local, utc] = Database::get().execute_read([](auto& txn) {
+        auto r = txn.exec(
+            "SELECT z, to_char(now() AT TIME ZONE z, 'YYYY-MM-DD'), to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD') "
+            "FROM unnest(ARRAY['Pacific/Kiritimati', 'Pacific/Pago_Pago']) AS z "
+            "WHERE (now() AT TIME ZONE z)::date <> (now() AT TIME ZONE 'UTC')::date LIMIT 1");
+        return std::make_tuple(
+            r[0][0].template as<std::string>(), r[0][1].template as<std::string>(), r[0][2].template as<std::string>());
+    });
+    ASSERT_NE(local, utc);
+    auto req = TestHelpers::authed_json(user(kAnna), json{{"text", "Kaspi *8880 100 KZT"}});
+    req->setParameter("tz", zone);
+    HttpResponsePtr resp;
+    controller.parseText(req, [&](const HttpResponsePtr& r) { resp = r; });
+    ASSERT_TRUE(resp);
+    ASSERT_EQ(resp->statusCode(), k202Accepted) << resp->body();
+    const json row =
+        body_of(call_id(&Api::MoneyController::parseStatus, user(kAnna), Get, body_of(resp)["data"]["id"]))["data"];
+    EXPECT_EQ(row["hint_date"], local);
+    auto job = Jobs::get().pick({"money_parse"}, 1);
+    ASSERT_TRUE(job.has_value());
+    Jobs::get().complete(job->id, json::object());
+}
 
 TEST_F(MoneyParseApiTest, TextAndReceiptAreQueuedForTheCaller) {
     EXPECT_EQ(body_of(call(&Api::MoneyController::getSettings, user(kAnna), Get))["data"]["llm_available"], true);

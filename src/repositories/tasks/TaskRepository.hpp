@@ -16,6 +16,7 @@
 
 #include "database/Database.hpp"
 #include "repositories/LikePattern.hpp"
+#include "repositories/Zones.hpp"
 #include "repositories/tasks/Errors.hpp"
 #include "tasks/Agenda.hpp"
 
@@ -260,18 +261,7 @@ public:
     }
 
     /// The zone names PostgreSQL knows, read once per process (the list only changes with a server upgrade).
-    static bool is_timezone(const std::string& tz) {
-        static const std::set<std::string> zones = [] {
-            return Database::get().execute_read([](auto& txn) {
-                std::set<std::string> out;
-                for (const auto& row : txn.exec("SELECT name FROM pg_timezone_names")) {
-                    out.insert(row[0].template as<std::string>());
-                }
-                return out;
-            });
-        }();
-        return zones.count(tz) > 0;
-    }
+    static bool is_timezone(const std::string& tz) { return Zones::is_zone(tz); }
 
     /// Whether a money ledger row is the owner's (the table exists whether the module is on or not).
     bool money_row_is_owners(const std::string& owner, const std::string& id) {
