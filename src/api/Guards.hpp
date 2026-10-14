@@ -30,8 +30,9 @@
     } while (0)
 
 /// Reject with 403 unless the principal holds `perm` (a Domain::Permission bit).
-/// No-op when auth is disabled. For fine-grained gates beyond full-admin —
-/// admins hold every 0xff bit, so they pass automatically.
+/// No-op when auth is disabled. For fine-grained gates beyond full-admin: a
+/// principal with the admin sentinel bit (Security::Auth::kAdminPermissionBits,
+/// 0x40000000) passes every check, Auth::current_user_can short-circuits on it.
 #define API_REQUIRE_PERMISSION(req, callback, perm)                            \
     do {                                                                       \
         if (auto _guard_err = Security::Auth::require_permission(req, perm)) { \

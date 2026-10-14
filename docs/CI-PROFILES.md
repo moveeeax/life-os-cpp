@@ -32,10 +32,14 @@ here was learned the expensive way on self-hosted runners.
   cost seconds and scoping them would buy nothing.
 - **`gate-selftest` is self-scoped + nightly.** Per-PR it runs
   `scripts/check-selftest.sh` only when the diff touches `scripts/`,
-  `.github/workflows/` or `helm/` (where gate mutations live); the daily
-  unconditional backstop is `.github/workflows/gates-nightly.yml`
-  (cron + `workflow_dispatch`: check-selftest.sh + check-module-deps.sh),
-  so gate rot is caught within a day even when nobody touches the gates.
+  `.github/workflows/`, `helm/` or `deploy/` (where gate mutations live);
+  the daily unconditional backstop is `.github/workflows/gates-nightly.yml`
+  (cron + `workflow_dispatch`): its `gate-selftest` job runs
+  check-selftest.sh (28 planted breakages) and check-module-deps.sh, so
+  gate rot is caught within a day even when nobody touches the gates, and
+  its `swagger-sri-guard` job re-downloads the pinned swagger-ui-dist files
+  from the CDN and compares them with the sha384 SRI hashes in
+  `src/api/Middleware.cpp`, which no per-PR job can do offline.
 - **Three cache layers.** `cache-from` lists `type=gha` plus
   `ghcr.io/<repo>/builder:cache`. The gha cache is evicted aggressively
   (7 days / 10 GB); the GHCR layer survives, EXCEPT after a vcpkg baseline

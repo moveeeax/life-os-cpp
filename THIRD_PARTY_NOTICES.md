@@ -23,6 +23,7 @@ run a license checker over `frontend/node_modules`.
 | prometheus-cpp | MIT |
 | opentelemetry-cpp | Apache-2.0 † |
 | nlohmann/json | MIT |
+| inja v3.4.0 (vendored single header, `third_party/inja-include/`, not from vcpkg; renders the email templates) | MIT |
 | GoogleTest | BSD-3-Clause (tests only — not shipped in runtime images) |
 
 ## Runtime — system libraries (apt, present in the runtime image)

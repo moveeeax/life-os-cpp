@@ -304,7 +304,7 @@ jobs:
           sudo install -m 0755 /tmp/yq /usr/local/bin/yq
           helm version --short
           yq --version
-      - name: Gate selftest (21 planted breakages must be caught)
+      - name: Gate selftest (28 planted breakages must be caught)
         if: steps.scope.outputs.relevant == 'true'
         run: ./scripts/check-selftest.sh
 

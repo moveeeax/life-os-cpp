@@ -1,6 +1,8 @@
 # Design: mi-fitness-api, porting the Mi Fitness bridge to C++
 
-Date: 2026-09-29. Status: pending approval.
+> Historical design of 2026-09-29, kept as written. The shipped fitness module differs: MIT license (not AGPL), per-user Mi accounts (table `mi_accounts`, one per user) instead of one account, the adapter in `src/fitness/xiaomi/`, credentials through `MI_FITNESS_TOKEN_KEY` and the QR sign-in rather than `MI_FITNESS_USER_ID` / `MI_FITNESS_PASS_TOKEN`. What runs today is in the README, section "Fitness module", and `docs/CONFIG.md`.
+
+Date: 2026-09-29. Status: historical (superseded by the shipped module, see the note above).
 
 ## Why
 

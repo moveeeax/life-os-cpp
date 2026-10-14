@@ -78,6 +78,11 @@ docker compose -f docker/docker-compose.yml exec app \
 
 `make down` stops everything, `make down-v` also drops the volumes.
 
+The compose Postgres is `postgres:18-alpine`, the major production runs. A
+`postgres_data` volume created before the bump holds 15-format data, which
+18 cannot open: run `make down-v` (or `docker volume rm life-os-cpp_postgres_data`)
+once before the first `make up` after pulling the change.
+
 Native build without Docker uses the CMake presets in `CMakePresets.json`
 (`dev`, `dev-asan`, `release`, `ci`, `coverage`, `devcontainer`):
 
@@ -125,8 +130,11 @@ Every knob has an env var, a key in `config/config.json` (with
 `CONFIG_FILE` points at another JSON file, for example `config/worker.json`
 for the worker or a local overlay such as `config/dev.local.json` (the
 `config/*.local.json` pattern and `config/local/` are gitignored).
-`config/config.production.json` is the hardened profile; `make prod-check`
-validates it and `make env-check` reports unset placeholders.
+There is no production JSON profile: production is the chart
+`helm/life-os-cpp` plus `deploy/values-prod.yaml`, and `make prod-check`
+renders them and asserts the floor on the result (auth on, cookies Secure
+with CSRF, rate limit fail-closed, docs off, HSTS on, credentials only from
+a Secret). `make env-check` reports unset placeholders of `config/config.json`.
 
 The full table is in [`docs/CONFIG.md`](docs/CONFIG.md).
 
@@ -158,8 +166,9 @@ data: an agent needs a key of the user whose data it reads, from
 `POST /api/v1/account/api-keys`. Sync runs as a job per account
 (`src/jobs/FitnessSyncHandler.hpp`) on the worker; an optional timer in the
 API pod enqueues one for every linked account every
-`MI_FITNESS_SYNC_SCHEDULE_HOURS`. The port design
-note is in `docs/fitness/`.
+`MI_FITNESS_SYNC_SCHEDULE_HOURS`. The historical design note of the port
+(2026-09-29, before the per-user accounts and the MIT license) is in
+`docs/fitness/`; this section describes what runs.
 
 ## Repo layout
 
@@ -172,7 +181,7 @@ src/            api/ (controllers, Endpoints.hpp registry, middleware), core/ (i
                 main.cpp, worker_main.cpp
 tests/          unit/, integration/, api/, e2e/, fitness/, fuzz/
 migrations/     NNN_<slug>.sql, applied in order on boot or via --run-migrations
-config/         config.json, worker.json, config.production.json, bench/
+config/         config.json, config.sample.json, worker.json, bench/
 docker/         Dockerfile, docker-compose.yml, .env.* presets, Prometheus and Grafana config
 helm/           life-os-cpp, life-os-cpp-worker, cpp-frontend, cpp-env umbrella
 deploy/         values for the owner's cluster: values-prod.yaml, values-worker-prod.yaml,
@@ -208,8 +217,13 @@ the OpenAPI drift check and spectral. `CONTRIBUTING.md` has the commit
 convention and release flow; `docs/CONVENTIONS.md` is the checklist for adding
 a domain entity.
 
-The binary also runs one-shot modes: `--print-routes`, `--dump-config`,
-`--verify-migrations`, `--run-migrations`, `--create-admin EMAIL [PASS]`.
+The binary also runs one-shot modes (`./life_os_cpp --help`):
+`--print-routes`, `--dump-config` (secrets masked), `--verify-migrations`
+(exit 1 while anything is pending), `--run-migrations`, `--setup-dev`
+(migrations plus the seeded roles, idempotent), `--create-admin EMAIL [PASS]`
+(needs the Administrator role, so `--setup-dev` or a booted app first;
+default password `password`) and `--seed-fake [N]` (N fake confirmed users,
+default 10, at most 1000, password `password`, for a demo database).
 
 ## Kubernetes
 

@@ -2,17 +2,29 @@ openapi: 3.1.0
 info:
   title: life-os-cpp API
   description: |
-    Infrastructure endpoints of life-os-cpp: health probes
-    and a background-job API. Authentication is opt-in (auth.mode=jwt|bearer|none).
-    Rate-limiting and idempotency are driven by headers.
+    The REST API of Life OS, a C++20 service on Drogon with Postgres and
+    Redis. Four families of routes: the probes and infrastructure (`/healthz`,
+    `/ready`, `/health`, `/metrics`, the background-job queue and its DLQ under
+    `/api/v1/jobs`); accounts and administration (`/api/v1/auth`,
+    `/api/v1/account`, `/api/v1/admin`, API keys, the audit log); billing
+    (PayPal top-ups into a credit wallet, `/api/v1/billing` and
+    `/api/v1/admin/billing`); and the life modules, each behind its own
+    switch and answering 404 while off: fitness (Mi Fitness sync), workout,
+    food, money, tasks with projects, goals, now (`/api/v1/today`, wallpapers,
+    sounds), travel, habits and notes. Every route except the probes is under
+    `/api/v1`. Authentication is a JWT bearer, an API key (`X-API-Key`) or the
+    HttpOnly session cookie the SPA uses; rate limiting and idempotency are
+    driven by headers (`Idempotency-Key` on writes). Maintained by one owner,
+    see the repository.
   version: 1.28.0
   contact:
-    name: Platform team
+    name: life-os-cpp repository
+    url: https://github.com/moveeeax/life-os-cpp
 servers:
   - url: http://localhost:8080
-    description: Local dev
-  - url: https://api.example.com
-    description: Production
+    description: Local dev (make up)
+  - url: https://life-os.tarassov.me
+    description: Production, through the frontend's nginx, which proxies /api/ to the API pod
 
 # Global security — attached per-operation below where needed.
 components:
@@ -26,7 +38,7 @@ components:
     # admin bit. /api/v1/account/* (including the api-keys routes) and
     # /api/v1/admin/* answer 401 key_not_allowed to a key.
     # Browser-SPA session: the access JWT travels in an HttpOnly
-    # __Host- cookie set by POST /api/auth/login (auth.cookies.* in
+    # __Host- cookie set by POST /api/v1/auth/login (auth.cookies.* in
     # config/config.json). Same-origin only — the SPA never reads it
     # from JS; fetch sends it via credentials: 'include'.
     cookieAuth:
