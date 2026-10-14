@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { useModuleProbe } from '@/hooks/useModuleProbe';
-import { ApiClientError, api, apiErrorMessage } from '@/lib/api/client';
+import { useParseJob } from '@/hooks/useParseJob';
+import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import type {
   FoodDay,
@@ -204,7 +204,7 @@ export function useSaveGoals(onSuccess?: (goals: FoodGoals) => void) {
 
 // ── the parse job ──────────────────────────────────────────────────────────
 
-export type ParseState = 'idle' | 'starting' | 'running' | 'done' | 'failed';
+export type { ParseState } from '@/hooks/useParseJob';
 
 export interface ParseStart {
   text: string;
@@ -217,102 +217,19 @@ export interface ParseStart {
  * the hook polls until the worker finishes. `cancel()` and unmount stop the
  * polling and drop the job's lines: a reopened form starts clean.
  */
-export function useParseJob() {
-  const [state, setState] = useState<ParseState>('idle');
-  const [job, setJob] = useState<FoodParseJob | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const starting = useRef(false);
-  // Bumped by every start and cancel: an answer of an older job is dropped.
-  const generation = useRef(0);
-
-  const start = useCallback(async (body: ParseStart) => {
-    if (starting.current) return;
-    starting.current = true;
-    const mine = ++generation.current;
-    setState('starting');
-    setError(null);
-    setJob(null);
-    try {
+export function useFoodParse() {
+  return useParseJob({
+    enqueue: async (body: ParseStart) => {
       const { data } = await api.postJson<{ data: { id: string; status: string } }>(
         `${BASE}/parse`,
         { body },
       );
-      if (generation.current !== mine) return;
-      setJob({ ...body, id: data.id, status: 'queued' } as FoodParseJob);
-      setState('running');
-    } catch (e) {
-      if (generation.current !== mine) return;
-      setError(
-        e instanceof ApiClientError && e.code === 'not_configured'
-          ? 'Text parsing is not configured on the server.'
-          : apiErrorMessage(e),
-      );
-      setState('failed');
-    } finally {
-      starting.current = false;
-    }
-  }, []);
-
-  const cancel = useCallback(() => {
-    generation.current++;
-    starting.current = false;
-    setState('idle');
-    setJob(null);
-    setError(null);
-  }, []);
-
-  const jobId = state === 'running' ? job?.id : undefined;
-
-  useEffect(() => {
-    if (!jobId) return;
-    const mine = generation.current;
-    const deadline = Date.now() + PARSE_DEADLINE_MS;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const controller = new AbortController();
-
-    const tick = async () => {
-      if (generation.current !== mine) return;
-      if (Date.now() > deadline) {
-        setError('parse_timeout');
-        setState('failed');
-        return;
-      }
-      try {
-        const { data } = await api.getJson<{ data: FoodParseJob }>(`${BASE}/parse/${jobId}`, {
-          signal: controller.signal,
-        });
-        if (generation.current !== mine) return;
-        setJob(data);
-        if (data.status === 'done') {
-          setState('done');
-          return;
-        }
-        if (data.status === 'failed') {
-          setError(data.error);
-          setState('failed');
-          return;
-        }
-      } catch (e) {
-        if (generation.current !== mine || controller.signal.aborted) return;
-        if (e instanceof ApiClientError && e.status === 404) {
-          setError('The parse job is gone.');
-          setState('failed');
-          return;
-        }
-        // A dropped connection: keep asking.
-      }
-      timer = setTimeout(() => void tick(), PARSE_POLL_MS);
-    };
-    void tick();
-
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
-  }, [jobId]);
-
-  // Unmount drops the job: nothing of it survives a closed form.
-  useEffect(() => () => void generation.current++, []);
-
-  return { state, job, error, start, cancel };
+      return { ...body, id: data.id, status: 'queued' } as FoodParseJob;
+    },
+    read: async (id, signal) =>
+      (await api.getJson<{ data: FoodParseJob }>(`${BASE}/parse/${id}`, { signal })).data,
+    pollMs: PARSE_POLL_MS,
+    deadlineMs: PARSE_DEADLINE_MS,
+    notConfigured: 'Text parsing is not configured on the server.',
+  });
 }

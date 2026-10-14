@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { useModuleProbe } from '@/hooks/useModuleProbe';
-import { ApiClientError, api, apiErrorMessage } from '@/lib/api/client';
+import { useParseJob } from '@/hooks/useParseJob';
+import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import {
   localToday,
@@ -112,111 +112,26 @@ export function useUpdateNote(onSuccess?: () => void) {
 
 // ── the parse ──────────────────────────────────────────────────────────────
 
-export type TasksParseState = 'idle' | 'starting' | 'running' | 'done' | 'failed';
+export type { ParseState as TasksParseState } from '@/hooks/useParseJob';
 
 /**
  * One phrase through the tasks_parse job: start, poll until done or failed
  * (or the deadline). cancel() and unmount drop the job.
  */
 export function useTasksParse() {
-  const [state, setState] = useState<TasksParseState>('idle');
-  const [job, setJob] = useState<TaskParseJob | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const starting = useRef(false);
-  const generation = useRef(0);
-
-  const start = useCallback(async (text: string, noteId?: string) => {
-    if (starting.current) return;
-    starting.current = true;
-    const mine = ++generation.current;
-    setState('starting');
-    setError(null);
-    setJob(null);
-    try {
+  return useParseJob({
+    enqueue: async (text: string, noteId?: string) => {
       const { data } = await api.postJson<{ data: { id: string } }>(`${BASE}/parse`, {
         body: { text, hint_date: localToday(), ...(noteId ? { note_id: noteId } : {}) },
       });
-      if (generation.current !== mine) return;
-      setJob({ id: data.id, status: 'queued' } as TaskParseJob);
-      setState('running');
-    } catch (e) {
-      if (generation.current !== mine) return;
-      setError(
-        e instanceof ApiClientError && e.code === 'not_configured'
-          ? 'not_configured'
-          : apiErrorMessage(e),
-      );
-      setState('failed');
-    } finally {
-      starting.current = false;
-    }
-  }, []);
-
-  const cancel = useCallback(() => {
-    generation.current++;
-    starting.current = false;
-    setState('idle');
-    setJob(null);
-    setError(null);
-  }, []);
-
-  const jobId = state === 'running' ? job?.id : undefined;
-
-  useEffect(() => {
-    if (!jobId) return;
-    const mine = generation.current;
-    const deadline = Date.now() + TASKS_PARSE_DEADLINE_MS;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const controller = new AbortController();
-    const tick = async () => {
-      if (generation.current !== mine) return;
-      if (Date.now() > deadline) {
-        setError('parse_timeout');
-        setState('failed');
-        return;
-      }
-      try {
-        const { data } = await api.getJson<{ data: TaskParseJob }>(`${BASE}/parse/${jobId}`, {
-          signal: controller.signal,
-        });
-        if (generation.current !== mine) return;
-        setJob(data);
-        if (data.status === 'done') {
-          setState('done');
-          return;
-        }
-        if (data.status === 'failed') {
-          setError(data.error);
-          setState('failed');
-          return;
-        }
-      } catch (e) {
-        if (generation.current !== mine || controller.signal.aborted) return;
-        if (e instanceof ApiClientError && e.status === 404) {
-          setError('The parse job is gone.');
-          setState('failed');
-          return;
-        }
-      }
-      timer = setTimeout(() => void tick(), TASKS_PARSE_POLL_MS);
-    };
-    void tick();
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
-  }, [jobId]);
-
-  // Unmount drops the job; a remount (StrictMode does one in development) may start again.
-  useEffect(
-    () => () => {
-      generation.current++;
-      starting.current = false;
+      return { id: data.id, status: 'queued' } as TaskParseJob;
     },
-    [],
-  );
-
-  return { state, job, error, start, cancel };
+    read: async (id, signal) =>
+      (await api.getJson<{ data: TaskParseJob }>(`${BASE}/parse/${id}`, { signal })).data,
+    pollMs: TASKS_PARSE_POLL_MS,
+    deadlineMs: TASKS_PARSE_DEADLINE_MS,
+    notConfigured: 'not_configured',
+  });
 }
 
 export function useAcceptTasksParse(jobId: string | undefined, onSuccess?: () => void) {

@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
-import { useCreateEntries, useParseJob } from '@/hooks/useFood';
+import { useCreateEntries, useFoodParse } from '@/hooks/useFood';
 import { useAccounts, useAcceptParse, useMoneyParse } from '@/hooks/useMoney';
 import { qk } from '@/lib/api/queryKeys';
 import {
@@ -30,7 +30,7 @@ type Kind = 'meal' | 'spend';
 export function Capture({ date, hour }: { date: string; hour: number }) {
   const [kind, setKind] = useState<Kind>('meal');
   const [text, setText] = useState('');
-  const food = useParseJob();
+  const food = useFoodParse();
   const money = useMoneyParse();
   const accounts = useAccounts().data ?? [];
   const input = useRef<HTMLInputElement>(null);
