@@ -50,9 +50,8 @@ namespace Utils::Strings {
  * Config semantics — two keys, two behaviors:
  *   - `api.public_paths` / `API_PUBLIC_PATHS` REPLACES this default wholesale.
  *     Forget one default entry in the override and that route starts 401ing —
- *     this bit both the content module (docs/CONFIG.md, Content section) and a
- *     the PayPal webhook, which was added only to this constant
- *     and silently died under any deployment that set the override key.
+ *     this bit the PayPal webhook, which was added only to this constant and
+ *     silently died under any deployment that set the override key.
  *   - `api.public_paths_extra` / `API_PUBLIC_PATHS_EXTRA` is ADDITIVE: its
  *     entries are appended to whichever base won above. To open ONE new route
  *     (a payment-provider webhook, a public feed), use the extra key — never

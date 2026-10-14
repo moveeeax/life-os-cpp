@@ -190,7 +190,6 @@ For URL components: `REDIS_HOST`, `REDIS_PORT`.
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
 | `BILLING_ENABLED` | `billing.enabled` | bool | `false` | Master switch for the billing module (`Core::billing_enabled()`) — same on/off pattern as `JOBS_ENABLED`; routes stay registered, handlers 404 while off. `Billing::initialize()` (called from `Core::initialize()`) throws at boot if this is `true` and `client_id`/`client_secret`/`webhook_id` are empty. |
-| — | `billing.provider` | string | `paypal` | Only provider supported today |
 | `BILLING_CURRENCY` | `billing.currency` | string | `USD` | ISO 4217; must be a 2-decimal currency (the cents parser rejects others) |
 | `BILLING_CREDITS_PER_UNIT` | `billing.credits_per_unit` | int | `100` | Credits minted per currency unit (100 cents) captured. Config default only — the live value is the `billing_settings` row (migration 008), editable at runtime by the admin API |
 | `BILLING_MIN_AMOUNT_CENTS` | `billing.min_amount_cents` | int | `100` | Custom top-up lower bound; live value in `billing_settings` |

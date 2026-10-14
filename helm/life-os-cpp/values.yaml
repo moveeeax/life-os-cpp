@@ -328,7 +328,6 @@ storage:
 # ---------------------------------------------------------------
 billing:
   enabled: false
-  provider: paypal
   currency: USD
   creditsPerUnit: 100
   minAmountCents: 100

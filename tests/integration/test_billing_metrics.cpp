@@ -58,7 +58,6 @@ protected:
         cfg["database"]["migrations_enabled"] = true;
         cfg["database"]["migrations_dir"] = "migrations";
         cfg["billing"]["enabled"] = true;
-        cfg["billing"]["provider"] = "paypal";
         cfg["billing"]["currency"] = "USD";
         // Matches migration 008's seeded defaults — rate 100 credits per 100
         // cents, i.e. 1 credit per 1 cent, which is what every amount/credits

@@ -92,7 +92,6 @@ protected:
         cfg["database"]["migrations_enabled"] = true;
         cfg["database"]["migrations_dir"] = "migrations";
         cfg["billing"]["enabled"] = true;
-        cfg["billing"]["provider"] = "paypal";
         cfg["billing"]["currency"] = "USD";
         // These match migration 008's seeded defaults exactly (100/100/100000)
         // — kept here only as the defensive config fallback billing_limits()

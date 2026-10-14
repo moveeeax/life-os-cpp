@@ -171,7 +171,6 @@
   },
   "billing": {
     "enabled": "${BILLING_ENABLED:-false}",
-    "provider": "paypal",
     "currency": "USD",
     "credits_per_unit": 100,
     "min_amount_cents": 100,

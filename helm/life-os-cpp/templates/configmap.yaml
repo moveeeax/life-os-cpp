@@ -76,7 +76,6 @@ data:
       },
       "billing": {
         "enabled": {{ .Values.billing.enabled }},
-        "provider": {{ .Values.billing.provider | quote }},
         "currency": {{ .Values.billing.currency | quote }},
         "credits_per_unit": {{ .Values.billing.creditsPerUnit }},
         "min_amount_cents": {{ .Values.billing.minAmountCents }},
