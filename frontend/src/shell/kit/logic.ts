@@ -29,14 +29,4 @@ export function dialogWidth(className: string | undefined): number {
 }
 
 /** "−5,000 KZT", "+460,000 KZT", "12.50": a true minus sign, grouped digits, the code after. */
-export function formatAmount(
-  value: number,
-  { currency, signed, digits = 2 }: { currency?: string; signed?: boolean; digits?: number } = {},
-): string {
-  const body = new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  }).format(Math.abs(value));
-  const sign = value < 0 ? '−' : signed && value > 0 ? '+' : '';
-  return `${sign}${body}${currency ? ` ${currency}` : ''}`;
-}
+export { formatAmount } from '@/lib/amounts';

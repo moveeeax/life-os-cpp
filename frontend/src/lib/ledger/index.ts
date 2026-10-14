@@ -1,5 +1,6 @@
 // Pure logic of the Money pages: formats, periods, per-currency totals, the
 // parse draft, small rules. Amounts of different currencies are never added.
+import { formatAmount } from '@/lib/amounts';
 import { shiftDays } from '@/lib/dates';
 
 import type {
@@ -30,19 +31,8 @@ export const decimalsOf = (currencies: Currency[] | undefined, code: string): nu
   currencies?.find((c) => c.code === code)?.decimals ?? 2;
 
 /** "₸13,275.61"-style text in the currency's own decimals. */
-export function formatMoney(amount: number, currency: string, decimals = 2): string {
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    }).format(amount);
-  } catch {
-    // An unknown code: the number and the code.
-    return `${amount.toFixed(decimals)} ${currency}`;
-  }
-}
+export const formatMoney = (amount: number, currency: string, decimals = 2): string =>
+  formatAmount(amount, { currency, symbol: true, digits: decimals });
 
 /** The amount as it moved the account: expenses negative, incomes positive. */
 export function signedAmount(row: Pick<Transaction, 'type' | 'amount'>): number {

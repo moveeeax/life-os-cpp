@@ -1,6 +1,7 @@
 // All accounts in one currency (Money summary): formats and the geometry of
 // the line by day. The numbers come converted from the server; nothing is
 // converted here.
+import { formatAmount } from '@/lib/amounts';
 
 export const SUMMARY_CURRENCIES = ['USD', 'EUR', 'KZT', 'RUB'] as const;
 export const SUMMARY_PERIODS = [30, 90, 365] as const;
@@ -14,17 +15,14 @@ const cents = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
-const whole = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 
 /** A total: cents under a thousand, whole units above. */
-export function formatTotal(v: number): string {
-  return Math.abs(v) >= 1000 ? whole.format(v) : cents.format(v);
-}
+export const formatTotal = (v: number): string =>
+  formatAmount(v, { wholeFrom: 1000, trueMinus: false });
 
 /** A change with its sign in front. */
-export function signed(v: number): string {
-  return (v < 0 ? '−' : '+') + formatTotal(Math.abs(v));
-}
+export const signed = (v: number): string =>
+  formatAmount(v, { wholeFrom: 1000, signed: true, zeroSign: '+' });
 
 /** "1 USD = 490.00 KZT" (@p rate is units of @p currency per 1 @p target), turned around when under one. */
 export function rateText(rate: number, currency: string, target: string): string {

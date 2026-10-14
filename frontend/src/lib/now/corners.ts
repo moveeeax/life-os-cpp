@@ -1,6 +1,7 @@
 // The four corners of Now: one main line and one small line each, a dot when
 // something is off (the rules of the quiet lines), and the countdowns of the
 // Goals corner.
+import { formatAmount } from '@/lib/amounts';
 import { daysBetween } from '@/lib/dates';
 import { paceWord, type Tone } from '@/lib/goals';
 
@@ -29,18 +30,9 @@ export const COUNTDOWN_DAYS = 60;
 const n0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const n1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
 
-const money0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
-const money2 = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
 /** An amount in its own currency: whole numbers stay whole, cents show as two digits. */
-export function formatMoney(amount: number): string {
-  return Number.isInteger(Math.round(amount * 100) / 100)
-    ? money0.format(amount)
-    : money2.format(amount);
-}
+export const formatMoney = (amount: number): string =>
+  formatAmount(amount, { wholeWhenWhole: true, trueMinus: false });
 
 /** The big figure of a countdown row: none for today and tomorrow, where the words say it. */
 export function countdownFigure(days: number): { figure: string | null; words: string } {
