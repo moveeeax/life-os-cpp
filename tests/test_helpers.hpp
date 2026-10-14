@@ -20,14 +20,13 @@
 #include "database/Database.hpp"
 #include "database/Migrations.hpp"
 #include "domain/Role.hpp"
+#include "e2e/openapi_check.hpp"
 #include "jobs/Jobs.hpp"
 #include "observability/Observability.hpp"
 #include "security/Auth.hpp"
 #include "tasks/Tasks.hpp"
 #include "utils/Config.hpp"
 #include "utils/Retry.hpp"
-
-#include "e2e/openapi_check.hpp"
 
 namespace TestHelpers {
 
@@ -498,6 +497,33 @@ inline void expect_2xx_matches_schema(const drogon::HttpResponsePtr& resp,
     const int status = static_cast<int>(resp->statusCode());
     if (status >= 200 && status < 300)
         expect_matches_schema(resp, method, spec_path);
+}
+
+/// The spelling of @p m the spec uses ("GET", "POST", ...), for the fixtures
+/// that drive handlers by member pointer and carry the method as a value.
+inline const char* method_name(drogon::HttpMethod m) {
+    switch (m) {
+        case drogon::Post:
+            return "POST";
+        case drogon::Put:
+            return "PUT";
+        case drogon::Patch:
+            return "PATCH";
+        case drogon::Delete:
+            return "DELETE";
+        case drogon::Head:
+            return "HEAD";
+        case drogon::Options:
+            return "OPTIONS";
+        default:
+            return "GET";
+    }
+}
+
+inline void expect_2xx_matches_schema(const drogon::HttpResponsePtr& resp,
+                                      drogon::HttpMethod method,
+                                      const std::string& spec_path) {
+    expect_2xx_matches_schema(resp, std::string(method_name(method)), spec_path);
 }
 
 // ---------------------------------------------------------------------------

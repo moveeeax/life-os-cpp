@@ -99,6 +99,30 @@ protected:
                                                       std::function<void(const HttpResponsePtr&)>&&,
                                                       const std::string&);
 
+    // The spec path of each handler the suite drives, for the schema check
+    // in call* (tests/test_helpers.hpp expect_2xx_matches_schema).
+    static const char* spec_path_of(Handler h) {
+        static const std::pair<Handler, const char*> kPaths[] = {
+            {&Api::SoundsController::listSounds, "/api/v1/sounds"},
+            {&Api::SoundsController::listAdmin, "/api/v1/admin/sounds"},
+            {&Api::SoundsController::createSound, "/api/v1/admin/sounds"},
+        };
+        for (const auto& [handler, path] : kPaths)
+            if (handler == h)
+                return path;
+        return nullptr;
+    }
+    static const char* spec_path_of(IdHandler h) {
+        static const std::pair<IdHandler, const char*> kPaths[] = {
+            {&Api::SoundsController::markReady, "/api/v1/admin/sounds/{id}/ready"},
+            {&Api::SoundsController::deleteSound, "/api/v1/admin/sounds/{id}"},
+        };
+        for (const auto& [handler, path] : kPaths)
+            if (handler == h)
+                return path;
+        return nullptr;
+    }
+
     HttpResponsePtr call(Handler h,
                          const Security::Auth::AuthPrincipal* who,
                          HttpMethod m,
@@ -107,6 +131,8 @@ protected:
         HttpResponsePtr captured;
         (c.*h)(req, [&](const HttpResponsePtr& r) { captured = r; });
         EXPECT_TRUE(captured);
+        if (const char* path = spec_path_of(h))
+            TestHelpers::expect_2xx_matches_schema(captured, m, path);
         return captured;
     }
     HttpResponsePtr call_id(IdHandler h,
@@ -118,6 +144,8 @@ protected:
         (c.*h)(
             req, [&](const HttpResponsePtr& r) { captured = r; }, id);
         EXPECT_TRUE(captured);
+        if (const char* path = spec_path_of(h))
+            TestHelpers::expect_2xx_matches_schema(captured, m, path);
         return captured;
     }
     json rain() {

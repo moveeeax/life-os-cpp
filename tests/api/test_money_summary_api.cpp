@@ -116,6 +116,7 @@ protected:
         HttpResponsePtr captured;
         c.summary(req, [&](const HttpResponsePtr& r) { captured = r; });
         EXPECT_TRUE(captured);
+        TestHelpers::expect_2xx_matches_schema(captured, "GET", "/api/v1/money/summary");
         return captured;
     }
 

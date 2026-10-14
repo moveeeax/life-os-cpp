@@ -131,6 +131,7 @@ protected:
     std::string created(const char* who, const json& body) {
         auto r = call(who, Post, body, [&](auto req, auto cb) { c.create(req, std::move(cb)); });
         EXPECT_EQ(r->statusCode(), k201Created) << std::string(r->body());
+        TestHelpers::expect_2xx_matches_schema(r, "POST", "/api/v1/habits");
         return body_of(r)["data"]["id"].get<std::string>();
     }
 
@@ -138,6 +139,7 @@ protected:
         auto r = call(
             who, Get, json::object(), [&](auto req, auto cb) { c.list(req, std::move(cb)); }, {{"archived", archived}});
         EXPECT_EQ(r->statusCode(), k200OK) << std::string(r->body());
+        TestHelpers::expect_2xx_matches_schema(r, "GET", "/api/v1/habits");
         return body_of(r)["data"];
     }
 
@@ -151,6 +153,7 @@ protected:
                       [&](auto req, auto cb) { c.days(req, std::move(cb)); },
                       {{"from", from}, {"to", to}, {"tz", tz}});
         EXPECT_EQ(r->statusCode(), k200OK) << std::string(r->body());
+        TestHelpers::expect_2xx_matches_schema(r, "GET", "/api/v1/habits/days");
         return body_of(r);
     }
 
@@ -158,8 +161,10 @@ protected:
                          const std::string& id,
                          const std::string& date,
                          const json& body = json::object()) {
-        return call(
-            who, Put, body, [&](auto req, auto cb) { c.putCheck(req, std::move(cb), id, date); }, {{"tz", "UTC"}});
+        auto r =
+            call(who, Put, body, [&](auto req, auto cb) { c.putCheck(req, std::move(cb), id, date); }, {{"tz", "UTC"}});
+        TestHelpers::expect_2xx_matches_schema(r, "PUT", "/api/v1/habits/{id}/checks/{date}");
+        return r;
     }
 
     static json habit_of(const json& list, const std::string& id) {
@@ -246,12 +251,14 @@ TEST_F(HabitsApiTest, CreateEditArchiveDelete) {
                        json{{"name", "Reading 20 min"}, {"schedule", "weekly"}, {"per_week", 5}},
                        [&](auto req, auto cb) { c.update(req, std::move(cb), b); });
     ASSERT_EQ(edited->statusCode(), k200OK) << std::string(edited->body());
+    TestHelpers::expect_matches_schema(edited, "PATCH", "/api/v1/habits/{id}");
     EXPECT_EQ(body_of(edited)["data"]["name"], "Reading 20 min");
     EXPECT_EQ(body_of(edited)["data"]["per_week"], 5);
 
     auto archived =
         call(kAnna, Post, json{{"archived", true}}, [&](auto req, auto cb) { c.archive(req, std::move(cb), a); });
     ASSERT_EQ(archived->statusCode(), k200OK);
+    TestHelpers::expect_matches_schema(archived, "POST", "/api/v1/habits/{id}/archive");
     EXPECT_TRUE(body_of(archived)["data"]["archived_at"].is_string());
     EXPECT_EQ(list(kAnna).size(), 1U);
     ASSERT_EQ(list(kAnna, "true").size(), 1U);
@@ -502,6 +509,7 @@ TEST_F(HabitsApiTest, TheTodayDigestCarriesTheHabitsPlate) {
     today.today(req, [&](const HttpResponsePtr& r) { resp = r; });
     ASSERT_TRUE(resp);
     ASSERT_EQ(resp->statusCode(), k200OK) << std::string(resp->body());
+    TestHelpers::expect_matches_schema(resp, "GET", "/api/v1/today");
     const json d = body_of(resp)["data"];
     ASSERT_TRUE(d.contains("habits")) << d.dump();
     EXPECT_EQ(d["habits"]["done"], 2);

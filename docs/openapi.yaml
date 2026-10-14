@@ -2036,7 +2036,7 @@ components:
       required: [id, source, off_code, name, brand, per, kcal, protein_g, fat_g, carbs_g, fiber_g, sugar_g, salt_g, servings, archived, created_at, updated_at]
       properties:
         id: { type: string, format: uuid }
-        source: { type: string, enum: [custom, off, ai] }
+        source: { type: string, enum: [custom, "off", ai] }
         off_code: { type: [string, 'null'], description: "Open Food Facts barcode of a copied product" }
         name: { type: string }
         brand: { type: string }

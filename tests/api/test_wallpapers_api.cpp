@@ -105,6 +105,30 @@ protected:
                                                           std::function<void(const HttpResponsePtr&)>&&,
                                                           const std::string&);
 
+    // The spec path of each handler the suite drives, for the schema check
+    // in call* (tests/test_helpers.hpp expect_2xx_matches_schema).
+    static const char* spec_path_of(Handler h) {
+        static const std::pair<Handler, const char*> kPaths[] = {
+            {&Api::WallpapersController::listWallpapers, "/api/v1/wallpapers"},
+            {&Api::WallpapersController::listAdmin, "/api/v1/admin/wallpapers"},
+            {&Api::WallpapersController::createWallpaper, "/api/v1/admin/wallpapers"},
+        };
+        for (const auto& [handler, path] : kPaths)
+            if (handler == h)
+                return path;
+        return nullptr;
+    }
+    static const char* spec_path_of(IdHandler h) {
+        static const std::pair<IdHandler, const char*> kPaths[] = {
+            {&Api::WallpapersController::markReady, "/api/v1/admin/wallpapers/{id}/ready"},
+            {&Api::WallpapersController::deleteWallpaper, "/api/v1/admin/wallpapers/{id}"},
+        };
+        for (const auto& [handler, path] : kPaths)
+            if (handler == h)
+                return path;
+        return nullptr;
+    }
+
     HttpResponsePtr call(Handler h,
                          const Security::Auth::AuthPrincipal* who,
                          HttpMethod m,
@@ -117,6 +141,8 @@ protected:
         HttpResponsePtr captured;
         (c.*h)(req, [&](const HttpResponsePtr& r) { captured = r; });
         EXPECT_TRUE(captured);
+        if (const char* path = spec_path_of(h))
+            TestHelpers::expect_2xx_matches_schema(captured, m, path);
         return captured;
     }
 
@@ -129,6 +155,8 @@ protected:
         (c.*h)(
             req, [&](const HttpResponsePtr& r) { captured = r; }, id);
         EXPECT_TRUE(captured);
+        if (const char* path = spec_path_of(h))
+            TestHelpers::expect_2xx_matches_schema(captured, m, path);
         return captured;
     }
 

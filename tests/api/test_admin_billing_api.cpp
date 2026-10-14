@@ -242,6 +242,7 @@ TEST_F(AdminBillingApiTest, NonAdminGets403OnEveryRoute) {
     HttpResponsePtr resp;
 
     controller.listPayments(TestHelpers::authed(user), [&](const HttpResponsePtr& r) { resp = r; });
+    TestHelpers::expect_2xx_matches_schema(resp, "GET", "/api/v1/admin/billing/payments");
     ASSERT_NE(resp, nullptr);
     EXPECT_EQ(resp->statusCode(), k403Forbidden);
 
@@ -294,6 +295,7 @@ TEST_F(AdminBillingApiTest, PackageCrudRoundtrip) {
     controller.createPackage(
         TestHelpers::authed_json(admin, json{{"title", "Starter"}, {"amount_cents", 500}, {"credits", 600}}),
         [&](const HttpResponsePtr& r) { resp = r; });
+    TestHelpers::expect_2xx_matches_schema(resp, "POST", "/api/v1/admin/billing/packages");
     ASSERT_EQ(resp->statusCode(), k201Created);
     auto created = json::parse(std::string(resp->body()))["data"];
     const std::string id = created["id"].get<std::string>();
@@ -304,6 +306,7 @@ TEST_F(AdminBillingApiTest, PackageCrudRoundtrip) {
     EXPECT_EQ(audit_count("billing.package.create", id), 1);
 
     controller.listPackages(TestHelpers::authed(admin), [&](const HttpResponsePtr& r) { resp = r; });
+    TestHelpers::expect_2xx_matches_schema(resp, "GET", "/api/v1/admin/billing/packages");
     ASSERT_EQ(resp->statusCode(), k200OK);
     auto list_body = json::parse(std::string(resp->body()));
     ASSERT_EQ(list_body["data"].size(), 1u);
@@ -314,6 +317,7 @@ TEST_F(AdminBillingApiTest, PackageCrudRoundtrip) {
         TestHelpers::authed_json(admin, json{{"title", "Starter Plus"}, {"active", false}}, Patch),
         [&](const HttpResponsePtr& r) { resp = r; },
         id);
+    TestHelpers::expect_2xx_matches_schema(resp, "PATCH", "/api/v1/admin/billing/packages/{id}");
     ASSERT_EQ(resp->statusCode(), k200OK);
     auto updated = json::parse(std::string(resp->body()))["data"];
     EXPECT_EQ(updated["title"], "Starter Plus");
@@ -324,12 +328,14 @@ TEST_F(AdminBillingApiTest, PackageCrudRoundtrip) {
 
     // Admin list still shows it (inactive included, unlike the user-facing view).
     controller.listPackages(TestHelpers::authed(admin), [&](const HttpResponsePtr& r) { resp = r; });
+    TestHelpers::expect_2xx_matches_schema(resp, "GET", "/api/v1/admin/billing/packages");
     list_body = json::parse(std::string(resp->body()));
     ASSERT_EQ(list_body["data"].size(), 1u);
     EXPECT_FALSE(list_body["data"][0]["active"].get<bool>());
 
     controller.deletePackage(
         TestHelpers::authed(admin, Delete), [&](const HttpResponsePtr& r) { resp = r; }, id);
+    TestHelpers::expect_2xx_matches_schema(resp, "DELETE", "/api/v1/admin/billing/packages/{id}");
     ASSERT_EQ(resp->statusCode(), k200OK);
     EXPECT_EQ(audit_count("billing.package.delete", id), 1);
     EXPECT_FALSE(packages.find(id).has_value());
@@ -381,6 +387,7 @@ TEST_F(AdminBillingApiTest, SettingsUpdateChangesComputedCredits) {
 
     HttpResponsePtr resp;
     controller.getSettings(TestHelpers::authed(admin), [&](const HttpResponsePtr& r) { resp = r; });
+    TestHelpers::expect_2xx_matches_schema(resp, "GET", "/api/v1/admin/billing/settings");
     ASSERT_EQ(resp->statusCode(), k200OK);
     auto before = json::parse(std::string(resp->body()))["data"];
     EXPECT_EQ(before["credits_per_unit"], 100);
@@ -390,6 +397,7 @@ TEST_F(AdminBillingApiTest, SettingsUpdateChangesComputedCredits) {
         TestHelpers::authed_json(
             admin, json{{"credits_per_unit", 50}, {"min_amount_cents", 100}, {"max_amount_cents", 100000}}, Put),
         [&](const HttpResponsePtr& r) { resp = r; });
+    TestHelpers::expect_2xx_matches_schema(resp, "PUT", "/api/v1/admin/billing/settings");
     ASSERT_EQ(resp->statusCode(), k200OK);
     auto after = json::parse(std::string(resp->body()))["data"];
     EXPECT_EQ(after["credits_per_unit"], 50);
@@ -413,6 +421,7 @@ TEST_F(AdminBillingApiTest, SettingsUpdateChangesComputedCredits) {
     HttpResponsePtr topup_resp;
     billing_controller.topup(TestHelpers::authed_json(user, json{{"amount_cents", 1000}}),
                              [&](const HttpResponsePtr& r) { topup_resp = r; });
+    TestHelpers::expect_2xx_matches_schema(topup_resp, "POST", "/api/v1/billing/topup");
     ASSERT_EQ(topup_resp->statusCode(), k201Created);
     auto new_payment = payments.find_by_order_id("ORDER-NEW");
     ASSERT_TRUE(new_payment.has_value());
@@ -486,6 +495,7 @@ TEST_F(AdminBillingApiTest, AdjustRequiresNoteAndWritesAudit) {
         TestHelpers::authed_json(admin, json{{"delta_credits", 250}, {"note", "welcome bonus"}}),
         [&](const HttpResponsePtr& r) { resp = r; },
         target.subject);
+    TestHelpers::expect_2xx_matches_schema(resp, "POST", "/api/v1/admin/billing/users/{id}/adjust");
     ASSERT_EQ(resp->statusCode(), k200OK);
     auto body = json::parse(std::string(resp->body()));
     EXPECT_EQ(body["data"]["balance"], 250);
@@ -535,6 +545,7 @@ TEST_F(AdminBillingApiTest, AdjustNotifyTrueEnqueuesExactlyOneAdjustmentEmailWit
         TestHelpers::authed_json(admin, json{{"delta_credits", 250}, {"note", "welcome bonus"}, {"notify", true}}),
         [&](const HttpResponsePtr& r) { resp = r; },
         target.subject);
+    TestHelpers::expect_2xx_matches_schema(resp, "POST", "/api/v1/admin/billing/users/{id}/adjust");
     ASSERT_EQ(resp->statusCode(), k200OK);
     auto body = json::parse(std::string(resp->body()));
     EXPECT_EQ(body["data"]["balance"], 250);
@@ -564,6 +575,7 @@ TEST_F(AdminBillingApiTest, AdjustNotifyTrueFormatsNegativeDeltaWithMinusSign) {
         TestHelpers::authed_json(admin, json{{"delta_credits", 500}, {"note", "seed"}}),
         [&](const HttpResponsePtr& r) { seed_resp = r; },
         target.subject);
+    TestHelpers::expect_2xx_matches_schema(seed_resp, "POST", "/api/v1/admin/billing/users/{id}/adjust");
     ASSERT_EQ(seed_resp->statusCode(), k200OK);
     ASSERT_EQ(queue_depth(), 0);
 
@@ -572,6 +584,7 @@ TEST_F(AdminBillingApiTest, AdjustNotifyTrueFormatsNegativeDeltaWithMinusSign) {
         TestHelpers::authed_json(admin, json{{"delta_credits", -75}, {"note", "correction"}, {"notify", true}}),
         [&](const HttpResponsePtr& r) { resp = r; },
         target.subject);
+    TestHelpers::expect_2xx_matches_schema(resp, "POST", "/api/v1/admin/billing/users/{id}/adjust");
     ASSERT_EQ(resp->statusCode(), k200OK);
 
     ASSERT_EQ(queue_depth(), 1);
@@ -592,6 +605,7 @@ TEST_F(AdminBillingApiTest, AdjustNotifyFalseOrOmittedEnqueuesNoEmail) {
         TestHelpers::authed_json(admin, json{{"delta_credits", 100}, {"note", "no notify field"}}),
         [&](const HttpResponsePtr& r) { resp = r; },
         target.subject);
+    TestHelpers::expect_2xx_matches_schema(resp, "POST", "/api/v1/admin/billing/users/{id}/adjust");
     ASSERT_EQ(resp->statusCode(), k200OK);
     EXPECT_EQ(queue_depth(), 0);
 
@@ -600,6 +614,7 @@ TEST_F(AdminBillingApiTest, AdjustNotifyFalseOrOmittedEnqueuesNoEmail) {
         TestHelpers::authed_json(admin, json{{"delta_credits", 50}, {"note", "explicit false"}, {"notify", false}}),
         [&](const HttpResponsePtr& r) { resp = r; },
         target.subject);
+    TestHelpers::expect_2xx_matches_schema(resp, "POST", "/api/v1/admin/billing/users/{id}/adjust");
     ASSERT_EQ(resp->statusCode(), k200OK);
     EXPECT_EQ(queue_depth(), 0);
 
@@ -640,6 +655,7 @@ TEST_F(AdminBillingApiTest, PaymentsListFiltersByStatusAndUser) {
 
     // No filter: all three.
     controller.listPayments(TestHelpers::authed(admin), [&](const HttpResponsePtr& r) { resp = r; });
+    TestHelpers::expect_2xx_matches_schema(resp, "GET", "/api/v1/admin/billing/payments");
     ASSERT_EQ(resp->statusCode(), k200OK);
     auto body = json::parse(std::string(resp->body()));
     EXPECT_EQ(body["total"], 3);
@@ -649,6 +665,7 @@ TEST_F(AdminBillingApiTest, PaymentsListFiltersByStatusAndUser) {
     auto req = TestHelpers::authed(admin);
     req->setParameter("status", "captured");
     controller.listPayments(req, [&](const HttpResponsePtr& r) { resp = r; });
+    TestHelpers::expect_2xx_matches_schema(resp, "GET", "/api/v1/admin/billing/payments");
     ASSERT_EQ(resp->statusCode(), k200OK);
     body = json::parse(std::string(resp->body()));
     EXPECT_EQ(body["total"], 2);
@@ -659,6 +676,7 @@ TEST_F(AdminBillingApiTest, PaymentsListFiltersByStatusAndUser) {
     req = TestHelpers::authed(admin);
     req->setParameter("user_id", alice.subject);
     controller.listPayments(req, [&](const HttpResponsePtr& r) { resp = r; });
+    TestHelpers::expect_2xx_matches_schema(resp, "GET", "/api/v1/admin/billing/payments");
     ASSERT_EQ(resp->statusCode(), k200OK);
     body = json::parse(std::string(resp->body()));
     EXPECT_EQ(body["total"], 2);
@@ -670,6 +688,7 @@ TEST_F(AdminBillingApiTest, PaymentsListFiltersByStatusAndUser) {
     req->setParameter("status", "captured");
     req->setParameter("user_id", alice.subject);
     controller.listPayments(req, [&](const HttpResponsePtr& r) { resp = r; });
+    TestHelpers::expect_2xx_matches_schema(resp, "GET", "/api/v1/admin/billing/payments");
     ASSERT_EQ(resp->statusCode(), k200OK);
     body = json::parse(std::string(resp->body()));
     ASSERT_EQ(body["total"], 1);

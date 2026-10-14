@@ -205,6 +205,7 @@ protected:
     json do_topup(const Security::Auth::AuthPrincipal& p, const json& body, int* status = nullptr) {
         HttpResponsePtr resp;
         controller.topup(TestHelpers::authed_json(p, body), [&](const HttpResponsePtr& r) { resp = r; });
+        TestHelpers::expect_2xx_matches_schema(resp, "POST", "/api/v1/billing/topup");
         if (status)
             *status = resp->statusCode();
         return json::parse(std::string(resp->body()));
@@ -214,6 +215,7 @@ protected:
         HttpResponsePtr resp;
         controller.capture(TestHelpers::authed_json(p, json{{"order_id", order_id}}),
                            [&](const HttpResponsePtr& r) { resp = r; });
+        TestHelpers::expect_2xx_matches_schema(resp, "POST", "/api/v1/billing/capture");
         if (status)
             *status = resp->statusCode();
         return json::parse(std::string(resp->body()));
@@ -228,6 +230,7 @@ protected:
         req->addHeader("Paypal-Transmission-Time", "2026-01-01T00:00:00Z");
         HttpResponsePtr resp;
         controller.paypalWebhook(req, [&](const HttpResponsePtr& r) { resp = r; });
+        TestHelpers::expect_2xx_matches_schema(resp, "POST", "/api/v1/billing/paypal/webhook");
         if (status)
             *status = resp->statusCode();
         return json::parse(std::string(resp->body()));

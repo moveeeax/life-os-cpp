@@ -232,6 +232,7 @@ protected:
     json do_topup(const Security::Auth::AuthPrincipal& p, const json& body, int* status = nullptr) {
         HttpResponsePtr resp;
         controller.topup(TestHelpers::authed_json(p, body), [&](const HttpResponsePtr& r) { resp = r; });
+        TestHelpers::expect_2xx_matches_schema(resp, "POST", "/api/v1/billing/topup");
         if (status)
             *status = resp->statusCode();
         return json::parse(std::string(resp->body()));
@@ -241,6 +242,7 @@ protected:
         HttpResponsePtr resp;
         controller.capture(TestHelpers::authed_json(p, json{{"order_id", order_id}}),
                            [&](const HttpResponsePtr& r) { resp = r; });
+        TestHelpers::expect_2xx_matches_schema(resp, "POST", "/api/v1/billing/capture");
         if (status)
             *status = resp->statusCode();
         return json::parse(std::string(resp->body()));
@@ -249,6 +251,7 @@ protected:
     json do_wallet(const Security::Auth::AuthPrincipal& p, int* status = nullptr) {
         HttpResponsePtr resp;
         controller.getWallet(TestHelpers::authed(p), [&](const HttpResponsePtr& r) { resp = r; });
+        TestHelpers::expect_2xx_matches_schema(resp, "GET", "/api/v1/billing/wallet");
         if (status)
             *status = resp->statusCode();
         return json::parse(std::string(resp->body()));
@@ -282,6 +285,7 @@ protected:
         }
         HttpResponsePtr resp;
         controller.paypalWebhook(req, [&](const HttpResponsePtr& r) { resp = r; });
+        TestHelpers::expect_2xx_matches_schema(resp, "POST", "/api/v1/billing/paypal/webhook");
         if (status)
             *status = resp->statusCode();
         return json::parse(std::string(resp->body()));
@@ -349,6 +353,7 @@ TEST_F(BillingApiTest, ListPackagesReturnsOnlyActiveOnes) {
 
     HttpResponsePtr resp;
     controller.listPackages(TestHelpers::authed(user), [&](const HttpResponsePtr& r) { resp = r; });
+    TestHelpers::expect_2xx_matches_schema(resp, "GET", "/api/v1/billing/packages");
     ASSERT_EQ(resp->statusCode(), k200OK);
     auto body = json::parse(std::string(resp->body()));
     ASSERT_EQ(body["data"].size(), 1u);
@@ -362,6 +367,7 @@ TEST_F(BillingApiTest, ListPackagesIncludesRateAndBounds) {
 
     HttpResponsePtr resp;
     controller.listPackages(TestHelpers::authed(user), [&](const HttpResponsePtr& r) { resp = r; });
+    TestHelpers::expect_2xx_matches_schema(resp, "GET", "/api/v1/billing/packages");
     ASSERT_EQ(resp->statusCode(), k200OK);
     auto body = json::parse(std::string(resp->body()));
     EXPECT_EQ(body["credits_per_unit"], 100);
@@ -1125,6 +1131,7 @@ TEST_F(BillingApiTest, WalletShowsOwnBalanceAndHistoryOnly) {
     req->setParameter("user_id", alice.subject);
     controller.getWallet(req, [&](const HttpResponsePtr& r) { resp = r; });
     ASSERT_EQ(resp->statusCode(), k200OK);
+    TestHelpers::expect_matches_schema(resp, "GET", "/api/v1/billing/wallet");
     auto bob_wallet = json::parse(std::string(resp->body()));
     EXPECT_EQ(bob_wallet["data"]["balance"], 0);
     EXPECT_EQ(bob_wallet["data"]["history"].size(), 0u);
@@ -1188,6 +1195,7 @@ TEST_F(BillingDisabledApiTest, AllRoutes404WhenBillingDisabled) {
 
     HttpResponsePtr resp;
     controller.listPackages(TestHelpers::authed(user), [&](const HttpResponsePtr& r) { resp = r; });
+    TestHelpers::expect_2xx_matches_schema(resp, "GET", "/api/v1/billing/packages");
     EXPECT_EQ(resp->statusCode(), k404NotFound);
 
     controller.getWallet(TestHelpers::authed(user), [&](const HttpResponsePtr& r) { resp = r; });

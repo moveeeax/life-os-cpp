@@ -215,6 +215,7 @@ TEST_F(JobsEndpointTest, ListJobs) {
 
     ASSERT_NE(list_resp, nullptr);
     EXPECT_EQ(list_resp->statusCode(), k200OK);
+    TestHelpers::expect_matches_schema(list_resp, "GET", "/api/v1/jobs");
 
     auto list_body = json::parse(std::string(list_resp->body()));
     EXPECT_TRUE(list_body["data"].is_array());
@@ -238,6 +239,7 @@ TEST_F(JobsEndpointTest, ListJobsPaginatesWithOffset) {
 
     ASSERT_NE(page_resp, nullptr);
     EXPECT_EQ(page_resp->statusCode(), k200OK);
+    TestHelpers::expect_matches_schema(page_resp, "GET", "/api/v1/jobs");
     auto body = json::parse(std::string(page_resp->body()));
     EXPECT_EQ(body["limit"].get<int>(), 2);
     EXPECT_EQ(body["offset"].get<int>(), 2);

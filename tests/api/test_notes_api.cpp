@@ -93,13 +93,16 @@ protected:
     }
 
     HttpResponsePtr add(const char* who, const json& body) {
-        return call(who, Post, body, [&](auto req, auto cb) { c.createNote(req, std::move(cb)); });
+        auto r = call(who, Post, body, [&](auto req, auto cb) { c.createNote(req, std::move(cb)); });
+        TestHelpers::expect_2xx_matches_schema(r, "POST", "/api/v1/notes");
+        return r;
     }
 
     json list(const char* who, const std::vector<std::pair<std::string, std::string>>& params = {}) {
         auto r = call(
             who, Get, json::object(), [&](auto req, auto cb) { c.listNotes(req, std::move(cb)); }, params);
         EXPECT_EQ(r->statusCode(), k200OK) << std::string(r->body());
+        TestHelpers::expect_2xx_matches_schema(r, "GET", "/api/v1/notes");
         return body_of(r);
     }
 
@@ -206,10 +209,12 @@ TEST_F(NotesApiTest, EditAndADeletedProject) {
         c.updateNote(req, std::move(cb), id);
     });
     ASSERT_EQ(edited->statusCode(), k200OK) << std::string(edited->body());
+    TestHelpers::expect_matches_schema(edited, "PATCH", "/api/v1/notes/{id}");
     EXPECT_EQ(body_of(edited)["data"]["body"], "More words");
     EXPECT_EQ(body_of(edited)["data"]["title"], "Draft") << "untouched fields stay";
     call(kAnna, Delete, json::object(), [&](auto req, auto cb) { projects.deleteProject(req, std::move(cb), p); });
     auto left = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.getNote(req, std::move(cb), id); });
+    TestHelpers::expect_2xx_matches_schema(left, "GET", "/api/v1/notes/{id}");
     EXPECT_TRUE(body_of(left)["data"]["project_id"].is_null());
     EXPECT_EQ(call(kAnna, Delete, json::object(), [&](auto req, auto cb) { c.deleteNote(req, std::move(cb), id); })
                   ->statusCode(),

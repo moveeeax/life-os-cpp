@@ -239,11 +239,19 @@ The auth and rate-limit allowlists (`public_paths`, `protected_paths` in
 paths and are read at runtime. No gate compares them with the registry, so
 they are updated by hand when a route moves.
 
-Additive-only is a review rule today. An `oasdiff` gate in CI (the spec of
-the PR against the spec on `master`, breaking changes fail) is the next
-step; it is planned for wave 3 of the 2026-10-14 review, since the route
-count has passed the point where a review catches a removed field reliably
-(§8).
+Additive-only is a gate, not a review rule: the `openapi-drift` job runs
+`scripts/check-openapi-breaking.sh`, which diffs the PR's `docs/openapi.yaml`
+against the spec on the merge base with `master` with `oasdiff breaking
+--fail-on WARN`. A removed path or operation, a response property that is no
+longer required, a tightened type or a removed enum value fails the job;
+adding is free. The same job runs `scripts/check-openapi-gen-fresh.sh`, so
+`tests/e2e/openapi.gen.json` cannot lag behind the YAML. Response bodies meet
+the schemas in the tests: the e2e suite over the wire and the api bucket
+in-process, both through `OpenApiCheck::expect_matches_schema`
+(`tests/e2e/openapi_check.hpp`, wrapped for handler responses in
+`tests/test_helpers.hpp`). Added in wave 3 of the 2026-10-14 review, once the
+route count had passed the point where a review catches a removed field
+reliably (§8).
 
 ## 8. What is deliberately absent
 
@@ -267,12 +275,14 @@ On 2026-10-14 the registry holds 243 routes served by 22 controllers (255
 describes 169 paths with 243 operations. The count condition has fired. The
 decision stays no for the generator: the scaffolder still writes the three
 surfaces from §7 and the two gates still catch method-and-path drift at
-this size. What the size changes is the second condition: the gates do not
-see a renamed field or a tightened type, so the next step is the `oasdiff`
-gate from §7 (wave 3), which checks the schemas instead of generating them.
+this size. What the size changes is the second condition: the (method,
+path) gates do not see a renamed field or a tightened type, so the
+`openapi-drift` job now runs `check-openapi-breaking.sh` (§7), which checks
+the schemas against master instead of generating them, and the api bucket
+validates handler bodies against the same schemas.
 
 Registering Drogon routes from `Endpoints.hpp`. The registry holds only
 `{method, path, description}` strings. Wiring handlers through it would make
 it include every controller, or would replace `HttpController` with lambda
-registration everywhere. Deferred, same as the DSL: it would buy nothing the
-`oasdiff` gate does not, and it costs the controller layout.
+registration everywhere. Deferred, same as the DSL: it would buy nothing
+`check-openapi-breaking.sh` does not, and it costs the controller layout.

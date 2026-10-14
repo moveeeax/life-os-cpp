@@ -35,7 +35,9 @@ here was learned the expensive way on self-hosted runners.
   `.github/workflows/`, `helm/` or `deploy/` (where gate mutations live);
   the daily unconditional backstop is `.github/workflows/gates-nightly.yml`
   (cron + `workflow_dispatch`): its `gate-selftest` job runs
-  check-selftest.sh (28 planted breakages) and check-module-deps.sh, so
+  check-selftest.sh (33 planted breakages; the two check-openapi-breaking.sh
+  cases run only where oasdiff is installed and print a SELFTEST SKIP line
+  elsewhere) and check-module-deps.sh, so
   gate rot is caught within a day even when nobody touches the gates, and
   its `swagger-sri-guard` job re-downloads the pinned swagger-ui-dist files
   from the CDN and compares them with the sha384 SRI hashes in

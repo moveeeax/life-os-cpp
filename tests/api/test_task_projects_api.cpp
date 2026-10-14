@@ -85,7 +85,9 @@ protected:
     }
 
     HttpResponsePtr create(const char* who, const json& body) {
-        return call(who, Post, body, [&](auto req, auto cb) { c.createProject(req, std::move(cb)); });
+        auto r = call(who, Post, body, [&](auto req, auto cb) { c.createProject(req, std::move(cb)); });
+        TestHelpers::expect_2xx_matches_schema(r, "POST", "/api/v1/tasks/projects");
+        return r;
     }
 
     std::string project(const char* who, const std::string& name) {
@@ -97,7 +99,9 @@ protected:
     HttpResponsePtr add_task(const char* who, const json& extra) {
         json body = {{"title", "Write the runbook"}, {"area", "projects"}};
         body.update(extra);
-        return call(who, Post, body, [&](auto req, auto cb) { tasks.createItem(req, std::move(cb)); });
+        auto r = call(who, Post, body, [&](auto req, auto cb) { tasks.createItem(req, std::move(cb)); });
+        TestHelpers::expect_2xx_matches_schema(r, "POST", "/api/v1/tasks/items");
+        return r;
     }
 };
 
@@ -158,6 +162,7 @@ TEST_F(TaskProjectsApiTest, CountsAndTheNextTask) {
              json{{"project_id", p}, {"title", "Working on it"}, {"status", "in_progress"}, {"due", "2026-10-18"}});
     add_task(kAnna, json{{"title", "No project"}});
     auto list = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.listProjects(req, std::move(cb)); });
+    TestHelpers::expect_2xx_matches_schema(list, "GET", "/api/v1/tasks/projects");
     ASSERT_EQ(body_of(list)["data"].size(), 1U);
     const auto row = body_of(list)["data"][0];
     EXPECT_EQ(row["open"], 3) << "in progress counts as open";
@@ -165,6 +170,7 @@ TEST_F(TaskProjectsApiTest, CountsAndTheNextTask) {
     EXPECT_EQ(row["next"]["title"], "Working on it") << "the earliest due first, in progress included";
     auto filtered = call(
         kAnna, Get, json::object(), [&](auto req, auto cb) { tasks.listItems(req, std::move(cb)); }, {{"project", p}});
+    TestHelpers::expect_2xx_matches_schema(filtered, "GET", "/api/v1/tasks/items");
     EXPECT_EQ(body_of(filtered)["data"].size(), 4U);
     EXPECT_EQ(body_of(filtered)["data"][0]["project_title"], "Life OS");
 }
@@ -186,6 +192,7 @@ TEST_F(TaskProjectsApiTest, ATaskTakesOnlyTheCallersProject) {
         tasks.updateItem(req, std::move(cb), task);
     });
     ASSERT_EQ(cleared->statusCode(), k200OK);
+    TestHelpers::expect_matches_schema(cleared, "PATCH", "/api/v1/tasks/items/{id}");
     EXPECT_TRUE(body_of(cleared)["data"]["project_id"].is_null());
 }
 
@@ -200,5 +207,6 @@ TEST_F(TaskProjectsApiTest, ADeletedProjectLeavesItsTasks) {
               k204NoContent);
     auto left = call(kAnna, Get, json::object(), [&](auto req, auto cb) { tasks.getItem(req, std::move(cb), task); });
     ASSERT_EQ(left->statusCode(), k200OK);
+    TestHelpers::expect_matches_schema(left, "GET", "/api/v1/tasks/items/{id}");
     EXPECT_TRUE(body_of(left)["data"]["project_id"].is_null());
 }

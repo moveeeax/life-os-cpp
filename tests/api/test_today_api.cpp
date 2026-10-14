@@ -139,6 +139,26 @@ protected:
     using Handler = void (Api::TodayController::*)(const HttpRequestPtr&,
                                                    std::function<void(const HttpResponsePtr&)>&&);
 
+    // The spec path of each handler the suite drives, for the schema check
+    // in call (tests/test_helpers.hpp expect_2xx_matches_schema).
+    static const char* spec_path_of(Handler h) {
+        static const std::pair<Handler, const char*> kPaths[] = {
+            {&Api::TodayController::today, "/api/v1/today"},
+            {&Api::TodayController::putFocus, "/api/v1/today/focus"},
+            {&Api::TodayController::deleteFocus, "/api/v1/today/focus"},
+            {&Api::TodayController::focusDone, "/api/v1/today/focus/done"},
+            {&Api::TodayController::putNote, "/api/v1/today/note"},
+            {&Api::TodayController::deleteNote, "/api/v1/today/note"},
+            {&Api::TodayController::getSettings, "/api/v1/now/settings"},
+            {&Api::TodayController::putSettings, "/api/v1/now/settings"},
+            {&Api::TodayController::weather, "/api/v1/now/weather"},
+        };
+        for (const auto& [handler, path] : kPaths)
+            if (handler == h)
+                return path;
+        return nullptr;
+    }
+
     HttpResponsePtr call(Handler h,
                          const std::string& who,
                          HttpMethod m,
@@ -151,6 +171,8 @@ protected:
         HttpResponsePtr captured;
         (c.*h)(req, [&](const HttpResponsePtr& r) { captured = r; });
         EXPECT_TRUE(captured);
+        if (const char* path = spec_path_of(h))
+            TestHelpers::expect_2xx_matches_schema(captured, m, path);
         return captured;
     }
 
