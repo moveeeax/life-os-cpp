@@ -12,6 +12,7 @@
 #include <chrono>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -42,6 +43,37 @@ struct Evaluated {
     int week_done = 0;  // done days in the week of the range's last day
     bool no_data = false;
 };
+
+/// Rows one read of a health table takes: a window is at most a year and a range
+/// long (kWindowsMaxDays), a night a day with room for naps.
+inline constexpr long kRowsPerWindow = 2000;
+
+/// The longest window windows() returns: the history year plus a 62-day range.
+inline constexpr int kWindowsMaxDays = kHistoryDays + 1 + 62;
+
+/**
+ * The day windows the sources are read for: the range [@p from, @p to], and the
+ * days the streak needs (the last kHistoryDays up to @p today with @p history,
+ * else @p today alone). Overlapping or adjacent windows become one. A range far
+ * from today is read on its own instead of as one window stretching to today,
+ * whose rows would pass the cap of a read and cut the newest days.
+ */
+inline std::vector<std::pair<::Habits::Day, ::Habits::Day>> windows(::Habits::Day from,
+                                                                    ::Habits::Day to,
+                                                                    ::Habits::Day today,
+                                                                    bool history) {
+    using std::chrono::days;
+    std::pair<::Habits::Day, ::Habits::Day> range{from, to};
+    std::pair<::Habits::Day, ::Habits::Day> streak{history ? today - days{kHistoryDays} : today, today};
+    if (streak.first < range.first) {
+        std::swap(range, streak);
+    }
+    // range now starts first.
+    if (streak.first <= range.second + days{1}) {
+        return {{range.first, std::max(range.second, streak.second)}};
+    }
+    return {range, streak};
+}
 
 inline ::Habits::Habit model_of(const nlohmann::json& row) {
     ::Habits::Habit h;
@@ -79,32 +111,54 @@ inline std::vector<Evaluated> evaluate(const std::string& owner,
         wants_health = wants_health || ::Habits::from_health(m.source);
         wants_workout = wants_workout || m.source == Source::Workout;
     }
-    const ::Habits::Day lo = history ? std::min(from, today - days{kHistoryDays}) : from;
-    const ::Habits::Day hi = std::max(to, today);
+    // Each window's values, kept to its own days: the sleep read is padded by a day
+    // on each side, and a padding day holds only part of its nights.
+    const auto keep =
+        [](::Habits::Values& into, const ::Habits::Values& from_window, ::Habits::Day lo, ::Habits::Day hi) {
+            for (const auto& [day, value] : from_window) {
+                if (day >= lo && day <= hi) {
+                    into.emplace(day, value);
+                }
+            }
+        };
 
     ::Habits::Values sleep;
     ::Habits::Values steps;
     ::Habits::Values kcal;
     ::Habits::Values workouts;
     bool health_linked = false;
+    const auto read_windows = windows(from, to, today, history);
     if (wants_health && access.health) {
         const std::string xiaomi = MiAccountRepository("").xiaomi_id_of(owner).value_or("");
         health_linked = !xiaomi.empty();
         if (health_linked) {
             HealthReadRepository health(xiaomi);
-            constexpr long kRows = 2000;  // a year of nights and days with room for naps
-            // Sleep rows are filed by the UTC day of their end; the region day may start hours earlier.
-            sleep = ::Habits::sleep_by_local_day(
-                health.sleep(::Habits::text_of(lo - days{1}), ::Habits::text_of(hi + days{1}), kRows, 0).rows,
-                region_offset_seconds(owner));
-            const auto activity = health.daily_activity(::Habits::text_of(lo), ::Habits::text_of(hi), kRows, 0).rows;
-            steps = ::Habits::activity_by_day(activity, "steps");
-            kcal = ::Habits::activity_by_day(activity, "active_kcal");
+            const long long offset = region_offset_seconds(owner);
+            for (const auto& [lo, hi] : read_windows) {
+                // Sleep rows are filed by the UTC day of their end; the region day may start hours earlier.
+                keep(sleep,
+                     ::Habits::sleep_by_local_day(
+                         health
+                             .sleep(::Habits::text_of(lo - days{1}), ::Habits::text_of(hi + days{1}), kRowsPerWindow, 0)
+                             .rows,
+                         offset),
+                     lo,
+                     hi);
+                const auto activity =
+                    health.daily_activity(::Habits::text_of(lo), ::Habits::text_of(hi), kRowsPerWindow, 0).rows;
+                keep(steps, ::Habits::activity_by_day(activity, "steps"), lo, hi);
+                keep(kcal, ::Habits::activity_by_day(activity, "active_kcal"), lo, hi);
+            }
         }
     }
     if (wants_workout && access.workout) {
-        workouts =
-            ::Habits::workouts_by_local_day(repo.sessions(owner, ::Habits::text_of(lo), ::Habits::text_of(hi), tz));
+        for (const auto& [lo, hi] : read_windows) {
+            keep(
+                workouts,
+                ::Habits::workouts_by_local_day(repo.sessions(owner, ::Habits::text_of(lo), ::Habits::text_of(hi), tz)),
+                lo,
+                hi);
+        }
     }
     const auto checks = repo.checks(owner);
     static const ::Habits::Checks kNoChecks;
