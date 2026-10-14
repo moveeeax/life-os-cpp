@@ -94,16 +94,18 @@ public:
         });
     }
 
-    /// [{document_id, holder, kind, valid_until, reason}] for a trip ending on @p end.
-    nlohmann::json warnings(const std::string& owner, const std::string& end) {
+    /// [{document_id, holder, kind, valid_until, reason}] for a trip from @p start to @p end.
+    nlohmann::json warnings(const std::string& owner, const std::string& start, const std::string& end) {
         const auto rows = list(owner);
         std::vector<::Travel::Document> docs;
         for (const auto& row : rows) {
-            docs.push_back(
-                {row["id"].get<std::string>(), row["kind"].get<std::string>(), row["valid_until"].get<std::string>()});
+            docs.push_back({row["id"].get<std::string>(),
+                            row["holder"].get<std::string>(),
+                            row["kind"].get<std::string>(),
+                            row["valid_until"].get<std::string>()});
         }
         nlohmann::json out = nlohmann::json::array();
-        for (const auto& w : ::Travel::warnings(docs, end)) {
+        for (const auto& w : ::Travel::warnings(docs, start, end)) {
             for (const auto& row : rows) {
                 if (row["id"] == w.document_id) {
                     out.push_back({{"document_id", w.document_id},

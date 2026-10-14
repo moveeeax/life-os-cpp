@@ -98,6 +98,14 @@ Transport& transport() {
     return production;
 }
 
+Transport& quick_transport() {
+    if (override_slot() != nullptr) {
+        return *override_slot();
+    }
+    static CurlTransport quick(3);
+    return quick;
+}
+
 void install_for_testing(Transport* transport) {
     override_slot() = transport;
 }

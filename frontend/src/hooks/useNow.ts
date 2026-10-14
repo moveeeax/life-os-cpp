@@ -122,7 +122,8 @@ export function useSaveNote() {
       if (text.trim() === '') return del(`${TODAY}/note`, { date });
       await api.putJson<unknown>(`${TODAY}/note`, { body: { date, text: text.trim() } });
     },
-    { invalidate: [qk.now.all()] },
+    // The day's digest only: settings, weather and wallpapers do not change with a note.
+    { invalidate: [qk.now.days()] },
   );
 }
 
