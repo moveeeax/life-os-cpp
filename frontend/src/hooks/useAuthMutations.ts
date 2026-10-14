@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
+import { clearSignedInStorage } from '@/lib/auth/storage';
 
 export function useLogin() {
   const qc = useQueryClient();
@@ -37,10 +38,14 @@ export function useLogout() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      await api.POST('/api/v1/auth/logout');
+      const { error } = await api.POST('/api/v1/auth/logout');
+      // A 401 means the session is already gone: signed out all the same.
+      // Anything else (offline, 5xx) left the cookies alive, so say so.
+      if (error && error.status !== 401) throw error;
     },
     onSuccess: () => {
       qc.clear();
+      clearSignedInStorage();
     },
   });
 }

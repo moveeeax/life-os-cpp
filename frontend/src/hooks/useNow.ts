@@ -5,6 +5,7 @@ import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import {
   cacheKey,
+  pruneDays,
   readCache,
   writeCache,
   type AdminSound,
@@ -68,7 +69,10 @@ export function useToday(userId: string | null, date: string, tz: string) {
     queryFn: async ({ signal }) => {
       const data = (await api.getJson<{ data: Today }>(TODAY, { query: { date, tz }, signal }))
         .data;
-      if (key) writeCache(key, data);
+      if (key && userId) {
+        writeCache(key, data);
+        pruneDays(userId, date);
+      }
       return data;
     },
   });

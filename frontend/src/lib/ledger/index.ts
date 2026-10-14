@@ -11,6 +11,9 @@ import type {
 
 export * from './types';
 
+/** The account the add form picked last, kept in the browser. */
+export const LAST_ACCOUNT_KEY = 'money:last-account';
+
 // ── formats ────────────────────────────────────────────────────────────────
 
 /** Decimals of a currency from the user's list (2 when unknown). */

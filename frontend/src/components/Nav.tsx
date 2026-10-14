@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { LogOut, Menu, Moon, Sun, Wallet, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/toaster';
 import { BRAND } from '@/lib/brand';
 import { useLogout } from '@/hooks/useAuthMutations';
 import { useMe } from '@/hooks/useMe';
@@ -18,6 +19,7 @@ export function Nav() {
   const me = useMe();
   const user = me.data ?? null;
   const logout = useLogout();
+  const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -59,8 +61,12 @@ export function Nav() {
       : location.pathname === path || location.pathname.startsWith(path + '/');
 
   const logoutAndRedirect = async () => {
-    await logout.mutateAsync();
-    navigate('/login');
+    try {
+      await logout.mutateAsync();
+      navigate('/login');
+    } catch {
+      toast.error('Could not sign out. Check the connection and try again.');
+    }
   };
 
   return (
