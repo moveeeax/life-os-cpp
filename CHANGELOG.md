@@ -19,9 +19,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   its end and a visa or insurance that ends before it does.
 
 ### Fixed
-- The frontend nginx takes the client address from Traefik's X-Forwarded-For,
-  so the login throttle and the failed-login audit see the client, not the
-  Traefik pod; until now every login shared one bucket per Traefik pod.
+- The image's own nginx config (used by docker compose, not by the cluster,
+  whose config comes from the cpp-frontend chart) read the client address
+  from X-Forwarded-For for 10.42.0.0/16. Correction after the release: the
+  login throttle on the cluster already saw the client, because Traefik sets
+  X-Real-Ip and the chart's nginx passes it on; the change is reverted.
 - Travel: a flight can be marked as needing no border crossing (domestic, or one
   you are not on) and the trip page stops asking for one; a trip total shows a
   rate day only when a rate was used; a spend linked to one trip is not moved to
