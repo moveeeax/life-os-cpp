@@ -29,6 +29,7 @@
 #include "repositories/money/SummaryRepository.hpp"
 #include "repositories/travel/Counters.hpp"
 #include "repositories/travel/CrossingRepository.hpp"
+#include "repositories/travel/DocumentRepository.hpp"
 #include "repositories/travel/Errors.hpp"
 #include "repositories/travel/RuleRepository.hpp"
 #include "repositories/travel/SettingsRepository.hpp"
@@ -58,6 +59,7 @@ const std::vector<std::string> kWindows = {
     "rolling_days", "rolling_12_months_in_year", "calendar_year", "since_last_entry"};
 const std::vector<std::string> kThresholds = {"at_most", "over"};
 const std::vector<std::string> kItemKinds = {"flight", "stay", "booking", "note"};
+const std::vector<std::string> kDocumentKinds = {"passport", "visa", "insurance", "other"};
 
 bool is_country(const std::string& s) {
     return s.size() == 2 && s[0] >= 'A' && s[0] <= 'Z' && s[1] >= 'A' && s[1] <= 'Z';
@@ -246,6 +248,29 @@ std::optional<TripRepository::ItemInput> item_input(const json& body, const Trav
                                      opt_text(body, "link").value_or(""),
                                      opt_text(body, "note").value_or(""),
                                      body.value("no_crossing", false)};
+}
+
+/// A document body, checked; nullopt (answered) when bad.
+std::optional<Repositories::Travel::DocumentRepository::Input> document_input(
+    const json& body, const TravelController::Callback& callback) {
+    Validation::Errors errs;
+    Validation::require_string(errs, body, "holder");
+    Validation::require_string(errs, body, "kind");
+    Validation::require_string(errs, body, "valid_until");
+    text_length(errs, body, "holder", 1, 80);
+    Validation::one_of(errs, body, "kind", kDocumentKinds);
+    text_length(errs, body, "number", 0, 60);
+    date_field(errs, body, "valid_until");
+    text_length(errs, body, "note", 0, 500);
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return std::nullopt;
+    }
+    return Repositories::Travel::DocumentRepository::Input{body["holder"].get<std::string>(),
+                                                           body["kind"].get<std::string>(),
+                                                           opt_text(body, "number").value_or(""),
+                                                           body["valid_until"].get<std::string>(),
+                                                           opt_text(body, "note").value_or("")};
 }
 
 /// The trip's spends in each currency and in @p target at each spend's day rate.
@@ -635,6 +660,8 @@ void TravelController::getTrip(const HttpRequestPtr& req, Callback&& callback, c
             throw Repositories::Travel::NotFound("trip");
         }
         json view = trip_view(repo, owner, *row, *currency, true);
+        view["document_warnings"] =
+            Repositories::Travel::DocumentRepository().warnings(owner, (*row)["end_date"].get<std::string>());
         view["allowed"] = Repositories::Travel::allowed_json(
             owner, (*row)["countries"].get<std::set<std::string>>(), (*row)["start_date"].get<std::string>(), *date);
         callback(Response::ok(json{{"data", view}}));
@@ -799,6 +826,59 @@ void TravelController::linkSpends(const HttpRequestPtr& req, Callback&& callback
             throw Repositories::Travel::NotFound("trip");
         }
         callback(Response::ok(json{{"data", {{"changed", changed}}}}));
+    });
+}
+
+// ── documents ───────────────────────────────────────────────────────────────
+
+void TravelController::listDocuments(const HttpRequestPtr& req, Callback&& callback) {
+    TRAVEL_GUARD(req, callback, owner);
+    with_repo_errors(callback, "travel.documents", [&] {
+        callback(Response::ok(json{{"data", Repositories::Travel::DocumentRepository().list(owner)}}));
+    });
+}
+
+void TravelController::createDocument(const HttpRequestPtr& req, Callback&& callback) {
+    TRAVEL_GUARD(req, callback, owner);
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    const auto in = document_input(body, callback);
+    if (!in) {
+        return;
+    }
+    with_repo_errors(callback, "travel.documents.create", [&] {
+        callback(Response::created(json{{"data", Repositories::Travel::DocumentRepository().create(owner, *in)}}));
+    });
+}
+
+void TravelController::updateDocument(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    TRAVEL_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    const auto in = document_input(body, callback);
+    if (!in) {
+        return;
+    }
+    with_repo_errors(callback, "travel.documents.update", [&] {
+        callback(Response::ok(json{{"data", Repositories::Travel::DocumentRepository().replace(owner, id, *in)}}));
+    });
+}
+
+void TravelController::deleteDocument(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    TRAVEL_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "travel.documents.delete", [&] {
+        Repositories::Travel::DocumentRepository().remove(owner, id);
+        no_content(callback);
     });
 }
 

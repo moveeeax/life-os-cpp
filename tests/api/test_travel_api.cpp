@@ -59,8 +59,12 @@ protected:
             return;
         Database::get().execute_write([](auto& txn) {
             // DELETE, not TRUNCATE: task_items and money_transactions reference travel_trips.
-            for (const char* table :
-                 {"travel_trip_items", "travel_trips", "travel_rules", "travel_crossings", "travel_settings"}) {
+            for (const char* table : {"travel_trip_items",
+                                      "travel_trips",
+                                      "travel_rules",
+                                      "travel_crossings",
+                                      "travel_settings",
+                                      "travel_documents"}) {
                 txn.exec(std::string("DELETE FROM ") + table);
             }
             for (const char* id : {kAnna, kBoris}) {
@@ -226,6 +230,57 @@ TEST_F(TravelApiTest, AFlightCanNeedNoCrossing) {
     ASSERT_EQ(domestic->statusCode(), k201Created);
     EXPECT_EQ(body_of(domestic)["data"]["no_crossing"], true);
     EXPECT_EQ(add({{"no_crossing", "yes"}})->statusCode(), k400BadRequest);
+}
+
+// The trip ends 2026-11-20: a passport to 2027-05-01 is short of six months, a visa to
+// 2026-11-10 ends during the trip, a passport to 2030 and an "other" document raise nothing.
+TEST_F(TravelApiTest, DocumentsAndTheirWarningsForATrip) {
+    const auto add = [&](const char* who, const json& body) {
+        return call(who, Post, body, [&](auto req, auto cb) { c.createDocument(req, std::move(cb)); });
+    };
+    EXPECT_EQ(add(kAnna, {{"holder", "Olesia"}, {"kind", "license"}, {"valid_until", "2030-01-01"}})->statusCode(),
+              k400BadRequest);
+    EXPECT_EQ(add(kAnna, {{"holder", ""}, {"kind", "visa"}, {"valid_until", "2030-01-01"}})->statusCode(),
+              k400BadRequest);
+    auto short_passport = add(kAnna, {{"holder", "Maksim"}, {"kind", "passport"}, {"valid_until", "2027-05-01"}});
+    ASSERT_EQ(short_passport->statusCode(), k201Created) << std::string(short_passport->body());
+    const auto passport_id = body_of(short_passport)["data"]["id"].get<std::string>();
+    add(kAnna, {{"holder", "Olesia"}, {"kind", "visa"}, {"number", "ETA-1"}, {"valid_until", "2026-11-10"}});
+    add(kAnna, {{"holder", "Mikhail"}, {"kind", "passport"}, {"valid_until", "2030-01-21"}});
+    add(kAnna, {{"holder", "Mikhail"}, {"kind", "other"}, {"valid_until", "2020-01-01"}});
+    auto list = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.listDocuments(req, std::move(cb)); });
+    ASSERT_EQ(body_of(list)["data"].size(), 4U);
+    EXPECT_EQ(body_of(list)["data"][0]["kind"], "other") << "the soonest to expire first";
+
+    const auto trip = created_trip(kAnna)["id"].get<std::string>();
+    auto view = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.getTrip(req, std::move(cb), trip); });
+    const auto warnings = body_of(view)["data"]["document_warnings"];
+    ASSERT_EQ(warnings.size(), 2U) << warnings.dump();
+    EXPECT_EQ(warnings[0]["reason"], "expires_during_trip");
+    EXPECT_EQ(warnings[0]["holder"], "Olesia");
+    EXPECT_EQ(warnings[1]["reason"], "passport_6_months");
+    EXPECT_EQ(warnings[1]["document_id"], passport_id);
+
+    auto boris = call(kBoris, Get, json::object(), [&](auto req, auto cb) { c.listDocuments(req, std::move(cb)); });
+    EXPECT_EQ(body_of(boris)["data"].size(), 0U);
+    EXPECT_EQ(call(kBoris,
+                   Patch,
+                   json{{"holder", "x"}, {"kind", "visa"}, {"valid_until", "2030-01-01"}},
+                   [&](auto req, auto cb) { c.updateDocument(req, std::move(cb), passport_id); })
+                  ->statusCode(),
+              k404NotFound);
+    auto renewed = call(kAnna,
+                        Patch,
+                        json{{"holder", "Maksim"}, {"kind", "passport"}, {"valid_until", "2032-03-11"}},
+                        [&](auto req, auto cb) { c.updateDocument(req, std::move(cb), passport_id); });
+    ASSERT_EQ(renewed->statusCode(), k200OK);
+    EXPECT_EQ(body_of(renewed)["data"]["valid_until"], "2032-03-11");
+    EXPECT_EQ(call(kAnna,
+                   Delete,
+                   json::object(),
+                   [&](auto req, auto cb) { c.deleteDocument(req, std::move(cb), passport_id); })
+                  ->statusCode(),
+              k204NoContent);
 }
 
 TEST_F(TravelApiTest, TemplatesAndCounters) {

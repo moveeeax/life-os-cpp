@@ -12407,6 +12407,291 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/today/note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set or replace the note of a day */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        date: string;
+                        text: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The note */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** Format: date */
+                                date: string;
+                                text: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /** Clear the note of a day */
+        delete: {
+            parameters: {
+                query: {
+                    date: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Cleared */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad date */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/now/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The weather city and the corner layout of Now */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The settings, defaults when none were saved */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["NowSettings"];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /** Set the weather city (geocoded) and or the corner layout */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["NowSettingsInput"];
+                };
+            };
+            responses: {
+                /** @description The settings */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["NowSettings"];
+                        };
+                    };
+                };
+                /** @description Validation failed (a chip twice, an unknown chip or corner) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The geocoder knows no such city (city_not_found) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The geocoder is not answering (geocoder_unavailable) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/now/weather": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The weather of the settings city now and today's range, cached for an hour */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The weather, or null without a city */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["NowWeather"] | null;
+                            cached?: boolean;
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The weather service is not answering and nothing is cached (weather_unavailable) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/today/focus/done": {
         parameters: {
             query?: never;
@@ -13805,6 +14090,206 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/travel/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's travel documents, the soonest to expire first */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The documents */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["TravelDocument"][];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Travel module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Add a travel document */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["TravelDocumentInput"];
+                };
+            };
+            responses: {
+                /** @description The document */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["TravelDocument"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Travel module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/travel/documents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a travel document */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Travel module disabled, or not the caller's document */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Replace a travel document (every field) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["TravelDocumentInput"];
+                };
+            };
+            responses: {
+                /** @description The document */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["TravelDocument"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Travel module disabled, or not the caller's document */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
     "/api/v1/travel/trips": {
         parameters: {
             query?: never;
@@ -14749,6 +15234,11 @@ export interface components {
         };
         /** @description A section key is absent when its module is off, the caller has nothing there, or it failed (then it is in errors) */
         Today: {
+            /** @description The note of the day and of the day before */
+            note?: {
+                today: string | null;
+                yesterday: string | null;
+            };
             /** @description The next trip and the day counters near their threshold (within 14 days) */
             travel?: {
                 next_trip: {
@@ -15198,6 +15688,77 @@ export interface components {
             };
             count: number;
         };
+        /** @description The chip of each corner, or null for an empty corner; a chip at most once */
+        NowCorners: {
+            /** @enum {string|null} */
+            tl: "body" | "goals" | "day" | "tasks" | null;
+            /** @enum {string|null} */
+            tr: "body" | "goals" | "day" | "tasks" | null;
+            /** @enum {string|null} */
+            bl: "body" | "goals" | "day" | "tasks" | null;
+            /** @enum {string|null} */
+            br: "body" | "goals" | "day" | "tasks" | null;
+        };
+        NowSettings: {
+            /** @description The place the geocoder found */
+            city: string | null;
+            country_code: string | null;
+            latitude: number | null;
+            longitude: number | null;
+            timezone: string | null;
+            corners: components["schemas"]["NowCorners"];
+        };
+        NowSettingsInput: {
+            /** @description Geocoded with Open-Meteo; null clears the city */
+            city?: string | null;
+            corners?: components["schemas"]["NowCorners"];
+        };
+        NowWeather: {
+            place: string;
+            /** @description Degrees Celsius */
+            temperature: number;
+            min: number | null;
+            max: number | null;
+            /** @description WMO weather code */
+            code: number;
+            words: string;
+            is_day: boolean;
+            /** @description Local time of the reading, as Open-Meteo gives it */
+            time: string;
+        };
+        TravelDocument: {
+            /** Format: uuid */
+            id: string;
+            holder: string;
+            /** @enum {string} */
+            kind: "passport" | "visa" | "insurance" | "other";
+            number: string;
+            /** Format: date */
+            valid_until: string;
+            note: string;
+        };
+        TravelDocumentInput: {
+            holder: string;
+            /** @enum {string} */
+            kind: "passport" | "visa" | "insurance" | "other";
+            number?: string;
+            /** Format: date */
+            valid_until: string;
+            note?: string;
+        };
+        TravelDocumentWarning: {
+            /** Format: uuid */
+            document_id: string;
+            holder: string;
+            kind: string;
+            /** Format: date */
+            valid_until: string;
+            /**
+             * @description A passport valid less than six months past the end, or a visa or insurance ending before it
+             * @enum {string}
+             */
+            reason: "passport_6_months" | "expires_during_trip";
+        };
         TravelTrip: {
             /** Format: uuid */
             id: string;
@@ -15213,6 +15774,8 @@ export interface components {
                 total: number;
             };
             spends: components["schemas"]["TravelSpends"];
+            /** @description GET of one trip only */
+            document_warnings?: components["schemas"]["TravelDocumentWarning"][];
             /** @description GET of one trip only, coming trips: how many days in a row a stay from the start may last under each rolling "at most" rule counting one of its countries */
             allowed?: {
                 rule: string;

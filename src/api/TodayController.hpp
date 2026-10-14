@@ -23,6 +23,11 @@ public:
     ADD_METHOD_TO(TodayController::putFocus, "/api/v1/today/focus", Put);
     ADD_METHOD_TO(TodayController::deleteFocus, "/api/v1/today/focus", Delete);
     ADD_METHOD_TO(TodayController::focusDone, "/api/v1/today/focus/done", Post);
+    ADD_METHOD_TO(TodayController::putNote, "/api/v1/today/note", Put);
+    ADD_METHOD_TO(TodayController::deleteNote, "/api/v1/today/note", Delete);
+    ADD_METHOD_TO(TodayController::getSettings, "/api/v1/now/settings", Get);
+    ADD_METHOD_TO(TodayController::putSettings, "/api/v1/now/settings", Put);
+    ADD_METHOD_TO(TodayController::weather, "/api/v1/now/weather", Get);
     METHOD_LIST_END
 
     using Callback = std::function<void(const HttpResponsePtr&)>;
@@ -31,6 +36,11 @@ public:
     void putFocus(const HttpRequestPtr& req, Callback&& callback);
     void deleteFocus(const HttpRequestPtr& req, Callback&& callback);
     void focusDone(const HttpRequestPtr& req, Callback&& callback);
+    void putNote(const HttpRequestPtr& req, Callback&& callback);
+    void deleteNote(const HttpRequestPtr& req, Callback&& callback);
+    void getSettings(const HttpRequestPtr& req, Callback&& callback);
+    void putSettings(const HttpRequestPtr& req, Callback&& callback);
+    void weather(const HttpRequestPtr& req, Callback&& callback);
 };
 
 }  // namespace Api
