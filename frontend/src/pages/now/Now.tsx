@@ -14,7 +14,6 @@ import { useFocusSession } from './focus/useFocusSession';
 import { useSoundPlayer } from './focus/useSoundPlayer';
 import { FocusLine } from './FocusLine';
 import { FocusPicker } from './FocusPicker';
-import { NoteLine } from './NoteLine';
 import './now.css';
 
 const LENGTH_KEY = 'now:focus:length';
@@ -154,13 +153,6 @@ function NowScreen() {
             player.play();
           }}
         />
-        {data && (
-          <NoteLine
-            date={date}
-            today={data.note?.today ?? null}
-            yesterday={data.note?.yesterday ?? null}
-          />
-        )}
         {today.isError && (
           <span className="n-note">
             {data ? 'Offline: showing the last answer' : 'Could not load the day'}
