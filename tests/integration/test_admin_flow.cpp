@@ -220,6 +220,10 @@ void seed_module_rows(const std::string& owner) {
             " VALUES ($1::uuid, 'Georgia', '2026-08-03', '2026-08-12') RETURNING id) "
             "INSERT INTO travel_trip_items (owner_id, trip_id, kind, date, title) "
             "SELECT $1::uuid, id, 'flight', '2026-08-03', 'ALA to TBS' FROM t");
+        run("INSERT INTO travel_documents (owner_id, holder, kind, valid_until) "
+            "VALUES ($1::uuid, 'Mikhail', 'passport', '2030-01-21')");
+        run("INSERT INTO now_settings (owner_id, city, latitude, longitude) VALUES ($1::uuid, 'Almaty', 43.25, 76.91)");
+        run("INSERT INTO day_note (owner_id, date, text) VALUES ($1::uuid, '2026-10-01', 'Call the bank')");
         run("WITH x AS (INSERT INTO exercises (id, name, source, owner_id) "
             " VALUES ('custom-' || $1::text, 'Mine', 'custom', $1::uuid) RETURNING id), "
             "r AS (INSERT INTO routines (owner_id, name) VALUES ($1::uuid, 'Push') RETURNING id), "
@@ -258,7 +262,7 @@ TEST_F(AdminFlowTest, deleteUserRemovesEveryModuleRowTheyOwn) {
     seed_module_rows(target.user.id);
     seed_module_rows(admin_user.user.id);
     const auto before = owned_rows(target.user.id);
-    ASSERT_GE(before.second, 29) << "every module table got a row";
+    ASSERT_GE(before.second, 32) << "every module table got a row";
 
     HttpResponsePtr resp;
     admin.deleteUser(

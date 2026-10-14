@@ -786,6 +786,28 @@
     ],
     "description": "A section key is absent when its module is off, the caller has nothing there, or it failed (then it is in errors)",
     "properties": {
+     "note": {
+      "type": "object",
+      "required": [
+       "today",
+       "yesterday"
+      ],
+      "description": "The note of the day and of the day before",
+      "properties": {
+       "today": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "yesterday": {
+        "type": [
+         "string",
+         "null"
+        ]
+       }
+      }
+     },
      "travel": {
       "type": "object",
       "required": [
@@ -2408,6 +2430,291 @@
      }
     }
    },
+   "NowCorners": {
+    "type": "object",
+    "required": [
+     "tl",
+     "tr",
+     "bl",
+     "br"
+    ],
+    "description": "The chip of each corner, or null for an empty corner; a chip at most once",
+    "properties": {
+     "tl": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "body",
+       "goals",
+       "day",
+       "tasks",
+       null
+      ]
+     },
+     "tr": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "body",
+       "goals",
+       "day",
+       "tasks",
+       null
+      ]
+     },
+     "bl": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "body",
+       "goals",
+       "day",
+       "tasks",
+       null
+      ]
+     },
+     "br": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "body",
+       "goals",
+       "day",
+       "tasks",
+       null
+      ]
+     }
+    }
+   },
+   "NowSettings": {
+    "type": "object",
+    "required": [
+     "city",
+     "country_code",
+     "latitude",
+     "longitude",
+     "timezone",
+     "corners"
+    ],
+    "properties": {
+     "city": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "The place the geocoder found"
+     },
+     "country_code": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "latitude": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "longitude": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "timezone": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "corners": {
+      "$ref": "#/components/schemas/NowCorners"
+     }
+    }
+   },
+   "NowSettingsInput": {
+    "type": "object",
+    "properties": {
+     "city": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "Geocoded with Open-Meteo; null clears the city"
+     },
+     "corners": {
+      "$ref": "#/components/schemas/NowCorners"
+     }
+    }
+   },
+   "NowWeather": {
+    "type": "object",
+    "required": [
+     "place",
+     "temperature",
+     "min",
+     "max",
+     "code",
+     "words",
+     "is_day",
+     "time"
+    ],
+    "properties": {
+     "place": {
+      "type": "string"
+     },
+     "temperature": {
+      "type": "number",
+      "description": "Degrees Celsius"
+     },
+     "min": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "max": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "code": {
+      "type": "integer",
+      "description": "WMO weather code"
+     },
+     "words": {
+      "type": "string"
+     },
+     "is_day": {
+      "type": "boolean"
+     },
+     "time": {
+      "type": "string",
+      "description": "Local time of the reading, as Open-Meteo gives it"
+     }
+    }
+   },
+   "TravelDocument": {
+    "type": "object",
+    "required": [
+     "id",
+     "holder",
+     "kind",
+     "number",
+     "valid_until",
+     "note"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "holder": {
+      "type": "string"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "passport",
+       "visa",
+       "insurance",
+       "other"
+      ]
+     },
+     "number": {
+      "type": "string"
+     },
+     "valid_until": {
+      "type": "string",
+      "format": "date"
+     },
+     "note": {
+      "type": "string"
+     }
+    }
+   },
+   "TravelDocumentInput": {
+    "type": "object",
+    "required": [
+     "holder",
+     "kind",
+     "valid_until"
+    ],
+    "properties": {
+     "holder": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "passport",
+       "visa",
+       "insurance",
+       "other"
+      ]
+     },
+     "number": {
+      "type": "string",
+      "maxLength": 60
+     },
+     "valid_until": {
+      "type": "string",
+      "format": "date"
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 500
+     }
+    }
+   },
+   "TravelDocumentWarning": {
+    "type": "object",
+    "required": [
+     "document_id",
+     "holder",
+     "kind",
+     "valid_until",
+     "reason"
+    ],
+    "properties": {
+     "document_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "holder": {
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
+     },
+     "valid_until": {
+      "type": "string",
+      "format": "date"
+     },
+     "reason": {
+      "type": "string",
+      "enum": [
+       "passport_6_months",
+       "expires_during_trip"
+      ],
+      "description": "A passport valid less than six months past the end, or a visa or insurance ending before it"
+     }
+    }
+   },
    "TravelTrip": {
     "type": "object",
     "required": [
@@ -2462,6 +2769,13 @@
      },
      "spends": {
       "$ref": "#/components/schemas/TravelSpends"
+     },
+     "document_warnings": {
+      "type": "array",
+      "description": "GET of one trip only",
+      "items": {
+       "$ref": "#/components/schemas/TravelDocumentWarning"
+      }
      },
      "allowed": {
       "type": "array",
@@ -22309,6 +22623,269 @@
     }
    }
   },
+  "/api/v1/today/note": {
+   "put": {
+    "summary": "Set or replace the note of a day",
+    "tags": [
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "date",
+         "text"
+        ],
+        "properties": {
+         "date": {
+          "type": "string",
+          "format": "date"
+         },
+         "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The note",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "date",
+            "text"
+           ],
+           "properties": {
+            "date": {
+             "type": "string",
+             "format": "date"
+            },
+            "text": {
+             "type": "string"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Now module disabled"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Clear the note of a day",
+    "tags": [
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "date",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Cleared"
+     },
+     "400": {
+      "description": "Bad date"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Now module disabled"
+     }
+    }
+   }
+  },
+  "/api/v1/now/settings": {
+   "get": {
+    "summary": "The weather city and the corner layout of Now",
+    "tags": [
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The settings, defaults when none were saved",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/NowSettings"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Now module disabled"
+     }
+    }
+   },
+   "put": {
+    "summary": "Set the weather city (geocoded) and or the corner layout",
+    "tags": [
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NowSettingsInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The settings",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/NowSettings"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed (a chip twice, an unknown chip or corner)"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Now module disabled"
+     },
+     "422": {
+      "description": "The geocoder knows no such city (city_not_found)"
+     },
+     "503": {
+      "description": "The geocoder is not answering (geocoder_unavailable)"
+     }
+    }
+   }
+  },
+  "/api/v1/now/weather": {
+   "get": {
+    "summary": "The weather of the settings city now and today's range, cached for an hour",
+    "tags": [
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The weather, or null without a city",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "oneOf": [
+            {
+             "$ref": "#/components/schemas/NowWeather"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "cached": {
+           "type": "boolean"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Now module disabled"
+     },
+     "503": {
+      "description": "The weather service is not answering and nothing is cached (weather_unavailable)"
+     }
+    }
+   }
+  },
   "/api/v1/today/focus/done": {
    "post": {
     "summary": "Tick or untick the focus; a task focus closes or reopens the task",
@@ -23828,6 +24405,183 @@
     }
    }
   },
+  "/api/v1/travel/documents": {
+   "get": {
+    "summary": "The caller's travel documents, the soonest to expire first",
+    "tags": [
+     "travel"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The documents",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/TravelDocument"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Travel module disabled"
+     }
+    }
+   },
+   "post": {
+    "summary": "Add a travel document",
+    "tags": [
+     "travel"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TravelDocumentInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "The document",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/TravelDocument"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Travel module disabled"
+     }
+    }
+   }
+  },
+  "/api/v1/travel/documents/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "patch": {
+    "summary": "Replace a travel document (every field)",
+    "tags": [
+     "travel"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TravelDocumentInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The document",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/TravelDocument"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Travel module disabled, or not the caller's document"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a travel document",
+    "tags": [
+     "travel"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Travel module disabled, or not the caller's document"
+     }
+    }
+   }
+  },
   "/api/v1/travel/trips": {
    "get": {
     "summary": "Trips with packing and spends, the latest first",
@@ -24721,7 +25475,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 363179,
-  "source_fnv1a64": "5edb702598578992"
+  "source_bytes": 372999,
+  "source_fnv1a64": "5746ef6b84375bed"
  }
 }

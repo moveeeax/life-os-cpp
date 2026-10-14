@@ -42,6 +42,10 @@ public:
     ADD_METHOD_TO(TravelController::deleteItem, "/api/v1/travel/trips/{id}/items/{child}", Delete);
     ADD_METHOD_TO(TravelController::candidateSpends, "/api/v1/travel/trips/{id}/candidate-spends", Get);
     ADD_METHOD_TO(TravelController::linkSpends, "/api/v1/travel/trips/{id}/spends", Post);
+    ADD_METHOD_TO(TravelController::listDocuments, "/api/v1/travel/documents", Get);
+    ADD_METHOD_TO(TravelController::createDocument, "/api/v1/travel/documents", Post);
+    ADD_METHOD_TO(TravelController::updateDocument, "/api/v1/travel/documents/{id}", Patch);
+    ADD_METHOD_TO(TravelController::deleteDocument, "/api/v1/travel/documents/{id}", Delete);
     METHOD_LIST_END
 
     using Callback = std::function<void(const HttpResponsePtr&)>;
@@ -69,6 +73,10 @@ public:
     void deleteItem(const HttpRequestPtr& req, Callback&& callback, const std::string& id, const std::string& child);
     void candidateSpends(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void linkSpends(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void listDocuments(const HttpRequestPtr& req, Callback&& callback);
+    void createDocument(const HttpRequestPtr& req, Callback&& callback);
+    void updateDocument(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void deleteDocument(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
 
 private:
     static bool require_enabled(const Callback& callback);

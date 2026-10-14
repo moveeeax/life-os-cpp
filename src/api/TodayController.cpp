@@ -13,6 +13,7 @@
 #include <vector>
 
 #include <drogon/drogon.h>
+#include <spdlog/spdlog.h>
 
 #include <nlohmann/json.hpp>
 
@@ -21,11 +22,15 @@
 #include "api/HandlerSupport.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
+#include "cache/Cache.hpp"
 #include "core/Modules.hpp"
 #include "domain/Role.hpp"
 #include "goals/Progress.hpp"
 #include "money/Period.hpp"
+#include "net/Http.hpp"
+#include "now/Settings.hpp"
 #include "now/Today.hpp"
+#include "now/Weather.hpp"
 #include "repositories/fitness/HealthReadRepository.hpp"
 #include "repositories/fitness/MiAccountRepository.hpp"
 #include "repositories/food/EntryRepository.hpp"
@@ -36,6 +41,8 @@
 #include "repositories/money/SummaryRepository.hpp"
 #include "repositories/money/TransactionRepository.hpp"
 #include "repositories/now/FocusRepository.hpp"
+#include "repositories/now/NoteRepository.hpp"
+#include "repositories/now/SettingsRepository.hpp"
 #include "repositories/tasks/NoteRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
 #include "repositories/travel/Counters.hpp"
@@ -58,6 +65,8 @@ using Repositories::Tasks::NoteRepository;
 using Repositories::Tasks::TaskRepository;
 
 constexpr std::size_t kTextMax = 200;
+constexpr std::size_t kNoteMax = 2000;
+constexpr std::size_t kCityMax = 120;
 const std::vector<std::string> kKinds = {"task", "goal", "text"};
 
 /// The now switch, then a user account; false (answered) otherwise.
@@ -245,6 +254,14 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
             {"food", Core::food_enabled(), [&] { return food_part(owner, date); }},
             {"money", Core::money_enabled(), [&] { return money_part(owner, date); }},
             {"health", Core::fitness_enabled() && fitness_read, [&] { return health_part(owner, date); }},
+            {"note",
+             true,
+             [&] {
+                 const auto [today_note, yesterday_note] =
+                     Repositories::Now::NoteRepository().with_yesterday(owner, date);
+                 return json{{"today", today_note ? json(*today_note) : json()},
+                             {"yesterday", yesterday_note ? json(*yesterday_note) : json()}};
+             }},
             {"travel",
              Core::travel_enabled(),
              [&] {
@@ -376,6 +393,147 @@ void TodayController::deleteFocus(const HttpRequestPtr& req, Callback&& callback
         resp->setStatusCode(k204NoContent);
         callback(resp);
     });
+}
+
+// ── the note of a day ───────────────────────────────────────────────────────
+
+void TodayController::putNote(const HttpRequestPtr& req, Callback&& callback) {
+    TODAY_GUARD(req, callback, owner);
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    body_date(errs, body);
+    Validation::require(errs, body, "text");
+    Api::Fields::text_length(errs, body, "text", 1, kNoteMax);
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    const std::string date = body["date"].get<std::string>();
+    const std::string text = body["text"].get<std::string>();
+    with_repo_errors(callback, "today.putNote", [&] {
+        Repositories::Now::NoteRepository().put(owner, date, text);
+        callback(Response::ok(json{{"data", {{"date", date}, {"text", text}}}}));
+    });
+}
+
+void TodayController::deleteNote(const HttpRequestPtr& req, Callback&& callback) {
+    TODAY_GUARD(req, callback, owner);
+    const std::string date = req->getParameter("date");
+    if (!is_calendar_date(date)) {
+        callback(ErrorResponse::bad_request("invalid_query", "date must be a calendar day"));
+        return;
+    }
+    with_repo_errors(callback, "today.deleteNote", [&] {
+        Repositories::Now::NoteRepository().remove(owner, date);
+        auto resp = HttpResponse::newHttpResponse();
+        resp->setStatusCode(k204NoContent);
+        callback(resp);
+    });
+}
+
+// ── settings and weather ────────────────────────────────────────────────────
+
+void TodayController::getSettings(const HttpRequestPtr& req, Callback&& callback) {
+    TODAY_GUARD(req, callback, owner);
+    with_repo_errors(callback, "now.settings", [&] {
+        callback(Response::ok(json{{"data", Repositories::Now::SettingsRepository().get(owner)}}));
+    });
+}
+
+void TodayController::putSettings(const HttpRequestPtr& req, Callback&& callback) {
+    TODAY_GUARD(req, callback, owner);
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    if (body.contains("city") && !body["city"].is_null()) {
+        Api::Fields::text_length(errs, body, "city", 1, kCityMax);
+    }
+    if (body.contains("corners")) {
+        if (const auto problem = ::Now::Settings::corners_problem(body["corners"])) {
+            errs.add("corners", "invalid", *problem);
+        }
+    }
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    // The geocoder first, outside any transaction: a city it does not know saves nothing.
+    std::optional<std::optional<::Now::Weather::Place>> place;
+    if (body.contains("city")) {
+        if (body["city"].is_null()) {
+            place = std::optional<::Now::Weather::Place>();
+        } else {
+            try {
+                const auto found = ::Now::Weather::geocode(Net::Http::transport(), body["city"].get<std::string>());
+                if (!found) {
+                    callback(ErrorResponse::unprocessable("city_not_found", "the geocoder knows no such city"));
+                    return;
+                }
+                place = found;
+            } catch (const ::Now::Weather::Unavailable& e) {
+                spdlog::warn("now: the geocoder is unavailable: {}", e.what());
+                callback(
+                    ErrorResponse::service_unavailable("geocoder_unavailable", "the city lookup is not answering"));
+                return;
+            }
+        }
+    }
+    with_repo_errors(callback, "now.putSettings", [&] {
+        Repositories::Now::SettingsRepository repo;
+        if (place) {
+            repo.put_place(owner, *place);
+        }
+        if (body.contains("corners")) {
+            repo.put_corners(owner, body["corners"]);
+        }
+        callback(Response::ok(json{{"data", repo.get(owner)}}));
+    });
+}
+
+void TodayController::weather(const HttpRequestPtr& req, Callback&& callback) {
+    TODAY_GUARD(req, callback, owner);
+    json settings;
+    try {
+        settings = Repositories::Now::SettingsRepository().get(owner);
+    } catch (const std::exception& e) {
+        spdlog::error("now.weather: {}", e.what());
+        callback(ErrorResponse::internal_error());
+        return;
+    }
+    if (settings["latitude"].is_null() || settings["longitude"].is_null()) {
+        callback(Response::ok(json{{"data", nullptr}}));
+        return;
+    }
+    const double lat = settings["latitude"].get<double>();
+    const double lon = settings["longitude"].get<double>();
+    const std::string place = settings["city"].get<std::string>();
+    // Weather is public: one cached answer per coordinates serves every owner there.
+    const std::string key = ::Now::Weather::cache_key(lat, lon);
+    if (Cache::is_initialized()) {
+        if (const auto cached = Cache::get().get(key)) {
+            json block = json::parse(*cached, nullptr, /*allow_exceptions=*/false);
+            if (block.is_object()) {
+                block["place"] = place;
+                callback(Response::ok(json{{"data", block}, {"cached", true}}));
+                return;
+            }
+        }
+    }
+    try {
+        const json block = ::Now::Weather::forecast(Net::Http::transport(), lat, lon, place);
+        if (Cache::is_initialized()) {
+            Cache::get().set(key, block.dump(), ::Now::Weather::kCacheSeconds);
+        }
+        callback(Response::ok(json{{"data", block}, {"cached", false}}));
+    } catch (const ::Now::Weather::Unavailable& e) {
+        spdlog::warn("now: the weather is unavailable: {}", e.what());
+        callback(ErrorResponse::service_unavailable("weather_unavailable", "the weather service is not answering"));
+    }
 }
 
 }  // namespace Api
