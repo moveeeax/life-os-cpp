@@ -278,14 +278,6 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
             {"food", Core::food_enabled(), [&] { return food_part(owner, date); }},
             {"money", Core::money_enabled(), [&] { return money_part(owner, date); }},
             {"health", Core::fitness_enabled() && fitness_read, [&] { return health_part(owner, date); }},
-            {"note",
-             true,
-             [&] {
-                 const auto [today_note, yesterday_note] =
-                     Repositories::Now::NoteRepository().with_yesterday(owner, date);
-                 return json{{"today", today_note ? json(*today_note) : json()},
-                             {"yesterday", yesterday_note ? json(*yesterday_note) : json()}};
-             }},
             {"travel",
              Core::travel_enabled(),
              [&] {

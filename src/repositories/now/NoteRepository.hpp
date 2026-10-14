@@ -7,7 +7,6 @@
 
 #include <optional>
 #include <string>
-#include <utility>
 
 #include "database/Database.hpp"
 
@@ -23,22 +22,6 @@ public:
                 return std::nullopt;
             }
             return r[0][0].template as<std::string>();
-        });
-    }
-
-    /// The note of @p date and of the day before it.
-    std::pair<std::optional<std::string>, std::optional<std::string>> with_yesterday(const std::string& owner,
-                                                                                     const std::string& date) {
-        return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params(
-                "SELECT (SELECT text FROM day_note WHERE owner_id = $1::uuid AND date = $2::date), "
-                " (SELECT text FROM day_note WHERE owner_id = $1::uuid AND date = $2::date - 1)",
-                owner,
-                date);
-            const auto at = [&](int i) {
-                return r[0][i].is_null() ? std::nullopt : std::optional(r[0][i].template as<std::string>());
-            };
-            return std::pair{at(0), at(1)};
         });
     }
 

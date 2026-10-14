@@ -1008,28 +1008,6 @@
     ],
     "description": "A section key is absent when its module is off, the caller has nothing there, or it failed (then it is in errors)",
     "properties": {
-     "note": {
-      "type": "object",
-      "required": [
-       "today",
-       "yesterday"
-      ],
-      "description": "The note of the day and of the day before",
-      "properties": {
-       "today": {
-        "type": [
-         "string",
-         "null"
-        ]
-       },
-       "yesterday": {
-        "type": [
-         "string",
-         "null"
-        ]
-       }
-      }
-     },
      "travel": {
       "type": "object",
       "required": [
@@ -27286,7 +27264,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 398465,
-  "source_fnv1a64": "2191096e14b01535"
+  "source_bytes": 398206,
+  "source_fnv1a64": "fc455f0d569fd375"
  }
 }

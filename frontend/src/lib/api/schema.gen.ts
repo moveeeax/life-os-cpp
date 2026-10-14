@@ -16413,11 +16413,6 @@ export interface components {
         };
         /** @description A section key is absent when its module is off, the caller has nothing there, or it failed (then it is in errors) */
         Today: {
-            /** @description The note of the day and of the day before */
-            note?: {
-                today: string | null;
-                yesterday: string | null;
-            };
             /** @description The next trip and the day counters near their threshold (within 14 days) */
             travel?: {
                 next_trip: {
