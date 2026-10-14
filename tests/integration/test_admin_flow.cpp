@@ -25,6 +25,7 @@
 #include "repositories/RoleRepository.hpp"
 #include "repositories/UserRepository.hpp"
 #include "security/Auth.hpp"
+#include "security/SessionStore.hpp"
 #include "test_helpers.hpp"
 
 using json = nlohmann::json;
@@ -303,6 +304,31 @@ TEST_F(AdminFlowTest, deleteUserRemovesEveryModuleRowTheyOwn) {
     // These tables have no FK to users, so the suite's TRUNCATE users would leave them behind.
     Repositories::UserRepository().remove(admin_user.user.id);
     EXPECT_EQ(owned_rows(admin_user.user.id).first, 0);
+}
+
+TEST_F(AdminFlowTest, deleteAndRoleChangeRevokeRefreshSessions) {
+    auto admin_user = seed_user("admin@example.com", "Administrator");
+    auto demoted = seed_user("demoted@example.com", "Administrator");
+    auto deleted = seed_user("deleted@example.com", "User");
+    const auto& cookies = Security::Auth::get().config().cookies;
+    ASSERT_TRUE(Security::Sessions::record(cookies, demoted.user.id, "jti-demoted", 600));
+    ASSERT_TRUE(Security::Sessions::record(cookies, deleted.user.id, "jti-deleted", 600));
+
+    auto user_role = Repositories::RoleRepository().find_by_name("User");
+    ASSERT_TRUE(user_role.has_value());
+    auto patch = authed_post(admin_user.principal, {{"role_id", user_role->id}});
+    patch->setMethod(Patch);
+    HttpResponsePtr r1;
+    admin.updateUser(
+        patch, [&](const HttpResponsePtr& r) { r1 = r; }, demoted.user.id);
+    ASSERT_EQ(r1->statusCode(), k200OK) << r1->body();
+    EXPECT_FALSE(Security::Sessions::consume(cookies, "jti-demoted")) << "role change must drop refresh sessions";
+
+    HttpResponsePtr r2;
+    admin.deleteUser(
+        authed(admin_user.principal), [&](const HttpResponsePtr& r) { r2 = r; }, deleted.user.id);
+    ASSERT_EQ(r2->statusCode(), k200OK);
+    EXPECT_FALSE(Security::Sessions::consume(cookies, "jti-deleted")) << "delete must drop refresh sessions";
 }
 
 TEST_F(AdminFlowTest, adminCannotDeleteSelf) {
