@@ -3,9 +3,17 @@ import { Link } from 'react-router';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Modal } from '@/components/Modal';
-import { useBalances, useCurrencies, useDeleteAccount, useSaveAccount } from '@/hooks/useMoney';
-import { formatMoney, type Account, type AccountInput } from '@/lib/ledger';
+import {
+  useAccounts,
+  useBalances,
+  useCurrencies,
+  useDeleteAccount,
+  useMoneySummary,
+  useSaveAccount,
+} from '@/hooks/useMoney';
+import { formatMoney, type Account, type AccountInput, type Currency } from '@/lib/ledger';
 import { decimalsOf } from '@/lib/ledger';
+import { SMALL_LIMITS, valueAccounts, viewAccounts, type Valued } from '@/lib/ledger/accountsView';
 
 import {
   dangerButton,
@@ -209,17 +217,155 @@ function AccountForm({ account, onClose }: { account: Account | null; onClose: (
   );
 }
 
-/** Accounts grouped by currency, with balances computed from the ledger. */
+type View = { by: 'value' | 'currency'; small: number; archived: boolean };
+const VIEW_KEY = 'money:accounts:view';
+const DEFAULT_VIEW: View = { by: 'value', small: 0, archived: false };
+
+/** The remembered way of looking at the list; a per-browser convenience. */
+function readView(): View {
+  try {
+    const v = JSON.parse(globalThis.localStorage?.getItem(VIEW_KEY) ?? 'null') as Partial<View>;
+    return {
+      by: v?.by === 'currency' ? 'currency' : 'value',
+      small: SMALL_LIMITS.includes(v?.small as (typeof SMALL_LIMITS)[number]) ? v!.small! : 0,
+      archived: v?.archived === true,
+    };
+  } catch {
+    return DEFAULT_VIEW;
+  }
+}
+
+function saveView(v: View) {
+  try {
+    globalThis.localStorage?.setItem(VIEW_KEY, JSON.stringify(v));
+  } catch {
+    /* private window: the choice lasts until reload */
+  }
+}
+
+const usd = (v: number) => formatMoney(v, 'USD', Math.abs(v) >= 100 ? 0 : 2);
+
+function AccountRow({
+  item,
+  currencies,
+  onEdit,
+}: {
+  item: Valued<Account>;
+  currencies: Currency[] | undefined;
+  onEdit: (a: Account) => void;
+}) {
+  const a = item.account;
+  const facts = [a.bank, a.kind, a.last4 && `•${a.last4}`].filter(Boolean).join(' · ');
+  return (
+    <Row
+      title={a.name}
+      sub={
+        <>
+          {facts}
+          {a.currency !== 'USD' && item.value !== null && (
+            <>
+              {facts && ' · '}≈ <Num>{usd(item.value)}</Num>
+            </>
+          )}
+        </>
+      }
+      right={<Num>{formatMoney(a.balance, a.currency, decimalsOf(currencies, a.currency))}</Num>}
+    >
+      <span>{a.last_activity ? `Last activity ${a.last_activity}` : 'No activity yet'}</span>
+      <span className="k-actions">
+        <Link to={`/money?account=${a.id}`} className="k-link">
+          Rows
+        </Link>
+        <button type="button" className="k-link" onClick={() => onEdit(a)}>
+          Edit
+        </button>
+      </span>
+    </Row>
+  );
+}
+
+function HiddenNote({ count, limit }: { count: number; limit: number }) {
+  if (count === 0) return null;
+  return (
+    <p className="k-empty" data-num-ok>
+      {count} {count === 1 ? 'account' : 'accounts'} under {usd(limit)} hidden
+    </p>
+  );
+}
+
+/**
+ * The accounts with their balances from the ledger: by dollar value, largest
+ * first, or grouped by currency; small ones (by dollar value) and archived
+ * ones can be kept out of sight.
+ */
 export function MoneyAccountsPage() {
   const balances = useBalances();
+  const summary = useMoneySummary('USD', 30);
+  const all = useAccounts(true);
   const currencies = useCurrencies().data;
   const [open, setOpen] = useState<Account | 'new' | null>(null);
+  const [view, setViewState] = useState<View>(readView);
+  const setView = (patch: Partial<View>) => {
+    const next = { ...view, ...patch };
+    setViewState(next);
+    saveView(next);
+  };
+
+  const rows = summary.data?.accounts ?? [];
+  const active = valueAccounts(balances.data?.flatMap((g) => g.accounts) ?? [], rows);
+  const archived = valueAccounts(
+    (all.data ?? []).filter((a) => a.archived),
+    rows,
+  );
+  const archivedView = viewAccounts(archived, view.small);
+  const edit = (a: Account) => setOpen(a);
 
   return (
     <MoneyFrame
       title="Accounts"
       actions={
         <>
+          <div className="k-seg" role="group" aria-label="Order">
+            {(
+              [
+                ['value', 'By value'],
+                ['currency', 'By currency'],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={view.by === key}
+                className={view.by === key ? 'k-seg-on' : undefined}
+                onClick={() => setView({ by: key })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <label className="k-check" data-num-ok>
+            Hide under
+            <select
+              className="k-input k-select-inline"
+              aria-label="Hide accounts worth less than"
+              value={view.small}
+              onChange={(e) => setView({ small: Number(e.target.value) })}
+            >
+              {SMALL_LIMITS.map((l) => (
+                <option key={l} value={l}>
+                  {l === 0 ? 'nothing' : usd(l)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="k-check">
+            <input
+              type="checkbox"
+              checked={view.archived}
+              onChange={(e) => setView({ archived: e.target.checked })}
+            />
+            Archived
+          </label>
           <span className="k-grow" />
           <button type="button" onClick={() => setOpen('new')} className={primaryButton}>
             New account
@@ -231,43 +377,63 @@ export function MoneyAccountsPage() {
         <Placeholder className="h-48" />
       ) : balances.isError ? (
         <LoadError error={balances.error} onRetry={() => void balances.refetch()} />
-      ) : balances.data.length === 0 ? (
+      ) : balances.data.length === 0 && archived.length === 0 ? (
         <p className="k-empty">No accounts yet.</p>
+      ) : view.by === 'value' ? (
+        (() => {
+          const v = viewAccounts(active, view.small);
+          return (
+            <Group
+              label="By value in USD"
+              total={summary.data ? <Num>≈ {usd(summary.data.total)}</Num> : undefined}
+            >
+              {v.shown.map((item) => (
+                <AccountRow
+                  key={item.account.id}
+                  item={item}
+                  currencies={currencies}
+                  onEdit={edit}
+                />
+              ))}
+              <HiddenNote count={v.hidden} limit={view.small} />
+            </Group>
+          );
+        })()
       ) : (
-        balances.data.map((g) => (
-          <Group
-            key={g.currency}
-            label={g.currency}
-            total={
-              <Num>{formatMoney(g.total, g.currency, decimalsOf(currencies, g.currency))}</Num>
-            }
-          >
-            {g.accounts.map((a) => (
-              <Row
-                key={a.id}
-                title={a.name}
-                sub={[a.bank, a.kind, a.last4 && `•${a.last4}`].filter(Boolean).join(' · ')}
-                right={
-                  <Num>
-                    {formatMoney(a.balance, a.currency, decimalsOf(currencies, a.currency))}
-                  </Num>
-                }
-              >
-                <span>
-                  {a.last_activity ? `Last activity ${a.last_activity}` : 'No activity yet'}
-                </span>
-                <span className="k-actions">
-                  <Link to={`/money?account=${a.id}`} className="k-link">
-                    Rows
-                  </Link>
-                  <button type="button" className="k-link" onClick={() => setOpen(a)}>
-                    Edit
-                  </button>
-                </span>
-              </Row>
-            ))}
-          </Group>
-        ))
+        balances.data.map((g) => {
+          const v = viewAccounts(
+            active.filter((x) => x.account.currency === g.currency),
+            view.small,
+          );
+          if (v.shown.length === 0 && v.hidden > 0) return null;
+          return (
+            <Group
+              key={g.currency}
+              label={g.currency}
+              total={
+                <Num>{formatMoney(g.total, g.currency, decimalsOf(currencies, g.currency))}</Num>
+              }
+            >
+              {v.shown.map((item) => (
+                <AccountRow
+                  key={item.account.id}
+                  item={item}
+                  currencies={currencies}
+                  onEdit={edit}
+                />
+              ))}
+              <HiddenNote count={v.hidden} limit={view.small} />
+            </Group>
+          );
+        })
+      )}
+      {view.archived && archived.length > 0 && (
+        <Group label="Archived">
+          {archivedView.shown.map((item) => (
+            <AccountRow key={item.account.id} item={item} currencies={currencies} onEdit={edit} />
+          ))}
+          <HiddenNote count={archivedView.hidden} limit={view.small} />
+        </Group>
       )}
       {open && (
         <Modal onClose={() => setOpen(null)} className="max-w-xl">
