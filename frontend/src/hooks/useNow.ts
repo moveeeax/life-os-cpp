@@ -113,19 +113,7 @@ export function useFocusDone() {
   );
 }
 
-// ── the note, settings and weather ─────────────────────────────────────────
-
-/** Saves the note of a day; an empty text clears it. */
-export function useSaveNote() {
-  return useApiMutation(
-    async ({ date, text }: { date: string; text: string }) => {
-      if (text.trim() === '') return del(`${TODAY}/note`, { date });
-      await api.putJson<unknown>(`${TODAY}/note`, { body: { date, text: text.trim() } });
-    },
-    // The day's digest only: settings, weather and wallpapers do not change with a note.
-    { invalidate: [qk.now.days()] },
-  );
-}
+// ── settings and weather ───────────────────────────────────────────────────
 
 export function useNowSettings(enabled = true) {
   return useQuery({

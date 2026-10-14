@@ -186,35 +186,3 @@
 .n-arrange:focus-visible {
   color: var(--g-ink);
 }
-
-/* The note of the day: a quiet field under the focus. */
-.n-note-box {
-  display: grid;
-  gap: 6px;
-  justify-items: center;
-  margin-top: 14px;
-  width: min(520px, 100%);
-}
-.n-note-field {
-  width: 100%;
-  resize: none;
-  border: 0;
-  border-bottom: 1px solid var(--g-glass-line);
-  background: transparent;
-  color: var(--g-ink);
-  font: inherit;
-  font-size: 15px;
-  text-align: center;
-  padding: 4px 0;
-}
-.n-note-field::placeholder {
-  color: var(--g-ink-faint);
-}
-.n-note-field:focus {
-  outline: none;
-  border-bottom-color: var(--g-ink-soft);
-}
-.n-yesterday {
-  font-size: 13px;
-  color: var(--g-ink-faint);
-}
