@@ -5,7 +5,7 @@ info:
     Infrastructure endpoints of life-os-cpp: health probes
     and a background-job API. Authentication is opt-in (auth.mode=jwt|bearer|none).
     Rate-limiting and idempotency are driven by headers.
-  version: 1.0.0
+  version: 1.26.0
   contact:
     name: Platform team
 servers:

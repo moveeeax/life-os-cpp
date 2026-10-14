@@ -25,6 +25,10 @@
 #     helm/{life-os-cpp,life-os-cpp-worker,cpp-frontend,cpp-env}/Chart.yaml
 #                                      appVersion (default tag for standalone
 #                                      installs + app.kubernetes.io/version)
+#     docs/openapi.yaml                info.version (and tests/e2e/openapi.gen.json
+#                                      regenerated: it stamps the spec's hash)
+#     frontend/package.json            "version" (+ the two root entries of
+#     frontend/package-lock.json       package-lock.json)
 #
 # Deliberately NOT touched: vcpkg.json "version" (the Dockerfile keys the
 # dependency-install layer on that manifest — bumping it rebuilds ~29 packages
@@ -152,6 +156,25 @@ for chart in life-os-cpp life-os-cpp-worker cpp-frontend cpp-env; do
     echo "  bumped helm/$chart/Chart.yaml  appVersion -> $new_version"
 done
 
+# info.version is the only 2-space-indented `version:` in the spec (schema
+# properties named version sit deeper).
+bump docs/openapi.yaml \
+    '(?m)^(  version:[ \t]*)[0-9][0-9.]*$' "\\g<1>$new_version" 1
+echo "  bumped docs/openapi.yaml     info.version -> $new_version"
+# The e2e spec copy embeds a hash of the YAML bytes; a stale copy fails the
+# e2e suite on the release commit.
+"$SCRIPT_DIR/gen-openapi-json.sh" | sed 's/^/  /'
+
+bump frontend/package.json \
+    '(?m)^(  "version": ")[^"]*(",)$' "\\g<1>$new_version\\g<2>" 1
+# Root entries only: the top-level key and packages[""] (both right after
+# their "name"). Dependency entries are left alone.
+bump frontend/package-lock.json \
+    '\A(\{\n  "name": "[^"]*",\n  "version": ")[^"]*(")' "\\g<1>$new_version\\g<2>" 1
+bump frontend/package-lock.json \
+    '(\n    "": \{\n      "name": "[^"]*",\n      "version": ")[^"]*(")' "\\g<1>$new_version\\g<2>" 1
+echo "  bumped frontend/package.json + package-lock.json  version -> $new_version"
+
 # --- verify ------------------------------------------------------------------
 echo ""
 "$SCRIPT_DIR/check-version-sync.sh"
@@ -160,7 +183,8 @@ echo ""
 echo ""
 git -C "$REPO" --no-pager diff --stat -- \
     CHANGELOG.md changelog.d CMakeLists.txt helm/cpp-env deploy \
-    helm/life-os-cpp/Chart.yaml helm/life-os-cpp-worker/Chart.yaml helm/cpp-frontend/Chart.yaml
+    helm/life-os-cpp/Chart.yaml helm/life-os-cpp-worker/Chart.yaml helm/cpp-frontend/Chart.yaml \
+    docs/openapi.yaml tests/e2e/openapi.gen.json frontend/package.json frontend/package-lock.json
 cat <<EOF
 
 Next steps (nothing has been committed):
@@ -169,4 +193,12 @@ Next steps (nothing has been committed):
        git commit -am 'chore(release): $new_version — <one-line summary>'
   3. after it lands on master, tag to trigger release.yml:
        git tag v$new_version && git push origin v$new_version
+     release.yml refuses a tag off master and promotes nothing until the CI
+     run of that commit on master has passed (it waits for a running one).
+  4. once the images are published, deploy in this order
+     (docs/RUNBOOK.md, "Upgrade order"):
+       API      -> its init container applies the migrations
+       worker   -> its wait-for-schema init container holds it until the
+                   schema carries every migration of $new_version
+       frontend -> last, so the SPA never calls an API that is not there yet
 EOF
