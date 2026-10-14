@@ -11,6 +11,7 @@
 #include <fstream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <drogon/HttpRequest.h>
 #include <drogon/HttpResponse.h>
@@ -37,6 +38,28 @@ constexpr const char* kSecret = "test-jwt-secret-for-admin-flow-padding";
 // Domain::Permission bits so a backend bit-layout change shows up here.
 constexpr std::uint32_t kEditorPerms = Domain::Permission::kGeneral | 0x02;                // 0x03
 constexpr std::uint32_t kEditorPermsWidened = Domain::Permission::kGeneral | 0x02 | 0x04;  // 0x07
+
+/// Snapshot of every role's permissions, written back on destruction.
+struct RestoreRolePermissions {
+    std::vector<std::pair<int, int>> saved;
+    RestoreRolePermissions() {
+        auto rows =
+            Database::get().execute_read([](auto& txn) { return txn.exec("SELECT id, permissions FROM roles"); });
+        for (const auto& row : rows)
+            saved.emplace_back(row["id"].as<int>(), row["permissions"].as<int>());
+    }
+    ~RestoreRolePermissions() {
+        try {
+            Database::get().execute_write([&](auto& txn) {
+                for (const auto& [role_id, perms] : saved)
+                    txn.exec_params("UPDATE roles SET permissions = $1 WHERE id = $2", perms, role_id);
+                return 0;
+            });
+        } catch (...) {}
+    }
+    RestoreRolePermissions(const RestoreRolePermissions&) = delete;
+    RestoreRolePermissions& operator=(const RestoreRolePermissions&) = delete;
+};
 
 class AdminFlowTest : public TestHelpers::CoreBackedTest {
 protected:
@@ -373,6 +396,88 @@ TEST_F(AdminFlowTest, updateRoleEmptyPatchRefused) {
     admin.updateRole(
         req, [&](const HttpResponsePtr& r) { resp = r; }, std::to_string(created.id));
     EXPECT_EQ(resp->statusCode(), k400BadRequest);
+}
+
+TEST_F(AdminFlowTest, createRoleRefusesADefaultRoleWithTheAdminBit) {
+    auto admin_user = seed_user("admin@example.com", "Administrator");
+    auto req =
+        authed_post(admin_user.principal,
+                    {{"name", "Everyone"}, {"permissions", Domain::Permission::kAdminister | 1}, {"is_default", true}});
+    HttpResponsePtr resp;
+    admin.createRole(req, [&](const HttpResponsePtr& r) { resp = r; });
+    ASSERT_NE(resp, nullptr);
+    EXPECT_EQ(resp->statusCode(), k400BadRequest);
+    EXPECT_EQ(json::parse(std::string(resp->body()))["error"], "default_role_admin");
+    EXPECT_FALSE(Repositories::RoleRepository().find_by_name("Everyone").has_value());
+}
+
+TEST_F(AdminFlowTest, updateRoleRefusesTheAdminBitOnTheDefaultRole) {
+    auto admin_user = seed_user("admin@example.com", "Administrator");
+    Repositories::RoleRepository repo;
+    auto user_role = repo.find_by_name("User");
+    ASSERT_TRUE(user_role.has_value());
+    ASSERT_TRUE(user_role->is_default);
+
+    auto req = authed_post(admin_user.principal, {{"permissions", Domain::Permission::kAdminister | 1}});
+    req->setMethod(Patch);
+    HttpResponsePtr resp;
+    admin.updateRole(
+        req, [&](const HttpResponsePtr& r) { resp = r; }, std::to_string(user_role->id));
+    ASSERT_NE(resp, nullptr);
+    EXPECT_EQ(resp->statusCode(), k400BadRequest);
+    EXPECT_EQ(json::parse(std::string(resp->body()))["error"], "default_role_admin");
+    EXPECT_EQ(repo.find(user_role->id)->permissions, user_role->permissions);
+}
+
+TEST_F(AdminFlowTest, updateRoleRefusesMakingAnAdminRoleTheDefault) {
+    auto admin_user = seed_user("admin@example.com", "Administrator");
+    auto req = authed_post(admin_user.principal, {{"is_default", true}});
+    req->setMethod(Patch);
+    HttpResponsePtr resp;
+    admin.updateRole(
+        req, [&](const HttpResponsePtr& r) { resp = r; }, std::to_string(admin_user.user.role_id));
+    ASSERT_NE(resp, nullptr);
+    EXPECT_EQ(resp->statusCode(), k400BadRequest);
+    EXPECT_EQ(json::parse(std::string(resp->body()))["error"], "default_role_admin");
+}
+
+TEST_F(AdminFlowTest, updateRoleRefusesDroppingTheAdminBitFromTheLastAdminRole) {
+    auto admin_user = seed_user("admin@example.com", "Administrator");
+    Repositories::RoleRepository repo;
+    // wipe_app_data keeps the seed roles' permissions as they are, so this
+    // test must hand them back exactly, even when an assertion bails out.
+    RestoreRolePermissions restore;
+    // Make the seed Administrator role the only admin-bit role, whatever an
+    // earlier suite left behind.
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE roles SET permissions = permissions & ~$1::int WHERE id <> $2",
+                        static_cast<int>(Domain::Permission::kAdminister),
+                        admin_user.user.role_id);
+        txn.exec_params("UPDATE roles SET permissions = permissions | $1::int WHERE id = $2",
+                        static_cast<int>(Domain::Permission::kAdminister),
+                        admin_user.user.role_id);
+        return 0;
+    });
+
+    auto req = authed_post(admin_user.principal, {{"permissions", 1}});
+    req->setMethod(Patch);
+    HttpResponsePtr resp;
+    admin.updateRole(
+        req, [&](const HttpResponsePtr& r) { resp = r; }, std::to_string(admin_user.user.role_id));
+    ASSERT_NE(resp, nullptr);
+    EXPECT_EQ(resp->statusCode(), k409Conflict);
+    EXPECT_EQ(json::parse(std::string(resp->body()))["error"], "last_admin_role");
+    EXPECT_TRUE(repo.find(admin_user.user.role_id)->is_admin());
+
+    // With a second admin role the same demotion goes through.
+    repo.create("Second admins", Domain::Permission::kAdminister, false);
+    HttpResponsePtr ok;
+    auto again = authed_post(admin_user.principal, {{"permissions", 1}});
+    again->setMethod(Patch);
+    admin.updateRole(
+        again, [&](const HttpResponsePtr& r) { ok = r; }, std::to_string(admin_user.user.role_id));
+    ASSERT_NE(ok, nullptr);
+    EXPECT_EQ(ok->statusCode(), k200OK) << ok->body();
 }
 
 TEST_F(AdminFlowTest, deleteRoleHappyPath) {
