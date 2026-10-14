@@ -153,6 +153,40 @@ TEST_F(AuthTest, UnsupportedAlgRejected) {
     EXPECT_EQ(err, "unsupported_alg");
 }
 
+// The header and the payload are read before and after the signature check
+// respectively; neither may throw on a shape the parser did not expect, since
+// the auth advice turns the error code into a 401 and nothing catches above it.
+TEST_F(AuthTest, ScalarHeaderIsMalformedNotAnException) {
+    Security::Auth::Authenticator auth(make_cfg());
+    std::string err;
+    // "MQ" is base64url for "1": each segment decodes to the JSON scalar 1.
+    auto p = auth.verify_jwt("MQ.MQ.MQ", err);
+    ASSERT_FALSE(p.has_value());
+    EXPECT_EQ(err, "malformed_header");
+}
+
+TEST_F(AuthTest, NonStringAlgIsUnsupportedNotAnException) {
+    Security::Auth::Authenticator auth(make_cfg());
+    for (const json header : {json{{"alg", 1}, {"typ", "JWT"}}, json{{"alg", "HS256"}, {"typ", 7}}}) {
+        json claims = {{"sub", "u"}};
+        std::string token =
+            Utils::Base64::url_encode(header.dump()) + "." + Utils::Base64::url_encode(claims.dump()) + ".";
+        std::string err;
+        auto p = auth.verify_jwt(token, err);
+        ASSERT_FALSE(p.has_value()) << header.dump();
+        EXPECT_EQ(err, "unsupported_alg") << header.dump();
+    }
+}
+
+TEST_F(AuthTest, ScalarPayloadIsMalformedNotAnException) {
+    Security::Auth::Authenticator auth(make_cfg());
+    std::string err;
+    // Correctly signed, but the payload is the scalar 1, not a claim set.
+    auto p = auth.verify_jwt(make_jwt(json(1), secret), err);
+    ASSERT_FALSE(p.has_value());
+    EXPECT_EQ(err, "malformed_payload");
+}
+
 TEST_F(AuthTest, ScopesAsSpaceSeparatedString) {
     Security::Auth::Authenticator auth(make_cfg());
     json claims = {

@@ -12,6 +12,7 @@ import {
   nights,
   parseRange,
   rangeForDays,
+  rangeHeadline,
   validCustomRange,
   weightChange,
   widenRange,
@@ -96,6 +97,19 @@ describe('rangeForDays / daysInRange / parseRange', () => {
       dflt,
     );
     expect(parseRange(new URLSearchParams('days=13'), '2026-10-05')).toEqual(dflt);
+  });
+});
+
+describe('rangeHeadline', () => {
+  it('names a preset by its days', () => {
+    expect(rangeHeadline(parseRange(new URLSearchParams('days=7'), '2026-10-05'))).toBe(
+      'Last 7 days',
+    );
+    expect(rangeHeadline(parseRange(new URLSearchParams(''), '2026-10-05'))).toBe('Last 30 days');
+  });
+  it('shows the two dates of a custom range, never "Last custom days"', () => {
+    const r = parseRange(new URLSearchParams('from=2026-08-01&to=2026-08-10'), '2026-10-05');
+    expect(rangeHeadline(r)).toBe('2026-08-01 – 2026-08-10');
   });
 });
 

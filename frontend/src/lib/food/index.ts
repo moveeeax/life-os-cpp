@@ -1,4 +1,5 @@
 // Pure logic of the Food pages: dates, scaling, the parse draft, formats.
+import { parseAmount } from '@/lib/amounts';
 import { shiftDays } from '@/lib/dates';
 
 import type { FoodEntryInput, FoodItem, FoodMeal, FoodParseJob, FoodWeek } from './types';
@@ -89,13 +90,8 @@ export const formatKcal = (n: number): string => Math.round(n).toLocaleString('e
 
 export const formatGrams = (n: number): string => String(round1(n));
 
-/** The number a field holds, or null when it is empty or not a number. */
-export function parseNumber(value: string): number | null {
-  const t = value.trim().replace(',', '.');
-  if (t === '') return null;
-  const n = Number(t);
-  return Number.isFinite(n) ? n : null;
-}
+/** The number a field holds, or null when it is empty or not a number. Grams and macros are never negative. */
+export const parseNumber = (value: string): number | null => parseAmount(value);
 
 // ── the parse draft ────────────────────────────────────────────────────────
 

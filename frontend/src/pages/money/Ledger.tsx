@@ -32,6 +32,7 @@ import {
   type Transaction,
   type TransactionPatch,
 } from '@/lib/ledger';
+import { parseAmount } from '@/lib/amounts';
 
 import { Banner, Filters, Group, Row as KitRow } from '@/shell/kit';
 import {
@@ -68,15 +69,16 @@ function TransactionEditor({
   const [confirm, setConfirm] = useState(false);
   const update = useUpdateTransaction(row.id, onClose);
   const remove = useDeleteTransaction(onClose);
-  const a = Number(amount.replace(',', '.'));
+  // A bank recalculation may be negative; an income or an expense may not.
+  const a = parseAmount(amount, { signed: adjustment });
   const amountBad =
-    !Number.isFinite(a) ||
+    a === null ||
     (adjustment ? a === 0 : a <= 0) ||
     (!adjustment && (name.trim() === '' || !isDay(date)));
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (amountBad) return;
+    if (amountBad || a === null) return;
     const patch: TransactionPatch = {};
     if (a !== row.amount) patch.amount = a;
     if (note !== row.note) patch.note = note;

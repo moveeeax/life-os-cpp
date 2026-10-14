@@ -1,5 +1,7 @@
 // Pure logic of a logged workout session: volume, set entry, the queue of
 // unsent sets and the rest timer. No React, no fetch; storage is passed in.
+import { parseAmount } from '@/lib/amounts';
+
 import { usesReps } from './index';
 import type {
   TrackingMode,
@@ -154,9 +156,8 @@ export interface ParsedSet {
 
 /** A decimal with a dot or a comma (phone keyboards differ); null when empty, NaN when not a number. */
 function decimal(text: string): number | null {
-  const s = text.trim().replace(',', '.');
-  if (s === '') return null;
-  return /^\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
+  if (text.trim() === '') return null;
+  return parseAmount(text) ?? NaN;
 }
 
 function whole(text: string): number | null {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { api, apiErrorMessage, ApiClientError } from './client';
+import { api, apiErrorMessage, ApiClientError, newIdempotencyKey } from './client';
 
 /**
  * The refresh-on-401 machinery is the most failure-prone logic in the SPA:
@@ -240,6 +240,81 @@ describe('api client failure modes', () => {
     expect(error?.code).toBe('validation_failed');
     expect(error?.fields).toHaveLength(1);
     expect(apiErrorMessage(error)).toBe('email: expected format: email');
+  });
+});
+
+describe('Idempotency-Key', () => {
+  const keyOf = (call: FetchCall): string | undefined =>
+    (call.init.headers as Record<string, string>)['Idempotency-Key'];
+
+  it('is sent on every mutating method and never on a GET', async () => {
+    mockFetchSequence([() => jsonResponse(200, { ok: true })]);
+    await api.GET('/api/v1/jobs');
+    expect(keyOf(calls[0])).toBeUndefined();
+
+    for (const verb of ['POST', 'PUT', 'PATCH', 'DELETE'] as const) {
+      calls = [];
+      mockFetchSequence([() => jsonResponse(200, { ok: true })]);
+      await api[verb]('/api/v1/jobs', { body: {} });
+      expect(keyOf(calls[0]), verb).toMatch(/^[0-9a-f-]{32,36}$/);
+    }
+  });
+
+  it('mints a different key per call', async () => {
+    mockFetchSequence([() => jsonResponse(200, { ok: true })]);
+    await api.POST('/api/v1/jobs', { body: { type: 'echo' } });
+    await api.POST('/api/v1/jobs', { body: { type: 'echo' } });
+    expect(keyOf(calls[0])).not.toBe(keyOf(calls[1]));
+  });
+
+  it('replays the same key after a 401 + refresh', async () => {
+    mockFetchSequence([
+      () => jsonResponse(401, { error: 'missing_token' }), // original POST
+      () => new Response(null, { status: 200 }), // refresh
+      () => jsonResponse(200, { ok: true }), // replay
+    ]);
+    const { error } = await api.POST('/api/v1/jobs', { body: { type: 'echo' } });
+    expect(error).toBeUndefined();
+    expect(calls.map((c) => c.url)).toEqual([
+      '/api/v1/jobs',
+      '/api/v1/auth/refresh',
+      '/api/v1/jobs',
+    ]);
+    const first = keyOf(calls[0]);
+    expect(first).toBeDefined();
+    expect(keyOf(calls[2])).toBe(first);
+    // The refresh is its own call, not a replay of anything: no key.
+    expect(keyOf(calls[1])).toBeUndefined();
+  });
+
+  it('keeps a key the caller supplied, whatever its case', async () => {
+    mockFetchSequence([() => jsonResponse(200, { ok: true })]);
+    await api.POST('/api/v1/jobs', { body: {}, headers: { 'Idempotency-Key': 'mine-1' } });
+    expect(keyOf(calls[0])).toBe('mine-1');
+
+    calls = [];
+    mockFetchSequence([() => jsonResponse(200, { ok: true })]);
+    await api.POST('/api/v1/jobs', { body: {}, headers: { 'idempotency-key': 'mine-2' } });
+    const headers = calls[0].init.headers as Record<string, string>;
+    expect(headers['idempotency-key']).toBe('mine-2');
+    expect(headers['Idempotency-Key']).toBeUndefined();
+  });
+
+  it('falls back to 32 hex digits without crypto (a plain-HTTP LAN page)', () => {
+    vi.stubGlobal('crypto', undefined);
+    const key = newIdempotencyKey();
+    expect(key).toMatch(/^[0-9a-f]{32}$/);
+    expect(newIdempotencyKey()).not.toBe(key);
+  });
+
+  it('uses getRandomValues when randomUUID is missing (no secure context)', () => {
+    vi.stubGlobal('crypto', {
+      getRandomValues: (a: Uint8Array) => {
+        a.fill(0xab);
+        return a;
+      },
+    });
+    expect(newIdempotencyKey()).toBe('ab'.repeat(16));
   });
 });
 

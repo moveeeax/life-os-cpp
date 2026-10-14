@@ -174,6 +174,17 @@ std::optional<Job> JobQueue::pick(const std::vector<std::string>& types,
     }
 
     auto job = Job::from_json(json::parse(*data));
+    if (is_terminal_status_(job.status)) {
+        // The id was on the queue after its blob reached a terminal state: a
+        // cancel() that lost the race with this pop, or a completed job that
+        // startup recovery pushed again. Running it would overwrite the
+        // outcome; drop the queue entry instead.
+        spdlog::info("Job {} popped from queue but already {} — skipped", job_id, job.status);
+        try {
+            redis.lrem(proc_list, 0, job_id);
+        } catch (...) {}
+        return std::nullopt;
+    }
     job.status = "processing";
     job.worker_id = worker_id;
     job.updated_at = now_epoch();
@@ -220,10 +231,12 @@ void JobQueue::fail(const std::string& id, const std::string& error) {
     job.retry_count++;
     job.updated_at = now_epoch();
 
-    // Remove from the worker's processing list whether we requeue or DLQ —
-    // recovery should never double-process a job that already failed once.
-    release_from_worker_(redis, job);
-
+    // The id lands on its next list (live queue, delayed set or DLQ) BEFORE it
+    // leaves the worker's processing list. The two writes are not atomic: a
+    // crash in between then leaves the id on both lists, and startup recovery
+    // pushes it once more (a duplicate, the documented at-least-once
+    // contract). The other order left it on neither, with no lease to reap
+    // and a blob stuck "pending" that nothing would ever find again.
     if (job.retry_count < job.max_retries) {
         // Requeue for retry.
         job.status = "pending";
@@ -241,6 +254,7 @@ void JobQueue::fail(const std::string& id, const std::string& error) {
             redis.lpush(queue_key(job.type), id);
             spdlog::info("Job {} requeued (retry {}/{}): {}", id, job.retry_count, job.max_retries, error);
         }
+        release_from_worker_(redis, job);
     } else {
         // Max retries exceeded — send to dead-letter queue for inspection.
         // DLQ entries are NOT reaped by result_ttl_ (operator must drain
@@ -250,6 +264,7 @@ void JobQueue::fail(const std::string& id, const std::string& error) {
         save_job_(redis, job);
         redis.lpush(dlq_key(job.type), id);
         redis.sadd(kDlqAllKey, id);  // index for "list all DLQ" queries
+        release_from_worker_(redis, job);
         spdlog::warn("Job {} DLQ'd after {} retries: {}", id, job.retry_count, error);
         Dispatcher::get().on_dead(job, error);
     }
@@ -259,15 +274,18 @@ void JobQueue::defer(const std::string& id, int64_t delay_ms, const std::string&
     check_initialized();
     auto& redis = Cache::get().get_client();
     auto job = load_job_or_throw_(redis, id);
-    release_from_worker_(redis, job);
     // retry_count stays: waiting for another delivery to let go is not an attempt.
     job.status = "pending";
     job.error = reason;
+    const std::string worker_id = job.worker_id;
     job.worker_id.clear();
     job.updated_at = now_epoch();
     save_job_(redis, job);
     const int64_t wait = delay_ms < 1000 ? 1000 : delay_ms;
+    // Delayed set first, processing list second: see fail().
     redis.zadd(delayed_key(), id, static_cast<double>(Utils::Time::now_epoch_millis() + wait));
+    job.worker_id = worker_id;
+    release_from_worker_(redis, job);
     spdlog::info("Job {} deferred for {}ms: {}", id, wait, reason);
 }
 
@@ -276,17 +294,18 @@ void JobQueue::dead_letter(const std::string& id, const std::string& error) {
     auto& redis = Cache::get().get_client();
     auto job = load_job_or_throw_(redis, id);
     job.updated_at = now_epoch();
-    release_from_worker_(redis, job);
     job.status = "dead";
     job.error = error;
     // Index BEFORE committing the blob: the 3 writes aren't atomic, and if
     // lpush/sadd threw after the blob was already marked "dead" the job
     // would vanish from list_dlq/requeue/recover entirely. Indexing first
     // means a failure leaves it discoverable (with its prior status) and
-    // list_dlq heals once the blob write lands.
+    // list_dlq heals once the blob write lands. The processing list is
+    // released last, after the id is on the DLQ: see fail().
     redis.lpush(dlq_key(job.type), id);
     redis.sadd(kDlqAllKey, id);
     save_job_(redis, job);
+    release_from_worker_(redis, job);
     spdlog::warn("Job {} sent straight to DLQ (permanent failure): {}", id, error);
     Dispatcher::get().on_dead(job, error);
 }
@@ -379,6 +398,11 @@ long JobQueue::recover_processing(const std::string& worker_id) {
             if (!loaded)
                 continue;
             Job job = std::move(*loaded);
+            // A crash between complete()'s blob write and its lrem leaves a
+            // finished job here; running it again would send a second email
+            // or webhook. The same for a cancelled or dead-lettered one.
+            if (is_terminal_status_(job.status))
+                continue;
             // Put it back on the live queue so another worker (or this one
             // after restart) picks it up again. Don't touch retry_count —
             // the job didn't fail, we just missed its completion.
@@ -424,6 +448,8 @@ long JobQueue::promote_due_jobs() {
             auto job = load_job_(redis, id);
             if (!job)
                 continue;  // blob expired — drop the orphaned delayed entry
+            if (is_terminal_status_(job->status))
+                continue;  // cancelled while it waited — the entry is spent
             redis.lpush(queue_key(job->type), id);
             ++moved;
         } catch (...) {}

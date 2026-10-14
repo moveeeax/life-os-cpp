@@ -244,6 +244,14 @@ describe('set entry', () => {
     expect(parsed.values.weight_kg).toBeNull();
   });
 
+  it('refuses a thousands comma in the weight rather than reading 1.234', () => {
+    const bad = parseSetFields(
+      { weight: '1,234', reps: '5', duration: '', distance: '' },
+      'weight_reps',
+    );
+    expect(Object.keys(bad.errors)).toEqual(['weight']);
+  });
+
   it('rejects text, negatives, fractions of reps and values over the limits', () => {
     const bad = parseSetFields(
       { weight: '-5', reps: '2.5', duration: '', distance: '' },

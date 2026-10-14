@@ -38,22 +38,28 @@ heading in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Quick start
 
-Prerequisites: Docker with Compose v2. The first build compiles the vcpkg
-dependency set, so give the Docker VM at least 8 GiB of memory
-(`colima start --cpu 4 --memory 8` on macOS). `make doctor` checks the
-toolchain, `make warm-cache` pulls the CI-built dependency layer so the cold
-build drops from about 30 minutes to a few.
+Prerequisites: Docker with Compose v2. `make up` pulls the last release
+image from `ghcr.io/moveeeax/life-os-cpp:latest`, so nothing compiles and the
+stack runs in a minute, but it runs the release, not your checkout. To run
+the code you are editing use `make quickstart` (build + up + smoke),
+`make up-build` or `make dev`. The first build compiles the vcpkg dependency
+set, so give the Docker VM at least 8 GiB of memory (`colima start --cpu 4
+--memory 8` on macOS). `make doctor` checks the toolchain, `make warm-cache`
+pulls the CI-built dependency layer so the cold build drops from about 30
+minutes to a few.
 
 ```bash
 git clone https://github.com/moveeeax/life-os-cpp.git
 cd life-os-cpp
 
 make doctor          # Docker, VM memory, local tools
-make warm-cache      # optional: prebuilt vcpkg layer
-make up              # app + Postgres + Redis + Mailpit, AUTH_MODE=none
+make up              # last release: app + Postgres + Redis + Mailpit, AUTH_MODE=none
 make health          # /healthz, /ready, head of /metrics
 make smoke           # curl through the critical endpoints
 make logs            # tail the app
+
+make warm-cache      # optional: prebuilt vcpkg layer for the local build
+make quickstart      # your checkout: build + up + smoke
 ```
 
 The API listens on `:8080`, metrics on `:9090`. Migrations from `migrations/`

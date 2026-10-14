@@ -9,6 +9,7 @@ import {
   mondayOf,
   parseDateParam,
   parseErrorText,
+  parseNumber,
   percent,
   scaled,
   shiftDate,
@@ -136,7 +137,9 @@ describe('draftProblem', () => {
   });
   it('names the first problem of a selected line and ignores unselected ones', () => {
     expect(draftProblem([{ ...draft[1], grams: '0' }])).toBe('Eggs: grams must be above 0.');
-    expect(draftProblem([{ ...draft[1], kcal: '12.' }])).toBeNull();
+    expect(draftProblem([{ ...draft[1], kcal: '12.5' }])).toBeNull();
+    // A half-typed "12." is kept in the field but is not a number yet.
+    expect(draftProblem([{ ...draft[1], kcal: '12.' }])).toBe('Eggs: kcal must be 0 or more.');
     expect(draftProblem([{ ...draft[1], kcal: '' }])).toBe('Eggs: kcal must be 0 or more.');
     expect(draftProblem([{ ...draft[1], fat_g: '-1' }])).toBe('Eggs: fat must be 0 or more.');
     expect(draftProblem([{ ...draft[1], name: ' ' }])).toBe('Every line needs a name.');
@@ -173,6 +176,11 @@ describe('linesToEntries', () => {
     expect(linesToEntries([{ ...draft[1], grams: '12,5' }], '2026-10-05', 'lunch')[0].grams).toBe(
       12.5,
     );
+  });
+  it('does not read a thousands comma as a decimal', () => {
+    expect(parseNumber('1,234')).toBeNull();
+    expect(parseNumber('1.234')).toBe(1.234);
+    expect(parseNumber('-5')).toBeNull();
   });
 });
 

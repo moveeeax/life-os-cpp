@@ -11,6 +11,7 @@ import {
   type GoalKind,
   type Tone,
 } from '@/lib/goals';
+import { parseAmount } from '@/lib/amounts';
 import { formatDay } from '@/lib/dates';
 import { goalBody } from '@/lib/goals/bodies';
 import { AREAS, areaOf, localToday, type Area } from '@/lib/tasks';
@@ -171,17 +172,15 @@ function GoalForm({ onClose }: { onClose: () => void }) {
   const [unit, setUnit] = useState('');
   const [count, setCount] = useState('');
   const save = useSaveGoal(null, onClose);
-  const num = (s: string) => Number(s.replace(',', '.'));
+  // A number goal may start or end below zero; a count is a whole number of times.
+  const fromValue = parseAmount(from, { signed: true });
+  const toValue = parseAmount(to, { signed: true });
+  const countValue = parseAmount(count);
   const ok =
     title.trim() !== '' &&
     due > today &&
-    (kind !== 'number' ||
-      (from.trim() !== '' &&
-        to.trim() !== '' &&
-        Number.isFinite(num(from)) &&
-        Number.isFinite(num(to)) &&
-        num(from) !== num(to))) &&
-    (kind !== 'count' || (Number.isInteger(num(count)) && num(count) >= 1));
+    (kind !== 'number' || (fromValue !== null && toValue !== null && fromValue !== toValue)) &&
+    (kind !== 'count' || (countValue !== null && Number.isInteger(countValue) && countValue >= 1));
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!ok) return;

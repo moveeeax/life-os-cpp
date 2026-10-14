@@ -297,6 +297,22 @@ TEST(HttpE2E, AuthMiddlewareGuardsNonPublicPaths) {
     EXPECT_EQ(resp->getHeader("x-content-type-options"), "nosniff");
 }
 
+TEST(HttpE2E, MalformedBearerTokenIs401NotAnException) {
+    // The header segment is read before the signature check. "MQ.MQ.MQ"
+    // decodes to the JSON scalar 1 in every segment; a token like this used
+    // to throw out of the auth advice instead of answering 401.
+    REQUIRE_E2E_ENV();
+    for (const char* token : {"MQ.MQ.MQ", "eyJhbGciOjF9.MQ.MQ"}) {  // {"alg":1}
+        auto req = HttpRequest::newHttpRequest();
+        req->setPath("/api/v1/jobs");
+        req->addHeader("Authorization", std::string("Bearer ") + token);
+        auto resp = send(req);
+        EXPECT_EQ(resp->statusCode(), k401Unauthorized) << token << " " << resp->getBody();
+        expect_matches_schema(resp, "GET", "/api/v1/jobs");
+        EXPECT_FALSE(resp->getHeader("x-request-id").empty());
+    }
+}
+
 TEST(HttpE2E, AccountTokenRoutesArePublic) {
     // The token-bearing account routes must reach their handler WITHOUT a
     // session (the user clicking an email link isn't logged in). Pre-fix the

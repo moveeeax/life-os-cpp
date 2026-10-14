@@ -194,6 +194,57 @@ TEST_F(JobsIntegrationTest, CancelPendingJob) {
     EXPECT_TRUE(queue_contents.empty());
 }
 
+// A cancel() that lands between a worker's pop and its own queue cleanup
+// leaves the id on the queue with a "failed" blob: the pick must not turn it
+// back into "processing" and run it.
+TEST_F(JobsIntegrationTest, PickSkipsAJobCancelledAfterItWasQueued) {
+    auto job = Jobs::get().submit("cancelq", {});
+    track(job.id);
+    ASSERT_TRUE(Jobs::get().cancel(job.id));
+    Cache::get().get_client().lpush(Jobs::queue_key("cancelq"), job.id);
+
+    EXPECT_FALSE(Jobs::get().pick({"cancelq"}, 1, "w1"));
+    auto status = Jobs::get().get_status(job.id);
+    ASSERT_TRUE(status);
+    EXPECT_EQ(status->status, "failed");
+    EXPECT_EQ(status->error, "cancelled");
+    std::vector<std::string> proc;
+    Cache::get().get_client().lrange(Jobs::processing_key("w1"), 0, -1, std::back_inserter(proc));
+    EXPECT_TRUE(proc.empty()) << "the stale queue entry is dropped, not claimed";
+}
+
+// A crash between complete()'s blob write and its lrem leaves a finished job
+// in the processing list; startup recovery must not run it a second time.
+TEST_F(JobsIntegrationTest, RecoverProcessingSkipsACompletedJob) {
+    auto job = Jobs::get().submit("recoverq", {});
+    track(job.id);
+    ASSERT_TRUE(Jobs::get().pick({"recoverq"}, 2, "rwrk-1"));
+    Jobs::get().complete(job.id, {{"ok", true}});
+    Cache::get().get_client().rpush(Jobs::processing_key("rwrk-1"), job.id);
+
+    EXPECT_EQ(Jobs::get().recover_processing("rwrk-1"), 0);
+    EXPECT_EQ(Jobs::get().get_status(job.id)->status, "completed");
+    std::vector<std::string> q;
+    Cache::get().get_client().lrange(Jobs::queue_key("recoverq"), 0, -1, std::back_inserter(q));
+    EXPECT_TRUE(q.empty()) << "a completed job is not queued again";
+}
+
+// A job cancelled while it waited in the delayed set must not be promoted.
+TEST_F(JobsIntegrationTest, PromoteSkipsACancelledJob) {
+    auto job = Jobs::get().submit("cancelq", {});
+    track(job.id);
+    ASSERT_TRUE(Jobs::get().cancel(job.id));
+    Cache::get().get_client().zadd(Jobs::delayed_key(), job.id, 1.0);
+
+    EXPECT_EQ(Jobs::get().promote_due_jobs(), 0);
+    std::vector<std::string> q;
+    Cache::get().get_client().lrange(Jobs::queue_key("cancelq"), 0, -1, std::back_inserter(q));
+    EXPECT_TRUE(q.empty());
+    std::vector<std::string> delayed;
+    Cache::get().get_client().zrange(Jobs::delayed_key(), 0, -1, std::back_inserter(delayed));
+    EXPECT_TRUE(delayed.empty()) << "the spent entry is removed";
+}
+
 TEST_F(JobsIntegrationTest, CancelCompletedJobReturnsFalse) {
     auto job = Jobs::get().submit("cancelq", {});
     track(job.id);

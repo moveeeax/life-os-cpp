@@ -1,6 +1,6 @@
 // Pure logic of the Money pages: formats, periods, per-currency totals, the
 // parse draft, small rules. Amounts of different currencies are never added.
-import { formatAmount } from '@/lib/amounts';
+import { formatAmount, parseAmount } from '@/lib/amounts';
 import { shiftDays } from '@/lib/dates';
 
 import type {
@@ -251,12 +251,7 @@ export function draftFromJob(job: ParseJob, categoryKinds?: Map<string, string>)
   }));
 }
 
-const num = (v: string): number | null => {
-  const t = v.trim().replace(',', '.');
-  if (t === '') return null;
-  const n = Number(t);
-  return Number.isFinite(n) ? n : null;
-};
+const num = parseAmount;
 
 /** The first thing that keeps the selected lines out of the inbox, or null. */
 export function draftProblem(lines: DraftLine[]): string | null {

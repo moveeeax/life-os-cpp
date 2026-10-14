@@ -43,7 +43,17 @@ inline std::optional<json> verify_hs256_jwt(const std::string& token, const std:
         err = "malformed_header";
         return std::nullopt;
     }
-    if (header.value("alg", "") != "HS256" || header.value("typ", "JWT") != "JWT") {
+    // The header is attacker-controlled and read before the signature check:
+    // a scalar header (`MQ.MQ.MQ` decodes to `1`) or a non-string alg/typ
+    // must answer "malformed", not throw out of the auth advice.
+    if (!header.is_object()) {
+        err = "malformed_header";
+        return std::nullopt;
+    }
+    const auto alg = header.find("alg");
+    const auto typ = header.find("typ");
+    if (alg == header.end() || !alg->is_string() || alg->get_ref<const std::string&>() != "HS256" ||
+        (typ != header.end() && (!typ->is_string() || typ->get_ref<const std::string&>() != "JWT"))) {
         err = "unsupported_alg";
         return std::nullopt;
     }
@@ -70,6 +80,12 @@ inline std::optional<json> verify_hs256_jwt(const std::string& token, const std:
     try {
         claims = json::parse(Utils::Base64::url_decode(payload_b64));
     } catch (...) {
+        err = "malformed_payload";
+        return std::nullopt;
+    }
+    // Every caller reads claims with value()/operator[], which throw on a
+    // non-object; a signed scalar payload is still not a claim set.
+    if (!claims.is_object()) {
         err = "malformed_payload";
         return std::nullopt;
     }

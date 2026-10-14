@@ -22,6 +22,7 @@ import {
   type Report,
 } from '@/lib/ledger';
 import { decimalsOf } from '@/lib/ledger';
+import { parseAmount } from '@/lib/amounts';
 import { cn } from '@/lib/utils';
 
 import {
@@ -123,8 +124,9 @@ function CategoryForm({
         : 'Archived: rows refer to it, so it is hidden instead of removed.',
     ),
   );
-  const b = budget.trim() === '' ? null : Number(budget.replace(',', '.'));
-  const ok = name.trim() !== '' && (b === null || (Number.isFinite(b) && b > 0));
+  // An empty field means no budget; a field with text in it must be a number above 0.
+  const b = parseAmount(budget);
+  const ok = name.trim() !== '' && (budget.trim() === '' || (b !== null && b > 0));
 
   const submit = (e: FormEvent) => {
     e.preventDefault();

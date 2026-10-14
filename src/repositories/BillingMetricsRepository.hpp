@@ -173,8 +173,8 @@ public:
                                                          : 0.0;
 
             // ── refunds: only rows that actually debited the wallet ────────────
-            // (outcome='applied' — 'skipped_insufficient'/'skipped_zero_credits'
-            // rows are durable attempt markers, not money that actually moved;
+            // (outcome='applied' — the 'skipped_*' rows are durable attempt
+            // markers, not money that actually moved;
             // see migrations/007_billing.sql and Wallet::refund_capture).
             auto refunds = txn.exec_params(
                 "SELECT COALESCE(SUM(amount_cents), 0) AS total, COUNT(*) AS cnt "

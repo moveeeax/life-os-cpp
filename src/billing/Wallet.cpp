@@ -211,8 +211,8 @@ CreditResult refund_capture(const std::string& provider_capture_id,
         // same payment, and fixes this function's lock order to match
         // credit_capture's (payments, then wallet_balances).
         auto pr = txn.exec_params(
-            "SELECT id, user_id, amount_cents, credits_expected FROM payments WHERE provider_capture_id = $1 "
-            "FOR UPDATE",
+            "SELECT id, user_id, amount_cents, credits_expected, status FROM payments "
+            "WHERE provider_capture_id = $1 FOR UPDATE",
             provider_capture_id);
         if (pr.empty())
             throw Repositories::PaymentNotFound{};
@@ -220,6 +220,13 @@ CreditResult refund_capture(const std::string& provider_capture_id,
         const std::string user_id = pr[0]["user_id"].template as<std::string>();
         const std::int64_t amount_cents = pr[0]["amount_cents"].template as<std::int64_t>();
         const std::int64_t credits_expected = pr[0]["credits_expected"].template as<std::int64_t>();
+        const std::string status = pr[0]["status"].template as<std::string>();
+        // Only a captured payment ever moved credits into the wallet (and a
+        // refunded one was captured first). A payment that failed capture
+        // (amount or currency mismatch) keeps its provider_capture_id but
+        // credited nothing, so a refund of it has nothing to take back: the
+        // credits on the balance came from OTHER payments.
+        const bool credited_payment = (status == "captured" || status == "refunded");
 
         // Idempotency FIRST, via the durable marker — see the function docs
         // for why this can no longer be "does a wallet_entries row exist".
@@ -288,7 +295,15 @@ CreditResult refund_capture(const std::string& provider_capture_id,
         std::string outcome;
         std::int64_t credits_deducted = 0;
 
-        if (refund_credits == 0) {
+        if (!credited_payment) {
+            outcome = "skipped_not_credited";
+            spdlog::warn(
+                "billing: refund {} for payment {} (status {}) — the payment never credited the wallet, "
+                "recorded, wallet untouched",
+                provider_refund_id,
+                payment_id,
+                status);
+        } else if (refund_credits == 0) {
             // Too small to represent at this payment's credits_expected/
             // amount_cents ratio — inserting delta_credits=0 would trip
             // wallet_entries' CHECK (delta_credits <> 0). Record the attempt
