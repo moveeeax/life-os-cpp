@@ -475,7 +475,11 @@ export function TravelTripPage() {
       {trip.isPending ? (
         <Placeholder />
       ) : trip.isError ? (
-        <LoadError error={trip.error} onRetry={() => void trip.refetch()} />
+        <LoadError
+          error={trip.error}
+          onRetry={() => void trip.refetch()}
+          notFound="This trip is not here: it may have been deleted."
+        />
       ) : tab === 'plan' ? (
         <Plan trip={trip.data} today={today} />
       ) : tab === 'packing' ? (

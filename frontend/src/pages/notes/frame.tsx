@@ -24,6 +24,14 @@ export function NotesFrame({
 }
 
 /** A failed query of Notes (a 404 names the module). */
-export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
-  return <KitLoadError error={error} onRetry={onRetry} module="notes" />;
+export function LoadError({
+  error,
+  onRetry,
+  notFound,
+}: {
+  error: unknown;
+  onRetry: () => void;
+  notFound?: string;
+}) {
+  return <KitLoadError error={error} onRetry={onRetry} module="notes" notFound={notFound} />;
 }

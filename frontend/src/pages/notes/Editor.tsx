@@ -23,7 +23,11 @@ export function NoteEditorPage() {
   if (note.isError || !note.data) {
     return (
       <NotesFrame headline="Note">
-        <LoadError error={note.error} onRetry={() => void note.refetch()} />
+        <LoadError
+          error={note.error}
+          onRetry={() => void note.refetch()}
+          notFound="This note is not here: it may have been deleted."
+        />
       </NotesFrame>
     );
   }

@@ -4,8 +4,16 @@ import { Group, LoadError as KitLoadError, SectionFrame, type TabItem } from '@/
 export { Placeholder } from '@/shell/kit';
 
 /** A failed query of Tasks (a 404 names the module). */
-export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
-  return <KitLoadError error={error} onRetry={onRetry} module="tasks" />;
+export function LoadError({
+  error,
+  onRetry,
+  notFound,
+}: {
+  error: unknown;
+  onRetry: () => void;
+  notFound?: string;
+}) {
+  return <KitLoadError error={error} onRetry={onRetry} module="tasks" notFound={notFound} />;
 }
 
 interface TasksFrameProps {
