@@ -222,8 +222,10 @@ helm --kube-context oci-k3s upgrade --install life-os-cpp-frontend ./helm/cpp-fr
 ```
 
 Release images are multi-arch (`linux/amd64` and `linux/arm64`), built
-natively per architecture by `release.yml` on `v*` tags and promoted only
-after a Trivy scan. Prod runs only these images. Alerts and what to do when they fire are in
+natively per architecture by `release.yml` on `v*` tags. The workflow
+refuses a tag that is not on `master` or whose commit has no green CI run,
+and promotes the images only after a Trivy scan and cosign signing. Prod
+runs only these images. Alerts and what to do when they fire are in
 [`docs/RUNBOOK.md`](docs/RUNBOOK.md); the production hardening checklist is in
 [`SECURITY.md`](SECURITY.md).
 

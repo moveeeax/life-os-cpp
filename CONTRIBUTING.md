@@ -122,9 +122,10 @@ The PR template covers:
 CI lives in `.github/workflows/` (GitHub Actions): build + tests, gitleaks,
 shellcheck, clang-format/clang-tidy, ASan+UBSan and TSan sanitizer builds, a
 runtime-smoke image check, helm-render, frontend checks, and the openapi-drift
-+ routes-registered + test-bucket + version-sync gates. (Spectral OpenAPI lint
-runs via pre-commit / `make lint-openapi`, not in CI.) Release images are
-Trivy-scanned and emit SBOM + provenance (`release.yml`).
++ routes-registered + test-bucket + version-sync + config-sync gates and the
+Spectral OpenAPI lint. Release images are Trivy-scanned (fixable CRITICAL and
+HIGH fail the release), signed with cosign, and emit SBOM + provenance
+(`release.yml`).
 
 ## Release
 
@@ -152,7 +153,14 @@ one edit can reach by hand (that is how three releases shipped with a stale
    builds the app, worker and frontend images, pushes them to
    `ghcr.io/<owner>/<repo>` (and `-worker` / `-frontend`) with the
    **unprefixed** version as the tag, and publishes a GitHub Release seeded
-   from auto-generated commit notes.
+   from auto-generated commit notes. The workflow refuses a tag whose commit
+   is not on `master`, and promotes nothing until the CI run of that commit
+   (the push run on `master`) has concluded success; tagging right after the
+   merge is fine, it waits. A manual `workflow_dispatch` rebuild of a version
+   GHCR already carries needs the `force` input. Tags `v*` cannot be moved or
+   deleted (repository ruleset).
+4. Deploy in the order API → worker → frontend (see `docs/RUNBOOK.md`,
+   "Upgrade order").
 
 `vcpkg.json`'s `version` is deliberately NOT part of a release — the
 Dockerfile keys the dependency-install layer on that manifest.
