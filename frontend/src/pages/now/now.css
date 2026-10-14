@@ -168,25 +168,11 @@
   }
 }
 
-/* The weather in place of the zone, and the Arrange link. */
+/* The weather in place of the zone. */
 .n-weather {
   color: var(--g-ink);
 }
 .n-glyph {
   font-size: 15px;
   line-height: 1;
-}
-.n-arrange {
-  margin-left: 10px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--g-ink-faint);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-.n-arrange:hover,
-.n-arrange:focus-visible {
-  color: var(--g-ink);
 }
