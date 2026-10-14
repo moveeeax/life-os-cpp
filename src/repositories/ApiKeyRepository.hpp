@@ -64,6 +64,17 @@ public:
             return !r.empty();
         });
     }
+
+    /// Soft-revoke every live key of @p user_id (password reset / change).
+    /// Returns how many keys were revoked.
+    long revoke_all_for_user(const std::string& user_id) {
+        return Database::get().execute_write([&](auto& txn) {
+            auto r = txn.exec_params(
+                "UPDATE api_keys SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL RETURNING id",
+                user_id);
+            return static_cast<long>(r.size());
+        });
+    }
 };
 
 }  // namespace Repositories

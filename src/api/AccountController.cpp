@@ -19,6 +19,7 @@
 #include "api/Validation.hpp"
 #include "database/Database.hpp"
 #include "email/AccountEmails.hpp"
+#include "repositories/ApiKeyRepository.hpp"
 #include "repositories/UserRepository.hpp"
 #include "security/Auth.hpp"
 #include "security/Password.hpp"
@@ -31,6 +32,7 @@ namespace Api {
 
 void AccountController::resendConfirm(const HttpRequestPtr& req,
                                       std::function<void(const HttpResponsePtr&)>&& callback) {
+    API_REFUSE_API_KEY(req, callback);
     API_REQUIRE_PRINCIPAL(req, callback, principal);
     try {
         Repositories::UserRepository repo;
@@ -124,6 +126,18 @@ void AccountController::applyReset(const HttpRequestPtr& req,
         callback(ErrorResponse::bad_request("invalid_token", "Reset link is invalid or has expired"));
         return;
     }
+    // The link is bound to the password it was issued against (the "pwf"
+    // claim): after any reset or password change, the other outstanding
+    // links stop working. A link without the claim is refused.
+    std::optional<Domain::User> user;
+    if (!with_repo_errors(callback, "applyReset lookup", [&] { user = Repositories::UserRepository().find(vr.sub); }))
+        return;
+    const auto pwf = vr.extra.find("pwf");
+    if (!user || pwf == vr.extra.end() || !pwf->is_string() ||
+        pwf->get<std::string>() != Security::Tokens::password_fingerprint(user->password_hash)) {
+        callback(ErrorResponse::bad_request("invalid_token", "Reset link is no longer valid"));
+        return;
+    }
     // One-shot: a captured reset link must not be replayable to set the
     // password a second time after the legitimate user used it.
     if (!consume_once(token, /*ttl_sec=*/3600)) {
@@ -133,17 +147,25 @@ void AccountController::applyReset(const HttpRequestPtr& req,
     with_repo_errors(callback, "applyReset", [&] {
         Repositories::UserRepository repo;
         const std::string new_hash = Security::Password::hash((*body)["new_password"].get<std::string>());
-        repo.update_password_hash(vr.sub, new_hash);
+        // Compare-and-set against the hash the link was checked with: two
+        // links redeemed at the same moment cannot both win.
+        if (!repo.replace_password_hash(vr.sub, user->password_hash, new_hash)) {
+            callback(ErrorResponse::bad_request("invalid_token", "Reset link is no longer valid"));
+            return;
+        }
         // Evict every existing session — a reset must lock out anyone
         // holding an old refresh token (incl. an attacker who triggered
         // the reset path). Best-effort; the new login mints a fresh one.
         Security::Sessions::revoke_all(Security::Auth::get().config().cookies, vr.sub);
+        // API keys too: whoever forced the reset may have minted one.
+        Repositories::ApiKeyRepository().revoke_all_for_user(vr.sub);
         callback(Response::ok({{"message", "Password updated"}}));
     });
 }
 
 void AccountController::requestChangeEmail(const HttpRequestPtr& req,
                                            std::function<void(const HttpResponsePtr&)>&& callback) {
+    API_REFUSE_API_KEY(req, callback);
     API_REQUIRE_PRINCIPAL(req, callback, principal);
     json body;
     if (!Validation::parse_body(req, body, callback))
@@ -239,6 +261,7 @@ void AccountController::joinFromInvite(const HttpRequestPtr& req,
 
 void AccountController::changePassword(const HttpRequestPtr& req,
                                        std::function<void(const HttpResponsePtr&)>&& callback) {
+    API_REFUSE_API_KEY(req, callback);
     API_REQUIRE_PRINCIPAL(req, callback, principal);
     json body;
     if (!Validation::parse_body(req, body, callback))
@@ -266,6 +289,7 @@ void AccountController::changePassword(const HttpRequestPtr& req,
         // will re-auth on its next refresh). Closes the "changed my
         // password but the thief stays logged in" gap.
         Security::Sessions::revoke_all(Security::Auth::get().config().cookies, user->id);
+        Repositories::ApiKeyRepository().revoke_all_for_user(user->id);
         callback(Response::ok({{"message", "Password updated"}}));
     } catch (const std::exception& e) {
         spdlog::error("changePassword failed: {}", e.what());

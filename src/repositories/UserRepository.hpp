@@ -145,6 +145,26 @@ public:
             detail::throw_on<DuplicateEmail>("23505"));
     }
 
+    /**
+     * @brief Set a new password hash only while the stored one still equals
+     *        @p expected_hash (nullopt = no password yet). False when the
+     *        hash moved on (another reset link or a password change won the
+     *        race) or the user is gone.
+     */
+    bool replace_password_hash(const std::string& id,
+                               const std::optional<std::string>& expected_hash,
+                               const std::string& new_hash) {
+        return Database::get().execute_write([&](auto& txn) {
+            auto r = txn.exec_params(
+                "UPDATE users SET password_hash = $1 "
+                "WHERE id = $2 AND password_hash IS NOT DISTINCT FROM $3 RETURNING id",
+                new_hash,
+                id,
+                expected_hash);
+            return !r.empty();
+        });
+    }
+
     void update_password_hash(const std::string& id, const std::string& new_hash) {
         Database::get().execute_write([&](auto& txn) {
             auto r = txn.exec_params("UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING id", new_hash, id);

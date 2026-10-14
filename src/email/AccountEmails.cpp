@@ -90,8 +90,12 @@ void deliver_now(const std::string& kind, const Domain::User& user, const std::s
         ctx["confirm_link"] = base_url() + "/account/confirm/" + token;
         render_and_send("confirm", "Confirm your account", user.email, ctx);
     } else if (kind == "reset_password") {
-        const auto token = Security::Tokens::issue(
-            master_secret(), user.id, Security::Tokens::Purpose::ResetPassword, std::chrono::hours(1));
+        const auto token =
+            Security::Tokens::issue(master_secret(),
+                                    user.id,
+                                    Security::Tokens::Purpose::ResetPassword,
+                                    std::chrono::hours(1),
+                                    json{{"pwf", Security::Tokens::password_fingerprint(user.password_hash)}});
         ctx["reset_link"] = base_url() + "/account/reset-password/" + token;
         render_and_send("reset_password", "Reset your password", user.email, ctx);
     } else if (kind == "change_email") {

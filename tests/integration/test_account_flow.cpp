@@ -22,8 +22,10 @@
 
 #include "api/AccountController.hpp"
 #include "api/AuthController.hpp"
+#include "repositories/ApiKeyRepository.hpp"
 #include "repositories/RoleRepository.hpp"
 #include "repositories/UserRepository.hpp"
+#include "security/ApiKeys.hpp"
 #include "security/Auth.hpp"
 #include "security/Password.hpp"
 #include "security/Tokens.hpp"
@@ -62,6 +64,15 @@ protected:
     }
 
     static HttpRequestPtr post_json(const json& body) { return TestHelpers::post_json(body); }
+
+    /// A reset link as AccountEmails builds it: bound to the current hash.
+    static std::string reset_token(const Domain::User& user) {
+        return Security::Tokens::issue(kSecret,
+                                       user.id,
+                                       Security::Tokens::Purpose::ResetPassword,
+                                       std::chrono::hours(1),
+                                       json{{"pwf", Security::Tokens::password_fingerprint(user.password_hash)}});
+    }
 
     HttpResponsePtr register_user(const std::string& email, const std::string& password) {
         HttpResponsePtr r;
@@ -147,8 +158,7 @@ TEST_F(AccountFlowTest, applyResetRotatesPasswordHash) {
     auto user = repo.find_by_email("d@example.com");
     const std::string old_hash = *user->password_hash;
 
-    auto token =
-        Security::Tokens::issue(kSecret, user->id, Security::Tokens::Purpose::ResetPassword, std::chrono::hours(1));
+    auto token = reset_token(*user);
     auto req = post_json({{"new_password", "newpassword42"}});
     HttpResponsePtr resp;
     account.applyReset(
@@ -163,12 +173,90 @@ TEST_F(AccountFlowTest, applyResetRotatesPasswordHash) {
     EXPECT_FALSE(Security::Password::verify("originalpass", *refreshed->password_hash));
 }
 
+TEST_F(AccountFlowTest, usedResetLinkInvalidatesTheOthers) {
+    ASSERT_EQ(register_user("two-links@example.com", "originalpass")->statusCode(), k201Created);
+    Repositories::UserRepository repo;
+    auto user = repo.find_by_email("two-links@example.com");
+    ASSERT_TRUE(user.has_value());
+    // Two reset emails requested before either was used. Issued a second
+    // apart in spirit; the extra claim keeps the tokens distinct.
+    const auto first = reset_token(*user);
+    const auto second =
+        Security::Tokens::issue(kSecret,
+                                user->id,
+                                Security::Tokens::Purpose::ResetPassword,
+                                std::chrono::hours(2),
+                                json{{"pwf", Security::Tokens::password_fingerprint(user->password_hash)}});
+    ASSERT_NE(first, second);
+
+    HttpResponsePtr r1, r2;
+    account.applyReset(
+        post_json({{"new_password", "firstnewpass"}}), [&](const HttpResponsePtr& r) { r1 = r; }, first);
+    ASSERT_NE(r1, nullptr);
+    EXPECT_EQ(r1->statusCode(), k200OK);
+
+    account.applyReset(
+        post_json({{"new_password", "secondnewpass"}}), [&](const HttpResponsePtr& r) { r2 = r; }, second);
+    ASSERT_NE(r2, nullptr);
+    EXPECT_EQ(r2->statusCode(), k400BadRequest);
+    auto refreshed = repo.find(user->id);
+    EXPECT_TRUE(Security::Password::verify("firstnewpass", *refreshed->password_hash));
+}
+
+TEST_F(AccountFlowTest, resetLinkWithoutPasswordBindingIsRefused) {
+    ASSERT_EQ(register_user("unbound@example.com", "originalpass")->statusCode(), k201Created);
+    Repositories::UserRepository repo;
+    auto user = repo.find_by_email("unbound@example.com");
+    const auto token =
+        Security::Tokens::issue(kSecret, user->id, Security::Tokens::Purpose::ResetPassword, std::chrono::hours(1));
+    HttpResponsePtr resp;
+    account.applyReset(
+        post_json({{"new_password", "newpassword42"}}), [&](const HttpResponsePtr& r) { resp = r; }, token);
+    ASSERT_NE(resp, nullptr);
+    EXPECT_EQ(resp->statusCode(), k400BadRequest);
+}
+
+TEST_F(AccountFlowTest, passwordResetAndChangeRevokeApiKeys) {
+    ASSERT_EQ(register_user("keys-reset@example.com", "originalpass")->statusCode(), k201Created);
+    Repositories::UserRepository repo;
+    auto user = repo.find_by_email("keys-reset@example.com");
+    ASSERT_TRUE(user.has_value());
+    Repositories::ApiKeyRepository keys;
+    auto gen = Security::ApiKeys::generate();
+    keys.create(user->id, "before-reset", gen.key_hash, gen.prefix);
+
+    HttpResponsePtr resp;
+    account.applyReset(
+        post_json({{"new_password", "newpassword42"}}),
+        [&](const HttpResponsePtr& r) { resp = r; },
+        reset_token(*user));
+    ASSERT_NE(resp, nullptr);
+    ASSERT_EQ(resp->statusCode(), k200OK);
+    auto req = HttpRequest::newHttpRequest();
+    req->addHeader("X-API-Key", gen.plaintext);
+    EXPECT_FALSE(Security::ApiKeys::authenticate(req).has_value()) << "reset must revoke API keys";
+
+    // changePassword does the same.
+    auto gen2 = Security::ApiKeys::generate();
+    keys.create(user->id, "before-change", gen2.key_hash, gen2.prefix);
+    Security::Auth::AuthPrincipal p;
+    p.subject = user->id;
+    HttpResponsePtr changed;
+    account.changePassword(
+        TestHelpers::authed_json(p, {{"old_password", "newpassword42"}, {"new_password", "thirdpassword9"}}),
+        [&](const HttpResponsePtr& r) { changed = r; });
+    ASSERT_NE(changed, nullptr);
+    ASSERT_EQ(changed->statusCode(), k200OK) << changed->body();
+    auto req2 = HttpRequest::newHttpRequest();
+    req2->addHeader("X-API-Key", gen2.plaintext);
+    EXPECT_FALSE(Security::ApiKeys::authenticate(req2).has_value()) << "password change must revoke API keys";
+}
+
 TEST_F(AccountFlowTest, applyResetRefusesShortPassword) {
     ASSERT_EQ(register_user("e@example.com", "originalpass")->statusCode(), k201Created);
     Repositories::UserRepository repo;
     auto user = repo.find_by_email("e@example.com");
-    auto token =
-        Security::Tokens::issue(kSecret, user->id, Security::Tokens::Purpose::ResetPassword, std::chrono::hours(1));
+    auto token = reset_token(*user);
     auto req = post_json({{"new_password", "abc"}});
     HttpResponsePtr resp;
     account.applyReset(
@@ -230,8 +318,7 @@ TEST_F(AccountFlowTest, applyResetRejectsReplay) {
     ASSERT_EQ(register_user("replay-reset@example.com", "originalpass")->statusCode(), k201Created);
     Repositories::UserRepository repo;
     auto user = repo.find_by_email("replay-reset@example.com");
-    auto token =
-        Security::Tokens::issue(kSecret, user->id, Security::Tokens::Purpose::ResetPassword, std::chrono::hours(1));
+    auto token = reset_token(*user);
 
     HttpResponsePtr first, second;
     account.applyReset(
