@@ -99,7 +99,7 @@ export function DayPanel({ today, date, hour }: { today: Today; date: string; ho
           <span className="c-r">
             <span className="num">{n0.format(m.net_worth.total)}</span> {m.net_worth.currency}
             {m.net_worth.partial ? ' · partial' : ''} · rates of{' '}
-            {rateDay(m.net_worth.rate_date, new Date().toISOString().slice(0, 10))}
+            {rateDay(m.net_worth.rate_date, date)}
           </span>
         </Link>
       )}
