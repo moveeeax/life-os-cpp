@@ -119,4 +119,11 @@ inline bool travel_enabled() {
     return Config::get().get<bool>("travel.enabled", "TRAVEL_ENABLED", false);
 }
 
+/// Notes module master switch — same pattern as travel_enabled().
+inline bool notes_enabled() {
+    if (!Config::is_initialized())
+        return false;
+    return Config::get().get<bool>("notes.enabled", "NOTES_ENABLED", false);
+}
+
 }  // namespace Core

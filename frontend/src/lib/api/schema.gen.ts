@@ -9981,6 +9981,276 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's notes, newest first, with the topics and tags in use */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Over the title, the summary and the body */
+                    q?: string;
+                    topic?: string;
+                    tag?: string;
+                    project?: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The notes without their bodies, and the facets over all the caller's notes */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Note"][];
+                            total: number;
+                            topics: components["schemas"]["NoteFacet"][];
+                            tags: components["schemas"]["NoteFacet"][];
+                        };
+                    };
+                };
+                /** @description Bad query */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Notes module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Add a note */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["NoteInput"];
+                };
+            };
+            responses: {
+                /** @description The note */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Note"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Notes module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Another note of the caller has this slug (slug_taken) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** One note with its body */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The note */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Note"];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Notes module disabled, or not the caller's note */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete a note */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Notes module disabled, or not the caller's note */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Edit a note (the fields given) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["NoteInput"];
+                };
+            };
+            responses: {
+                /** @description The note */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Note"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Notes module disabled, or not the caller's note */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Another note of the caller has this slug (slug_taken) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
     "/api/v1/tasks/projects": {
         parameters: {
             query?: never;
@@ -15722,6 +15992,63 @@ export interface components {
         TaskArea: "finance" | "health" | "travel" | "growth" | "relationships" | "projects";
         /** @enum {string|null} */
         TaskEffort: "5min" | "30min" | "deep" | null;
+        /** @description A private Markdown note with the fields of a tarassov.me blog post (slug, title, summary, body, status, topic, tags, published_at); the list leaves the body out */
+        Note: {
+            /** Format: uuid */
+            id: string;
+            slug: string;
+            title: string;
+            summary: string;
+            /** @description Markdown; in the answer of one note only */
+            body?: string;
+            /**
+             * @description private for now
+             * @enum {string}
+             */
+            status: "private" | "published";
+            topic: string;
+            tags: string[];
+            /** Format: uuid */
+            project_id: string | null;
+            /** Format: uuid */
+            task_id: string | null;
+            project_title: string | null;
+            /** @enum {string|null} */
+            project_kind: "project" | "course" | null;
+            /** Format: date-time */
+            published_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        NoteInput: {
+            /** @description Required on create */
+            title?: string;
+            /** @description Made from the title when not given */
+            slug?: string;
+            summary?: string;
+            body?: string;
+            topic?: string;
+            tags?: string[];
+            /** @enum {string} */
+            status?: "private";
+            /**
+             * Format: uuid
+             * @description A project or course of the caller
+             */
+            project_id?: string | null;
+            /**
+             * Format: uuid
+             * @description A task of the caller
+             */
+            task_id?: string | null;
+        };
+        NoteFacet: {
+            topic?: string;
+            tag?: string;
+            count: number;
+        };
         /** @description A project groups tasks; a course (kind course) is a project of Learning with a platform and dates */
         Project: {
             /** Format: uuid */

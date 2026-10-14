@@ -483,6 +483,45 @@ components:
     TaskEffort:
       type: [string, 'null']
       enum: ['5min', '30min', deep, null]
+    Note:
+      type: object
+      required: [id, slug, title, summary, status, topic, tags, project_id, task_id, project_title, project_kind, published_at, created_at, updated_at]
+      description: 'A private Markdown note with the fields of a tarassov.me blog post (slug, title, summary, body, status, topic, tags, published_at); the list leaves the body out'
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        title: { type: string }
+        summary: { type: string }
+        body: { type: string, description: Markdown; in the answer of one note only }
+        status: { type: string, enum: [private, published], description: private for now }
+        topic: { type: string }
+        tags: { type: array, items: { type: string } }
+        project_id: { type: [string, 'null'], format: uuid }
+        task_id: { type: [string, 'null'], format: uuid }
+        project_title: { type: [string, 'null'] }
+        project_kind: { type: [string, 'null'], enum: [project, course, null] }
+        published_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    NoteInput:
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200, description: Required on create }
+        slug: { type: string, maxLength: 120, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$', description: Made from the title when not given }
+        summary: { type: string, maxLength: 500 }
+        body: { type: string, maxLength: 200000 }
+        topic: { type: string, maxLength: 60 }
+        tags: { type: array, maxItems: 20, items: { type: string, minLength: 1, maxLength: 40, description: No comma } }
+        status: { type: string, enum: [private] }
+        project_id: { type: [string, 'null'], format: uuid, description: A project or course of the caller }
+        task_id: { type: [string, 'null'], format: uuid, description: A task of the caller }
+    NoteFacet:
+      type: object
+      required: [count]
+      properties:
+        topic: { type: string }
+        tag: { type: string }
+        count: { type: integer }
     Project:
       type: object
       required: [id, kind, name, code, description, link, status, platform, starts_on, ends_on, certificate, position, open, done, next, created_at, updated_at]
@@ -7062,6 +7101,107 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/notes:
+    get:
+      summary: The caller's notes, newest first, with the topics and tags in use
+      tags: [notes]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: 'Over the title, the summary and the body' }
+        - { name: topic, in: query, schema: { type: string } }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: project, in: query, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200':
+          description: The notes without their bodies, and the facets over all the caller's notes
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, total, topics, tags]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Note' } }
+                  total: { type: integer }
+                  topics: { type: array, items: { $ref: '#/components/schemas/NoteFacet' } }
+                  tags: { type: array, items: { $ref: '#/components/schemas/NoteFacet' } }
+        '400': { description: Bad query }
+        '401': { description: Not authenticated }
+        '404': { description: Notes module disabled }
+    post:
+      summary: Add a note
+      tags: [notes]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NoteInput' }
+      responses:
+        '201':
+          description: The note
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Note' }
+        '400': { description: Validation failed }
+        '401': { description: Not authenticated }
+        '404': { description: Notes module disabled }
+        '409': { description: Another note of the caller has this slug (slug_taken) }
+  /api/v1/notes/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: One note with its body
+      tags: [notes]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The note
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Note' }
+        '401': { description: Not authenticated }
+        '404': { description: 'Notes module disabled, or not the caller''s note' }
+    patch:
+      summary: Edit a note (the fields given)
+      tags: [notes]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NoteInput' }
+      responses:
+        '200':
+          description: The note
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Note' }
+        '400': { description: Validation failed }
+        '401': { description: Not authenticated }
+        '404': { description: 'Notes module disabled, or not the caller''s note' }
+        '409': { description: Another note of the caller has this slug (slug_taken) }
+    delete:
+      summary: Delete a note
+      tags: [notes]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '401': { description: Not authenticated }
+        '404': { description: 'Notes module disabled, or not the caller''s note' }
   /api/v1/tasks/projects:
     get:
       summary: Projects and courses with their task counts and the next open task

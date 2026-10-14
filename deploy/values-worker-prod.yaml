@@ -82,6 +82,9 @@ goals:
 travel:
   enabled: true
 
+notes:
+  enabled: true
+
 now:
   enabled: true
 

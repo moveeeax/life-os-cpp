@@ -199,6 +199,12 @@ travel:
   enabled: false
 
 # ---------------------------------------------------------------
+# notes module — keep in sync with the life-os-cpp chart. Env var set: NOTES_ENABLED
+# ---------------------------------------------------------------
+notes:
+  enabled: false
+
+# ---------------------------------------------------------------
 # now module — keep in sync with the life-os-cpp chart. Env var set: NOW_ENABLED
 # ---------------------------------------------------------------
 now:

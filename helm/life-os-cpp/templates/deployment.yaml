@@ -224,6 +224,9 @@ spec:
             # travel module — master switch
             - name: TRAVEL_ENABLED
               value: {{ .Values.travel.enabled | quote }}
+            # notes module — master switch
+            - name: NOTES_ENABLED
+              value: {{ .Values.notes.enabled | quote }}
             # now module — master switch
             - name: NOW_ENABLED
               value: {{ .Values.now.enabled | quote }}
