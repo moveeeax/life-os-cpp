@@ -1,47 +1,36 @@
 #!/usr/bin/env bash
 #
-# Scaffold a new React page and wire it into the routes manifest.
-#
-# Mirror of scripts/new-endpoint.sh in spirit: one command creates the
-# file, registers it in the single source of truth (the routes manifest,
-# which feeds both App.tsx routing and Nav.tsx links), and optionally
-# scaffolds a zod schema + a query-key branch.
+# Scaffold a section page on the glass shell, built from the kit
+# (frontend/src/shell/kit), and wire it into the routes manifest the way the
+# habits and notes pages are wired: a lazy import plus a RouteEntry with
+# layout 'shell'.
 #
 # Usage:
 #   ./scripts/new-react-page.sh [flags] <PageName> <route-path>
 #
 # Examples:
-#   ./scripts/new-react-page.sh Reports /reports
-#   ./scripts/new-react-page.sh --guard admin --nav "Reports" Reports /admin/reports
-#   ./scripts/new-react-page.sh --guard confirmed --schema reports --query reports Billing /account/billing
+#   ./scripts/new-react-page.sh ReadingList /reading
+#   ./scripts/new-react-page.sh --query reading ReadingBook /reading/:id
 #
 # Arguments:
-#   PageName      PascalCase component stem. The component is exported as
-#                 <PageName>Page and the file is src/pages/<PageName>.tsx
-#                 (or src/pages/admin/<PageName>.tsx for --guard admin).
-#   route-path    The URL path, e.g. /reports or /admin/reports/:id.
+#   PageName      PascalCase component stem; the component is <PageName>Page.
+#   route-path    The URL path. Its first segment names the section folder:
+#                 /reading/:id -> src/pages/reading/<PageName>.tsx.
 #
 # Flags:
-#   --guard <g>      public|auth|confirmed|admin  (default: public)
-#   --nav <label>    Add this page to the top nav with <label>. Routes with
-#                    a :param segment refuse --nav (they can't be linked).
-#   --schema <area>  Append an empty zod schema to src/lib/schemas/<area>.ts
-#                    (created if missing) named <pageName>Schema.
+#   --guard <g>      public|auth|confirmed|admin (default: confirmed, as every
+#                    section of the shell).
 #   --query <name>   Append a query-key branch qk.<name> to
-#                    src/lib/api/queryKeys.ts (top-level, after `me`).
+#                    src/lib/api/queryKeys.ts (after `me`).
 #   --force          Overwrite the page file if it already exists.
 #
-# What it does:
-#   1. Creates src/pages[/admin]/<PageName>.tsx with a Card stub.
-#   2. Inserts a RouteEntry into src/routes/manifest.tsx (import + array row).
-#   3. (--schema) Appends a zod schema stub.
-#   4. (--query)  Appends a query-key branch.
+# The page opens with the kit's SectionFrame (eyebrow, headline, one line) and
+# a Placeholder; LoadError is imported ready for the first query. A new section
+# also needs its entry in src/shell/sections.ts for the glass nav.
 #
 set -euo pipefail
 
-GUARD="public"
-NAV_LABEL=""
-SCHEMA_AREA=""
+GUARD="confirmed"
 QUERY_NAME=""
 FORCE=0
 ARGS=()
@@ -50,14 +39,6 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
     --guard)
         GUARD="${2:-}"
-        shift 2
-        ;;
-    --nav)
-        NAV_LABEL="${2:-}"
-        shift 2
-        ;;
-    --schema)
-        SCHEMA_AREA="${2:-}"
         shift 2
         ;;
     --query)
@@ -69,7 +50,7 @@ while [[ $# -gt 0 ]]; do
         shift
         ;;
     --help | -h)
-        sed -n '2,45p' "$0"
+        sed -n '2,30p' "$0"
         exit 0
         ;;
     -*)
@@ -85,13 +66,17 @@ done
 
 if [[ ${#ARGS[@]} -lt 2 ]]; then
     echo "Usage: $0 [flags] <PageName> <route-path>" >&2
-    echo "Example: $0 --guard admin --nav Reports Reports /admin/reports" >&2
+    echo "Example: $0 ReadingList /reading" >&2
     exit 1
 fi
 
 PAGE_NAME="${ARGS[0]}"
 ROUTE="${ARGS[1]}"
 
+[[ "$PAGE_NAME" =~ ^[A-Z][A-Za-z0-9]*$ ]] || {
+    echo "ERROR: PageName must be PascalCase, got '$PAGE_NAME'" >&2
+    exit 2
+}
 case "$GUARD" in
 public | auth | confirmed | admin) ;;
 *)
@@ -99,157 +84,102 @@ public | auth | confirmed | admin) ;;
     exit 2
     ;;
 esac
-
 if [[ "$ROUTE" != /* ]]; then
     echo "ERROR: route-path must start with '/', got '$ROUTE'" >&2
     exit 2
 fi
 
-# A :param route can never be a nav link — nav links need a concrete URL.
-if [[ -n "$NAV_LABEL" && "$ROUTE" == *":"* ]]; then
-    echo "ERROR: --nav cannot be used with a route that has a ':param' segment" >&2
+AREA="$(printf '%s' "$ROUTE" | cut -d/ -f2)"
+[[ "$AREA" =~ ^[a-z][a-z0-9-]*$ ]] || {
+    echo "ERROR: the first segment of '$ROUTE' must be a lower-case section name" >&2
     exit 2
-fi
-
-# camelCase form of the PascalCase page name (Reports -> reports), used for
-# the schema export name.
-CAMEL_NAME="$(printf '%s' "$PAGE_NAME" | cut -c1 | tr '[:upper:]' '[:lower:]')$(printf '%s' "$PAGE_NAME" | cut -c2-)"
+}
+# "reading-list" -> "Reading list" for the eyebrow.
+EYEBROW="$(printf '%s' "$AREA" | tr '-' ' ')"
+EYEBROW="$(printf '%s' "$EYEBROW" | cut -c1 | tr '[:lower:]' '[:upper:]')$(printf '%s' "$EYEBROW" | cut -c2-)"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FRONTEND="$ROOT/frontend"
 MANIFEST="$FRONTEND/src/routes/manifest.tsx"
-
-if [[ ! -f "$MANIFEST" ]]; then
+[[ -f "$MANIFEST" ]] || {
     echo "ERROR: routes manifest not found at $MANIFEST" >&2
     exit 1
-fi
+}
 
-# Admin pages live under src/pages/admin/ and are imported with the Admin
-# prefix to match the existing convention (AdminUsersPage, etc.).
-if [[ "$GUARD" == "admin" ]]; then
-    PAGE_DIR="$FRONTEND/src/pages/admin"
-    COMPONENT="Admin${PAGE_NAME}Page"
-    IMPORT_PATH="@/pages/admin/${PAGE_NAME}"
-else
-    PAGE_DIR="$FRONTEND/src/pages"
-    COMPONENT="${PAGE_NAME}Page"
-    IMPORT_PATH="@/pages/${PAGE_NAME}"
-fi
+COMPONENT="${PAGE_NAME}Page"
+PAGE_DIR="$FRONTEND/src/pages/${AREA}"
 PAGE_FILE="$PAGE_DIR/${PAGE_NAME}.tsx"
+IMPORT_PATH="@/pages/${AREA}/${PAGE_NAME}"
 
-# ── 1. Create the page file ─────────────────────────────────────────────
+# ── 1. The page ─────────────────────────────────────────────────────────
 mkdir -p "$PAGE_DIR"
 if [[ -f "$PAGE_FILE" && "$FORCE" -ne 1 ]]; then
     echo "==> $PAGE_FILE already exists — skipping (use --force to overwrite)"
 else
     cat >"$PAGE_FILE" <<EOF
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Placeholder, SectionFrame } from '@/shell/kit';
 
 /**
- * ${COMPONENT} — generated by scripts/new-react-page.sh.
- * Route: ${ROUTE} (guard: ${GUARD})
+ * ${COMPONENT}: ${ROUTE} (guard: ${GUARD}), generated by scripts/new-react-page.sh.
+ * Lists stay calm: a title and a date per row, details on click. A failed
+ * query renders <LoadError error={...} onRetry={...} module="${AREA}" /> from
+ * '@/shell/kit'.
  */
 export function ${COMPONENT}() {
   return (
-    <div className="container mx-auto max-w-2xl py-12">
-      <Card>
-        <CardHeader>
-          <CardTitle>${PAGE_NAME}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">TODO: build the ${PAGE_NAME} page.</p>
-        </CardContent>
-      </Card>
-    </div>
+    <SectionFrame eyebrow="${EYEBROW}" headline="${PAGE_NAME}" sub="Nothing here yet.">
+      <Placeholder />
+    </SectionFrame>
   );
 }
 EOF
     echo "==> Created $PAGE_FILE"
 fi
 
-# ── 2. Wire into the routes manifest ────────────────────────────────────
+# ── 2. The routes manifest: a lazy import and a shell route ─────────────
 if grep -qF "path: '${ROUTE}'" "$MANIFEST"; then
     echo "==> manifest already has a route for ${ROUTE} — skipping manifest edit"
 else
-    # 2a. Add the import after the last existing page import line.
-    IMPORT_LINE="import { ${COMPONENT} } from '${IMPORT_PATH}';"
-    if ! grep -qF "$IMPORT_LINE" "$MANIFEST"; then
-        awk -v imp="$IMPORT_LINE" '
-            /^import .* from .@\/pages\// { last = NR }
-            { lines[NR] = $0 }
-            END {
-                for (i = 1; i <= NR; i++) {
-                    print lines[i]
-                    if (i == last) print imp
-                }
-            }
-        ' "$MANIFEST" >"$MANIFEST.tmp" && mv "$MANIFEST.tmp" "$MANIFEST"
-    fi
+    python3 - "$MANIFEST" "$COMPONENT" "$IMPORT_PATH" "$ROUTE" "$GUARD" <<'PY'
+import re
+import sys
 
-    # 2b. Build the RouteEntry row.
-    ROW="  { path: '${ROUTE}', element: <${COMPONENT} />, guard: '${GUARD}'"
-    if [[ -n "$NAV_LABEL" ]]; then
-        ROW="${ROW}, navLabel: '${NAV_LABEL}'"
-    fi
-    ROW="${ROW} },"
+path, component, import_path, route, guard = sys.argv[1:]
+text = open(path, encoding="utf-8").read()
 
-    # Insert the row just before the closing '];' of `export const routes`.
-    awk -v row="$ROW" '
-        /^export const routes/ { in_routes = 1 }
-        in_routes && /^\];/ && !done { print row; done = 1 }
-        { print }
-    ' "$MANIFEST" >"$MANIFEST.tmp" && mv "$MANIFEST.tmp" "$MANIFEST"
+lazy = (f"const {component} = lazy(() =>\n"
+        f"  import('{import_path}').then((m) => ({{ default: m.{component} }})),\n"
+        f");\n")
+if f"const {component} = lazy(" not in text:
+    # After the last top-level lazy page constant.
+    last = None
+    for m in re.finditer(r"^const \w+ = lazy\(.*?\);\n", text, re.M | re.S):
+        last = m
+    if last is None:
+        sys.exit(f"ERROR: no lazy page constant in {path}; add the import by hand")
+    text = text[: last.end()] + lazy + text[last.end():]
 
-    if grep -qF "path: '${ROUTE}'" "$MANIFEST"; then
-        echo "==> Added route ${ROUTE} (guard: ${GUARD}) to manifest"
-    else
-        echo "ERROR: failed to insert the manifest row — add it by hand in $MANIFEST" >&2
-        exit 1
-    fi
+row = f"  {{ path: '{route}', element: <{component} />, guard: '{guard}', layout: 'shell' }},\n"
+start = text.find("export const routes")
+end = text.find("\n];", start)
+if start < 0 or end < 0:
+    sys.exit(f"ERROR: `export const routes` not found in {path}; add the route by hand")
+text = text[: end + 1] + row + text[end + 1:]
+open(path, "w", encoding="utf-8").write(text)
+PY
+    echo "==> Added route ${ROUTE} (guard: ${GUARD}, layout: shell) to the manifest"
 fi
 
-# ── 3. Optional zod schema ──────────────────────────────────────────────
-if [[ -n "$SCHEMA_AREA" ]]; then
-    SCHEMA_FILE="$FRONTEND/src/lib/schemas/${SCHEMA_AREA}.ts"
-    SCHEMA_NAME="${CAMEL_NAME}Schema"
-    VALUES_NAME="${PAGE_NAME}Values"
-    if [[ ! -f "$SCHEMA_FILE" ]]; then
-        cat >"$SCHEMA_FILE" <<EOF
-import { z } from 'zod';
-
-/**
- * ${SCHEMA_AREA} form schemas. zod is the source of truth on the client;
- * the backend re-validates on every request.
- */
-EOF
-        echo "==> Created $SCHEMA_FILE"
-    fi
-    if grep -qE "export const ${SCHEMA_NAME}\b" "$SCHEMA_FILE"; then
-        echo "==> $SCHEMA_FILE already exports ${SCHEMA_NAME} — skipping"
-    else
-        cat >>"$SCHEMA_FILE" <<EOF
-
-export const ${SCHEMA_NAME} = z.object({
-  // TODO: add fields mirroring the backend validation.
-});
-
-export type ${VALUES_NAME} = z.infer<typeof ${SCHEMA_NAME}>;
-EOF
-        echo "==> Appended ${SCHEMA_NAME} to $SCHEMA_FILE"
-    fi
-fi
-
-# ── 4. Optional query-key branch ────────────────────────────────────────
+# ── 3. Optional query-key branch ────────────────────────────────────────
 if [[ -n "$QUERY_NAME" ]]; then
     QK_FILE="$FRONTEND/src/lib/api/queryKeys.ts"
-    if [[ ! -f "$QK_FILE" ]]; then
+    [[ -f "$QK_FILE" ]] || {
         echo "ERROR: query keys file not found at $QK_FILE" >&2
         exit 1
-    fi
+    }
     if grep -qE "^  ${QUERY_NAME}:" "$QK_FILE"; then
         echo "==> qk.${QUERY_NAME} already exists — skipping"
     else
-        # Insert a branch right after the `me: () => ...` line.
         BRANCH="  ${QUERY_NAME}: (id?: string) =>\n    id === undefined ? (['${QUERY_NAME}'] as const) : (['${QUERY_NAME}', id] as const),"
         awk -v branch="$BRANCH" '
             { print }
@@ -268,4 +198,5 @@ if [[ -n "$QUERY_NAME" ]]; then
     fi
 fi
 
-echo "==> Done. Next: fill in $PAGE_FILE, then run 'npm run typecheck' in frontend/."
+echo "==> Done. Next: add the section to src/shell/sections.ts if it is new, fill in"
+echo "    $PAGE_FILE, then run 'npx tsc -b && npx prettier --write' in frontend/."
