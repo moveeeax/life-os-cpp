@@ -5017,6 +5017,8 @@ paths:
       summary: Goals profile, the weight it uses and the computed daily targets
       tags: [food]
       security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the age behind the targets is counted on today there' }
       responses:
         '200':
           description: The goals
@@ -5042,6 +5044,8 @@ paths:
       summary: Replace the goals profile
       tags: [food]
       security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the age behind the targets is counted on today there' }
       requestBody:
         required: true
         content:
@@ -5344,7 +5348,8 @@ paths:
       tags: [food]
       security: [{ BearerAuth: [] }]
       parameters:
-        - { name: date, in: query, schema: { type: string, format: date }, description: Defaults to today (UTC) }
+        - { name: date, in: query, schema: { type: string, format: date }, description: 'The local day; today in tz by default' }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there' }
       responses:
         '200':
           description: The day
@@ -5382,6 +5387,7 @@ paths:
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the age behind the targets is counted on today there' }
       responses:
         '200':
           description: The week
@@ -5664,7 +5670,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '404':
-          description: Food module disabled, or the job is not the caller's
+          description: Food module disabled, or the job is not the caller's (parse_job)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -6407,7 +6413,7 @@ paths:
           description: The rows
           content:
             application/json:
-              schema: { type: object, required: [data, count], properties: { data: { type: array, items: { $ref: '#/components/schemas/MoneyTransfer' } }, count: { type: integer } } }
+              schema: { type: object, required: [data, count, total], properties: { data: { type: array, items: { $ref: '#/components/schemas/MoneyTransfer' } }, count: { type: integer, description: Rows in this page }, total: { type: integer, description: Rows matching the filter, for paging } } }
         '400':
           description: A bad filter
           content:
@@ -6645,8 +6651,9 @@ paths:
       tags: [money]
       security: [{ BearerAuth: [] }]
       parameters:
-        - { name: date, in: query, schema: { type: string, format: date }, description: Defaults to today (UTC) }
+        - { name: date, in: query, schema: { type: string, format: date }, description: 'The local day; today in tz by default' }
         - { name: quote, in: query, required: true, schema: { type: string, pattern: '^[A-Z]{3}$' } }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there' }
       responses:
         '200':
           description: The rate
@@ -6683,7 +6690,8 @@ paths:
         - { name: amount, in: query, required: true, schema: { type: number } }
         - { name: from, in: query, required: true, schema: { type: string, pattern: '^[A-Z]{3}$' } }
         - { name: to, in: query, required: true, schema: { type: string, pattern: '^[A-Z]{3}$' } }
-        - { name: date, in: query, schema: { type: string, format: date } }
+        - { name: date, in: query, schema: { type: string, format: date }, description: 'The local day; today in tz by default' }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there' }
       responses:
         '200':
           description: The number
@@ -6957,7 +6965,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '404':
-          description: Money module disabled, or the job is not the caller's
+          description: Money module disabled, or the job is not the caller's (parse_job)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -6995,7 +7003,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '404':
-          description: Money module disabled, or the job is not the caller's
+          description: Money module disabled, or the job is not the caller's (parse_job)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -7070,11 +7078,13 @@ paths:
       summary: Ask for a review of the week, month or quarter containing a day (once per period; a failed one is queued again)
       tags: [money]
       security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there' }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, properties: { period: { type: string, enum: [week, month, quarter], default: week }, date: { type: string, format: date, description: A day of the period; defaults to today (UTC) } } }
+            schema: { type: object, properties: { period: { type: string, enum: [week, month, quarter], default: week }, date: { type: string, format: date, description: 'A day of the period; today in tz by default' } } }
       responses:
         '202':
           description: Queued
@@ -7400,11 +7410,12 @@ paths:
       tags: [tasks]
       security: [{ BearerAuth: [] }]
       parameters:
-        - { name: status, in: query, schema: { type: string, enum: [open, done] } }
+        - { name: status, in: query, schema: { type: string, enum: [open, in_progress, done] } }
         - { name: area, in: query, schema: { $ref: '#/components/schemas/TaskArea' } }
         - { name: q, in: query, schema: { type: string }, description: Over the title and the next step }
         - { name: due_to, in: query, schema: { type: string, format: date } }
-        - { name: done_since, in: query, schema: { type: string, format: date } }
+        - { name: done_since, in: query, schema: { type: string, format: date }, description: 'Tasks completed on or after this day, read in tz' }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the day done_since starts in' }
         - { name: trip, in: query, schema: { type: string, format: uuid }, description: The tasks of one trip (packing) }
         - { name: project, in: query, schema: { type: string, format: uuid }, description: The tasks of one project or course }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
@@ -7416,7 +7427,7 @@ paths:
             application/json:
               schema: { type: object, required: [data, total, limit, offset], properties: { data: { type: array, items: { $ref: '#/components/schemas/Task' } }, total: { type: integer }, limit: { type: integer }, offset: { type: integer } } }
         '400':
-          description: A filter is not a known value or day (invalid_query)
+          description: A filter is not a known value, day or zone (invalid_query)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -7816,7 +7827,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '404':
-          description: Tasks module disabled, or the row is not the caller's
+          description: Tasks module disabled, or the job is not the caller's (parse_job)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -7856,7 +7867,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '404':
-          description: Tasks module disabled, or the row is not the caller's
+          description: Tasks module disabled, or the job is not the caller's (parse_job)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -8047,11 +8058,13 @@ paths:
       summary: A check-in of a number goal; a second one for the same date replaces the first
       tags: [goals]
       security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there' }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [value], properties: { value: { type: number }, date: { type: string, format: date, description: Defaults to today in UTC }, note: { type: string, maxLength: 200 } } }
+            schema: { type: object, required: [value], properties: { value: { type: number }, date: { type: string, format: date, description: 'The local day; today in tz by default' }, note: { type: string, maxLength: 200 } } }
       responses:
         '201':
           description: The check-in
@@ -8688,7 +8701,8 @@ paths:
       parameters:
         - { name: currency, in: query, schema: { type: string, default: USD }, description: 'ISO code of the target currency' }
         - { name: days, in: query, schema: { type: integer, enum: [30, 90, 365], default: 90 } }
-        - { name: date, in: query, schema: { type: string, format: date }, description: 'The last day; today in UTC by default' }
+        - { name: date, in: query, schema: { type: string, format: date }, description: 'The last day; today in tz by default' }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there' }
       responses:
         '200':
           description: The summary

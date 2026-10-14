@@ -262,6 +262,38 @@ TEST_F(MoneyAdvisorJobTest, AReviewWhoseWorkerDiedReadsFailedAndCanBeAskedAgain)
     EXPECT_EQ(requeued_row["status"], "queued");
 }
 
+TEST_F(MoneyAdvisorJobTest, AReviewTheQueueLostReadsFailedAndCanBeAskedAgain) {
+    const auto [row, queued] = reports.create_or_get(kAnna, "month", "2026-09-01", "2026-09-30");
+    ASSERT_TRUE(queued);
+    const auto backdate = [&] {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params(
+                "UPDATE money_advisor_reports SET created_at = now() - interval '11 minutes', "
+                " started_at = CASE WHEN started_at IS NULL THEN NULL ELSE now() - interval '11 minutes' END "
+                "WHERE id = $1::uuid",
+                row["id"].get<std::string>());
+            return true;
+        });
+    };
+    backdate();
+    const json polled = *reports.get(kAnna, row["id"]);
+    EXPECT_EQ(polled["status"], "failed") << "a review nobody ever picked must not read queued forever";
+    EXPECT_EQ(polled["error"].get<std::string>().rfind("queue_lost", 0), 0u) << polled.dump();
+    EXPECT_EQ(reports.list(kAnna, 10)[0]["status"], "failed");
+
+    // Run now queues it again, with a fresh clock, so it reads queued.
+    const auto [requeued_row, requeued] = reports.create_or_get(kAnna, "month", "2026-09-01", "2026-09-30");
+    EXPECT_TRUE(requeued);
+    EXPECT_EQ(requeued_row["status"], "queued");
+    EXPECT_EQ(requeued_row["id"], row["id"]);
+
+    // The row stayed queued underneath: a late delivery still claims it.
+    backdate();
+    EXPECT_EQ((*reports.get(kAnna, row["id"]))["status"], "failed");
+    EXPECT_EQ(reports.start(row["id"]), 1);
+    EXPECT_EQ((*reports.get(kAnna, row["id"]))["status"], "running");
+}
+
 TEST_F(MoneyAdvisorJobTest, AReviewTheQueueRefusedIsFailedAndCanBeAskedAgain) {
     const auto refuse = [](const json&) { throw std::runtime_error("redis is down"); };
     const auto [row, queued] = reports.create_or_get(kAnna, "month", "2026-09-01", "2026-09-30");

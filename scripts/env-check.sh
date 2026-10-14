@@ -6,7 +6,8 @@
 # instead of letting the app crash on a bad libpqxx connection string.
 #
 # A placeholder counts as "satisfied" if either:
-#   - the env var is set (`printenv NAME` succeeds), OR
+#   - the env var is set to a non-empty value (an empty export expands to ""
+#     in the DSN exactly like an unset one), OR
 #   - the placeholder includes a default (`${VAR:-something}`).
 #
 # Exit status: 0 if every required placeholder is satisfied, 1 otherwise.
@@ -40,7 +41,7 @@ while IFS=$'\t' read -r path token; do
         continue   # ${VAR:-default}: never empty
     fi
     var="$inner"
-    if printenv "$var" >/dev/null 2>&1; then
+    if [[ -n "${!var:-}" ]]; then
         continue
     fi
     printf '  %-46s %s\n' "$path" "$var"

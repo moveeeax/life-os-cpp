@@ -1,6 +1,10 @@
 # Production values of the life-os-cpp-worker: same namespace, same database
 # and Redis as the API. Secrets via extraEnvFrom from life-os-app.
 
+# Bump together with deploy/values-prod.yaml after a secret rotation; the
+# worker pods restart with the new values.
+secretsVersion: ""
+
 image:
   repository: ghcr.io/moveeeax/life-os-cpp-worker
   tag: "1.28.0"
@@ -49,6 +53,9 @@ externalRedis:
   db: 3
 
 worker:
+  # WORKER_ID is the pod name (chart default, id: ""), so a replaced pod never
+  # shares a processing list with the one it replaced.
+  id: ""
   # The worker pulls only the listed queues: without fitness_sync, sync jobs
   # would pile up in Redis silently. Mail is off, its queues are not subscribed.
   types: "fitness_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse"
@@ -60,6 +67,11 @@ jobs:
   # A failed job waits 2 s, 4 s, ... before its retry: with an immediate
   # requeue a parse whose row was still held spent its retries in milliseconds.
   retryBackoffBaseMs: 2000
+  # A job whose pod was killed goes back to the queue after 300 s. Longer
+  # than the longest handler (fitness sync: MI_FITNESS_SYNC_TYPE_TIMEOUT per
+  # type, 180 s; the LLM parses: MONEY_LLM_TIMEOUT_SECONDS 90 s), so a live
+  # job is not reaped. Raise it together with those timeouts.
+  visibilityTimeoutSec: 300
 
 fitness:
   enabled: true
@@ -103,3 +115,13 @@ mail:
 
 tracing:
   enabled: false
+
+# Monitoring stays OFF until prometheus-operator is confirmed on oci-k3s; see
+# the monitoring block in deploy/values-prod.yaml for the check and the exact
+# values to flip. Then: serviceMonitor.enabled: true, monitoring.alertsEnabled:
+# true, monitoring.targetSelector as for the API (service="life-os-cpp-worker").
+serviceMonitor:
+  enabled: false
+monitoring:
+  alertsEnabled: false
+  targetSelector: ""

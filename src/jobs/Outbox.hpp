@@ -35,9 +35,16 @@
  * kStaleClaimSec — job handlers for outbox kinds must tolerate a duplicate
  * (the same contract Jobs' retry/visibility-timeout paths already impose).
  *
- * Existing flows are NOT routed through here — the after-response paths keep
+ * Most flows are NOT routed through here — the after-response paths keep
  * their exact behaviour; the outbox is the opt-in upgrade for the call sites
  * that need it. Worked example: docs/CONVENTIONS.md gotcha 20.
+ *
+ * The LLM job rows (food, money and tasks parse jobs, the advisor review) are
+ * such a call site: a row left `queued` with no job behind it never runs and
+ * only reads as failed after JobRows::kStaleRunning. They go through
+ * `enqueue_if_drained` (below): the outbox row rides the row's own
+ * transaction when a drain is configured, and the pre-outbox direct submit
+ * after the commit is kept for a stack that runs without the drain.
  */
 
 #pragma once
@@ -67,6 +74,36 @@ inline constexpr int kStaleClaimSec = 300;
 template <typename Txn>
 void enqueue(Txn& txn, const std::string& kind, const json& payload) {
     txn.exec_params("INSERT INTO outbox (kind, payload) VALUES ($1, $2::jsonb)", kind, payload.dump());
+}
+
+/**
+ * @brief Whether a drain is configured for this deployment
+ *        (`outbox.drain_interval_sec` / OUTBOX_DRAIN_INTERVAL_SEC > 0, read
+ *        from the loaded config) and the job queue is up. Core schedules the
+ *        drain in server mode under the same condition; a worker process with
+ *        the knob set writes rows the API pods drain, the table being shared.
+ *        False without a loaded config or an initialized queue.
+ */
+bool drain_configured();
+
+/**
+ * @brief Record the job of a row written in @p txn, when a drain will relay
+ *        it. With the drain configured, `enqueue` inside the same transaction
+ *        and return true: the commit makes the row and its job durable
+ *        together, a rollback erases both, and the caller is done. With the
+ *        drain off (OUTBOX_DRAIN_INTERVAL_SEC=0: the compose stack, the test
+ *        suites) nothing is written and false comes back: the caller then
+ *        submits the job directly once the transaction has committed, the
+ *        pre-outbox behaviour, so a stack without the drain never strands a
+ *        row in the table. Throws what `enqueue` throws.
+ */
+template <typename Txn>
+bool enqueue_if_drained(Txn& txn, const std::string& kind, const json& payload) {
+    if (!drain_configured()) {
+        return false;
+    }
+    enqueue(txn, kind, payload);
+    return true;
 }
 
 /// What one drain pass did — returned for tests/observability; the periodic

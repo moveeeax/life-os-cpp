@@ -70,7 +70,9 @@ data:
         "enabled": {{ .Values.food.enabled }}
       },
       "worker": {
+        {{- if .Values.worker.id }}
         "id": {{ .Values.worker.id | quote }},
+        {{- end }}
         "types": [{{- range $i, $t := splitList "," .Values.worker.types }}{{- if gt $i 0 }}, {{ end }}{{ $t | quote }}{{- end }}],
         "concurrency": {{ .Values.worker.concurrency }},
         "health_port": {{ .Values.worker.healthPort }},

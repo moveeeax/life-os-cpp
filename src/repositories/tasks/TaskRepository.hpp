@@ -63,11 +63,12 @@ public:
         std::string area;        // "" any
         std::string q;           // over title and next step
         std::string due_to;      // "" or YYYY-MM-DD
-        std::string done_since;  // "" or YYYY-MM-DD (completed_at >= that day, UTC)
+        std::string done_since;  // "" or YYYY-MM-DD (completed_at >= the start of that day in tz)
         int limit = 50;
         int offset = 0;
-        std::string trip;     // "" any, or a trip id: that trip's tasks (packing)
-        std::string project;  // "" any, or a project (or course) id
+        std::string trip;        // "" any, or a trip id: that trip's tasks (packing)
+        std::string project;     // "" any, or a project (or course) id
+        std::string tz = "UTC";  // the zone done_since is read in (a zone PostgreSQL knows)
     };
 
     nlohmann::json create(const std::string& owner, const Input& in) {
@@ -180,7 +181,7 @@ public:
                 " AND ($4 = '' OR title ILIKE '%' || $4 || '%' ESCAPE '\\' OR next_step ILIKE '%' || $4 || '%' ESCAPE "
                 "'\\') "
                 " AND ($5 = '' OR due <= $5::date) AND ($6 = '' OR completed_at >= ($6::date::timestamp AT TIME ZONE "
-                "'UTC')) AND ($9 = '' OR trip_id = NULLIF($9, '')::uuid) "
+                "$11)) AND ($9 = '' OR trip_id = NULLIF($9, '')::uuid) "
                 " AND ($10 = '' OR project_id = NULLIF($10, '')::uuid) ";
             const std::string q = escape_like(f.q);
             auto total =
@@ -194,7 +195,8 @@ public:
                                 f.limit,
                                 f.offset,
                                 f.trip,
-                                f.project);
+                                f.project,
+                                f.tz);
             auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
                                          " FROM task_items" + where + " ORDER BY created_at DESC LIMIT $7 OFFSET $8) t",
                                      owner,
@@ -206,7 +208,8 @@ public:
                                      f.limit,
                                      f.offset,
                                      f.trip,
-                                     f.project);
+                                     f.project,
+                                     f.tz);
             return nlohmann::json{{"data", nlohmann::json::parse(r[0][0].template as<std::string>())},
                                   {"total", total[0][0].template as<long>()}};
         });

@@ -12,6 +12,7 @@ data:
   config.json: |
     {
       "app": {
+        "env": {{ .Values.app.env | default "production" | quote }},
         "name": {{ .Values.app.name | quote }},
         "base_url": {{ .Values.app.baseUrl | quote }}
       },
@@ -64,6 +65,16 @@ data:
         "enabled": {{ .Values.jobs.enabled }},
         "result_ttl": {{ .Values.jobs.resultTtl }},
         "max_retries": {{ .Values.jobs.maxRetries }}
+      },
+      "outbox": {
+        "drain_interval_sec": {{ .Values.outbox.drainIntervalSec | default 0 }}
+      },
+      "docs": {
+        "enabled": {{ .Values.docs.enabled }}
+      },
+      "security": {
+        "hsts": {{ .Values.security.hsts }},
+        "hsts_max_age": {{ .Values.security.hstsMaxAge | default 31536000 }}
       },
       "fitness": {
         "enabled": {{ .Values.fitness.enabled }}

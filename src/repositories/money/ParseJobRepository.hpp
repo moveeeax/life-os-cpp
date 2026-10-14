@@ -25,6 +25,17 @@ public:
     static constexpr const char* kTable = "money_parse_jobs";
 
     nlohmann::json create_text(const std::string& owner, const std::string& text, const std::string& hint_date) {
+        return create_text(owner, text, hint_date, [](auto&, const std::string&) {});
+    }
+
+    /// With @p in_txn(txn, id) run in the same transaction right after the
+    /// insert: the outbox row of its queue job rides the commit
+    /// (Jobs::Outbox::enqueue_if_drained), so a crash leaves no row without a job.
+    template <typename InTxn>
+    nlohmann::json create_text(const std::string& owner,
+                               const std::string& text,
+                               const std::string& hint_date,
+                               InTxn&& in_txn) {
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
@@ -34,7 +45,9 @@ public:
                         owner,
                         text,
                         hint_date);
-                    return *find_in(txn, owner, r[0][0].template as<std::string>());
+                    const std::string id = r[0][0].template as<std::string>();
+                    in_txn(txn, id);
+                    return *find_in(txn, owner, id);
                 });
             },
             &detail::translate);
@@ -45,6 +58,16 @@ public:
                                   const std::string& image_base64,
                                   const std::string& image_type,
                                   const std::string& hint_date) {
+        return create_receipt(owner, image_base64, image_type, hint_date, [](auto&, const std::string&) {});
+    }
+
+    /// @p in_txn as in create_text.
+    template <typename InTxn>
+    nlohmann::json create_receipt(const std::string& owner,
+                                  const std::string& image_base64,
+                                  const std::string& image_type,
+                                  const std::string& hint_date,
+                                  InTxn&& in_txn) {
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
@@ -55,7 +78,9 @@ public:
                         image_base64,
                         image_type,
                         hint_date);
-                    return *find_in(txn, owner, r[0][0].template as<std::string>());
+                    const std::string id = r[0][0].template as<std::string>();
+                    in_txn(txn, id);
+                    return *find_in(txn, owner, id);
                 });
             },
             &detail::translate);
@@ -141,7 +166,7 @@ public:
         return !r.empty();
     }
 
-    /// Jobs of the owner that are queued or running (a stale running row is not counted).
+    /// Jobs of the owner that are queued or running (a stale queued or running row is not counted).
     long open_count(const std::string& owner) { return JobRows::open_count(kTable, owner); }
 
     /// Whether the photo is still stored (tests and the cleanup check).

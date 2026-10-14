@@ -29,26 +29,44 @@ public:
      * A failed one is queued again (a "Run now" after a provider outage), and
      * so is a done one written before its period ended (finished on or before
      * period_end, UTC): the week has more rows now. So is a running one whose
-     * worker died (older than JobRows::kStaleRunning).
+     * worker died, or a queued one the queue lost (older than
+     * JobRows::kStaleRunning either way: both read as failed).
      * @returns {row, true} when this call queued it (created or re-queued).
      */
     std::pair<nlohmann::json, bool> create_or_get(const std::string& owner,
                                                   const std::string& period,
                                                   const std::string& start,
                                                   const std::string& end) {
+        return create_or_get(owner, period, start, end, [](auto&, const std::string&) {});
+    }
+
+    /// With @p on_queued(txn, id) run in the same transaction when this call
+    /// queued the row: the outbox row of its queue job rides the commit
+    /// (Jobs::Outbox::enqueue_if_drained), so a crash leaves no row without a job.
+    template <typename OnQueued>
+    std::pair<nlohmann::json, bool> create_or_get(const std::string& owner,
+                                                  const std::string& period,
+                                                  const std::string& start,
+                                                  const std::string& end,
+                                                  OnQueued&& on_queued) {
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) -> std::pair<nlohmann::json, bool> {
+                    // A re-queue restarts the row's clock (started_at): the old one would read
+                    // the row as lost again (JobRows::shown_status) before any worker saw it.
                     auto r = txn.exec_params(
                         "INSERT INTO money_advisor_reports (owner_id, period, period_start, period_end) "
                         "VALUES ($1::uuid, $2, $3::date, $4::date) "
                         "ON CONFLICT (owner_id, period, period_start) DO UPDATE SET status = 'queued', attempts = 0, "
-                        " error = NULL, finished_at = NULL WHERE money_advisor_reports.status = 'failed' "
+                        " error = NULL, finished_at = NULL, started_at = now() "
+                        "WHERE money_advisor_reports.status = 'failed' "
                         " OR (money_advisor_reports.status = 'done' AND money_advisor_reports.period_end >= "
                         "  (money_advisor_reports.finished_at AT TIME ZONE 'UTC')::date) "
-                        // A review whose worker died reads as failed (JobRows::shown_status): it can be asked again.
-                        " OR (money_advisor_reports.status = 'running' AND COALESCE(money_advisor_reports.started_at, "
-                        "  money_advisor_reports.created_at) < now() - $5::interval) "
+                        // A review whose worker died, or one the queue lost, reads as failed
+                        // (JobRows::shown_status): it can be asked again.
+                        " OR (money_advisor_reports.status IN ('queued', 'running') AND "
+                        "  COALESCE(money_advisor_reports.started_at, money_advisor_reports.created_at) < "
+                        "  now() - $5::interval) "
                         "RETURNING id::text",
                         owner,
                         period,
@@ -56,7 +74,9 @@ public:
                         end,
                         JobRows::kStaleRunning);
                     if (!r.empty()) {
-                        return {*find_in(txn, owner, r[0][0].template as<std::string>()), true};
+                        const std::string id = r[0][0].template as<std::string>();
+                        on_queued(txn, id);
+                        return {*find_in(txn, owner, id), true};
                     }
                     auto existing = txn.exec_params(
                         "SELECT id::text FROM money_advisor_reports WHERE owner_id = $1::uuid AND period = $2 "

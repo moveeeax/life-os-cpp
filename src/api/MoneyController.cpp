@@ -33,6 +33,7 @@
 #include "jobs/MoneyAdvisorHandler.hpp"
 #include "jobs/MoneyParseHandler.hpp"
 #include "jobs/MoneyRatesHandler.hpp"
+#include "jobs/Outbox.hpp"
 #include "money/Currencies.hpp"
 #include "money/Llm.hpp"
 #include "money/Period.hpp"
@@ -765,7 +766,8 @@ void MoneyController::listTransfers(const HttpRequestPtr& req, Callback&& callba
     }
     with_repo_errors(callback, "money.listTransfers", [&] {
         const json rows = Repo::TransferRepository().list(owner, f);
-        callback(Response::ok(json{{"data", rows}, {"count", rows.size()}}));
+        const long total = Repo::TransferRepository().count(owner, f);
+        callback(Response::ok(json{{"data", rows}, {"count", rows.size()}, {"total", total}}));
     });
 }
 
@@ -929,7 +931,7 @@ json rate_json(const Repo::FxRateRepository::Rate& r) {
 
 void MoneyController::rate(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
-    const std::string date = req->getParameter("date").empty() ? today_utc() : req->getParameter("date");
+    const std::string date = request_day(req, &Repositories::Zones::today_in, today_utc());
     const std::string quote = req->getParameter("quote");
     if (!is_calendar_date(date) || !std::regex_match(quote, kCodeRe)) {
         callback(ErrorResponse::bad_request("invalid_query", "date must be a calendar day and quote an ISO code"));
@@ -947,7 +949,7 @@ void MoneyController::rate(const HttpRequestPtr& req, Callback&& callback) {
 
 void MoneyController::convert(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
-    const std::string date = req->getParameter("date").empty() ? today_utc() : req->getParameter("date");
+    const std::string date = request_day(req, &Repositories::Zones::today_in, today_utc());
     const std::string from = req->getParameter("from");
     const std::string to = req->getParameter("to");
     double amount = 0;
@@ -1119,7 +1121,7 @@ void MoneyController::summary(const HttpRequestPtr& req, Callback&& callback) {
         callback(ErrorResponse::bad_request("invalid_query", "days must be 30, 90 or 365"));
         return;
     }
-    const std::string date = req->getParameter("date").empty() ? today_utc() : req->getParameter("date");
+    const std::string date = request_day(req, &Repositories::Zones::today_in, today_utc());
     if (!is_calendar_date(date)) {
         callback(ErrorResponse::bad_request("invalid_date", "date must be a calendar day as YYYY-MM-DD"));
         return;
@@ -1213,7 +1215,8 @@ std::optional<DataUrl> data_url(const std::string& url, std::string& problem) {
     return out;
 }
 
-/// The shared tail of both parse routes: the cap, the row, the job.
+/// The shared tail of both parse routes: the cap, the row, the job. @p create(repo, in_txn)
+/// inserts the row and runs in_txn(txn, id) inside the same transaction.
 template <typename Create>
 void start_parse(const std::string& owner, MoneyController::Callback& callback, Create&& create) {
     if (!Money::Llm::parse_settings().has_value()) {
@@ -1222,6 +1225,16 @@ void start_parse(const std::string& owner, MoneyController::Callback& callback, 
     }
     Repo::ParseJobRepository repo;
     std::string id;
+    const auto payload = [&](const std::string& job_id) {
+        return json{{"job_id", job_id},
+                    {"owner_id", owner},
+                    {"max_attempts", Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries}};
+    };
+    // The job rides the row's transaction as an outbox row when a drain is configured
+    // (Jobs::Outbox::enqueue_if_drained): a crash after the commit cannot leave the row
+    // queued with no job behind it. With the drain off (OUTBOX_DRAIN_INTERVAL_SEC=0: the
+    // compose stack, the test suites) the direct submit below follows the commit, as before.
+    bool via_outbox = false;
     try {
         if (repo.open_count(owner) >= Repositories::JobRows::kOpenMax) {
             callback(ErrorResponse::make({k429TooManyRequests,
@@ -1230,7 +1243,11 @@ void start_parse(const std::string& owner, MoneyController::Callback& callback, 
                                           json{{"retry_after_sec", 30}}}));
             return;
         }
-        id = create(repo)["id"].template get<std::string>();
+        id = create(repo,
+                    [&](auto& txn, const std::string& job_id) {
+                        via_outbox = Jobs::Outbox::enqueue_if_drained(txn, Jobs::MoneyParse::kJobType, payload(job_id));
+                    })["id"]
+                 .template get<std::string>();
     } catch (const Repositories::ValidationError& e) {
         callback(ErrorResponse::bad_request(e.code(), e.message()));
         return;
@@ -1245,12 +1262,12 @@ void start_parse(const std::string& owner, MoneyController::Callback& callback, 
         return;
     }
     try {
-        if (!Jobs::is_initialized()) {
-            throw std::runtime_error("the job queue is not initialized");
+        if (!via_outbox) {
+            if (!Jobs::is_initialized()) {
+                throw std::runtime_error("the job queue is not initialized");
+            }
+            Jobs::get().submit(Jobs::MoneyParse::kJobType, payload(id));
         }
-        Jobs::get().submit(
-            Jobs::MoneyParse::kJobType,
-            json{{"job_id", id}, {"owner_id", owner}, {"max_attempts", Jobs::get().default_max_retries()}});
     } catch (const std::exception& e) {
         spdlog::warn("money parse enqueue unavailable: {}", e.what());
         try {
@@ -1290,7 +1307,9 @@ void MoneyController::parseText(const HttpRequestPtr& req, Callback&& callback) 
     }
     const auto given_hint = Validation::opt_string(body, "hint_date");
     const std::string hint = given_hint ? *given_hint : local_today(req, &Repositories::Zones::today_in, today_utc());
-    start_parse(owner, callback, [&](Repo::ParseJobRepository& repo) { return repo.create_text(owner, text, hint); });
+    start_parse(owner, callback, [&](Repo::ParseJobRepository& repo, auto&& in_txn) {
+        return repo.create_text(owner, text, hint, in_txn);
+    });
 }
 
 void MoneyController::parseReceipt(const HttpRequestPtr& req, Callback&& callback) {
@@ -1315,8 +1334,8 @@ void MoneyController::parseReceipt(const HttpRequestPtr& req, Callback&& callbac
     }
     const auto given_hint = Validation::opt_string(body, "hint_date");
     const std::string hint = given_hint ? *given_hint : local_today(req, &Repositories::Zones::today_in, today_utc());
-    start_parse(owner, callback, [&](Repo::ParseJobRepository& repo) {
-        return repo.create_receipt(owner, image->payload, image->type, hint);
+    start_parse(owner, callback, [&](Repo::ParseJobRepository& repo, auto&& in_txn) {
+        return repo.create_receipt(owner, image->payload, image->type, hint, in_txn);
     });
 }
 
@@ -1328,7 +1347,7 @@ void MoneyController::parseStatus(const HttpRequestPtr& req, Callback&& callback
     with_repo_errors(callback, "money.parseStatus", [&] {
         const auto row = Repo::ParseJobRepository().get(owner, id);
         if (!row) {
-            callback(ErrorResponse::not_found("money_parse"));
+            callback(ErrorResponse::not_found("parse_job"));
             return;
         }
         callback(Response::ok(json{{"data", *row}}));
@@ -1354,7 +1373,7 @@ void MoneyController::parseAccept(const HttpRequestPtr& req, Callback&& callback
         return;
     }
     if (!job) {
-        callback(ErrorResponse::not_found("money_parse"));
+        callback(ErrorResponse::not_found("parse_job"));
         return;
     }
     Validation::Errors errs;
@@ -1438,14 +1457,29 @@ void MoneyController::advisorRun(const HttpRequestPtr& req, Callback&& callback)
         return;
     }
     const std::string period = Validation::opt_string(body, "period").value_or("week");
-    const std::string date = Validation::opt_string(body, "date").value_or(today_utc());
+    const std::string date =
+        Validation::opt_string(body, "date").value_or(local_today(req, &Repositories::Zones::today_in, today_utc()));
     const auto kind = period == "week"      ? Money::Period::Kind::week
                       : period == "quarter" ? Money::Period::Kind::quarter
                                             : Money::Period::Kind::month;
     const auto range = Money::Period::of(kind, date);
     with_repo_errors(callback, "money.advisorRun", [&] {
-        const auto [row, queued] = Repo::AdvisorReportRepository().create_or_get(owner, period, range.from, range.to);
-        if (queued && !Jobs::MoneyAdvisor::submit_review(row["id"].get<std::string>(), owner)) {
+        // The job rides the row's transaction as an outbox row when a drain is configured
+        // (Jobs::Outbox::enqueue_if_drained): a crash after the commit cannot leave the review
+        // queued with no job behind it. With the drain off (OUTBOX_DRAIN_INTERVAL_SEC=0: the
+        // compose stack, the test suites) submit_review follows the commit, as before. The
+        // payload is the one submit_review builds.
+        bool via_outbox = false;
+        const auto [row, queued] = Repo::AdvisorReportRepository().create_or_get(
+            owner, period, range.from, range.to, [&](auto& txn, const std::string& report_id) {
+                via_outbox = Jobs::Outbox::enqueue_if_drained(
+                    txn,
+                    Jobs::MoneyAdvisor::kJobType,
+                    json{{"report_id", report_id},
+                         {"owner_id", owner},
+                         {"max_attempts", Jobs::get().default_max_retries()}});
+            });
+        if (queued && !via_outbox && !Jobs::MoneyAdvisor::submit_review(row["id"].get<std::string>(), owner)) {
             callback(ErrorResponse::service_unavailable("queue_unavailable"));
             return;
         }

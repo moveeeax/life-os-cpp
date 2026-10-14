@@ -20,6 +20,7 @@
 #include "database/Database.hpp"
 #include "domain/Role.hpp"
 #include "jobs/Jobs.hpp"
+#include "jobs/Outbox.hpp"
 #include "repositories/tasks/ParseJobRepository.hpp"
 #include "test_helpers.hpp"
 
@@ -42,7 +43,7 @@ protected:
     std::string config_file_name() const override { return "tasks_api_test_config.json"; }
     void config_overrides(nlohmann::json& cfg) override {
         cfg["tasks"]["enabled"] = true;
-        cfg["money"]["enabled"] = true;  // the ledger-row source check runs only with money on
+        cfg["money"]["enabled"] = true;  // ledger rows are made in the tables below; the check runs with money off too
     }
 
     void SetUp() override {
@@ -120,6 +121,15 @@ protected:
     void config_overrides(nlohmann::json& cfg) override { cfg["tasks"]["enabled"] = false; }
 };
 
+class TasksMoneyOffTest : public TasksApiTest {
+protected:
+    std::string config_file_name() const override { return "tasks_money_off_test_config.json"; }
+    void config_overrides(nlohmann::json& cfg) override {
+        TasksApiTest::config_overrides(cfg);
+        cfg["money"]["enabled"] = false;
+    }
+};
+
 }  // namespace
 
 TEST_F(TasksApiTest, ATaskBelongsToItsOwnerAndTheServerOwnsCompletedAt) {
@@ -189,6 +199,64 @@ TEST_F(TasksApiTest, ASourceIsAPairAndALedgerRowMustBeYours) {
     ledger["source_kind"] = "money_transaction";
     ledger["source_ref"] = boris_row;
     EXPECT_EQ(post(ledger), k400BadRequest) << "another user's ledger row";
+}
+
+TEST_F(TasksMoneyOffTest, ALedgerRowOfAnotherUserIsRefusedWhileMoneyIsOff) {
+    const std::string boris_row = Database::get().execute_write([](auto& txn) {
+        const auto acc = txn.exec_params(
+                                "INSERT INTO money_accounts (owner_id, name, currency) VALUES ($1::uuid, 'K', 'KZT') "
+                                "RETURNING id::text",
+                                std::string(kBoris))[0][0]
+                             .template as<std::string>();
+        const auto cat = txn.exec_params(
+                                "INSERT INTO money_categories (owner_id, name, kind) VALUES ($1::uuid, 'Food', "
+                                "'expense') RETURNING id::text",
+                                std::string(kBoris))[0][0]
+                             .template as<std::string>();
+        return txn
+            .exec_params(
+                "INSERT INTO money_transactions (owner_id, type, date, account_id, amount, category_id, name) "
+                "VALUES ($1::uuid, 'expense', '2026-10-05', $2::uuid, 2790, $3::uuid, 'x') RETURNING id::text",
+                std::string(kBoris),
+                acc,
+                cat)[0][0]
+            .template as<std::string>();
+    });
+    const json ledger{{"title", "Dispute the charge"},
+                      {"area", "finance"},
+                      {"source_kind", "money_transaction"},
+                      {"source_ref", boris_row}};
+    EXPECT_EQ(call_json(&Api::TasksController::createItem, user(kAnna), ledger)->statusCode(), k400BadRequest)
+        << "the table is there whether the module is on or not: another user's row stays refused";
+    EXPECT_EQ(call_json(&Api::TasksController::createItem, user(kBoris), ledger)->statusCode(), k201Created)
+        << "the owner of the row links it";
+}
+
+TEST_F(TasksApiTest, DoneSinceReadsTheDayInTheGivenZoneAndInProgressIsAStatus) {
+    const json closed =
+        created(&Api::TasksController::createItem, kAnna, json{{"title", "Closed"}, {"area", "projects"}});
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params(
+            "UPDATE task_items SET status = 'done', completed_at = '2026-10-06 23:30:00+00' WHERE id = $1::uuid",
+            closed["id"].get<std::string>());
+        return true;
+    });
+    const auto list = [&](const std::vector<std::pair<std::string, std::string>>& params) {
+        return call(&Api::TasksController::listItems, user(kAnna), Get, params);
+    };
+    EXPECT_EQ(body_of(list({{"done_since", "2026-10-07"}, {"tz", "Asia/Bangkok"}}))["total"], 1)
+        << "23:30 UTC on the 6th is the 7th in Bangkok";
+    EXPECT_EQ(body_of(list({{"done_since", "2026-10-07"}}))["total"], 0) << "no tz: UTC";
+    EXPECT_EQ(body_of(list({{"done_since", "2026-10-06"}}))["total"], 1);
+    EXPECT_EQ(list({{"tz", "Mars/Olympus"}})->statusCode(), k400BadRequest);
+
+    created(&Api::TasksController::createItem,
+            kAnna,
+            json{{"title", "Started"}, {"area", "health"}, {"status", "in_progress"}});
+    const json page = body_of(list({{"status", "in_progress"}}));
+    EXPECT_EQ(page["total"], 1);
+    EXPECT_EQ(page["data"][0]["title"], "Started");
+    EXPECT_EQ(list({{"status", "paused"}})->statusCode(), k400BadRequest);
 }
 
 TEST_F(TasksApiTest, TheAgendaReadsTheDayInTheGivenZone) {
@@ -303,7 +371,87 @@ TEST_F(TasksParseApiTest, ANoteBecomesATaskOnceAndIsArchived) {
     EXPECT_EQ(archived[0]["task_id"], task_id);
     EXPECT_EQ(call_id(&Api::TasksController::parseAccept, user(kAnna), Post, id, json{{"lines", lines}})->statusCode(),
               k409Conflict);
-    EXPECT_EQ(call_id(&Api::TasksController::parseStatus, user(kBoris), Get, id)->statusCode(), k404NotFound);
+    const auto theirs = call_id(&Api::TasksController::parseStatus, user(kBoris), Get, id);
+    EXPECT_EQ(theirs->statusCode(), k404NotFound);
+    EXPECT_EQ(body_of(theirs)["error"], "parse_job") << "one code for a missing parse job in every module";
+}
+
+namespace {
+
+/// With a drain configured the job goes through the outbox, inside the row's transaction.
+class TasksParseOutboxApiTest : public TasksParseApiTest {
+protected:
+    std::string config_file_name() const override { return "tasks_parse_outbox_api_test_config.json"; }
+
+    void config_overrides(nlohmann::json& cfg) override {
+        TasksParseApiTest::config_overrides(cfg);
+        // An hourly tick never fires during the test: every drain below is an explicit call.
+        cfg["outbox"]["drain_interval_sec"] = 3600;
+    }
+
+    void SetUp() override {
+        TasksParseApiTest::SetUp();
+        if (::testing::Test::IsSkipped())
+            return;
+        truncate_outbox();
+        TestHelpers::drain_jobs({"tasks_parse"});
+    }
+
+    void TearDown() override {
+        if (Database::is_initialized()) {
+            try {
+                truncate_outbox();
+            } catch (...) {}
+        }
+        TasksParseApiTest::TearDown();
+    }
+
+    static void truncate_outbox() {
+        Database::get().execute_write([](auto& txn) {
+            txn.exec("TRUNCATE TABLE outbox");
+            return true;
+        });
+    }
+
+    static json outbox_rows() {
+        return Database::get().execute_read_primary([](auto& txn) {
+            auto r = txn.exec(
+                "SELECT COALESCE(json_agg(json_build_object('kind', kind, 'payload', payload)), '[]') FROM outbox");
+            return json::parse(r[0][0].template as<std::string>());
+        });
+    }
+};
+
+}  // namespace
+
+TEST_F(TasksParseOutboxApiTest, WithADrainTheJobRidesTheRowsTransaction) {
+    ASSERT_TRUE(Jobs::Outbox::drain_configured());
+    const auto queued = call_json(
+        &Api::TasksController::parse, user(kAnna), json{{"text", "завтра купить воду"}, {"hint_date", "2026-10-07"}});
+    ASSERT_EQ(queued->statusCode(), k202Accepted) << queued->body();
+    const std::string id = body_of(queued)["data"]["id"];
+
+    const auto depth = Jobs::get().queue_depth_by_type();
+    EXPECT_EQ(depth.count("tasks_parse") ? depth.at("tasks_parse") : 0, 0) << "nothing is submitted directly";
+    const json rows = outbox_rows();
+    ASSERT_EQ(rows.size(), 1u) << rows.dump();
+    EXPECT_EQ(rows[0]["kind"], "tasks_parse");
+    EXPECT_EQ(rows[0]["payload"]["job_id"], id);
+    EXPECT_EQ(rows[0]["payload"]["owner_id"], kAnna);
+    EXPECT_EQ(rows[0]["payload"]["max_attempts"], Jobs::get().default_max_retries());
+
+    // A refused note rolls the row and its event back together.
+    const auto refused = call_json(&Api::TasksController::parse,
+                                   user(kAnna),
+                                   json{{"text", "x"}, {"note_id", "55555555-5555-4555-8555-555555555555"}});
+    EXPECT_EQ(refused->statusCode(), k404NotFound);
+    EXPECT_EQ(outbox_rows().size(), 1u);
+
+    EXPECT_EQ(Jobs::Outbox::drain().submitted, 1);
+    auto job = Jobs::get().pick({"tasks_parse"}, 1);
+    ASSERT_TRUE(job.has_value());
+    EXPECT_EQ(job->payload["job_id"], id);
+    Jobs::get().complete(job->id, json::object());
 }
 
 TEST_F(TasksParseApiTest, AFewOpenParsesPerUser) {

@@ -1,7 +1,9 @@
 {{- /*
   PrometheusRule — bundles a minimum-viable alert set that pairs with the
   ServiceMonitor. Requires the prometheus-operator CRDs installed in the
-  cluster.
+  cluster. Alert names and thresholds follow docs/SLO.md and the anchors in
+  docs/RUNBOOK.md (the compose stack runs the same set from
+  docker/prometheus-rules.yml).
 
   IMPORTANT: metric selectors depend on how your prometheus-operator
   installation labels scraped targets. Our ServiceMonitor sets
@@ -31,14 +33,14 @@ spec:
     - name: {{ include "life-os-cpp.fullname" . }}.rules
       interval: 30s
       rules:
-        - alert: CppApiHighErrorRate
-          # Fires when >1% of HTTP responses are 5xx over a 5-min window.
+        - alert: High5xxRate
+          # Fires when more than errorRate (5 %) of HTTP responses are 5xx over a 5-min window.
           expr: |
             (
               sum(rate(http_requests_total{ {{ $selector }}, status=~"5.."}[5m]))
               /
               clamp_min(sum(rate(http_requests_total{ {{ $selector }} }[5m])), 1)
-            ) > {{ .Values.monitoring.thresholds.errorRate | default 0.01 }}
+            ) > {{ .Values.monitoring.thresholds.errorRate | default 0.05 }}
           for: 5m
           labels:
             severity: critical
@@ -46,9 +48,9 @@ spec:
           annotations:
             runbook_url: "https://github.com/moveeeax/life-os-cpp/blob/master/docs/RUNBOOK.md#high5xx"
             summary: "High 5xx rate on {{ include "life-os-cpp.fullname" . }}"
-            description: "More than {{ .Values.monitoring.thresholds.errorRate | default 0.01 }} of requests returned 5xx over 5m."
+            description: "More than {{ .Values.monitoring.thresholds.errorRate | default 0.05 }} of requests returned 5xx over 5m."
 
-        - alert: CppApiTargetDown
+        - alert: ApiTargetDown
           # Fires when the scrape target disappears or returns up==0 for 2m.
           # This is the authoritative "is the API reachable?" signal.
           expr: |
@@ -62,7 +64,7 @@ spec:
             summary: "life-os-cpp target is down"
             description: "Prometheus cannot scrape {{ include "life-os-cpp.fullname" . }} — the pod is gone or the metrics endpoint is unreachable."
 
-        - alert: CppApiDbPoolSaturationHigh
+        - alert: DbPoolSaturationHigh
           # Fires when more than 90 % of DB connections are in use for 5 m.
           # A saturated pool means new requests queue for a connection and p99
           # latency climbs before any error surfaces.
@@ -84,7 +86,7 @@ spec:
         {{- if .Values.monitoring.jobsAlerts }}
         # jobs_queue_depth is only published when Jobs is enabled — gate this with
         # the sibling DLQ alerts so a Jobs-less API doesn't ship a dead rule.
-        - alert: CppApiJobsQueueBacklog
+        - alert: JobsQueueBacklog
           # Fires when the total waiting-jobs queue stays elevated for 10 m —
           # the leading indicator that workers can't keep up with submission rate.
           expr: |
@@ -99,7 +101,7 @@ spec:
             description: "Waiting-jobs queue is growing — scale the life-os-cpp-worker deployment or investigate slow job handlers."
         {{- end }}
 
-        - alert: CppApiHighLatencyP99
+        - alert: HighP99Latency
           expr: |
             histogram_quantile(
               0.99,
@@ -114,18 +116,18 @@ spec:
             summary: "p99 latency over {{ .Values.monitoring.thresholds.latencyP99Sec | default 1 }}s"
             description: "Investigate slow queries, pool saturation, or downstream latency."
 
-        - alert: CppApiHighReplicaLag
+        - alert: ReplicationLagHigh
           expr: |
-            db_replica_lag_seconds{ {{ $selector }} } > {{ .Values.monitoring.thresholds.replicaLagSec | default 10 }}
+            db_replica_lag_seconds{ {{ $selector }} } > {{ .Values.monitoring.thresholds.replicaLagSec | default 60 }}
           for: 5m
           labels:
             severity: warning
             service: {{ include "life-os-cpp.fullname" . }}
           annotations:
-            summary: "Read replica lagging > {{ .Values.monitoring.thresholds.replicaLagSec | default 10 }}s behind primary"
+            summary: "Read replica lagging > {{ .Values.monitoring.thresholds.replicaLagSec | default 60 }}s behind primary"
             description: "Read-after-write reads may serve stale rows. Check replica health, network, or WAL apply load (only fires when replicas are configured)."
 
-        - alert: CppApiPodNotReady
+        - alert: ApiPodNotReady
           expr: |
             kube_pod_status_ready{condition="true", namespace="{{ .Release.Namespace }}", pod=~"{{ include "life-os-cpp.fullname" . }}-.*"} == 0
           for: 5m
@@ -137,7 +139,7 @@ spec:
             summary: "Pod not ready"
             description: "A pod has been NotReady for 5 minutes — check logs and readiness probe."
 
-        - alert: CppApiCrashLoopBackOff
+        - alert: ApiCrashLoopBackOff
           expr: |
             rate(kube_pod_container_status_restarts_total{namespace="{{ .Release.Namespace }}", pod=~"{{ include "life-os-cpp.fullname" . }}-.*"}[15m]) > 0
           for: 15m
@@ -149,13 +151,13 @@ spec:
             summary: "Container restarting"
             description: "Container has restarted in the last 15 minutes."
 
-        - alert: CppApiRetriesExhaustedSpike
+        - alert: RetriesExhaustedSpike
           # Retries hitting max attempts consistently means a downstream is
           # degraded but the app is soldiering on. Paired with retries_total
           # counter from Retry::run.
           expr: |
-            sum(rate(retries_total{ {{ $selector }}, outcome="exhausted"}[5m])) > {{ .Values.monitoring.thresholds.retriesExhaustedPerSec | default 0.5 }}
-          for: 10m
+            sum(rate(retries_total{ {{ $selector }}, outcome="exhausted"}[5m])) > {{ .Values.monitoring.thresholds.retriesExhaustedPerSec | default 0.1 }}
+          for: 5m
           labels:
             severity: warning
             service: {{ include "life-os-cpp.fullname" . }}
@@ -165,11 +167,11 @@ spec:
             description: "Downstream is likely degraded — investigate database / cache health."
 
         {{- if .Values.monitoring.jobsAlerts }}
-        - alert: CppApiJobsDlqGrowing
+        - alert: DeadLetterQueueGrowing
           # jobs_dlq_depth is labeled by type; the "_total" label is the aggregate.
           expr: |
-            sum(jobs_dlq_depth{ {{ $selector }}, type="_total"}) > {{ .Values.monitoring.thresholds.dlqDepth | default 10 }}
-          for: 10m
+            sum(jobs_dlq_depth{ {{ $selector }}, type="_total"}) > {{ .Values.monitoring.thresholds.dlqDepth | int }}
+          for: 15m
           labels:
             severity: warning
             service: {{ include "life-os-cpp.fullname" . }}
@@ -178,7 +180,7 @@ spec:
             summary: "Dead-letter queue depth over threshold"
             description: "Investigate repeatedly-failing jobs — inspect /api/v1/jobs/dlq and decide whether to requeue or discard."
 
-        - alert: CppApiJobsDlqSpikeByType
+        - alert: DeadLetterQueueSpikeByType
           # One job type alone is accumulating a DLQ backlog fast.
           expr: |
             max by (type) (jobs_dlq_depth{ {{ $selector }}, type!="_total"}) > {{ .Values.monitoring.thresholds.dlqPerTypeDepth | default 5 }}
@@ -192,7 +194,7 @@ spec:
             description: "A specific job type keeps failing all retries — bug in the handler or a chronically-bad input."
 
         {{- if .Values.backup.enabled }}
-        - alert: CppApiBackupJobFailed
+        - alert: BackupJobFailed
           # The pg_dump CronJob's most recent run failed. Needs kube-state-metrics.
           expr: |
             max(kube_job_status_failed{job_name=~"{{ include "life-os-cpp.fullname" . }}-backup.*"}) > 0
@@ -205,7 +207,7 @@ spec:
             summary: "Postgres backup CronJob failed"
             description: "The latest backup Job failed — no fresh dump was uploaded. Check the Job logs; do not assume a recoverable backup exists."
 
-        - alert: CppApiBackupTooOld
+        - alert: BackupTooOld
           # No successful backup within the staleness window (default 26h for a
           # daily schedule). Catches a CronJob that is silently broken or descheduled.
           expr: |

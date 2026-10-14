@@ -243,6 +243,24 @@ TEST_F(MoneyParseJobTest, AStaleRunningRowIsClaimedAgainAndAFinishedOneIsLeftAlo
     EXPECT_EQ(provider.bodies.size(), 1u);
 }
 
+TEST_F(MoneyParseJobTest, AQueuedRowTheQueueLostReadsAsFailedUntilADeliveryClaimsIt) {
+    const std::string id = text_job();
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE money_parse_jobs SET created_at = now() - interval '11 minutes' WHERE id = $1::uuid",
+                        id);
+        return true;
+    });
+    const json polled = *jobs.get(kAnna, id);
+    EXPECT_EQ(polled["status"], "failed") << "a page polling a row the queue lost must stop waiting";
+    EXPECT_EQ(polled["error"].get<std::string>().rfind("queue_lost", 0), 0u) << polled.dump();
+    EXPECT_EQ(jobs.open_count(kAnna), 0) << "nor does the row hold a parse slot";
+
+    // The row stayed queued underneath: a late delivery still claims and finishes it.
+    provider.replies.push_back({200, completion(good_lines())});
+    EXPECT_EQ(run(id)["status"], "done");
+    EXPECT_EQ((*jobs.get(kAnna, id))["status"], "done");
+}
+
 TEST_F(MoneyParseJobTest, ARunningRowIsRetriedAndALateResultChangesNothing) {
     const std::string id = text_job();
     ASSERT_EQ(jobs.start(id), 1) << "a worker claimed the row and died";

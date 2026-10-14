@@ -15,6 +15,11 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        # Rolls the pods when the extraEnvFrom sources change or the operator
+        # bumps secretsVersion after rotating a key in one of those Secrets
+        # (their contents are outside the chart, so the config checksum above
+        # cannot see them). See secretsVersion in values.yaml.
+        checksum/extra-env: {{ printf "%s|%s" (toJson .Values.extraEnvFrom) (.Values.secretsVersion | default "" | toString) | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -25,6 +30,9 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      # The app never talks to the Kubernetes API; without this every pod
+      # carries a token that reads as the default ServiceAccount.
+      automountServiceAccountToken: false
       securityContext:
         runAsUser: 1000
         runAsNonRoot: true

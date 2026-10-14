@@ -20,6 +20,8 @@
 #include "database/Database.hpp"
 #include "domain/Role.hpp"
 #include "jobs/Jobs.hpp"
+#include "jobs/Outbox.hpp"
+#include "money/Period.hpp"
 #include "repositories/money/FxRateRepository.hpp"
 #include "repositories/money/ParseJobRepository.hpp"
 #include "test_helpers.hpp"
@@ -343,6 +345,48 @@ TEST_F(MoneyApiTest, TransfersAndBalances) {
     EXPECT_EQ(
         call_id(&Api::MoneyController::deleteTransfer, user(kBoris), Delete, body_of(x)["data"]["id"])->statusCode(),
         k404NotFound);
+
+    const json page = body_of(call(&Api::MoneyController::listTransfers, user(kAnna), Get, {{"limit", "1"}}));
+    EXPECT_EQ(page["data"].size(), 1u);
+    EXPECT_EQ(page["count"], 1);
+    EXPECT_EQ(page["total"], 2) << "total counts past the page, so a client can page";
+    EXPECT_EQ(body_of(call(&Api::MoneyController::listTransfers, user(kAnna), Get, {{"offset", "1"}}))["count"], 1);
+    EXPECT_EQ(body_of(call(&Api::MoneyController::listTransfers, user(kBoris), Get))["total"], 0);
+}
+
+TEST_F(MoneyApiTest, WithoutADateTheRateIsOfTodayInTheGivenZone) {
+    // Kiritimati is UTC+14 and Pago Pago UTC-11: at any hour one of them is on another date than UTC.
+    const auto [zone, local, utc] = Database::get().execute_read([](auto& txn) {
+        auto r = txn.exec(
+            "SELECT z, to_char(now() AT TIME ZONE z, 'YYYY-MM-DD'), to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD') "
+            "FROM unnest(ARRAY['Pacific/Kiritimati', 'Pacific/Pago_Pago']) AS z "
+            "WHERE (now() AT TIME ZONE z)::date <> (now() AT TIME ZONE 'UTC')::date LIMIT 1");
+        return std::make_tuple(
+            r[0][0].template as<std::string>(), r[0][1].template as<std::string>(), r[0][2].template as<std::string>());
+    });
+    ASSERT_NE(local, utc);
+    const std::string local_day = local;
+    const std::string utc_day = utc;
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params(
+            "INSERT INTO money_fx_rates (date, quote, per_usd) VALUES ($1::date, 'ZZZ', 7), ($2::date, 'ZZZ', 9)",
+            local_day,
+            utc_day);
+        return true;
+    });
+    const auto rate = [&](const std::vector<std::pair<std::string, std::string>>& params) {
+        return body_of(call(&Api::MoneyController::rate, user(kAnna), Get, params))["data"]["rate_date"];
+    };
+    EXPECT_EQ(rate({{"quote", "ZZZ"}, {"tz", zone}}), local);
+    EXPECT_EQ(rate({{"quote", "ZZZ"}}), utc) << "no tz: UTC";
+    const auto convert = [&](const std::vector<std::pair<std::string, std::string>>& extra) {
+        std::vector<std::pair<std::string, std::string>> params{{"amount", "1"}, {"from", "USD"}, {"to", "ZZZ"}};
+        params.insert(params.end(), extra.begin(), extra.end());
+        return body_of(call(&Api::MoneyController::convert, user(kAnna), Get, params))["data"]["rate_date"];
+    };
+    EXPECT_EQ(convert({{"tz", zone}}), local);
+    EXPECT_EQ(convert({}), utc) << "no tz: UTC";
+    EXPECT_EQ(convert({{"tz", zone}, {"date", utc}}), utc) << "a given date wins";
 }
 
 TEST_F(MoneyApiTest, InboxAndMerchantMemory) {
@@ -849,7 +893,9 @@ TEST_F(MoneyParseApiTest, TextAndReceiptAreQueuedForTheCaller) {
         body_of(call_id(&Api::MoneyController::parseStatus, user(kAnna), Get, body_of(receipt)["data"]["id"]))["data"];
     EXPECT_EQ(row["kind"], "receipt");
     EXPECT_FALSE(row.contains("image")) << "the photo never leaves";
-    EXPECT_EQ(call_id(&Api::MoneyController::parseStatus, user(kBoris), Get, id)->statusCode(), k404NotFound);
+    const auto theirs = call_id(&Api::MoneyController::parseStatus, user(kBoris), Get, id);
+    EXPECT_EQ(theirs->statusCode(), k404NotFound);
+    EXPECT_EQ(body_of(theirs)["error"], "parse_job") << "one code for a missing parse job in every module";
     auto second = Jobs::get().pick({"money_parse"}, 1);
     ASSERT_TRUE(second.has_value());
     Jobs::get().complete(second->id, json::object());
@@ -1016,4 +1062,142 @@ TEST_F(MoneyAdvisorApiTest, RunQueuesOnceAndTheReportsStayWithTheirOwner) {
     EXPECT_EQ(call_id(&Api::MoneyController::advisorReport, user(kAnna), Get, row["id"])->statusCode(), k200OK);
     EXPECT_EQ(run(json{{"period", "year"}})->statusCode(), k400BadRequest);
     EXPECT_EQ(run(json{{"date", "2026-02-30"}})->statusCode(), k400BadRequest);
+}
+
+TEST_F(MoneyAdvisorApiTest, WithoutADateTheRunIsForThePeriodOfTodayInTheGivenZone) {
+    // Kiritimati is UTC+14 and Pago Pago UTC-11: at any hour one of them is on another date than UTC.
+    const auto [zone, local, utc] = Database::get().execute_read([](auto& txn) {
+        auto r = txn.exec(
+            "SELECT z, to_char(now() AT TIME ZONE z, 'YYYY-MM-DD'), to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD') "
+            "FROM unnest(ARRAY['Pacific/Kiritimati', 'Pacific/Pago_Pago']) AS z "
+            "WHERE (now() AT TIME ZONE z)::date <> (now() AT TIME ZONE 'UTC')::date LIMIT 1");
+        return std::make_tuple(
+            r[0][0].template as<std::string>(), r[0][1].template as<std::string>(), r[0][2].template as<std::string>());
+    });
+    ASSERT_NE(local, utc);
+    auto req = TestHelpers::authed_json(user(kAnna), json{{"period", "week"}}, Post);
+    req->setParameter("tz", zone);
+    HttpResponsePtr resp;
+    controller.advisorRun(req, [&](const HttpResponsePtr& r) { resp = r; });
+    ASSERT_TRUE(resp);
+    ASSERT_EQ(resp->statusCode(), k202Accepted) << resp->body();
+    const auto week = Money::Period::of(Money::Period::Kind::week, local);
+    EXPECT_EQ(body_of(resp)["data"]["period_start"], week.from);
+    EXPECT_EQ(body_of(resp)["data"]["period_end"], week.to);
+    auto job = Jobs::get().pick({"money_advisor"}, 1);
+    ASSERT_TRUE(job.has_value());
+    Jobs::get().complete(job->id, json::object());
+}
+
+// ── the outbox path ─────────────────────────────────────────────────────────
+
+namespace {
+
+/// With a drain configured the parse and advisor jobs go through the outbox,
+/// inside the row's transaction. One fixture: both LLM settings are present.
+class MoneyOutboxApiTest : public MoneyApiTest {
+protected:
+    std::string config_file_name() const override { return "money_outbox_api_test_config.json"; }
+
+    void config_overrides(nlohmann::json& cfg) override {
+        MoneyApiTest::config_overrides(cfg);
+        cfg["jobs"]["enabled"] = true;
+        cfg["jobs"]["result_ttl"] = 3600;
+        cfg["money"]["llm"]["base_url"] = "https://llm.example/v1";
+        cfg["money"]["llm"]["api_key"] = "sk-test";
+        cfg["money"]["llm"]["model"] = "gpt-6-luna";
+        cfg["money"]["llm"]["prompt_parse"] = "Answer with JSON.";
+        cfg["money"]["llm"]["prompt_advisor"] = "Write a review.";
+        // An hourly tick never fires during the test: every drain below is an explicit call.
+        cfg["outbox"]["drain_interval_sec"] = 3600;
+    }
+
+    void SetUp() override {
+        MoneyApiTest::SetUp();
+        if (::testing::Test::IsSkipped())
+            return;
+        Database::get().execute_write([](auto& txn) {
+            txn.exec("TRUNCATE TABLE money_parse_jobs, money_advisor_reports, outbox");
+            return true;
+        });
+        TestHelpers::drain_jobs({"money_parse", "money_advisor"});
+    }
+
+    void TearDown() override {
+        if (Database::is_initialized()) {
+            try {
+                Database::get().execute_write([](auto& txn) {
+                    txn.exec("TRUNCATE TABLE outbox");
+                    return true;
+                });
+            } catch (...) {}
+        }
+        MoneyApiTest::TearDown();
+    }
+
+    static json outbox_rows() {
+        return Database::get().execute_read_primary([](auto& txn) {
+            auto r = txn.exec(
+                "SELECT COALESCE(json_agg(json_build_object('kind', kind, 'payload', payload)), '[]') FROM outbox");
+            return json::parse(r[0][0].template as<std::string>());
+        });
+    }
+
+    static long queued(const char* type) {
+        const auto depth = Jobs::get().queue_depth_by_type();
+        return depth.count(type) ? depth.at(type) : 0;
+    }
+};
+
+}  // namespace
+
+TEST_F(MoneyOutboxApiTest, WithADrainTheParseJobRidesTheRowsTransaction) {
+    ASSERT_TRUE(Jobs::Outbox::drain_configured());
+    const auto text = call_json(&Api::MoneyController::parseText, user(kAnna), json{{"text", "Kaspi *8880 100 KZT"}});
+    ASSERT_EQ(text->statusCode(), k202Accepted) << text->body();
+    const std::string id = body_of(text)["data"]["id"];
+
+    EXPECT_EQ(queued("money_parse"), 0) << "nothing is submitted directly";
+    const json rows = outbox_rows();
+    ASSERT_EQ(rows.size(), 1u) << rows.dump();
+    EXPECT_EQ(rows[0]["kind"], "money_parse");
+    EXPECT_EQ(rows[0]["payload"]["job_id"], id);
+    EXPECT_EQ(rows[0]["payload"]["owner_id"], kAnna);
+    EXPECT_EQ(rows[0]["payload"]["max_attempts"], Jobs::get().default_max_retries());
+
+    EXPECT_EQ(Jobs::Outbox::drain().submitted, 1);
+    auto job = Jobs::get().pick({"money_parse"}, 1);
+    ASSERT_TRUE(job.has_value());
+    EXPECT_EQ(job->payload["job_id"], id);
+    Jobs::get().complete(job->id, json::object());
+}
+
+TEST_F(MoneyOutboxApiTest, WithADrainTheAdvisorRunRidesTheRowsTransaction) {
+    ASSERT_TRUE(Jobs::Outbox::drain_configured());
+    const auto first =
+        call_json(&Api::MoneyController::advisorRun, user(kAnna), json{{"period", "month"}, {"date", "2026-10-07"}});
+    ASSERT_EQ(first->statusCode(), k202Accepted) << first->body();
+    const json row = body_of(first)["data"];
+    EXPECT_EQ(body_of(first)["queued"], true);
+
+    EXPECT_EQ(queued("money_advisor"), 0) << "nothing is submitted directly";
+    const json rows = outbox_rows();
+    ASSERT_EQ(rows.size(), 1u) << rows.dump();
+    EXPECT_EQ(rows[0]["kind"], "money_advisor");
+    EXPECT_EQ(rows[0]["payload"]["report_id"], row["id"]);
+    EXPECT_EQ(rows[0]["payload"]["owner_id"], kAnna);
+    EXPECT_EQ(rows[0]["payload"]["max_attempts"], Jobs::get().default_max_retries());
+
+    // The same month again queues nothing, in the outbox either.
+    const auto again =
+        call_json(&Api::MoneyController::advisorRun, user(kAnna), json{{"period", "month"}, {"date", "2026-10-20"}});
+    EXPECT_EQ(again->statusCode(), k200OK);
+    EXPECT_EQ(body_of(again)["queued"], false);
+    EXPECT_EQ(outbox_rows().size(), 1u);
+
+    EXPECT_EQ(Jobs::Outbox::drain().submitted, 1);
+    auto job = Jobs::get().pick({"money_advisor"}, 1);
+    ASSERT_TRUE(job.has_value());
+    EXPECT_EQ(job->payload["report_id"], row["id"]);
+    Jobs::get().complete(job->id, json::object());
 }

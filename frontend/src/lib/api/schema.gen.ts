@@ -5529,7 +5529,10 @@ export interface paths {
         /** Goals profile, the weight it uses and the computed daily targets */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description IANA zone of the caller: the age behind the targets is counted on today there */
+                    tz?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -5577,7 +5580,10 @@ export interface paths {
         /** Replace the goals profile */
         put: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description IANA zone of the caller: the age behind the targets is counted on today there */
+                    tz?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -6182,8 +6188,10 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    /** @description Defaults to today (UTC) */
+                    /** @description The local day; today in tz by default */
                     date?: string;
+                    /** @description IANA zone of the caller: the default day is today there */
+                    tz?: string;
                 };
                 header?: never;
                 path?: never;
@@ -6260,6 +6268,8 @@ export interface paths {
             parameters: {
                 query: {
                     from: string;
+                    /** @description IANA zone of the caller: the age behind the targets is counted on today there */
+                    tz?: string;
                 };
                 header?: never;
                 path?: never;
@@ -6792,7 +6802,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description Food module disabled, or the job is not the caller's */
+                /** @description Food module disabled, or the job is not the caller's (parse_job) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -8333,7 +8343,10 @@ export interface paths {
                     content: {
                         "application/json": {
                             data: components["schemas"]["MoneyTransfer"][];
+                            /** @description Rows in this page */
                             count: number;
+                            /** @description Rows matching the filter */
+                            total: number;
                         };
                     };
                 };
@@ -8801,9 +8814,11 @@ export interface paths {
         get: {
             parameters: {
                 query: {
-                    /** @description Defaults to today (UTC) */
+                    /** @description The local day; today in tz by default */
                     date?: string;
                     quote: string;
+                    /** @description IANA zone of the caller: the default day is today there */
+                    tz?: string;
                 };
                 header?: never;
                 path?: never;
@@ -8882,7 +8897,10 @@ export interface paths {
                     amount: number;
                     from: string;
                     to: string;
+                    /** @description The local day; today in tz by default */
                     date?: string;
+                    /** @description IANA zone of the caller: the default day is today there */
+                    tz?: string;
                 };
                 header?: never;
                 path?: never;
@@ -9490,7 +9508,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description Money module disabled, or the job is not the caller's */
+                /** @description Money module disabled, or the job is not the caller's (parse_job) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -9577,7 +9595,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description Money module disabled, or the job is not the caller's */
+                /** @description Money module disabled, or the job is not the caller's (parse_job) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -9761,7 +9779,10 @@ export interface paths {
         /** Ask for a review of the week, month or quarter containing a day (once per period; a failed one is queued again) */
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description IANA zone of the caller: the default day is today there */
+                    tz?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -9776,7 +9797,7 @@ export interface paths {
                         period?: "week" | "month" | "quarter";
                         /**
                          * Format: date
-                         * @description A day of the period; defaults to today (UTC)
+                         * @description A day of the period; today in tz by default
                          */
                         date?: string;
                     };
@@ -10597,12 +10618,15 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    status?: "open" | "done";
+                    status?: "open" | "in_progress" | "done";
                     area?: components["schemas"]["TaskArea"];
                     /** @description Over the title and the next step */
                     q?: string;
                     due_to?: string;
+                    /** @description Tasks completed on or after this day, read in tz */
                     done_since?: string;
+                    /** @description IANA zone of the caller: the day done_since starts in */
+                    tz?: string;
                     /** @description The tasks of one trip (packing) */
                     trip?: string;
                     /** @description The tasks of one project or course */
@@ -10630,7 +10654,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description A filter is not a known value or day (invalid_query) */
+                /** @description A filter is not a known value, day or zone (invalid_query) */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -11478,7 +11502,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description Tasks module disabled, or the row is not the caller's */
+                /** @description Tasks module disabled, or the job is not the caller's (parse_job) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11567,7 +11591,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description Tasks module disabled, or the row is not the caller's */
+                /** @description Tasks module disabled, or the job is not the caller's (parse_job) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11961,7 +11985,10 @@ export interface paths {
         /** A check-in of a number goal; a second one for the same date replaces the first */
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description IANA zone of the caller: the default day is today there */
+                    tz?: string;
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -11974,7 +12001,7 @@ export interface paths {
                         value: number;
                         /**
                          * Format: date
-                         * @description Defaults to today in UTC
+                         * @description The local day; today in tz by default
                          */
                         date?: string;
                         note?: string;
@@ -13708,8 +13735,10 @@ export interface paths {
                     /** @description ISO code of the target currency */
                     currency?: string;
                     days?: 30 | 90 | 365;
-                    /** @description The last day; today in UTC by default */
+                    /** @description The last day; today in tz by default */
                     date?: string;
+                    /** @description IANA zone of the caller: the default day is today there */
+                    tz?: string;
                 };
                 header?: never;
                 path?: never;

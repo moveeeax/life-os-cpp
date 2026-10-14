@@ -104,6 +104,22 @@ public:
         });
     }
 
+    /// How many rows list() would page through with the same filter.
+    long count(const std::string& owner, const Filter& f) {
+        return Database::get().execute_read([&](auto& txn) {
+            return txn
+                .exec_params(
+                    "SELECT count(*) FROM money_transfers x WHERE x.owner_id = $1::uuid "
+                    " AND ($2::date IS NULL OR x.date >= $2::date) AND ($3::date IS NULL OR x.date <= $3::date) "
+                    " AND ($4::uuid IS NULL OR x.from_account_id = $4::uuid OR x.to_account_id = $4::uuid)",
+                    owner,
+                    f.from,
+                    f.to,
+                    f.account_id)[0][0]
+                .template as<long>();
+        });
+    }
+
     /// The accounts of a transfer do not change: make a new one. @throws NotFound, Invariant, InvalidDate.
     nlohmann::json update(const std::string& owner, const std::string& id, const Patch& p) {
         return detail::translate_sql(

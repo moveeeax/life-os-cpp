@@ -17,7 +17,7 @@
 #
 # (api/Guards.hpp): 404 "<name>" while the module is off, then 401 without an
 # identity, then 403 no_user_account for a principal that is not a user.
-# config/config.production.json and the deploy/ overlays are not touched:
+# The deploy/ overlays (deploy/values-*prod.yaml) are not touched:
 # turn the module on there when it is ready.
 #
 # Safe to re-run: every patch is anchor-checked and skipped when present.

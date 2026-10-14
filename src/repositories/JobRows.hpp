@@ -7,9 +7,12 @@
  * A row goes queued -> running (one more attempt) -> done | failed, or back to
  * queued for an outage the queue retries. A `running` row older than
  * kStaleRunning was left by a worker that died: it can be claimed again, it
- * no longer counts as open (nor does a queued row that old), and a reader
- * sees it as failed. Every write after the claim is fenced by the attempt
- * start() returned, so only the current claim holder changes the row.
+ * no longer counts as open, and a reader sees it as failed (worker_lost). A
+ * `queued` row that old was lost by the queue (Redis flushed, the job never
+ * submitted): it reads as failed too (queue_lost) and does not count as open,
+ * but it stays claimable, so a late delivery still runs it. Every write
+ * after the claim is fenced by the attempt start() returned, so only the
+ * current claim holder changes the row.
  *
  * @p table is always one of the job table names spelled in code, never input.
  */
@@ -118,18 +121,26 @@ inline std::string while_open(int n) {
            "))";
 }
 
-/// The status as a reader sees it: a `running` row past kStaleRunning was left
-/// by a worker that died, and a page polling it would wait forever. If the
-/// queue still holds the job it is claimed again and turns `running` anew.
-inline std::string shown_status() {
-    return std::string("CASE WHEN status = 'running' AND COALESCE(started_at, created_at) < now() - interval '") +
-           kStaleRunning + "' THEN 'failed' ELSE status END";
+/// SQL condition: the row's clock (the last claim, else the creation) is
+/// older than kStaleRunning.
+inline std::string stale_sql() {
+    return std::string("COALESCE(started_at, created_at) < now() - interval '") + kStaleRunning + "'";
 }
 
-/// The error next to shown_status(): `worker_lost` for such a row.
+/// The status as a reader sees it: a `running` row past kStaleRunning was left
+/// by a worker that died, a `queued` row that old never reached a worker (the
+/// queue lost it), and a page polling either would wait forever. If a delivery
+/// still arrives the row is claimed and turns `running` anew.
+inline std::string shown_status() {
+    return "CASE WHEN status IN ('queued', 'running') AND " + stale_sql() + " THEN 'failed' ELSE status END";
+}
+
+/// The error next to shown_status(): `worker_lost` or `queue_lost` for such a row.
 inline std::string shown_error() {
-    return std::string("CASE WHEN status = 'running' AND COALESCE(started_at, created_at) < now() - interval '") +
-           kStaleRunning + "' THEN 'worker_lost: the worker stopped while running the job' ELSE error END";
+    return "CASE WHEN status = 'running' AND " + stale_sql() +
+           " THEN 'worker_lost: the worker stopped while running the job'"
+           " WHEN status = 'queued' AND " +
+           stale_sql() + " THEN 'queue_lost: the job never reached a worker' ELSE error END";
 }
 
 }  // namespace Repositories::JobRows

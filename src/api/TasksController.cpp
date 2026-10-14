@@ -24,6 +24,7 @@
 #include "api/Validation.hpp"
 #include "core/Modules.hpp"
 #include "jobs/Jobs.hpp"
+#include "jobs/Outbox.hpp"
 #include "jobs/TasksParseHandler.hpp"
 #include "repositories/JobRows.hpp"
 #include "repositories/Zones.hpp"
@@ -130,7 +131,7 @@ void source_fields(Validation::Errors& errs, const json& body, const std::string
     if (kind == "money_transaction") {
         if (!is_valid_uuid(ref)) {
             errs.add("source_ref", "bad_format", "a ledger row id is a uuid");
-        } else if (Core::money_enabled() && !Repo::TaskRepository().money_row_is_owners(owner, ref)) {
+        } else if (!Repo::TaskRepository().money_row_is_owners(owner, ref)) {
             errs.add("source_ref", "not_yours", "the ledger row is not yours");
         }
     }
@@ -228,6 +229,9 @@ void TasksController::listItems(const HttpRequestPtr& req, Callback&& callback) 
     f.done_since = req->getParameter("done_since");
     f.trip = req->getParameter("trip");
     f.project = req->getParameter("project");
+    if (!req->getParameter("tz").empty()) {
+        f.tz = req->getParameter("tz");
+    }
     f.limit = clamp_int(req->getParameter("limit"), kDefaultLimit, 1, kMaxLimit);
     f.offset = clamp_int(req->getParameter("offset"), 0, 0, 1000000);
     const auto bad = [](const std::string& v, const std::vector<std::string>& allowed) {
@@ -241,6 +245,10 @@ void TasksController::listItems(const HttpRequestPtr& req, Callback&& callback) 
         return;
     }
     with_repo_errors(callback, "tasks.listItems", [&] {
+        if (!Repo::TaskRepository::is_timezone(f.tz)) {
+            callback(ErrorResponse::bad_request("invalid_query", "tz must be an IANA zone like Asia/Bangkok"));
+            return;
+        }
         const json page = Repo::TaskRepository().list(owner, f);
         callback(Response::ok(
             json{{"data", page["data"]}, {"total", page["total"]}, {"limit", f.limit}, {"offset", f.offset}}));
@@ -485,6 +493,16 @@ void TasksController::parse(const HttpRequestPtr& req, Callback&& callback) {
     const auto note_id = Validation::opt_string(body, "note_id");
     Repo::ParseJobRepository repo;
     std::string id;
+    const auto payload = [&](const std::string& job_id) {
+        return json{{"job_id", job_id},
+                    {"owner_id", owner},
+                    {"max_attempts", Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries}};
+    };
+    // The job rides the row's transaction as an outbox row when a drain is configured
+    // (Jobs::Outbox::enqueue_if_drained): a crash after the commit cannot leave the row
+    // queued with no job behind it. With the drain off (OUTBOX_DRAIN_INTERVAL_SEC=0: the
+    // compose stack, the test suites) the direct submit below follows the commit, as before.
+    bool via_outbox = false;
     try {
         if (repo.open_count(owner) >= Repositories::JobRows::kOpenMax) {
             callback(ErrorResponse::make({k429TooManyRequests,
@@ -493,7 +511,15 @@ void TasksController::parse(const HttpRequestPtr& req, Callback&& callback) {
                                           json{{"retry_after_sec", 30}}}));
             return;
         }
-        id = repo.create(owner, text, hint, note_id)["id"].get<std::string>();
+        id = repo.create(owner,
+                         text,
+                         hint,
+                         note_id,
+                         [&](auto& txn, const std::string& job_id) {
+                             via_outbox =
+                                 Jobs::Outbox::enqueue_if_drained(txn, Jobs::TasksParse::kJobType, payload(job_id));
+                         })["id"]
+                 .get<std::string>();
     } catch (const Repositories::NotFoundError&) {
         callback(ErrorResponse::not_found("task_note"));
         return;
@@ -507,12 +533,12 @@ void TasksController::parse(const HttpRequestPtr& req, Callback&& callback) {
         return;
     }
     try {
-        if (!Jobs::is_initialized()) {
-            throw std::runtime_error("the job queue is not initialized");
+        if (!via_outbox) {
+            if (!Jobs::is_initialized()) {
+                throw std::runtime_error("the job queue is not initialized");
+            }
+            Jobs::get().submit(Jobs::TasksParse::kJobType, payload(id));
         }
-        Jobs::get().submit(
-            Jobs::TasksParse::kJobType,
-            json{{"job_id", id}, {"owner_id", owner}, {"max_attempts", Jobs::get().default_max_retries()}});
     } catch (const std::exception& e) {
         spdlog::warn("tasks parse enqueue unavailable: {}", e.what());
         try {
@@ -536,7 +562,7 @@ void TasksController::parseStatus(const HttpRequestPtr& req, Callback&& callback
     with_repo_errors(callback, "tasks.parseStatus", [&] {
         const auto row = Repo::ParseJobRepository().get(owner, id);
         if (!row) {
-            callback(ErrorResponse::not_found("task_parse"));
+            callback(ErrorResponse::not_found("parse_job"));
             return;
         }
         callback(Response::ok(json{{"data", *row}}));
@@ -563,7 +589,7 @@ void TasksController::parseAccept(const HttpRequestPtr& req, Callback&& callback
         return;
     }
     if (!job) {
-        callback(ErrorResponse::not_found("task_parse"));
+        callback(ErrorResponse::not_found("parse_job"));
         return;
     }
     Validation::Errors errs;

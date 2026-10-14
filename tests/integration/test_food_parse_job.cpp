@@ -310,6 +310,24 @@ TEST_F(FoodParseJobTest, AStaleRunningRowIsClaimedAgain) {
     EXPECT_EQ((*jobs.get(kAnna, id))["status"], "done") << "a late result does not overwrite a finished row";
 }
 
+TEST_F(FoodParseJobTest, AQueuedRowTheQueueLostReadsAsFailedUntilADeliveryClaimsIt) {
+    const std::string id = queued();
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE food_parse_jobs SET created_at = now() - interval '11 minutes' WHERE id = $1::uuid",
+                        id);
+        return true;
+    });
+    const json polled = *jobs.get(kAnna, id);
+    EXPECT_EQ(polled["status"], "failed") << "a page polling a row the queue lost must stop waiting";
+    EXPECT_EQ(polled["error"].get<std::string>().rfind("queue_lost", 0), 0u) << polled.dump();
+    EXPECT_EQ(jobs.open_count(kAnna), 0) << "nor does the row hold a parse slot";
+
+    // The row stayed queued underneath: a late delivery still claims and finishes it.
+    provider.replies.push_back({200, completion(kGoodLines)});
+    EXPECT_EQ(run(id)["status"], "done");
+    EXPECT_EQ((*jobs.get(kAnna, id))["status"], "done");
+}
+
 TEST_F(FoodParseJobTest, TheRetryLimitComesWithTheJob) {
     const std::string id = queued();
     provider.fail = true;

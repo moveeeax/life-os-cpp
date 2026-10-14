@@ -156,9 +156,10 @@ void Application::validate_config_(Config::AppConfig& cfg) {
                 "dropped and session cookies would travel over plaintext. Set AUTH_COOKIE_SECURE=true.");
     }
     // Production-safety checks the BINARY enforces regardless of which config
-    // profile / env produced the values — so the Helm deploy path can't quietly
-    // bypass them the way it bypasses prod-check.sh / env-check.sh (they only
-    // run against config.production.json, never the gitignored values-prod.yaml).
+    // profile / env produced the values. scripts/prod-check.sh and
+    // scripts/check-helm-render.sh assert the same floor on the rendered
+    // chart (deploy/values-prod.yaml) before a deploy; this is the last line
+    // when a pod is started with values those gates never saw.
     if (is_prod) {
         if (!cfg.get<bool>("rate_limit.enabled", "RATE_LIMIT_ENABLED", false))
             spdlog::warn(

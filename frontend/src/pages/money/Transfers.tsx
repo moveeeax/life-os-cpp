@@ -180,7 +180,7 @@ export function TransfersList({
 }) {
   const transfers = useTransfers(from, to, account || undefined);
   const [open, setOpen] = useState<Transfer | null>(null);
-  const rows = transfers.data ?? [];
+  const rows = transfers.data?.pages.flatMap((p) => p.data) ?? [];
   if (rows.length === 0) return null;
   const name = (id: string) => accounts.find((a) => a.id === id)?.name ?? '';
   const money = (n: number, c: string) => formatMoney(n, c, decimalsOf(currencies, c));
@@ -218,6 +218,16 @@ export function TransfersList({
           </span>
         </Row>
       ))}
+      {transfers.hasNextPage && (
+        <button
+          type="button"
+          onClick={() => void transfers.fetchNextPage()}
+          disabled={transfers.isFetchingNextPage}
+          className={secondaryButton}
+        >
+          {transfers.isFetchingNextPage ? 'Loading…' : 'Show more transfers'}
+        </button>
+      )}
       {open && (
         <Modal onClose={() => setOpen(null)} className="max-w-lg">
           <TransferEditor transfer={open} onClose={() => setOpen(null)} />

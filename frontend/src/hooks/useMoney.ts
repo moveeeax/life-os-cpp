@@ -119,16 +119,20 @@ export function useTransaction(id: string | null) {
   });
 }
 
+/** Transfers of the period, a page at a time; `total` says how many match the filter. */
 export function useTransfers(from?: string, to?: string, account?: string) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: qk.money.transfers(from, to, account),
-    queryFn: async ({ signal }) =>
-      (
-        await api.getJson<{ data: Transfer[] }>(`${BASE}/transfers`, {
-          query: { from, to, account, limit: 200 },
-          signal,
-        })
-      ).data,
+    initialPageParam: 0,
+    queryFn: ({ pageParam, signal }) =>
+      api.getJson<{ data: Transfer[]; total: number }>(`${BASE}/transfers`, {
+        query: { from, to, account, limit: TRANSACTION_PAGE, offset: pageParam },
+        signal,
+      }),
+    getNextPageParam: (last, pages) => {
+      const loaded = pages.reduce((n, p) => n + p.data.length, 0);
+      return last.data.length > 0 && loaded < last.total ? loaded : undefined;
+    },
   });
 }
 
