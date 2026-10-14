@@ -201,7 +201,8 @@ export function usePatchSession(id: string, onDone?: (session: WorkoutSession) =
     async (body: WorkoutSessionPatch) =>
       (await api.patchJson<{ data: WorkoutSession }>(`${BASE}/sessions/${id}`, { body })).data,
     {
-      invalidate: [qk.workout.sessions(), qk.workout.heartRate(id)],
+      // A finished session ticks a workout habit and the Habits plate of Now.
+      invalidate: [qk.workout.sessions(), qk.workout.heartRate(id), qk.habits.all(), qk.now.all()],
       onSuccess: (session) => {
         cacheSession(qc, session);
         onDone?.(session);
@@ -213,7 +214,7 @@ export function usePatchSession(id: string, onDone?: (session: WorkoutSession) =
 export function useDeleteSession(id: string, onDone: () => void) {
   const qc = useQueryClient();
   return useApiMutation(() => api.deleteJson<unknown>(`${BASE}/sessions/${id}`), {
-    invalidate: [qk.workout.sessions()],
+    invalidate: [qk.workout.sessions(), qk.habits.all(), qk.now.all()],
     onSuccess: () => {
       qc.removeQueries({ queryKey: qk.workout.session(id) });
       qc.setQueryData<WorkoutSession | null>(qk.workout.active(), (s) => (s?.id === id ? null : s));

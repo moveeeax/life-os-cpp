@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 
+import { useHabitsEnabled } from '@/hooks/useHabits';
 import { useSaveNowSettings } from '@/hooks/useNow';
 import {
   CHIP_LABEL,
@@ -17,14 +18,22 @@ const CHIP_KEYS = Object.keys(CHIP_LABEL) as Chip['key'][];
 /** The weather city and which chip sits in which corner of Now. */
 export function ArrangeSheet({
   settings,
+  initialCorners,
   onClose,
 }: {
   settings: NowSettings;
+  /** A layout to start from instead of the saved one (Habits' "Show on Now"). */
+  initialCorners?: NowCorners;
   onClose: () => void;
 }) {
   const [city, setCity] = useState(settings.city ?? '');
   // A chip an older or newer client saved, unknown here, is offered as an empty corner.
-  const [corners, setCorners] = useState<NowCorners>(() => cleanCorners(settings.corners));
+  const [corners, setCorners] = useState<NowCorners>(() =>
+    cleanCorners(initialCorners ?? settings.corners),
+  );
+  // A chip of a module switched off is not offered.
+  const habitsOn = useHabitsEnabled(true);
+  const offered = CHIP_KEYS.filter((c) => c !== 'habits' || habitsOn);
   const save = useSaveNowSettings(onClose);
   // Picking a chip already in another corner moves it: that corner turns empty.
   const pick = (corner: (typeof CORNER_KEYS)[number], value: string) => {
@@ -62,7 +71,7 @@ export function ArrangeSheet({
               <span>{CORNER_LABEL[k]}</span>
               <select value={corners[k] ?? ''} onChange={(e) => pick(k, e.target.value)}>
                 <option value="">Nothing</option>
-                {CHIP_KEYS.map((c) => (
+                {offered.map((c) => (
                   <option key={c} value={c}>
                     {CHIP_LABEL[c]}
                   </option>

@@ -169,3 +169,10 @@ api -> goals
 api -> repositories/goals
 api -> repositories/travel
 api -> travel
+habits -> utils
+repositories/habits -> database
+repositories/habits -> habits
+repositories/habits -> repositories
+repositories/habits -> repositories/fitness
+api -> habits
+api -> repositories/habits

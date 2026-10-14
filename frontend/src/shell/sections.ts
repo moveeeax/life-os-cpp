@@ -18,6 +18,7 @@ export const NAV: readonly NavItem[] = [
   { key: 'now', label: 'Now', to: '/now' },
   { key: 'tasks', label: 'Tasks', to: '/tasks' },
   { key: 'goals', label: 'Goals', to: '/goals' },
+  { key: 'habits', label: 'Habits', to: '/habits' },
   { key: 'travel', label: 'Travel', to: '/travel' },
   { key: 'money', label: 'Money', to: '/money' },
   { key: 'food', label: 'Food', to: '/food' },

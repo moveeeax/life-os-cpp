@@ -285,6 +285,12 @@ travel:
   enabled: false
 
 # ---------------------------------------------------------------
+# habits module — habits ticked by hand or from Mi Fitness and Training. Env var set: HABITS_ENABLED.
+# ---------------------------------------------------------------
+habits:
+  enabled: false
+
+# ---------------------------------------------------------------
 # now module — the Now screen's digest, the focus of the day and the
 # wallpaper library. Env var set: NOW_ENABLED.
 # ---------------------------------------------------------------

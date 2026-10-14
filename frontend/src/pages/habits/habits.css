@@ -1,0 +1,130 @@
+/* Habits: the tick ring beside a row, the 30-day strip, the week grid. */
+.h-tick {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  margin-top: 9px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--g-ink-faint);
+  background: none;
+  cursor: pointer;
+}
+.h-tick[aria-pressed='true'] {
+  background: var(--g-ok);
+  border-color: var(--g-ok);
+}
+.h-tick[aria-pressed='true']::after {
+  content: '✓';
+  display: block;
+  color: #0b1020;
+  font-size: 13px;
+  line-height: 19px;
+  text-align: center;
+}
+.h-tick:disabled {
+  cursor: default;
+}
+.h-tick:focus-visible,
+.h-c:focus-visible {
+  outline: 2px solid var(--g-brand);
+  outline-offset: 2px;
+}
+.h-auto {
+  color: var(--g-ink-faint);
+  font-size: 12.5px;
+}
+.h-strip-wrap {
+  display: grid;
+  gap: 4px;
+}
+.h-strip {
+  display: grid;
+  grid-template-columns: repeat(30, minmax(0, 1fr));
+  gap: 3px;
+  max-width: 330px;
+}
+.h-strip i {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--g-ink-ghost);
+}
+.h-strip i.h-on {
+  background: var(--g-ok);
+}
+.h-foot {
+  margin: 14px 0 4px;
+  font-size: 13px;
+}
+.h-often {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.h-per-week {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--g-ink-soft);
+}
+.h-per-week select {
+  width: auto;
+}
+
+/* The week: a name, seven days, the streak or the week's count. */
+.h-week {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(7, 22px) 64px;
+  align-items: center;
+  gap: 8px 6px;
+  margin-top: 6px;
+  font-size: 14px;
+}
+.h-h {
+  color: var(--g-ink-faint);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+.h-n {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.h-c {
+  width: 16px;
+  height: 16px;
+  justify-self: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--g-ink-faint);
+  background: none;
+  cursor: pointer;
+}
+.h-c.h-c-manual {
+  background: var(--g-ink);
+  border-color: var(--g-ink);
+}
+.h-c.h-c-auto {
+  background: var(--g-ok);
+  border-color: var(--g-ok);
+  cursor: default;
+}
+.h-c.h-c-future {
+  border-color: var(--g-ink-ghost);
+  cursor: default;
+}
+.h-end {
+  font-size: 12.5px;
+  color: var(--g-ink-soft);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.h-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--g-ink-faint);
+}

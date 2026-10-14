@@ -7,7 +7,7 @@ import { quietLines, type LinePart } from './lines';
 import type { Today } from './types';
 
 export interface Chip {
-  key: 'body' | 'goals' | 'day' | 'tasks';
+  key: 'body' | 'goals' | 'day' | 'tasks' | 'habits';
   title: string;
   main: LinePart[];
   small: LinePart[];
@@ -201,9 +201,47 @@ function tasksChip(t: Today): Chip {
   return { key: 'tasks', title: 'Tasks', main, small, dot: late ? 'late' : null };
 }
 
-/** The four corners in their order: top left, top right, bottom left, bottom right. */
+/** The hour from which an open daily habit lights the dot of the Habits plate. */
+export const HABITS_EVENING_HOUR = 20;
+
+function habitsChip(t: Today, hour: number): Chip {
+  const h = t.habits;
+  if (!h || h.total === 0) {
+    return {
+      key: 'habits',
+      title: 'Habits',
+      main: [{ text: 'No habits yet' }],
+      small: [],
+      dot: null,
+    };
+  }
+  const main: LinePart[] = [
+    { text: String(h.done), num: true },
+    { text: ' of ' },
+    { text: String(h.total), num: true },
+    { text: ' today' },
+  ];
+  const small: LinePart[] = h.left.length
+    ? [{ text: `${h.left.join(', ')} left`, title: true }]
+    : [{ text: h.done >= h.total ? 'All done today' : 'Every day done' }];
+  return {
+    key: 'habits',
+    title: 'Habits',
+    main,
+    small,
+    dot: h.left.length > 0 && hour >= HABITS_EVENING_HOUR ? 'warn' : null,
+  };
+}
+
+/** Every chip in the default order: the four corners, then Habits (placed through Arrange). */
 export function chips(today: Today, hour: number, todayDate: string): Chip[] {
-  return [bodyChip(today), goalsChip(today, todayDate), dayChip(today, hour), tasksChip(today)];
+  return [
+    bodyChip(today),
+    goalsChip(today, todayDate),
+    dayChip(today, hour),
+    tasksChip(today),
+    habitsChip(today, hour),
+  ];
 }
 
 /** The pace word of a goal in the digest: the same words as the Goals page. */
