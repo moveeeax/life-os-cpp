@@ -136,3 +136,16 @@ TEST_F(GoalsRepositoryTest, DeletingAGoalUnlinksItsTasks) {
     EXPECT_TRUE(after["goal_section_id"].is_null());
     EXPECT_EQ(after["status"], "in_progress");
 }
+
+TEST_F(GoalsRepositoryTest, TheForeignKeysDeletesFollowAreIndexed) {
+    // Migration 040: a task or goal delete reaches these children through the
+    // foreign key; without an index each delete scans the child table.
+    const long n = Database::get().execute_read([](auto& txn) {
+        return txn
+            .exec(
+                "SELECT count(*) FROM pg_indexes WHERE schemaname = 'public' AND indexname IN "
+                "('notes_task', 'idx_task_notes_task', 'idx_goal_milestones_goal')")[0][0]
+            .template as<long>();
+    });
+    EXPECT_EQ(n, 3);
+}
