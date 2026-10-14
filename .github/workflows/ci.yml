@@ -5,9 +5,12 @@ on:
     branches: [master, main]
   pull_request:
 
+# A newer push to a PR supersedes the running check; a push to master never
+# cancels the previous master run, so every merged commit gets a full verdict
+# (release.yml looks the tagged SHA's CI run up and needs it to finish).
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # CI only reads the repo; release/builder-cache workflows declare their own
 # write scopes explicitly. pull-requests: read exists solely for the
@@ -32,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          fetch-depth: 2  # HEAD^ for the push-event scope diff
+          fetch-depth: 2  # HEAD^ fallback for the push-event scope diff
 
       - name: Scope — does the diff touch anything this job builds?
         # Self-scoping, NOT a workflow-level `paths:` filter: the job always
@@ -44,15 +47,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PUSH_BEFORE: ${{ github.event.before }}
           RELEVANT: '^(src/|tests/|migrations/|docker/|config/|templates/|third_party/|scripts/|CMakeLists\.txt$|CMakePresets\.json$|vcpkg\.json$|Makefile$|\.github/workflows/ci\.yml$)'
         run: |
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             changed=$(gh api --paginate \
               "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
               --jq '.[].filename') || changed=""
+          elif [ -n "$PUSH_BEFORE" ] && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            # push: diff the whole push (before..sha), not just its last
+            # commit — a multi-commit push would otherwise hide every change
+            # but the head's. Fetch the old tip (the checkout is shallow);
+            # any failure (force-push to an unreachable SHA) fails open below.
+            changed=$(git fetch --no-tags --depth=1 origin "$PUSH_BEFORE" >/dev/null 2>&1 &&
+              git diff --name-only "$PUSH_BEFORE" "$GITHUB_SHA" 2>/dev/null) || changed=""
           else
-            # push: first-parent diff of the pushed head (checkout fetched
-            # depth 2). HEAD^ is absent on a root commit → fail open below.
+            # push that created the branch (before is all zeros): first-parent
+            # diff of the head (checkout fetched depth 2). HEAD^ is absent on a
+            # root commit → fail open below.
             changed=$(git diff --name-only HEAD^..HEAD 2>/dev/null) || changed=""
           fi
           if [ -z "$changed" ]; then
@@ -225,7 +237,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          fetch-depth: 2  # HEAD^ for the push-event scope diff
+          fetch-depth: 2  # HEAD^ fallback for the push-event scope diff
 
       - name: Scope — does the diff touch the gates?
         # Same self-scoping contract as the heavy jobs: always start, exit
@@ -234,15 +246,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PUSH_BEFORE: ${{ github.event.before }}
           RELEVANT: '^(scripts/|helm/|deploy/|\.github/workflows/)'
         run: |
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             changed=$(gh api --paginate \
               "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
               --jq '.[].filename') || changed=""
+          elif [ -n "$PUSH_BEFORE" ] && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            # push: diff the whole push (before..sha), not just its last
+            # commit — a multi-commit push would otherwise hide every change
+            # but the head's. Fetch the old tip (the checkout is shallow);
+            # any failure (force-push to an unreachable SHA) fails open below.
+            changed=$(git fetch --no-tags --depth=1 origin "$PUSH_BEFORE" >/dev/null 2>&1 &&
+              git diff --name-only "$PUSH_BEFORE" "$GITHUB_SHA" 2>/dev/null) || changed=""
           else
-            # push: first-parent diff of the pushed head (checkout fetched
-            # depth 2). HEAD^ is absent on a root commit → fail open below.
+            # push that created the branch (before is all zeros): first-parent
+            # diff of the head (checkout fetched depth 2). HEAD^ is absent on a
+            # root commit → fail open below.
             changed=$(git diff --name-only HEAD^..HEAD 2>/dev/null) || changed=""
           fi
           if [ -z "$changed" ]; then
@@ -286,7 +307,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          fetch-depth: 2  # HEAD^ for the push-event scope diff
+          fetch-depth: 2  # HEAD^ fallback for the push-event scope diff
 
       - name: Scope — does the diff touch anything this job builds?
         # Self-scoping, NOT a workflow-level `paths:` filter: the job always
@@ -298,15 +319,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PUSH_BEFORE: ${{ github.event.before }}
           RELEVANT: '^(src/|tests/|migrations/|docker/|config/|templates/|third_party/|scripts/|CMakeLists\.txt$|CMakePresets\.json$|vcpkg\.json$|Makefile$|\.github/workflows/ci\.yml$)'
         run: |
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             changed=$(gh api --paginate \
               "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
               --jq '.[].filename') || changed=""
+          elif [ -n "$PUSH_BEFORE" ] && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            # push: diff the whole push (before..sha), not just its last
+            # commit — a multi-commit push would otherwise hide every change
+            # but the head's. Fetch the old tip (the checkout is shallow);
+            # any failure (force-push to an unreachable SHA) fails open below.
+            changed=$(git fetch --no-tags --depth=1 origin "$PUSH_BEFORE" >/dev/null 2>&1 &&
+              git diff --name-only "$PUSH_BEFORE" "$GITHUB_SHA" 2>/dev/null) || changed=""
           else
-            # push: first-parent diff of the pushed head (checkout fetched
-            # depth 2). HEAD^ is absent on a root commit → fail open below.
+            # push that created the branch (before is all zeros): first-parent
+            # diff of the head (checkout fetched depth 2). HEAD^ is absent on a
+            # root commit → fail open below.
             changed=$(git diff --name-only HEAD^..HEAD 2>/dev/null) || changed=""
           fi
           if [ -z "$changed" ]; then
@@ -444,7 +474,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          fetch-depth: 2  # HEAD^ for the push-event scope diff
+          fetch-depth: 2  # HEAD^ fallback for the push-event scope diff
 
       - name: Scope — does the diff touch the frontend?
         # Self-scoping, NOT a workflow-level `paths:` filter: the job always
@@ -457,15 +487,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PUSH_BEFORE: ${{ github.event.before }}
           RELEVANT: '^(frontend/|docs/openapi\.yaml$|\.github/workflows/ci\.yml$)'
         run: |
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             changed=$(gh api --paginate \
               "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
               --jq '.[].filename') || changed=""
+          elif [ -n "$PUSH_BEFORE" ] && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            # push: diff the whole push (before..sha), not just its last
+            # commit — a multi-commit push would otherwise hide every change
+            # but the head's. Fetch the old tip (the checkout is shallow);
+            # any failure (force-push to an unreachable SHA) fails open below.
+            changed=$(git fetch --no-tags --depth=1 origin "$PUSH_BEFORE" >/dev/null 2>&1 &&
+              git diff --name-only "$PUSH_BEFORE" "$GITHUB_SHA" 2>/dev/null) || changed=""
           else
-            # push: first-parent diff of the pushed head (checkout fetched
-            # depth 2). HEAD^ is absent on a root commit → fail open below.
+            # push that created the branch (before is all zeros): first-parent
+            # diff of the head (checkout fetched depth 2). HEAD^ is absent on a
+            # root commit → fail open below.
             changed=$(git diff --name-only HEAD^..HEAD 2>/dev/null) || changed=""
           fi
           if [ -z "$changed" ]; then
@@ -524,7 +563,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          fetch-depth: 2  # HEAD^ for the push-event scope diff
+          fetch-depth: 2  # HEAD^ fallback for the push-event scope diff
 
       - name: Scope — does the diff touch anything this job builds?
         # Self-scoping, NOT a workflow-level `paths:` filter: the job always
@@ -536,15 +575,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PUSH_BEFORE: ${{ github.event.before }}
           RELEVANT: '^(src/|tests/|migrations/|docker/|config/|templates/|third_party/|scripts/|CMakeLists\.txt$|CMakePresets\.json$|vcpkg\.json$|Makefile$|\.github/workflows/ci\.yml$)'
         run: |
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             changed=$(gh api --paginate \
               "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
               --jq '.[].filename') || changed=""
+          elif [ -n "$PUSH_BEFORE" ] && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            # push: diff the whole push (before..sha), not just its last
+            # commit — a multi-commit push would otherwise hide every change
+            # but the head's. Fetch the old tip (the checkout is shallow);
+            # any failure (force-push to an unreachable SHA) fails open below.
+            changed=$(git fetch --no-tags --depth=1 origin "$PUSH_BEFORE" >/dev/null 2>&1 &&
+              git diff --name-only "$PUSH_BEFORE" "$GITHUB_SHA" 2>/dev/null) || changed=""
           else
-            # push: first-parent diff of the pushed head (checkout fetched
-            # depth 2). HEAD^ is absent on a root commit → fail open below.
+            # push that created the branch (before is all zeros): first-parent
+            # diff of the head (checkout fetched depth 2). HEAD^ is absent on a
+            # root commit → fail open below.
             changed=$(git diff --name-only HEAD^..HEAD 2>/dev/null) || changed=""
           fi
           if [ -z "$changed" ]; then
@@ -640,7 +688,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          fetch-depth: 2  # HEAD^ for the push-event scope diff
+          fetch-depth: 2  # HEAD^ fallback for the push-event scope diff
 
       - name: Scope — does the diff touch anything this job builds?
         # Self-scoping, NOT a workflow-level `paths:` filter: the job always
@@ -652,15 +700,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PUSH_BEFORE: ${{ github.event.before }}
           RELEVANT: '^(src/|tests/|migrations/|docker/|config/|templates/|third_party/|scripts/|CMakeLists\.txt$|CMakePresets\.json$|vcpkg\.json$|Makefile$|\.github/workflows/ci\.yml$)'
         run: |
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             changed=$(gh api --paginate \
               "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
               --jq '.[].filename') || changed=""
+          elif [ -n "$PUSH_BEFORE" ] && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            # push: diff the whole push (before..sha), not just its last
+            # commit — a multi-commit push would otherwise hide every change
+            # but the head's. Fetch the old tip (the checkout is shallow);
+            # any failure (force-push to an unreachable SHA) fails open below.
+            changed=$(git fetch --no-tags --depth=1 origin "$PUSH_BEFORE" >/dev/null 2>&1 &&
+              git diff --name-only "$PUSH_BEFORE" "$GITHUB_SHA" 2>/dev/null) || changed=""
           else
-            # push: first-parent diff of the pushed head (checkout fetched
-            # depth 2). HEAD^ is absent on a root commit → fail open below.
+            # push that created the branch (before is all zeros): first-parent
+            # diff of the head (checkout fetched depth 2). HEAD^ is absent on a
+            # root commit → fail open below.
             changed=$(git diff --name-only HEAD^..HEAD 2>/dev/null) || changed=""
           fi
           if [ -z "$changed" ]; then
@@ -793,7 +850,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          fetch-depth: 2  # HEAD^ for the push-event scope diff
+          fetch-depth: 2  # HEAD^ fallback for the push-event scope diff
 
       - name: Scope — does the diff touch anything this job builds?
         # Self-scoping, NOT a workflow-level `paths:` filter: the job always
@@ -805,15 +862,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PUSH_BEFORE: ${{ github.event.before }}
           RELEVANT: '^(src/|tests/|migrations/|docker/|config/|templates/|third_party/|scripts/|CMakeLists\.txt$|CMakePresets\.json$|vcpkg\.json$|Makefile$|\.github/workflows/ci\.yml$)'
         run: |
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             changed=$(gh api --paginate \
               "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
               --jq '.[].filename') || changed=""
+          elif [ -n "$PUSH_BEFORE" ] && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            # push: diff the whole push (before..sha), not just its last
+            # commit — a multi-commit push would otherwise hide every change
+            # but the head's. Fetch the old tip (the checkout is shallow);
+            # any failure (force-push to an unreachable SHA) fails open below.
+            changed=$(git fetch --no-tags --depth=1 origin "$PUSH_BEFORE" >/dev/null 2>&1 &&
+              git diff --name-only "$PUSH_BEFORE" "$GITHUB_SHA" 2>/dev/null) || changed=""
           else
-            # push: first-parent diff of the pushed head (checkout fetched
-            # depth 2). HEAD^ is absent on a root commit → fail open below.
+            # push that created the branch (before is all zeros): first-parent
+            # diff of the head (checkout fetched depth 2). HEAD^ is absent on a
+            # root commit → fail open below.
             changed=$(git diff --name-only HEAD^..HEAD 2>/dev/null) || changed=""
           fi
           if [ -z "$changed" ]; then
