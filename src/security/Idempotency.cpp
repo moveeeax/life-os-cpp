@@ -26,6 +26,7 @@
 
 #include "cache/Cache.hpp"
 #include "security/Auth.hpp"
+#include "security/RateLimit.hpp"
 #include "utils/Config.hpp"
 #include "utils/Crypto.hpp"
 #include "utils/ErrorResponse.hpp"
@@ -208,11 +209,13 @@ drogon::HttpResponsePtr pre_handle(const drogon::HttpRequestPtr& req) {
     // two different real users sharing an Idempotency-Key would cross-replay
     // each other's cached responses (a data leak under the AUTH_MODE=none
     // default). With auth on, the principal subject is unique and used as-is.
+    // The IP is the shared trusted resolver's (honours rate_limit.trust_proxy):
+    // behind the ingress the raw peer is the proxy, the same for every caller.
     std::string principal;
     if (auto p = Security::Auth::principal_of(req); p && !p->subject.empty())
         principal = p->subject;
     else
-        principal = "anon:" + req->getPeerAddr().toIp();
+        principal = "anon:" + Security::RateLimit::client_ip(req);
     const std::string ck = cache_key(principal, std::string(req->getMethodString()), req->path(), key);
 
     if (auto stored = read_stored_entry(ck)) {

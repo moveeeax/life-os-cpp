@@ -17,8 +17,18 @@ namespace Net::Http {
 
 namespace {
 
+/// Largest response body any caller of this client needs (LLM answers, rate
+/// tables, Open Food Facts records are all well under it).
+constexpr std::size_t kMaxResponseBytes = 16 * 1024 * 1024;
+
 std::size_t append_body(const char* data, std::size_t size, std::size_t nmemb, void* user) {
-    static_cast<std::string*>(user)->append(data, size * nmemb);
+    auto* body = static_cast<std::string*>(user);
+    // Returning less than handed over makes curl abort with CURLE_WRITE_ERROR:
+    // a body past the cap (a server that streams without Content-Length)
+    // never grows the string beyond it.
+    if (body->size() + size * nmemb > kMaxResponseBytes)
+        return 0;
+    body->append(data, size * nmemb);
     return size * nmemb;
 }
 
@@ -50,6 +60,17 @@ Response perform(CURL* handle,
     ::curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1L);
     ::curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1L);
     ::curl_easy_setopt(handle, CURLOPT_MAXREDIRS, 3L);
+    // Only http and https, for the first request and for every redirect: a
+    // redirect to file:// or gopher:// must not be followed.
+#if LIBCURL_VERSION_NUM >= 0x075500
+    ::curl_easy_setopt(handle, CURLOPT_PROTOCOLS_STR, "http,https");
+    ::curl_easy_setopt(handle, CURLOPT_REDIR_PROTOCOLS_STR, "http,https");
+#else
+    ::curl_easy_setopt(handle, CURLOPT_PROTOCOLS, static_cast<long>(CURLPROTO_HTTP | CURLPROTO_HTTPS));
+    ::curl_easy_setopt(handle, CURLOPT_REDIR_PROTOCOLS, static_cast<long>(CURLPROTO_HTTP | CURLPROTO_HTTPS));
+#endif
+    // Refuse up front when the server announces a larger body.
+    ::curl_easy_setopt(handle, CURLOPT_MAXFILESIZE_LARGE, static_cast<curl_off_t>(kMaxResponseBytes));
     ::curl_easy_setopt(handle, CURLOPT_ACCEPT_ENCODING, "");
     if (list != nullptr) {
         ::curl_easy_setopt(handle, CURLOPT_HTTPHEADER, list);

@@ -74,15 +74,21 @@ public:
             if (unknown[0][0].template as<long>() > 0) {
                 throw ValidationError("unknown_exercise", "exercise_id must be a library or own exercise");
             }
-            txn.exec_params(
+            // The owner predicate sits on the upsert itself: a row another owner
+            // inserted after the SELECT above is left alone (no row comes back)
+            // instead of being renamed and having its exercises replaced.
+            auto upserted = txn.exec_params(
                 "INSERT INTO routines (id, owner_id, name, weekday, note) VALUES ($1::uuid, $2::uuid, $3, $4, $5) "
                 "ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, weekday = EXCLUDED.weekday, "
-                "note = EXCLUDED.note",
+                "note = EXCLUDED.note WHERE routines.owner_id = EXCLUDED.owner_id RETURNING id",
                 id,
                 owner,
                 name,
                 weekday,
                 note);
+            if (upserted.empty()) {
+                throw RoutineNotFound();
+            }
             txn.exec_params("DELETE FROM routine_exercises WHERE routine_id = $1::uuid", id);
             txn.exec_params(
                 "INSERT INTO routine_exercises (routine_id, exercise_id, position, target_sets, target_reps_min, "
