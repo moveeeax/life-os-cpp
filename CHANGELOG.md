@@ -6,6 +6,22 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-10-14
+
+### Added
+- Money Accounts by dollar value: the list sorts by what each account is worth
+  in USD (from `/money/summary`), largest first, with the dollar value under each
+  non-USD account; "Hide under" keeps accounts worth less than $1, $10, $100 or
+  $1,000 out of sight (by value, so 0.05 BTC stays); archived accounts show only
+  when asked; "By currency" keeps the old groups. The choice is remembered in
+  the browser.
+
+### Fixed
+- An API key of an administrator keeps the data permissions (general, fitness
+  read, fitness sync) once its admin bit is masked: the Administrator role is
+  the sentinel bit alone, so 1.27.0 left such a key with no permission at all
+  and every fitness, workout and habits call answered 403.
+
 ## [1.27.0] - 2026-10-14
 
 ### Added
