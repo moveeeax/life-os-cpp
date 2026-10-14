@@ -47,6 +47,17 @@ public:
 
     void submitJob(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
 
+    /**
+     * @brief Job types an admin may enqueue by hand through POST /jobs: the
+     *        demo handlers (echo, slow, fail) and the rates refresh
+     *        (money_rates). Everything else is enqueued by the app with a
+     *        payload it built itself: webhook.deliver would turn the endpoint
+     *        into an SSRF probe, email.send / account_email into a mail relay,
+     *        and the parse / sync jobs need rows the app writes first.
+     *        Anything else answers 400 job_type_not_allowed.
+     */
+    static bool manual_type_allowed(const std::string& type);
+
     void getJobStatus(const HttpRequestPtr& req,
                       std::function<void(const HttpResponsePtr&)>&& callback,
                       const std::string& id);

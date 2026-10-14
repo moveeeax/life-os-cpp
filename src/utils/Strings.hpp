@@ -40,6 +40,13 @@ namespace Utils::Strings {
  * have to discover an auth override. It MUST also live in
  * `config/config.json`'s `api.public_paths` — see the override semantics
  * right below.
+ * `/api/v1/auth/logout` is public so a client whose access cookie already
+ * expired can still end its session: the handler reads the refresh cookie,
+ * revokes its JTI and clears both cookies. Behind the auth gate it answered
+ * 401 and the refresh token stayed live for its full TTL.
+ * `/api/v1/auth/registration` answers whether sign-up is open, which the
+ * sign-in page asks before anyone has a session.
+ *
  * Config semantics — two keys, two behaviors:
  *   - `api.public_paths` / `API_PUBLIC_PATHS` REPLACES this default wholesale.
  *     Forget one default entry in the override and that route starts 401ing —
@@ -57,6 +64,7 @@ inline constexpr const char* kDefaultPublicPathsCsv =
     "/,/healthz,/ready,/health,/metrics,"
     "/api/v1/docs,/api/v1/openapi.yaml,"
     "/api/v1/auth/login,/api/v1/auth/register,/api/v1/auth/refresh,"
+    "/api/v1/auth/logout,/api/v1/auth/registration,"
     "/api/v1/account/confirm/*,/api/v1/account/reset-password-request,"
     "/api/v1/account/reset-password/*,/api/v1/account/change-email/*,"
     "/api/v1/account/join-from-invite/*,"

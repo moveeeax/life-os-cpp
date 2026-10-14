@@ -291,6 +291,13 @@ habits:
   enabled: false
 
 # ---------------------------------------------------------------
+# Self sign-up. true: anyone may register; false: invite-only (POST /api/v1/auth/register
+# answers 403 registration_closed, admin invites keep working). Env var set: REGISTRATION_OPEN.
+# ---------------------------------------------------------------
+registration:
+  open: true
+
+# ---------------------------------------------------------------
 # notes module — private Markdown notes shaped like tarassov.me posts. Env var set: NOTES_ENABLED.
 # ---------------------------------------------------------------
 notes:

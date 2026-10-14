@@ -174,6 +174,29 @@ TEST(ValidationTest, EmailBad) {
     EXPECT_EQ(errs.items()[0].code, "bad_format");
 }
 
+TEST(ValidationTest, EmailAtTheLengthLimitIsChecked) {
+    // 254 bytes is the longest address SMTP carries (RFC 5321 path limit).
+    V::Errors errs;
+    const std::string local(64, 'a');
+    std::string domain(254 - local.size() - 1 - 4, 'b');
+    domain += ".com";
+    json body = {{"email", local + "@" + domain}};
+    ASSERT_EQ(body["email"].get<std::string>().size(), V::kEmailMaxLen);
+    V::email(errs, body, "email");
+    EXPECT_FALSE(errs.any());
+}
+
+TEST(ValidationTest, EmailOverTheLimitIsTooLongBeforeTheRegex) {
+    // A megabyte of address must be refused by length, never handed to
+    // std::regex_match (whose backtracking recursion grows with the input).
+    V::Errors errs;
+    json body = {{"email", std::string(1024 * 1024, 'a') + "@example.com"}};
+    V::email(errs, body, "email");
+    ASSERT_EQ(errs.items().size(), 1u);
+    EXPECT_EQ(errs.items()[0].field, "email");
+    EXPECT_EQ(errs.items()[0].code, "too_long");
+}
+
 TEST(ValidationTest, UuidGood) {
     V::Errors errs;
     json body = {{"id", "550e8400-e29b-41d4-a716-446655440000"}};

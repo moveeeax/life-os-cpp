@@ -10,9 +10,13 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cctype>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <drogon/HttpRequest.h>
 #include <spdlog/spdlog.h>
@@ -69,10 +73,93 @@ inline bool request_has_key(const drogon::HttpRequestPtr& req) {
     return !extract_key(req).empty();
 }
 
+namespace detail {
+
+/**
+ * @brief Canonical segments of a request path, for the key-scope decision:
+ *        percent-decoded once, backslashes read as slashes, lower-cased,
+ *        empty and "." segments dropped, ".." resolved (never above the
+ *        root). "/API//v1/./x/../Admin/users" -> {"api","v1","admin","users"}.
+ *        The scope check runs in a sync advice BEFORE routing, so it cannot
+ *        ask which route matched; it must read the path the way any router
+ *        might, and err towards refusing.
+ */
+inline std::vector<std::string> canonical_segments(std::string_view path) {
+    const auto hex = [](char c) -> int {
+        if (c >= '0' && c <= '9')
+            return c - '0';
+        if (c >= 'a' && c <= 'f')
+            return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F')
+            return c - 'A' + 10;
+        return -1;
+    };
+    std::string decoded;
+    decoded.reserve(path.size());
+    for (std::size_t i = 0; i < path.size(); ++i) {
+        char c = path[i];
+        if (c == '%' && i + 2 < path.size()) {
+            const int hi = hex(path[i + 1]);
+            const int lo = hex(path[i + 2]);
+            if (hi >= 0 && lo >= 0) {
+                c = static_cast<char>(hi * 16 + lo);
+                i += 2;
+            }
+        }
+        if (c == '\\')
+            c = '/';
+        decoded.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+    }
+    std::vector<std::string> segs;
+    std::size_t i = 0;
+    while (i <= decoded.size()) {
+        const auto j = std::min(decoded.find('/', i), decoded.size());
+        const std::string seg = decoded.substr(i, j - i);
+        if (seg == "..") {
+            if (!segs.empty())
+                segs.pop_back();
+        } else if (!seg.empty() && seg != ".") {
+            segs.push_back(seg);
+        }
+        i = j + 1;
+    }
+    return segs;
+}
+
+}  // namespace detail
+
+/**
+ * @brief Whether an API key may authenticate a request to @p path. Keys are
+ *        for machine clients reading and writing the owner's data; they may
+ *        not manage the account (password, email, the keys themselves under
+ *        /api/v1/account/api-keys) or reach the admin surface. A leaked key
+ *        must not be able to mint more keys or take over the account.
+ *        The middleware answers 401 key_not_allowed on a refused path. The
+ *        path is canonicalized first (detail::canonical_segments), so case,
+ *        doubled slashes, dot segments and percent-encoding cannot slip a
+ *        key past the check; the account / audit / key controllers also
+ *        refuse a key principal themselves (API_REFUSE_API_KEY), and the
+ *        admin guards see a key's permissions without the admin bit.
+ */
+inline bool path_allows_key(std::string_view path) {
+    const auto segs = detail::canonical_segments(path);
+    std::size_t idx = 0;
+    if (idx < segs.size() && segs[idx] == "api")
+        ++idx;
+    if (idx < segs.size() && segs[idx].size() >= 2 && segs[idx][0] == 'v' &&
+        std::all_of(segs[idx].begin() + 1, segs[idx].end(), [](unsigned char c) { return std::isdigit(c) != 0; }))
+        ++idx;
+    if (idx >= segs.size())
+        return true;
+    const std::string& area = segs[idx];
+    return area != "account" && area != "admin" && !area.starts_with("api-keys");
+}
+
 /**
  * @brief Authenticate the request's API key. Returns a principal carrying the
- *        owning user's subject + role permissions, or nullopt if the key is
- *        absent / unknown / revoked.
+ *        owning user's subject + role permissions (with the admin bit masked
+ *        out, via_api_key set), or nullopt if the key is absent / unknown /
+ *        revoked.
  *
  * Runs on PRIMARY (a just-issued key must authenticate immediately — no replica
  * lag). last_used_at is stamped THROTTLED: a single CTE always returns the auth
@@ -108,10 +195,14 @@ inline std::optional<Security::Auth::AuthPrincipal> authenticate(const drogon::H
             if (r.empty())
                 return std::nullopt;
             const auto user_id = r[0]["user_id"].template as<std::string>();
-            const auto permissions = r[0]["permissions"].template as<long long>();
+            // The owner's role permissions minus the admin bit: an admin's key
+            // acts with the admin's data permissions, never as an admin.
+            const auto permissions = static_cast<std::uint32_t>(r[0]["permissions"].template as<long long>()) &
+                                     ~Security::Auth::kAdminPermissionBits;
             Security::Auth::AuthPrincipal p;
             p.subject = user_id;
-            p.raw_claims = json{{"sub", user_id}, {"permissions", permissions}};
+            p.via_api_key = true;
+            p.raw_claims = json{{"sub", user_id}, {"permissions", permissions}, {"api_key", true}};
             return p;
         });
     } catch (const std::exception& e) {

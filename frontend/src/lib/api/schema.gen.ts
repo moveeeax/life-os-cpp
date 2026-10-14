@@ -219,6 +219,15 @@ export interface paths {
                     };
                     content?: never;
                 };
+                /** @description Self sign-up is closed (auth.registration_open = false): error registration_closed. Invited users redeem their link at /api/v1/account/join-from-invite/{token} instead. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
                 /** @description Email already registered */
                 409: {
                     headers: {
@@ -237,6 +246,49 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/registration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether self sign-up is open
+         * @description Auth-public. The sign-in page reads it to show or hide the sign-up link. Mirrors auth.registration_open (REGISTRATION_OPEN).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Registration status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                open: boolean;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -315,7 +367,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Log out (clears cookies + revokes refresh token) */
+        /**
+         * Log out (clears cookies + revokes refresh token)
+         * @description Auth-public: works with only the refresh cookie (an expired access cookie) and answers 200 even without a session.
+         */
         post: {
             parameters: {
                 query?: never;

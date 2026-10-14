@@ -21,6 +21,10 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    # API keys (cpk_..., in X-API-Key or as the Bearer token) authenticate
+    # like BearerAuth on data routes, with the owner's permissions minus the
+    # admin bit. /api/v1/account/* (including the api-keys routes) and
+    # /api/v1/admin/* answer 401 key_not_allowed to a key.
     # Browser-SPA session: the access JWT travels in an HttpOnly
     # __Host- cookie set by POST /api/auth/login (auth.cookies.* in
     # config/config.json). Same-origin only — the SPA never reads it
@@ -2788,12 +2792,36 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/RegisterResponse' }
         '400': { description: Validation failed }
+        '403':
+          description: "Self sign-up is closed (auth.registration_open = false): error registration_closed. Invited users redeem their link at /api/v1/account/join-from-invite/{token} instead."
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '409': { description: Email already registered }
         '422':
           description: Idempotency-Key conflict — same key, different body (idempotency middleware)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/auth/registration:
+    get:
+      summary: Whether self sign-up is open
+      description: "Auth-public. The sign-in page reads it to show or hide the sign-up link. Mirrors auth.registration_open (REGISTRATION_OPEN)."
+      tags: [auth]
+      responses:
+        '200':
+          description: Registration status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [open]
+                    properties:
+                      open: { type: boolean }
   /api/v1/auth/login:
     post:
       summary: Log in
@@ -2830,8 +2858,8 @@ paths:
   /api/v1/auth/logout:
     post:
       summary: Log out (clears cookies + revokes refresh token)
+      description: "Auth-public: works with only the refresh cookie (an expired access cookie) and answers 200 even without a session."
       tags: [auth]
-      security: [{ BearerAuth: [] }]
       responses:
         '200':
           description: Logged out

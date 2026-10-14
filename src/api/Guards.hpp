@@ -67,6 +67,18 @@
         (var) = _owner_p->subject;                         \
     } while (0)
 
+/// Reject with 401 key_not_allowed when the request authenticated with an API
+/// key. For the account / key-management / audit handlers: the middleware
+/// already refuses keys on those paths, this is the same rule decided on the
+/// matched route instead of the raw path.
+#define API_REFUSE_API_KEY(req, callback)                                                     \
+    do {                                                                                      \
+        if (auto _key_p = Security::Auth::principal_of(req); _key_p && _key_p->via_api_key) { \
+            callback(ErrorResponse::unauthorized("key_not_allowed"));                         \
+            return;                                                                           \
+        }                                                                                     \
+    } while (0)
+
 /// Reject with 403 unless the caller's email is confirmed (401 if anonymous).
 /// No-op when auth is disabled. The confirmed flag is minted into the access
 /// JWT but NOT enforced by default — gate your domain's confirmation-required

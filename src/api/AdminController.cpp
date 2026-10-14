@@ -21,6 +21,7 @@
 #include "security/Audit.hpp"
 #include "security/Auth.hpp"
 #include "security/Password.hpp"
+#include "security/SessionStore.hpp"
 #include "utils/ErrorResponse.hpp"
 
 namespace Api {
@@ -177,6 +178,12 @@ void AdminController::updateUser(const HttpRequestPtr& req,
         if (new_email || new_role_id || first_name || last_name) {
             users.admin_update(id, new_email, new_role_id, first_name, last_name);
         }
+        // A role change must not ride on sessions minted with the old
+        // permissions: drop the refresh tokens so the next refresh fails and
+        // the user signs in again under the new role. (API keys read the role
+        // on every request, so they follow the change without revocation.)
+        if (new_role_id)
+            Security::Sessions::revoke_all(Security::Auth::get().config().cookies, id);
         // Read from the primary so the echoed row reflects the write we
         // just made — a lagging replica would return the pre-update values.
         auto fresh = users.find(id, /*from_primary=*/true);
@@ -204,6 +211,9 @@ void AdminController::deleteUser(const HttpRequestPtr& req,
     with_repo_errors(callback, "admin deleteUser", [&] {
         Repositories::UserRepository repo;
         repo.remove(id);
+        // The user's API keys went with the row (ON DELETE CASCADE); their
+        // refresh tokens live in Redis and must be dropped explicitly.
+        Security::Sessions::revoke_all(Security::Auth::get().config().cookies, id);
         Security::Audit::record(actor_of(req), "user.delete", "user", id);
         callback(Response::ok({{"message", "User deleted"}}));
     });

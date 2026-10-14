@@ -367,6 +367,10 @@ void register_auth() {
         // token with the cpk_ prefix) fully decides the request. Absent → fall
         // through to the JWT/cookie path below. Honored in JWT mode only.
         if (Security::ApiKeys::request_has_key(req)) {
+            // Checked before the lookup: the account and admin surface is
+            // session-only, whatever the key.
+            if (!Security::ApiKeys::path_allows_key(req->path()))
+                return unauthorized("key_not_allowed");
             auto key_principal = Security::ApiKeys::authenticate(req);
             if (!key_principal)
                 return unauthorized("invalid_api_key");

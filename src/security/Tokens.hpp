@@ -24,6 +24,7 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -110,6 +111,18 @@ inline std::string issue(std::string_view master_secret,
     const std::string key = detail::derive_key(master_secret, purpose);
     const std::string sig_b64 = Utils::Base64::url_encode(Utils::Crypto::hmac_sha256(key, payload_b64));
     return payload_b64 + "." + sig_b64;
+}
+
+/**
+ * @brief Short fingerprint of a user's current password hash, carried in a
+ *        reset token as the "pwf" claim. applyReset accepts the token only
+ *        while the hash still matches, so once any reset link (or a password
+ *        change) sets a new password, every other outstanding link dies.
+ *        A user without a password (pending invite) fingerprints the empty
+ *        string. Not secret: it is a truncated hash of a salted hash.
+ */
+inline std::string password_fingerprint(const std::optional<std::string>& password_hash) {
+    return Utils::Crypto::sha256_hex("pwf:" + password_hash.value_or("")).substr(0, 16);
 }
 
 struct VerifyResult {

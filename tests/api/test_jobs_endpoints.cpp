@@ -5,8 +5,12 @@
 #include <nlohmann/json.hpp>
 
 #include "api/JobsController.hpp"
+#include "email/AccountEmails.hpp"
+#include "email/GenericEmail.hpp"
+#include "jobs/MoneyRatesHandler.hpp"
 #include "test_fixtures.hpp"
 #include "test_helpers.hpp"
+#include "webhooks/Webhooks.hpp"
 
 using json = nlohmann::json;
 using namespace drogon;
@@ -71,6 +75,22 @@ TEST_F(JobsEndpointTest, SubmitJobWithMaxRetries) {
     auto body = submit({{"type", "echo"}, {"payload", json::object()}, {"max_retries", 5}});
     EXPECT_EQ(body["_status"], 201);
     EXPECT_EQ(body["data"]["max_retries"], 5);
+}
+
+TEST_F(JobsEndpointTest, SubmitRefusesTypesTheAppEnqueuesItself) {
+    // webhook.deliver from the admin API is an SSRF probe; email.send a relay.
+    for (const char* type :
+         {Webhooks::kJobType, Email::SendEmail::kJobType, Email::AccountEmails::kJobType, "no_such_handler"}) {
+        auto body = submit({{"type", type}, {"payload", {{"url", "http://169.254.169.254/"}}}});
+        EXPECT_EQ(body["_status"], 400) << type;
+        EXPECT_EQ(body["error"], "job_type_not_allowed") << type;
+    }
+}
+
+TEST_F(JobsEndpointTest, ManualAllowlistMatchesTheHandlerNames) {
+    EXPECT_TRUE(Api::JobsController::manual_type_allowed(Jobs::MoneyRates::kJobType));
+    EXPECT_TRUE(Api::JobsController::manual_type_allowed("echo"));
+    EXPECT_FALSE(Api::JobsController::manual_type_allowed(Webhooks::kJobType));
 }
 
 TEST_F(JobsEndpointTest, SubmitJobInvalidJson) {

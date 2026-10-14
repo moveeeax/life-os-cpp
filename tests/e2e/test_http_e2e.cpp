@@ -369,6 +369,102 @@ TEST(HttpE2E, LogoutRevokesRefreshToken) {
     expect_matches_schema(denied, "POST", "/api/v1/auth/refresh");
 }
 
+TEST(HttpE2E, LogoutWorksAfterTheAccessCookieExpired) {
+    // The browser drops an expired access cookie, so a late sign-out carries
+    // only the refresh cookie. Logout must still reach its handler (it is
+    // auth-public) and revoke the refresh JTI; behind the auth gate it got a
+    // 401 and the refresh token stayed usable for its whole TTL.
+    REQUIRE_E2E_ENV();
+    auto sc = register_and_login("e2e-late-logout@example.com", "password-e2e-1");
+    SessionCookies refresh_only;
+    refresh_only.refresh = sc.refresh;
+
+    auto logout = HttpRequest::newHttpRequest();
+    logout->setMethod(Post);
+    logout->setPath("/api/v1/auth/logout");
+    attach_session(logout, refresh_only);
+    auto logout_resp = send(logout);
+    ASSERT_EQ(logout_resp->statusCode(), k200OK) << logout_resp->getBody();
+    expect_matches_schema(logout_resp, "POST", "/api/v1/auth/logout");
+
+    auto refresh = HttpRequest::newHttpRequest();
+    refresh->setMethod(Post);
+    refresh->setPath("/api/v1/auth/refresh");
+    attach_session(refresh, refresh_only);
+    auto denied = send(refresh);
+    EXPECT_EQ(denied->statusCode(), k401Unauthorized);
+}
+
+TEST(HttpE2E, LogoutWithoutAnySessionStillSucceeds) {
+    REQUIRE_E2E_ENV();
+    auto logout = HttpRequest::newHttpRequest();
+    logout->setMethod(Post);
+    logout->setPath("/api/v1/auth/logout");
+    auto resp = send(logout);
+    EXPECT_EQ(resp->statusCode(), k200OK) << resp->getBody();
+}
+
+TEST(HttpE2E, RegistrationProbeIsPublic) {
+    REQUIRE_E2E_ENV();
+    auto req = HttpRequest::newHttpRequest();
+    req->setPath("/api/v1/auth/registration");
+    auto resp = send(req);
+    ASSERT_EQ(resp->statusCode(), k200OK) << resp->getBody();
+    EXPECT_EQ(body_of(resp)["data"]["open"], true);
+    expect_matches_schema(resp, "GET", "/api/v1/auth/registration");
+}
+
+TEST(HttpE2E, ApiKeyIsRefusedOnTheAccountSurface) {
+    // A key may read the owner's data but never manage the account: with a
+    // leaked key one could otherwise mint more keys.
+    REQUIRE_E2E_ENV();
+    auto sc = register_and_login("e2e-keys@example.com", "password-e2e-1");
+    auto create = json_post("/api/v1/account/api-keys", {{"name", "e2e"}});
+    attach_session(create, sc);
+    auto created = send(create);
+    ASSERT_EQ(created->statusCode(), k201Created) << created->getBody();
+    const std::string key = body_of(created)["key"];
+
+    auto list = HttpRequest::newHttpRequest();
+    list->setPath("/api/v1/account/api-keys");
+    list->addHeader("X-API-Key", key);
+    auto refused = send(list);
+    EXPECT_EQ(refused->statusCode(), k401Unauthorized) << refused->getBody();
+    EXPECT_EQ(body_of(refused)["error"], "key_not_allowed");
+
+    auto mint = json_post("/api/v1/account/api-keys", {{"name", "second"}});
+    mint->addHeader("X-API-Key", key);
+    auto mint_resp = send(mint);
+    EXPECT_EQ(mint_resp->statusCode(), k401Unauthorized) << mint_resp->getBody();
+
+    auto admin = HttpRequest::newHttpRequest();
+    admin->setPath("/api/v1/admin/users");
+    admin->addHeader("X-API-Key", key);
+    EXPECT_EQ(send(admin)->statusCode(), k401Unauthorized);
+
+    // Other spellings of the refused paths are refused too (the middleware
+    // canonicalizes before deciding).
+    for (const char* path : {"/API/v1/admin/users",
+                             "//api/v1/admin/users",
+                             "/api/v1/./admin/users",
+                             "/api/v1/x/../admin/users",
+                             "/api/v1/Account/api-keys"}) {
+        auto odd = HttpRequest::newHttpRequest();
+        odd->setPath(path);
+        odd->addHeader("X-API-Key", key);
+        auto odd_resp = send(odd);
+        EXPECT_EQ(odd_resp->statusCode(), k401Unauthorized) << path << " " << odd_resp->getBody();
+        EXPECT_EQ(body_of(odd_resp)["error"], "key_not_allowed") << path;
+    }
+
+    // The same key still works where keys belong.
+    auto me = HttpRequest::newHttpRequest();
+    me->setPath("/api/v1/auth/me");
+    me->addHeader("X-API-Key", key);
+    auto me_resp = send(me);
+    EXPECT_EQ(me_resp->statusCode(), k200OK) << me_resp->getBody();
+}
+
 TEST(HttpE2E, IdempotencyKeyReplaysResponse) {
     REQUIRE_E2E_ENV();
     const json body = {{"email", "e2e-idem@example.com"}, {"password", "password-e2e-1"}};

@@ -40,6 +40,7 @@ class AuthController : public HttpController<AuthController> {
 public:
     METHOD_LIST_BEGIN
     ADD_METHOD_TO(AuthController::registerUser, "/api/v1/auth/register", Post);
+    ADD_METHOD_TO(AuthController::registration, "/api/v1/auth/registration", Get);
     ADD_METHOD_TO(AuthController::login, "/api/v1/auth/login", Post);
     ADD_METHOD_TO(AuthController::logout, "/api/v1/auth/logout", Post);
     ADD_METHOD_TO(AuthController::refresh, "/api/v1/auth/refresh", Post);
@@ -57,6 +58,17 @@ public:
     void registerUser(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
 
     // ---------------------------------------------------------------------
+    // GET /api/v1/auth/registration
+    //
+    // Auth-public probe: {"data": {"open": bool}}. The sign-in page asks it
+    // to decide whether to show the sign-up link. With
+    // auth.registration_open = false, POST /register answers 403
+    // registration_closed; admin invites (POST /admin/invite, then
+    // /account/join-from-invite/{token}) keep working.
+    // ---------------------------------------------------------------------
+    void registration(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
+
+    // ---------------------------------------------------------------------
     // POST /api/auth/login
     //
     // Body: { email, password }
@@ -70,7 +82,9 @@ public:
     // POST /api/auth/logout
     //
     // Reads refresh-token cookie, deletes its JTI from Redis (so further
-    // /refresh calls fail), and zeroes both cookies.
+    // /refresh calls fail), and zeroes both cookies. Auth-public
+    // (kDefaultPublicPathsCsv): it must work after the access cookie expired,
+    // and it answers 200 even when there is no session at all.
     // ---------------------------------------------------------------------
     void logout(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
 
@@ -100,6 +114,9 @@ private:
 
     static std::string make_jti();
 
+    /// auth.registration_open / REGISTRATION_OPEN, read per request (default true).
+    static bool registration_open();
+
     /**
      * @brief Mint access + refresh JWTs, write refresh JTI to Redis.
      *        Returns nullopt if Redis write fails — refresh would be
@@ -107,6 +124,10 @@ private:
      *        permanently-invalid session.
      */
     std::optional<Session> mint_session(const Domain::User& user);
+
+    /// True when the refresh token carries an integer `exp` that has not
+    /// passed (with the configured leeway). A token without `exp` is refused.
+    static bool refresh_unexpired(const json& claims, int leeway_sec);
 
     /// True only for the one caller that removed the live JTI (see Sessions::consume).
     static bool consume_refresh(const Security::Auth::AuthConfig& cfg, const std::string& jti);
