@@ -8,8 +8,13 @@ on:
 # A newer push to a PR supersedes the running check; a push to master never
 # cancels the previous master run, so every merged commit gets a full verdict
 # (release.yml looks the tagged SHA's CI run up and needs it to finish).
+# A pull request keeps one run per branch and cancels the older one. A push to
+# master gets its own group per commit: in a shared group GitHub keeps one run
+# and one pending, and a newer pending run cancels the older pending one even
+# without cancel-in-progress, which left release commits with no CI run and
+# release.yml's ci-green check failing.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # CI only reads the repo; release/builder-cache workflows declare their own
