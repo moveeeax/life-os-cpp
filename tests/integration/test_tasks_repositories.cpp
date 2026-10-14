@@ -143,7 +143,7 @@ TEST_F(TasksRepositoryTest, UpdatedAtMovesByTheTriggerAlone) {
     Repositories::Tasks::TaskRepository repo;
     Repositories::Tasks::TaskRepository::Input in;
     in.title = "Renew the passport";
-    in.area = "admin";
+    in.area = "travel";
     const json t = repo.create(kAnna, in);
     const std::string sql = std::string("SELECT ") + kUpdatedAtFormat + " FROM task_items WHERE id = $1::uuid";
     const std::string before = updated_at_of(sql, t["id"]);
