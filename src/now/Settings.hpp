@@ -17,7 +17,8 @@
 namespace Now::Settings {
 
 inline constexpr std::array<std::string_view, 4> kCorners = {"tl", "tr", "bl", "br"};
-inline constexpr std::array<std::string_view, 4> kChips = {"body", "goals", "day", "tasks"};
+/// The chips a corner may hold; habits is placed through Arrange, never by default.
+inline constexpr std::array<std::string_view, 5> kChips = {"body", "goals", "day", "tasks", "habits"};
 
 /// Body top left, Goals top right, Food and money bottom left, Tasks bottom right.
 inline nlohmann::json default_corners() {
@@ -48,7 +49,7 @@ inline std::optional<std::string> corners_problem(const nlohmann::json& corners)
             known = known || chip == k;
         }
         if (!known) {
-            return "a corner holds body, goals, day, tasks or null";
+            return "a corner holds body, goals, day, tasks, habits or null";
         }
         if (!seen.insert(chip).second) {
             return "a chip sits in one corner at most";

@@ -35,6 +35,7 @@
 #include "api/FitnessController.hpp"
 #include "api/FoodController.hpp"
 #include "api/GoalsController.hpp"
+#include "api/HabitsController.hpp"
 #include "api/HealthController.hpp"
 #include "api/JobsController.hpp"
 #include "api/Middleware.hpp"
