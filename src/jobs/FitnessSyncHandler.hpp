@@ -137,16 +137,19 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     }
     const std::string owner_id = payload["owner_id"].get<std::string>();
     Repositories::MiAccountRepository accounts(token_key);
-    const auto credentials = accounts.load(owner_id);
-    if (!credentials.has_value()) {
+    const auto loaded = accounts.load_fenced(owner_id);
+    if (!loaded.has_value()) {
         runs.finish(run_id, "failed", nlohmann::json{{"error", "not_linked"}, {"detail", "no Mi account is linked"}});
         return {{"run_id", run_id}, {"status", "failed"}};
     }
+    // The link as it was loaded: a re-link during the run must not be undone by this run's writes.
+    std::string fence = loaded->rotated_at;
 
-    Sync::SyncService service(
-        Xiaomi::Service::transport(), *credentials, [&accounts, &owner_id](const Xiaomi::Credentials& rotated) {
-            accounts.store_rotated(owner_id, rotated);
-        });
+    Sync::SyncService service(Xiaomi::Service::transport(),
+                              loaded->credentials,
+                              [&accounts, &owner_id, &fence](const Xiaomi::Credentials& rotated) {
+                                  accounts.store_rotated(owner_id, rotated, fence);
+                              });
     const auto result = service.run(run_id, from, to, data_types);
 
     // The link status follows what Xiaomi said to the stored token. A run that
@@ -155,7 +158,7 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         if (service.login_outcome() == Sync::SyncService::Login::Accepted) {
             accounts.mark_ok(owner_id);
         } else if (service.login_outcome() == Sync::SyncService::Login::Refused) {
-            accounts.mark_reauth_required(owner_id, "upstream_auth");
+            accounts.mark_reauth_required(owner_id, "upstream_auth", fence);
         }
     } catch (const std::exception& e) {
         spdlog::warn("fitness sync {}: failed to record the link status: {}", run_id, e.what());

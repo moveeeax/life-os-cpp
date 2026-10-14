@@ -49,6 +49,11 @@ protected:
         return {xiaomi_id, std::string(347, fill), "cn"};
     }
 
+    /// The link's current fence (what a fresh load would hold).
+    static std::string fence(const char* owner) {
+        return Repositories::MiAccountRepository("").rotated_at(owner).value_or("");
+    }
+
     static long count(const std::string& sql) {
         return Database::get().execute_read([&](auto& txn) { return txn.exec(sql)[0][0].template as<long>(); });
     }
@@ -123,7 +128,7 @@ TEST_F(MiAccountRepositoryTest, RelinkOfAnotherXiaomiAccountIsRefused) {
 TEST_F(MiAccountRepositoryTest, RelinkOfTheSameAccountReplacesTheTokenAndClearsReauth) {
     Repositories::MiAccountRepository repo(kTestKeyB64);
     repo.link(kAnna, creds("1111111111"), true);
-    repo.mark_reauth_required(kAnna, "upstream_auth");
+    repo.mark_reauth_required(kAnna, "upstream_auth", fence(kAnna));
     EXPECT_EQ((*repo.status(kAnna))["status"], "reauth_required");
     EXPECT_EQ((*repo.status(kAnna))["last_error"], "upstream_auth");
 
@@ -140,23 +145,49 @@ TEST_F(MiAccountRepositoryTest, StoreRotatedKeepsStatusAndOwner) {
     Repositories::MiAccountRepository repo(kTestKeyB64);
     repo.link(kAnna, creds("1111111111"), true);
     repo.link(kBoris, creds("2222222222"), true);
-    repo.mark_reauth_required(kAnna, "upstream_auth");
+    repo.mark_reauth_required(kAnna, "upstream_auth", fence(kAnna));
 
-    repo.store_rotated(kAnna, creds("1111111111", 'R'));
+    std::string held = fence(kAnna);
+    EXPECT_TRUE(repo.store_rotated(kAnna, creds("1111111111", 'R'), held));
+    EXPECT_EQ(held, fence(kAnna)) << "the holder's fence follows its own rotation";
     EXPECT_EQ(repo.load(kAnna)->pass_token, std::string(347, 'R'));
     EXPECT_EQ((*repo.status(kAnna))["status"], "reauth_required");
     EXPECT_EQ(repo.load(kBoris)->pass_token, std::string(347, 'S'));
 
     // A rotation that arrives after the link was removed does not bring it back.
     ASSERT_TRUE(repo.unlink(kAnna, false));
-    repo.store_rotated(kAnna, creds("1111111111", 'Z'));
+    EXPECT_FALSE(repo.store_rotated(kAnna, creds("1111111111", 'Z'), held));
     EXPECT_FALSE(repo.load(kAnna).has_value());
+}
+
+TEST_F(MiAccountRepositoryTest, ALoginThatStartedBeforeARelinkCannotUndoIt) {
+    Repositories::MiAccountRepository repo(kTestKeyB64);
+    repo.link(kAnna, creds("1111111111", 'S'), true);
+    // A sync loads the token, then the user links the account again with a fresh token.
+    const auto loaded = repo.load_fenced(kAnna);
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ(loaded->credentials.pass_token, std::string(347, 'S'));
+    std::string stale = loaded->rotated_at;
+    repo.link(kAnna, creds("1111111111", 'T'), true);
+    ASSERT_NE(fence(kAnna), stale) << "a link moves the fence";
+
+    // The late login's rotation and its refusal belong to the old token.
+    EXPECT_FALSE(repo.store_rotated(kAnna, creds("1111111111", 'R'), stale));
+    EXPECT_FALSE(repo.mark_reauth_required(kAnna, "upstream_auth", stale));
+    EXPECT_EQ(repo.load(kAnna)->pass_token, std::string(347, 'T')) << "the fresh link keeps its token";
+    EXPECT_EQ((*repo.status(kAnna))["status"], "ok");
+    EXPECT_EQ(stale, loaded->rotated_at) << "a refused write leaves the fence as it was";
+
+    // A holder of the current fence still records a refusal.
+    EXPECT_TRUE(repo.mark_reauth_required(kAnna, "upstream_auth", fence(kAnna)));
+    EXPECT_EQ((*repo.status(kAnna))["status"], "reauth_required");
+    EXPECT_FALSE(repo.mark_reauth_required(kAnna, "upstream_auth", "")) << "no fence, no write";
 }
 
 TEST_F(MiAccountRepositoryTest, MarkOkClearsTheError) {
     Repositories::MiAccountRepository repo(kTestKeyB64);
     repo.link(kAnna, creds("1111111111"), true);
-    repo.mark_reauth_required(kAnna, "upstream_auth");
+    repo.mark_reauth_required(kAnna, "upstream_auth", fence(kAnna));
     repo.mark_ok(kAnna);
     EXPECT_EQ((*repo.status(kAnna))["status"], "ok");
     EXPECT_TRUE((*repo.status(kAnna))["last_error"].is_null());
@@ -253,7 +284,7 @@ TEST_F(MiAccountRepositoryTest, OnlyAccountsWithAnAcceptedTokenAreSynced) {
     repo.set_region(kBoris, "sg", true);
     ASSERT_EQ(repo.list_syncable().size(), 2u);
 
-    repo.mark_reauth_required(kAnna, "upstream_auth");
+    repo.mark_reauth_required(kAnna, "upstream_auth", fence(kAnna));
     const auto syncable = repo.list_syncable();
     ASSERT_EQ(syncable.size(), 1u);
     EXPECT_EQ(syncable[0].owner_id, kBoris);

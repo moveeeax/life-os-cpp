@@ -197,6 +197,8 @@ spec:
               value: {{ .Values.jobs.resultTtl | quote }}
             - name: JOBS_MAX_RETRIES
               value: {{ .Values.jobs.maxRetries | quote }}
+            - name: JOBS_RETRY_BACKOFF_BASE_MS
+              value: {{ .Values.jobs.retryBackoffBaseMs | quote }}
             # billing module — master switch plus the non-secret
             # billing.paypal.* config, matching how the app reads them
             # (see src/billing/PayPalClient.hpp). The client secret is the

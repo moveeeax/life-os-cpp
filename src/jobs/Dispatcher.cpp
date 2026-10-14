@@ -8,6 +8,10 @@
 
 #include "jobs/Dispatcher.hpp"
 
+#include <exception>
+
+#include <spdlog/spdlog.h>
+
 namespace Jobs {
 
 Dispatcher& Dispatcher::get() {
@@ -36,6 +40,19 @@ json Dispatcher::dispatch(const Job& job) const {
     if (it == handlers_.end())
         throw PermanentJobError("no handler for job type: " + job.type);
     return it->second(job.payload);
+}
+
+void Dispatcher::on_dead(const Job& job, const std::string& error) const {
+    auto it = dead_hooks_.find(job.type);
+    if (it == dead_hooks_.end() || !it->second)
+        return;
+    try {
+        it->second(job.payload, error);
+    } catch (const std::exception& e) {
+        spdlog::warn("Job {} dead-letter hook for {} failed: {}", job.id, job.type, e.what());
+    } catch (...) {
+        spdlog::warn("Job {} dead-letter hook for {} failed with a non-std exception", job.id, job.type);
+    }
 }
 
 }  // namespace Jobs

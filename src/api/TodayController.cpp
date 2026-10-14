@@ -32,6 +32,7 @@
 #include "now/Settings.hpp"
 #include "now/Today.hpp"
 #include "now/Weather.hpp"
+#include "repositories/Zones.hpp"
 #include "repositories/fitness/HealthReadRepository.hpp"
 #include "repositories/fitness/MiAccountRepository.hpp"
 #include "repositories/food/EntryRepository.hpp"
@@ -252,7 +253,7 @@ json habits_part(const std::string& owner,
 
 void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
     TODAY_GUARD(req, callback, owner);
-    const std::string date = req->getParameter("date").empty() ? today_utc() : req->getParameter("date");
+    const std::string date = request_day(req, &Repositories::Zones::today_in, today_utc());
     if (!is_calendar_date(date)) {
         callback(ErrorResponse::bad_request("invalid_query", "date must be a calendar day"));
         return;
@@ -269,8 +270,7 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
              Core::tasks_enabled(),
              [&] {
                  const auto groups = ::Tasks::Agenda::group(TaskRepository().agenda_items(owner, date, tz), date);
-                 return ::Now::Today::tasks_block(
-                     groups, date, static_cast<long>(NoteRepository().list(owner, "inbox").size()));
+                 return ::Now::Today::tasks_block(groups, date, NoteRepository().count(owner, "inbox"));
              }},
             {"goals",
              Core::goals_enabled(),

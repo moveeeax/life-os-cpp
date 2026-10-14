@@ -112,6 +112,10 @@ inline int next_metrics_port() {
  * tests pass vacuously. Suites
  * that mint real tokens with their own kSecret keep overriding
  * auth.jwt.secret in config_overrides().
+ *
+ * `jobs.retry_backoff_base_ms` is 0: the app defaults to a 2 s backoff, and
+ * the queue tests pick a failed job again at once. A suite that tests the
+ * backoff turns it on itself (set_retry_backoff).
  */
 inline std::string minimal_config() {
     return R"({
@@ -148,6 +152,9 @@ inline std::string minimal_config() {
     },
     "messaging": {
         "enabled": false
+    },
+    "jobs": {
+        "retry_backoff_base_ms": 0
     }
 })";
 }

@@ -64,6 +64,43 @@ inline void number_range(
     }
 }
 
+/// Significant digits of a JSON number as text: an integer as written, a double
+/// in the shortest form that reads back to the same value (nlohmann's dump).
+/// Leading and trailing zeros do not count; the exponent does not either.
+inline int significant_digits(const std::string& number_text) {
+    const std::string mantissa = number_text.substr(0, number_text.find_first_of("eE"));
+    std::string digits;
+    for (const char c : mantissa) {
+        if (c >= '0' && c <= '9') {
+            digits.push_back(c);
+        }
+    }
+    const auto first = digits.find_first_not_of('0');
+    if (first == std::string::npos) {
+        return 0;
+    }
+    const auto last = digits.find_last_not_of('0');
+    return static_cast<int>(last - first + 1);
+}
+
+/// A double holds 15 significant decimal digits exactly; past that the amount
+/// stored is not the amount the client meant.
+inline constexpr int kAmountDigitsMax = 15;
+
+/// number_range for money: also refuses more than kAmountDigitsMax significant
+/// digits (code `precision`), so the numeric column stores what was sent.
+inline void amount_range(
+    Validation::Errors& errs, const nlohmann::json& body, const std::string& field, double lo, double hi) {
+    number_range(errs, body, field, lo, hi);
+    if (!body.contains(field) || !body[field].is_number()) {
+        return;
+    }
+    const double v = body[field].get<double>();
+    if (v >= lo && v <= hi && significant_digits(body[field].dump()) > kAmountDigitsMax) {
+        errs.add(field, "precision", "must have at most " + std::to_string(kAmountDigitsMax) + " significant digits");
+    }
+}
+
 /// Like Validation::string_length, but in characters: the table CHECKs count
 /// characters too, and a Cyrillic name must not get half the room.
 inline void text_length(

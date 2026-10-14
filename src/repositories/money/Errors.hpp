@@ -33,6 +33,12 @@ struct AlreadyAccepted : ConflictError {
         : ConflictError("already_accepted", "the parse is not finished or its lines were accepted already") {}
 };
 
+/// A delete that lost a race: a row referencing the account or category
+/// arrived after the "is it used" check of the same delete.
+struct InUse : ConflictError {
+    InUse() : ConflictError("in_use", "rows were added to it meanwhile; it was not deleted") {}
+};
+
 struct InvalidDate : ValidationError {
     InvalidDate() : ValidationError("invalid_date", "not a valid date") {}
 };

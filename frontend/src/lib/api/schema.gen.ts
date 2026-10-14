@@ -7286,6 +7286,15 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
+                /** @description A row referring to the account arrived during the delete (in_use); nothing changed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
             };
         };
         options?: never;
@@ -7613,6 +7622,15 @@ export interface paths {
                 };
                 /** @description Money module disabled, or the row is not the caller's */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A row referring to the category arrived during the delete (in_use); nothing changed */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };

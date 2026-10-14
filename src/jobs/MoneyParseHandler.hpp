@@ -48,8 +48,9 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     }
     const std::string job_id = payload["job_id"].get<std::string>();
     Repositories::Money::ParseJobRepository jobs;
+    int attempt = 0;  // 0 until the claim: a fail before it is not fenced by an attempt
     const auto failed = [&](const std::string& code, const std::string& message) {
-        jobs.fail(job_id, code, message);
+        jobs.fail(job_id, code, message, attempt);
         spdlog::warn("money parse {}: {}", job_id, code);
         return nlohmann::json{{"job_id", job_id}, {"status", "failed"}, {"error", code}};
     };
@@ -65,13 +66,13 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     if (!job.has_value()) {
         return {{"job_id", job_id}, {"status", "missing"}};
     }
-    const int attempt = jobs.start(job_id);
+    attempt = jobs.start(job_id);
     if (attempt == 0) {
         // A row still `running` is held by another delivery, or by a worker that died less than
-        // JobRows::kStaleRunning ago: the queue retries with backoff instead of dropping the job.
+        // JobRows::kStaleRunning ago: the job waits until the row turns stale, without spending an attempt.
         const auto now = jobs.status(job_id);
         if (now == "running") {
-            throw std::runtime_error("money_parse: the row is running elsewhere");
+            throw Jobs::DeferJob("money_parse: the row is running elsewhere", jobs.stale_in_ms(job_id));
         }
         return {{"job_id", job_id}, {"status", now.value_or("missing")}};
     }
@@ -84,7 +85,7 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         if (attempt >= max_attempts) {
             return failed(code, what);
         }
-        jobs.requeue(job_id);
+        jobs.requeue(job_id, attempt);
         throw std::runtime_error(std::string("money_parse: ") + what);
     };
 
@@ -161,6 +162,7 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
             return failed("invalid_answer", e.what());
         }
         jobs.finish(job_id,
+                    attempt,
                     Money::Parse::to_json(lines),
                     body.contains("model") && body["model"].is_string() ? body["model"].get<std::string>() : model,
                     Chat::usage(body, "prompt_tokens"),

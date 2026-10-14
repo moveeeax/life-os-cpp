@@ -592,10 +592,11 @@ void Application::init_jobs_(Config::AppConfig& cfg) {
     long ttl = cfg.get<int>("jobs.result_ttl", "JOBS_RESULT_TTL", 86400);
     int retries = cfg.get<int>("jobs.max_retries", "JOBS_MAX_RETRIES", 3);
     Jobs::initialize(ttl, retries);
-    // Reliability knobs (opt-in; 0 keeps the legacy immediate-requeue /
-    // no-lease behaviour). promote_due_jobs() / reap_expired_leases() are
-    // driven from the worker loop.
-    const int backoff_base = cfg.get<int>("jobs.retry_backoff_base_ms", "JOBS_RETRY_BACKOFF_BASE_MS", 0);
+    // Reliability knobs. Retry backoff is on by default (2 s doubling): with an
+    // immediate requeue a job spent its whole retry budget within milliseconds.
+    // The lease stays opt-in (0 = no lease). promote_due_jobs() /
+    // reap_expired_leases() are driven from the worker loop.
+    const int backoff_base = cfg.get<int>("jobs.retry_backoff_base_ms", "JOBS_RETRY_BACKOFF_BASE_MS", 2000);
     const int backoff_max = cfg.get<int>("jobs.retry_backoff_max_ms", "JOBS_RETRY_BACKOFF_MAX_MS", 60000);
     const int visibility = cfg.get<int>("jobs.visibility_timeout_sec", "JOBS_VISIBILITY_TIMEOUT_SEC", 0);
     Jobs::get().set_retry_backoff(backoff_base, backoff_max);

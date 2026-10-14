@@ -57,8 +57,9 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     if (job_id.empty()) {
         throw std::invalid_argument("food_parse: payload has no job_id");
     }
+    int attempt = 0;  // 0 until the claim: a fail before it is not fenced by an attempt
     const auto failed = [&](const std::string& code, const std::string& message) {
-        jobs.fail(job_id, code, message);
+        jobs.fail(job_id, code, message, attempt);
         spdlog::warn("food parse {}: {}", job_id, code);
         return nlohmann::json{{"job_id", job_id}, {"status", "failed"}, {"error", code}};
     };
@@ -75,13 +76,13 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         // Nothing to update: the row is gone.
         return {{"job_id", job_id}, {"status", "missing"}};
     }
-    const int attempt = jobs.start(job_id);
+    attempt = jobs.start(job_id);
     if (attempt == 0) {
         // A row still `running` is held by another delivery, or by a worker that died less than
-        // JobRows::kStaleRunning ago: the queue retries with backoff instead of dropping the job.
+        // JobRows::kStaleRunning ago: the job waits until the row turns stale, without spending an attempt.
         const auto now = jobs.status(job_id);
         if (now == "running") {
-            throw std::runtime_error("food_parse: the row is running elsewhere");
+            throw Jobs::DeferJob("food_parse: the row is running elsewhere", jobs.stale_in_ms(job_id));
         }
         return {{"job_id", job_id}, {"status", now.value_or("missing")}};
     }
@@ -96,7 +97,7 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         if (attempt >= max_attempts) {
             return failed(code, what);
         }
-        jobs.requeue(job_id);
+        jobs.requeue(job_id, attempt);
         throw std::runtime_error(std::string("food_parse: ") + what);
     };
 
@@ -162,6 +163,7 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         const std::string model =
             body.contains("model") && body["model"].is_string() ? body["model"].get<std::string>() : settings->model;
         jobs.finish(job_id,
+                    attempt,
                     Food::Parse::to_json(lines),
                     model,
                     detail::usage(body, "prompt_tokens"),

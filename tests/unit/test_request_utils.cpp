@@ -8,6 +8,12 @@
  * relevant — a regression would drop reset tokens back into the access log.
  */
 
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include <gtest/gtest.h>
 
 #include "api/RequestUtils.hpp"
@@ -65,6 +71,42 @@ TEST(RequestUtilsTest, ParseIntClamp) {
     EXPECT_EQ(Api::clamp_int("500", 20, 1, 200), 200);
     EXPECT_EQ(Api::clamp_int("-5", 20, 0, 200), 0);
     EXPECT_EQ(Api::clamp_int("", 20, 1, 200), 20);
+}
+
+// 2026-10-14 20:30 UTC is already 2026-10-15 in Asia/Almaty (UTC+5): a default
+// taken from UTC would file the evening's row under the day before.
+drogon::HttpRequestPtr with_params(const std::vector<std::pair<std::string, std::string>>& params) {
+    auto req = drogon::HttpRequest::newHttpRequest();
+    for (const auto& [k, v] : params) {
+        req->setParameter(k, v);
+    }
+    return req;
+}
+
+std::optional<std::string> almaty_only(const std::string& tz) {
+    if (tz == "Asia/Almaty") {
+        return std::string("2026-10-15");
+    }
+    return std::nullopt;
+}
+
+TEST(RequestUtilsTest, LocalTodayFollowsAValidZone) {
+    EXPECT_EQ(Api::local_today(with_params({{"tz", "Asia/Almaty"}}), almaty_only, "2026-10-14"), "2026-10-15");
+    EXPECT_EQ(Api::local_today(with_params({}), almaty_only, "2026-10-14"), "2026-10-14") << "no tz: UTC";
+    EXPECT_EQ(Api::local_today(with_params({{"tz", "Mars/Olympus"}}), almaty_only, "2026-10-14"), "2026-10-14")
+        << "not a zone: UTC";
+    const auto down = [](const std::string&) -> std::optional<std::string> {
+        throw std::runtime_error("database is away");
+    };
+    EXPECT_EQ(Api::local_today(with_params({{"tz", "Asia/Almaty"}}), down, "2026-10-14"), "2026-10-14")
+        << "a resolver that cannot answer leaves UTC";
+}
+
+TEST(RequestUtilsTest, RequestDayPrefersTheGivenDate) {
+    EXPECT_EQ(Api::request_day(with_params({{"date", "2026-09-01"}, {"tz", "Asia/Almaty"}}), almaty_only, "2026-10-14"),
+              "2026-09-01");
+    EXPECT_EQ(Api::request_day(with_params({{"tz", "Asia/Almaty"}}), almaty_only, "2026-10-14"), "2026-10-15");
+    EXPECT_EQ(Api::request_day(with_params({}), almaty_only, "2026-10-14"), "2026-10-14");
 }
 
 }  // namespace

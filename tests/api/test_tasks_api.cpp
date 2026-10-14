@@ -6,6 +6,7 @@
  */
 
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -229,6 +230,26 @@ TEST_F(TasksApiTest, TheAgendaReadsTheDayInTheGivenZone) {
               k400BadRequest);
 }
 
+TEST_F(TasksApiTest, WithoutADateTheAgendaIsTodayInTheGivenZone) {
+    // Kiritimati is UTC+14 and Pago Pago UTC-11: at any hour one of them is on another date than UTC.
+    const auto [zone, local, utc] = Database::get().execute_read([](auto& txn) {
+        auto r = txn.exec(
+            "SELECT z, to_char(now() AT TIME ZONE z, 'YYYY-MM-DD'), to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD') "
+            "FROM unnest(ARRAY['Pacific/Kiritimati', 'Pacific/Pago_Pago']) AS z "
+            "WHERE (now() AT TIME ZONE z)::date <> (now() AT TIME ZONE 'UTC')::date LIMIT 1");
+        return std::make_tuple(
+            r[0][0].template as<std::string>(), r[0][1].template as<std::string>(), r[0][2].template as<std::string>());
+    });
+    ASSERT_NE(local, utc);
+    EXPECT_EQ(body_of(call(&Api::TasksController::agenda, user(kAnna), Get, {{"tz", zone}}))["data"]["date"], local);
+    EXPECT_EQ(body_of(call(&Api::TasksController::agenda, user(kAnna), Get))["data"]["date"], utc) << "no tz: UTC";
+    EXPECT_EQ(
+        body_of(call(
+            &Api::TasksController::agenda, user(kAnna), Get, {{"tz", zone}, {"date", "2026-10-07"}}))["data"]["date"],
+        "2026-10-07")
+        << "a given date wins";
+}
+
 TEST_F(TasksApiTest, NotesAreTheInbox) {
     const json n = created(&Api::TasksController::createNote, kAnna, json{{"text", "Coworking day passes"}});
     EXPECT_EQ(n["status"], "inbox");
@@ -278,7 +299,7 @@ TEST_F(TasksParseApiTest, ANoteBecomesATaskOnceAndIsArchived) {
     Jobs::get().complete(job->id, json::object());
     ASSERT_EQ(Repositories::Tasks::ParseJobRepository().start(id), 1) << "the worker claims it before it answers";
     Repositories::Tasks::ParseJobRepository().finish(
-        id, json::array({json{{"title", "Купить воду"}, {"area", "projects"}, {"due", "2026-10-08"}}}), "m", 1, 1);
+        id, 1, json::array({json{{"title", "Купить воду"}, {"area", "projects"}, {"due", "2026-10-08"}}}), "m", 1, 1);
     const json lines = json::array({json{{"title", "Купить воду"}, {"area", "projects"}, {"due", "2026-10-08"}}});
     const auto accepted = call_id(&Api::TasksController::parseAccept, user(kAnna), Post, id, json{{"lines", lines}});
     ASSERT_EQ(accepted->statusCode(), k201Created) << accepted->body();

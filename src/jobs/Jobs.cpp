@@ -20,6 +20,7 @@
 #include <nlohmann/json.hpp>
 
 #include "cache/Cache.hpp"
+#include "jobs/Dispatcher.hpp"
 #include "observability/Trace.hpp"
 #include "utils/Time.hpp"
 
@@ -250,7 +251,24 @@ void JobQueue::fail(const std::string& id, const std::string& error) {
         redis.lpush(dlq_key(job.type), id);
         redis.sadd(kDlqAllKey, id);  // index for "list all DLQ" queries
         spdlog::warn("Job {} DLQ'd after {} retries: {}", id, job.retry_count, error);
+        Dispatcher::get().on_dead(job, error);
     }
+}
+
+void JobQueue::defer(const std::string& id, int64_t delay_ms, const std::string& reason) {
+    check_initialized();
+    auto& redis = Cache::get().get_client();
+    auto job = load_job_or_throw_(redis, id);
+    release_from_worker_(redis, job);
+    // retry_count stays: waiting for another delivery to let go is not an attempt.
+    job.status = "pending";
+    job.error = reason;
+    job.worker_id.clear();
+    job.updated_at = now_epoch();
+    save_job_(redis, job);
+    const int64_t wait = delay_ms < 1000 ? 1000 : delay_ms;
+    redis.zadd(delayed_key(), id, static_cast<double>(Utils::Time::now_epoch_millis() + wait));
+    spdlog::info("Job {} deferred for {}ms: {}", id, wait, reason);
 }
 
 void JobQueue::dead_letter(const std::string& id, const std::string& error) {
@@ -270,6 +288,7 @@ void JobQueue::dead_letter(const std::string& id, const std::string& error) {
     redis.sadd(kDlqAllKey, id);
     save_job_(redis, job);
     spdlog::warn("Job {} sent straight to DLQ (permanent failure): {}", id, error);
+    Dispatcher::get().on_dead(job, error);
 }
 
 std::vector<Job> JobQueue::list_dlq(const std::string& type, int limit) {
@@ -381,7 +400,8 @@ long JobQueue::recover_processing(const std::string& worker_id) {
 }
 
 long JobQueue::promote_due_jobs() {
-    if (!initialized_ || retry_backoff_base_ms_ <= 0)
+    // Not gated on retry backoff: defer() parks jobs in the same set.
+    if (!initialized_)
         return 0;
     auto& redis = Cache::get().get_client();
     const auto now_ms = Utils::Time::now_epoch_millis();

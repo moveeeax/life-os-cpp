@@ -257,8 +257,8 @@ TEST_F(MoneyParseJobTest, ARunningRowIsRetriedAndALateResultChangesNothing) {
     EXPECT_EQ(jobs.open_count(kAnna), 0) << "a stale row does not hold a parse slot";
     provider.replies.push_back({200, completion(good_lines())});
     EXPECT_EQ(run(id)["status"], "done");
-    jobs.finish(id, json::array(), "late-model", 1, 1);
-    jobs.fail(id, "internal_error", "late");
+    jobs.finish(id, /*attempt=*/1, json::array(), "late-model", 1, 1);
+    jobs.fail(id, "internal_error", "late", /*attempt=*/1);
     const json row = *jobs.get(kAnna, id);
     EXPECT_EQ(row["status"], "done");
     EXPECT_EQ(row["result"].size(), 1u);

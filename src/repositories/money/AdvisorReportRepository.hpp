@@ -27,7 +27,8 @@ public:
      * The owner's review of the period, created queued when there is none.
      * A failed one is queued again (a "Run now" after a provider outage), and
      * so is a done one written before its period ended (finished on or before
-     * period_end, UTC): the week has more rows now.
+     * period_end, UTC): the week has more rows now. So is a running one whose
+     * worker died (older than JobRows::kStaleRunning).
      * @returns {row, true} when this call queued it (created or re-queued).
      */
     std::pair<nlohmann::json, bool> create_or_get(const std::string& owner,
@@ -44,11 +45,15 @@ public:
                         " error = NULL, finished_at = NULL WHERE money_advisor_reports.status = 'failed' "
                         " OR (money_advisor_reports.status = 'done' AND money_advisor_reports.period_end >= "
                         "  (money_advisor_reports.finished_at AT TIME ZONE 'UTC')::date) "
+                        // A review whose worker died reads as failed (JobRows::shown_status): it can be asked again.
+                        " OR (money_advisor_reports.status = 'running' AND COALESCE(money_advisor_reports.started_at, "
+                        "  money_advisor_reports.created_at) < now() - $5::interval) "
                         "RETURNING id::text",
                         owner,
                         period,
                         start,
-                        end);
+                        end,
+                        JobRows::kStaleRunning);
                     if (!r.empty()) {
                         return {*find_in(txn, owner, r[0][0].template as<std::string>()), true};
                     }
@@ -75,11 +80,13 @@ public:
                 "SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT id, period, "
                 " to_char(period_start, 'YYYY-MM-DD') AS period_start, to_char(period_end, 'YYYY-MM-DD') AS "
                 "period_end, "
-                " status, error, model, "
-                " to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-                " to_char(finished_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS finished_at "
-                " FROM money_advisor_reports WHERE owner_id = $1::uuid ORDER BY period_start DESC, created_at DESC "
-                " LIMIT $2) t",
+                " " +
+                    JobRows::shown_status() + " AS status, " + JobRows::shown_error() +
+                    " AS error, model, "
+                    " to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
+                    " to_char(finished_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS finished_at "
+                    " FROM money_advisor_reports WHERE owner_id = $1::uuid ORDER BY period_start DESC, created_at DESC "
+                    " LIMIT $2) t",
                 owner,
                 limit);
             return nlohmann::json::parse(r[0][0].template as<std::string>());
@@ -107,10 +114,15 @@ public:
     /// The row's status now; nullopt when the row is gone.
     std::optional<std::string> status(const std::string& id) { return JobRows::status(kTable, id); }
 
-    /// running -> queued, for an outage the queue will retry.
-    void requeue(const std::string& id) { JobRows::requeue(kTable, id); }
+    /// running -> queued, for an outage the queue will retry; only by the holder of @p attempt.
+    void requeue(const std::string& id, int attempt) { JobRows::requeue(kTable, id, attempt); }
 
+    /// Milliseconds until a running row may be claimed again; 0 when it is not running.
+    long long stale_in_ms(const std::string& id) { return JobRows::stale_in_ms(kTable, id); }
+
+    /// Only the holder of @p attempt (what start() returned) writes the result.
     void finish(const std::string& id,
+                int attempt,
                 const nlohmann::json& facts,
                 const std::string& content,
                 const std::string& model,
@@ -120,25 +132,27 @@ public:
             txn.exec_params(
                 "UPDATE money_advisor_reports SET status = 'done', facts = $2::jsonb, content = $3, error = NULL, "
                 " model = $4, prompt_tokens = $5, completion_tokens = $6, finished_at = now() WHERE id = $1::uuid" +
-                    std::string(JobRows::kWhileRunning),
+                    JobRows::while_claimed(7),
                 id,
                 facts.dump(),
                 content,
                 model,
                 prompt_tokens,
-                completion_tokens);
+                completion_tokens,
+                attempt);
             return true;
         });
     }
 
-    void fail(const std::string& id, const std::string& code, const std::string& message) {
+    void fail(const std::string& id, const std::string& code, const std::string& message, int attempt = 0) {
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params(
                 "UPDATE money_advisor_reports SET status = 'failed', error = $2, finished_at = now() WHERE id = "
                 "$1::uuid" +
-                    std::string(JobRows::kWhileOpen),
+                    JobRows::while_open(3),
                 id,
-                message.empty() ? code : code + ": " + message);
+                message.empty() ? code : code + ": " + message,
+                attempt);
             return true;
         });
     }
@@ -148,11 +162,13 @@ private:
     static std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& id) {
         auto r = txn.exec_params(
             "SELECT row_to_json(t) FROM (SELECT id, period, to_char(period_start, 'YYYY-MM-DD') AS period_start, "
-            " to_char(period_end, 'YYYY-MM-DD') AS period_end, status, facts, content, error, model, prompt_tokens, "
-            " completion_tokens, "
-            " to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-            " to_char(finished_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS finished_at "
-            " FROM money_advisor_reports WHERE owner_id = $1::uuid AND id = $2::uuid) t",
+            " to_char(period_end, 'YYYY-MM-DD') AS period_end, " +
+                JobRows::shown_status() + " AS status, facts, content, " + JobRows::shown_error() +
+                " AS error, model, prompt_tokens, "
+                " completion_tokens, "
+                " to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
+                " to_char(finished_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS finished_at "
+                " FROM money_advisor_reports WHERE owner_id = $1::uuid AND id = $2::uuid) t",
             owner,
             id);
         if (r.empty()) {

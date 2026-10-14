@@ -26,6 +26,7 @@
 #include "fitness/xiaomi/Credentials.hpp"
 #include "fitness/xiaomi/Crypto.hpp"
 #include "fitness/xiaomi/Regions.hpp"
+#include "repositories/FitnessData.hpp"
 #include "repositories/RepoErrors.hpp"
 
 namespace Repositories {
@@ -54,6 +55,39 @@ public:
                 return std::nullopt;
             }
             return unseal_row(r[0]);
+        });
+    }
+
+    /// Credentials together with the rotated_at they were read at. A link or a
+    /// rotation moves rotated_at, so a writer holding an older value is late.
+    struct Fenced {
+        Xiaomi::Credentials credentials;
+        std::string rotated_at;  // as PostgreSQL prints it; only handed back to SQL
+    };
+
+    /// Credentials of this user's account with their fence, or nullopt without a link.
+    std::optional<Fenced> load_fenced(const std::string& owner_id) {
+        return Database::get().execute_read([&](auto& txn) -> std::optional<Fenced> {
+            auto r = txn.exec_params(
+                "SELECT xiaomi_user_id, pass_token_sealed, nonce, region, rotated_at::text AS rotated_at "
+                "FROM mi_accounts WHERE owner_id = $1::uuid",
+                owner_id);
+            if (r.empty()) {
+                return std::nullopt;
+            }
+            return Fenced{unseal_row(r[0]), r[0]["rotated_at"].template as<std::string>()};
+        });
+    }
+
+    /// The fence of this user's link without unsealing the token (for a token
+    /// that cannot be unsealed at all); nullopt without a link.
+    std::optional<std::string> rotated_at(const std::string& owner_id) {
+        return Database::get().execute_read([&](auto& txn) -> std::optional<std::string> {
+            auto r = txn.exec_params("SELECT rotated_at::text FROM mi_accounts WHERE owner_id = $1::uuid", owner_id);
+            if (r.empty()) {
+                return std::nullopt;
+            }
+            return r[0][0].template as<std::string>();
         });
     }
 
@@ -168,25 +202,41 @@ public:
         });
     }
 
-    /// Write the token Xiaomi rotated during a login. A link that was removed
-    /// in the meantime stays removed.
-    void store_rotated(const std::string& owner_id, const Xiaomi::Credentials& credentials) {
+    /**
+     * @brief Write the token Xiaomi rotated during a login. Only while the row
+     *        is still at @p fence (the rotated_at the token was loaded at): a
+     *        link removed in the meantime stays removed, and a fresh link made
+     *        meanwhile is not overwritten by the login that started before it.
+     *        On success @p fence moves to the new rotated_at.
+     * @returns false when the write was refused as late.
+     */
+    bool store_rotated(const std::string& owner_id, const Xiaomi::Credentials& credentials, std::string& fence) {
         validate_identity(credentials);
         Xiaomi::validate_pass_token(credentials.pass_token);
         const Xiaomi::Sealed sealed = Xiaomi::seal(credentials.pass_token, key_b64_);
         const std::string ciphertext_b64 = Xiaomi::Crypto::b64_encode(sealed.ciphertext);
         const std::string nonce_b64 = Xiaomi::Crypto::b64_encode(sealed.nonce);
 
-        Database::get().execute_write([&](auto& txn) {
-            txn.exec_params(
+        const auto moved = Database::get().execute_write([&](auto& txn) -> std::optional<std::string> {
+            auto r = txn.exec_params(
                 "UPDATE mi_accounts SET pass_token_sealed = $3, nonce = $4, rotated_at = now() "
-                "WHERE owner_id = $1::uuid AND xiaomi_user_id = $2",
+                "WHERE owner_id = $1::uuid AND xiaomi_user_id = $2 AND rotated_at = $5::timestamptz "
+                "RETURNING rotated_at::text",
                 owner_id,
                 credentials.user_id,
                 ciphertext_b64,
-                nonce_b64);
-            return true;
+                nonce_b64,
+                fence);
+            if (r.empty()) {
+                return std::nullopt;
+            }
+            return r[0][0].template as<std::string>();
         });
+        if (!moved.has_value()) {
+            return false;
+        }
+        fence = *moved;
+        return true;
     }
 
     /// @returns false without a link.
@@ -215,14 +265,21 @@ public:
         });
     }
 
-    /// Xiaomi refused the stored token: the user has to link again.
-    void mark_reauth_required(const std::string& owner_id, const std::string& error_code) {
-        Database::get().execute_write([&](auto& txn) {
-            txn.exec_params(
-                "UPDATE mi_accounts SET status = 'reauth_required', last_error = $2 WHERE owner_id = $1::uuid",
+    /// Xiaomi refused the token loaded at @p fence: the user has to link again.
+    /// A link made after that load is left alone (its token was not the one refused).
+    /// @returns false when the row moved past @p fence or is gone.
+    bool mark_reauth_required(const std::string& owner_id, const std::string& error_code, const std::string& fence) {
+        if (fence.empty()) {
+            return false;
+        }
+        return Database::get().execute_write([&](auto& txn) {
+            auto r = txn.exec_params(
+                "UPDATE mi_accounts SET status = 'reauth_required', last_error = $2 "
+                "WHERE owner_id = $1::uuid AND rotated_at = $3::timestamptz RETURNING 1",
                 owner_id,
-                error_code);
-            return true;
+                error_code,
+                fence);
+            return !r.empty();
         });
     }
 
@@ -270,19 +327,7 @@ public:
             if (!delete_data) {
                 return true;
             }
-            const std::string xiaomi_id = r[0][0].template as<std::string>();
-            for (const char* table : {"daily_activity",
-                                      "sleep_sessions",
-                                      "workouts",
-                                      "body_measurements",
-                                      "heart_rate_samples",
-                                      "spo2_samples",
-                                      "stress_samples",
-                                      "abnormal_heart_beat_events"}) {
-                txn.exec_params(std::string("DELETE FROM ") + table + " WHERE user_id = $1", xiaomi_id);
-            }
-            txn.exec_params("DELETE FROM sync_runs WHERE xiaomi_user_id = $1", xiaomi_id);
-            txn.exec_params("DELETE FROM sync_state WHERE xiaomi_user_id = $1", xiaomi_id);
+            FitnessData::delete_in(txn, r[0][0].template as<std::string>());
             // The band data of finished workouts came from the deleted rows.
             txn.exec_params(
                 "UPDATE workout_sessions SET health_status = 'pending', hr_avg = NULL, hr_max = NULL, "

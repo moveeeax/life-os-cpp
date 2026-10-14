@@ -6,6 +6,7 @@
  */
 
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -618,6 +619,36 @@ protected:
 
 // ── eight decimals ──────────────────────────────────────────────────────────
 
+TEST_F(MoneyApiTest, AnAmountADoubleCannotHoldIsRefused) {
+    const json kaspi = account(kAnna, "Kaspi", "KZT");
+    const json food = category(kAnna, json{{"name", "Food"}});
+    const auto post = [&](double amount) {
+        return call_json(&Api::MoneyController::createTransaction,
+                         user(kAnna),
+                         json{{"date", "2026-10-05"},
+                              {"account_id", kaspi["id"]},
+                              {"amount", amount},
+                              {"category_id", food["id"]},
+                              {"name", "Groceries"}});
+    };
+    // 16 significant digits: the double nearest to it is not the amount sent.
+    const auto refused = post(12345678901.23456);
+    ASSERT_EQ(refused->statusCode(), k400BadRequest) << refused->body();
+    const json errors = body_of(refused)["errors"];
+    ASSERT_EQ(errors.size(), 1u) << errors.dump();
+    EXPECT_EQ(errors[0]["field"], "amount");
+    EXPECT_EQ(errors[0]["code"], "precision");
+    // 15 digits are kept exactly.
+    EXPECT_EQ(post(123456789012.34)->statusCode(), k201Created);
+    EXPECT_EQ(post(13275.61)->statusCode(), k201Created);
+    EXPECT_EQ(call_json(&Api::MoneyController::createAccount,
+                        user(kAnna),
+                        json{{"name", "Big"}, {"currency", "KZT"}, {"opening_balance", 0.1 + 0.2}})
+                  ->statusCode(),
+              k400BadRequest)
+        << "0.30000000000000004 is 17 digits";
+}
+
 TEST_F(MoneyApiTest, ACryptoWalletKeepsEightDecimals) {
     // A known code takes its smallest unit from the table; it cannot be told otherwise.
     const auto btc =
@@ -764,6 +795,7 @@ protected:
         const std::string id = jobs.create_text(kAnna, "Kaspi *8880 13275.61 KZT", "2026-10-07")["id"];
         EXPECT_EQ(jobs.start(id), 1) << "the worker claims it before it answers";
         jobs.finish(id,
+                    /*attempt=*/1,
                     json::array({json{{"date", "2026-10-05"},
                                       {"account_id", account["id"]},
                                       {"amount", 13275.61},
@@ -781,6 +813,31 @@ std::string png_data_url(std::size_t payload_chars) {
 }
 
 }  // namespace
+
+TEST_F(MoneyParseApiTest, WithoutAHintDateTheParseTakesTodayInTheGivenZone) {
+    // Kiritimati is UTC+14 and Pago Pago UTC-11: at any hour one of them is on another date than UTC.
+    const auto [zone, local, utc] = Database::get().execute_read([](auto& txn) {
+        auto r = txn.exec(
+            "SELECT z, to_char(now() AT TIME ZONE z, 'YYYY-MM-DD'), to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD') "
+            "FROM unnest(ARRAY['Pacific/Kiritimati', 'Pacific/Pago_Pago']) AS z "
+            "WHERE (now() AT TIME ZONE z)::date <> (now() AT TIME ZONE 'UTC')::date LIMIT 1");
+        return std::make_tuple(
+            r[0][0].template as<std::string>(), r[0][1].template as<std::string>(), r[0][2].template as<std::string>());
+    });
+    ASSERT_NE(local, utc);
+    auto req = TestHelpers::authed_json(user(kAnna), json{{"text", "Kaspi *8880 100 KZT"}});
+    req->setParameter("tz", zone);
+    HttpResponsePtr resp;
+    controller.parseText(req, [&](const HttpResponsePtr& r) { resp = r; });
+    ASSERT_TRUE(resp);
+    ASSERT_EQ(resp->statusCode(), k202Accepted) << resp->body();
+    const json row =
+        body_of(call_id(&Api::MoneyController::parseStatus, user(kAnna), Get, body_of(resp)["data"]["id"]))["data"];
+    EXPECT_EQ(row["hint_date"], local);
+    auto job = Jobs::get().pick({"money_parse"}, 1);
+    ASSERT_TRUE(job.has_value());
+    Jobs::get().complete(job->id, json::object());
+}
 
 TEST_F(MoneyParseApiTest, TextAndReceiptAreQueuedForTheCaller) {
     EXPECT_EQ(body_of(call(&Api::MoneyController::getSettings, user(kAnna), Get))["data"]["llm_available"], true);

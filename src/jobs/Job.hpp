@@ -31,6 +31,18 @@ struct PermanentJobError : std::runtime_error {
 };
 
 /**
+ * @brief Thrown by a job handler that cannot run the job YET, through no
+ *        fault of the job: e.g. its database row is still held by another
+ *        delivery that may be alive. The worker parks the job for
+ *        @p delay_ms and does not count an attempt (JobQueue::defer), so a
+ *        wait cannot use up the retry budget and dead-letter a healthy job.
+ */
+struct DeferJob : std::runtime_error {
+    DeferJob(const std::string& what, int64_t delay) : std::runtime_error(what), delay_ms(delay) {}
+    int64_t delay_ms;
+};
+
+/**
  * @brief Generate a UUID v4 string via libuuid (uuid_generate_random).
  */
 inline std::string generate_uuid() {

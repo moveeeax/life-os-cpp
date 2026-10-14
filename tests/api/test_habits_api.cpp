@@ -25,6 +25,7 @@
 #include "api/TodayController.hpp"
 #include "database/Database.hpp"
 #include "domain/Role.hpp"
+#include "repositories/habits/Days.hpp"
 #include "test_helpers.hpp"
 
 using json = nlohmann::json;
@@ -338,6 +339,54 @@ TEST_F(HabitsApiTest, TicksByHandAndTheStreak) {
     EXPECT_EQ(tick(kAnna, a, utc_day(-367))->statusCode(), k400BadRequest) << "too far back";
     EXPECT_EQ(tick(kAnna, a, "2026-02-30")->statusCode(), k400BadRequest);
     EXPECT_EQ(tick(kAnna, a, utc_day(-1), json{{"value", -1}})->statusCode(), k400BadRequest);
+}
+
+TEST_F(HabitsApiTest, AnOldRangeDoesNotCutTheStreakOffAtTheRowCap) {
+    // 2100 days of steps up to yesterday. A range ~5.7 years back used to be read
+    // as one window up to today: its first 2000 rows (oldest first) ended 90 days
+    // ago, so the streak lost its newest days. Each window is read on its own now.
+    sql(std::string("INSERT INTO mi_accounts (owner_id, xiaomi_user_id, pass_token_sealed, nonce, region) VALUES ('") +
+        kAnna + "', '" + kAnnaMi + "', 'x', 'x', 'sg')");
+    sql(std::string("INSERT INTO daily_activity (user_id, date, steps) SELECT '") + kAnnaMi +
+        "', d::date, 9000 FROM generate_series((now() AT TIME ZONE 'UTC')::date - 2100, "
+        "(now() AT TIME ZONE 'UTC')::date - 1, interval '1 day') AS d");
+    const auto steps =
+        created(kAnna, json{{"name", "Steps 8000"}, {"schedule", "daily"}, {"source", "steps"}, {"goal", 8000}});
+
+    const json h = habit_of(days(reader(kAnna), utc_day(-2090), utc_day(-2080), "UTC")["data"], steps);
+    EXPECT_TRUE(day_of(h, utc_day(-2085))["done"]) << "the old range has its values";
+    EXPECT_EQ(day_of(h, utc_day(-2085))["value"], 9000);
+    EXPECT_GE(h["streak"].get<int>(), 365) << "the last year up to yesterday is whole";
+}
+
+TEST(HabitsWindows, ARangeFarFromTodayIsReadOnItsOwn) {
+    using Habits::day_of;
+    using Repositories::Habits::windows;
+    const auto today = day_of("2026-10-14");
+    const auto near = windows(day_of("2026-10-01"), day_of("2026-10-31"), today, true);
+    ASSERT_EQ(near.size(), 1u) << "the range overlaps the history year";
+    EXPECT_EQ(near[0].first, day_of("2025-10-14"));
+    EXPECT_EQ(near[0].second, day_of("2026-10-31"));
+
+    const auto old = windows(day_of("2020-01-01"), day_of("2020-01-31"), today, true);
+    ASSERT_EQ(old.size(), 2u);
+    EXPECT_EQ(old[0], std::make_pair(day_of("2020-01-01"), day_of("2020-01-31")));
+    EXPECT_EQ(old[1], std::make_pair(day_of("2025-10-14"), today));
+
+    const auto later = windows(day_of("2027-03-01"), day_of("2027-03-31"), today, true);
+    ASSERT_EQ(later.size(), 2u) << "a range after today too";
+    EXPECT_EQ(later[0].second, today);
+    EXPECT_EQ(later[1].first, day_of("2027-03-01"));
+
+    const auto plate = windows(day_of("2026-10-12"), today, today, false);
+    ASSERT_EQ(plate.size(), 1u) << "without history only the range and today";
+    EXPECT_EQ(plate[0], std::make_pair(day_of("2026-10-12"), today));
+
+    const auto adjacent = windows(day_of("2026-10-15"), day_of("2026-10-20"), today, false);
+    ASSERT_EQ(adjacent.size(), 1u) << "a range starting the day after today joins it";
+    for (const auto& w : {near[0], old[0], old[1], later[0], later[1]}) {
+        EXPECT_LE((w.second - w.first).count(), Repositories::Habits::kWindowsMaxDays);
+    }
 }
 
 TEST_F(HabitsApiTest, TheRangeIsChecked) {

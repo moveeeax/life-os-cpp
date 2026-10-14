@@ -231,12 +231,16 @@ externalKafka:
 
 # ---------------------------------------------------------------
 # Jobs configuration (disabled on the API by default — use life-os-cpp-worker chart)
-# Env vars set: JOBS_ENABLED, JOBS_RESULT_TTL, JOBS_MAX_RETRIES
+# Env vars set: JOBS_ENABLED, JOBS_RESULT_TTL, JOBS_MAX_RETRIES,
+# JOBS_RETRY_BACKOFF_BASE_MS
 # ---------------------------------------------------------------
 jobs:
   enabled: false
   resultTtl: 86400
   maxRetries: 3
+  # Delay before the first retry of a failed job, doubling per retry (capped
+  # at 60 s by the app). 0 requeues at once.
+  retryBackoffBaseMs: 2000
 
 # ---------------------------------------------------------------
 # fitness module — wired by hand on the new-module.sh pattern (there is

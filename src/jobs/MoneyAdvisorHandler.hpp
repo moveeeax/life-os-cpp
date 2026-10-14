@@ -88,8 +88,9 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     }
     const std::string id = payload["report_id"].get<std::string>();
     Repositories::Money::AdvisorReportRepository reports;
+    int attempt = 0;  // 0 until the claim: a fail before it is not fenced by an attempt
     const auto failed = [&](const std::string& code, const std::string& message) {
-        reports.fail(id, code, message);
+        reports.fail(id, code, message, attempt);
         spdlog::warn("money advisor {}: {}", id, code);
         return nlohmann::json{{"report_id", id}, {"status", "failed"}, {"error", code}};
     };
@@ -105,13 +106,13 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     if (!row.has_value()) {
         return {{"report_id", id}, {"status", "missing"}};
     }
-    const int attempt = reports.start(id);
+    attempt = reports.start(id);
     if (attempt == 0) {
         // A row still `running` is held by another delivery, or by a worker that died less than
-        // JobRows::kStaleRunning ago: the queue retries with backoff instead of dropping the job.
+        // JobRows::kStaleRunning ago: the job waits until the row turns stale, without spending an attempt.
         const auto now = reports.status(id);
         if (now == "running") {
-            throw std::runtime_error("money_advisor: the row is running elsewhere");
+            throw Jobs::DeferJob("money_advisor: the row is running elsewhere", reports.stale_in_ms(id));
         }
         return {{"report_id", id}, {"status", now.value_or("missing")}};
     }
@@ -123,7 +124,7 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         if (attempt >= max_attempts) {
             return failed(code, what);
         }
-        reports.requeue(id);
+        reports.requeue(id, attempt);
         throw std::runtime_error(std::string("money_advisor: ") + what);
     };
 
@@ -138,7 +139,7 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
                                     Money::Period::detail::text_of(
                                         std::chrono::floor<std::chrono::days>(std::chrono::system_clock::now()))));
         if (facts["blocks"].empty()) {
-            reports.finish(id, facts, kNothing, "", std::nullopt, std::nullopt);
+            reports.finish(id, attempt, facts, kNothing, "", std::nullopt, std::nullopt);
             return {{"report_id", id}, {"status", "done"}, {"empty", true}};
         }
         const nlohmann::json request{
@@ -162,6 +163,7 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
             return failed("invalid_answer", "no message content");
         }
         reports.finish(id,
+                       attempt,
                        facts,
                        content,
                        Chat::model_of(body, *settings),

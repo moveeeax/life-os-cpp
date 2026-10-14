@@ -235,11 +235,31 @@ TEST_F(MoneyAdvisorJobTest, ARunningReviewIsRetriedAndALateResultChangesNothing)
         return true;
     });
     EXPECT_EQ(run(row["id"])["status"], "done") << "the stale row is claimed again";
-    reports.finish(row["id"], json::object(), "late", "late-model", 1, 1);
-    reports.fail(row["id"], "internal_error", "late");
+    reports.finish(row["id"], /*attempt=*/1, json::object(), "late", "late-model", 1, 1);
+    reports.fail(row["id"], "internal_error", "late", /*attempt=*/1);
     const json after = *reports.get(kAnna, row["id"]);
     EXPECT_EQ(after["status"], "done");
     EXPECT_EQ(after["content"], Jobs::MoneyAdvisor::kNothing);
+}
+
+TEST_F(MoneyAdvisorJobTest, AReviewWhoseWorkerDiedReadsFailedAndCanBeAskedAgain) {
+    const auto [row, queued] = reports.create_or_get(kAnna, "month", "2026-09-01", "2026-09-30");
+    ASSERT_EQ(reports.start(row["id"]), 1);
+    const auto [same, again] = reports.create_or_get(kAnna, "month", "2026-09-01", "2026-09-30");
+    EXPECT_FALSE(again) << "a review being written is not queued twice";
+    EXPECT_EQ(same["status"], "running");
+
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params(
+            "UPDATE money_advisor_reports SET started_at = now() - interval '11 minutes' WHERE id = $1::uuid",
+            row["id"].get<std::string>());
+        return true;
+    });
+    EXPECT_EQ((*reports.get(kAnna, row["id"]))["status"], "failed");
+    EXPECT_EQ(reports.list(kAnna, 10)[0]["status"], "failed");
+    const auto [requeued_row, requeued] = reports.create_or_get(kAnna, "month", "2026-09-01", "2026-09-30");
+    EXPECT_TRUE(requeued);
+    EXPECT_EQ(requeued_row["status"], "queued");
 }
 
 TEST_F(MoneyAdvisorJobTest, AReviewTheQueueRefusedIsFailedAndCanBeAskedAgain) {

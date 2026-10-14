@@ -53,8 +53,20 @@ public:
     /// faking success, and without burning the retry budget.
     json dispatch(const Job& job) const;
 
+    /// Called when the queue gives a job of one type up (dead-lettered): the
+    /// place to close a record the job was meant to finish, so it does not
+    /// stay `queued` or `running` for a page that polls it.
+    using DeadHook = std::function<void(const json& payload, const std::string& error)>;
+
+    void register_dead_letter(const std::string& type, DeadHook fn) { dead_hooks_[type] = std::move(fn); }
+
+    /// Runs the dead-letter hook of @p job.type, if any. Never throws: the job
+    /// is already in the DLQ, a failing hook is logged and left at that.
+    void on_dead(const Job& job, const std::string& error) const;
+
 private:
     std::unordered_map<std::string, Handler> handlers_;
+    std::unordered_map<std::string, DeadHook> dead_hooks_;
 };
 
 /**
