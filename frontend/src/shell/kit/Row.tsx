@@ -11,10 +11,12 @@ interface RowProps {
   open?: boolean;
   onToggle?: (open: boolean) => void;
   id?: string;
+  /** A control beside the row (a tick), outside the button that opens it. */
+  action?: ReactNode;
 }
 
 /** One calm row: title and one value; the rest behind a click. */
-export function Row({ title, sub, right, dot, children, open, onToggle, id }: RowProps) {
+export function Row({ title, sub, right, dot, children, open, onToggle, id, action }: RowProps) {
   const [own, setOwn] = useState(false);
   const isOpen = open ?? own;
   const detailsId = useId();
@@ -50,6 +52,7 @@ export function Row({ title, sub, right, dot, children, open, onToggle, id }: Ro
         ) : (
           <div className="k-row-head">{body}</div>
         )}
+        {action}
       </div>
       {expandable && isOpen && (
         <div className="k-row-more" id={detailsId}>

@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Chip } from './corners';
-import { DEFAULT_CORNERS, cleanCorners, placeChips, weatherGlyph, weatherLine } from './settings';
+import {
+  DEFAULT_CORNERS,
+  cleanCorners,
+  isPlaced,
+  placeChips,
+  weatherGlyph,
+  weatherLine,
+  withChip,
+} from './settings';
 
 const chip = (key: Chip['key']): Chip => ({ key, title: key, main: [], small: [], dot: null });
-const all = [chip('body'), chip('goals'), chip('day'), chip('tasks')];
+const all = [chip('body'), chip('goals'), chip('day'), chip('tasks'), chip('habits')];
 
 describe('placeChips', () => {
   it('puts each chip in its corner, in the corner order', () => {
@@ -22,6 +30,32 @@ describe('placeChips', () => {
       'day@c-bl',
       'body@c-br',
     ]);
+  });
+});
+
+describe('the Habits plate', () => {
+  it('is not placed by default', () => {
+    expect(isPlaced(DEFAULT_CORNERS, 'habits')).toBe(false);
+    expect(placeChips(all, DEFAULT_CORNERS).map((p) => p.chip.key)).not.toContain('habits');
+  });
+  it('takes the bottom right when every corner is full, and Tasks leaves Now', () => {
+    const next = withChip(DEFAULT_CORNERS, 'habits');
+    expect(next).toEqual({ tl: 'body', tr: 'goals', bl: 'day', br: 'habits' });
+    expect(placeChips(all, next).map((p) => `${p.chip.key}@${p.spot}`)).toEqual([
+      'body@c-tl',
+      'goals@c-tr',
+      'day@c-bl',
+      'habits@c-br',
+    ]);
+  });
+  it('takes the first empty corner, and stays where it is once placed', () => {
+    expect(withChip({ tl: 'body', tr: null, bl: 'day', br: 'tasks' }, 'habits').tr).toBe('habits');
+    const placed = { tl: 'habits', tr: null, bl: null, br: null } as const;
+    expect(withChip(placed, 'habits')).toBe(placed);
+  });
+  it('is a chip this client knows', () => {
+    const layout = { tl: 'body', tr: 'goals', bl: 'day', br: 'habits' } as const;
+    expect(cleanCorners(layout)).toEqual(layout);
   });
 });
 
