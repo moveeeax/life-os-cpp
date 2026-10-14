@@ -9981,6 +9981,268 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Projects and courses with their task counts and the next open task */
+        get: {
+            parameters: {
+                query?: {
+                    kind?: "project" | "course";
+                    status?: "planned" | "active" | "paused" | "done";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The projects */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Project"][];
+                        };
+                    };
+                };
+                /** @description Bad query */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Tasks module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Add a project or a course */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ProjectInput"];
+                };
+            };
+            responses: {
+                /** @description The project */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Project"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Tasks module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Another project of the caller has this code (code_taken) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/projects/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** One project or course */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The project */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Project"];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Tasks module disabled, or not the caller's project */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete a project or course; its tasks stay, unlinked */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Tasks module disabled, or not the caller's project */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Edit a project or course (the fields given; the kind stays) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ProjectInput"];
+                };
+            };
+            responses: {
+                /** @description The project */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Project"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Tasks module disabled, or not the caller's project */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Another project of the caller has this code (code_taken) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
     "/api/v1/tasks/items": {
         parameters: {
             query?: never;
@@ -9998,6 +10260,10 @@ export interface paths {
                     q?: string;
                     due_to?: string;
                     done_since?: string;
+                    /** @description The tasks of one trip (packing) */
+                    trip?: string;
+                    /** @description The tasks of one project or course */
+                    project?: string;
                     limit?: number;
                     offset?: number;
                 };
@@ -15456,6 +15722,74 @@ export interface components {
         TaskArea: "finance" | "health" | "travel" | "growth" | "relationships" | "projects";
         /** @enum {string|null} */
         TaskEffort: "5min" | "30min" | "deep" | null;
+        /** @description A project groups tasks; a course (kind course) is a project of Learning with a platform and dates */
+        Project: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "project" | "course";
+            name: string;
+            /** @description The handle a task phrase uses, as in "#small" */
+            code: string;
+            description: string;
+            link: string;
+            /**
+             * @description A project: active, paused or done; a course: planned, active or done
+             * @enum {string}
+             */
+            status: "planned" | "active" | "paused" | "done";
+            platform: string;
+            /** Format: date */
+            starts_on: string | null;
+            /** Format: date */
+            ends_on: string | null;
+            certificate: string;
+            position: number;
+            /** @description Open tasks */
+            open: number;
+            /** @description Done tasks */
+            done: number;
+            next: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+                /** Format: date */
+                due: string | null;
+            } | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ProjectInput: {
+            /**
+             * @default project
+             * @enum {string}
+             */
+            kind: "project" | "course";
+            name: string;
+            /** @description Made from the name when not given */
+            code?: string;
+            description?: string;
+            /** @description An http(s) address or empty */
+            link?: string;
+            /** @enum {string} */
+            status?: "planned" | "active" | "paused" | "done";
+            /** @description Course only */
+            platform?: string;
+            /**
+             * Format: date
+             * @description Course only
+             */
+            starts_on?: string | null;
+            /**
+             * Format: date
+             * @description Course only
+             */
+            ends_on?: string | null;
+            /** @description Course only: an http(s) address or empty */
+            certificate?: string;
+        };
         Task: {
             /** Format: uuid */
             id: string;
@@ -15484,6 +15818,15 @@ export interface components {
              * @description The trip this task is packing for
              */
             trip_id: string | null;
+            /**
+             * Format: uuid
+             * @description The project or course the task belongs to
+             */
+            project_id: string | null;
+            /** @description The name of that project or course */
+            project_title: string | null;
+            /** @enum {string|null} */
+            project_kind: "project" | "course" | null;
             /** @description The title of the goal the task belongs to */
             goal_title: string | null;
             /** Format: date-time */
@@ -15519,6 +15862,11 @@ export interface components {
              * @description A trip of the caller (packing)
              */
             trip_id?: string | null;
+            /**
+             * Format: uuid
+             * @description A project or course of the caller; null unlinks
+             */
+            project_id?: string | null;
             external_id?: string;
         };
         TaskPatch: {
@@ -15549,6 +15897,11 @@ export interface components {
              * @description A trip of the caller (packing)
              */
             trip_id?: string | null;
+            /**
+             * Format: uuid
+             * @description A project or course of the caller; null unlinks
+             */
+            project_id?: string | null;
         };
         TravelCrossing: {
             /** Format: uuid */
