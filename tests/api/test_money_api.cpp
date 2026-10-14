@@ -1291,7 +1291,10 @@ TEST_F(MoneyApiTest, FewerDecimalsAreRefusedWhileAnAccountKeepsTheCurrency) {
     ASSERT_EQ(refused->statusCode(), k409Conflict) << refused->body();
     EXPECT_EQ(body_of(refused)["error"], "decimals_in_use");
     int kept = -1;
-    for (const auto& c : body_of(call(&Api::MoneyController::listCurrencies, user(kAnna), Get))["data"]) {
+    // Bound to a local first: a range-for over `temporary["data"]` reads the
+    // temporary after it is gone (the loop keeps only the subobject alive).
+    const json listed = body_of(call(&Api::MoneyController::listCurrencies, user(kAnna), Get));
+    for (const auto& c : listed["data"]) {
         if (c["code"] == "XAU") {
             kept = c["decimals"].get<int>();
         }
