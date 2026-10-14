@@ -78,9 +78,8 @@ printf '%s' "$workloads" | grep -qi jaeger && fail "values-minimal still renders
 #    it. Render the REAL prod releases — the values files under deploy/ that the
 #    cluster runs (namespace life-os, releases life-os-cpp, life-os-cpp-worker,
 #    life-os-cpp-frontend) — with their charts, and assert the security-critical
-#    env the API pod actually gets. The values-prod.example.yaml overlays are
-#    examples only; nothing deploys from them, so asserting on them proved
-#    nothing about prod.
+#    env the API pod actually gets. These deploy/ files are the only prod
+#    overlays in the repo.
 API_CHART="$ROOT/helm/life-os-cpp"
 WORKER_CHART="$ROOT/helm/life-os-cpp-worker"
 FRONTEND_CHART="$ROOT/helm/cpp-frontend"

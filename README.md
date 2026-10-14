@@ -207,8 +207,7 @@ namespace `life-os`, as three helm releases. Their values live in `deploy/`:
 (`life-os-cpp-frontend`). External CNPG Postgres and Redis, secrets through
 `extraEnvFrom`; `deploy/db/` documents the database and role setup,
 `deploy/sync-tuning-configmap.yaml` holds the fitness sync knobs. There is
-no stage environment. Each chart also ships a secret-free
-`values-prod.example.yaml` to copy from.
+no stage environment.
 
 ```bash
 make helm-lint        # helm lint + template over every chart
