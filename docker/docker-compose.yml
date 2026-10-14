@@ -70,6 +70,7 @@ services:
       JOBS_ENABLED: ${JOBS_ENABLED:-false}
       JOBS_RESULT_TTL: ${JOBS_RESULT_TTL:-86400}
       JOBS_MAX_RETRIES: ${JOBS_MAX_RETRIES:-3}
+      JOBS_RETRY_BACKOFF_BASE_MS: ${JOBS_RETRY_BACKOFF_BASE_MS:-2000}
       BILLING_ENABLED: ${BILLING_ENABLED:-false}
       FITNESS_ENABLED: ${FITNESS_ENABLED:-false}
       WORKOUT_ENABLED: ${WORKOUT_ENABLED:-false}
@@ -205,6 +206,9 @@ services:
       # Same data/auth/mail env as app — see the x-*-env anchors up top.
       <<: [*data-env, *auth-env, *mail-env]
       JOBS_ENABLED: "true"
+      # A failed job waits 2 s, 4 s, ... before its retry instead of spending
+      # the retry budget at once.
+      JOBS_RETRY_BACKOFF_BASE_MS: ${JOBS_RETRY_BACKOFF_BASE_MS:-2000}
       # fitness module: the worker must see the same switch as the app, or it
       # finishes every fitness_sync job as failed/fitness_disabled.
       FITNESS_ENABLED: ${FITNESS_ENABLED:-false}

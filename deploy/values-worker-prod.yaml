@@ -57,6 +57,9 @@ worker:
 
 jobs:
   enabled: true
+  # A failed job waits 2 s, 4 s, ... before its retry: with an immediate
+  # requeue a parse whose row was still held spent its retries in milliseconds.
+  retryBackoffBaseMs: 2000
 
 fitness:
   enabled: true
