@@ -14,7 +14,13 @@
 #     (root), api/HealthController.hpp and its own body file core/Core.cpp
 #     may include it. Everything else
 #     that needs a module switch or the shutdown flag includes the tiny
-#     core/Modules.hpp instead.
+#     utils/Modules.hpp instead (it keeps the Core:: namespace).
+#   * jobs/ is a leaf of the module graph: the queue, the dispatcher, the
+#     outbox and the queue's own built-ins. A module's job handlers live in
+#     src/<module>/jobs/ and depend on jobs/, never the reverse; core/ (the
+#     composition root) registers them all (core/JobHandlers.cpp).
+#   * A module's part of the Now digest lives in src/<module>/now/ and is
+#     the only thing api/TodayController.cpp reads of that module.
 #   * webhooks must not include email (that edge closed the
 #     email <-> jobs <-> webhooks cycle; the shared curl bootstrap lives in
 #     utils/CurlInit.hpp).
@@ -33,11 +39,17 @@ api -> database
 api -> domain
 api -> email
 api -> fitness
+api -> fitness/jobs
+api -> fitness/now
 api -> fitness/sync
 api -> fitness/xiaomi
 api -> food
+api -> food/jobs
+api -> food/now
 api -> jobs
 api -> money
+api -> money/jobs
+api -> money/now
 api -> net
 api -> notes
 api -> now
@@ -61,11 +73,16 @@ core -> billing
 core -> cache
 core -> database
 core -> email
+core -> email/jobs
+core -> fitness/jobs
+core -> food/jobs
 core -> jobs
+core -> money/jobs
 core -> observability
 core -> root
 core -> security
 core -> tasks
+core -> tasks/jobs
 core -> utils
 database -> utils
 domain -> utils
@@ -74,14 +91,31 @@ email -> jobs
 email -> repositories
 email -> security
 email -> utils
+email/jobs -> email
+email/jobs -> jobs
 food -> utils
 food -> llm
 food -> net
+food/jobs -> food
+food/jobs -> jobs
+food/jobs -> llm
+food/jobs -> repositories/food
+food/jobs -> utils
+food/now -> repositories/food
 llm -> net
 llm -> utils
 money -> llm
 money -> net
 money -> utils
+money/jobs -> jobs
+money/jobs -> llm
+money/jobs -> money
+money/jobs -> net
+money/jobs -> repositories/money
+money/jobs -> utils
+money/now -> money
+money/now -> now
+money/now -> repositories/money
 net -> utils
 fitness -> cache
 fitness -> fitness/xiaomi
@@ -90,23 +124,22 @@ fitness/sync -> database
 fitness/sync -> fitness/xiaomi
 fitness/sync -> repositories/fitness
 fitness/sync -> utils
+fitness/jobs -> fitness/sync
+fitness/jobs -> fitness/xiaomi
+fitness/jobs -> jobs
+fitness/jobs -> repositories/fitness
+fitness/jobs -> repositories/workout
+fitness/jobs -> utils
+fitness/now -> money
+fitness/now -> now
+fitness/now -> repositories/fitness
+fitness/now -> repositories/food
+fitness/now -> utils
 fitness/xiaomi -> domain/fitness
 fitness/xiaomi -> utils
 jobs -> cache
-jobs -> core
 jobs -> database
-jobs -> email
-jobs -> fitness/sync
-jobs -> fitness/xiaomi
-jobs -> food
-jobs -> llm
-jobs -> money
-jobs -> net
 jobs -> observability
-jobs -> repositories/fitness
-jobs -> repositories/food
-jobs -> repositories/money
-jobs -> repositories/workout
 jobs -> utils
 jobs -> webhooks
 now -> net
@@ -136,7 +169,6 @@ root -> cache
 root -> core
 root -> database
 root -> domain
-root -> email
 root -> jobs
 root -> observability
 root -> repositories
@@ -149,7 +181,18 @@ storage -> utils
 webhooks -> utils
 tasks -> utils
 tasks -> llm
+tasks/jobs -> jobs
+tasks/jobs -> llm
+tasks/jobs -> net
+tasks/jobs -> repositories/tasks
+tasks/jobs -> tasks
+tasks/jobs -> utils
+tasks/now -> now
+tasks/now -> repositories/tasks
+tasks/now -> tasks
 travel -> utils
+travel/now -> now
+travel/now -> repositories/travel
 repositories/tasks -> database
 repositories/tasks -> repositories
 repositories/tasks -> tasks
@@ -158,23 +201,32 @@ repositories/travel -> repositories
 repositories/travel -> travel
 api -> repositories/tasks
 api -> tasks
-jobs -> repositories/tasks
-jobs -> tasks
+api -> tasks/jobs
+api -> tasks/now
 goals -> utils
+goals/now -> goals
+goals/now -> now
+goals/now -> repositories/goals
 repositories/goals -> database
 repositories/goals -> goals
 repositories/goals -> repositories
 repositories/goals -> repositories/tasks
 api -> goals
+api -> goals/now
 api -> repositories/goals
 api -> repositories/travel
 api -> travel
+api -> travel/now
 habits -> utils
+habits/now -> habits
+habits/now -> repositories/habits
 repositories/habits -> database
 repositories/habits -> habits
 repositories/habits -> repositories
 repositories/habits -> repositories/fitness
 api -> habits
+api -> habits/now
 api -> repositories/habits
 repositories/notes -> database
 repositories/notes -> repositories
+

@@ -240,3 +240,15 @@
     @apply bg-background text-foreground antialiased;
   }
 }
+
+/* Hide numbers (hooks/useHideNumbers): the class on <html> blurs every
+   marked number on every layout, the glass shell and the classic pages
+   alike. Charts: their series, value labels and tooltips are numbers too. */
+.hide-numbers .num {
+  filter: blur(7px);
+}
+.hide-numbers
+  .num-chart
+  :is(.apexcharts-series, .apexcharts-yaxis-label, .apexcharts-datalabels, .apexcharts-tooltip) {
+  filter: blur(7px);
+}

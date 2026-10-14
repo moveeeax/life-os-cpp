@@ -482,9 +482,9 @@ new-resource:      ## Scaffold a full CRUD resource: make new-resource ENTITY=Pr
 	@if [ -z "$(ENTITY)" ]; then echo "Usage: make new-resource ENTITY=Product   (singular PascalCase)"; exit 1; fi
 	./scripts/new-resource.sh $(ENTITY)
 
-new-job:           ## Scaffold a background-job handler: make new-job TYPE=reindex [HANDLER=ReindexJob]
-	@if [ -z "$(TYPE)" ]; then echo "Usage: make new-job TYPE=reindex [HANDLER=ReindexJob]"; exit 1; fi
-	./scripts/new-job.sh $(TYPE) $(HANDLER)
+new-job:           ## Scaffold a module's job handler: make new-job MODULE=food TYPE=reindex [HANDLER=Reindex]
+	@if [ -z "$(MODULE)" ] || [ -z "$(TYPE)" ]; then echo "Usage: make new-job MODULE=food TYPE=reindex [HANDLER=Reindex]"; exit 1; fi
+	./scripts/new-job.sh $(MODULE) $(TYPE) $(HANDLER)
 
 seed:              ## Apply optional seed fixtures from migrations/seeds/*.sql (idempotent at your risk)
 	@if ! ls migrations/seeds/*.sql >/dev/null 2>&1; then \

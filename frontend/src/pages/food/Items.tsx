@@ -412,7 +412,8 @@ export function FoodItemsPage() {
                 <span>
                   Servings:{' '}
                   {it.servings.map((sv, i) => (
-                    <span key={sv.label}>
+                    // Two servings may share a label ("slice"): the position tells them apart.
+                    <span key={`${i}:${sv.label}`}>
                       {i > 0 && ', '}
                       {sv.label} <Num>{formatGrams(sv.grams)} g</Num>
                     </span>

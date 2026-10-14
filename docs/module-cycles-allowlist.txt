@@ -1,0 +1,17 @@
+# module-cycles-allowlist.txt — include cycles between src/ directories that
+# scripts/check-module-deps.sh tolerates while they are being dismantled.
+#
+# One cycle per line: its member directories sorted and joined with commas,
+# a comment per line saying who is removing it. The gate computes the
+# strongly connected components of the declared graph (docs/module-deps.txt)
+# and fails on any component of size > 1 that is not a subset of a line
+# here. A cycle that shrinks keeps passing; one that grows, or a new one,
+# fails. When the gate reports a line as no longer needed, delete it; when
+# the file is empty, delete the file.
+
+# email -> jobs (src/email/AccountEmails.cpp), jobs -> email (src/jobs/BuiltinHandlers.cpp),
+# jobs -> core (FitnessSyncHandler.hpp via core/Modules.hpp), core -> jobs (src/core/Core.cpp),
+# plus api -> core -> root -> api through main.cpp and version.hpp. Review
+# 2026-10-14 finding 4; removed by the handler move; delete this line when
+# check-module-deps passes without it.
+api,core,email,jobs,root

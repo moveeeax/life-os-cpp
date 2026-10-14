@@ -1,5 +1,5 @@
 /**
- * @file FoodParseHandler.hpp
+ * @file ParseJob.hpp
  * @brief food_parse job handler: a text description to the LLM, the parsed
  *        lines into the job row.
  *
@@ -26,7 +26,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include "core/Modules.hpp"
 #include "food/Http.hpp"
 #include "food/Llm.hpp"
 #include "food/ParseAnswer.hpp"
@@ -35,6 +34,7 @@
 #include "repositories/food/GoalsRepository.hpp"
 #include "repositories/food/ItemRepository.hpp"
 #include "repositories/food/ParseJobRepository.hpp"
+#include "utils/Modules.hpp"
 
 namespace Jobs::FoodParse {
 

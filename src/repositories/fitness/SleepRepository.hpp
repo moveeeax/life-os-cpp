@@ -55,7 +55,7 @@ public:
                     "sleep_score_source = CASE WHEN EXCLUDED.end_at = sleep_sessions.end_at "
                     "  THEN COALESCE(EXCLUDED.sleep_score_source, sleep_sessions.sleep_score_source) "
                     "  ELSE EXCLUDED.sleep_score_source END, "
-                    "is_nap = EXCLUDED.is_nap, stages = EXCLUDED.stages, updated_at = now() "
+                    "is_nap = EXCLUDED.is_nap, stages = EXCLUDED.stages "
                     "WHERE EXCLUDED.end_at >= sleep_sessions.end_at "
                     "RETURNING (xmax = 0) AS inserted",
                     s.user_id,

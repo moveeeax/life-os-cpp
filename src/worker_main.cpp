@@ -28,14 +28,14 @@
 
 #include "cache/Cache.hpp"
 #include "core/Core.hpp"
-#include "email/AccountEmailWorker.hpp"
-#include "jobs/BuiltinHandlers.hpp"
+#include "core/JobHandlers.hpp"
 #include "jobs/Dispatcher.hpp"
 #include "jobs/Jobs.hpp"
 #include "observability/Observability.hpp"
 #include "observability/Trace.hpp"
 #include "observability/TraceOtel.hpp"
 #include "utils/Config.hpp"
+#include "utils/ConfigKeys.hpp"
 #include "utils/Strings.hpp"
 
 using json = nlohmann::json;
@@ -61,8 +61,9 @@ void signal_handler(int /*signal*/) {
     shutdown_requested.store(true);
 }
 
-// register_builtin_handlers() lives in jobs/BuiltinHandlers.hpp so it's
-// unit-testable (see tests/unit/test_job_dispatch.cpp).
+// Core::register_job_handlers() (core/JobHandlers.hpp) wires every module's
+// handlers; it lives in app_core so it's unit-testable (see
+// tests/unit/test_job_dispatch.cpp).
 
 /**
  * @brief Process a single job by dispatching on its type. Unknown types throw
@@ -251,15 +252,15 @@ int main(int argc, char* argv[]) {
 
         // Register job-type handlers into the Dispatcher before any worker
         // thread can pick + dispatch.
-        Jobs::register_builtin_handlers();
+        Core::register_job_handlers();
 
         // Read worker configuration from env vars (override config.json).
         // Read ONCE, up here, because both the recovery sweep below and the
         // spawn loop need the same id/concurrency — a second read with its own
         // defaults is how the two paths drift apart.
         auto& config = Config::get();
-        std::string worker_id = config.get<std::string>("worker.id", "WORKER_ID", "worker-1");
-        int concurrency = config.get<int>("worker.concurrency", "WORKER_CONCURRENCY", 2);
+        std::string worker_id = config.get<std::string>(Config::Keys::worker_id, "worker-1");
+        int concurrency = config.get<int>(Config::Keys::worker_concurrency, 2);
 
         // Rescue any jobs that the previous instance with this WORKER_ID
         // left in the processing list before crashing. Must run BEFORE
@@ -305,7 +306,7 @@ int main(int argc, char* argv[]) {
         if (worker_types.empty()) {
             // Fall back to every registered handler type (not a hardcoded
             // "default" pseudo-queue that has no handler — which the guard rail
-            // below would then flag on every boot). register_builtin_handlers()
+            // below would then flag on every boot). Core::register_job_handlers()
             // ran above, so this is the real set this binary can process.
             worker_types = Jobs::Dispatcher::get().known_types();
         }

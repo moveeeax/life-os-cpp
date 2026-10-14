@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
+import { Num } from '@/shell/kit/Num';
 
 interface StatusView {
   icon: ReactNode;
@@ -84,9 +85,9 @@ export function BillingReturnPage() {
             description: (
               <>
                 Your new balance is{' '}
-                <span className="font-semibold text-foreground">
+                <Num className="font-semibold text-foreground">
                   {result.balance.toLocaleString()} credits
-                </span>
+                </Num>
                 .
               </>
             ),

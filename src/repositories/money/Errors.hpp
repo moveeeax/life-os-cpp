@@ -39,6 +39,15 @@ struct InUse : ConflictError {
     InUse() : ConflictError("in_use", "rows were added to it meanwhile; it was not deleted") {}
 };
 
+/// A currency's decimals lowered while an account, a budget or a receipt in it
+/// keeps amounts at the old scale (check_scale_in would refuse them afterwards).
+struct DecimalsInUse : ConflictError {
+    DecimalsInUse()
+        : ConflictError("decimals_in_use",
+                        "an account, a budget or a receipt in this currency keeps its decimals; fewer decimals "
+                        "would leave their amounts unrepresentable") {}
+};
+
 struct InvalidDate : ValidationError {
     InvalidDate() : ValidationError("invalid_date", "not a valid date") {}
 };

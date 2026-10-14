@@ -162,16 +162,7 @@
   color: var(--g-ink-soft);
   padding: 6px 12px;
 }
-.hide-numbers .glass .num {
-  filter: blur(7px);
-}
-/* Charts: their series, value labels and tooltips are numbers too. */
-.hide-numbers
-  .glass
-  .num-chart
-  :is(.apexcharts-series, .apexcharts-yaxis-label, .apexcharts-datalabels, .apexcharts-tooltip) {
-  filter: blur(7px);
-}
+/* The blur itself (.hide-numbers .num) lives in index.css: it covers the classic pages too. */
 
 /* Screens. */
 .g-main {

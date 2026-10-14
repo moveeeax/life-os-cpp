@@ -232,7 +232,9 @@ export interface QueuedSet {
 
 export const QUEUE_KEY = 'workout.unsentSets';
 
-type Store = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+/** What the queue and the rest timer need of localStorage. */
+export type SetStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+type Store = SetStore;
 
 const isQueued = (x: unknown): x is QueuedSet => {
   if (typeof x !== 'object' || x === null) return false;

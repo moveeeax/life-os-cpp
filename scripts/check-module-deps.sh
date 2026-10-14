@@ -133,9 +133,153 @@ while IFS= read -r edge; do
     fi
 done <<<"$allowed_edges"
 
+# ── cycles: the declared graph must be a DAG, minus the allowlisted SCCs ─────
+# Membership of every edge in docs/module-deps.txt says nothing about
+# acyclicity: email -> jobs and jobs -> email were both declared and both
+# real for a year (review 2026-10-14, finding 4). Tarjan over the DECLARED
+# edges (a superset of the real ones — stale declarations only warn above);
+# every strongly connected component of size > 1 is a cycle, and fails
+# unless it is covered by a line in docs/module-cycles-allowlist.txt
+# (members sorted, comma-joined). Coverage is subset-wise: a cycle that
+# shrinks while being dismantled keeps passing, a cycle that grows or a new
+# one fails. An allowlist line no cycle needs any more is reported as stale.
+CYCLES_ALLOW="$REPO/docs/module-cycles-allowlist.txt"
+cycle_out="$(MODULE_EDGES="$allowed_edges" python3 -I - "$CYCLES_ALLOW" <<'PY'
+import os
+import sys
+from collections import deque
+
+allow_path = sys.argv[1]
+edges = []
+for line in os.environ.get("MODULE_EDGES", "").splitlines():
+    line = line.strip()
+    if " -> " in line:
+        a, b = line.split(" -> ", 1)
+        edges.append((a, b))
+nodes = sorted({n for e in edges for n in e})
+adj = {n: [] for n in nodes}
+for a, b in edges:
+    adj[a].append(b)
+
+# Tarjan, iterative (no recursion limit games on a graph this small, but the
+# gate should not depend on the interpreter's default either).
+index = {}
+low = {}
+on_stack = set()
+stack = []
+sccs = []
+counter = 0
+for root in nodes:
+    if root in index:
+        continue
+    work = [(root, iter(adj[root]))]
+    index[root] = low[root] = counter
+    counter += 1
+    stack.append(root)
+    on_stack.add(root)
+    while work:
+        v, it = work[-1]
+        advanced = False
+        for w in it:
+            if w not in index:
+                index[w] = low[w] = counter
+                counter += 1
+                stack.append(w)
+                on_stack.add(w)
+                work.append((w, iter(adj[w])))
+                advanced = True
+                break
+            if w in on_stack:
+                low[v] = min(low[v], index[w])
+        if advanced:
+            continue
+        work.pop()
+        if work:
+            low[work[-1][0]] = min(low[work[-1][0]], low[v])
+        if low[v] == index[v]:
+            comp = []
+            while True:
+                w = stack.pop()
+                on_stack.discard(w)
+                comp.append(w)
+                if w == v:
+                    break
+            sccs.append(sorted(comp))
+
+cycles = [frozenset(c) for c in sccs if len(c) > 1]
+
+allowed = []
+if os.path.isfile(allow_path):
+    with open(allow_path, encoding="utf-8") as fh:
+        for raw in fh:
+            text = raw.split("#", 1)[0].strip()
+            if not text:
+                continue
+            members = frozenset(m.strip() for m in text.split(",") if m.strip())
+            if len(members) < 2:
+                print("ERROR: docs/module-cycles-allowlist.txt line %r names fewer than two"
+                      " directories — a cycle has at least two" % raw.rstrip("\n"))
+                sys.exit(1)
+            allowed.append(members)
+
+
+def example_cycle(comp):
+    """One concrete cycle inside the SCC, for the diagnostic: BFS from the
+    first member back to itself, staying inside the component."""
+    start = sorted(comp)[0]
+    prev = {start: None}
+    queue = deque([start])
+    while queue:
+        v = queue.popleft()
+        for w in adj[v]:
+            if w not in comp:
+                continue
+            if w == start:
+                path = [v]
+                while prev[path[-1]] is not None:
+                    path.append(prev[path[-1]])
+                path.reverse()
+                return path + [start]
+            if w not in prev:
+                prev[w] = v
+                queue.append(w)
+    return sorted(comp)
+
+
+bad = 0
+for comp in sorted(cycles, key=sorted):
+    if any(comp <= a for a in allowed):
+        print("WARNING: include cycle still allowlisted in docs/module-cycles-allowlist.txt: %s"
+              % ",".join(sorted(comp)))
+        continue
+    bad += 1
+    print("ERROR: include cycle between src/ directories: %s" % ",".join(sorted(comp)))
+    print("  e.g. %s" % " -> ".join(example_cycle(comp)))
+    print("  The directory graph must be a DAG. Break the cycle (move the code that")
+    print("  needs the other side, or depend on a smaller header); allowlisting it in")
+    print("  docs/module-cycles-allowlist.txt is for cycles already being dismantled.")
+
+for a in allowed:
+    if not any(c & a for c in cycles):
+        print("WARNING: docs/module-cycles-allowlist.txt allows '%s' but no declared cycle"
+              " needs it any more — delete the line." % ",".join(sorted(a)))
+
+if bad:
+    sys.exit(1)
+print("cycles: %d allowlisted, 0 unexpected" % len(cycles))
+PY
+)" || {
+    printf '%s\n' "$cycle_out" >&2
+    fail=1
+}
+if [ "$fail" -eq 0 ]; then
+    printf '%s\n' "$cycle_out" | grep -v '^cycles: ' >&2 || true
+fi
+
 if [ "$fail" -ne 0 ]; then
     exit 1
 fi
 
 edge_count="$(printf '%s' "$edges_seen" | sort -u | grep -c . || true)"
-echo "✓ module deps OK: $edge_count cross-directory edge(s), all declared in docs/module-deps.txt"
+cycle_summary="$(printf '%s\n' "$cycle_out" | grep '^cycles: ' || true)"
+echo "✓ module deps OK: $edge_count cross-directory edge(s), all declared in docs/module-deps.txt; ${cycle_summary:-cycles: none}"

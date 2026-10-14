@@ -22,12 +22,12 @@
 #include "api/HandlerSupport.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
-#include "core/Modules.hpp"
 #include "notes/Slug.hpp"
 #include "repositories/notes/NoteRepository.hpp"
 #include "repositories/tasks/ProjectRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Modules.hpp"
 #include "utils/Utf8.hpp"
 
 namespace Api {

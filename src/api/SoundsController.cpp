@@ -20,10 +20,10 @@
 #include "api/HandlerSupport.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
-#include "core/Modules.hpp"
 #include "repositories/now/SoundRepository.hpp"
 #include "storage/ObjectStore.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Modules.hpp"
 
 namespace Api {
 

@@ -71,6 +71,9 @@ export function AdminUserDetailPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <form
+            // The fields are uncontrolled (defaultValue): a refetch that
+            // brought a newer record remounts the form so they reseed.
+            key={`${user.id}:${user.updated_at}`}
             onSubmit={(e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);

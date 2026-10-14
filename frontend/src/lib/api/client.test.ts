@@ -350,3 +350,23 @@ describe('a 204 No Content answer', () => {
     await expect(api.getJson('/api/v1/tasks/items')).rejects.toThrow(/empty body/);
   });
 });
+
+describe('query strings', () => {
+  it('appends the query, drops null and undefined, keeps a query already in the path', async () => {
+    mockFetchSequence([() => jsonResponse(200, { ok: true })]);
+    await api.getJson('/api/v1/things?a=1', {
+      query: { limit: 20, offset: 0, q: 'coffee & tea', skip: undefined, none: null, on: false },
+    });
+    expect(calls[0].url).toBe('/api/v1/things?a=1&limit=20&offset=0&q=coffee+%26+tea&on=false');
+  });
+
+  it('leaves the path alone without a query', async () => {
+    mockFetchSequence([
+      () => jsonResponse(200, { ok: true }),
+      () => jsonResponse(200, { ok: true }),
+    ]);
+    await api.getJson('/api/v1/things');
+    await api.getJson('/api/v1/things', { query: { skip: undefined } });
+    expect(calls.map((c) => c.url)).toEqual(['/api/v1/things', '/api/v1/things']);
+  });
+});

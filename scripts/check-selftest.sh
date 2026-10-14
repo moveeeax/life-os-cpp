@@ -9,14 +9,16 @@
 # with zero rules — green for months, checking nothing. So: for each of the ten
 # gate scripts, copy the subtree it reads into a scratch dir, plant a known
 # breakage, and require the gate to FAIL and to NAME what it found. Two planted
-# breakages per gate, with three exceptions: five for check-version-sync.sh,
+# breakages per gate, with four exceptions: five for check-version-sync.sh,
 # which also guards the helm image pins, Chart.yaml appVersions and the
 # openapi.yaml / frontend package versions; eight for check-helm-render.sh,
 # whose production floor has one case per assertion (fail-open limiter,
 # committed credential, open registration, dev APP_ENV, docs UI on, worker
-# lease off, missing automountServiceAccountToken, NetworkPolicy off); one
-# each for assemble-changelog.sh --check (the changelog-fragment format gate)
-# and prod-check.sh (the rendered production profile). Twenty-eight in all.
+# lease off, missing automountServiceAccountToken, NetworkPolicy off); three
+# for check-config-sync.sh (an unregistered key, a stale doc row, one knob
+# read with two defaults); one each for assemble-changelog.sh --check (the
+# changelog-fragment format gate) and prod-check.sh (the rendered production
+# profile). Twenty-nine in all.
 #
 # Every case follows the same discipline (borrowed from the cyber-accountant
 # service's check-render-selftest.sh, which learned it the expensive way):
@@ -642,6 +644,27 @@ with open(path, "w", encoding="utf-8") as fh:
 PY
 }
 
+# 16b. The same knob read twice with two different literal defaults — the
+#      worker.id drift (worker_main.cpp once read it in two places): the
+#      gate must name the key AND both sites. The planted read uses the
+#      literal-triple form against a site that reads the registry form
+#      (Config::Keys::worker_concurrency), so both parsers are exercised.
+break_config_default_mismatch() {
+    python3 - "$1/src/core/Core.cpp" <<'PY'
+import sys
+path = sys.argv[1]
+planted = 'cfg.get<int>("worker.concurrency", "WORKER_CONCURRENCY", 99);'
+with open(path, encoding="utf-8") as fh:
+    text = fh.read()
+if planted in text:
+    sys.exit("break_config_default_mismatch: %s already contains the planted read" % path)
+# Appended at EOF — never compiled, only parsed by the gate's extractor.
+with open(path, "a", encoding="utf-8") as fh:
+    fh.write("\n// planted by scripts/check-selftest.sh\n"
+             "static void selftest_planted_default_(Config::AppConfig& cfg) { " + planted + " }\n")
+PY
+}
+
 # 17. A changelog fragment whose type is not a keep-a-changelog section —
 #     assemble-changelog.sh --check must reject it BY NAME, or a typo'd
 #     fragment silently never reaches the CHANGELOG at release time. The
@@ -814,6 +837,12 @@ run_case config-unregistered-key check-config-sync.sh break_config_unregistered_
 run_case config-stale-doc-row check-config-sync.sh break_config_doc_row_removed \
     "$CONFIG_SYNC_PATHS" \
     "env 'MAIL_TIMEOUT_SEC' is read in src/ but not documented in docs/CONFIG.md"
+
+run_case config-default-mismatch check-config-sync.sh break_config_default_mismatch \
+    "$CONFIG_SYNC_PATHS" \
+    "default-mismatch: config key 'worker.concurrency' (env WORKER_CONCURRENCY)" \
+    '2 at src/worker_main.cpp:' \
+    '99 at src/core/Core.cpp:'
 
 # --- verdict -----------------------------------------------------------------
 

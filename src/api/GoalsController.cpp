@@ -22,7 +22,6 @@
 #include "api/HandlerSupport.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
-#include "core/Modules.hpp"
 #include "goals/Fields.hpp"
 #include "goals/Progress.hpp"
 #include "repositories/Zones.hpp"
@@ -30,6 +29,7 @@
 #include "repositories/goals/GoalRepository.hpp"
 #include "tasks/Fields.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Modules.hpp"
 
 namespace Api {
 

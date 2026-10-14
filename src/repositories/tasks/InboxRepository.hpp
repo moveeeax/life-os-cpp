@@ -64,8 +64,8 @@ public:
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
                     auto r = txn.exec_params(
-                        "UPDATE task_notes SET text = COALESCE($3, text), status = COALESCE($4, status), "
-                        " updated_at = now() WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
+                        "UPDATE task_notes SET text = COALESCE($3, text), status = COALESCE($4, status) "
+                        "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
                         owner,
                         id,
                         text,
@@ -101,7 +101,7 @@ public:
     template <typename Txn>
     static void archive_in(Txn& txn, const std::string& owner, const std::string& note_id, const std::string& task_id) {
         txn.exec_params(
-            "UPDATE task_notes SET status = 'archived', task_id = $3::uuid, updated_at = now() "
+            "UPDATE task_notes SET status = 'archived', task_id = $3::uuid "
             "WHERE owner_id = $1::uuid AND id = $2::uuid",
             owner,
             note_id,

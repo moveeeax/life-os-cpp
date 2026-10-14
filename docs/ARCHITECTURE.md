@@ -21,7 +21,7 @@ State lives in Postgres (system of record) and Redis (cache, sessions, rate
 limits, idempotency keys, the job queue).
 
 Feature modules are compiled in always and switched at runtime. Each has a
-`Core::<name>_enabled()` switch in `src/core/Modules.hpp` that reads the
+`Core::<name>_enabled()` switch in `src/utils/Modules.hpp` that reads the
 config (`<name>.enabled`, env `<NAME>_ENABLED`, default off): `billing`,
 `fitness`, `workout`, `food`, `money`, `tasks`, `goals`, `now` (the Now
 screen, with the wallpaper and sound library behind it), `travel`, `habits`
@@ -35,7 +35,9 @@ Allowed include edges between `src/` directories are declared in
 `docs/module-deps.txt` and enforced by `scripts/check-module-deps.sh`. Three
 rules are hard-coded in the gate: `utils/` includes nothing outside itself,
 `core/Core.hpp` is included only by the entry points (everything else uses
-`core/Modules.hpp`), and `webhooks` never includes `email`.
+`utils/Modules.hpp`, which keeps the `Core::` namespace), and `webhooks`
+never includes `email`. The directory graph is a DAG: `core/` is the
+composition root and may name every module, a module never names `core/`.
 
 ## 2. HTTP layer
 
@@ -74,6 +76,39 @@ Drogon would cost more than the duplicate does.
 ## 4. Module layout
 
 A module is a header plus, when it has heavy bodies, a paired `.cpp`.
+
+A feature module is spread over a fixed set of directories, each a node of
+the include graph (`docs/module-deps.txt`):
+
+- `src/<module>/`: the domain of the module (parsers, field tables, period
+  and progress arithmetic). It depends on `utils/`, `llm/`, `net/` and
+  nothing above them; `repositories/<module>/` depends on it, not the
+  reverse.
+- `src/repositories/<module>/`: the SQL of the module.
+- `src/<module>/jobs/`: the module's job handlers (`food/jobs/ParseJob.hpp`,
+  `money/jobs/RatesJob.hpp`, `fitness/jobs/SyncJob.hpp`, ...) and a
+  `Register.hpp` declaring `<Module>::register_jobs(Jobs::Dispatcher&)`.
+  Handlers depend on `jobs/` (the queue), on the module's domain and its
+  repositories. `src/jobs/` itself holds the queue, the dispatcher, the
+  outbox and the queue's own built-ins (`webhook.deliver`, the echo / slow
+  / fail demo handlers); it includes no module. The email handlers
+  (`account_email`, `email.send`) register from `src/email/jobs/`.
+  `Core::register_job_handlers()` (`src/core/JobHandlers.cpp`) calls every
+  `register_jobs()` once at worker startup; a new module's handlers are one
+  more call there. `scripts/new-job.sh <module> <job-type>` scaffolds a
+  handler in this shape.
+- `src/<module>/now/Digest.hpp`: the module's part of the Now screen's
+  digest, one function (`<Module>::digest(owner, day, ...)`) returning the
+  JSON block of `GET /api/v1/today`. `api/TodayController.cpp` calls these
+  facades and `Now::Today::assemble()`; it composes no module's repositories
+  itself. The block shapes (`Now::Today::tasks_block` and the others) stay
+  in `src/now/Today.hpp`, the words of the Now screen.
+- `src/api/<Module>Controller.hpp` + `.cpp`: the routes (declarations in the
+  header, bodies in the `.cpp`).
+
+The module switches (`Core::<name>_enabled()`) and the shutdown flag live in
+`src/utils/Modules.hpp` so that a handler or a facade can read them without
+an edge to `core/`.
 
 Stays in the `.hpp`:
 

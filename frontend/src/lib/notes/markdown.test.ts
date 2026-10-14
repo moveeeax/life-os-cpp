@@ -82,7 +82,7 @@ describe('parseNote', () => {
   });
 });
 
-import { monthOf, tagsFrom } from './index';
+import { dayOf, monthOf, tagsFrom } from './index';
 
 describe('tagsFrom', () => {
   it('splits, trims and drops repeats', () => {
@@ -94,5 +94,17 @@ describe('tagsFrom', () => {
 describe('monthOf', () => {
   it('names the month', () => {
     expect(monthOf('2026-10-12T08:00:00+00:00')).toBe('October 2026');
+  });
+  it('reads the instant in the given zone, not in UTC', () => {
+    // 23:30 UTC on Oct 31 is already November in Almaty (UTC+5).
+    expect(monthOf('2026-10-31T23:30:00Z', 'Asia/Almaty')).toBe('November 2026');
+    expect(monthOf('2026-10-31T23:30:00Z', 'UTC')).toBe('October 2026');
+  });
+});
+
+describe('dayOf', () => {
+  it('reads the instant in the given zone, not in UTC', () => {
+    expect(dayOf('2026-10-31T23:30:00Z', 'Asia/Almaty')).toBe('Nov 1');
+    expect(dayOf('2026-10-31T23:30:00Z', 'UTC')).toBe('Oct 31');
   });
 });

@@ -3,11 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 
-/** Answer of the public GET /api/v1/auth/registration. */
-interface RegistrationState {
-  data: { open: boolean };
-}
-
 /**
  * Whether anyone may sign up on this server (closed means invite-only).
  * While unknown, or when the server does not answer the probe, sign-up
@@ -20,9 +15,8 @@ export function useRegistrationOpen(enabled = true): boolean {
     staleTime: 10 * 60_000,
     retry: false,
     queryFn: async ({ signal }) => {
-      const { data } = await api.GET('/api/v1/auth/registration' as string, { signal });
-      const open = (data as Partial<RegistrationState> | undefined)?.data?.open;
-      return typeof open === 'boolean' ? open : true;
+      const { data } = await api.GET('/api/v1/auth/registration', { signal });
+      return data?.data.open ?? true;
     },
   });
   return probe.data ?? true;

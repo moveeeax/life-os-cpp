@@ -97,11 +97,34 @@ public:
             &detail::translate);
     }
 
-    /// @throws NotFound, Invariant.
+    /// @throws NotFound, Invariant; DecimalsInUse when fewer decimals are asked
+    /// for a currency an account, a budget or a receipt is kept in (the rows
+    /// hold amounts at the current scale; migration 028 explains the scale).
     nlohmann::json patch(const std::string& owner, const std::string& code, const Patch& p) {
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
+                    if (p.decimals.has_value()) {
+                        auto cur = txn.exec_params(
+                            "SELECT decimals FROM money_currencies WHERE owner_id = $1::uuid AND code = $2 FOR UPDATE",
+                            owner,
+                            code);
+                        if (cur.empty()) {
+                            throw NotFound("money_currency");
+                        }
+                        if (*p.decimals < cur[0][0].template as<int>()) {
+                            auto used = txn.exec_params(
+                                "SELECT 1 WHERE EXISTS (SELECT 1 FROM money_accounts WHERE owner_id = $1::uuid AND "
+                                "currency = $2) OR EXISTS (SELECT 1 FROM money_categories WHERE owner_id = $1::uuid "
+                                "AND budget_currency = $2) OR EXISTS (SELECT 1 FROM money_transactions WHERE "
+                                "owner_id = $1::uuid AND receipt_currency = $2)",
+                                owner,
+                                code);
+                            if (!used.empty()) {
+                                throw DecimalsInUse();
+                            }
+                        }
+                    }
                     auto r = txn.exec_params(
                         "UPDATE money_currencies SET name = COALESCE($3, name), "
                         " role = CASE WHEN $4::boolean THEN $5 ELSE role END, "
@@ -125,8 +148,21 @@ public:
             &detail::translate);
     }
 
-    /// The owner's ten for a user who has none yet; a user with any row keeps theirs.
+    /// Whether the owner keeps any currency (a read; no transaction is opened for writing).
+    bool any(const std::string& owner) {
+        return Database::get().execute_read([&](auto& txn) {
+            return !txn.exec_params("SELECT 1 FROM money_currencies WHERE owner_id = $1::uuid LIMIT 1", owner).empty();
+        });
+    }
+
+    /// The owner's ten for a user who has none yet; a user with any row keeps
+    /// theirs. Reads first: every list and write of the money module calls
+    /// this, and only the first call of a new user is a write. The write
+    /// re-checks under its own transaction for two first calls at once.
     void seed_defaults(const std::string& owner) {
+        if (any(owner)) {
+            return;
+        }
         Database::get().execute_write([&](auto& txn) {
             auto r = txn.exec_params("SELECT 1 FROM money_currencies WHERE owner_id = $1::uuid LIMIT 1", owner);
             if (!r.empty()) {

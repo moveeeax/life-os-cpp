@@ -22,10 +22,8 @@
 #include "api/HandlerSupport.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
-#include "core/Modules.hpp"
 #include "jobs/Jobs.hpp"
 #include "jobs/Outbox.hpp"
-#include "jobs/TasksParseHandler.hpp"
 #include "repositories/JobRows.hpp"
 #include "repositories/Zones.hpp"
 #include "repositories/goals/GoalRepository.hpp"
@@ -39,7 +37,9 @@
 #include "tasks/Fields.hpp"
 #include "tasks/Llm.hpp"
 #include "tasks/ParseAnswer.hpp"
+#include "tasks/jobs/ParseJob.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Modules.hpp"
 
 namespace Api {
 

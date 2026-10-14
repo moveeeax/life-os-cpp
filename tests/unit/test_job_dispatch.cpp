@@ -13,10 +13,10 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/JobHandlers.hpp"
 #include "email/AccountEmailWorker.hpp"  // Email::AccountEmails::kJobType
-#include "jobs/BuiltinHandlers.hpp"
+#include "fitness/jobs/SyncJob.hpp"
 #include "jobs/Dispatcher.hpp"
-#include "jobs/FitnessSyncHandler.hpp"
 #include "jobs/Job.hpp"
 
 using nlohmann::json;
@@ -72,9 +72,10 @@ TEST(JobDispatchTest, UnregisteredReportsTypesWithoutHandlers) {
 TEST(JobDispatchTest, BuiltinHandlersAreRegistered) {
     // Guards the if-ladder→Dispatcher refactor: dropping/renaming a built-in
     // (esp. account_email) would silently dead-letter real jobs with no other
-    // failing test. register_builtin_handlers() was extracted from
-    // worker_main.cpp into the jobs module for exactly this reason.
-    Jobs::register_builtin_handlers();
+    // failing test. Core::register_job_handlers() was extracted from
+    // worker_main.cpp into app_core for exactly this reason; it calls the
+    // queue's own built-ins and every module's register_jobs().
+    Core::register_job_handlers();
     auto& d = Jobs::Dispatcher::get();
     EXPECT_TRUE(d.has_handler(Email::AccountEmails::kJobType));
     EXPECT_TRUE(d.has_handler(Jobs::FitnessSync::kJobType));

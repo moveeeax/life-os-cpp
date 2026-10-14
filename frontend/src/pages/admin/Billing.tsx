@@ -29,6 +29,7 @@ import type {
 import { formatDateTime } from '@/lib/dates';
 import { dollarsToCents, formatCents } from '@/lib/money';
 import { AdjustDialog } from '@/pages/admin/billing/AdjustDialog';
+import { Num } from '@/shell/kit/Num';
 
 const PER_PAGE = 20;
 
@@ -91,10 +92,13 @@ export function AdminBillingPage() {
         </div>
       </div>
 
-      <div className="flex gap-2 border-b">
+      <div className="flex gap-2 border-b" role="tablist" aria-label="Billing">
         {(['packages', 'payments', 'settings'] as const).map((t) => (
           <button
             key={t}
+            type="button"
+            role="tab"
+            aria-selected={tab === t}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px capitalize ${
               tab === t
                 ? 'border-primary text-foreground'
@@ -160,8 +164,17 @@ function PackagesTab() {
 
   const columns: Column<BillingPackage>[] = [
     { header: 'Title', className: 'font-medium', cell: (p) => p.title },
-    { header: 'Price', className: 'font-mono', cell: (p) => `$${formatCents(p.amount_cents)}` },
-    { header: 'Credits', className: 'font-mono', cell: (p) => p.credits.toLocaleString() },
+    // The price list is the same for everyone: not personal.
+    {
+      header: 'Price',
+      className: 'font-mono',
+      cell: (p) => <span data-num-ok>${formatCents(p.amount_cents)}</span>,
+    },
+    {
+      header: 'Credits',
+      className: 'font-mono',
+      cell: (p) => <span data-num-ok>{p.credits.toLocaleString()}</span>,
+    },
     {
       header: 'Active',
       cell: (p) => (
@@ -170,7 +183,7 @@ function PackagesTab() {
         </span>
       ),
     },
-    { header: 'Sort', className: 'font-mono', cell: (p) => p.sort },
+    { header: 'Sort', className: 'font-mono', cell: (p) => <span data-num-ok>{p.sort}</span> },
     {
       header: '',
       className: 'text-right space-x-1',
@@ -377,11 +390,16 @@ function PaymentsTab() {
   const columns: Column<Payment>[] = [
     { header: 'ID', className: 'font-mono text-xs', cell: (p) => `${p.id.slice(0, 8)}…` },
     { header: 'User', className: 'font-mono text-xs', cell: (p) => `${p.user_id.slice(0, 8)}…` },
-    { header: 'Amount', className: 'font-mono', cell: (p) => `$${formatCents(p.amount_cents)}` },
+    // Another user's money: personal, so Hide numbers blurs it.
+    {
+      header: 'Amount',
+      className: 'font-mono',
+      cell: (p) => <Num>${formatCents(p.amount_cents)}</Num>,
+    },
     {
       header: 'Credits',
       className: 'font-mono',
-      cell: (p) => p.credits_expected.toLocaleString(),
+      cell: (p) => <Num>{p.credits_expected.toLocaleString()}</Num>,
     },
     { header: 'Status', cell: (p) => <PaymentStatusBadge status={p.status} /> },
     {
@@ -409,7 +427,11 @@ function PaymentsTab() {
           <option value="failed">failed</option>
           <option value="refunded">refunded</option>
         </select>
-        {data && <span className="text-sm text-muted-foreground">{data.total} total</span>}
+        {data && (
+          <span className="text-sm text-muted-foreground" data-num-ok>
+            {data.total} total
+          </span>
+        )}
       </div>
 
       <Card>

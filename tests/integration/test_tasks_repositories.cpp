@@ -5,6 +5,8 @@
  *        the source pair and the unique external_id, the owner scope.
  */
 
+#include <thread>
+#include <chrono>
 #include <optional>
 #include <string>
 #include <vector>
@@ -121,4 +123,33 @@ TEST_F(TasksRepositoryTest, TheInboxIsCountedPerOwnerAndStatus) {
     EXPECT_EQ(notes.count(kAnna, "inbox"), 1);
     EXPECT_EQ(notes.count(kAnna, "archived"), 1);
     EXPECT_EQ(notes.count(kBoris, "inbox"), 1);
+}
+
+namespace {
+
+/// updated_at of one row at microsecond precision; the text orders as time does.
+std::string updated_at_of(const std::string& sql, const std::string& param) {
+    return Database::get().execute_read(
+        [&](auto& txn) { return txn.exec_params(sql, param)[0][0].template as<std::string>(); });
+}
+
+constexpr const char* kUpdatedAtFormat = "to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS.US')";
+
+}  // namespace
+
+// The trigger of migration 042 bumps updated_at; TaskRepository::update no
+// longer sets the column by hand.
+TEST_F(TasksRepositoryTest, UpdatedAtMovesByTheTriggerAlone) {
+    Repositories::Tasks::TaskRepository repo;
+    Repositories::Tasks::TaskRepository::Input in;
+    in.title = "Renew the passport";
+    in.area = "admin";
+    const json t = repo.create(kAnna, in);
+    const std::string sql = std::string("SELECT ") + kUpdatedAtFormat + " FROM task_items WHERE id = $1::uuid";
+    const std::string before = updated_at_of(sql, t["id"]);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    Repositories::Tasks::TaskRepository::Patch p;
+    p.title = "Renew both passports";
+    repo.update(kAnna, t["id"], p);
+    EXPECT_GT(updated_at_of(sql, t["id"]), before) << "task_items_touch_updated_at";
 }

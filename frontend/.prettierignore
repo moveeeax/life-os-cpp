@@ -1,0 +1,2 @@
+# Generated from docs/openapi.yaml (npm run gen:api); never formatted by hand or by prettier.
+src/lib/api/schema.gen.ts

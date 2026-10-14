@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
+import { useBatchMutation } from '@/hooks/useBatchMutation';
 import { useModuleProbe } from '@/hooks/useModuleProbe';
 import { useParseJob } from '@/hooks/useParseJob';
 import { api } from '@/lib/api/client';
@@ -254,10 +255,10 @@ export function useDeleteTransaction(onSuccess?: () => void) {
   });
 }
 
-export function useConfirmTransaction() {
-  return useApiMutation(
-    async (id: string) =>
-      (await api.postJson<{ data: Transaction }>(`${BASE}/transactions/${id}/confirm`)).data,
+/** Posts inbox rows one after another; one call, one error, one refetch. */
+export function useConfirmTransactions() {
+  return useBatchMutation(
+    (id: string) => api.postJson<{ data: Transaction }>(`${BASE}/transactions/${id}/confirm`),
     { invalidate: ALL },
   );
 }

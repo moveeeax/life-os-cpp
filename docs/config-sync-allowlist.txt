@@ -1,11 +1,15 @@
 # Exceptions for scripts/check-config-sync.sh — every line carries its reason.
 #
-# Two entry kinds:
+# Three entry kinds:
 #   triple <json.path> <ENV_NAME>   a real config read the extractor regex
 #                                   cannot see (it only parses literal
-#                                   cfg.get<T>("path", "ENV", ...) calls)
+#                                   cfg.get<T>("path", "ENV", ...) calls and
+#                                   cfg.get(Keys::name, ...) registry reads)
 #   absent-json <json.path>         a key deliberately NOT present in
 #                                   config/config.json + config.sample.json
+#   defaults-differ <json.path> <ENV_NAME>
+#                                   two sites read the knob with two different
+#                                   literal defaults on purpose, both documented
 #
 # Rot protection is built into the gate: an entry that becomes satisfiable
 # (triple now parsed directly, absent-json key added to the jsons or no
@@ -51,3 +55,9 @@ triple tasks.llm.api_key TASKS_LLM_API_KEY
 triple tasks.llm.model TASKS_LLM_MODEL
 triple tasks.llm.timeout_seconds TASKS_LLM_TIMEOUT_SECONDS
 triple tasks.llm.max_tokens TASKS_LLM_MAX_TOKENS
+
+# Core::init_database_ defaults database.primary to "" and assembles the DSN
+# from the DATABASE_* parts; `--verify-migrations` (main.cpp) runs without
+# Core and falls back to postgresql://localhost:5432/app. docs/CONFIG.md
+# documents both in the DATABASE_PRIMARY_URL row.
+defaults-differ database.primary DATABASE_PRIMARY_URL

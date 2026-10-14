@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
+import { useBatchMutation } from '@/hooks/useBatchMutation';
 import { useModuleProbe } from '@/hooks/useModuleProbe';
 import { useParseJob } from '@/hooks/useParseJob';
 import { api } from '@/lib/api/client';
@@ -76,6 +77,14 @@ export function useInbox(status: 'inbox' | 'archived' = 'inbox') {
 export function useCreateTask(onSuccess?: (task: Task) => void) {
   return useApiMutation(
     async (body: TaskInput) => (await api.postJson<{ data: Task }>(`${BASE}/items`, { body })).data,
+    { invalidate: ALL, onSuccess },
+  );
+}
+
+/** Creates several tasks one after another (copying a packing list); one call, one error. */
+export function useCreateTasks(onSuccess?: () => void) {
+  return useBatchMutation(
+    (body: TaskInput) => api.postJson<{ data: Task }>(`${BASE}/items`, { body }),
     { invalidate: ALL, onSuccess },
   );
 }

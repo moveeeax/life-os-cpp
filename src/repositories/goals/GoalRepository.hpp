@@ -109,7 +109,7 @@ public:
                             next_status +
                             ", unit = COALESCE($8, unit), start_value = COALESCE($9, start_value), "
                             " target_value = COALESCE($10, target_value), target_count = COALESCE($11, target_count), "
-                            " result = COALESCE($12, result), updated_at = now() "
+                            " result = COALESCE($12, result) "
                             "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
                         owner,
                         id,

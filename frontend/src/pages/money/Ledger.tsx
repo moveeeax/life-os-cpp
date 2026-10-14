@@ -6,7 +6,7 @@ import { Modal } from '@/components/Modal';
 import {
   useAccounts,
   useCategories,
-  useConfirmTransaction,
+  useConfirmTransactions,
   useCurrencies,
   useDeleteTransaction,
   useInbox,
@@ -17,6 +17,7 @@ import {
 } from '@/hooks/useMoney';
 import {
   decimalsOf,
+  filtersFromSearch,
   formatDay,
   formatMoney,
   groupByDay,
@@ -25,6 +26,7 @@ import {
   periodRange,
   todayLocal,
   totalsByCurrency,
+  withSearch,
   type Account,
   type Category,
   type InboxRow,
@@ -304,7 +306,9 @@ function Inbox({
   currencies: ReturnType<typeof useCurrencies>['data'];
   onOpen: (row: Transaction) => void;
 }) {
-  const confirm = useConfirmTransaction();
+  // One mutation for the whole list: one pending state, one error
+  // ("2 of 5 failed: …"), one refetch at the end.
+  const confirm = useConfirmTransactions();
   const remove = useDeleteTransaction();
   const [asking, setAsking] = useState<InboxRow[] | null>(null);
   const post = (list: InboxRow[]) => {
@@ -312,7 +316,7 @@ function Inbox({
       setAsking(list);
       return;
     }
-    list.forEach((r) => confirm.mutate(r.id));
+    confirm.mutate(list.map((r) => r.id));
   };
 
   if (rows.length === 0) {
@@ -382,7 +386,7 @@ function Inbox({
           description="A posted row on the same account with the same amount is within a day of it. Post anyway?"
           confirmLabel="Post"
           onConfirm={() => {
-            asking.forEach((r) => confirm.mutate(r.id));
+            confirm.mutate(asking.map((r) => r.id));
             setAsking(null);
           }}
           onClose={() => setAsking(null)}
@@ -397,12 +401,16 @@ export function MoneyLedgerPage() {
   const [params, setParams] = useSearchParams();
   const { kind, date } = periodFromSearch(params, todayLocal());
   const range = periodRange(kind, date);
-  const [view, setView] = useState<'ledger' | 'inbox'>(
-    params.get('view') === 'inbox' ? 'inbox' : 'ledger',
-  );
-  const [account, setAccount] = useState(params.get('account') ?? '');
-  const [category, setCategory] = useState(params.get('category') ?? '');
-  const [type, setType] = useState(params.get('type') ?? '');
+  // The view and the filters live in the URL: a reload, a shared link and
+  // the back button keep them. A default value leaves the URL.
+  const { view, account, category, type } = filtersFromSearch(params);
+  const setView = (v: 'ledger' | 'inbox') =>
+    setParams((p) => withSearch(p, { view: v === 'inbox' ? 'inbox' : '' }));
+  const setFilter = (key: 'account' | 'category' | 'type', value: string) =>
+    setParams((p) => withSearch(p, { [key]: value }), { replace: true });
+  const setAccount = (v: string) => setFilter('account', v);
+  const setCategory = (v: string) => setFilter('category', v);
+  const setType = (v: string) => setFilter('type', v);
   const [text, setText] = useState('');
   const [q, setQ] = useState('');
   useEffect(() => {
@@ -460,9 +468,7 @@ export function MoneyLedgerPage() {
 
   const filterCount = [account, category, type, q].filter((v) => v !== '').length;
   const clearFilters = () => {
-    setAccount('');
-    setCategory('');
-    setType('');
+    setParams((p) => withSearch(p, { account: '', category: '', type: '' }), { replace: true });
     setText('');
   };
 
@@ -552,6 +558,11 @@ export function MoneyLedgerPage() {
         )
       ) : (
         <>
+          {rowId && linked.isError && (
+            <p role="status" className="k-sub">
+              The linked row was not found. It may have been deleted.
+            </p>
+          )}
           {inboxCount > 0 && (
             <Banner action="Review" onAction={() => setView('inbox')}>
               <span data-num-ok>

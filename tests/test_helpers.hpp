@@ -27,6 +27,8 @@
 #include "utils/Config.hpp"
 #include "utils/Retry.hpp"
 
+#include "e2e/openapi_check.hpp"
+
 namespace TestHelpers {
 
 // Test key prefix for Redis isolation
@@ -462,6 +464,40 @@ inline Security::Auth::AuthPrincipal user(const std::string& id) {
 /// The JSON body of a handler's response.
 inline nlohmann::json body_of(const drogon::HttpResponsePtr& resp) {
     return nlohmann::json::parse(std::string(resp->body()));
+}
+
+/**
+ * @brief Validate an in-process handler response against the response schema
+ *        docs/openapi.yaml declares for (method, spec path template, ACTUAL
+ *        status). Same validator the e2e bucket uses over the wire
+ *        (tests/e2e/openapi_check.hpp, reads tests/e2e/openapi.gen.json from
+ *        the repo root, which is the cwd of every test run); the api bucket
+ *        calls controllers directly, so this is the only place the bodies
+ *        they return meet the published contract. The spec path is the
+ *        template as written in the spec ("/api/v1/jobs/{id}"), not the
+ *        Drogon pattern ("/api/v1/jobs/{1}").
+ */
+inline void expect_matches_schema(const drogon::HttpResponsePtr& resp,
+                                  const std::string& method,
+                                  const std::string& spec_path) {
+    ASSERT_NE(resp, nullptr) << "no response captured for " << method << " " << spec_path;
+    OpenApiCheck::expect_matches_schema(
+        std::string(resp->body()), method, spec_path, static_cast<int>(resp->statusCode()));
+}
+
+/**
+ * @brief expect_matches_schema for helpers whose callers assert the status
+ *        themselves: validates 2xx bodies, leaves every other status to the
+ *        caller's own assertions (error envelopes are asserted field by field
+ *        in the suites, and not every provoked 4xx is documented).
+ */
+inline void expect_2xx_matches_schema(const drogon::HttpResponsePtr& resp,
+                                      const std::string& method,
+                                      const std::string& spec_path) {
+    ASSERT_NE(resp, nullptr) << "no response captured for " << method << " " << spec_path;
+    const int status = static_cast<int>(resp->statusCode());
+    if (status >= 200 && status < 300)
+        expect_matches_schema(resp, method, spec_path);
 }
 
 // ---------------------------------------------------------------------------

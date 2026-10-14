@@ -124,24 +124,16 @@ CREATE TRIGGER ${TABLE}_touch_updated_at
     FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 EOF
 else
-    # Commented skeleton — copy/uncomment for the common table shape, or write
-    # your own DDL. The trigger uses the shared touch_updated_at() function from
-    # migrations/000_updated_at_trigger.sql.
+    # No skeleton with a placeholder table name: the old commented
+    # "your_table" block was uncommented as-is and shipped in migrations 011,
+    # 012 and 013 with the placeholder in its trigger names. A new table goes
+    # through --table <name>, which writes the DDL with the real identifier.
     cat >>"$FILE" <<'EOF'
 
--- TODO: write your DDL here. Common table skeleton (uncomment + rename):
---
--- CREATE TABLE IF NOT EXISTS your_table (
---     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
---     name       TEXT        NOT NULL,
---     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
---     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
--- );
---
--- DROP TRIGGER IF EXISTS your_table_touch_updated_at ON your_table;
--- CREATE TRIGGER your_table_touch_updated_at
---     BEFORE UPDATE ON your_table
---     FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+-- TODO: write your DDL here (idempotent: IF NOT EXISTS / ON CONFLICT DO NOTHING).
+-- For a new table, run this script again with --table <name>: it writes the
+-- CREATE TABLE and the updated_at trigger with the real table name, so no
+-- placeholder identifier can be copied into the migration.
 EOF
 fi
 

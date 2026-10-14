@@ -7,6 +7,8 @@
  *        leaving its notes unlinked.
  */
 
+#include <thread>
+#include <chrono>
 #include <string>
 #include <utility>
 #include <vector>
@@ -212,4 +214,30 @@ TEST_F(NotesApiTest, EditAndADeletedProject) {
     EXPECT_EQ(call(kAnna, Delete, json::object(), [&](auto req, auto cb) { c.deleteNote(req, std::move(cb), id); })
                   ->statusCode(),
               k204NoContent);
+}
+
+namespace {
+
+/// updated_at of one row at microsecond precision; the text orders as time does.
+std::string updated_at_of(const std::string& sql, const std::string& param) {
+    return Database::get().execute_read(
+        [&](auto& txn) { return txn.exec_params(sql, param)[0][0].template as<std::string>(); });
+}
+
+constexpr const char* kUpdatedAtFormat = "to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS.US')";
+
+}  // namespace
+
+// The trigger of migration 042 bumps updated_at; NoteRepository::update no
+// longer sets the column by hand.
+TEST_F(NotesApiTest, UpdatedAtMovesByTheTriggerAlone) {
+    const auto id = body_of(add(kAnna, json{{"title", "Draft"}}))["data"]["id"].get<std::string>();
+    const std::string sql = std::string("SELECT ") + kUpdatedAtFormat + " FROM notes WHERE id = $1::uuid";
+    const std::string before = updated_at_of(sql, id);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    auto edited = call(kAnna, Patch, json{{"body", "More words"}}, [&](auto req, auto cb) {
+        c.updateNote(req, std::move(cb), id);
+    });
+    ASSERT_EQ(edited->statusCode(), k200OK) << std::string(edited->body());
+    EXPECT_GT(updated_at_of(sql, id), before) << "notes_touch_updated_at";
 }

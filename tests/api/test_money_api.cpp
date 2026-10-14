@@ -1201,3 +1201,36 @@ TEST_F(MoneyOutboxApiTest, WithADrainTheAdvisorRunRidesTheRowsTransaction) {
     EXPECT_EQ(job->payload["report_id"], row["id"]);
     Jobs::get().complete(job->id, json::object());
 }
+
+// A currency's decimals cannot shrink under an account that keeps it: the
+// rows hold amounts at the current scale (check_scale_in). More decimals,
+// or the same, are fine; another user's accounts do not count.
+TEST_F(MoneyApiTest, FewerDecimalsAreRefusedWhileAnAccountKeepsTheCurrency) {
+    const auto xau = call_json(&Api::MoneyController::upsertCurrency,
+                               user(kAnna),
+                               json{{"code", "XAU"}, {"decimals", 3}, {"minor_unit", "milli-ounce"}});
+    ASSERT_EQ(xau->statusCode(), k200OK) << xau->body();
+    const auto patch = [&](const char* who, const json& body) {
+        return call_id(&Api::MoneyController::patchCurrency, user(who), Patch, "XAU", body);
+    };
+    EXPECT_EQ(body_of(patch(kAnna, json{{"decimals", 2}}))["data"]["decimals"], 2) << "no account yet: any change";
+    account(kAnna, "Gold", "XAU");
+
+    const auto refused = patch(kAnna, json{{"decimals", 1}});
+    ASSERT_EQ(refused->statusCode(), k409Conflict) << refused->body();
+    EXPECT_EQ(body_of(refused)["error"], "decimals_in_use");
+    EXPECT_EQ(body_of(call_id(&Api::MoneyController::getCurrency, user(kAnna), Get, "XAU"))["data"]["decimals"], 2)
+        << "nothing changed";
+
+    EXPECT_EQ(body_of(patch(kAnna, json{{"decimals", 2}}))["data"]["decimals"], 2) << "the same is not a change";
+    EXPECT_EQ(body_of(patch(kAnna, json{{"decimals", 4}}))["data"]["decimals"], 4) << "more decimals fit every row";
+    EXPECT_EQ(body_of(patch(kAnna, json{{"name", "Gold"}}))["data"]["name"], "Gold") << "a patch without decimals";
+
+    // Boris keeps XAU too, without an account in it: his decimals are his.
+    ASSERT_EQ(call_json(&Api::MoneyController::upsertCurrency,
+                        user(kBoris),
+                        json{{"code", "XAU"}, {"decimals", 3}, {"minor_unit", "milli-ounce"}})
+                  ->statusCode(),
+              k200OK);
+    EXPECT_EQ(body_of(patch(kBoris, json{{"decimals", 1}}))["data"]["decimals"], 1);
+}

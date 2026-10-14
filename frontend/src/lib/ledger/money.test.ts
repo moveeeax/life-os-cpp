@@ -10,6 +10,8 @@ import {
   orderWithAdjustments,
   parseErrorText,
   customRangeFromSearch,
+  filtersFromSearch,
+  withSearch,
   merchantsByCategory,
   nearbyDuplicate,
   periodFromSearch,
@@ -67,6 +69,30 @@ describe('signedAmount', () => {
     expect(signedAmount(tx({ type: 'income', amount: 10 }))).toBe(10);
     expect(signedAmount(tx({ type: 'fx_adjustment', amount: 5 }))).toBe(-5);
     expect(signedAmount(tx({ type: 'fx_adjustment', amount: -5 }))).toBe(5);
+  });
+});
+
+describe('ledger filters in the URL', () => {
+  it('reads the filters and falls back to the ledger with everything', () => {
+    expect(filtersFromSearch(new URLSearchParams('view=inbox&account=a1&type=income'))).toEqual({
+      view: 'inbox',
+      account: 'a1',
+      category: '',
+      type: 'income',
+    });
+    expect(filtersFromSearch(new URLSearchParams('view=other&kind=week'))).toEqual({
+      view: 'ledger',
+      account: '',
+      category: '',
+      type: '',
+    });
+  });
+  it('writes a filter, drops a default, keeps the rest of the URL', () => {
+    const next = withSearch(new URLSearchParams('kind=week&date=2026-10-08&account=a1'), {
+      account: '',
+      category: 'c2',
+    });
+    expect(next.toString()).toBe('kind=week&date=2026-10-08&category=c2');
   });
 });
 

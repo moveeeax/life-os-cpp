@@ -2384,7 +2384,7 @@ components:
         archived: { type: boolean, default: false }
     MoneyCurrencyPatch:
       type: object
-      description: The decimals and minor_unit of a code in the built-in table do not change.
+      description: The decimals and minor_unit of a code in the built-in table do not change; fewer decimals than an account, a budget or a receipt in the currency keeps are refused (409 decimals_in_use).
       properties:
         name: { type: string, maxLength: 60 }
         role: { type: [string, 'null'], enum: [primary, local, null] }
@@ -5786,6 +5786,11 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '404':
           description: Money module disabled, or the row is not the caller's
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Fewer decimals than an account, a budget or a receipt in this currency keeps (decimals_in_use); nothing changed
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

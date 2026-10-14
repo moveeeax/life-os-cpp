@@ -7,6 +7,7 @@ import type { z } from 'zod';
 
 import '@fontsource-variable/outfit';
 
+import type { FromState } from '@/components/ProtectedRoute';
 import { useToast } from '@/components/ui/toaster';
 import { useLogin } from '@/hooks/useAuthMutations';
 import { useThemeToggle } from '@/hooks/useThemeToggle';
@@ -34,7 +35,8 @@ const inputBad =
 export function SignInPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const next = (location.state as { from?: string } | null)?.from ?? DASHBOARD_HOME;
+  // `from` holds the full location the guard bounced from (path, query, hash).
+  const next = (location.state as FromState | null)?.from ?? DASHBOARD_HOME;
 
   const toast = useToast();
   const login = useLogin();

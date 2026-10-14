@@ -3,6 +3,8 @@
  * @brief Idempotent upsert of daily activity: added, then updated.
  */
 
+#include <thread>
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -92,4 +94,28 @@ TEST_F(ActivityRepositoryTest, MissingOptionalsAreStoredAsNull) {
         return r[0][0].template as<bool>();
     });
     EXPECT_TRUE(distance_null);
+}
+
+namespace {
+
+/// updated_at of one row at microsecond precision; the text orders as time does.
+std::string updated_at_of(const std::string& sql, const std::string& param) {
+    return Database::get().execute_read(
+        [&](auto& txn) { return txn.exec_params(sql, param)[0][0].template as<std::string>(); });
+}
+
+constexpr const char* kUpdatedAtFormat = "to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS.US')";
+
+}  // namespace
+
+// A BEFORE UPDATE trigger fires on the DO UPDATE path of INSERT ... ON
+// CONFLICT, so the upsert no longer sets updated_at by hand (migration 042).
+TEST_F(ActivityRepositoryTest, ReSyncMovesUpdatedAtByTheTriggerAlone) {
+    Repositories::ActivityRepository repo;
+    repo.upsert({day("2026-09-22", 100)});
+    const std::string sql = std::string("SELECT ") + kUpdatedAtFormat + " FROM daily_activity WHERE date = $1::date";
+    const std::string before = updated_at_of(sql, "2026-09-22");
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    repo.upsert({day("2026-09-22", 2303)});
+    EXPECT_GT(updated_at_of(sql, "2026-09-22"), before) << "daily_activity_touch_updated_at";
 }

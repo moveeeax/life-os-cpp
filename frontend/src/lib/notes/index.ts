@@ -12,11 +12,16 @@ export function tagsFrom(text: string): string[] {
   return out;
 }
 
-/** The month a note falls in, for the list groups: "October 2026". */
-export function monthOf(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+/**
+ * The month a note was written in, for the list groups: "October 2026".
+ * `created_at` is an instant, so it is read in the browser's zone (a note
+ * written at 03:00 in UTC+5 is not yesterday's); @p timeZone is for tests.
+ */
+export function monthOf(iso: string, timeZone?: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone });
+}
+
+/** The day a note was written, for its row: "Oct 12"; in the browser's zone, as monthOf. */
+export function dayOf(iso: string, timeZone?: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone });
 }

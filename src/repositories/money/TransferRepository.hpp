@@ -157,7 +157,7 @@ public:
                         " amount_sent = COALESCE($4, amount_sent), "
                         " amount_received = CASE WHEN $5::boolean THEN $6 ELSE amount_received END, "
                         " fee = CASE WHEN $7::boolean THEN $8 ELSE fee END, "
-                        " name = COALESCE($9, name), note = COALESCE($10, note), updated_at = now() "
+                        " name = COALESCE($9, name), note = COALESCE($10, note) "
                         "WHERE owner_id = $1::uuid AND id = $2::uuid",
                         owner,
                         id,

@@ -1,5 +1,5 @@
 /**
- * @file MoneyParseHandler.hpp
+ * @file ParseJob.hpp
  * @brief money_parse job handler: a bank mail, a list or a receipt photo to
  *        the LLM, the checked lines into the job row. Nothing reaches the
  *        ledger here: the user accepts the lines into the inbox afterwards.
@@ -25,7 +25,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include "core/Modules.hpp"
 #include "jobs/Jobs.hpp"
 #include "llm/Chat.hpp"
 #include "money/Llm.hpp"
@@ -35,6 +34,7 @@
 #include "repositories/money/CategoryRepository.hpp"
 #include "repositories/money/MerchantRepository.hpp"
 #include "repositories/money/ParseJobRepository.hpp"
+#include "utils/Modules.hpp"
 
 namespace Jobs::MoneyParse {
 

@@ -16,6 +16,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/LikePattern.hpp"
 #include "repositories/RepoErrors.hpp"
 #include "repositories/SqlErrors.hpp"
 #include "repositories/SqlTime.hpp"
@@ -116,7 +117,7 @@ public:
                         " summary = COALESCE($5, summary), body = COALESCE($6, body), topic = COALESCE($7, topic), "
                         " tags = CASE WHEN $8::boolean THEN $9::text[] ELSE tags END, "
                         " project_id = CASE WHEN $10::boolean THEN $11::uuid ELSE project_id END, "
-                        " task_id = CASE WHEN $12::boolean THEN $13::uuid ELSE task_id END, updated_at = now() "
+                        " task_id = CASE WHEN $12::boolean THEN $13::uuid ELSE task_id END "
                         "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
                         owner,
                         id,
@@ -159,7 +160,7 @@ public:
                 " OR n.summary ILIKE '%' || $2 || '%' ESCAPE '\\' OR n.body ILIKE '%' || $2 || '%' ESCAPE '\\') "
                 " AND ($3 = '' OR n.topic = $3) AND ($4 = '' OR $4 = ANY(n.tags)) "
                 " AND ($5 = '' OR n.project_id = NULLIF($5, '')::uuid) ";
-            const std::string q = escape_like(f.q);
+            const std::string q = Repositories::escape_like(f.q);
             auto total = txn.exec_params("SELECT count(*) FROM notes n" + where + " AND $6::int >= 0 AND $7::int >= 0",
                                          owner,
                                          q,
@@ -244,17 +245,6 @@ private:
             out += '"';
         }
         return out + "}";
-    }
-
-    static std::string escape_like(const std::string& q) {
-        std::string out;
-        for (const char c : q) {
-            if (c == '%' || c == '_' || c == '\\') {
-                out += '\\';
-            }
-            out += c;
-        }
-        return out;
     }
 
     template <typename Txn>

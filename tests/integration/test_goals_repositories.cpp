@@ -5,6 +5,8 @@
  *        closing the goal, deleting a goal unlinking its tasks, the owner scope.
  */
 
+#include <thread>
+#include <chrono>
 #include <optional>
 #include <string>
 
@@ -148,4 +150,29 @@ TEST_F(GoalsRepositoryTest, TheForeignKeysDeletesFollowAreIndexed) {
             .template as<long>();
     });
     EXPECT_EQ(n, 3);
+}
+
+namespace {
+
+/// updated_at of one row at microsecond precision; the text orders as time does.
+std::string updated_at_of(const std::string& sql, const std::string& param) {
+    return Database::get().execute_read(
+        [&](auto& txn) { return txn.exec_params(sql, param)[0][0].template as<std::string>(); });
+}
+
+constexpr const char* kUpdatedAtFormat = "to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS.US')";
+
+}  // namespace
+
+// The trigger of migration 042 bumps updated_at; GoalRepository::update no
+// longer sets the column by hand.
+TEST_F(GoalsRepositoryTest, UpdatedAtMovesByTheTriggerAlone) {
+    const std::string id = goals.create(kAnna, input("steps"))["id"];
+    const std::string sql = std::string("SELECT ") + kUpdatedAtFormat + " FROM goal_items WHERE id = $1::uuid";
+    const std::string before = updated_at_of(sql, id);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    GoalRepository::Patch p;
+    p.title = "A renamed goal";
+    goals.update(kAnna, id, p);
+    EXPECT_GT(updated_at_of(sql, id), before) << "goal_items_touch_updated_at";
 }

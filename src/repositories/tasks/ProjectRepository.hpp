@@ -102,7 +102,7 @@ public:
                         " status = COALESCE($7, status), platform = COALESCE($8, platform), "
                         " starts_on = CASE WHEN $9::boolean THEN $10::date ELSE starts_on END, "
                         " ends_on = CASE WHEN $11::boolean THEN $12::date ELSE ends_on END, "
-                        " certificate = COALESCE($13, certificate), updated_at = now() "
+                        " certificate = COALESCE($13, certificate) "
                         "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
                         owner,
                         id,

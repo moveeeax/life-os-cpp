@@ -3,8 +3,8 @@
  * @brief Body for Email::detail::via_jobs() — compiled once into app_core.
  *        Deliberately the only thing de-inlined from Mailer.hpp: moving it
  *        here takes the jobs/Jobs.hpp include out of the header, breaking
- *        the email↔jobs cycle at the header level (the jobs→email half
- *        lives only in BuiltinHandlers.cpp now).
+ *        the email↔jobs cycle at the header level; the jobs→email half is gone,
+ *        the email handlers register themselves from email/jobs/Register.cpp.
  */
 
 #include "email/Mailer.hpp"

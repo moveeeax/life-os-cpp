@@ -98,7 +98,7 @@ public:
                         " kind = COALESCE($5, kind), last4 = COALESCE($6, last4), "
                         " opening_balance = COALESCE($7, opening_balance), "
                         " opening_date = CASE WHEN $8::boolean THEN $9::date ELSE opening_date END, "
-                        " archived = COALESCE($10, archived), position = COALESCE($11, position), updated_at = now() "
+                        " archived = COALESCE($10, archived), position = COALESCE($11, position) "
                         "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
                         owner,
                         id,
@@ -139,7 +139,7 @@ public:
                         id);
                     if (!used.empty()) {
                         txn.exec_params(
-                            "UPDATE money_accounts SET archived = true, updated_at = now() WHERE id = $1::uuid", id);
+                            "UPDATE money_accounts SET archived = true WHERE id = $1::uuid", id);
                         return "archived";
                     }
                     txn.exec_params("DELETE FROM money_accounts WHERE id = $1::uuid", id);

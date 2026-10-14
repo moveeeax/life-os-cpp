@@ -27,6 +27,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "utils/ConfigKeys.hpp"
 #include "utils/Strings.hpp"
 
 namespace Config {
@@ -106,6 +107,16 @@ public:
     }
 
     /**
+     * @brief get() by registry entry (utils/ConfigKeys.hpp): the knob's path
+     *        and env name come from the entry, the default stays with the
+     *        caller. `cfg.get(Keys::jobs_enabled, false)`.
+     */
+    template <typename T>
+    T get(const ConfigKey& key, const T& default_value = T{}) const {
+        return get<T>(key.path, key.env, default_value);
+    }
+
+    /**
      * @brief Like get() but throws if neither env var nor config value is present.
      * @details Use for values that must be explicitly set in any deployment —
      *          e.g. JWT secret, database URL in production.
@@ -123,6 +134,12 @@ public:
         } catch (...) {
             throw std::runtime_error("Required configuration missing: key='" + key + "' env='" + env_var + "'");
         }
+    }
+
+    /// require() by registry entry; see get(const ConfigKey&, const T&).
+    template <typename T>
+    T require(const ConfigKey& key) const {
+        return require<T>(key.path, key.env);
     }
 
     /**

@@ -47,7 +47,7 @@ public:
                         "INSERT INTO day_focus (owner_id, date, kind, ref_id, text) "
                         "VALUES ($1::uuid, $2::date, $3, $4::uuid, $5) "
                         "ON CONFLICT (owner_id, date) DO UPDATE SET kind = EXCLUDED.kind, ref_id = EXCLUDED.ref_id, "
-                        " text = EXCLUDED.text, done_at = NULL, updated_at = now()",
+                        " text = EXCLUDED.text, done_at = NULL",
                         owner,
                         date,
                         kind,
@@ -61,19 +61,24 @@ public:
 
     /// @throws FocusNotFound when the day has no focus.
     nlohmann::json set_done(const std::string& owner, const std::string& date, bool done) {
-        return Database::get().execute_write([&](auto& txn) {
-            auto r = txn.exec_params(
-                "UPDATE day_focus SET done_at = CASE WHEN $3::boolean THEN COALESCE(done_at, now()) END, updated_at = "
-                "now() "
-                "WHERE owner_id = $1::uuid AND date = $2::date RETURNING date",
-                owner,
-                date,
-                done);
-            if (r.empty()) {
-                throw FocusNotFound();
-            }
-            return *find_in(txn, owner, date);
-        });
+        return Database::get().execute_write([&](auto& txn) { return set_done_in(txn, owner, date, done); });
+    }
+
+    /// set_done() inside the caller's transaction, so the task that closes
+    /// with its focus (TodayController::focusDone) commits with it or not at
+    /// all. @throws FocusNotFound when the day has no focus.
+    template <typename Txn>
+    static nlohmann::json set_done_in(Txn& txn, const std::string& owner, const std::string& date, bool done) {
+        auto r = txn.exec_params(
+            "UPDATE day_focus SET done_at = CASE WHEN $3::boolean THEN COALESCE(done_at, now()) END "
+            "WHERE owner_id = $1::uuid AND date = $2::date RETURNING date",
+            owner,
+            date,
+            done);
+        if (r.empty()) {
+            throw FocusNotFound();
+        }
+        return *find_in(txn, owner, date);
     }
 
     /// @return whether there was a focus to clear.

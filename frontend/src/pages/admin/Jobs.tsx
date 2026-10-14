@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { usePagedQuery } from '@/hooks/usePagedQuery';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { useErrorToast } from '@/hooks/useErrorToast';
+import { onActivateKey } from '@/lib/a11y';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import type { DlqListResponse, Job } from '@/lib/api/types';
@@ -101,10 +102,13 @@ export function AdminJobsPage() {
         </Button>
       </div>
 
-      <div className="flex gap-2 border-b">
+      <div className="flex gap-2 border-b" role="tablist" aria-label="Jobs">
         {(['jobs', 'dlq'] as const).map((t) => (
           <button
             key={t}
+            type="button"
+            role="tab"
+            aria-selected={tab === t}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
               tab === t
                 ? 'border-primary text-foreground'
@@ -125,6 +129,7 @@ export function AdminJobsPage() {
 function JobsTab() {
   const [typeFilter, setTypeFilter] = useState('');
   const [selected, setSelected] = useState<Job | null>(null);
+  const toggle = (j: Job) => setSelected(selected?.id === j.id ? null : j);
 
   const { data, isLoading, error, isPlaceholderData, page, setPage, totalPages } = usePagedQuery({
     queryKey: qk.admin.jobs(typeFilter),
@@ -140,10 +145,30 @@ function JobsTab() {
     { header: 'ID', className: 'font-mono text-xs', cell: (j) => `${j.id.slice(0, 8)}…` },
     { header: 'Type', className: 'font-mono', cell: (j) => j.type },
     { header: 'Status', cell: (j) => <StatusBadge status={j.status} /> },
-    { header: 'Retries', cell: (j) => `${j.retry_count ?? 0}/${j.max_retries ?? 0}` },
+    {
+      header: 'Retries',
+      cell: (j) => <span data-num-ok>{`${j.retry_count ?? 0}/${j.max_retries ?? 0}`}</span>,
+    },
     { header: 'Worker', className: 'font-mono text-xs', cell: (j) => j.worker_id || '—' },
     { header: 'Created', className: 'whitespace-nowrap', cell: (j) => formatEpoch(j.created_at) },
     { header: 'Updated', className: 'whitespace-nowrap', cell: (j) => formatEpoch(j.updated_at) },
+    {
+      header: '',
+      className: 'text-right',
+      cell: (j) => (
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-expanded={selected?.id === j.id}
+          onClick={(ev) => {
+            ev.stopPropagation();
+            toggle(j);
+          }}
+        >
+          {selected?.id === j.id ? 'Hide' : 'Details'}
+        </Button>
+      ),
+    },
   ];
 
   return (
@@ -158,7 +183,11 @@ function JobsTab() {
           }}
           className="max-w-xs"
         />
-        {data && <span className="text-sm text-muted-foreground">{data.total} total</span>}
+        {data && (
+          <span className="text-sm text-muted-foreground" data-num-ok>
+            {data.total} total
+          </span>
+        )}
       </div>
 
       <Card>
@@ -171,9 +200,13 @@ function JobsTab() {
             error={error}
             emptyText="No jobs recorded yet."
             isPlaceholder={isPlaceholderData}
+            // The row opens the details on a click, Enter or Space; the
+            // button in the last cell is the same action for assistive tech.
             rowProps={(j) => ({
-              className: `cursor-pointer hover:bg-accent ${selected?.id === j.id ? 'bg-accent' : ''}`,
-              onClick: () => setSelected(selected?.id === j.id ? null : j),
+              className: `cursor-pointer hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${selected?.id === j.id ? 'bg-accent' : ''}`,
+              tabIndex: 0,
+              onClick: () => toggle(j),
+              onKeyDown: onActivateKey(() => toggle(j)),
             })}
           />
           {data && (
@@ -309,7 +342,9 @@ function DlqTab() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>{data ? `${data.depth} job(s) in DLQ` : 'Dead letter queue'}</CardTitle>
+          <CardTitle data-num-ok>
+            {data ? `${data.depth} job(s) in DLQ` : 'Dead letter queue'}
+          </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <DataTable

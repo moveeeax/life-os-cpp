@@ -1,5 +1,5 @@
 /**
- * @file TasksParseHandler.hpp
+ * @file ParseJob.hpp
  * @brief tasks_parse job handler: one phrase to the LLM, the checked draft
  *        lines into the job row. Nothing becomes a task here: the user
  *        accepts the lines afterwards.
@@ -24,7 +24,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include "core/Modules.hpp"
 #include "jobs/Jobs.hpp"
 #include "llm/Chat.hpp"
 #include "net/Http.hpp"
@@ -33,6 +32,7 @@
 #include "tasks/Fields.hpp"
 #include "tasks/Llm.hpp"
 #include "tasks/ParseAnswer.hpp"
+#include "utils/Modules.hpp"
 
 namespace Jobs::TasksParse {
 

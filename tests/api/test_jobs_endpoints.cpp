@@ -7,7 +7,7 @@
 #include "api/JobsController.hpp"
 #include "email/AccountEmails.hpp"
 #include "email/GenericEmail.hpp"
-#include "jobs/MoneyRatesHandler.hpp"
+#include "money/jobs/RatesJob.hpp"
 #include "test_fixtures.hpp"
 #include "test_helpers.hpp"
 #include "webhooks/Webhooks.hpp"

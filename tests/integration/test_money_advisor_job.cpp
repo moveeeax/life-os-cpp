@@ -13,11 +13,11 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/JobHandlers.hpp"
 #include "database/Database.hpp"
-#include "jobs/BuiltinHandlers.hpp"
 #include "jobs/Dispatcher.hpp"
 #include "jobs/Jobs.hpp"
-#include "jobs/MoneyAdvisorHandler.hpp"
+#include "money/jobs/AdvisorJob.hpp"
 #include "net/Http.hpp"
 #include "repositories/money/AccountRepository.hpp"
 #include "repositories/money/AdvisorReportRepository.hpp"
@@ -341,6 +341,6 @@ TEST_F(MoneyAdvisorJobTest, AReviewWrittenBeforeItsPeriodEndedIsQueuedAgain) {
 }
 
 TEST(MoneyAdvisorHandler, IsRegisteredAmongBuiltins) {
-    Jobs::register_builtin_handlers();
+    Core::register_job_handlers();
     EXPECT_TRUE(Jobs::Dispatcher::get().has_handler(Jobs::MoneyAdvisor::kJobType));
 }

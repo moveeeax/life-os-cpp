@@ -79,7 +79,7 @@ tree.
 |---|---|
 | `new-resource.sh` | Scaffold a FULL CRUD resource (domain + repository + controller + registry + openapi + test) per docs/CONVENTIONS.md; `--owned` scaffolds a per-user resource |
 | `new-endpoint.sh` | Scaffold a single controller + registry row + optional test + optional OpenAPI patch |
-| `new-job.sh` | Scaffold a background-job handler that self-registers with the dispatcher (one `#include` to wire into the worker) |
+| `new-job.sh` | Scaffold a module's job handler in `src/<module>/jobs/` and wire it into the module's `register_jobs()` (and that into `core/JobHandlers.cpp` for a first handler) |
 | `new-module.sh` | Scaffold a feature-module master switch (config flag + `Core::<name>_enabled()` + compose, both charts, docs/CONFIG.md), wired like the habits and notes modules; handlers open with `API_MODULE_USER_GUARD` |
 | `new-migration.sh` | Generate the next `NNN_<slug>.sql` |
 | `new-react-page.sh` | Scaffold a section page on the glass shell from the kit (`SectionFrame`, `Placeholder`) + a lazy shell route in the manifest, optional query-key branch |

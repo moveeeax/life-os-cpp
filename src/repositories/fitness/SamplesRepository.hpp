@@ -30,7 +30,7 @@ public:
                     " sample_type, updated_at) "
                     "VALUES ($1, $2, $3, $4, $5, $6, $7, now()) "
                     "ON CONFLICT (user_id, timestamp, sample_type) DO UPDATE SET "
-                    "bpm = EXCLUDED.bpm, updated_at = now() "
+                    "bpm = EXCLUDED.bpm "
                     "RETURNING (xmax = 0) AS inserted",
                     s.user_id,
                     s.timestamp,
@@ -61,7 +61,7 @@ public:
                     " updated_at) "
                     "VALUES ($1, $2, $3, $4, $5, $6, now()) "
                     "ON CONFLICT (user_id, timestamp) DO UPDATE SET "
-                    "spo2_pct = EXCLUDED.spo2_pct, updated_at = now() "
+                    "spo2_pct = EXCLUDED.spo2_pct "
                     "RETURNING (xmax = 0) AS inserted",
                     s.user_id,
                     s.timestamp,
@@ -91,8 +91,7 @@ public:
                     " stress_score, level, updated_at) "
                     "VALUES ($1, $2, $3, $4, $5, $6, $7, now()) "
                     "ON CONFLICT (user_id, timestamp) DO UPDATE SET "
-                    "stress_score = EXCLUDED.stress_score, level = EXCLUDED.level, "
-                    "updated_at = now() "
+                    "stress_score = EXCLUDED.stress_score, level = EXCLUDED.level "
                     "RETURNING (xmax = 0) AS inserted",
                     s.user_id,
                     s.timestamp,
@@ -124,7 +123,7 @@ public:
                     "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now()) "
                     "ON CONFLICT (user_id, event_id) DO UPDATE SET "
                     "start_at = EXCLUDED.start_at, end_at = EXCLUDED.end_at, "
-                    "duration_seconds = EXCLUDED.duration_seconds, updated_at = now() "
+                    "duration_seconds = EXCLUDED.duration_seconds "
                     "RETURNING (xmax = 0) AS inserted",
                     e.user_id,
                     e.event_id,
