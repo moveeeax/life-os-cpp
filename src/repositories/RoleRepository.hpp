@@ -189,7 +189,7 @@ public:
                     return 0;
                 });
             },
-            detail::throw_on_fk<RoleInUse>());
+            Repositories::detail::throw_on_fk<RoleInUse>());
     }
 
 private:
