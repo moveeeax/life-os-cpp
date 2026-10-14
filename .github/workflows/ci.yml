@@ -447,6 +447,36 @@ jobs:
           docker run --rm life-os-cpp-ci:runtime-ci --print-routes | tee routes.txt
           grep -q '/healthz' routes.txt
 
+      - name: API runtime --verify-migrations gates on the schema
+        # The worker chart's wait-for-schema init container loops on exactly
+        # this command from the API image: it must exit non-zero while the
+        # image's migrations are not applied, and 0 once they are.
+        if: steps.scope.outputs.relevant == 'true'
+        run: |
+          docker network create smoke
+          docker run -d --name smoke-pg --network smoke \
+            -e POSTGRES_USER=app -e POSTGRES_PASSWORD=smoke -e POSTGRES_DB=app postgres:15-alpine
+          for _ in $(seq 1 60); do
+            docker exec smoke-pg pg_isready -U app -d app >/dev/null 2>&1 && break
+            sleep 1
+          done
+          app() {
+            docker run --rm --network smoke \
+              -e DATABASE_HOST=smoke-pg -e DATABASE_USER=app -e DATABASE_PASSWORD=smoke \
+              -e DATABASE_NAME=app -e METRICS_ADDRESS= -e OTLP_ENDPOINT= \
+              life-os-cpp-ci:runtime-ci "$@" config/config.json
+          }
+          if app --verify-migrations > before.txt 2>&1; then
+            cat before.txt
+            echo "::error::--verify-migrations exited 0 on an empty database"
+            exit 1
+          fi
+          cat before.txt
+          grep -q 'Pending migrations' before.txt
+          app --run-migrations
+          app --verify-migrations | tee after.txt
+          grep -q 'All migrations applied' after.txt
+
       - name: Worker runtime binary starts
         # The worker takes no no-op flag: point it at a config that isn't there
         # so it exits non-zero AFTER the startup banner. The banner is what we

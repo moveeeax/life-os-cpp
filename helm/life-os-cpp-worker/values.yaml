@@ -9,6 +9,26 @@ image:
   tag: ""  # Defaults to chart appVersion
   pullPolicy: IfNotPresent
 
+# Init container that holds the worker until the database schema carries every
+# migration of this version (the API release migrates; the worker must not run
+# new code against the old schema). It runs `life_os_cpp --verify-migrations`
+# from the API image — same tag as the worker unless schemaWait.image.tag is
+# set — every intervalSeconds, and fails the pod after timeoutSeconds.
+schemaWait:
+  enabled: true
+  image:
+    repository: ghcr.io/moveeeax/life-os-cpp
+    tag: ""  # Defaults to image.tag, then the chart appVersion
+  timeoutSeconds: 600
+  intervalSeconds: 10
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
 # List of Kubernetes secrets for pulling from private registries
 imagePullSecrets: []
 # Override the generated resource names (leave empty to use chart defaults)
