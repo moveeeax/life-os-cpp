@@ -2,9 +2,8 @@
  * @file test_jobs.cpp
  * @brief Integration tests for JobQueue: submit / pick / complete / fail-retry / cancel.
  * @details Requires live Redis. Tests cover the retry path and the cancel
- *          semantics (completed/failed jobs cannot be cancelled). The TOCTOU
- *          race on cancel() is documented with a DISABLED_ test — once cancel()
- *          grows atomic semantics the test can be re-enabled.
+ *          semantics (completed/failed jobs cannot be cancelled), including
+ *          concurrent cancels of one job: exactly one of them wins.
  */
 
 #include <atomic>
@@ -214,25 +213,34 @@ TEST_F(JobsIntegrationTest, CancelUnknownJobReturnsFalse) {
     EXPECT_FALSE(Jobs::get().cancel("00000000-0000-0000-0000-000000000000"));
 }
 
-// TOCTOU on cancel(): read-decide-write is not atomic, so two concurrent
-// cancellers can both observe a pending job and both write "failed" state.
-// This test exists to document the race — disabled until cancel() becomes
-// atomic (e.g. via Redis WATCH/MULTI or a Lua script).
-TEST_F(JobsIntegrationTest, DISABLED_CancelIsAtomicUnderContention) {
+// cancel() decides on the blob it read and writes with a compare-and-set, so
+// concurrent cancellers of one pending job see exactly one success.
+TEST_F(JobsIntegrationTest, CancelIsAtomicUnderContention) {
     auto job = Jobs::get().submit("cancelq", {});
     track(job.id);
 
+    constexpr int kThreads = 4;
     std::atomic<int> successes{0};
-    auto race = [&]() {
-        if (Jobs::get().cancel(job.id))
-            ++successes;
-    };
-    std::thread t1(race), t2(race);
-    t1.join();
-    t2.join();
+    std::atomic<bool> go{false};
+    std::vector<std::thread> threads;
+    for (int i = 0; i < kThreads; ++i) {
+        threads.emplace_back([&] {
+            while (!go.load()) {
+                std::this_thread::yield();
+            }
+            if (Jobs::get().cancel(job.id))
+                ++successes;
+        });
+    }
+    go.store(true);
+    for (auto& t : threads)
+        t.join();
 
-    // Atomic cancel should allow exactly one successful cancellation.
     EXPECT_EQ(successes.load(), 1);
+    auto status = Jobs::get().get_status(job.id);
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(status->status, "failed");
+    EXPECT_EQ(status->error, "cancelled");
 }
 
 TEST_F(JobsIntegrationTest, ListPagedSlicesWithExactTotal) {

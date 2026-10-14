@@ -229,7 +229,9 @@ public:
     std::optional<Job> get_status(const std::string& id);
 
     /**
-     * @brief Cancel a job (sets status to failed with "cancelled" error)
+     * @brief Cancel a job (sets status to failed with "cancelled" error).
+     *        The status check and the write are one compare-and-set in Redis:
+     *        of concurrent cancels of one job exactly one returns true.
      */
     bool cancel(const std::string& id);
 
