@@ -34,7 +34,7 @@ TEST(FieldChecksAmount, TheDumpOfADoubleIsItsShortestForm) {
 
 TEST(FieldChecksAmount, MoreThanFifteenDigitsIsRefused) {
     const auto check = [](const json& value) {
-        Validation::Errors errs;
+        Api::Validation::Errors errs;
         amount_range(errs, json{{"amount", value}}, "amount", -1e12, 1e12);
         return errs.items().empty() ? std::string() : errs.items()[0].code;
     };
