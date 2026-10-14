@@ -153,7 +153,7 @@ public:
                     return "deleted";
                 });
             },
-            detail::throw_on<InUse>("23503"));
+            Repositories::detail::throw_on_fk<InUse>());
     }
 
     /// The kind of an owner's category, or nullopt when it is not theirs.

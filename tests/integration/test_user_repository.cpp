@@ -11,6 +11,7 @@
 #include <gtest/gtest.h>
 
 #include "database/Database.hpp"
+#include "repositories/SqlErrors.hpp"
 #include "repositories/UserRepository.hpp"
 #include "test_helpers.hpp"
 
@@ -114,7 +115,8 @@ TEST_F(UserRepositoryRemoveTest, AnotherForeignKeyIsNotReportedAsBillingHistory)
     } catch (const Repositories::UserHasBillingHistory&) {
         FAIL() << "a table missing from kOwnedTables is a bug, not billing history";
     } catch (const pqxx::sql_error& e) {
-        EXPECT_EQ(std::string(e.sqlstate()), "23503");
+        // 23503 up to PostgreSQL 17, 23001 (restrict_violation) from 18 on.
+        EXPECT_TRUE(Repositories::detail::is_fk_violation(e.sqlstate())) << e.sqlstate();
     }
 }
 

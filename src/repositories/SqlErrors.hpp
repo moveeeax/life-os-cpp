@@ -48,4 +48,21 @@ auto throw_on(std::string_view state) {
     };
 }
 
+/// A row that is still referenced. PostgreSQL 18 reports an ON DELETE
+/// RESTRICT violation as 23001 (restrict_violation); earlier majors used
+/// 23503 (foreign_key_violation) for every foreign-key error. The code
+/// treats both as the same thing.
+inline bool is_fk_violation(std::string_view ss) {
+    return ss == "23503" || ss == "23001";
+}
+
+/// throw_on for the foreign-key case: both SQLSTATEs above throw E.
+template <typename E>
+auto throw_on_fk() {
+    return [](std::string_view ss) {
+        if (is_fk_violation(ss))
+            throw E{};
+    };
+}
+
 }  // namespace Repositories::detail

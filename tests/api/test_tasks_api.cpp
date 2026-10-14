@@ -243,6 +243,11 @@ TEST_F(TasksApiTest, ASourceIsAPairAndALedgerRowMustBeYours) {
 
 TEST_F(TasksMoneyOffTest, ALedgerRowOfAnotherUserIsRefusedWhileMoneyIsOff) {
     const std::string boris_row = Database::get().execute_write([](auto& txn) {
+        // The module is off, so nothing seeded the currencies the account refers to.
+        txn.exec_params(
+            "INSERT INTO money_currencies (owner_id, code, name) VALUES ($1::uuid, 'KZT', 'Tenge') "
+            "ON CONFLICT DO NOTHING",
+            std::string(kBoris));
         const auto acc = txn.exec_params(
                                 "INSERT INTO money_accounts (owner_id, name, currency) VALUES ($1::uuid, 'K', 'KZT') "
                                 "RETURNING id::text",
@@ -413,7 +418,7 @@ TEST_F(TasksParseApiTest, ANoteBecomesATaskOnceAndIsArchived) {
               k409Conflict);
     const auto theirs = call_id(&Api::TasksController::parseStatus, user(kBoris), Get, id);
     EXPECT_EQ(theirs->statusCode(), k404NotFound);
-    EXPECT_EQ(body_of(theirs)["error"], "parse_job") << "one code for a missing parse job in every module";
+    EXPECT_EQ(body_of(theirs)["message"], "parse_job not found") << "one name for a missing parse job";
 }
 
 namespace {
