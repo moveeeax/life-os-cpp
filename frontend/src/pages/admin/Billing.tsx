@@ -41,9 +41,8 @@ const PER_PAGE = 20;
  * on a charting dependency. GET /api/v1/admin/billing/metrics already
  * serves everything a dashboard needs (BillingMetricsResponse in
  * docs/openapi.yaml: windowed revenue/conversion/refunds, an outstanding-credits snapshot, and a
- * zero-filled time series), qk.admin.billing.metrics(period) is the ready
- * query key, and lib/billingMetrics.ts holds the tested pure formatting
- * helpers — bring your own charting library and add the tab.
+ * zero-filled time series) and qk.admin.billing.metrics(period) is the ready
+ * query key — bring your own charting library and add the tab.
  */
 const PAYMENT_STATUS_STYLES: Record<Payment['status'], string> = {
   created:
