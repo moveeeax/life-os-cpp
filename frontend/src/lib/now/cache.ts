@@ -1,5 +1,6 @@
 // The last answers of Now kept in the browser, so a new tab paints at once.
 // Every access is guarded: storage can be blocked, full or absent.
+import { todayLocal } from '@/lib/dates';
 
 export interface KeyValueStore {
   getItem(key: string): string | null;
@@ -88,13 +89,4 @@ export function writeCache<T>(
 }
 
 /** YYYY-MM-DD of @p d in the zone @p tz. */
-export function localDate(d: Date, tz: string): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(d);
-  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
-  return `${get('year')}-${get('month')}-${get('day')}`;
-}
+export const localDate = (d: Date, tz: string): string => todayLocal(tz, d);

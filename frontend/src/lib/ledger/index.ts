@@ -1,5 +1,7 @@
 // Pure logic of the Money pages: formats, periods, per-currency totals, the
 // parse draft, small rules. Amounts of different currencies are never added.
+import { shiftDays } from '@/lib/dates';
+
 import type {
   Currency,
   Merchant,
@@ -10,6 +12,7 @@ import type {
 } from './types';
 
 export * from './types';
+export { formatDay, isDay, todayLocal } from '@/lib/dates';
 
 /** The account the add form picked last, kept in the browser. */
 export const LAST_ACCOUNT_KEY = 'money:last-account';
@@ -60,8 +63,6 @@ function parse(date: string): Date | null {
   return d.getMonth() === Number(m[2]) - 1 && d.getDate() === Number(m[3]) ? d : null;
 }
 
-export const todayLocal = (now: Date = new Date()): string => text(now);
-
 export function periodFromSearch(
   search: URLSearchParams,
   today: string,
@@ -75,11 +76,7 @@ export function periodFromSearch(
 }
 
 /** The day `by` days from `date` (YYYY-MM-DD in, YYYY-MM-DD out). */
-export function shiftDay(date: string, by: number): string {
-  const d = parse(date) ?? new Date();
-  d.setDate(d.getDate() + by);
-  return text(d);
-}
+export const shiftDay = shiftDays;
 
 /**
  * A posted row the draft may repeat: the same account, type and amount within
@@ -159,13 +156,6 @@ export function shiftPeriod(kind: PeriodKind, date: string, by: number): string 
     start.setMonth(start.getMonth() + (kind === 'quarter' ? 3 : 1) * by);
   }
   return text(start);
-}
-
-export function formatDay(date: string): string {
-  const d = parse(date);
-  return d
-    ? d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-    : date;
 }
 
 // ── totals ─────────────────────────────────────────────────────────────────
@@ -391,4 +381,3 @@ export async function scaleImage(
 export const RECEIPT_MAX_BYTES = 4 * 1024 * 1024;
 
 /** A calendar day as YYYY-MM-DD, for the forms' date fields. */
-export const isDay = (date: string): boolean => parse(date) !== null;

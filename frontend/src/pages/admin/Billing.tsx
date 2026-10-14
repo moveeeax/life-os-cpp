@@ -26,6 +26,7 @@ import type {
   MessageResponse,
   Payment,
 } from '@/lib/api/types';
+import { formatDateTime } from '@/lib/dates';
 import { dollarsToCents, formatCents } from '@/lib/money';
 import { AdjustDialog } from '@/pages/admin/billing/AdjustDialog';
 
@@ -65,14 +66,6 @@ function PaymentStatusBadge({ status }: { status: Payment['status'] }) {
       {status}
     </span>
   );
-}
-
-function fmtDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
 }
 
 export function AdminBillingPage() {
@@ -394,7 +387,7 @@ function PaymentsTab() {
     {
       header: 'Created',
       className: 'whitespace-nowrap text-xs',
-      cell: (p) => fmtDate(p.created_at),
+      cell: (p) => formatDateTime(p.created_at),
     },
   ];
 

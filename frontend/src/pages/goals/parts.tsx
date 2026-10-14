@@ -5,14 +5,15 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 import { useAddMilestone, useAddSection, usePutCheckin, useSaveGoal } from '@/hooks/useGoals';
 import { useCreateTask, useUpdateTask } from '@/hooks/useTasks';
+import { daysBetween, formatDay } from '@/lib/dates';
 import { formatValue, shelf, type GoalDetail } from '@/lib/goals';
 import { dueLabel, type Task } from '@/lib/tasks';
 import { cn } from '@/lib/utils';
 import { Meter, Num } from '@/shell/kit';
 
+// Chart positions: an instant per day (noon, so a zone never shifts the day).
 const day = (s: string) => Date.parse(`${s}T12:00:00Z`);
-const shortDate = (s: string) =>
-  new Date(day(s)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const shortDate = (s: string) => formatDay(s, { locale: 'en-GB' });
 const inputClass = 'k-input k-compact';
 const ghost = 'k-link';
 const STATUS: Record<Task['status'], string> = {
@@ -354,7 +355,7 @@ export function BinaryPart({ goal, today }: { goal: GoalDetail; today: string })
     setMdate('');
   });
   useErrorToast(addMilestone.error);
-  const total = Math.max(1, (day(goal.due) - day(goal.start_date)) / 86_400_000);
+  const total = Math.max(1, daysBetween(goal.start_date, goal.due));
   return (
     <div className="grid gap-3">
       <Meter
@@ -364,7 +365,7 @@ export function BinaryPart({ goal, today }: { goal: GoalDetail; today: string })
             <Num>{goal.progress.days_left} d</Num> left
           </>
         }
-        value={Math.max(0, (day(today) - day(goal.start_date)) / 86_400_000)}
+        value={Math.max(0, daysBetween(goal.start_date, today))}
         max={total}
       />
       {goal.milestones.length > 0 && (

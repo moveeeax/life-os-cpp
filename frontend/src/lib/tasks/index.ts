@@ -1,6 +1,8 @@
 // Tasks on the page: areas with their colour, the effort words, the due label.
 export * from './types';
 export * from './projects';
+import { daysBetween, formatDay, todayLocal } from '@/lib/dates';
+
 import type { Area, Effort } from './types';
 
 export const AREAS: { key: Area; label: string; dot: string }[] = [
@@ -20,25 +22,16 @@ export const EFFORT_LABEL: Record<Effort, string> = {
   deep: 'deep work',
 };
 
-/** Days from `from` to `to`, both YYYY-MM-DD, counted on the calendar (UTC noon avoids DST). */
-const dayGap = (from: string, to: string) =>
-  Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
-
 export function dueLabel(
   due: string | null | undefined,
   today: string,
 ): { text: string; tone: 'late' | 'today' | 'plain' } | null {
   if (!due) return null;
-  const d = dayGap(today, due);
+  const d = daysBetween(today, due);
   if (d < 0) return { text: `${-d} ${d === -1 ? 'day' : 'days'} late`, tone: 'late' };
   if (d === 0) return { text: 'today', tone: 'today' };
   if (d === 1) return { text: 'tomorrow', tone: 'plain' };
-  const text = new Date(`${due}T12:00:00Z`).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  });
-  return { text, tone: 'plain' };
+  return { text: formatDay(due, { locale: 'en-GB' }), tone: 'plain' };
 }
 
 /** A source link the page may put in an href: http(s) only, never javascript: or data:. */
@@ -67,11 +60,8 @@ export function parseErrorText(error: string | null | undefined): string {
   return words[code] ?? 'The phrase could not be read.';
 }
 
-export function localToday(): string {
-  const n = new Date();
-  const p = (x: number) => String(x).padStart(2, '0');
-  return `${n.getFullYear()}-${p(n.getMonth() + 1)}-${p(n.getDate())}`;
-}
+/** Today in the browser's zone. */
+export const localToday = (): string => todayLocal();
 
 export function localZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';

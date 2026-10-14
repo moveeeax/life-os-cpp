@@ -2,6 +2,8 @@
 // raw samples, night selection, tile statistics and the pagination loop.
 // No React, no fetch: everything here is unit-tested in health.test.ts.
 
+import { shiftDays, todayLocal } from '@/lib/dates';
+
 import type { Page, SleepSession } from './types';
 
 export interface DateRange {
@@ -26,9 +28,7 @@ function isIsoDate(s: string | null): s is string {
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
 }
 
-function shiftDate(date: string, days: number): string {
-  return new Date(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
-}
+const shiftDate = shiftDays;
 
 /**
  * Calendar date of an instant in a zone `offsetMin` minutes ahead of UTC.
@@ -41,9 +41,7 @@ export function localDate(iso: string, offsetMin?: number): string {
 }
 
 /** Today's calendar date in the browser's zone. */
-export function today(): string {
-  return localDate(new Date().toISOString());
-}
+export const today = (): string => todayLocal();
 
 /** The last `days` days ending on `end`, both ends included. */
 export function rangeForDays(days: number, end: string): DateRange {

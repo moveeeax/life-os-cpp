@@ -1,5 +1,7 @@
 // Habits: the words of a habit row, its value, the seven cells of a week, the
 // numbers of the day, and the body of the habit form.
+import { shiftDays } from '@/lib/dates';
+
 import type { Habit, HabitDays, HabitInput } from './types';
 
 export type * from './types';
@@ -81,11 +83,7 @@ export function goalLine(h: Pick<Habit, 'source' | 'goal' | 'unit'>): string | n
   return h.unit ? `${n1.format(h.goal)} ${h.unit}` : n1.format(h.goal);
 }
 
-function shift(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
+const shift = shiftDays;
 
 export const addDays = shift;
 

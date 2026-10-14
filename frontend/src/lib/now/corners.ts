@@ -1,6 +1,7 @@
 // The four corners of Now: one main line and one small line each, a dot when
 // something is off (the rules of the quiet lines), and the countdowns of the
 // Goals corner.
+import { daysBetween } from '@/lib/dates';
 import { paceWord, type Tone } from '@/lib/goals';
 
 import { quietLines, type LinePart } from './lines';
@@ -53,10 +54,6 @@ export function formatSleep(minutes: number): string {
   const m = Math.round(minutes);
   if (m < 60) return `${m} min`;
   return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`;
-}
-
-function daysBetween(from: string, to: string): number {
-  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }
 
 function inDays(days: number): string {

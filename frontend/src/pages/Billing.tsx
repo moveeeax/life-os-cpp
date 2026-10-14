@@ -12,6 +12,7 @@ import { useErrorToast } from '@/hooks/useErrorToast';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import type { BillingPackage, PublicWalletEntry } from '@/lib/api/types';
+import { formatDateTime } from '@/lib/dates';
 import { creditsForAmount, dollarsToCents, formatCents } from '@/lib/money';
 
 const HISTORY_PER_PAGE = 20;
@@ -47,14 +48,6 @@ function KindBadge({ kind }: { kind: PublicWalletEntry['kind'] }) {
       {kind}
     </span>
   );
-}
-
-function fmtDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
 }
 
 export function BillingPage() {
@@ -106,7 +99,11 @@ export function BillingPage() {
       : null;
 
   const historyColumns: Column<PublicWalletEntry>[] = [
-    { header: 'Date', className: 'whitespace-nowrap text-xs', cell: (e) => fmtDate(e.created_at) },
+    {
+      header: 'Date',
+      className: 'whitespace-nowrap text-xs',
+      cell: (e) => formatDateTime(e.created_at),
+    },
     { header: 'Type', cell: (e) => <KindBadge kind={e.kind} /> },
     {
       header: 'Credits',

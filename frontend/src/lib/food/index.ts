@@ -1,7 +1,10 @@
 // Pure logic of the Food pages: dates, scaling, the parse draft, formats.
+import { shiftDays } from '@/lib/dates';
+
 import type { FoodEntryInput, FoodItem, FoodMeal, FoodParseJob, FoodWeek } from './types';
 
 export * from './types';
+export { formatDay as formatDate, todayLocal } from '@/lib/dates';
 
 export const MEALS: { value: FoodMeal; label: string }[] = [
   { value: 'breakfast', label: 'Breakfast' },
@@ -20,9 +23,6 @@ const pad = (n: number) => String(n).padStart(2, '0');
 const fromParts = (d: Date): string =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-/** Local date as the API expects it. */
-export const todayLocal = (now: Date = new Date()): string => fromParts(now);
-
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /** Parse a "YYYY-MM-DD" into a local Date, or null when it is not a real date. */
@@ -40,11 +40,7 @@ export function toLocalDate(value: string): Date | null {
 export const parseDateParam = (value: string | null, fallback: string): string =>
   value !== null && toLocalDate(value) !== null ? value : fallback;
 
-export function shiftDate(date: string, days: number): string {
-  const d = toLocalDate(date) ?? new Date();
-  d.setDate(d.getDate() + days);
-  return fromParts(d);
-}
+export const shiftDate = shiftDays;
 
 /** The Monday of the week the date is in. */
 export function mondayOf(date: string): string {
@@ -52,14 +48,6 @@ export function mondayOf(date: string): string {
   const back = (d.getDay() + 6) % 7;
   d.setDate(d.getDate() - back);
   return fromParts(d);
-}
-
-/** "Mon, Oct 5" for a "YYYY-MM-DD". */
-export function formatDate(date: string): string {
-  const d = toLocalDate(date);
-  return d
-    ? d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-    : date;
 }
 
 /** "Mon" for a "YYYY-MM-DD". */

@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 
 import { useErrorToast } from '@/hooks/useErrorToast';
 import { useUpdateTask } from '@/hooks/useTasks';
+import { daysBetween } from '@/lib/dates';
 import type { Today } from '@/lib/now';
 import { Capture } from '@/pages/tasks/Capture';
 
@@ -40,9 +41,7 @@ function TickRow({
 }
 
 function daysLate(due: string, today: string): string {
-  const d = Math.round(
-    (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${due}T00:00:00Z`)) / 86_400_000,
-  );
+  const d = daysBetween(due, today);
   return d === 1 ? '1 day late' : `${d} days late`;
 }
 
