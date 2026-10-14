@@ -20,8 +20,8 @@
  * the base is for the plain single-table case.
  *
  * ── Data-layer ergonomics conventions (recommended for new resources) ────────
- *  - Sorting/filtering: never concatenate a client `?sort=` column into SQL.
- *    Use Repositories::safe_order_by() (ListQuery.hpp) with a column allowlist.
+ *  - Sorting/filtering: never concatenate a client `?sort=` column into SQL;
+ *    map it through a fixed column allowlist first.
  *  - Column single-source: keep the SELECT column list (kColumns), the struct
  *    fields, from_row(), and to_json() in sync — adding a column means touching
  *    all four. Prefer driving them from one place (an X-macro or a single
