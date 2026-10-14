@@ -285,6 +285,12 @@ travel:
   enabled: false
 
 # ---------------------------------------------------------------
+# habits module — habits ticked by hand or from Mi Fitness and Training. Env var set: HABITS_ENABLED.
+# ---------------------------------------------------------------
+habits:
+  enabled: false
+
+# ---------------------------------------------------------------
 # notes module — private Markdown notes shaped like tarassov.me posts. Env var set: NOTES_ENABLED.
 # ---------------------------------------------------------------
 notes:

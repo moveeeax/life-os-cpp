@@ -126,6 +126,8 @@ TEST(NowSettings, ACornerLayoutIsChecked) {
         << "a chip twice";
     EXPECT_TRUE(corners_problem(json({{"tl", "travel"}, {"tr", nullptr}, {"bl", nullptr}, {"br", nullptr}})))
         << "an unknown chip";
+    EXPECT_FALSE(corners_problem(json({{"tl", "body"}, {"tr", "goals"}, {"bl", "day"}, {"br", "habits"}})))
+        << "Habits placed through Arrange in the place of Tasks";
     EXPECT_TRUE(corners_problem(json({{"tl", "body"}, {"tr", "goals"}, {"bl", "day"}}))) << "a corner missing";
     EXPECT_TRUE(
         corners_problem(json({{"tl", "body"}, {"tr", "goals"}, {"bl", "day"}, {"br", "tasks"}, {"mid", nullptr}})))

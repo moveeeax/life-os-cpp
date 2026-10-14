@@ -119,6 +119,16 @@ inline bool travel_enabled() {
     return Config::get().get<bool>("travel.enabled", "TRAVEL_ENABLED", false);
 }
 
+/// Habits module master switch; same pattern (and same
+/// Config::is_initialized() guard) as travel_enabled() above: routes are
+/// statically registered, handlers consult this per-request and 404 while the
+/// module is off.
+inline bool habits_enabled() {
+    if (!Config::is_initialized())
+        return false;
+    return Config::get().get<bool>("habits.enabled", "HABITS_ENABLED", false);
+}
+
 /// Notes module master switch — same pattern as travel_enabled().
 inline bool notes_enabled() {
     if (!Config::is_initialized())

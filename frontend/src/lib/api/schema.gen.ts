@@ -15560,6 +15560,517 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/habits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The habits, in their order */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description true lists the archived habits */
+                    archived?: "true" | "false";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The habits */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Habit"][];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Habits module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Create a habit */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["HabitInput"];
+                };
+            };
+            responses: {
+                /** @description The habit */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Habit"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Habits module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/habits/days": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Each active habit over a range of days with its streak
+         * @description A day is done by a manual tick or by its source meeting the goal; the auto values come from Mi Fitness and Training on read. The streak and the best count from today in tz over the stored ticks and the last 365 days of data.
+         */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    /** @description At most 61 days after from */
+                    to: string;
+                    /** @description IANA zone of the caller: today and the local day of a Training session */
+                    tz?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The habits with their days */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["HabitDays"][];
+                            /** Format: date */
+                            from: string;
+                            /** Format: date */
+                            to: string;
+                            /** Format: date */
+                            today: string;
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Habits module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/habits/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a habit and its ticks */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Habits module disabled, or not the caller's habit */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Replace a habit (every field) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["HabitInput"];
+                };
+            };
+            responses: {
+                /** @description The habit */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Habit"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Habits module disabled, or not the caller's habit */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/habits/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive or restore a habit */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        archived: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description The habit */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Habit"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Habits module disabled, or not the caller's habit */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/habits/{id}/checks/{date}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                date: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Tick a habit by hand on a day */
+        put: {
+            parameters: {
+                query?: {
+                    /** @description IANA zone of the caller: a day after today there is refused */
+                    tz?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                    date: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        value?: number | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description The tick */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["HabitCheck"];
+                        };
+                    };
+                };
+                /** @description Validation failed: a bad date, a day after today or more than 366 days back */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Habits module disabled, or not the caller's habit */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /** Remove the manual tick of a day */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    date: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Removed, or there was none */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not a calendar day */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Habits module disabled, or not the caller's habit */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -15768,6 +16279,65 @@ export interface components {
             /** @description Required for text; ignored for task and goal (the title is copied) */
             text?: string;
         };
+        Habit: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            schedule: "daily" | "weekly";
+            per_week: number | null;
+            /** @description Hours for sleep, steps for steps, kcal for active_kcal; shown only for manual; null for workout */
+            goal: number | null;
+            unit: string;
+            /** @enum {string} */
+            source: "manual" | "sleep" | "steps" | "active_kcal" | "workout";
+            position: number;
+            /** Format: date-time */
+            archived_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        HabitInput: {
+            name: string;
+            /** @enum {string} */
+            schedule: "daily" | "weekly";
+            /** @description Required for weekly; not allowed for daily */
+            per_week?: number | null;
+            /** @description Required for sleep (hours, at most 24), steps and active_kcal; dropped for workout */
+            goal?: number | null;
+            unit?: string;
+            /**
+             * @default manual
+             * @enum {string}
+             */
+            source: "manual" | "sleep" | "steps" | "active_kcal" | "workout";
+        };
+        HabitDay: {
+            /** Format: date */
+            date: string;
+            done: boolean;
+            /** @description Ticked by hand */
+            manual: boolean;
+            /** @description The value of the tick, else the source value of the day (sleep minutes, steps, kcal, sessions) */
+            value: number | null;
+        };
+        HabitDays: components["schemas"]["Habit"] & {
+            days: components["schemas"]["HabitDay"][];
+            /** @description Days for a daily habit, met weeks for a weekly one */
+            streak: number;
+            best: number;
+            /** @description Weekly only: done days in the week of to */
+            week_done: number | null;
+            /** @description The source has no data for the caller (no Mi account, fitness or Training off) */
+            no_data: boolean;
+        };
+        HabitCheck: {
+            /** Format: uuid */
+            habit_id: string;
+            /** Format: date */
+            date: string;
+            value: number | null;
+        };
         /** @description A section key is absent when its module is off, the caller has nothing there, or it failed (then it is in errors) */
         Today: {
             /** @description The note of the day and of the day before */
@@ -15789,6 +16359,18 @@ export interface components {
                     rule: string;
                     /** @description Days left, or days until an over threshold is met */
                     left: number;
+                }[];
+            };
+            /** @description The Habits plate: habits done today of the active ones (a weekly habit counts when done today or its week is met), the open daily habits, the weekly ones this week */
+            habits?: {
+                done: number;
+                total: number;
+                /** @description Names of the daily habits still open today */
+                left: string[];
+                week: {
+                    name: string;
+                    done: number;
+                    per_week: number;
                 }[];
             };
             tasks?: {
@@ -16371,13 +16953,13 @@ export interface components {
         /** @description The chip of each corner, or null for an empty corner; a chip at most once */
         NowCorners: {
             /** @enum {string|null} */
-            tl: "body" | "goals" | "day" | "tasks" | null;
+            tl: "body" | "goals" | "day" | "tasks" | "habits" | null;
             /** @enum {string|null} */
-            tr: "body" | "goals" | "day" | "tasks" | null;
+            tr: "body" | "goals" | "day" | "tasks" | "habits" | null;
             /** @enum {string|null} */
-            bl: "body" | "goals" | "day" | "tasks" | null;
+            bl: "body" | "goals" | "day" | "tasks" | "habits" | null;
             /** @enum {string|null} */
-            br: "body" | "goals" | "day" | "tasks" | null;
+            br: "body" | "goals" | "day" | "tasks" | "habits" | null;
         };
         NowSettings: {
             /** @description The place the geocoder found */

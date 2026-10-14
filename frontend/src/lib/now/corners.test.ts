@@ -22,12 +22,13 @@ describe('formatSleep', () => {
 });
 
 describe('chips', () => {
-  it('always gives four corners in order', () => {
+  it('always gives every chip in order, Habits last', () => {
     expect(chips(base, 10, '2026-10-12').map((c) => c.key)).toEqual([
       'body',
       'goals',
       'day',
       'tasks',
+      'habits',
     ]);
   });
 
@@ -174,6 +175,40 @@ describe('chips', () => {
     const k = chips(base, 10, '2026-10-12')[3];
     expect(text(k.main)).toBe('Nothing for today');
     expect(text(k.small)).toBe('Nothing late');
+  });
+});
+
+describe('the Habits chip', () => {
+  const habits = (left: string[], done: number, total: number): Today => ({
+    ...base,
+    habits: { done, total, left, week: [{ name: 'Swimming', done: 2, per_week: 3 }] },
+  });
+
+  it('counts the day and names the open daily habits', () => {
+    const h = chips(habits(['Meditation', 'Reading'], 7, 11), 10, '2026-10-14')[4];
+    expect(h.title).toBe('Habits');
+    expect(text(h.main)).toBe('7 of 11 today');
+    expect(h.main.filter((p) => p.num).map((p) => p.text)).toEqual(['7', '11']);
+    expect(text(h.small)).toBe('Meditation, Reading left');
+    expect(h.small[0].title).toBe(true);
+    expect(h.dot).toBeNull();
+  });
+
+  it('lights the dot after 20:00 while a daily habit is open', () => {
+    expect(chips(habits(['Reading'], 6, 7), 19, '2026-10-14')[4].dot).toBeNull();
+    expect(chips(habits(['Reading'], 6, 7), 20, '2026-10-14')[4].dot).toBe('warn');
+    expect(chips(habits([], 7, 7), 21, '2026-10-14')[4].dot).toBeNull();
+  });
+
+  it('says all done, or that every daily habit is done while a weekly one is not', () => {
+    expect(text(chips(habits([], 7, 7), 10, '2026-10-14')[4].small)).toBe('All done today');
+    expect(text(chips(habits([], 6, 7), 10, '2026-10-14')[4].small)).toBe('Every day done');
+  });
+
+  it('says so when there are no habits', () => {
+    const h = chips(base, 10, '2026-10-14')[4];
+    expect(text(h.main)).toBe('No habits yet');
+    expect(h.dot).toBeNull();
   });
 });
 

@@ -19,6 +19,7 @@ export const CHIP_LABEL: Record<Chip['key'], string> = {
   goals: 'Goals',
   day: 'Food and money',
   tasks: 'Tasks',
+  habits: 'Habits',
 };
 
 /** A layout with every chip this client does not know turned into an empty corner. */
@@ -31,6 +32,21 @@ export function cleanCorners(corners: NowCorners): NowCorners {
     bl: known(corners.bl),
     br: known(corners.br),
   };
+}
+
+/** Whether @p key sits in a corner of the layout. */
+export function isPlaced(corners: NowCorners, key: Chip['key']): boolean {
+  return CORNER_KEYS.some((k) => corners[k] === key);
+}
+
+/**
+ * The layout with @p key placed: as it is when already there, else in the first
+ * empty corner, else in the bottom right (whatever sat there leaves Now).
+ */
+export function withChip(corners: NowCorners, key: Chip['key']): NowCorners {
+  if (isPlaced(corners, key)) return corners;
+  const empty = CORNER_KEYS.find((k) => corners[k] == null);
+  return { ...corners, [empty ?? 'br']: key };
 }
 
 /** The chips that have a corner, each with the class of its corner, in the corner order. */

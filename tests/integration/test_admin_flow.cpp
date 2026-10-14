@@ -224,6 +224,9 @@ void seed_module_rows(const std::string& owner) {
             "VALUES ($1::uuid, 'Mikhail', 'passport', '2030-01-21')");
         run("INSERT INTO now_settings (owner_id, city, latitude, longitude) VALUES ($1::uuid, 'Almaty', 43.25, 76.91)");
         run("INSERT INTO day_note (owner_id, date, text) VALUES ($1::uuid, '2026-10-01', 'Call the bank')");
+        run("WITH h AS (INSERT INTO habits (owner_id, name, schedule) VALUES ($1::uuid, 'Meditation', 'daily') "
+            " RETURNING id) "
+            "INSERT INTO habit_checks (owner_id, habit_id, date) SELECT $1::uuid, id, '2026-10-01' FROM h");
         run("INSERT INTO projects (owner_id, name, code, status) VALUES ($1::uuid, 'Life OS', 'life-os', 'active')");
         run("INSERT INTO notes (owner_id, slug, title) VALUES ($1::uuid, 'first-note', 'First note')");
         run("WITH x AS (INSERT INTO exercises (id, name, source, owner_id) "
@@ -264,7 +267,7 @@ TEST_F(AdminFlowTest, deleteUserRemovesEveryModuleRowTheyOwn) {
     seed_module_rows(target.user.id);
     seed_module_rows(admin_user.user.id);
     const auto before = owned_rows(target.user.id);
-    ASSERT_GE(before.second, 34) << "every module table got a row";
+    ASSERT_GE(before.second, 36) << "every module table got a row";
 
     HttpResponsePtr resp;
     admin.deleteUser(

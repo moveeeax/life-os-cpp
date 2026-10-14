@@ -26,6 +26,7 @@
 #include "core/Modules.hpp"
 #include "domain/Role.hpp"
 #include "goals/Progress.hpp"
+#include "habits/Habits.hpp"
 #include "money/Period.hpp"
 #include "net/Http.hpp"
 #include "now/Settings.hpp"
@@ -37,6 +38,7 @@
 #include "repositories/food/GoalsBody.hpp"
 #include "repositories/food/GoalsRepository.hpp"
 #include "repositories/goals/GoalRepository.hpp"
+#include "repositories/habits/Days.hpp"
 #include "repositories/money/ReportBuilder.hpp"
 #include "repositories/money/SummaryRepository.hpp"
 #include "repositories/money/TransactionRepository.hpp"
@@ -224,6 +226,28 @@ json health_part(const std::string& owner, const std::string& date) {
     return ::Now::Today::health_block(summary_row, sleep_rows, body_rows);
 }
 
+/// The Now plate of the habits: the week of @p date read up to @p date; null without habits.
+json habits_part(const std::string& owner,
+                 const std::string& date,
+                 const std::string& tz,
+                 const Repositories::Habits::Access& access) {
+    const auto day = ::Habits::day_of(date);
+    const auto evaluated =
+        Repositories::Habits::evaluate(owner, ::Habits::monday_of(day), day, day, tz, access, /*history=*/false);
+    if (evaluated.empty()) {
+        return json();
+    }
+    std::vector<::Habits::PlateItem> items;
+    for (const auto& e : evaluated) {
+        items.push_back({e.habit.at("name").get<std::string>(),
+                         e.model.schedule,
+                         e.model.per_week,
+                         !e.days.empty() && e.days.back().second.done,
+                         e.week_done});
+    }
+    return ::Habits::plate(items);
+}
+
 }  // namespace
 
 void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
@@ -269,6 +293,12 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
                      Repositories::Travel::TripRepository().next(owner, date).value_or(json()),
                      Repositories::Travel::counters_json(owner, date),
                      date);
+             }},
+            {"habits",
+             Core::habits_enabled(),
+             [&] {
+                 return habits_part(
+                     owner, date, tz, {Core::fitness_enabled() && fitness_read, Core::workout_enabled()});
              }},
         };
         const auto focus = FocusRepository().get(owner, date);

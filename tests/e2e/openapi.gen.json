@@ -778,6 +778,228 @@
      }
     }
    },
+   "Habit": {
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "schedule",
+     "per_week",
+     "goal",
+     "unit",
+     "source",
+     "position",
+     "archived_at",
+     "created_at"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "name": {
+      "type": "string"
+     },
+     "schedule": {
+      "type": "string",
+      "enum": [
+       "daily",
+       "weekly"
+      ]
+     },
+     "per_week": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 7
+     },
+     "goal": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "description": "Hours for sleep, steps for steps, kcal for active_kcal; shown only for manual; null for workout"
+     },
+     "unit": {
+      "type": "string"
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "manual",
+       "sleep",
+       "steps",
+       "active_kcal",
+       "workout"
+      ]
+     },
+     "position": {
+      "type": "integer"
+     },
+     "archived_at": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "HabitInput": {
+    "type": "object",
+    "required": [
+     "name",
+     "schedule"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+     },
+     "schedule": {
+      "type": "string",
+      "enum": [
+       "daily",
+       "weekly"
+      ]
+     },
+     "per_week": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 7,
+      "description": "Required for weekly; not allowed for daily"
+     },
+     "goal": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "exclusiveMinimum": 0,
+      "description": "Required for sleep (hours, at most 24), steps and active_kcal; dropped for workout"
+     },
+     "unit": {
+      "type": "string",
+      "maxLength": 16
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "manual",
+       "sleep",
+       "steps",
+       "active_kcal",
+       "workout"
+      ],
+      "default": "manual"
+     }
+    }
+   },
+   "HabitDay": {
+    "type": "object",
+    "required": [
+     "date",
+     "done",
+     "manual",
+     "value"
+    ],
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "done": {
+      "type": "boolean"
+     },
+     "manual": {
+      "type": "boolean",
+      "description": "Ticked by hand"
+     },
+     "value": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "description": "The value of the tick, else the source value of the day (sleep minutes, steps, kcal, sessions)"
+     }
+    }
+   },
+   "HabitDays": {
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Habit"
+     },
+     {
+      "type": "object",
+      "required": [
+       "days",
+       "streak",
+       "best",
+       "week_done",
+       "no_data"
+      ],
+      "properties": {
+       "days": {
+        "type": "array",
+        "items": {
+         "$ref": "#/components/schemas/HabitDay"
+        }
+       },
+       "streak": {
+        "type": "integer",
+        "description": "Days for a daily habit, met weeks for a weekly one"
+       },
+       "best": {
+        "type": "integer"
+       },
+       "week_done": {
+        "type": [
+         "integer",
+         "null"
+        ],
+        "description": "Weekly only: done days in the week of to"
+       },
+       "no_data": {
+        "type": "boolean",
+        "description": "The source has no data for the caller (no Mi account, fitness or Training off)"
+       }
+      }
+     }
+    ]
+   },
+   "HabitCheck": {
+    "type": "object",
+    "required": [
+     "habit_id",
+     "date",
+     "value"
+    ],
+    "properties": {
+     "habit_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "value": {
+      "type": [
+       "number",
+       "null"
+      ]
+     }
+    }
+   },
    "Today": {
     "type": "object",
     "required": [
@@ -863,6 +1085,53 @@
           "left": {
            "type": "integer",
            "description": "Days left, or days until an over threshold is met"
+          }
+         }
+        }
+       }
+      }
+     },
+     "habits": {
+      "type": "object",
+      "required": [
+       "done",
+       "total",
+       "left",
+       "week"
+      ],
+      "description": "The Habits plate: habits done today of the active ones (a weekly habit counts when done today or its week is met), the open daily habits, the weekly ones this week",
+      "properties": {
+       "done": {
+        "type": "integer"
+       },
+       "total": {
+        "type": "integer"
+       },
+       "left": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "description": "Names of the daily habits still open today"
+       },
+       "week": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "required": [
+          "name",
+          "done",
+          "per_week"
+         ],
+         "properties": {
+          "name": {
+           "type": "string"
+          },
+          "done": {
+           "type": "integer"
+          },
+          "per_week": {
+           "type": "integer"
           }
          }
         }
@@ -2874,6 +3143,7 @@
        "goals",
        "day",
        "tasks",
+       "habits",
        null
       ]
      },
@@ -2887,6 +3157,7 @@
        "goals",
        "day",
        "tasks",
+       "habits",
        null
       ]
      },
@@ -2900,6 +3171,7 @@
        "goals",
        "day",
        "tasks",
+       "habits",
        null
       ]
      },
@@ -2913,6 +3185,7 @@
        "goals",
        "day",
        "tasks",
+       "habits",
        null
       ]
      }
@@ -26453,12 +26726,504 @@
      }
     }
    }
+  },
+  "/api/v1/habits": {
+   "get": {
+    "summary": "The habits, in their order",
+    "tags": [
+     "habits"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "archived",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "true",
+        "false"
+       ],
+       "default": "false"
+      },
+      "description": "true lists the archived habits"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The habits",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Habit"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Habits module disabled"
+     }
+    }
+   },
+   "post": {
+    "summary": "Create a habit",
+    "tags": [
+     "habits"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/HabitInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "The habit",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Habit"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Habits module disabled"
+     }
+    }
+   }
+  },
+  "/api/v1/habits/days": {
+   "get": {
+    "summary": "Each active habit over a range of days with its streak",
+    "description": "A day is done by a manual tick or by its source meeting the goal; the auto values come from Mi Fitness and Training on read. The streak and the best count from today in tz over the stored ticks and the last 365 days of data.",
+    "tags": [
+     "habits"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "At most 61 days after from"
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: today and the local day of a Training session"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The habits with their days",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data",
+          "from",
+          "to",
+          "today"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/HabitDays"
+           }
+          },
+          "from": {
+           "type": "string",
+           "format": "date"
+          },
+          "to": {
+           "type": "string",
+           "format": "date"
+          },
+          "today": {
+           "type": "string",
+           "format": "date"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Habits module disabled"
+     }
+    }
+   }
+  },
+  "/api/v1/habits/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "patch": {
+    "summary": "Replace a habit (every field)",
+    "tags": [
+     "habits"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/HabitInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The habit",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Habit"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Habits module disabled, or not the caller's habit"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a habit and its ticks",
+    "tags": [
+     "habits"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Habits module disabled, or not the caller's habit"
+     }
+    }
+   }
+  },
+  "/api/v1/habits/{id}/archive": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "post": {
+    "summary": "Archive or restore a habit",
+    "tags": [
+     "habits"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "archived"
+        ],
+        "properties": {
+         "archived": {
+          "type": "boolean"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The habit",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Habit"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Habits module disabled, or not the caller's habit"
+     }
+    }
+   }
+  },
+  "/api/v1/habits/{id}/checks/{date}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    },
+    {
+     "name": "date",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "date"
+     }
+    }
+   ],
+   "put": {
+    "summary": "Tick a habit by hand on a day",
+    "tags": [
+     "habits"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: a day after today there is refused"
+     }
+    ],
+    "requestBody": {
+     "required": false,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "value": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "minimum": 0
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The tick",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/HabitCheck"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed: a bad date, a day after today or more than 366 days back"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Habits module disabled, or not the caller's habit"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Remove the manual tick of a day",
+    "tags": [
+     "habits"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Removed, or there was none"
+     },
+     "400": {
+      "description": "Not a calendar day"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Habits module disabled, or not the caller's habit"
+     }
+    }
+   }
   }
  },
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 385989,
-  "source_fnv1a64": "8a28684a5ea1ed21"
+  "source_bytes": 396646,
+  "source_fnv1a64": "79c43d5d703997a3"
  }
 }

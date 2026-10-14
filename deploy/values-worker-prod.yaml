@@ -82,6 +82,9 @@ goals:
 travel:
   enabled: true
 
+habits:
+  enabled: true
+
 notes:
   enabled: true
 

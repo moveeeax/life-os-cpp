@@ -133,6 +133,14 @@ export const qk = {
     packing: (id: string) => ['travel', 'packing', id] as const,
     documents: () => ['travel', 'documents'] as const,
   },
+  /** Habits section. */
+  habits: {
+    all: () => ['habits'] as const,
+    list: (archived: boolean) => ['habits', 'list', archived] as const,
+    days: (from: string, to: string, tz: string) => ['habits', 'days', from, to, tz] as const,
+    /** Whether the module answers at all (it is 404 while switched off). */
+    enabled: () => ['habits-enabled'] as const,
+  },
   goals: {
     all: () => ['goals'] as const,
     list: (status: string, date: string) => ['goals', 'list', status, date] as const,

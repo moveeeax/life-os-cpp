@@ -99,6 +99,12 @@ const TasksProjectPage = lazy(() =>
 );
 const NowPage = lazy(() => import('@/pages/now/Now').then((m) => ({ default: m.NowPage })));
 const GoalsPage = lazy(() => import('@/pages/goals/Goals').then((m) => ({ default: m.GoalsPage })));
+const HabitsTodayPage = lazy(() =>
+  import('@/pages/habits/Today').then((m) => ({ default: m.HabitsTodayPage })),
+);
+const HabitsWeekPage = lazy(() =>
+  import('@/pages/habits/Week').then((m) => ({ default: m.HabitsWeekPage })),
+);
 const TravelTripsPage = lazy(() =>
   import('@/pages/travel/Trips').then((m) => ({ default: m.TravelTripsPage })),
 );
@@ -335,6 +341,9 @@ export const routes: RouteEntry[] = [
   // ── Goals — any confirmed user; the module switch is the only gate ───────
   { path: '/goals', element: <GoalsPage />, guard: 'confirmed', layout: 'shell' },
 
+  // ── Habits — any confirmed user; the module switch is the only gate ──────
+  { path: '/habits', element: <HabitsTodayPage />, guard: 'confirmed', layout: 'shell' },
+  { path: '/habits/week', element: <HabitsWeekPage />, guard: 'confirmed', layout: 'shell' },
   // ── Learning — courses are projects of Tasks; the tasks switch gates it ──
   { path: '/learning', element: <LearningPage />, guard: 'confirmed', layout: 'shell' },
   {

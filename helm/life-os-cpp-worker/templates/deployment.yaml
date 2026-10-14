@@ -151,6 +151,9 @@ spec:
             # travel module — master switch
             - name: TRAVEL_ENABLED
               value: {{ .Values.travel.enabled | quote }}
+            # habits module — master switch
+            - name: HABITS_ENABLED
+              value: {{ .Values.habits.enabled | quote }}
             # notes module — master switch
             - name: NOTES_ENABLED
               value: {{ .Values.notes.enabled | quote }}

@@ -12,12 +12,13 @@ import {
 import { BodyPanel } from './BodyPanel';
 import { DayPanel } from './DayPanel';
 import { GoalsPanel } from './GoalsPanel';
+import { HabitsPanel } from './HabitsPanel';
 import { Parts } from './Parts';
 import { TasksPanel } from './TasksPanel';
 import './corners.css';
 
 /**
- * The four corners of Now. A chip is one quiet line; a click opens its glass
+ * The corners of Now. A chip is one quiet line; a click opens its glass
  * panel over the picture. One panel at a time; Escape, a click outside or the
  * chip again closes it and focus returns to the chip.
  */
@@ -117,6 +118,7 @@ export function Corners({
           {open === 'goals' && <GoalsPanel today={today} date={date} />}
           {open === 'day' && <DayPanel today={today} date={date} hour={hour} />}
           {open === 'tasks' && <TasksPanel today={today} date={date} />}
+          {open === 'habits' && <HabitsPanel date={date} />}
         </section>
       )}
     </>

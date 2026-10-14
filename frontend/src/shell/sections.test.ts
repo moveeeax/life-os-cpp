@@ -14,6 +14,7 @@ describe('glassNav', () => {
       ['Now', '/now'],
       ['Tasks', '/tasks'],
       ['Goals', '/goals'],
+      ['Habits', '/habits'],
       ['Learning', '/learning'],
       ['Notes', '/notes'],
       ['Travel', '/travel'],
@@ -29,6 +30,7 @@ describe('glassNav', () => {
       'Now',
       'Tasks',
       'Goals',
+      'Habits',
       'Learning',
       'Notes',
       'Travel',
@@ -46,6 +48,7 @@ describe('glassNav', () => {
     expect(list.map((s) => s.label)).toEqual([
       'Now',
       'Tasks',
+      'Habits',
       'Learning',
       'Notes',
       'Travel',
@@ -54,11 +57,17 @@ describe('glassNav', () => {
     ]);
   });
 
+  it('leaves Habits out when its module is off', () => {
+    const list = glassNav(user(Permission.General), new Set(['habits']));
+    expect(list.map((s) => s.label)).not.toContain('Habits');
+  });
+
   it('leaves Now out too when its module is off', () => {
     const list = glassNav(user(Permission.General), new Set(['now']));
     expect(list.map((s) => s.label)).toEqual([
       'Tasks',
       'Goals',
+      'Habits',
       'Learning',
       'Notes',
       'Travel',
