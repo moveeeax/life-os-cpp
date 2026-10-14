@@ -517,7 +517,7 @@ components:
       type: object
       required: [name]
       properties:
-        kind: { type: string, enum: [project, course], default: project }
+        kind: { type: string, enum: [project, course], description: 'project when not given; fixed after creation' }
         name: { type: string, minLength: 1, maxLength: 120 }
         code: { type: string, pattern: '^[a-z0-9-]{1,24}$', description: Made from the name when not given }
         description: { type: string, maxLength: 500 }

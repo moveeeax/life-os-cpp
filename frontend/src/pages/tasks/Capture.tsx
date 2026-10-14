@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 
+import { useProjects } from '@/hooks/useProjects';
 import { captureBody } from '@/lib/tasks/bodies';
 import {
   useAcceptTasksParse,
@@ -14,6 +15,7 @@ import {
   EFFORT_LABEL,
   localToday,
   parseErrorText,
+  takeProjectCode,
   type TaskParseLine,
 } from '@/lib/tasks';
 
@@ -53,6 +55,10 @@ export function Capture({
   const parse = useTasksParse();
   const [text, setText] = useState(initial ?? '');
   const [lines, setLines] = useState<TaskParseLine[] | null>(null);
+  // "#code" in the phrase files the task (or every parsed line) under that project.
+  const projects = useProjects().data ?? [];
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const project = projects.find((p) => p.id === projectId) ?? null;
   const today = localToday();
   const finish = () => {
     setLines(null);
@@ -80,7 +86,12 @@ export function Capture({
   }, [autoStart, initial, noteId, start, status?.llm_available]);
 
   const asTyped = () => {
-    if (text.trim()) create.mutate(captureBody(text, defaultDue));
+    const taken = takeProjectCode(text, projects);
+    if (taken.text)
+      create.mutate({
+        ...captureBody(taken.text, defaultDue),
+        ...(taken.projectId ? { project_id: taken.projectId } : {}),
+      });
   };
 
   const submit = (e: FormEvent) => {
@@ -91,7 +102,9 @@ export function Capture({
       return;
     }
     setLines(null);
-    void parse.start(text.trim(), noteId);
+    const taken = takeProjectCode(text, projects);
+    setProjectId(taken.projectId);
+    void parse.start(taken.text || text.trim(), noteId);
   };
 
   const busy = parse.state === 'starting' || parse.state === 'running';
@@ -137,7 +150,10 @@ export function Capture({
               className="grid gap-0.5 rounded-lg bg-brand-50 px-3.5 py-3 dark:bg-brand-500/15"
             >
               <p className="text-theme-sm font-medium">{l.title}</p>
-              <p className="text-theme-xs k-muted">{lineMeta(l, today)}</p>
+              <p className="text-theme-xs k-muted">
+                {lineMeta(l, today)}
+                {project && ` · ${project.name}`}
+              </p>
               {l.possible_duplicate && (
                 <p className="text-theme-xs text-warning-600">An open task has the same title.</p>
               )}
@@ -147,7 +163,11 @@ export function Capture({
             <button
               type="button"
               disabled={accept.isPending}
-              onClick={() => accept.mutate(lines)}
+              onClick={() =>
+                accept.mutate(
+                  projectId ? lines.map((l) => ({ ...l, project_id: projectId })) : lines,
+                )
+              }
               className="font-medium text-brand-500"
             >
               {accept.isPending ? 'Adding…' : lines.length > 1 ? `Add ${lines.length}` : 'Add'}

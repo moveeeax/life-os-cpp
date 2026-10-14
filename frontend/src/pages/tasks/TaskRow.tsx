@@ -16,11 +16,14 @@ export function TaskRow({
   today,
   open,
   onToggle,
+  hideProject,
 }: {
   task: Task;
   today: string;
   open: boolean;
   onToggle: () => void;
+  /** On the project's own page its name would only repeat. */
+  hideProject?: boolean;
 }) {
   const update = useUpdateTask(task.id);
   const [editing, setEditing] = useState(false);
@@ -52,6 +55,12 @@ export function TaskRow({
           <span className={cn('size-[7px] shrink-0 rounded-full', area.dot)} aria-hidden="true" />
           <span className={cn('truncate text-theme-sm', done ? 'k-muted line-through' : '')}>
             <span data-num-ok>{task.title}</span>
+            {task.project_title && !hideProject && (
+              <span className="k-muted" data-num-ok>
+                {' · '}
+                {task.project_title}
+              </span>
+            )}
           </span>
         </button>
         {due ? (
@@ -90,6 +99,22 @@ export function TaskRow({
               </>
             )}
           </p>
+          {task.project_id && task.project_title && (
+            <p>
+              {task.project_kind === 'course' ? 'Course' : 'Project'}:{' '}
+              <Link
+                to={
+                  task.project_kind === 'course'
+                    ? `/learning/${task.project_id}`
+                    : `/tasks/projects/${task.project_id}`
+                }
+                className="k-link"
+                data-num-ok
+              >
+                {task.project_title}
+              </Link>
+            </p>
+          )}
           {task.goal_title && (
             <p>
               Goal:{' '}
@@ -161,7 +186,15 @@ export function TaskRow({
 }
 
 /** Rows under one caption, one open at a time. */
-export function TaskList({ tasks, today }: { tasks: Task[]; today: string }) {
+export function TaskList({
+  tasks,
+  today,
+  hideProject,
+}: {
+  tasks: Task[];
+  today: string;
+  hideProject?: boolean;
+}) {
   const [open, setOpen] = useState<string | null>(null);
   return (
     <ul className="k-divide">
@@ -172,6 +205,7 @@ export function TaskList({ tasks, today }: { tasks: Task[]; today: string }) {
           today={today}
           open={open === t.id}
           onToggle={() => setOpen(open === t.id ? null : t.id)}
+          hideProject={hideProject}
         />
       ))}
     </ul>

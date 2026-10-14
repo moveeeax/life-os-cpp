@@ -15,6 +15,25 @@ const task = {
 } as const;
 
 describe('taskPatch', () => {
+  const draft = {
+    title: 'Pay rent',
+    area: 'finance',
+    effort: '',
+    due: '2026-10-20',
+    next: '',
+    note: '',
+    status: 'open',
+    goalId: '',
+    sectionId: '',
+  };
+  it('files the task under a project, takes it out with an empty choice', () => {
+    expect(taskPatch(task, { ...draft, projectId: 'p1' })).toEqual({ project_id: 'p1' });
+    expect(taskPatch({ ...task, project_id: 'p1' }, { ...draft, projectId: '' })).toEqual({
+      project_id: null,
+    });
+    expect(taskPatch({ ...task, project_id: 'p1' }, { ...draft, projectId: 'p1' })).toEqual({});
+    expect(taskPatch({ ...task, project_id: 'p1' }, draft)).toEqual({});
+  });
   it('sends only what changed', () => {
     expect(
       taskPatch(task, {

@@ -15763,10 +15763,10 @@ export interface components {
         };
         ProjectInput: {
             /**
-             * @default project
+             * @description project when not given; fixed after creation
              * @enum {string}
              */
-            kind: "project" | "course";
+            kind?: "project" | "course";
             name: string;
             /** @description Made from the name when not given */
             code?: string;

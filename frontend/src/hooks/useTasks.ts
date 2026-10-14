@@ -227,16 +227,17 @@ export function useTasksParse() {
 
 export function useAcceptTasksParse(jobId: string | undefined, onSuccess?: () => void) {
   return useApiMutation(
-    async (lines: TaskParseLine[]) =>
+    async (lines: (TaskParseLine & { project_id?: string | null })[]) =>
       (
         await api.postJson<{ data: Task[] }>(`${BASE}/parse/${jobId}/accept`, {
           body: {
-            lines: lines.map(({ title, area, effort, due, next_step }) => ({
+            lines: lines.map(({ title, area, effort, due, next_step, project_id }) => ({
               title,
               area,
               effort,
               due,
               next_step,
+              ...(project_id ? { project_id } : {}),
             })),
           },
         })

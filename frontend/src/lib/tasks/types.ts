@@ -10,3 +10,5 @@ export type TaskParseJob = S['TaskParseJob'];
 export type TaskParseLine = S['TaskParseLine'];
 export type Area = Task['area'];
 export type Effort = NonNullable<Task['effort']>;
+export type Project = S['Project'];
+export type ProjectInput = S['ProjectInput'];

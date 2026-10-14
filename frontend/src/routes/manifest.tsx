@@ -91,6 +91,12 @@ const TasksLaterPage = lazy(() =>
 const TasksInboxPage = lazy(() =>
   import('@/pages/tasks/Inbox').then((m) => ({ default: m.TasksInboxPage })),
 );
+const TasksProjectsPage = lazy(() =>
+  import('@/pages/tasks/Projects').then((m) => ({ default: m.TasksProjectsPage })),
+);
+const TasksProjectPage = lazy(() =>
+  import('@/pages/tasks/Project').then((m) => ({ default: m.TasksProjectPage })),
+);
 const NowPage = lazy(() => import('@/pages/now/Now').then((m) => ({ default: m.NowPage })));
 const GoalsPage = lazy(() => import('@/pages/goals/Goals').then((m) => ({ default: m.GoalsPage })));
 const TravelTripsPage = lazy(() =>
@@ -303,6 +309,18 @@ export const routes: RouteEntry[] = [
   { path: '/tasks', element: <TasksTodayPage />, guard: 'confirmed', layout: 'shell' },
   { path: '/tasks/later', element: <TasksLaterPage />, guard: 'confirmed', layout: 'shell' },
   { path: '/tasks/inbox', element: <TasksInboxPage />, guard: 'confirmed', layout: 'shell' },
+  {
+    path: '/tasks/projects',
+    element: <TasksProjectsPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
+  {
+    path: '/tasks/projects/:id',
+    element: <TasksProjectPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
 
   // ── Goals — any confirmed user; the module switch is the only gate ───────
   { path: '/goals', element: <GoalsPage />, guard: 'confirmed', layout: 'shell' },
