@@ -277,7 +277,8 @@ TEST_F(MiAccountApiTest, AnotherXiaomiAccountNeedsAnUnlinkFirst) {
 
 TEST_F(MiAccountApiTest, LinkingAgainReplacesTheTokenAfterReauth) {
     link_directly(kAnna, kXiaomiId);
-    Repositories::MiAccountRepository(kTestKeyB64).mark_reauth_required(kAnna, "upstream_auth");
+    Repositories::MiAccountRepository refused(kTestKeyB64);
+    ASSERT_TRUE(refused.mark_reauth_required(kAnna, "upstream_auth", refused.rotated_at(kAnna).value_or("")));
     EXPECT_EQ(body_of(status(user(kAnna)))["data"]["status"], "reauth_required");
     EXPECT_EQ(body_of(status(user(kAnna)))["data"]["last_error"], "upstream_auth");
 

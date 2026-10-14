@@ -230,17 +230,21 @@ void FitnessController::probe(const HttpRequestPtr& req, std::function<void(cons
     }
 
     Repositories::MiAccountRepository accounts(token_key);
+    // The link as it was loaded; a re-link meanwhile is not undone by this login.
+    std::string fence;
     try {
-        const auto credentials = accounts.load(owner);
-        if (!credentials.has_value()) {
+        const auto loaded = accounts.load_fenced(owner);
+        if (!loaded.has_value()) {
             callback(ErrorResponse::conflict("not_linked", "no Mi account is linked"));
             return;
         }
+        fence = loaded->rotated_at;
 
-        Xiaomi::CloudClient client(
-            Xiaomi::Service::transport(), *credentials, [&accounts, &owner](const Xiaomi::Credentials& rotated) {
-                accounts.store_rotated(owner, rotated);
-            });
+        Xiaomi::CloudClient client(Xiaomi::Service::transport(),
+                                   loaded->credentials,
+                                   [&accounts, &owner, &fence](const Xiaomi::Credentials& rotated) {
+                                       accounts.store_rotated(owner, rotated, fence);
+                                   });
         client.login();
         accounts.mark_ok(owner);
         const auto items = client.fetch_key(key, from, to, std::nullopt);
@@ -255,7 +259,9 @@ void FitnessController::probe(const HttpRequestPtr& req, std::function<void(cons
         // failures. MiFitness*Error messages contain no values by construction.
         spdlog::warn("fitness probe auth failure: {}", e.what());
         try {
-            accounts.mark_reauth_required(owner, "upstream_auth");
+            // An empty fence: the stored token could not be read at all, whatever link is there now.
+            accounts.mark_reauth_required(
+                owner, "upstream_auth", fence.empty() ? accounts.rotated_at(owner).value_or("") : fence);
         } catch (const std::exception& mark_error) {
             spdlog::warn("fitness probe: failed to record the link status: {}", mark_error.what());
         }
@@ -409,30 +415,36 @@ void FitnessController::accountDetectRegion(const HttpRequestPtr& req,
         return;
     }
     Repositories::MiAccountRepository accounts(token_key);
+    // The link as it was loaded; a re-link meanwhile is not undone by this login.
+    std::string fence;
     try {
-        const auto credentials = accounts.load(owner);
-        if (!credentials.has_value()) {
+        const auto loaded = accounts.load_fenced(owner);
+        if (!loaded.has_value()) {
             callback(ErrorResponse::not_found("mi_account"));
             return;
         }
+        fence = loaded->rotated_at;
+        const Xiaomi::Credentials& credentials = loaded->credentials;
         // Detection logs in, and a login must not run next to a sync of the account.
-        if (Repositories::SyncRunRepository().any_running(credentials->user_id)) {
+        if (Repositories::SyncRunRepository().any_running(credentials.user_id)) {
             callback(ErrorResponse::conflict("sync_in_progress", "a sync run is in progress, retry later"));
             return;
         }
         Xiaomi::CloudClient client(
-            Xiaomi::Service::transport(), *credentials, [&accounts, &owner](const Xiaomi::Credentials& rotated) {
-                accounts.store_rotated(owner, rotated);
+            Xiaomi::Service::transport(), credentials, [&accounts, &owner, &fence](const Xiaomi::Credentials& rotated) {
+                accounts.store_rotated(owner, rotated, fence);
             });
         client.login();
         accounts.mark_ok(owner);
         const auto region = Xiaomi::detect_region(client, Fitness::Link::detail::today_utc());
-        accounts.set_region(owner, region.value_or(credentials->region), region.has_value());
+        accounts.set_region(owner, region.value_or(credentials.region), region.has_value());
         callback(Response::ok(json{{"data", account_status_body(owner)}}));
     } catch (const Xiaomi::MiFitnessAuthError& e) {
         spdlog::warn("fitness region detection auth failure: {}", e.what());
         try {
-            accounts.mark_reauth_required(owner, "upstream_auth");
+            // An empty fence: the stored token could not be read at all, whatever link is there now.
+            accounts.mark_reauth_required(
+                owner, "upstream_auth", fence.empty() ? accounts.rotated_at(owner).value_or("") : fence);
         } catch (const std::exception& mark_error) {
             spdlog::warn("fitness region detection: failed to record the link status: {}", mark_error.what());
         }
