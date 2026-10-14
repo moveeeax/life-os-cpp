@@ -24,11 +24,25 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Install helm + yq
+        # Pinned by version AND sha256: the old `curl get-helm-3 | bash`
+        # executed whatever helm's main branch served that minute.
+        env:
+          HELM_VERSION: v3.22.0
+          HELM_SHA256: 1e4ab49e429626cf6c6958d914248b78c9730803c2751b87627e171dc800e7bb
+          YQ_VERSION: v4.44.6
+          YQ_SHA256: 0c2b24e645b57d8e7c0566d18643a6d4f5580feeea3878127354a46f2a1e4598
         run: |
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          sudo curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_amd64
-          sudo chmod +x /usr/local/bin/yq
-      - name: Gate selftest (20 planted breakages must be caught)
+          set -euo pipefail
+          curl -fsSL -o /tmp/helm.tgz "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
+          echo "${HELM_SHA256}  /tmp/helm.tgz" | sha256sum -c -
+          tar -xzf /tmp/helm.tgz -C /tmp linux-amd64/helm
+          sudo install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm
+          curl -fsSL -o /tmp/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
+          echo "${YQ_SHA256}  /tmp/yq" | sha256sum -c -
+          sudo install -m 0755 /tmp/yq /usr/local/bin/yq
+          helm version --short
+          yq --version
+      - name: Gate selftest (21 planted breakages must be caught)
         run: ./scripts/check-selftest.sh
       - name: Module dependency DAG gate
         run: ./scripts/check-module-deps.sh

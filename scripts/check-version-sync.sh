@@ -118,6 +118,44 @@ for chart in life-os-cpp life-os-cpp-worker cpp-frontend cpp-env; do
     fi
 done
 
+# --- docs/openapi.yaml info.version + frontend package version ---------------
+# The spec's info.version sat at 1.0.0 and the SPA's package version at 0.1.0
+# through 26 releases; both now carry the app version. The parsers are anchored
+# on fixed positions (the spec's 2-space `version:` under info:, the
+# package.json top-level key, the lockfile's root entries) so a layout change
+# fails loudly instead of matching something else.
+spec_version="$(awk '/^info:/{i=1; next} i && /^[^ ]/{exit} i && /^  version:/{print $2; exit}' \
+    "$REPO/docs/openapi.yaml" | tr -d '"'"'")"
+pkg_version="$(sed -n 's/^  "version": "\([^"]*\)",$/\1/p' "$REPO/frontend/package.json" | head -1)"
+# package-lock.json: the top-level "version" and packages[""].version.
+lock_versions="$(sed -n -e '3s/^  "version": "\([^"]*\)",$/\1/p' \
+    -e '9s/^      "version": "\([^"]*\)",$/\1/p' "$REPO/frontend/package-lock.json")"
+lock_count=0
+[ -n "$lock_versions" ] && lock_count="$(printf '%s\n' "$lock_versions" | wc -l | tr -d ' ')"
+
+check_point() {
+    # check_point <label> <parsed value>
+    if [ -z "$2" ]; then
+        echo "✗ $1: could not parse the version — the file layout changed under the parser" >&2
+        fail=1
+    elif [ "$2" != "$changelog_version" ]; then
+        echo "✗ version drift: $1 is \"$2\" but the newest CHANGELOG release heading is [$changelog_version]" >&2
+        fail=1
+    fi
+}
+check_point "docs/openapi.yaml info.version" "$spec_version"
+check_point "frontend/package.json version" "$pkg_version"
+if [ "$lock_count" -ne 2 ]; then
+    echo "✗ frontend/package-lock.json: expected the root version on lines 3 and 9, parsed $lock_count" >&2
+    fail=1
+else
+    while IFS= read -r v; do
+        check_point "frontend/package-lock.json root version" "$v"
+    done <<EOF_LOCK
+$lock_versions
+EOF_LOCK
+fi
+
 if [ "$fail" -ne 0 ]; then
     {
         echo ""
@@ -128,4 +166,4 @@ if [ "$fail" -ne 0 ]; then
 fi
 
 echo "✓ version in sync: $cmake_version (CMakeLists.txt == newest CHANGELOG heading" \
-    "== $pin_total helm image-tag pins == 4 Chart.yaml appVersions)"
+    "== $pin_total helm image-tag pins == 4 Chart.yaml appVersions == openapi.yaml == frontend package)"

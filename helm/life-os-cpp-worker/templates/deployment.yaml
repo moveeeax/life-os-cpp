@@ -32,6 +32,68 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       terminationGracePeriodSeconds: {{ .Values.shutdown.terminationGracePeriodSeconds | default 60 }}
+      {{- if .Values.schemaWait.enabled }}
+      # The worker never migrates (DB_MIGRATIONS_ENABLED=false below); the API
+      # release's init container does. Started first, a new worker would run
+      # new code against the old schema. This init container blocks until the
+      # database carries every migration shipped with this version: it runs
+      # the API binary's read-only --verify-migrations (exit 1 while any file
+      # in /app/migrations is missing from schema_migrations) from the API
+      # image of the same tag — the worker image has no API binary and no psql.
+      # A schema NEWER than this image (rolled-back worker) passes.
+      initContainers:
+        - name: wait-for-schema
+          image: "{{ .Values.schemaWait.image.repository }}:{{ .Values.schemaWait.image.tag | default .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              deadline=$(( $(date +%s) + {{ .Values.schemaWait.timeoutSeconds | int }} ))
+              until /app/life_os_cpp --verify-migrations config/config.json; do
+                if [ "$(date +%s)" -ge "$deadline" ]; then
+                  echo "schema still behind this release after {{ .Values.schemaWait.timeoutSeconds | int }}s: upgrade the API release (it migrates) before the worker"
+                  exit 1
+                fi
+                sleep {{ .Values.schemaWait.intervalSeconds | int }}
+              done
+          env:
+            {{- if .Values.externalDatabase.password }}
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "life-os-cpp-worker.fullname" . }}
+                  key: database-password
+            {{- end }}
+            {{- include "life-os-cpp-worker.databaseEnv" . | nindent 12 }}
+            - name: DB_POOL_SIZE
+              value: "1"
+            - name: LOG_LEVEL
+              value: {{ .Values.logging.level | quote }}
+            # One-shot check, nothing to scrape or trace.
+            - name: METRICS_ADDRESS
+              value: ""
+            - name: OTLP_ENDPOINT
+              value: ""
+          {{- with .Values.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml .Values.schemaWait.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+            - name: logs
+              mountPath: /app/logs
+            - name: tmp
+              mountPath: /tmp
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"

@@ -110,44 +110,133 @@ then throws — surfacing as 5xx and high p99.
 
 ## Backups {#backup}
 
-Off by default — set `backup.enabled=true` and point `backup.s3.*` at a bucket.
-The CronJob (`backup-cronjob.yaml`) runs `pg_dump`, gzips it, **verifies the gzip
-(`gunzip -t`) and a non-trivial size before uploading**, so a failed dump aborts
-the Job instead of silently shipping a truncated file. Two alerts watch it (need
-kube-state-metrics): `CppApiBackupJobFailed` (last run failed) and
-`CppApiBackupTooOld` (no success within `monitoring.thresholds.backupMaxAgeSeconds`,
-default 26h).
+Production data lives in the CloudNativePG cluster `postgresql` in namespace
+`db` (PostgreSQL 18, two instances, Longhorn volumes). The cluster is shared:
+it also hosts the databases of tarassov.me and tgw, so every backup and every
+restore below covers all of them, not only `life_os`.
 
-Verify a backup is real, don't just trust the green Job:
+What runs (read off the cluster on 2026-10-14):
+
+- CNPG barman backups to the bucket `s3://tarassov-me-backups/cnpg` on the
+  in-cluster MinIO (`http://minio.minio.svc.cluster.local:9000`), server name
+  `postgresql-oci-k3s`. WAL is archived continuously (gzip); a base backup is
+  taken daily at 00:00 UTC by the ScheduledBackup `scheduled-backup-postgresql`.
+  Retention is 14 days (`retentionPolicy: 14d`), so any point in time inside
+  that window can be restored.
+- The chart's `pg_dump` CronJob (`backup.enabled`, `backup-cronjob.yaml`) is
+  not used in production; it stays off.
+
+The backups are on-cluster. MinIO is a single pod on a Longhorn volume in the
+same k3s cluster, so losing the cluster or its storage loses the database and
+its backups together. This is the owner's decision of 2026-10-14: no
+off-cluster copy for now. Revisit it before storing anything that cannot be
+lost.
+
+Check that backups are real, read-only:
 
 ```sh
-aws s3 ls s3://$BUCKET/ | tail        # a recent, non-tiny object exists
-aws s3 cp s3://$BUCKET/<latest>.sql.gz - | gunzip -t && echo "gzip OK"
+kubectl --context oci-k3s -n db get backups.postgresql.cnpg.io        # one "completed" per day
+kubectl --context oci-k3s -n db get cluster postgresql \
+  -o jsonpath='{.status.firstRecoverabilityPoint}{"  "}{.status.lastSuccessfulBackup}{"\n"}'
 ```
 
-Restore is a deliberate human action — see below. **Do a restore drill** before
-you depend on these backups; an untested backup is a guess.
+The restore below has not been drilled on this cluster yet. Do one into a
+scratch cluster before the backups are needed.
 
 ## Restore Postgres {#restore}
 
-Backups (if `backup.enabled`) are `pg_dump` gzips in the configured S3 bucket
-(`backup-cronjob.yaml`). This is logical backup — no PITR. For PITR move to
-pgBackRest / WAL-G.
+A restore is a deliberate human action. Never restore over the live cluster:
+CNPG recovery always bootstraps a NEW cluster from the barman store, and the
+live one keeps running until you cut over.
 
-```sh
-# 1. Fetch the dump
-aws s3 cp s3://<bucket>/life-os-cpp/appdb-<ts>.sql.gz .
-# 2. Restore into a FRESH database (never over a live one without a maintenance window)
-gunzip -c appdb-<ts>.sql.gz | psql -h <host> -U <user> -d appdb_restore
-# 3. Verify, then cut over (repoint DATABASE_PRIMARY_URL, rolling restart).
-```
+1. Create a recovery cluster next to the live one. It reads the archive of
+   `postgresql-oci-k3s` and must write its own backups under a different server
+   name (or not at all), so it never overwrites the archive it restores from.
+   Copy `instances`, `imageName`, storage and `managed.roles` from the live
+   cluster's spec (`kubectl -n db get cluster postgresql -o yaml`).
 
-Migrations re-run idempotently on boot (advisory-locked), so a restored older
-schema will be brought forward automatically by the next deploy.
+   ```yaml
+   apiVersion: postgresql.cnpg.io/v1
+   kind: Cluster
+   metadata:
+     name: postgresql-restore
+     namespace: db
+   spec:
+     instances: 1
+     imageName: ghcr.io/cloudnative-pg/postgresql:18.3-system-trixie
+     storage:
+       storageClass: longhorn-single
+       size: 10Gi
+     bootstrap:
+       recovery:
+         source: oci-k3s-archive
+         # Optional point in time; without it the newest WAL is replayed.
+         # recoveryTarget:
+         #   targetTime: "2026-10-14 08:00:00+00"
+     externalClusters:
+       - name: oci-k3s-archive
+         barmanObjectStore:
+           destinationPath: s3://tarassov-me-backups/cnpg
+           endpointURL: http://minio.minio.svc.cluster.local:9000
+           serverName: postgresql-oci-k3s
+           s3Credentials:
+             accessKeyId: {name: minio-backups-creds, key: ACCESS_KEY_ID}
+             secretAccessKey: {name: minio-backups-creds, key: ACCESS_SECRET_KEY}
+           wal: {maxParallel: 2}
+   ```
+
+   The live cluster was itself created this way (its `bootstrap.recovery`
+   names the external cluster `talos-nbg1`, server name
+   `postgresql-tarassov-me`), so the procedure is known to work with this
+   bucket.
+
+2. Wait until `kubectl -n db get cluster postgresql-restore` reports a healthy
+   state, then check the data: connect to `postgresql-restore-rw` as `life-os`
+   (as in `deploy/db/README.md`, step 5) and look at the newest rows.
+
+3. Cut over. Two ways, pick by the damage:
+   - Only `life_os` is bad: dump it from the recovery cluster and load it into
+     the live one (`pg_dump -Fc -d life_os` from `postgresql-restore-rw`,
+     `pg_restore --clean --if-exists -d life_os` into `postgresql-rw`) with the
+     API and worker scaled to 0. The other databases stay untouched.
+   - The whole cluster is lost: point `externalDatabase.host` (and
+     `replicaHost`) in the three `deploy/values-*prod.yaml` at
+     `postgresql-restore-rw` / `-ro`, then upgrade in the order below. Give the
+     recovery cluster its own `backup.barmanObjectStore` with a new server name
+     before relying on it.
+
+4. Delete the recovery cluster once it is no longer needed.
+
+Migrations are idempotent and run in the API's init container, so a restored
+older schema is brought forward by the next API rollout.
+
+## Upgrade order {#upgrade-order}
+
+A release is three helm releases, upgraded in this order:
+
+1. API (`life-os-cpp`, `deploy/values-prod.yaml`). Its `migrate` init
+   container applies the new migrations before the new API starts.
+2. Worker (`life-os-cpp-worker`, `deploy/values-worker-prod.yaml`). Its
+   `wait-for-schema` init container runs `life_os_cpp --verify-migrations`
+   from the API image of the same tag every 10 seconds and lets the worker
+   start only when the database carries every migration of that version. If
+   the API was not upgraded first, the worker pod sits in `Init` and fails
+   after 10 minutes (`schemaWait.timeoutSeconds`); upgrade the API and the
+   pod recovers on its next restart.
+3. Frontend (`life-os-cpp-frontend`, `deploy/values-frontend-prod.yaml`), last,
+   so the new SPA never calls routes the API does not serve yet.
+
+The helm commands are in the README ("Kubernetes"). Images come only from
+`release.yml` (tag `v<ver>` on master, CI green on that commit).
 
 ## Roll back a release {#rollback}
 
-- k8s: `helm rollback life-os-cpp <REVISION>` (`helm history life-os-cpp`).
-- Images are tagged `vX.Y.Z` in GHCR; pin the previous tag if needed.
+- k8s: `helm rollback <release> <REVISION>` (`helm history <release>`) for
+  each of `life-os-cpp`, `life-os-cpp-worker`, `life-os-cpp-frontend`; roll
+  back in the reverse order: frontend, worker, API.
+- Images are tagged with the unprefixed version (`1.26.0`) in GHCR; pin the
+  previous tag if needed.
 - Migrations are forward-only — a rollback of the app does NOT revert schema.
-  If a migration is the problem, write a new forward migration that fixes it.
+  An older worker still passes `wait-for-schema` (a newer schema satisfies
+  it). If a migration is the problem, write a new forward migration that
+  fixes it.

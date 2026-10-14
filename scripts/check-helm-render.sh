@@ -78,9 +78,8 @@ printf '%s' "$workloads" | grep -qi jaeger && fail "values-minimal still renders
 #    it. Render the REAL prod releases — the values files under deploy/ that the
 #    cluster runs (namespace life-os, releases life-os-cpp, life-os-cpp-worker,
 #    life-os-cpp-frontend) — with their charts, and assert the security-critical
-#    env the API pod actually gets. The values-prod.example.yaml overlays are
-#    examples only; nothing deploys from them, so asserting on them proved
-#    nothing about prod.
+#    env the API pod actually gets. These deploy/ files are the only prod
+#    overlays in the repo.
 API_CHART="$ROOT/helm/life-os-cpp"
 WORKER_CHART="$ROOT/helm/life-os-cpp-worker"
 FRONTEND_CHART="$ROOT/helm/cpp-frontend"
@@ -148,6 +147,17 @@ assert_no_secret_credentials() {
 assert_no_secret_credentials "life-os-cpp + deploy/values-prod.yaml" "$PROD_RENDERED"
 assert_no_secret_credentials "life-os-cpp-worker + deploy/values-worker-prod.yaml" "$WORKER_RENDERED"
 assert_no_secret_credentials "cpp-frontend + deploy/values-frontend-prod.yaml" "$FRONTEND_RENDERED"
+
+# 9. The prod worker must wait for the schema of its own version: the API
+#    release migrates, and a worker started first would run new code against
+#    the old schema. The init container runs the API image (the worker image
+#    has no API binary) at the worker's tag.
+worker_tag="$(printf '%s' "$WORKER_RENDERED" |
+    yq 'select(.kind=="Deployment") | .spec.template.spec.containers[0].image' | sed 's/.*://')"
+wait_image="$(printf '%s' "$WORKER_RENDERED" |
+    yq 'select(.kind=="Deployment") | .spec.template.spec.initContainers[] | select(.name=="wait-for-schema") | .image')"
+[ "$wait_image" = "ghcr.io/moveeeax/life-os-cpp:$worker_tag" ] ||
+    fail "deploy/values-worker-prod.yaml: wait-for-schema init container image is '$wait_image', want the API image at the worker tag (ghcr.io/moveeeax/life-os-cpp:$worker_tag)"
 
 echo "==> helm template (umbrella, chart defaults) + committed-credential assertion"
 DEFAULT_RENDERED="$(helm template env-smoke "$CHART")"

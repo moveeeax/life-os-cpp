@@ -23,8 +23,10 @@ limits, idempotency keys, the job queue).
 Feature modules are compiled in always and switched at runtime. Each has a
 `Core::<name>_enabled()` switch in `src/core/Modules.hpp` that reads the
 config (`<name>.enabled`, env `<NAME>_ENABLED`, default off): `billing`,
-`fitness`, `workout`, `food`, `money`, `tasks`, `goals` and `now` (the Now
-screen, with the wallpaper and sound library behind it). A disabled module
+`fitness`, `workout`, `food`, `money`, `tasks`, `goals`, `now` (the Now
+screen, with the wallpaper and sound library behind it), `travel`, `habits`
+and `notes`. Projects and learning have no switch of their own: projects
+(courses are projects of kind course) are part of `tasks`. A disabled module
 answers 404 from its handlers. There are no plugins, no `dlopen`, no per-feature deployables.
 A single program keeps one init/shutdown lifecycle, whole-program sanitizers
 and LTO, and one chart per binary.

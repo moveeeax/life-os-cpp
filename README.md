@@ -20,7 +20,17 @@ heading in [`CHANGELOG.md`](CHANGELOG.md).
 - Accounts and admin: register, login, email confirm, password reset, email change, invites, user and role management, audit log (`GET /api/v1/admin/audit`).
 - Background jobs: Redis queue, retries (`JOBS_MAX_RETRIES`, optional exponential backoff), dead-letter queue per job type, served by a second binary (`life_os_cpp_worker`).
 - Billing: PayPal top-ups into a credit wallet with an append-only ledger, admin packages, settings, payments and metrics.
-- Fitness: Mi Fitness sync into Postgres and read routes under `/api/v1/fitness/*` (see below).
+- Life modules, each behind its own switch (`<NAME>_ENABLED`, default off; a switched-off module answers 404):
+  - fitness: Mi Fitness sync into Postgres per linked Xiaomi account, read routes under `/api/v1/fitness/*` (see below);
+  - workout: an exercise library, routines and logged sessions, matched with the band's workouts (`/api/v1/workout`);
+  - food: products, a meal diary, daily goals from the profile and the scale, Open Food Facts lookup, an LLM parse of typed meals (`/api/v1/food`);
+  - money: accounts, a multi-currency ledger, transfers, budgets, reports per currency, daily rates, an LLM parse and a weekly advisor (`/api/v1/money`);
+  - tasks: personal tasks with areas and an agenda, an inbox, an LLM parse of a phrase (`/api/v1/tasks`); projects group tasks (`/api/v1/tasks/projects`), and learning shows courses, which are projects of kind course;
+  - goals: four kinds of goals with progress and pace, check-ins, sections and milestones (`/api/v1/goals`);
+  - now: the Now screen's day digest in one call (`/api/v1/today`), the focus of the day, the wallpaper and focus-sound library (`/api/v1/wallpapers`, `/api/v1/sounds`);
+  - travel: border crossings and day counters (Schengen 90/180, tax residency), trips with flights and stays, family documents (`/api/v1/travel`);
+  - habits: daily or N-a-week habits ticked by hand or from data, with streaks (`/api/v1/habits`);
+  - notes: private Markdown notes with blog-post fields (`/api/v1/notes`).
 - Observability: Prometheus metrics on `:9090`, OpenTelemetry traces over OTLP HTTP, W3C `traceparent` in and `X-Request-Id` out, structured logs.
 - React SPA in `frontend/`, built to its own nginx image.
 - Docker compose stack in `docker/`, Helm charts in `helm/`, cluster values in `deploy/`.
@@ -148,15 +158,19 @@ note is in `docs/fitness/`.
 ## Repo layout
 
 ```
-src/            api/ (controllers, Endpoints.hpp registry, middleware), billing/, cache/, core/,
-                database/, domain/, email/, fitness/, jobs/, messaging/, observability/,
-                repositories/, security/, tasks/, utils/, webhooks/, main.cpp, worker_main.cpp
+src/            api/ (controllers, Endpoints.hpp registry, middleware), core/ (init, Modules.hpp
+                switches), database/, cache/, repositories/, domain/, security/, jobs/, llm/,
+                net/, storage/, email/, webhooks/, messaging/, observability/, utils/,
+                module code: billing/, fitness/, food/, money/, tasks/, goals/, now/, travel/,
+                habits/, notes/ (workout and projects live in api/ + repositories/),
+                main.cpp, worker_main.cpp
 tests/          unit/, integration/, api/, e2e/, fitness/, fuzz/
 migrations/     NNN_<slug>.sql, applied in order on boot or via --run-migrations
 config/         config.json, worker.json, config.production.json, bench/
 docker/         Dockerfile, docker-compose.yml, .env.* presets, Prometheus and Grafana config
 helm/           life-os-cpp, life-os-cpp-worker, cpp-frontend, cpp-env umbrella
-deploy/         values for the owner's cluster: values-prod.yaml, values-worker-prod.yaml, db/
+deploy/         values for the owner's cluster: values-prod.yaml, values-worker-prod.yaml,
+                values-frontend-prod.yaml, module ConfigMaps, db/
 frontend/       React SPA (Vite, TypeScript, Tailwind, TanStack Query), Dockerfile, nginx.conf
 scripts/        make-jwt.sh, smoke.sh, bench.sh, scaffolds (new-*.sh), CI gates (check-*.sh)
 docs/           openapi.yaml, CONFIG.md, TESTING.md, RUNBOOK.md, CONVENTIONS.md, SLO.md, ARCHITECTURE.md, fitness/
@@ -207,8 +221,9 @@ namespace `life-os`, as three helm releases. Their values live in `deploy/`:
 (`life-os-cpp-frontend`). External CNPG Postgres and Redis, secrets through
 `extraEnvFrom`; `deploy/db/` documents the database and role setup,
 `deploy/sync-tuning-configmap.yaml` holds the fitness sync knobs. There is
-no stage environment. Each chart also ships a secret-free
-`values-prod.example.yaml` to copy from.
+no stage environment. Upgrade the releases in the order below, API, worker,
+frontend: the API migrates, and the worker waits in an init container until
+the schema of its version is there (`docs/RUNBOOK.md`, "Upgrade order").
 
 ```bash
 make helm-lint        # helm lint + template over every chart
@@ -222,8 +237,10 @@ helm --kube-context oci-k3s upgrade --install life-os-cpp-frontend ./helm/cpp-fr
 ```
 
 Release images are multi-arch (`linux/amd64` and `linux/arm64`), built
-natively per architecture by `release.yml` on `v*` tags and promoted only
-after a Trivy scan. Prod runs only these images. Alerts and what to do when they fire are in
+natively per architecture by `release.yml` on `v*` tags. The workflow
+refuses a tag that is not on `master` or whose commit has no green CI run,
+and promotes the images only after a Trivy scan and cosign signing. Prod
+runs only these images. Alerts and what to do when they fire are in
 [`docs/RUNBOOK.md`](docs/RUNBOOK.md); the production hardening checklist is in
 [`SECURITY.md`](SECURITY.md).
 
