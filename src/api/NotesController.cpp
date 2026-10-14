@@ -44,6 +44,17 @@ constexpr std::size_t kBodyMax = 200000;
 constexpr int kDefaultLimit = 50;
 constexpr int kMaxLimit = 200;
 
+bool parse_object(const HttpRequestPtr& req, json& body, NotesController::Callback& callback) {
+    if (!Validation::parse_body(req, body, callback)) {
+        return false;
+    }
+    if (!body.is_object()) {
+        callback(ErrorResponse::bad_request("invalid_body", "the body must be a JSON object"));
+        return false;
+    }
+    return true;
+}
+
 bool require_user(const std::string& owner, const NotesController::Callback& callback) {
     if (is_valid_uuid(owner)) {
         return true;
