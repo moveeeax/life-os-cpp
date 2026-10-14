@@ -456,10 +456,16 @@ jobs:
           docker network create smoke
           docker run -d --name smoke-pg --network smoke \
             -e POSTGRES_USER=app -e POSTGRES_PASSWORD=smoke -e POSTGRES_DB=app postgres:15-alpine
-          for _ in $(seq 1 60); do
-            docker exec smoke-pg pg_isready -U app -d app >/dev/null 2>&1 && break
+          # The image's entrypoint first starts a temporary server for the init
+          # scripts, stops it, then starts the real one: pg_isready answers the
+          # temporary server too, and the connection right after it was refused.
+          # The real server is the second "ready to accept connections" line.
+          for _ in $(seq 1 90); do
+            ready=$(docker logs smoke-pg 2>&1 | grep -c 'database system is ready to accept connections' || true)
+            [ "$ready" -ge 2 ] && docker exec smoke-pg pg_isready -U app -d app >/dev/null 2>&1 && break
             sleep 1
           done
+          docker exec smoke-pg pg_isready -U app -d app
           app() {
             docker run --rm --network smoke \
               -e DATABASE_HOST=smoke-pg -e DATABASE_USER=app -e DATABASE_PASSWORD=smoke \
