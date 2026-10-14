@@ -269,6 +269,7 @@ public:
         "food_items",        "food_goals",       "food_parse_jobs",  "day_focus",
         "travel_trip_items", "travel_trips",     "travel_rules",     "travel_crossings",
         "travel_settings",   "travel_documents", "now_settings",     "day_note",
+        "habit_checks",      "habits",
     };
 
     /**

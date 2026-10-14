@@ -273,6 +273,9 @@
   "travel": {
     "enabled": "${TRAVEL_ENABLED:-false}"
   },
+  "habits": {
+    "enabled": "${HABITS_ENABLED:-false}"
+  },
   "worker": {
     "id": "worker-1",
     "types": [

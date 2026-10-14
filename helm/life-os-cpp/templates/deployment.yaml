@@ -224,6 +224,9 @@ spec:
             # travel module — master switch
             - name: TRAVEL_ENABLED
               value: {{ .Values.travel.enabled | quote }}
+            # habits module — master switch
+            - name: HABITS_ENABLED
+              value: {{ .Values.habits.enabled | quote }}
             # now module — master switch
             - name: NOW_ENABLED
               value: {{ .Values.now.enabled | quote }}

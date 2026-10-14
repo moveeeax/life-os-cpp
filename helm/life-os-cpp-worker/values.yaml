@@ -199,6 +199,12 @@ travel:
   enabled: false
 
 # ---------------------------------------------------------------
+# habits module — keep in sync with the life-os-cpp chart. Env var set: HABITS_ENABLED
+# ---------------------------------------------------------------
+habits:
+  enabled: false
+
+# ---------------------------------------------------------------
 # now module — keep in sync with the life-os-cpp chart. Env var set: NOW_ENABLED
 # ---------------------------------------------------------------
 now:
