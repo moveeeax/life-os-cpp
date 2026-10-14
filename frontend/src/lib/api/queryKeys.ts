@@ -95,7 +95,8 @@ export const qk = {
   tasks: {
     all: () => ['tasks'] as const,
     agenda: (date: string, tz: string) => ['tasks', 'agenda', date, tz] as const,
-    notes: (status: string) => ['tasks', 'notes', status] as const,
+    /** The inbox of Tasks (thoughts that are not tasks yet); the API calls them notes. */
+    inbox: (status: string) => ['tasks', 'inbox', status] as const,
     status: () => ['tasks', 'status'] as const,
     projects: (kind: string) => ['tasks', 'projects', kind] as const,
     project: (id: string) => ['tasks', 'project', id] as const,

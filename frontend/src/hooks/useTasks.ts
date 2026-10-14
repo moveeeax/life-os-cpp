@@ -61,9 +61,10 @@ export function useAgenda(date: string, tz: string) {
   });
 }
 
-export function useNotes(status: 'inbox' | 'archived' = 'inbox') {
+/** The inbox of Tasks; the API path stays /tasks/notes. */
+export function useInbox(status: 'inbox' | 'archived' = 'inbox') {
   return useQuery({
-    queryKey: qk.tasks.notes(status),
+    queryKey: qk.tasks.inbox(status),
     queryFn: async ({ signal }) =>
       (await api.getJson<{ data: TaskNote[] }>(`${BASE}/notes`, { query: { status }, signal }))
         .data,
