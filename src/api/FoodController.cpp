@@ -654,10 +654,9 @@ void FoodController::parseStart(const HttpRequestPtr& req, Callback&& callback) 
     Repositories::ParseJobRepository repo;
     std::string id;
     // The worker may run with another retry limit; the job carries the one it was submitted with.
+    const int max_attempts = Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries;
     const auto payload = [&](const std::string& job_id) {
-        return json{{"job_id", job_id},
-                    {"owner_id", owner},
-                    {"max_attempts", Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries}};
+        return json{{"job_id", job_id}, {"owner_id", owner}, {"max_attempts", max_attempts}};
     };
     // The job rides the row's transaction as an outbox row when a drain is configured
     // (Jobs::Outbox::enqueue_if_drained): a crash after the commit cannot leave the row

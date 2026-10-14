@@ -460,7 +460,7 @@ jobs:
         run: |
           docker network create smoke
           docker run -d --name smoke-pg --network smoke \
-            -e POSTGRES_USER=app -e POSTGRES_PASSWORD=smoke -e POSTGRES_DB=app postgres:15-alpine
+            -e POSTGRES_USER=app -e POSTGRES_PASSWORD=smoke -e POSTGRES_DB=app postgres:18-alpine
           # The image's entrypoint first starts a temporary server for the init
           # scripts, stops it, then starts the real one: pg_isready answers the
           # temporary server too, and the connection right after it was refused.

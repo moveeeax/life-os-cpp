@@ -23,6 +23,14 @@ command -v yq >/dev/null 2>&1 || {
     echo "yq not installed — brew install yq"
     exit 1
 }
+# Two unrelated tools answer to `yq`: mikefarah/yq (Go, the one every query
+# below is written for) and the Python jq wrapper, whose syntax differs and
+# whose every `select(...)` here would error out or print nothing — a false
+# FAIL at best, a silent pass of a broken render at worst.
+yq --version 2>/dev/null | grep -q mikefarah || {
+    echo "yq is not mikefarah/yq (got: $(yq --version 2>&1 | head -1)) — install https://github.com/mikefarah/yq (brew install yq; the Python 'yq' package is a different tool)"
+    exit 1
+}
 
 echo "==> helm dependency build (re-vendor subcharts)"
 helm dependency build "$CHART" >/dev/null
@@ -118,6 +126,87 @@ penv() {
 for s in DATABASE_PASSWORD JWT_SECRET; do
     [ -z "$(penv "$s")" ] || fail "deploy/values-prod.yaml: $s carries a plaintext value — pass it via --set / external-secrets, never a tracked overlay"
 done
+
+# 7b. The rest of the production floor. Production is invite-only, the
+#     boot-time guard must be armed, the docs UI off (env AND the rendered
+#     config.json, the two places the binary reads), HSTS on.
+[ "$(penv REGISTRATION_OPEN)" = "false" ] ||
+    fail "deploy/values-prod.yaml: REGISTRATION_OPEN != false (self sign-up is open; production is invite-only). Set registration.open=false."
+[ "$(penv APP_ENV)" = "production" ] ||
+    fail "deploy/values-prod.yaml: APP_ENV != production (the boot-time prod guard that refuses auth.mode=none is disarmed). Set app.env=production."
+docs_env="$(penv DOCS_ENABLED)"
+[ -z "$docs_env" ] || [ "$docs_env" = "false" ] ||
+    fail "deploy/values-prod.yaml: DOCS_ENABLED=$docs_env (the Swagger UI would be public). Set docs.enabled=false."
+prod_cfg="$(printf '%s' "$PROD_RENDERED" | yq 'select(.kind=="ConfigMap" and .data."config.json" != null) | .data."config.json"')"
+[ -n "$prod_cfg" ] || fail "life-os-cpp render has no ConfigMap with config.json — the chart layout changed, update this script"
+[ "$(printf '%s' "$prod_cfg" | yq '.docs.enabled')" = "false" ] ||
+    fail "deploy/values-prod.yaml: rendered config.json has docs.enabled != false (the Swagger UI would be public). Set docs.enabled=false."
+[ "$(printf '%s' "$prod_cfg" | yq '.security.hsts')" = "true" ] ||
+    fail "deploy/values-prod.yaml: rendered config.json has security.hsts != true. Set security.hsts=true."
+
+# 7c. The worker's processing lease. With 0 a job whose pod was killed stays
+#     in its Redis processing list forever; the lease returns it to the queue.
+#     And the id of that list must be the pod name, or two replicas (or a
+#     replaced pod) share one list.
+wenv() {
+    printf '%s' "$WORKER_RENDERED" |
+        yq "select(.kind==\"Deployment\") | .spec.template.spec.containers[0].env[] | select(.name==\"$1\") | .value"
+}
+lease="$(wenv JOBS_VISIBILITY_TIMEOUT_SEC)"
+case "$lease" in
+'' | *[!0-9]*) fail "deploy/values-worker-prod.yaml: JOBS_VISIBILITY_TIMEOUT_SEC is not rendered as an integer on the worker (got '$lease'). Set jobs.visibilityTimeoutSec=300." ;;
+esac
+[ "$lease" -gt 0 ] ||
+    fail "deploy/values-worker-prod.yaml: JOBS_VISIBILITY_TIMEOUT_SEC is 0 — the processing lease is off, a job whose worker pod is killed stays 'processing' forever. Set jobs.visibilityTimeoutSec=300."
+worker_id_src="$(printf '%s' "$WORKER_RENDERED" |
+    yq 'select(.kind=="Deployment") | .spec.template.spec.containers[0].env[] | select(.name=="WORKER_ID") | .valueFrom.fieldRef.fieldPath')"
+[ "$worker_id_src" = "metadata.name" ] ||
+    fail "deploy/values-worker-prod.yaml: WORKER_ID is not the pod name (valueFrom fieldRef metadata.name) — replicas would share one processing list. Leave worker.id empty."
+
+# 7d. No pod may mount a ServiceAccount token: nothing here talks to the
+#     Kubernetes API, and a mounted token is a credential for anyone who gets
+#     code execution in the container. Every Deployment of the three prod
+#     releases, and both CronJobs of the API chart (rendered with them on,
+#     since production keeps them off).
+assert_no_sa_token() {
+    local label="$1" manifests="$2" bad
+    bad="$(printf '%s' "$manifests" |
+        yq 'select(.kind=="Deployment" and .spec.template.spec.automountServiceAccountToken != false) | .metadata.name' | grep -v '^---$' | grep . || true)"
+    [ -z "$bad" ] || fail "$label: Deployment(s) without automountServiceAccountToken: false in the pod spec: $(printf '%s' "$bad" | paste -sd' ' -)"
+    bad="$(printf '%s' "$manifests" |
+        yq 'select(.kind=="CronJob" and .spec.jobTemplate.spec.template.spec.automountServiceAccountToken != false) | .metadata.name' | grep -v '^---$' | grep . || true)"
+    [ -z "$bad" ] || fail "$label: CronJob(s) without automountServiceAccountToken: false in the pod spec: $(printf '%s' "$bad" | paste -sd' ' -)"
+}
+assert_no_sa_token "life-os-cpp + deploy/values-prod.yaml" "$PROD_RENDERED"
+assert_no_sa_token "life-os-cpp-worker + deploy/values-worker-prod.yaml" "$WORKER_RENDERED"
+assert_no_sa_token "cpp-frontend + deploy/values-frontend-prod.yaml" "$FRONTEND_RENDERED"
+
+echo "==> helm template (prod API + backups + monitoring on) + CronJob / PrometheusRule assertions"
+PROD_FULL="$(helm template life-os-cpp "$API_CHART" -n life-os -f "$PROD_API_VALUES" \
+    --set backup.enabled=true --set backup.s3.bucket=render-check \
+    --set backupMirror.enabled=true --set backupMirror.source.credentialsSecret.name=render-src \
+    --set backupMirror.destination.bucket=render-check --set backupMirror.destination.credentialsSecret.name=render-dst \
+    --set serviceMonitor.enabled=true --set monitoring.alertsEnabled=true --set monitoring.jobsAlerts=true)"
+cronjobs="$(printf '%s' "$PROD_FULL" | yq 'select(.kind=="CronJob") | .metadata.name' | grep -v '^---$' | grep -c . || true)"
+[ "$cronjobs" = "2" ] || fail "expected the backup and backup-mirror CronJobs to render with backup.enabled / backupMirror.enabled (got $cronjobs CronJob(s))"
+assert_no_sa_token "life-os-cpp + backups on" "$PROD_FULL"
+# The alert set is gated behind the CRD flags in production, so this is the
+# only render that proves the PrometheusRule template still compiles and
+# carries the names docs/SLO.md and docs/RUNBOOK.md refer to.
+alerts="$(printf '%s' "$PROD_FULL" | yq 'select(.kind=="PrometheusRule") | .spec.groups[].rules[].alert')"
+for a in High5xxRate HighP99Latency DeadLetterQueueGrowing JobsQueueBacklog DbPoolSaturationHigh ApiTargetDown; do
+    printf '%s\n' "$alerts" | grep -qx "$a" || fail "PrometheusRule lost the alert $a (docs/SLO.md names it)"
+done
+[ "$(printf '%s' "$PROD_FULL" | yq 'select(.kind=="ServiceMonitor") | .metadata.name' | grep -v '^---$' | grep -c . || true)" = "1" ] ||
+    fail "serviceMonitor.enabled=true did not render exactly one ServiceMonitor"
+
+# 7e. The NetworkPolicy of the API pods is part of the production floor:
+#     deploy/values-prod.yaml enables it, and its egress must keep Postgres.
+np_count="$(printf '%s' "$PROD_RENDERED" | yq 'select(.kind=="NetworkPolicy") | .metadata.name' | grep -v '^---$' | grep -c . || true)"
+[ "$np_count" = "1" ] ||
+    fail "deploy/values-prod.yaml: no NetworkPolicy rendered for the API pods — networkPolicy.enabled must stay true (got $np_count)."
+printf '%s' "$PROD_RENDERED" | yq 'select(.kind=="NetworkPolicy") | .spec.egress[].ports[].port' | grep -qx 5432 ||
+    fail "deploy/values-prod.yaml: the NetworkPolicy egress has no rule for Postgres (5432) — the pods could not reach the database."
 
 # 8. …but that env check can only ever see the plain `.value` path, and every
 #    credential in these charts reaches the container via secretKeyRef — the

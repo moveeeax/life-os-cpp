@@ -493,10 +493,10 @@ void TasksController::parse(const HttpRequestPtr& req, Callback&& callback) {
     const auto note_id = Validation::opt_string(body, "note_id");
     Repo::ParseJobRepository repo;
     std::string id;
+    // The job carries the retry limit it was submitted with.
+    const int max_attempts = Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries;
     const auto payload = [&](const std::string& job_id) {
-        return json{{"job_id", job_id},
-                    {"owner_id", owner},
-                    {"max_attempts", Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries}};
+        return json{{"job_id", job_id}, {"owner_id", owner}, {"max_attempts", max_attempts}};
     };
     // The job rides the row's transaction as an outbox row when a drain is configured
     // (Jobs::Outbox::enqueue_if_drained): a crash after the commit cannot leave the row

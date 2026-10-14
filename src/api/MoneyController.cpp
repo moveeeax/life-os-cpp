@@ -1225,10 +1225,10 @@ void start_parse(const std::string& owner, MoneyController::Callback& callback, 
     }
     Repo::ParseJobRepository repo;
     std::string id;
+    // The job carries the retry limit it was submitted with.
+    const int max_attempts = Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries;
     const auto payload = [&](const std::string& job_id) {
-        return json{{"job_id", job_id},
-                    {"owner_id", owner},
-                    {"max_attempts", Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries}};
+        return json{{"job_id", job_id}, {"owner_id", owner}, {"max_attempts", max_attempts}};
     };
     // The job rides the row's transaction as an outbox row when a drain is configured
     // (Jobs::Outbox::enqueue_if_drained): a crash after the commit cannot leave the row
@@ -1472,12 +1472,12 @@ void MoneyController::advisorRun(const HttpRequestPtr& req, Callback&& callback)
         bool via_outbox = false;
         const auto [row, queued] = Repo::AdvisorReportRepository().create_or_get(
             owner, period, range.from, range.to, [&](auto& txn, const std::string& report_id) {
-                via_outbox = Jobs::Outbox::enqueue_if_drained(
-                    txn,
-                    Jobs::MoneyAdvisor::kJobType,
-                    json{{"report_id", report_id},
-                         {"owner_id", owner},
-                         {"max_attempts", Jobs::get().default_max_retries()}});
+                via_outbox =
+                    Jobs::Outbox::enqueue_if_drained(txn,
+                                                     Jobs::MoneyAdvisor::kJobType,
+                                                     json{{"report_id", report_id},
+                                                          {"owner_id", owner},
+                                                          {"max_attempts", Jobs::get().default_max_retries()}});
             });
         if (queued && !via_outbox && !Jobs::MoneyAdvisor::submit_review(row["id"].get<std::string>(), owner)) {
             callback(ErrorResponse::service_unavailable("queue_unavailable"));

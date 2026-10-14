@@ -85,7 +85,7 @@ Set `CONFIG_FILE` to point at a different JSON file (e.g.
 | `SECURITY_CSRF_ENABLED` | `security.csrf.enabled` | bool | `false` | Double-submit CSRF check for cookie-auth mutations; production config validation warns if cookie auth is on without it |
 | `SECURITY_CSRF_COOKIE` | `security.csrf.cookie_name` | string | `csrf-token` | Readable (non-HttpOnly) cookie the SPA mirrors |
 | `SECURITY_CSRF_HEADER` | `security.csrf.header_name` | string | `X-CSRF-Token` | Header the mirrored token must arrive in |
-| `SECURITY_HSTS` | `security.hsts` | bool | `false` | Emit `Strict-Transport-Security` (only makes sense behind TLS) |
+| `SECURITY_HSTS` | `security.hsts` | bool | `false` | Emit `Strict-Transport-Security` (only makes sense behind TLS). Helm: `security.hsts`; production sets `true` |
 | `SECURITY_HSTS_MAX_AGE` | `security.hsts_max_age` | int | `31536000` | `max-age` in seconds (1 year) |
 
 ## Idempotency
@@ -102,7 +102,7 @@ Set `CONFIG_FILE` to point at a different JSON file (e.g.
 
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
-| `DOCS_ENABLED` | `docs.enabled` | bool | `false` | Mount `/api/v1/docs` + `/api/v1/openapi.yaml` — dev only |
+| `DOCS_ENABLED` | `docs.enabled` | bool | `false` | Mount `/api/v1/docs` + `/api/v1/openapi.yaml` — dev only. Helm: `docs.enabled`; `scripts/check-helm-render.sh` refuses a production render with it on |
 | `DOCS_OPENAPI_PATH` | `docs.openapi_path` | string | `docs/openapi.yaml` | Path served at `/api/v1/openapi.yaml` |
 
 ## Observability
@@ -179,10 +179,10 @@ For URL components: `REDIS_HOST`, `REDIS_PORT`.
 | `JOBS_MAX_RETRIES` | `jobs.max_retries` | int | `3` | |
 | `JOBS_RETRY_BACKOFF_BASE_MS` | `jobs.retry_backoff_base_ms` | int | `2000` | Delay before a failed job is retried (exponential, capped by the max below). `0` brings back the immediate requeue, which lets a job spend its retries within milliseconds |
 | `JOBS_RETRY_BACKOFF_MAX_MS` | `jobs.retry_backoff_max_ms` | int | `60000` | Cap on the retry backoff |
-| `JOBS_VISIBILITY_TIMEOUT_SEC` | `jobs.visibility_timeout_sec` | int | `0` | Processing lease: a job whose worker dies is re-queued after this many seconds. `0` disables leases (legacy behaviour) |
+| `JOBS_VISIBILITY_TIMEOUT_SEC` | `jobs.visibility_timeout_sec` | int | `0` | Processing lease: a job whose worker dies is re-queued after this many seconds. `0` disables leases (legacy behaviour). Helm: `jobs.visibilityTimeoutSec` on the worker chart; production sets `300` (`deploy/values-worker-prod.yaml`) |
 | `JOBS_DLQ_METRIC_REFRESH_SEC` | `jobs.dlq_metric_refresh_sec` | int | `10` | Exports `jobs_dlq_depth{type="..."}` plus an aggregate `type="_total"` |
 | `JOBS_QUEUE_METRIC_REFRESH_SEC` | `jobs.queue_metric_refresh_sec` | int | `10` | Same bookkeeping for the waiting queue: `jobs_queue_depth{type="..."}` plus `type="_total"` |
-| `OUTBOX_DRAIN_INTERVAL_SEC` | `outbox.drain_interval_sec` | int | `0` | Transactional outbox (`src/jobs/Outbox.hpp`): how often the API pod relays `outbox` table rows to the job queue. `0` (default) disables draining — the pattern is opt-in; rows written via `Outbox::enqueue` sit in Postgres until a deploy enables this. Needs `jobs.enabled=true`. |
+| `OUTBOX_DRAIN_INTERVAL_SEC` | `outbox.drain_interval_sec` | int | `0` | Transactional outbox (`src/jobs/Outbox.hpp`): how often the API pod relays `outbox` table rows to the job queue. `0` (default) disables draining — the pattern is opt-in; rows written via `Outbox::enqueue` sit in Postgres until a deploy enables this. Needs `jobs.enabled=true`. Helm: `outbox.drainIntervalSec` on the API chart; production sets `5` (`deploy/values-prod.yaml`) |
 | `DB_REPLICA_LAG_METRIC_REFRESH_SEC` | `database.replica_lag_metric_refresh_sec` | int | `15` | Refresh interval for the `db_replica_lag_seconds` gauge. Only registered when read replicas are configured (primary has no replay timestamp). |
 
 ## Billing module
@@ -298,7 +298,7 @@ outage can never affect the money path.
 
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
-| `WORKER_ID` | `worker.id` | string | `worker-1` | |
+| `WORKER_ID` | `worker.id` | string | `worker-1` | Names the Redis processing list of this instance. Helm: the pod name (`metadata.name`) unless `worker.id` is set, so replicas never share a list |
 | `WORKER_TYPES` | `worker.types` | csv | all registered handler types | Queues the worker pulls from. Unset (prod leaves it unset) → every type with a registered handler. The nine handlers this binary registers: `account_email`, `email.send`, `webhook.deliver`, `fitness_sync`, `food_parse`, `money_parse`, `money_rates`, `money_advisor`, `tasks_parse`. When you DO set it, a type left out piles up undrained: the compose stack lists all nine, `config.json` ships `default` (no handler of that name; the startup guard warns). |
 | `WORKER_STRICT_TYPES` | `worker.strict_types` | bool | `false` | A `WORKER_TYPES` entry without a registered handler logs a warning; `true` upgrades it to a refusal to start |
 | `WORKER_CONCURRENCY` | `worker.concurrency` | int | `2` | |

@@ -16,5 +16,8 @@
 - [ ] No new auth bypass paths
 - [ ] Input validated at the API boundary
 
+## Migrations
+- [ ] Every migration works under the previous binary (expand only; a destructive step waits for the next release, `migrations/README.md`)
+
 ## Breaking changes
 <!-- List config keys / HTTP routes / response shapes that changed. Delete if none. -->

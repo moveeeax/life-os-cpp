@@ -440,7 +440,7 @@ TEST_F(TasksParseOutboxApiTest, WithADrainTheJobRidesTheRowsTransaction) {
     EXPECT_EQ(rows[0]["payload"]["owner_id"], kAnna);
     EXPECT_EQ(rows[0]["payload"]["max_attempts"], Jobs::get().default_max_retries());
 
-    // A refused note rolls the row and its event back together.
+    // A refused note leaves no row and no event behind.
     const auto refused = call_json(&Api::TasksController::parse,
                                    user(kAnna),
                                    json{{"text", "x"}, {"note_id", "55555555-5555-4555-8555-555555555555"}});
