@@ -44,6 +44,17 @@ const std::vector<std::string> kAllStatuses = {"planned", "active", "paused", "d
 const std::regex kCode("^[a-z0-9-]{1,24}$");
 constexpr std::size_t kCodeMax = 24;
 
+bool parse_object(const HttpRequestPtr& req, json& body, ProjectsController::Callback& callback) {
+    if (!Validation::parse_body(req, body, callback)) {
+        return false;
+    }
+    if (!body.is_object()) {
+        callback(ErrorResponse::bad_request("invalid_body", "the body must be a JSON object"));
+        return false;
+    }
+    return true;
+}
+
 bool require_user(const std::string& owner, const ProjectsController::Callback& callback) {
     if (is_valid_uuid(owner)) {
         return true;
