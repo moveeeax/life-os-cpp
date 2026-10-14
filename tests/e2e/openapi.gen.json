@@ -1912,6 +1912,385 @@
      null
     ]
    },
+   "Note": {
+    "type": "object",
+    "required": [
+     "id",
+     "slug",
+     "title",
+     "summary",
+     "status",
+     "topic",
+     "tags",
+     "project_id",
+     "task_id",
+     "project_title",
+     "project_kind",
+     "published_at",
+     "created_at",
+     "updated_at"
+    ],
+    "description": "A private Markdown note with the fields of a tarassov.me blog post (slug, title, summary, body, status, topic, tags, published_at); the list leaves the body out",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "slug": {
+      "type": "string"
+     },
+     "title": {
+      "type": "string"
+     },
+     "summary": {
+      "type": "string"
+     },
+     "body": {
+      "type": "string",
+      "description": "Markdown; in the answer of one note only"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "private",
+       "published"
+      ],
+      "description": "private for now"
+     },
+     "topic": {
+      "type": "string"
+     },
+     "tags": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "project_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid"
+     },
+     "task_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid"
+     },
+     "project_title": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "project_kind": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "project",
+       "course",
+       null
+      ]
+     },
+     "published_at": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "NoteInput": {
+    "type": "object",
+    "properties": {
+     "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Required on create"
+     },
+     "slug": {
+      "type": "string",
+      "maxLength": 120,
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Made from the title when not given"
+     },
+     "summary": {
+      "type": "string",
+      "maxLength": 500
+     },
+     "body": {
+      "type": "string",
+      "maxLength": 200000
+     },
+     "topic": {
+      "type": "string",
+      "maxLength": 60
+     },
+     "tags": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 40,
+       "description": "No comma"
+      }
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "private"
+      ]
+     },
+     "project_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "A project or course of the caller"
+     },
+     "task_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "A task of the caller"
+     }
+    }
+   },
+   "NoteFacet": {
+    "type": "object",
+    "required": [
+     "count"
+    ],
+    "properties": {
+     "topic": {
+      "type": "string"
+     },
+     "tag": {
+      "type": "string"
+     },
+     "count": {
+      "type": "integer"
+     }
+    }
+   },
+   "Project": {
+    "type": "object",
+    "required": [
+     "id",
+     "kind",
+     "name",
+     "code",
+     "description",
+     "link",
+     "status",
+     "platform",
+     "starts_on",
+     "ends_on",
+     "certificate",
+     "position",
+     "open",
+     "done",
+     "next",
+     "created_at",
+     "updated_at"
+    ],
+    "description": "A project groups tasks; a course (kind course) is a project of Learning with a platform and dates",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "project",
+       "course"
+      ]
+     },
+     "name": {
+      "type": "string"
+     },
+     "code": {
+      "type": "string",
+      "description": "The handle a task phrase uses, as in \"#small\""
+     },
+     "description": {
+      "type": "string"
+     },
+     "link": {
+      "type": "string"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "planned",
+       "active",
+       "paused",
+       "done"
+      ],
+      "description": "A project: active, paused or done; a course: planned, active or done"
+     },
+     "platform": {
+      "type": "string"
+     },
+     "starts_on": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date"
+     },
+     "ends_on": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date"
+     },
+     "certificate": {
+      "type": "string"
+     },
+     "position": {
+      "type": "integer"
+     },
+     "open": {
+      "type": "integer",
+      "description": "Open tasks"
+     },
+     "done": {
+      "type": "integer",
+      "description": "Done tasks"
+     },
+     "next": {
+      "oneOf": [
+       {
+        "type": "object",
+        "required": [
+         "id",
+         "title",
+         "due"
+        ],
+        "properties": {
+         "id": {
+          "type": "string",
+          "format": "uuid"
+         },
+         "title": {
+          "type": "string"
+         },
+         "due": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "format": "date"
+         }
+        }
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "ProjectInput": {
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "project",
+       "course"
+      ],
+      "description": "project when not given; fixed after creation"
+     },
+     "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+     },
+     "code": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]{1,24}$",
+      "description": "Made from the name when not given"
+     },
+     "description": {
+      "type": "string",
+      "maxLength": 500
+     },
+     "link": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "An http(s) address or empty"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "planned",
+       "active",
+       "paused",
+       "done"
+      ]
+     },
+     "platform": {
+      "type": "string",
+      "maxLength": 80,
+      "description": "Course only"
+     },
+     "starts_on": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date",
+      "description": "Course only"
+     },
+     "ends_on": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date",
+      "description": "Course only"
+     },
+     "certificate": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Course only: an http(s) address or empty"
+     }
+    }
+   },
    "Task": {
     "type": "object",
     "required": [
@@ -1930,7 +2309,10 @@
      "goal_id",
      "goal_section_id",
      "trip_id",
+     "project_id",
      "goal_title",
+     "project_title",
+     "project_kind",
      "created_at",
      "updated_at"
     ],
@@ -2022,6 +2404,32 @@
       ],
       "format": "uuid",
       "description": "The trip this task is packing for"
+     },
+     "project_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "The project or course the task belongs to"
+     },
+     "project_title": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "The name of that project or course"
+     },
+     "project_kind": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "project",
+       "course",
+       null
+      ]
      },
      "goal_title": {
       "type": [
@@ -2123,6 +2531,14 @@
       "format": "uuid",
       "description": "A trip of the caller (packing)"
      },
+     "project_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "A project or course of the caller; null unlinks"
+     },
      "external_id": {
       "type": "string",
       "minLength": 1,
@@ -2208,6 +2624,14 @@
       ],
       "format": "uuid",
       "description": "A trip of the caller (packing)"
+     },
+     "project_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "A project or course of the caller; null unlinks"
      }
     }
    },
@@ -20110,6 +20534,547 @@
     }
    }
   },
+  "/api/v1/notes": {
+   "get": {
+    "summary": "The caller's notes, newest first, with the topics and tags in use",
+    "tags": [
+     "notes"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "q",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Over the title, the summary and the body"
+     },
+     {
+      "name": "topic",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "tag",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "project",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The notes without their bodies, and the facets over all the caller's notes",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data",
+          "total",
+          "topics",
+          "tags"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Note"
+           }
+          },
+          "total": {
+           "type": "integer"
+          },
+          "topics": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/NoteFacet"
+           }
+          },
+          "tags": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/NoteFacet"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Bad query"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Notes module disabled"
+     }
+    }
+   },
+   "post": {
+    "summary": "Add a note",
+    "tags": [
+     "notes"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NoteInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "The note",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Note"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Notes module disabled"
+     },
+     "409": {
+      "description": "Another note of the caller has this slug (slug_taken)"
+     }
+    }
+   }
+  },
+  "/api/v1/notes/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "get": {
+    "summary": "One note with its body",
+    "tags": [
+     "notes"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The note",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Note"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Notes module disabled, or not the caller's note"
+     }
+    }
+   },
+   "patch": {
+    "summary": "Edit a note (the fields given)",
+    "tags": [
+     "notes"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NoteInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The note",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Note"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Notes module disabled, or not the caller's note"
+     },
+     "409": {
+      "description": "Another note of the caller has this slug (slug_taken)"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a note",
+    "tags": [
+     "notes"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Notes module disabled, or not the caller's note"
+     }
+    }
+   }
+  },
+  "/api/v1/tasks/projects": {
+   "get": {
+    "summary": "Projects and courses with their task counts and the next open task",
+    "tags": [
+     "tasks"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "kind",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "project",
+        "course"
+       ]
+      }
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "planned",
+        "active",
+        "paused",
+        "done"
+       ]
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The projects",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Project"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Bad query"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Tasks module disabled"
+     }
+    }
+   },
+   "post": {
+    "summary": "Add a project or a course",
+    "tags": [
+     "tasks"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProjectInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "The project",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Project"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Tasks module disabled"
+     },
+     "409": {
+      "description": "Another project of the caller has this code (code_taken)"
+     }
+    }
+   }
+  },
+  "/api/v1/tasks/projects/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "get": {
+    "summary": "One project or course",
+    "tags": [
+     "tasks"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The project",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Project"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Tasks module disabled, or not the caller's project"
+     }
+    }
+   },
+   "patch": {
+    "summary": "Edit a project or course (the fields given; the kind stays)",
+    "tags": [
+     "tasks"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProjectInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The project",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Project"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Tasks module disabled, or not the caller's project"
+     },
+     "409": {
+      "description": "Another project of the caller has this code (code_taken)"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a project or course; its tasks stay, unlinked",
+    "tags": [
+     "tasks"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Tasks module disabled, or not the caller's project"
+     }
+    }
+   }
+  },
   "/api/v1/tasks/items": {
    "get": {
     "summary": "The caller's tasks, newest first",
@@ -20163,6 +21128,24 @@
        "type": "string",
        "format": "date"
       }
+     },
+     {
+      "name": "trip",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "description": "The tasks of one trip (packing)"
+     },
+     {
+      "name": "project",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "description": "The tasks of one project or course"
      },
      {
       "name": "limit",
@@ -26240,7 +27223,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 383656,
-  "source_fnv1a64": "6bcfaacea6c9a2b3"
+  "source_bytes": 396646,
+  "source_fnv1a64": "79c43d5d703997a3"
  }
 }

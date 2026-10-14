@@ -11,6 +11,8 @@ export interface TaskDraft {
   status: string;
   goalId: string;
   sectionId: string;
+  /** The project or course; left out, the task keeps its own. */
+  projectId?: string;
 }
 
 type TaskFields = Pick<
@@ -24,7 +26,7 @@ type TaskFields = Pick<
   | 'status'
   | 'goal_id'
   | 'goal_section_id'
->;
+> & { project_id?: string | null };
 
 /** Only the fields that changed; a section travels with its goal (the API checks the pair). */
 export function taskPatch(task: TaskFields, d: TaskDraft): TaskPatch {
@@ -39,6 +41,9 @@ export function taskPatch(task: TaskFields, d: TaskDraft): TaskPatch {
   if ((d.goalId || null) !== task.goal_id || (d.sectionId || null) !== task.goal_section_id) {
     patch.goal_id = d.goalId || null;
     patch.goal_section_id = d.goalId && d.sectionId ? d.sectionId : null;
+  }
+  if (d.projectId !== undefined && (d.projectId || null) !== (task.project_id ?? null)) {
+    patch.project_id = d.projectId || null;
   }
   return patch;
 }

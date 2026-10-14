@@ -1014,3 +1014,13 @@ select.k-input option {
 .k-capture-form .k-input {
   flex: 1;
 }
+
+/* A row title that opens its page: the row's ink, no underline until hovered. */
+.k-row-link {
+  color: inherit;
+  text-decoration: none;
+}
+.k-row-link:hover,
+.k-row-link:focus-visible {
+  text-decoration: underline;
+}

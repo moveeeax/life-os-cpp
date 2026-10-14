@@ -129,4 +129,11 @@ inline bool habits_enabled() {
     return Config::get().get<bool>("habits.enabled", "HABITS_ENABLED", false);
 }
 
+/// Notes module master switch — same pattern as travel_enabled().
+inline bool notes_enabled() {
+    if (!Config::is_initialized())
+        return false;
+    return Config::get().get<bool>("notes.enabled", "NOTES_ENABLED", false);
+}
+
 }  // namespace Core

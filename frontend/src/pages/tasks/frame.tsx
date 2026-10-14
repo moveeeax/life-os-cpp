@@ -11,11 +11,15 @@ export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => v
 interface TasksFrameProps {
   /** Quiet counts beside the tab names; zero shows nothing. */
   counts?: { today?: number; later?: number; inbox?: number };
+  /** In place of the date (the Projects tab says how many are active). */
+  headline?: ReactNode;
+  sub?: ReactNode;
+  tools?: ReactNode;
   children: ReactNode;
 }
 
-/** One narrow column on the calm sheet: the local date, three tabs, the page. */
-export function TasksFrame({ counts, children }: TasksFrameProps) {
+/** One narrow column on the calm sheet: the local date, the tabs, the page. */
+export function TasksFrame({ counts, headline, sub, tools, children }: TasksFrameProps) {
   const date = new Date().toLocaleDateString('en-GB', {
     weekday: 'long',
     day: 'numeric',
@@ -25,9 +29,10 @@ export function TasksFrame({ counts, children }: TasksFrameProps) {
     { to: '/tasks', label: 'Today', count: counts?.today, end: true },
     { to: '/tasks/later', label: 'Later', count: counts?.later },
     { to: '/tasks/inbox', label: 'Inbox', count: counts?.inbox },
+    { to: '/tasks/projects', label: 'Projects' },
   ];
   return (
-    <SectionFrame eyebrow="Tasks" headline={date} tabs={tabs}>
+    <SectionFrame eyebrow="Tasks" headline={headline ?? date} sub={sub} tabs={tabs} tools={tools}>
       {children}
     </SectionFrame>
   );

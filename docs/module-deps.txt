@@ -39,12 +39,14 @@ api -> food
 api -> jobs
 api -> money
 api -> net
+api -> notes
 api -> now
 api -> repositories/money
 api -> observability
 api -> repositories
 api -> repositories/fitness
 api -> repositories/food
+api -> repositories/notes
 api -> repositories/now
 api -> repositories/workout
 api -> security
@@ -176,3 +178,5 @@ repositories/habits -> repositories
 repositories/habits -> repositories/fitness
 api -> habits
 api -> repositories/habits
+repositories/notes -> database
+repositories/notes -> repositories

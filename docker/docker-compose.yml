@@ -79,6 +79,7 @@ services:
       GOALS_ENABLED: ${GOALS_ENABLED:-false}
       TRAVEL_ENABLED: ${TRAVEL_ENABLED:-false}
       HABITS_ENABLED: ${HABITS_ENABLED:-false}
+      NOTES_ENABLED: ${NOTES_ENABLED:-false}
       NOW_ENABLED: ${NOW_ENABLED:-false}
       PAYPAL_ENV: ${PAYPAL_ENV:-sandbox}
       PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
@@ -216,6 +217,7 @@ services:
       GOALS_ENABLED: ${GOALS_ENABLED:-false}
       TRAVEL_ENABLED: ${TRAVEL_ENABLED:-false}
       HABITS_ENABLED: ${HABITS_ENABLED:-false}
+      NOTES_ENABLED: ${NOTES_ENABLED:-false}
       NOW_ENABLED: ${NOW_ENABLED:-false}
       WORKER_ID: ${WORKER_ID:-worker-1}
       # Production-shaped default: only the real job types the app enqueues.

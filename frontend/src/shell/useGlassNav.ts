@@ -3,6 +3,7 @@ import { useGoalsEnabled } from '@/hooks/useGoals';
 import { useHabitsEnabled } from '@/hooks/useHabits';
 import { useMe } from '@/hooks/useMe';
 import { useMoneyEnabled } from '@/hooks/useMoney';
+import { useNotesEnabled } from '@/hooks/useNotes';
 import { useNowEnabled } from '@/hooks/useNow';
 import { useTasksEnabled } from '@/hooks/useTasks';
 import { useTravelEnabled } from '@/hooks/useTravel';
@@ -26,6 +27,7 @@ export function useGlassNav(): { items: NavItem[]; nowOn: boolean | undefined } 
   const goalsOn = useGoalsEnabled(signedIn);
   const travelOn = useTravelEnabled(signedIn);
   const habitsOn = useHabitsEnabled(signedIn);
+  const notesOn = useNotesEnabled(signedIn);
   const off = new Set<string>();
   if (nowOn === false) off.add('now');
   if (!workoutOn) off.add('workout');
@@ -35,5 +37,8 @@ export function useGlassNav(): { items: NavItem[]; nowOn: boolean | undefined } 
   if (!goalsOn) off.add('goals');
   if (!travelOn) off.add('travel');
   if (!habitsOn) off.add('habits');
+  if (!notesOn) off.add('notes');
+  // Learning has no module of its own: its courses are projects of Tasks.
+  if (!tasksOn) off.add('learning');
   return { items: glassNav(user, off), nowOn };
 }

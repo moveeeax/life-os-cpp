@@ -1,9 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router';
 
+import { useHabitsEnabled } from '@/hooks/useHabits';
 import { useMe } from '@/hooks/useMe';
 import { useNowSettings, useSounds, useToday, useWeather } from '@/hooks/useNow';
-import { FOCUS_LENGTHS, greeting, localDate, weatherGlyph, weatherLine } from '@/lib/now';
+import {
+  FOCUS_LENGTHS,
+  greeting,
+  localDate,
+  weatherGlyph,
+  weatherLine,
+  withoutChip,
+} from '@/lib/now';
 import { homeOf } from '@/shell/sections';
 import { useGlassNav } from '@/shell/useGlassNav';
 
@@ -96,6 +104,7 @@ function NowScreen() {
   const today = useToday(me?.id ?? null, date, tz);
   const settings = useNowSettings(me?.id ?? null);
   const weather = useWeather(Boolean(settings.data?.city));
+  const habitsOn = useHabitsEnabled(Boolean(me));
   const [picking, setPicking] = useState(false);
   const session = useFocusSession(me?.id ?? null);
   const player = useSoundPlayer(useSounds(me !== null).data ?? []);
@@ -164,7 +173,18 @@ function NowScreen() {
           </span>
         )}
       </div>
-      {data && <Corners today={data} hour={hour} date={date} corners={settings.data?.corners} />}
+      {data && (
+        <Corners
+          today={data}
+          hour={hour}
+          date={date}
+          corners={
+            settings.data && !habitsOn
+              ? withoutChip(settings.data.corners, 'habits')
+              : settings.data?.corners
+          }
+        />
+      )}
       {session.phase !== 'idle' && (
         <FocusMode
           phase={session.phase}

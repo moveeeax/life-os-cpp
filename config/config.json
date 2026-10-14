@@ -276,6 +276,9 @@
   "habits": {
     "enabled": "${HABITS_ENABLED:-false}"
   },
+  "notes": {
+    "enabled": "${NOTES_ENABLED:-false}"
+  },
   "worker": {
     "id": "worker-1",
     "types": ["default"],

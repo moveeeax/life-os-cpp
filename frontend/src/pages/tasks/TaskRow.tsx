@@ -3,9 +3,11 @@ import { Link } from 'react-router';
 
 import { Modal } from '@/components/Modal';
 import { useUpdateTask } from '@/hooks/useTasks';
+import { useNotesEnabled } from '@/hooks/useNotes';
 import { areaOf, dueLabel, EFFORT_LABEL, safeLink, type Task } from '@/lib/tasks';
 import { cn } from '@/lib/utils';
 
+import { NoteSheet } from '../notes/NoteSheet';
 import { TaskForm } from './TaskForm';
 
 const TONE = { late: 'k-error-text', today: 'k-warn-text', plain: 'k-muted' } as const;
@@ -16,15 +18,20 @@ export function TaskRow({
   today,
   open,
   onToggle,
+  hideProject,
 }: {
   task: Task;
   today: string;
   open: boolean;
   onToggle: () => void;
+  /** On the project's own page its name would only repeat. */
+  hideProject?: boolean;
 }) {
   const update = useUpdateTask(task.id);
   const [editing, setEditing] = useState(false);
   const [moving, setMoving] = useState(false);
+  const [noting, setNoting] = useState(false);
+  const notesOn = useNotesEnabled(true);
   const done = task.status === 'done';
   // A closed task's deadline no longer asks for anything.
   const due = done ? null : dueLabel(task.due, today);
@@ -52,6 +59,12 @@ export function TaskRow({
           <span className={cn('size-[7px] shrink-0 rounded-full', area.dot)} aria-hidden="true" />
           <span className={cn('truncate text-theme-sm', done ? 'k-muted line-through' : '')}>
             <span data-num-ok>{task.title}</span>
+            {task.project_title && !hideProject && (
+              <span className="k-muted" data-num-ok>
+                {' · '}
+                {task.project_title}
+              </span>
+            )}
           </span>
         </button>
         {due ? (
@@ -90,6 +103,22 @@ export function TaskRow({
               </>
             )}
           </p>
+          {task.project_id && task.project_title && (
+            <p>
+              {task.project_kind === 'course' ? 'Course' : 'Project'}:{' '}
+              <Link
+                to={
+                  task.project_kind === 'course'
+                    ? `/learning/${task.project_id}`
+                    : `/tasks/projects/${task.project_id}`
+                }
+                className="k-link"
+                data-num-ok
+              >
+                {task.project_title}
+              </Link>
+            </p>
+          )}
           {task.goal_title && (
             <p>
               Goal:{' '}
@@ -143,6 +172,15 @@ export function TaskRow({
             >
               Edit
             </button>
+            {notesOn && (
+              <button
+                type="button"
+                onClick={() => setNoting(true)}
+                className="k-muted hover:text-gray-800 dark:hover:text-gray-200"
+              >
+                Make a note
+              </button>
+            )}
           </div>
           {update.error && (
             <p role="alert" className="k-error-text">
@@ -156,12 +194,28 @@ export function TaskRow({
           <TaskForm task={task} onClose={() => setEditing(false)} />
         </Modal>
       )}
+      {noting && (
+        <NoteSheet
+          title={task.title}
+          taskId={task.id}
+          projectId={task.project_id ?? null}
+          onClose={() => setNoting(false)}
+        />
+      )}
     </li>
   );
 }
 
 /** Rows under one caption, one open at a time. */
-export function TaskList({ tasks, today }: { tasks: Task[]; today: string }) {
+export function TaskList({
+  tasks,
+  today,
+  hideProject,
+}: {
+  tasks: Task[];
+  today: string;
+  hideProject?: boolean;
+}) {
   const [open, setOpen] = useState<string | null>(null);
   return (
     <ul className="k-divide">
@@ -172,6 +226,7 @@ export function TaskList({ tasks, today }: { tasks: Task[]; today: string }) {
           today={today}
           open={open === t.id}
           onToggle={() => setOpen(open === t.id ? null : t.id)}
+          hideProject={hideProject}
         />
       ))}
     </ul>

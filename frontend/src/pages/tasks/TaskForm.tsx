@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useGoal, useGoals } from '@/hooks/useGoals';
+import { useProjects } from '@/hooks/useProjects';
 import { useDeleteTask, useUpdateTask } from '@/hooks/useTasks';
 import { AREAS, EFFORT_LABEL, localToday, type Area, type Effort, type Task } from '@/lib/tasks';
 import { taskPatch } from '@/lib/tasks/bodies';
@@ -29,6 +30,10 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
   const [status, setStatus] = useState<Task['status']>(task.status);
   const [goalId, setGoalId] = useState(task.goal_id ?? '');
   const [sectionId, setSectionId] = useState(task.goal_section_id ?? '');
+  const [projectId, setProjectId] = useState(task.project_id ?? '');
+  const projects = (useProjects().data ?? []).filter(
+    (p) => p.status !== 'done' || p.id === task.project_id,
+  );
   const today = localToday();
   const active = useGoals('active', today).data ?? [];
   // A task of a done or dropped goal still shows that goal, by its title.
@@ -55,6 +60,7 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
       status,
       goalId,
       sectionId,
+      projectId,
     });
     if (Object.keys(patch).length === 0) {
       onClose();
@@ -154,6 +160,24 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
               <option value="open">Not started</option>
               <option value="in_progress">In progress</option>
               <option value="done">Done</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="task-project" className={labelClass}>
+              Project or course
+            </label>
+            <select
+              id="task-project"
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">None</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.kind === 'course' ? `${p.name} (course)` : p.name}
+                </option>
+              ))}
             </select>
           </div>
           <div>

@@ -1,5 +1,6 @@
 // Tasks on the page: areas with their colour, the effort words, the due label.
 export * from './types';
+export * from './projects';
 import type { Area, Effort } from './types';
 
 export const AREAS: { key: Area; label: string; dot: string }[] = [

@@ -291,6 +291,12 @@ habits:
   enabled: false
 
 # ---------------------------------------------------------------
+# notes module — private Markdown notes shaped like tarassov.me posts. Env var set: NOTES_ENABLED.
+# ---------------------------------------------------------------
+notes:
+  enabled: false
+
+# ---------------------------------------------------------------
 # now module — the Now screen's digest, the focus of the day and the
 # wallpaper library. Env var set: NOW_ENABLED.
 # ---------------------------------------------------------------

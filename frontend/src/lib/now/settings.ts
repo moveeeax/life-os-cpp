@@ -49,6 +49,14 @@ export function withChip(corners: NowCorners, key: Chip['key']): NowCorners {
   return { ...corners, [empty ?? 'br']: key };
 }
 
+/** The layout with the corner of @p key emptied (its module is off); as it is when not placed. */
+export function withoutChip(corners: NowCorners, key: Chip['key']): NowCorners {
+  if (!isPlaced(corners, key)) return corners;
+  const out = { ...corners };
+  for (const k of CORNER_KEYS) if (out[k] === key) out[k] = null;
+  return out;
+}
+
 /** The chips that have a corner, each with the class of its corner, in the corner order. */
 export function placeChips(list: Chip[], corners: NowCorners): { chip: Chip; spot: string }[] {
   const out: { chip: Chip; spot: string }[] = [];

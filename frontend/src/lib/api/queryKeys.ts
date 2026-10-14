@@ -95,8 +95,17 @@ export const qk = {
     agenda: (date: string, tz: string) => ['tasks', 'agenda', date, tz] as const,
     notes: (status: string) => ['tasks', 'notes', status] as const,
     status: () => ['tasks', 'status'] as const,
+    projects: (kind: string) => ['tasks', 'projects', kind] as const,
+    project: (id: string) => ['tasks', 'project', id] as const,
+    byProject: (id: string) => ['tasks', 'by-project', id] as const,
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['tasks-enabled'] as const,
+  },
+  notes: {
+    all: () => ['notes'] as const,
+    list: (filter: string) => ['notes', 'list', filter] as const,
+    one: (id: string) => ['notes', 'one', id] as const,
+    enabled: () => ['notes-enabled'] as const,
   },
   now: {
     all: () => ['now'] as const,
