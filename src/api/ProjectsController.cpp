@@ -44,40 +44,6 @@ const std::vector<std::string> kAllStatuses = {"planned", "active", "paused", "d
 const std::regex kCode("^[a-z0-9-]{1,24}$");
 constexpr std::size_t kCodeMax = 24;
 
-bool parse_object(const HttpRequestPtr& req, json& body, ProjectsController::Callback& callback) {
-    if (!Validation::parse_body(req, body, callback)) {
-        return false;
-    }
-    if (!body.is_object()) {
-        callback(ErrorResponse::bad_request("invalid_body", "the body must be a JSON object"));
-        return false;
-    }
-    return true;
-}
-
-bool require_user(const std::string& owner, const ProjectsController::Callback& callback) {
-    if (is_valid_uuid(owner)) {
-        return true;
-    }
-    callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
-    return false;
-}
-
-#define PROJECTS_GUARD(req, callback, owner)         \
-    if (!Core::tasks_enabled()) {                    \
-        callback(ErrorResponse::not_found("tasks")); \
-        return;                                      \
-    }                                                \
-    API_REQUIRE_OWNER(req, callback, owner);         \
-    if (!require_user(owner, callback))              \
-    return
-
-void no_content(const ProjectsController::Callback& callback) {
-    auto resp = HttpResponse::newHttpResponse();
-    resp->setStatusCode(k204NoContent);
-    callback(resp);
-}
-
 /// An http(s) address or empty; anything else is refused (it becomes a link on the page).
 void web_field(Validation::Errors& errs, const json& body, const char* field) {
     text_length(errs, body, field, 0, 500);
@@ -175,7 +141,7 @@ std::optional<std::optional<std::string>> nullable_date(const json& body, const 
 }  // namespace
 
 void ProjectsController::listProjects(const HttpRequestPtr& req, Callback&& callback) {
-    PROJECTS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     const std::string kind = req->getParameter("kind");
     const std::string status = req->getParameter("status");
     const auto known = [](const std::string& v, const std::vector<std::string>& all) {
@@ -191,7 +157,7 @@ void ProjectsController::listProjects(const HttpRequestPtr& req, Callback&& call
 }
 
 void ProjectsController::createProject(const HttpRequestPtr& req, Callback&& callback) {
-    PROJECTS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -225,7 +191,7 @@ void ProjectsController::createProject(const HttpRequestPtr& req, Callback&& cal
 }
 
 void ProjectsController::getProject(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    PROJECTS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -239,7 +205,7 @@ void ProjectsController::getProject(const HttpRequestPtr& req, Callback&& callba
 }
 
 void ProjectsController::updateProject(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    PROJECTS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -281,7 +247,7 @@ void ProjectsController::updateProject(const HttpRequestPtr& req, Callback&& cal
 }
 
 void ProjectsController::deleteProject(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    PROJECTS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }

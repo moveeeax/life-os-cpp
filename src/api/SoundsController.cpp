@@ -113,11 +113,7 @@ void SoundsController::createSound(const HttpRequestPtr& req, Callback&& callbac
     API_REQUIRE_ADMIN(req, callback);
     API_REQUIRE_OWNER(req, callback, admin);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
-        return;
-    }
-    if (!body.is_object()) {
-        callback(ErrorResponse::bad_request("invalid_body", "the body must be a JSON object"));
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -213,9 +209,7 @@ void SoundsController::deleteSound(const HttpRequestPtr& req, Callback&& callbac
             return;
         }
         repo.remove(id);
-        auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(k204NoContent);
-        callback(resp);
+        no_content(callback);
     });
 }
 

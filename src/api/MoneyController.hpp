@@ -112,9 +112,6 @@ public:
     void advisorRun(const HttpRequestPtr& req, Callback&& callback);
     void getSettings(const HttpRequestPtr& req, Callback&& callback);
     void putSettings(const HttpRequestPtr& req, Callback&& callback);
-
-private:
-    static bool require_enabled(const Callback& callback);
 };
 
 }  // namespace Api

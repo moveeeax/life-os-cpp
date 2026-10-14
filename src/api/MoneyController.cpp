@@ -70,8 +70,6 @@ using Api::Fields::opt_number;
 using Api::Fields::text_length;
 using Api::Fields::today_utc;
 
-constexpr int kDefaultLimit = 50;
-constexpr int kMaxLimit = 200;
 constexpr std::size_t kBatchMax = 100;
 constexpr double kAmountMax = 1e12;
 /// The smallest positive amount: one unit of the eighth decimal (a satoshi), migration 028.
@@ -102,27 +100,6 @@ void seed_currencies(const std::string& owner) {
     } catch (const std::exception& e) {
         spdlog::warn("money: seeding currencies failed: {}", e.what());
     }
-}
-
-/// The JSON body, which must be an object: an array or a scalar answers 400, not 500.
-bool parse_object(const HttpRequestPtr& req, json& body, MoneyController::Callback& callback) {
-    if (!Validation::parse_body(req, body, callback)) {
-        return false;
-    }
-    if (!body.is_object()) {
-        callback(ErrorResponse::bad_request("invalid_body", "the body must be a JSON object"));
-        return false;
-    }
-    return true;
-}
-
-/// Rows belong to an app user; a static-bearer principal has no user id.
-bool require_user(const std::string& owner, const MoneyController::Callback& callback) {
-    if (is_valid_uuid(owner)) {
-        return true;
-    }
-    callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
-    return false;
 }
 
 std::optional<std::string> query_param(const HttpRequestPtr& req, const char* name) {
@@ -267,25 +244,10 @@ std::optional<HttpResponsePtr> filter_problem(const Repo::TransactionRepository:
 
 }  // namespace
 
-#define MONEY_GUARD(req, callback, owner)    \
-    if (!require_enabled(callback))          \
-        return;                              \
-    API_REQUIRE_OWNER(req, callback, owner); \
-    if (!require_user(owner, callback))      \
-    return
-
-bool MoneyController::require_enabled(const Callback& callback) {
-    if (Core::money_enabled()) {
-        return true;
-    }
-    callback(ErrorResponse::not_found("money"));
-    return false;
-}
-
 // ── currencies ──────────────────────────────────────────────────────────────
 
 void MoneyController::listCurrencies(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     with_repo_errors(callback, "money.listCurrencies", [&] {
         Repo::CurrencyRepository repo;
         repo.seed_defaults(owner);
@@ -294,7 +256,7 @@ void MoneyController::listCurrencies(const HttpRequestPtr& req, Callback&& callb
 }
 
 void MoneyController::upsertCurrency(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     seed_currencies(owner);
     json body;
     if (!parse_object(req, body, callback)) {
@@ -340,7 +302,7 @@ void MoneyController::upsertCurrency(const HttpRequestPtr& req, Callback&& callb
 }
 
 void MoneyController::patchCurrency(const HttpRequestPtr& req, Callback&& callback, const std::string& code) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -403,7 +365,7 @@ void account_fields(Validation::Errors& errs, const json& body) {
 }  // namespace
 
 void MoneyController::listAccounts(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     with_repo_errors(callback, "money.listAccounts", [&] {
         callback(Response::ok(
             json{{"data", Repo::AccountRepository().list(owner, req->getParameter("archived") == "true")}}));
@@ -411,7 +373,7 @@ void MoneyController::listAccounts(const HttpRequestPtr& req, Callback&& callbac
 }
 
 void MoneyController::createAccount(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     seed_currencies(owner);
     json body;
     if (!parse_object(req, body, callback)) {
@@ -440,7 +402,7 @@ void MoneyController::createAccount(const HttpRequestPtr& req, Callback&& callba
 }
 
 void MoneyController::getAccount(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -455,7 +417,7 @@ void MoneyController::getAccount(const HttpRequestPtr& req, Callback&& callback,
 }
 
 void MoneyController::updateAccount(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -491,7 +453,7 @@ void MoneyController::updateAccount(const HttpRequestPtr& req, Callback&& callba
 }
 
 void MoneyController::deleteAccount(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -527,7 +489,7 @@ void category_fields(Validation::Errors& errs, const json& body) {
 }  // namespace
 
 void MoneyController::listCategories(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     with_repo_errors(callback, "money.listCategories", [&] {
         callback(Response::ok(
             json{{"data", Repo::CategoryRepository().list(owner, req->getParameter("archived") == "true")}}));
@@ -535,7 +497,7 @@ void MoneyController::listCategories(const HttpRequestPtr& req, Callback&& callb
 }
 
 void MoneyController::createCategory(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     seed_currencies(owner);
     json body;
     if (!parse_object(req, body, callback)) {
@@ -561,7 +523,7 @@ void MoneyController::createCategory(const HttpRequestPtr& req, Callback&& callb
 }
 
 void MoneyController::getCategory(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -576,7 +538,7 @@ void MoneyController::getCategory(const HttpRequestPtr& req, Callback&& callback
 }
 
 void MoneyController::updateCategory(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -608,7 +570,7 @@ void MoneyController::updateCategory(const HttpRequestPtr& req, Callback&& callb
 }
 
 void MoneyController::deleteCategory(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -621,7 +583,7 @@ void MoneyController::deleteCategory(const HttpRequestPtr& req, Callback&& callb
 // ── transactions ────────────────────────────────────────────────────────────
 
 void MoneyController::listTransactions(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     const auto f = transaction_filter(req);
     if (const auto problem = filter_problem(f)) {
         callback(*problem);
@@ -634,7 +596,7 @@ void MoneyController::listTransactions(const HttpRequestPtr& req, Callback&& cal
 }
 
 void MoneyController::createTransaction(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -651,7 +613,7 @@ void MoneyController::createTransaction(const HttpRequestPtr& req, Callback&& ca
 }
 
 void MoneyController::createTransactions(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -680,7 +642,7 @@ void MoneyController::createTransactions(const HttpRequestPtr& req, Callback&& c
 }
 
 void MoneyController::getTransaction(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -695,7 +657,7 @@ void MoneyController::getTransaction(const HttpRequestPtr& req, Callback&& callb
 }
 
 void MoneyController::updateTransaction(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -754,20 +716,18 @@ void MoneyController::updateTransaction(const HttpRequestPtr& req, Callback&& ca
 }
 
 void MoneyController::deleteTransaction(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
     with_repo_errors(callback, "money.deleteTransaction", [&] {
         Repo::TransactionRepository().remove(owner, id);
-        auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(k204NoContent);
-        callback(resp);
+        no_content(callback);
     });
 }
 
 void MoneyController::confirmTransaction(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -777,7 +737,7 @@ void MoneyController::confirmTransaction(const HttpRequestPtr& req, Callback&& c
 }
 
 void MoneyController::inbox(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     with_repo_errors(callback, "money.inbox", [&] {
         const json rows = Repo::TransactionRepository().inbox(owner);
         callback(Response::ok(json{{"data", rows}, {"count", rows.size()}}));
@@ -787,7 +747,7 @@ void MoneyController::inbox(const HttpRequestPtr& req, Callback&& callback) {
 // ── transfers ───────────────────────────────────────────────────────────────
 
 void MoneyController::listTransfers(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     Repo::TransferRepository::Filter f;
     f.from = query_param(req, "from");
     f.to = query_param(req, "to");
@@ -826,7 +786,7 @@ void transfer_fields(Validation::Errors& errs, const json& body) {
 }  // namespace
 
 void MoneyController::createTransfer(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -857,7 +817,7 @@ void MoneyController::createTransfer(const HttpRequestPtr& req, Callback&& callb
 }
 
 void MoneyController::getTransfer(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -872,7 +832,7 @@ void MoneyController::getTransfer(const HttpRequestPtr& req, Callback&& callback
 }
 
 void MoneyController::updateTransfer(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -908,22 +868,20 @@ void MoneyController::updateTransfer(const HttpRequestPtr& req, Callback&& callb
 }
 
 void MoneyController::deleteTransfer(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
     with_repo_errors(callback, "money.deleteTransfer", [&] {
         Repo::TransferRepository().remove(owner, id);
-        auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(k204NoContent);
-        callback(resp);
+        no_content(callback);
     });
 }
 
 // ── merchants ───────────────────────────────────────────────────────────────
 
 void MoneyController::merchants(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     const int limit = clamp_int(req->getParameter("limit"), 20, 1, 300);
     with_repo_errors(callback, "money.merchants", [&] {
         const json rows = Repo::MerchantRepository().suggest(owner, req->getParameter("q"), limit);
@@ -932,7 +890,7 @@ void MoneyController::merchants(const HttpRequestPtr& req, Callback&& callback) 
 }
 
 void MoneyController::patchMerchant(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -970,7 +928,7 @@ json rate_json(const Repo::FxRateRepository::Rate& r) {
 }  // namespace
 
 void MoneyController::rate(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     const std::string date = req->getParameter("date").empty() ? today_utc() : req->getParameter("date");
     const std::string quote = req->getParameter("quote");
     if (!is_calendar_date(date) || !std::regex_match(quote, kCodeRe)) {
@@ -988,7 +946,7 @@ void MoneyController::rate(const HttpRequestPtr& req, Callback&& callback) {
 }
 
 void MoneyController::convert(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     const std::string date = req->getParameter("date").empty() ? today_utc() : req->getParameter("date");
     const std::string from = req->getParameter("from");
     const std::string to = req->getParameter("to");
@@ -1033,7 +991,7 @@ void MoneyController::convert(const HttpRequestPtr& req, Callback&& callback) {
 }
 
 void MoneyController::refreshRates(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     // No body or {}: today's rates. {from, to}: one job per day of the range that has none yet,
     // refused while an earlier backfill still waits in the queue (its days would be queued twice).
     std::optional<std::string> from;
@@ -1100,7 +1058,7 @@ void MoneyController::refreshRates(const HttpRequestPtr& req, Callback&& callbac
 // ── reports ─────────────────────────────────────────────────────────────────
 
 void MoneyController::periodReport(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     const std::string kind_text = req->getParameter("kind").empty() ? "month" : req->getParameter("kind");
     if (std::find(kPeriodKinds.begin(), kPeriodKinds.end(), kind_text) == kPeriodKinds.end()) {
         callback(ErrorResponse::bad_request("invalid_kind", "kind must be week, month, quarter or custom"));
@@ -1150,7 +1108,7 @@ void MoneyController::periodReport(const HttpRequestPtr& req, Callback&& callbac
 }
 
 void MoneyController::summary(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     const std::string currency = req->getParameter("currency").empty() ? "USD" : req->getParameter("currency");
     if (!std::regex_match(currency, kCodeRe)) {
         callback(ErrorResponse::bad_request("invalid_currency", "currency must be an ISO code like USD"));
@@ -1177,7 +1135,7 @@ void MoneyController::summary(const HttpRequestPtr& req, Callback&& callback) {
 }
 
 void MoneyController::balances(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     with_repo_errors(callback, "money.balances", [&] {
         const json accounts = Repo::AccountRepository().list(owner, req->getParameter("archived") == "true");
         std::map<std::string, json> groups;
@@ -1311,7 +1269,7 @@ void start_parse(const std::string& owner, MoneyController::Callback& callback, 
 }  // namespace
 
 void MoneyController::parseText(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -1336,7 +1294,7 @@ void MoneyController::parseText(const HttpRequestPtr& req, Callback&& callback) 
 }
 
 void MoneyController::parseReceipt(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -1363,7 +1321,7 @@ void MoneyController::parseReceipt(const HttpRequestPtr& req, Callback&& callbac
 }
 
 void MoneyController::parseStatus(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -1378,7 +1336,7 @@ void MoneyController::parseStatus(const HttpRequestPtr& req, Callback&& callback
 }
 
 void MoneyController::parseAccept(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -1433,7 +1391,7 @@ void MoneyController::parseAccept(const HttpRequestPtr& req, Callback&& callback
 // ── advisor ─────────────────────────────────────────────────────────────────
 
 void MoneyController::advisorReports(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     const int limit = clamp_int(req->getParameter("limit"), 20, 1, 100);
     with_repo_errors(callback, "money.advisorReports", [&] {
         const json rows = Repo::AdvisorReportRepository().list(owner, limit);
@@ -1442,7 +1400,7 @@ void MoneyController::advisorReports(const HttpRequestPtr& req, Callback&& callb
 }
 
 void MoneyController::advisorReport(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -1457,7 +1415,7 @@ void MoneyController::advisorReport(const HttpRequestPtr& req, Callback&& callba
 }
 
 void MoneyController::advisorRun(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -1500,7 +1458,7 @@ void MoneyController::advisorRun(const HttpRequestPtr& req, Callback&& callback)
 // ── settings ────────────────────────────────────────────────────────────────
 
 void MoneyController::getSettings(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     with_repo_errors(callback, "money.getSettings", [&] {
         json data = Repo::SettingsRepository().load(owner);
         data["llm_available"] = Money::Llm::parse_settings().has_value();
@@ -1509,7 +1467,7 @@ void MoneyController::getSettings(const HttpRequestPtr& req, Callback&& callback
 }
 
 void MoneyController::putSettings(const HttpRequestPtr& req, Callback&& callback) {
-    MONEY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     seed_currencies(owner);
     json body;
     if (!parse_object(req, body, callback)) {

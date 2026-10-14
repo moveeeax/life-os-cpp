@@ -56,27 +56,6 @@ const std::vector<std::string> kKinds = listed(::Goals::Fields::kKinds);
 const std::vector<std::string> kStatuses = listed(::Goals::Fields::kStatuses);
 const std::vector<std::string> kResults = {"pass", "fail"};
 
-/// The JSON body, which must be an object: an array or a scalar answers 400, not 500.
-bool parse_object(const HttpRequestPtr& req, json& body, GoalsController::Callback& callback) {
-    if (!Validation::parse_body(req, body, callback)) {
-        return false;
-    }
-    if (!body.is_object()) {
-        callback(ErrorResponse::bad_request("invalid_body", "the body must be a JSON object"));
-        return false;
-    }
-    return true;
-}
-
-/// Rows belong to an app user; a static-bearer principal has no user id.
-bool require_user(const std::string& owner, const GoalsController::Callback& callback) {
-    if (is_valid_uuid(owner)) {
-        return true;
-    }
-    callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
-    return false;
-}
-
 /// The date the progress is computed at: ?date=, today in UTC by default; nullopt (answered) when bad.
 std::optional<std::string> at_date(const HttpRequestPtr& req, const GoalsController::Callback& callback) {
     const std::string date = request_day(req, &Repositories::Zones::today_in, today_utc());
@@ -152,25 +131,10 @@ void goal_fields(Validation::Errors& errs, const json& body, const std::string& 
 
 }  // namespace
 
-#define GOALS_GUARD(req, callback, owner)    \
-    if (!require_enabled(callback))          \
-        return;                              \
-    API_REQUIRE_OWNER(req, callback, owner); \
-    if (!require_user(owner, callback))      \
-    return
-
-bool GoalsController::require_enabled(const Callback& callback) {
-    if (Core::goals_enabled()) {
-        return true;
-    }
-    callback(ErrorResponse::not_found("goals"));
-    return false;
-}
-
 // ── goals ───────────────────────────────────────────────────────────────────
 
 void GoalsController::listGoals(const HttpRequestPtr& req, Callback&& callback) {
-    GOALS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::goals_enabled(), "goals", req, callback, owner);
     const auto date = at_date(req, callback);
     if (!date) {
         return;
@@ -193,7 +157,7 @@ void GoalsController::listGoals(const HttpRequestPtr& req, Callback&& callback) 
 }
 
 void GoalsController::createGoal(const HttpRequestPtr& req, Callback&& callback) {
-    GOALS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::goals_enabled(), "goals", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -252,7 +216,7 @@ void GoalsController::createGoal(const HttpRequestPtr& req, Callback&& callback)
 }
 
 void GoalsController::getGoal(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    GOALS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::goals_enabled(), "goals", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -294,7 +258,7 @@ void GoalsController::getGoal(const HttpRequestPtr& req, Callback&& callback, co
 }
 
 void GoalsController::updateGoal(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    GOALS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::goals_enabled(), "goals", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -359,22 +323,20 @@ void GoalsController::updateGoal(const HttpRequestPtr& req, Callback&& callback,
 }
 
 void GoalsController::deleteGoal(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    GOALS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::goals_enabled(), "goals", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
     with_repo_errors(callback, "goals.delete", [&] {
         GoalRepository().remove(owner, id);
-        auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(k204NoContent);
-        callback(resp);
+        no_content(callback);
     });
 }
 
 // ── check-ins ───────────────────────────────────────────────────────────────
 
 void GoalsController::putCheckin(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    GOALS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::goals_enabled(), "goals", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -405,22 +367,20 @@ void GoalsController::deleteCheckin(const HttpRequestPtr& req,
                                     Callback&& callback,
                                     const std::string& id,
                                     const std::string& child) {
-    GOALS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::goals_enabled(), "goals", req, callback, owner);
     if (!require_valid_uuid(id, callback) || !require_valid_uuid(child, callback)) {
         return;
     }
     with_repo_errors(callback, "goals.deleteCheckin", [&] {
         GoalRepository().remove_checkin(owner, id, child);
-        auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(k204NoContent);
-        callback(resp);
+        no_content(callback);
     });
 }
 
 // ── sections ────────────────────────────────────────────────────────────────
 
 void GoalsController::addSection(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    GOALS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::goals_enabled(), "goals", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -447,7 +407,7 @@ void GoalsController::updateSection(const HttpRequestPtr& req,
                                     Callback&& callback,
                                     const std::string& id,
                                     const std::string& child) {
-    GOALS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::goals_enabled(), "goals", req, callback, owner);
     if (!require_valid_uuid(id, callback) || !require_valid_uuid(child, callback)) {
         return;
     }
@@ -474,22 +434,20 @@ void GoalsController::deleteSection(const HttpRequestPtr& req,
                                     Callback&& callback,
                                     const std::string& id,
                                     const std::string& child) {
-    GOALS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::goals_enabled(), "goals", req, callback, owner);
     if (!require_valid_uuid(id, callback) || !require_valid_uuid(child, callback)) {
         return;
     }
     with_repo_errors(callback, "goals.deleteSection", [&] {
         GoalRepository().remove_section(owner, id, child);
-        auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(k204NoContent);
-        callback(resp);
+        no_content(callback);
     });
 }
 
 // ── milestones ──────────────────────────────────────────────────────────────
 
 void GoalsController::addMilestone(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    GOALS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::goals_enabled(), "goals", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -518,15 +476,13 @@ void GoalsController::deleteMilestone(const HttpRequestPtr& req,
                                       Callback&& callback,
                                       const std::string& id,
                                       const std::string& child) {
-    GOALS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::goals_enabled(), "goals", req, callback, owner);
     if (!require_valid_uuid(id, callback) || !require_valid_uuid(child, callback)) {
         return;
     }
     with_repo_errors(callback, "goals.deleteMilestone", [&] {
         GoalRepository().remove_milestone(owner, id, child);
-        auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(k204NoContent);
-        callback(resp);
+        no_content(callback);
     });
 }
 

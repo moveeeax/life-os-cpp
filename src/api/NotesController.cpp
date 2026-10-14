@@ -42,44 +42,6 @@ const std::regex kSlug("^[a-z0-9]+(-[a-z0-9]+)*$");
 constexpr std::size_t kTagsMax = 20;
 constexpr std::size_t kTagMax = 40;
 constexpr std::size_t kBodyMax = 200000;
-constexpr int kDefaultLimit = 50;
-constexpr int kMaxLimit = 200;
-
-bool parse_object(const HttpRequestPtr& req, json& body, NotesController::Callback& callback) {
-    if (!Validation::parse_body(req, body, callback)) {
-        return false;
-    }
-    if (!body.is_object()) {
-        callback(ErrorResponse::bad_request("invalid_body", "the body must be a JSON object"));
-        return false;
-    }
-    return true;
-}
-
-bool require_user(const std::string& owner, const NotesController::Callback& callback) {
-    if (is_valid_uuid(owner)) {
-        return true;
-    }
-    callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
-    return false;
-}
-
-#define NOTES_GUARD(req, callback, owner)            \
-    if (!Core::notes_enabled()) {                    \
-        callback(ErrorResponse::not_found("notes")); \
-        return;                                      \
-    }                                                \
-    API_REQUIRE_OWNER(req, callback, owner);         \
-    if (!require_user(owner, callback))              \
-    return
-
-int clamp(const std::string& text, int fallback, int lo, int hi) {
-    try {
-        return text.empty() ? fallback : std::clamp(std::stoi(text), lo, hi);
-    } catch (const std::exception&) {
-        return fallback;
-    }
-}
 
 /// The tags of a body, trimmed; nullopt (with an error) when they break a rule.
 std::optional<std::vector<std::string>> tags_field(Validation::Errors& errs, const json& body) {
@@ -154,23 +116,17 @@ std::optional<std::optional<std::string>> nullable(const json& body, const char*
     return body[field].is_null() ? std::optional<std::string>() : std::optional(body[field].get<std::string>());
 }
 
-void no_content(const NotesController::Callback& callback) {
-    auto resp = HttpResponse::newHttpResponse();
-    resp->setStatusCode(k204NoContent);
-    callback(resp);
-}
-
 }  // namespace
 
 void NotesController::listNotes(const HttpRequestPtr& req, Callback&& callback) {
-    NOTES_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::notes_enabled(), "notes", req, callback, owner);
     NoteRepository::Filter f;
     f.q = req->getParameter("q");
     f.topic = req->getParameter("topic");
     f.tag = req->getParameter("tag");
     f.project = req->getParameter("project");
-    f.limit = clamp(req->getParameter("limit"), kDefaultLimit, 1, kMaxLimit);
-    f.offset = clamp(req->getParameter("offset"), 0, 0, 1000000);
+    f.limit = clamp_int(req->getParameter("limit"), kDefaultLimit, 1, kMaxLimit);
+    f.offset = clamp_int(req->getParameter("offset"), 0, 0, 1000000);
     if (!f.project.empty() && !is_valid_uuid(f.project)) {
         callback(ErrorResponse::bad_request("invalid_query", "project must be an id"));
         return;
@@ -186,7 +142,7 @@ void NotesController::listNotes(const HttpRequestPtr& req, Callback&& callback) 
 }
 
 void NotesController::createNote(const HttpRequestPtr& req, Callback&& callback) {
-    NOTES_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::notes_enabled(), "notes", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -215,7 +171,7 @@ void NotesController::createNote(const HttpRequestPtr& req, Callback&& callback)
 }
 
 void NotesController::getNote(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    NOTES_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::notes_enabled(), "notes", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -229,7 +185,7 @@ void NotesController::getNote(const HttpRequestPtr& req, Callback&& callback, co
 }
 
 void NotesController::updateNote(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    NOTES_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::notes_enabled(), "notes", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -259,7 +215,7 @@ void NotesController::updateNote(const HttpRequestPtr& req, Callback&& callback,
 }
 
 void NotesController::deleteNote(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    NOTES_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::notes_enabled(), "notes", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }

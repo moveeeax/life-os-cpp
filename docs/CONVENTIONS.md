@@ -95,13 +95,16 @@ Per handler:
 1. First line: a guard from `Guards.hpp` —
    `API_REQUIRE_ADMIN(req, callback)` or `API_REQUIRE_PRINCIPAL(req, callback, p)`.
    Every mutating endpoint needs one (under `AUTH_MODE=none` it's a no-op, so
-   it never gets in the way during dev — but it's there for prod). Handlers of
-   a toggleable feature module gate first with
-   `if (!require_enabled(callback)) return;` (see `FitnessController`;
-   `new-module.sh` scaffolds the flag).
+   it never gets in the way during dev — but it's there for prod). A per-user
+   route of a toggleable feature module opens with
+   `API_MODULE_USER_GUARD(Core::notes_enabled(), "notes", req, callback, owner);`
+   (404 while the module is off, then 401 without an identity, then 403
+   `no_user_account` for a principal with no user id; see `NotesController`).
+   `API_MODULE_PERMISSION_USER_GUARD` adds a permission check after the switch.
 2. UUID path params: `if (!require_valid_uuid(id, callback)) return;`
    (`Guards.hpp`) — don't hand-roll the `is_valid_uuid` + 400 pair.
-3. Parse + validate: `Validation::parse_body(req, body, callback)` then
+3. Parse + validate: `parse_object(req, body, callback)` (`HandlerSupport.hpp`:
+   `Validation::parse_body` plus "the body is an object") then
    `Validation::require/email/string_length`, accumulate into
    `Validation::Errors`, bail with `Validation::response_400(errs)`.
 4. Repository call inside `with_repo_errors(callback, "op", [&]{ … })`
@@ -110,8 +113,8 @@ Per handler:
 5. List endpoints: `parse_page_params(req, default, max)` →
    `Response::paginated(to_json_array(items), total, page.limit, page.offset)`
    (see `AdminController::listUsers`).
-6. Success: `Response::ok(...)` / `Response::created(...)` — never build the
-   `HttpResponse` by hand.
+6. Success: `Response::ok(...)` / `Response::created(...)`, or
+   `no_content(callback)` for a 204 — never build the `HttpResponse` by hand.
 7. **`callback(...)` exactly once on every path**, including early returns and
    the guard expansions.
 

@@ -66,10 +66,6 @@ public:
     // A text description to the LLM, through the food_parse worker job.
     void parseStart(const HttpRequestPtr& req, Callback&& callback);
     void parseStatus(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
-
-private:
-    /// 404 while the module is off; the routes stay registered.
-    static bool require_enabled(const Callback& callback);
 };
 
 }  // namespace Api

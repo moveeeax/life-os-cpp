@@ -72,35 +72,6 @@ constexpr std::size_t kNoteMax = 2000;
 constexpr std::size_t kCityMax = 120;
 const std::vector<std::string> kKinds = {"task", "goal", "text"};
 
-/// The now switch, then a user account; false (answered) otherwise.
-bool require_user(const std::string& owner, const TodayController::Callback& callback) {
-    if (is_valid_uuid(owner)) {
-        return true;
-    }
-    callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
-    return false;
-}
-
-#define TODAY_GUARD(req, callback, owner)          \
-    if (!Core::now_enabled()) {                    \
-        callback(ErrorResponse::not_found("now")); \
-        return;                                    \
-    }                                              \
-    API_REQUIRE_OWNER(req, callback, owner);       \
-    if (!require_user(owner, callback))            \
-    return
-
-bool parse_object(const HttpRequestPtr& req, json& body, TodayController::Callback& callback) {
-    if (!Validation::parse_body(req, body, callback)) {
-        return false;
-    }
-    if (!body.is_object()) {
-        callback(ErrorResponse::bad_request("invalid_body", "the body must be a JSON object"));
-        return false;
-    }
-    return true;
-}
-
 /// The date of a body: a calendar day, required.
 bool body_date(Validation::Errors& errs, const json& body) {
     if (!body.contains("date") || !body["date"].is_string() || !is_calendar_date(body["date"].get<std::string>())) {
@@ -252,7 +223,7 @@ json habits_part(const std::string& owner,
 }  // namespace
 
 void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
-    TODAY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::now_enabled(), "now", req, callback, owner);
     const std::string date = request_day(req, &Repositories::Zones::today_in, today_utc());
     if (!is_calendar_date(date)) {
         callback(ErrorResponse::bad_request("invalid_query", "date must be a calendar day"));
@@ -300,7 +271,7 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
 }
 
 void TodayController::putFocus(const HttpRequestPtr& req, Callback&& callback) {
-    TODAY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::now_enabled(), "now", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -351,7 +322,7 @@ void TodayController::putFocus(const HttpRequestPtr& req, Callback&& callback) {
 }
 
 void TodayController::focusDone(const HttpRequestPtr& req, Callback&& callback) {
-    TODAY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::now_enabled(), "now", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -401,7 +372,7 @@ void TodayController::focusDone(const HttpRequestPtr& req, Callback&& callback) 
 }
 
 void TodayController::deleteFocus(const HttpRequestPtr& req, Callback&& callback) {
-    TODAY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::now_enabled(), "now", req, callback, owner);
     const std::string date = req->getParameter("date");
     if (!is_calendar_date(date)) {
         callback(ErrorResponse::bad_request("invalid_query", "date must be a calendar day"));
@@ -411,16 +382,14 @@ void TodayController::deleteFocus(const HttpRequestPtr& req, Callback&& callback
         if (!FocusRepository().remove(owner, date)) {
             throw Repositories::Now::FocusNotFound();
         }
-        auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(k204NoContent);
-        callback(resp);
+        no_content(callback);
     });
 }
 
 // ── the note of a day ───────────────────────────────────────────────────────
 
 void TodayController::putNote(const HttpRequestPtr& req, Callback&& callback) {
-    TODAY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::now_enabled(), "now", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -442,7 +411,7 @@ void TodayController::putNote(const HttpRequestPtr& req, Callback&& callback) {
 }
 
 void TodayController::deleteNote(const HttpRequestPtr& req, Callback&& callback) {
-    TODAY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::now_enabled(), "now", req, callback, owner);
     const std::string date = req->getParameter("date");
     if (!is_calendar_date(date)) {
         callback(ErrorResponse::bad_request("invalid_query", "date must be a calendar day"));
@@ -450,23 +419,21 @@ void TodayController::deleteNote(const HttpRequestPtr& req, Callback&& callback)
     }
     with_repo_errors(callback, "today.deleteNote", [&] {
         Repositories::Now::NoteRepository().remove(owner, date);
-        auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(k204NoContent);
-        callback(resp);
+        no_content(callback);
     });
 }
 
 // ── settings and weather ────────────────────────────────────────────────────
 
 void TodayController::getSettings(const HttpRequestPtr& req, Callback&& callback) {
-    TODAY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::now_enabled(), "now", req, callback, owner);
     with_repo_errors(callback, "now.settings", [&] {
         callback(Response::ok(json{{"data", Repositories::Now::SettingsRepository().get(owner)}}));
     });
 }
 
 void TodayController::putSettings(const HttpRequestPtr& req, Callback&& callback) {
-    TODAY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::now_enabled(), "now", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -519,7 +486,7 @@ void TodayController::putSettings(const HttpRequestPtr& req, Callback&& callback
 }
 
 void TodayController::weather(const HttpRequestPtr& req, Callback&& callback) {
-    TODAY_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::now_enabled(), "now", req, callback, owner);
     json settings;
     try {
         settings = Repositories::Now::SettingsRepository().get(owner);

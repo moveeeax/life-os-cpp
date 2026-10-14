@@ -77,9 +77,6 @@ public:
     void createDocument(const HttpRequestPtr& req, Callback&& callback);
     void updateDocument(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void deleteDocument(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
-
-private:
-    static bool require_enabled(const Callback& callback);
 };
 
 }  // namespace Api

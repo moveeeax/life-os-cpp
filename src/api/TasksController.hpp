@@ -52,9 +52,6 @@ public:
     void parse(const HttpRequestPtr& req, Callback&& callback);
     void parseStatus(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void parseAccept(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
-
-private:
-    static bool require_enabled(const Callback& callback);
 };
 
 }  // namespace Api

@@ -51,25 +51,6 @@ constexpr double kSleepGoalMax = 24;
 const std::vector<std::string> kSchedules = {"daily", "weekly"};
 const std::vector<std::string> kSources = {"manual", "sleep", "steps", "active_kcal", "workout"};
 
-bool parse_object(const HttpRequestPtr& req, json& body, HabitsController::Callback& callback) {
-    if (!Validation::parse_body(req, body, callback)) {
-        return false;
-    }
-    if (!body.is_object()) {
-        callback(ErrorResponse::bad_request("invalid_body", "the body must be a JSON object"));
-        return false;
-    }
-    return true;
-}
-
-bool require_user(const std::string& owner, const HabitsController::Callback& callback) {
-    if (is_valid_uuid(owner)) {
-        return true;
-    }
-    callback(ErrorResponse::forbidden("no_user_account", "this route needs a user account"));
-    return false;
-}
-
 /// ?tz=, UTC by default; nullopt (answered) when not an IANA zone.
 std::optional<std::string> zone_of(const HttpRequestPtr& req, const HabitsController::Callback& callback) {
     const std::string tz = req->getParameter("tz").empty() ? "UTC" : req->getParameter("tz");
@@ -127,12 +108,6 @@ std::optional<HabitRepository::Input> habit_input(const json& body, const Habits
                                   source};
 }
 
-void no_content(const HabitsController::Callback& callback) {
-    auto resp = HttpResponse::newHttpResponse();
-    resp->setStatusCode(k204NoContent);
-    callback(resp);
-}
-
 /// The day of a tick, checked against today in the caller's zone; false (answered) when bad.
 bool tick_day(const std::string& date, const std::string& tz, const HabitsController::Callback& callback) {
     if (!is_calendar_date(date)) {
@@ -154,23 +129,8 @@ bool tick_day(const std::string& date, const std::string& tz, const HabitsContro
 
 }  // namespace
 
-#define HABITS_GUARD(req, callback, owner)   \
-    if (!require_enabled(callback))          \
-        return;                              \
-    API_REQUIRE_OWNER(req, callback, owner); \
-    if (!require_user(owner, callback))      \
-    return
-
-bool HabitsController::require_enabled(const Callback& callback) {
-    if (Core::habits_enabled()) {
-        return true;
-    }
-    callback(ErrorResponse::not_found("habits"));
-    return false;
-}
-
 void HabitsController::list(const HttpRequestPtr& req, Callback&& callback) {
-    HABITS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::habits_enabled(), "habits", req, callback, owner);
     const std::string archived = req->getParameter("archived");
     if (!archived.empty() && archived != "true" && archived != "false") {
         callback(ErrorResponse::bad_request("invalid_query", "archived must be true or false"));
@@ -182,7 +142,7 @@ void HabitsController::list(const HttpRequestPtr& req, Callback&& callback) {
 }
 
 void HabitsController::create(const HttpRequestPtr& req, Callback&& callback) {
-    HABITS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::habits_enabled(), "habits", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -197,7 +157,7 @@ void HabitsController::create(const HttpRequestPtr& req, Callback&& callback) {
 }
 
 void HabitsController::update(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    HABITS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::habits_enabled(), "habits", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -215,7 +175,7 @@ void HabitsController::update(const HttpRequestPtr& req, Callback&& callback, co
 }
 
 void HabitsController::remove(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    HABITS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::habits_enabled(), "habits", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -226,7 +186,7 @@ void HabitsController::remove(const HttpRequestPtr& req, Callback&& callback, co
 }
 
 void HabitsController::archive(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    HABITS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::habits_enabled(), "habits", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -246,7 +206,7 @@ void HabitsController::archive(const HttpRequestPtr& req, Callback&& callback, c
 }
 
 void HabitsController::days(const HttpRequestPtr& req, Callback&& callback) {
-    HABITS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::habits_enabled(), "habits", req, callback, owner);
     const std::string from = req->getParameter("from");
     const std::string to = req->getParameter("to");
     if (!is_calendar_date(from) || !is_calendar_date(to) || to < from) {
@@ -293,7 +253,7 @@ void HabitsController::putCheck(const HttpRequestPtr& req,
                                 Callback&& callback,
                                 const std::string& id,
                                 const std::string& date) {
-    HABITS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::habits_enabled(), "habits", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -325,7 +285,7 @@ void HabitsController::deleteCheck(const HttpRequestPtr& req,
                                    Callback&& callback,
                                    const std::string& id,
                                    const std::string& date) {
-    HABITS_GUARD(req, callback, owner);
+    API_MODULE_USER_GUARD(Core::habits_enabled(), "habits", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
