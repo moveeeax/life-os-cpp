@@ -46,6 +46,27 @@ void register_builtin_handlers() {
     d.register_handler(MoneyParse::kJobType, [](const json& payload) { return MoneyParse::process_job(payload); });
     d.register_handler(MoneyAdvisor::kJobType, [](const json& payload) { return MoneyAdvisor::process_job(payload); });
     d.register_handler(TasksParse::kJobType, [](const json& payload) { return TasksParse::process_job(payload); });
+    // When the queue gives one of the LLM jobs up, its row is closed as failed
+    // (if still queued or running) instead of waiting for a page that polls it.
+    const auto row_of = [](const json& payload, const char* key) {
+        return payload.contains(key) && payload[key].is_string() ? payload[key].get<std::string>() : std::string();
+    };
+    d.register_dead_letter(FoodParse::kJobType, [row_of](const json& payload, const std::string& error) {
+        if (const auto id = row_of(payload, "job_id"); !id.empty())
+            Repositories::ParseJobRepository().fail(id, "queue_gave_up", error);
+    });
+    d.register_dead_letter(MoneyParse::kJobType, [row_of](const json& payload, const std::string& error) {
+        if (const auto id = row_of(payload, "job_id"); !id.empty())
+            Repositories::Money::ParseJobRepository().fail(id, "queue_gave_up", error);
+    });
+    d.register_dead_letter(MoneyAdvisor::kJobType, [row_of](const json& payload, const std::string& error) {
+        if (const auto id = row_of(payload, "report_id"); !id.empty())
+            Repositories::Money::AdvisorReportRepository().fail(id, "queue_gave_up", error);
+    });
+    d.register_dead_letter(TasksParse::kJobType, [row_of](const json& payload, const std::string& error) {
+        if (const auto id = row_of(payload, "job_id"); !id.empty())
+            Repositories::Tasks::ParseJobRepository().fail(id, "queue_gave_up", error);
+    });
     // Demo handlers used by examples/tests.
     d.register_handler("echo", [](const json& payload) { return payload; });
     d.register_handler("slow", [](const json& payload) -> json {

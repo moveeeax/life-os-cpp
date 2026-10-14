@@ -299,7 +299,7 @@ TEST_F(TasksParseApiTest, ANoteBecomesATaskOnceAndIsArchived) {
     Jobs::get().complete(job->id, json::object());
     ASSERT_EQ(Repositories::Tasks::ParseJobRepository().start(id), 1) << "the worker claims it before it answers";
     Repositories::Tasks::ParseJobRepository().finish(
-        id, json::array({json{{"title", "Купить воду"}, {"area", "projects"}, {"due", "2026-10-08"}}}), "m", 1, 1);
+        id, 1, json::array({json{{"title", "Купить воду"}, {"area", "projects"}, {"due", "2026-10-08"}}}), "m", 1, 1);
     const json lines = json::array({json{{"title", "Купить воду"}, {"area", "projects"}, {"due", "2026-10-08"}}});
     const auto accepted = call_id(&Api::TasksController::parseAccept, user(kAnna), Post, id, json{{"lines", lines}});
     ASSERT_EQ(accepted->statusCode(), k201Created) << accepted->body();

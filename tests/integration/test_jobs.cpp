@@ -8,15 +8,21 @@
  */
 
 #include <atomic>
+#include <chrono>
 #include <fstream>
+#include <iterator>
 #include <set>
+#include <stdexcept>
+#include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
 
 #include <nlohmann/json.hpp>
 
+#include "jobs/Dispatcher.hpp"
 #include "jobs/Jobs.hpp"
 #include "test_helpers.hpp"
 
@@ -27,8 +33,17 @@ namespace {
 class JobsIntegrationTest : public TestHelpers::CoreBackedTest {
 protected:
     // Queue names used by the tests below; TearDown drains exactly these.
-    static constexpr const char* kQueues[] = {
-        "default", "retryq", "cancelq", "pagedq", "healq", "depthq", "backoffq", "leaseq"};
+    static constexpr const char* kQueues[] = {"default",
+                                              "retryq",
+                                              "cancelq",
+                                              "pagedq",
+                                              "healq",
+                                              "depthq",
+                                              "backoffq",
+                                              "leaseq",
+                                              "deferq",
+                                              "hookq",
+                                              "hookq-throws"};
 
     std::vector<std::string> job_ids_to_cleanup;
 
@@ -329,6 +344,73 @@ TEST_F(JobsIntegrationTest, BackoffDelaysRequeueUntilDue) {
     auto p2 = Jobs::get().pick({"backoffq"}, 2, "w1");
     ASSERT_TRUE(p2);
     EXPECT_EQ(p2->id, job.id);
+}
+
+TEST_F(JobsIntegrationTest, DeferParksTheJobWithoutCountingAnAttempt) {
+    // Retry backoff is off in this suite: a deferred job still waits in the delayed set.
+    auto job = Jobs::get().submit("deferq", {});
+    track(job.id);
+    auto p1 = Jobs::get().pick({"deferq"}, 2, "dwrk-0");
+    ASSERT_TRUE(p1);
+
+    Jobs::get().defer(job.id, /*delay_ms=*/1000, "the row is running elsewhere");
+    auto after = Jobs::get().get_status(job.id);
+    ASSERT_TRUE(after);
+    EXPECT_EQ(after->status, "pending");
+    EXPECT_EQ(after->retry_count, 0) << "a wait is not an attempt";
+    EXPECT_EQ(after->error, "the row is running elsewhere");
+
+    std::vector<std::string> q;
+    Cache::get().get_client().lrange(Jobs::queue_key("deferq"), 0, -1, std::back_inserter(q));
+    EXPECT_TRUE(q.empty()) << "not back on the queue before its time";
+    std::vector<std::string> proc;
+    Cache::get().get_client().lrange(Jobs::processing_key("dwrk-0"), 0, -1, std::back_inserter(proc));
+    EXPECT_TRUE(proc.empty()) << "a restart of the worker must not run it early";
+    EXPECT_EQ(Jobs::get().promote_due_jobs(), 0);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+    EXPECT_EQ(Jobs::get().promote_due_jobs(), 1) << "promoted with retry backoff off too";
+    auto p2 = Jobs::get().pick({"deferq"}, 2, "dwrk-0");
+    ASSERT_TRUE(p2);
+    EXPECT_EQ(p2->id, job.id);
+    EXPECT_EQ(p2->retry_count, 0);
+}
+
+TEST_F(JobsIntegrationTest, TheDeadLetterHookSeesTheJobTheQueueGaveUp) {
+    std::vector<std::pair<json, std::string>> seen;
+    Jobs::Dispatcher::get().register_dead_letter(
+        "hookq", [&seen](const json& payload, const std::string& error) { seen.emplace_back(payload, error); });
+    Jobs::Dispatcher::get().register_dead_letter(
+        "hookq-throws", [](const json&, const std::string&) { throw std::runtime_error("the database is away"); });
+
+    // Through the retry budget (max_retries = 2 in this suite).
+    auto job = Jobs::get().submit("hookq", {{"job_id", "row-1"}});
+    track(job.id);
+    for (const char* error : {"boom-1", "boom-2"}) {
+        ASSERT_TRUE(Jobs::get().pick({"hookq"}, 2, "hwrk-0"));
+        Jobs::get().fail(job.id, error);
+    }
+    ASSERT_EQ(seen.size(), 1u) << "only the give-up, not the retry";
+    EXPECT_EQ(seen[0].first["job_id"], "row-1");
+    EXPECT_EQ(seen[0].second, "boom-2");
+
+    // Straight to the DLQ.
+    auto permanent = Jobs::get().submit("hookq", {{"job_id", "row-2"}});
+    track(permanent.id);
+    ASSERT_TRUE(Jobs::get().pick({"hookq"}, 2, "hwrk-0"));
+    Jobs::get().dead_letter(permanent.id, "no handler");
+    ASSERT_EQ(seen.size(), 2u);
+    EXPECT_EQ(seen[1].first["job_id"], "row-2");
+
+    // A hook that throws leaves the job dead-lettered and fail() quiet.
+    auto other = Jobs::get().submit("hookq-throws", {}, /*max_retries=*/1);
+    track(other.id);
+    ASSERT_TRUE(Jobs::get().pick({"hookq-throws"}, 2, "hwrk-0"));
+    EXPECT_NO_THROW(Jobs::get().fail(other.id, "boom"));
+    EXPECT_EQ(Jobs::get().get_status(other.id)->status, "dead");
+
+    Jobs::Dispatcher::get().register_dead_letter("hookq", {});
+    Jobs::Dispatcher::get().register_dead_letter("hookq-throws", {});
 }
 
 TEST_F(JobsIntegrationTest, VisibilityTimeoutReapsExpiredLease) {

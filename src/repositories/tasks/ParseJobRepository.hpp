@@ -74,10 +74,15 @@ public:
     /// The row's status now; nullopt when the row is gone.
     std::optional<std::string> status(const std::string& id) { return JobRows::status(kTable, id); }
 
-    /// running -> queued, for an outage the queue will retry.
-    void requeue(const std::string& id) { JobRows::requeue(kTable, id); }
+    /// running -> queued, for an outage the queue will retry; only by the holder of @p attempt.
+    void requeue(const std::string& id, int attempt) { JobRows::requeue(kTable, id, attempt); }
 
+    /// Milliseconds until a running row may be claimed again; 0 when it is not running.
+    long long stale_in_ms(const std::string& id) { return JobRows::stale_in_ms(kTable, id); }
+
+    /// Only the holder of @p attempt (what start() returned) writes the result.
     void finish(const std::string& id,
+                int attempt,
                 const nlohmann::json& lines,
                 const std::string& model,
                 std::optional<int> prompt_tokens,
@@ -86,24 +91,26 @@ public:
             txn.exec_params(
                 "UPDATE task_parse_jobs SET status = 'done', result = $2::jsonb, error = NULL, model = $3, "
                 " prompt_tokens = $4, completion_tokens = $5, finished_at = now() WHERE id = $1::uuid" +
-                    std::string(JobRows::kWhileRunning),
+                    JobRows::while_claimed(6),
                 id,
                 lines.dump(),
                 model,
                 prompt_tokens,
-                completion_tokens);
+                completion_tokens,
+                attempt);
             return true;
         });
     }
 
     /// @p error is stored as "<code>: <message>".
-    void fail(const std::string& id, const std::string& code, const std::string& message) {
+    void fail(const std::string& id, const std::string& code, const std::string& message, int attempt = 0) {
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params(
                 "UPDATE task_parse_jobs SET status = 'failed', error = $2, finished_at = now() WHERE id = $1::uuid" +
-                    std::string(JobRows::kWhileOpen),
+                    JobRows::while_open(3),
                 id,
-                message.empty() ? code : code + ": " + message);
+                message.empty() ? code : code + ": " + message,
+                attempt);
             return true;
         });
     }
@@ -159,12 +166,14 @@ private:
     template <typename Txn>
     static std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& id) {
         auto r = txn.exec_params(
-            "SELECT row_to_json(t) FROM (SELECT id, status, text, hint_date::text AS hint_date, note_id, result, "
-            " error, model, prompt_tokens, completion_tokens, "
-            " to_char(accepted_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS accepted_at, "
-            " to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-            " to_char(finished_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS finished_at "
-            " FROM task_parse_jobs WHERE owner_id = $1::uuid AND id = $2::uuid) t",
+            "SELECT row_to_json(t) FROM (SELECT id, " + JobRows::shown_status() +
+                " AS status, text, hint_date::text AS hint_date, note_id, result, " + JobRows::shown_error() +
+                " AS"
+                " error, model, prompt_tokens, completion_tokens, "
+                " to_char(accepted_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS accepted_at, "
+                " to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
+                " to_char(finished_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS finished_at "
+                " FROM task_parse_jobs WHERE owner_id = $1::uuid AND id = $2::uuid) t",
             owner,
             id);
         if (r.empty()) {

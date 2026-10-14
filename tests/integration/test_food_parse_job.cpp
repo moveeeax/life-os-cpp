@@ -305,7 +305,7 @@ TEST_F(FoodParseJobTest, AStaleRunningRowIsClaimedAgain) {
     EXPECT_EQ(provider.calls.size(), 1u);
     EXPECT_EQ(jobs.open_count(kAnna), 1) << "the fresh running row counts, the done one does not";
 
-    jobs.finish(id, json::array(), "late-model", 1, 1);
+    jobs.finish(id, /*attempt=*/0, json::array(), "late-model", 1, 1);
     jobs.fail(id, "internal_error", "late");
     EXPECT_EQ((*jobs.get(kAnna, id))["status"], "done") << "a late result does not overwrite a finished row";
 }

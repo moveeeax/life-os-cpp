@@ -98,9 +98,9 @@ void worker_loop(const std::string& worker_id, const std::vector<std::string>& t
 
     while (!shutdown_requested.load()) {
         try {
-            // Maintenance: promote backoff-delayed jobs that are due and reclaim
+            // Maintenance: promote backoff-delayed and deferred jobs that are due and reclaim
             // jobs whose visibility lease expired (a worker that died mid-job).
-            // Both are cheap no-ops unless enabled via config; idempotent across
+            // The reaper is a no-op unless enabled via config; both are idempotent across
             // worker threads (ZREM-gated), so running them on every thread/cycle
             // is safe — worst case is a wasted ZRANGEBYSCORE on an empty set.
             try {
@@ -172,6 +172,14 @@ void worker_loop(const std::string& worker_id, const std::vector<std::string>& t
                 span->End();
                 record_done("success");
                 spdlog::info("Job completed: id={}", job->id);
+            } catch (const Jobs::DeferJob& e) {
+                // Not a failure: the job waits (e.g. its row is held by another
+                // delivery) and comes back without spending an attempt.
+                spdlog::info("Job deferred: id={} for {}ms: {}", job->id, e.delay_ms, e.what());
+                span->SetAttribute("job.deferred_ms", static_cast<int64_t>(e.delay_ms));
+                span->End();
+                Jobs::get().defer(job->id, e.delay_ms, e.what());
+                record_done("deferred");
             } catch (const Jobs::PermanentJobError& e) {
                 // No retries — straight to DLQ so a permanent mismatch can't
                 // spin the worker through its full retry budget.

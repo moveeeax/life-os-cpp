@@ -14,6 +14,8 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "jobs/BuiltinHandlers.hpp"
+#include "jobs/Dispatcher.hpp"
 #include "jobs/TasksParseHandler.hpp"
 #include "net/Http.hpp"
 #include "repositories/tasks/ParseJobRepository.hpp"
@@ -164,12 +166,105 @@ TEST_F(TasksParseFallbackTest, UsesTheMoneyProviderWithTheTasksPrompt) {
     EXPECT_EQ(provider.bodies[0]["messages"][0]["content"], "Answer with task JSON.");
 }
 
-TEST_F(TasksParseJobTest, ARedeliveryOfARunningRowIsRetriedNotDropped) {
+TEST_F(TasksParseJobTest, ARedeliveryOfARunningRowWaitsUntilTheRowIsStale) {
     const std::string id = job("buy water");
     ASSERT_EQ(jobs.start(id), 1) << "a worker claimed the row and died";
-    EXPECT_THROW(run(id), std::runtime_error) << "the queue retries with backoff until the row is stale";
+    try {
+        run(id);
+        ADD_FAILURE() << "a row another delivery holds is not run twice";
+    } catch (const Jobs::DeferJob& e) {
+        // Deferred, not failed: the queue does not count an attempt, so a worker
+        // restart cannot spend the whole retry budget while the row is held.
+        EXPECT_GT(e.delay_ms, 9 * 60 * 1000) << "the row was claimed a moment ago";
+        EXPECT_LE(e.delay_ms, 10 * 60 * 1000 + 2000) << "the stale window plus a second";
+    }
     EXPECT_TRUE(provider.bodies.empty());
     EXPECT_EQ((*jobs.get(kAnna, id))["status"], "running");
+}
+
+TEST_F(TasksParseJobTest, AStaleRunningRowReadsAsFailedUntilItIsClaimedAgain) {
+    const std::string id = job("buy water");
+    ASSERT_EQ(jobs.start(id), 1);
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE task_parse_jobs SET started_at = now() - interval '11 minutes' WHERE id = $1::uuid",
+                        id);
+        return true;
+    });
+    const json polled = *jobs.get(kAnna, id);
+    EXPECT_EQ(polled["status"], "failed") << "a page polling a row whose worker died must stop waiting";
+    EXPECT_EQ(polled["error"].get<std::string>().rfind("worker_lost", 0), 0u) << polled.dump();
+    EXPECT_EQ(jobs.stale_in_ms(id), 0) << "claimable now";
+
+    provider.replies.push_back({200, completion(json{{"lines", {{{"title", "Buy water"}, {"area", "projects"}}}}})});
+    EXPECT_EQ(run(id)["status"], "done") << "the queue's redelivery still finishes it";
+    EXPECT_EQ((*jobs.get(kAnna, id))["status"], "done");
+}
+
+TEST_F(TasksParseJobTest, OnlyTheCurrentClaimWritesTheRow) {
+    const std::string id = job("buy water");
+    const int first = jobs.start(id);
+    ASSERT_EQ(first, 1);
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE task_parse_jobs SET started_at = now() - interval '11 minutes' WHERE id = $1::uuid",
+                        id);
+        return true;
+    });
+    const int second = jobs.start(id);
+    ASSERT_EQ(second, 2) << "the stale row was claimed again";
+
+    // The first worker wakes up while the second still runs: none of its writes land.
+    jobs.finish(id, first, json::array(), "late-model", 1, 1);
+    jobs.requeue(id, first);
+    jobs.fail(id, "internal_error", "late", first);
+    json row = *jobs.get(kAnna, id);
+    EXPECT_EQ(row["status"], "running");
+    EXPECT_TRUE(row["result"].is_null());
+
+    jobs.finish(id, second, json::array({json{{"title", "Buy water"}, {"area", "projects"}}}), "gpt-6-luna", 1, 1);
+    row = *jobs.get(kAnna, id);
+    EXPECT_EQ(row["status"], "done");
+    EXPECT_EQ(row["result"].size(), 1u);
+}
+
+TEST_F(TasksParseJobTest, AFailBeforeTheClaimClosesAQueuedRow) {
+    const std::string id = job("buy water");
+    jobs.fail(id, "tasks_disabled", "the module is off");
+    EXPECT_EQ((*jobs.get(kAnna, id))["status"], "failed");
+}
+
+TEST_F(TasksParseJobTest, AQueuedRowTheQueueLostDoesNotHoldAParseSlot) {
+    for (int i = 0; i < 3; ++i) {
+        job("buy water");
+    }
+    EXPECT_EQ(jobs.open_count(kAnna), 3);
+    Database::get().execute_write([](auto& txn) {
+        txn.exec("UPDATE task_parse_jobs SET created_at = now() - interval '11 minutes'");
+        return true;
+    });
+    EXPECT_EQ(jobs.open_count(kAnna), 0) << "queued rows nobody picked for the whole window must not lock the user out";
+    job("call parents");
+    EXPECT_EQ(jobs.open_count(kAnna), 1);
+}
+
+TEST_F(TasksParseJobTest, TheQueueGivingUpFailsTheRow) {
+    Jobs::register_builtin_handlers();
+    const std::string id = job("buy water");
+    Jobs::Job dead;
+    dead.id = "redis-job";
+    dead.type = Jobs::TasksParse::kJobType;
+    dead.payload = json{{"job_id", id}, {"owner_id", kAnna}};
+    Jobs::Dispatcher::get().on_dead(dead, "visibility timeout exceeded");
+    const json row = *jobs.get(kAnna, id);
+    EXPECT_EQ(row["status"], "failed");
+    EXPECT_EQ(row["error"].get<std::string>().rfind("queue_gave_up: ", 0), 0u) << row.dump();
+
+    // A finished row stays as it is.
+    provider.replies.push_back({200, completion(json{{"lines", {{{"title", "Buy water"}, {"area", "projects"}}}}})});
+    const std::string done = job("buy water");
+    ASSERT_EQ(run(done)["status"], "done");
+    dead.payload["job_id"] = done;
+    Jobs::Dispatcher::get().on_dead(dead, "late");
+    EXPECT_EQ((*jobs.get(kAnna, done))["status"], "done");
 }
 
 TEST_F(TasksParseJobTest, AStaleRunningRowDoesNotHoldAParseSlot) {
@@ -190,7 +285,7 @@ TEST_F(TasksParseJobTest, ALateResultDoesNotOverwriteAFinishedRow) {
     provider.replies.push_back({200, completion(json{{"lines", {{{"title", "Buy water"}, {"area", "projects"}}}}})});
     const std::string id = job("buy water");
     ASSERT_EQ(run(id)["status"], "done");
-    jobs.finish(id, json::array(), "late-model", 1, 1);
+    jobs.finish(id, /*attempt=*/1, json::array(), "late-model", 1, 1);
     jobs.fail(id, "internal_error", "a worker whose stale row was claimed again");
     const json row = *jobs.get(kAnna, id);
     EXPECT_EQ(row["status"], "done");

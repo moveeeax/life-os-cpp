@@ -49,7 +49,8 @@ private:
     bool initialized_ = false;
     long result_ttl_ = 86400;  // seconds
     int default_max_retries_ = kDefaultMaxRetries;
-    // Retry backoff (opt-in). 0 = legacy behaviour: fail() requeues immediately.
+    // Retry backoff (JOBS_RETRY_BACKOFF_BASE_MS, 2000 ms by default in Core).
+    // 0 = legacy behaviour: fail() requeues immediately.
     // >0 = a failed job is parked in jobs:delayed for an exponentially growing
     // delay (base * 2^(retry_count-1), capped at max), promoted back by
     // promote_due_jobs() — kills the tight pick→fail→pick loop on a near-empty
@@ -141,6 +142,15 @@ public:
     void fail(const std::string& id, const std::string& error);
 
     /**
+     * @brief Park a picked job for @p delay_ms without counting an attempt
+     *        (a handler threw DeferJob): it leaves the worker's processing
+     *        list, goes back to `pending` in the delayed set, and
+     *        promote_due_jobs() returns it to its queue when due. Works with
+     *        retry backoff off too. A delay below 1 s is raised to 1 s.
+     */
+    void defer(const std::string& id, int64_t delay_ms, const std::string& reason);
+
+    /**
      * @brief Send a job STRAIGHT to the dead-letter queue, bypassing the retry
      *        budget — for permanent failures (PermanentJobError, e.g. no handler
      *        for the type) where retrying only burns tight pick→throw→requeue
@@ -194,9 +204,10 @@ public:
     long recover_processing(const std::string& worker_id);
 
     /**
-     * @brief Move every job whose backoff window has elapsed from the delayed
-     *        set back onto its live queue. Cheap no-op when backoff is disabled.
-     *        Call periodically from the worker loop.
+     * @brief Move every job whose backoff or defer window has elapsed from the
+     *        delayed set back onto its live queue. Runs whether or not retry
+     *        backoff is on (a deferred job waits there too); an empty set
+     *        costs one ZRANGEBYSCORE. Call periodically from the worker loop.
      * @return number of jobs promoted.
      */
     long promote_due_jobs();

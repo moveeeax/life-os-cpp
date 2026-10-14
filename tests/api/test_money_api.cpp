@@ -795,6 +795,7 @@ protected:
         const std::string id = jobs.create_text(kAnna, "Kaspi *8880 13275.61 KZT", "2026-10-07")["id"];
         EXPECT_EQ(jobs.start(id), 1) << "the worker claims it before it answers";
         jobs.finish(id,
+                    /*attempt=*/1,
                     json::array({json{{"date", "2026-10-05"},
                                       {"account_id", account["id"]},
                                       {"amount", 13275.61},
