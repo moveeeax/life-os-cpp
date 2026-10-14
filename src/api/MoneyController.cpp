@@ -61,9 +61,9 @@ namespace {
 using json = nlohmann::json;
 namespace Repo = Repositories::Money;
 
+using Api::Fields::amount_range;
 using Api::Fields::date_field;
 using Api::Fields::is_calendar_date;
-using Api::Fields::number_range;
 using Api::Fields::opt_int;
 using Api::Fields::opt_number;
 using Api::Fields::text_length;
@@ -180,13 +180,13 @@ bool transaction_input(const json& body,
     Validation::require_string(local, body, "account_id");
     Validation::uuid(local, body, "account_id");
     Validation::require(local, body, "amount");
-    number_range(local, body, "amount", -kAmountMax, kAmountMax);
+    amount_range(local, body, "amount", -kAmountMax, kAmountMax);
     uuid_field(local, body, "category_id");
     uuid_field(local, body, "adjusts_id");
     text_length(local, body, "merchant", 0, kNameMax);
     Validation::require_string(local, body, "name");
     text_length(local, body, "name", 1, kNameMax);
-    number_range(local, body, "receipt_amount", kAmountMin, kAmountMax);
+    amount_range(local, body, "receipt_amount", kAmountMin, kAmountMax);
     code_field(local, body, "receipt_currency");
     if ((body.contains("receipt_amount") && !body["receipt_amount"].is_null()) !=
         (body.contains("receipt_currency") && !body["receipt_currency"].is_null())) {
@@ -393,7 +393,7 @@ void account_fields(Validation::Errors& errs, const json& body) {
     if (body.contains("last4") && !body["last4"].is_null()) {
         Validation::regex_match(errs, body, "last4", kLast4Re, "up to four digits");
     }
-    number_range(errs, body, "opening_balance", -kAmountMax, kAmountMax);
+    amount_range(errs, body, "opening_balance", -kAmountMax, kAmountMax);
     date_field(errs, body, "opening_date");
     Validation::int_range(errs, body, "position", 0, 10000);
     Validation::boolean(errs, body, "archived");
@@ -512,7 +512,7 @@ void category_fields(Validation::Errors& errs, const json& body) {
     if (body.contains("flexibility")) {
         Validation::one_of(errs, body, "flexibility", kFlex);
     }
-    number_range(errs, body, "budget_max", kAmountMin, kAmountMax);
+    amount_range(errs, body, "budget_max", kAmountMin, kAmountMax);
     code_field(errs, body, "budget_currency");
     const bool has_max = body.contains("budget_max") && !body["budget_max"].is_null();
     const bool has_cur = body.contains("budget_currency") && !body["budget_currency"].is_null();
@@ -708,11 +708,11 @@ void MoneyController::updateTransaction(const HttpRequestPtr& req, Callback&& ca
         Validation::regex_match(errs, body, "time", std::regex(R"(^([01]\d|2[0-3]):[0-5]\d$)"), "expected HH:MM");
     }
     uuid_field(errs, body, "account_id");
-    number_range(errs, body, "amount", -kAmountMax, kAmountMax);
+    amount_range(errs, body, "amount", -kAmountMax, kAmountMax);
     uuid_field(errs, body, "category_id");
     text_length(errs, body, "merchant", 0, kNameMax);
     text_length(errs, body, "name", 1, kNameMax);
-    number_range(errs, body, "receipt_amount", kAmountMin, kAmountMax);
+    amount_range(errs, body, "receipt_amount", kAmountMin, kAmountMax);
     code_field(errs, body, "receipt_currency");
     text_length(errs, body, "fx_note", 0, 200);
     text_length(errs, body, "trip", 0, 60);
@@ -814,9 +814,9 @@ void transfer_fields(Validation::Errors& errs, const json& body) {
     date_field(errs, body, "date");
     uuid_field(errs, body, "from_account_id");
     uuid_field(errs, body, "to_account_id");
-    number_range(errs, body, "amount_sent", kAmountMin, kAmountMax);
-    number_range(errs, body, "amount_received", kAmountMin, kAmountMax);
-    number_range(errs, body, "fee", 0, kAmountMax);
+    amount_range(errs, body, "amount_sent", kAmountMin, kAmountMax);
+    amount_range(errs, body, "amount_received", kAmountMin, kAmountMax);
+    amount_range(errs, body, "fee", 0, kAmountMax);
     text_length(errs, body, "name", 0, kNameMax);
     text_length(errs, body, "note", 0, kNoteMax);
     text_length(errs, body, "external_id", 1, 120);
