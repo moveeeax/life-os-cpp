@@ -1,5 +1,6 @@
 Now: with a city set, the top line is the place, the degrees and a text glyph
-for the weather (the word in its tooltip), without the time zone; Hide numbers
+for the weather (the word in its tooltip), without the time zone; Arrange moved
+from that line into the account menu (on Now only); Hide numbers
 leaves task and goal titles readable, as on Tasks; the corner layout paints
 from the last answer, so a moved corner does not flash. Capture: a spend line
 shows its currency and account, an empty parse says so, a meal parse error is

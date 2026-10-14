@@ -1,18 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 
 import { useToast } from '@/components/ui/toaster';
 import { useLogout } from '@/hooks/useAuthMutations';
 import { useMe } from '@/hooks/useMe';
+import { useNowSettings } from '@/hooks/useNow';
 import { Permission, userCan } from '@/lib/auth/permissions';
 
-/** The account on the right of the bar: Account, Admin, Billing, Sign out. */
+import { ArrangeSheet } from './ArrangeSheet';
+
+/** The account on the right of the bar: Arrange (on Now), Account, Admin, Billing, Sign out. */
 export function GlassAccountMenu() {
   const user = useMe().data ?? null;
   const logout = useLogout();
   const toast = useToast();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [arranging, setArranging] = useState(false);
+  // Arrange belongs to Now: the weather city and the corners of that page.
+  const onNow = useLocation().pathname === '/now';
+  const settings = useNowSettings(onNow && user ? user.id : null);
   const ref = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -70,6 +77,17 @@ export function GlassAccountMenu() {
       {open && (
         <div id="glass-account-menu" className="g-menu">
           <div className="g-who">{user.email}</div>
+          {onNow && settings.data && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                setArranging(true);
+              }}
+            >
+              Arrange Now
+            </button>
+          )}
           <Link to="/account" onClick={() => setOpen(false)}>
             Account
           </Link>
@@ -85,6 +103,9 @@ export function GlassAccountMenu() {
             Sign out
           </button>
         </div>
+      )}
+      {arranging && settings.data && (
+        <ArrangeSheet settings={settings.data} onClose={() => setArranging(false)} />
       )}
     </div>
   );
