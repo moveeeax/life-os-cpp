@@ -101,6 +101,12 @@ export const qk = {
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['tasks-enabled'] as const,
   },
+  notes: {
+    all: () => ['notes'] as const,
+    list: (filter: string) => ['notes', 'list', filter] as const,
+    one: (id: string) => ['notes', 'one', id] as const,
+    enabled: () => ['notes-enabled'] as const,
+  },
   now: {
     all: () => ['now'] as const,
     days: () => ['now', 'today'] as const,

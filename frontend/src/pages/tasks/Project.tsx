@@ -1,11 +1,14 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useDeleteProject, useProject, useProjectTasks } from '@/hooks/useProjects';
+import { useNoteList, useNotesEnabled } from '@/hooks/useNotes';
 import { useCreateTask } from '@/hooks/useTasks';
 import { PROJECT_STATUS, safeLink } from '@/lib/tasks';
-import { Group, Num } from '@/shell/kit';
+import { Group, Num, Row } from '@/shell/kit';
+
+import { NoteSheet } from '../notes/NoteSheet';
 
 import { useTasksDay } from './counts';
 import { LoadError, Placeholder, TasksFrame } from './frame';
@@ -25,6 +28,9 @@ export function TasksProjectPage() {
   const [title, setTitle] = useState('');
   const create = useCreateTask(() => setTitle(''));
   const remove = useDeleteProject(() => navigate('/tasks/projects'));
+  const notesOn = useNotesEnabled(true);
+  const notes = useNoteList({ project: id }, notesOn);
+  const [noting, setNoting] = useState(false);
   const p = project.data;
   const list = tasks.data ?? [];
   const open = list.filter((t) => t.status !== 'done');
@@ -103,6 +109,37 @@ export function TasksProjectPage() {
               <p className="k-empty">Nothing open here.</p>
             )}
           </Group>
+          {notesOn && (
+            <Group
+              label="Notes"
+              total={
+                <button type="button" className="k-link" onClick={() => setNoting(true)}>
+                  New note
+                </button>
+              }
+            >
+              {(notes.data?.data ?? []).length === 0 ? (
+                <p className="k-empty">No notes for this project yet.</p>
+              ) : (
+                notes.data!.data.map((n) => (
+                  <Row
+                    key={n.id}
+                    dot="var(--g-brand)"
+                    title={
+                      <Link to={`/notes/${n.id}`} className="k-row-link" data-num-ok>
+                        {n.title}
+                      </Link>
+                    }
+                    sub={
+                      <span data-num-ok>
+                        {[n.topic, n.tags.join(', ')].filter(Boolean).join(' · ')}
+                      </span>
+                    }
+                  />
+                ))
+              )}
+            </Group>
+          )}
           {done.length > 0 && (
             <Group
               label="Done"
@@ -118,6 +155,7 @@ export function TasksProjectPage() {
         </>
       )}
       {editing && p && <ProjectSheet project={p} onClose={() => setEditing(false)} />}
+      {noting && <NoteSheet projectId={id} onClose={() => setNoting(false)} />}
       {confirm && p && (
         <ConfirmDialog
           title={`Delete ${p.name}?`}

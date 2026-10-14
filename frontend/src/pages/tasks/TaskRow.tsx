@@ -3,9 +3,11 @@ import { Link } from 'react-router';
 
 import { Modal } from '@/components/Modal';
 import { useUpdateTask } from '@/hooks/useTasks';
+import { useNotesEnabled } from '@/hooks/useNotes';
 import { areaOf, dueLabel, EFFORT_LABEL, safeLink, type Task } from '@/lib/tasks';
 import { cn } from '@/lib/utils';
 
+import { NoteSheet } from '../notes/NoteSheet';
 import { TaskForm } from './TaskForm';
 
 const TONE = { late: 'k-error-text', today: 'k-warn-text', plain: 'k-muted' } as const;
@@ -28,6 +30,8 @@ export function TaskRow({
   const update = useUpdateTask(task.id);
   const [editing, setEditing] = useState(false);
   const [moving, setMoving] = useState(false);
+  const [noting, setNoting] = useState(false);
+  const notesOn = useNotesEnabled(true);
   const done = task.status === 'done';
   // A closed task's deadline no longer asks for anything.
   const due = done ? null : dueLabel(task.due, today);
@@ -168,6 +172,15 @@ export function TaskRow({
             >
               Edit
             </button>
+            {notesOn && (
+              <button
+                type="button"
+                onClick={() => setNoting(true)}
+                className="k-muted hover:text-gray-800 dark:hover:text-gray-200"
+              >
+                Make a note
+              </button>
+            )}
           </div>
           {update.error && (
             <p role="alert" className="k-error-text">
@@ -180,6 +193,14 @@ export function TaskRow({
         <Modal onClose={() => setEditing(false)} className="max-w-lg">
           <TaskForm task={task} onClose={() => setEditing(false)} />
         </Modal>
+      )}
+      {noting && (
+        <NoteSheet
+          title={task.title}
+          taskId={task.id}
+          projectId={task.project_id ?? null}
+          onClose={() => setNoting(false)}
+        />
       )}
     </li>
   );

@@ -1,0 +1,104 @@
+/* The editor: source and preview side by side; one at a time on a phone. */
+.n-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 12px;
+}
+.n-source {
+  min-height: 420px;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid var(--g-glass-line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--g-ink);
+  font:
+    13px/1.55 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+.n-preview {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--g-glass-line);
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+.n-mode {
+  display: none;
+}
+@media (max-width: 760px) {
+  .n-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .n-mode {
+    display: inline-flex;
+  }
+  .n-show-write .n-preview,
+  .n-show-preview .n-source {
+    display: none;
+  }
+}
+.n-prose {
+  font-size: 15px;
+  line-height: 1.6;
+}
+.n-prose h2,
+.n-prose h3,
+.n-prose h4 {
+  margin: 0.6em 0 0.3em;
+  font-weight: 500;
+}
+.n-prose h2 {
+  font-size: 20px;
+}
+.n-prose h3 {
+  font-size: 17px;
+}
+.n-prose h4 {
+  font-size: 15px;
+}
+.n-prose p,
+.n-prose ul,
+.n-prose ol,
+.n-prose blockquote,
+.n-prose pre {
+  margin: 0 0 0.8em;
+}
+.n-prose ul,
+.n-prose ol {
+  padding-left: 1.3em;
+}
+.n-prose ul {
+  list-style: disc;
+}
+.n-prose ol {
+  list-style: decimal;
+}
+.n-prose blockquote {
+  padding-left: 12px;
+  border-left: 2px solid var(--g-glass-line);
+  color: var(--g-ink-soft);
+}
+.n-prose code {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--g-glass);
+  font:
+    12.5px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+.n-prose pre {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  overflow-x: auto;
+}
+.n-prose pre code {
+  padding: 0;
+  background: none;
+}
