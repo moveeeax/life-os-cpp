@@ -130,6 +130,17 @@ TEST_F(AccountFlowTest, resetRequestAlwaysReturns200) {
     EXPECT_EQ(resp2->statusCode(), k200OK);
 }
 
+TEST_F(AccountFlowTest, resetRequestRefusesAMegabyteEmailWith400) {
+    const std::string huge = std::string(1024 * 1024, 'a') + "@example.com";
+    HttpResponsePtr resp;
+    account.requestReset(post_json({{"email", huge}}), [&](const HttpResponsePtr& r) { resp = r; });
+    ASSERT_NE(resp, nullptr);
+    EXPECT_EQ(resp->statusCode(), k400BadRequest);
+    auto body = json::parse(std::string(resp->body()));
+    ASSERT_TRUE(body.contains("errors"));
+    EXPECT_EQ(body["errors"][0]["code"], "too_long");
+}
+
 TEST_F(AccountFlowTest, applyResetRotatesPasswordHash) {
     ASSERT_EQ(register_user("d@example.com", "originalpass")->statusCode(), k201Created);
     Repositories::UserRepository repo;

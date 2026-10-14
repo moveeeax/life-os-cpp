@@ -118,6 +118,23 @@ TEST_F(AuthFlowTest, registerRejectsShortPassword) {
     EXPECT_EQ(resp->statusCode(), k400BadRequest);
 }
 
+TEST_F(AuthFlowTest, registerRefusesAMegabyteEmailWith400) {
+    // Before the length check this string went straight into std::regex_match
+    // on an unauthenticated route.
+    const std::string huge = std::string(1024 * 1024, 'a') + "@example.com";
+    HttpResponsePtr resp;
+    controller.registerUser(make_post({{"email", huge}, {"password", "long-enough-1"}}),
+                            [&](const HttpResponsePtr& r) { resp = r; });
+    ASSERT_NE(resp, nullptr);
+    EXPECT_EQ(resp->statusCode(), k400BadRequest);
+    auto body = json::parse(std::string(resp->body()));
+    ASSERT_TRUE(body.contains("errors"));
+    bool too_long = false;
+    for (const auto& e : body["errors"])
+        too_long = too_long || (e["field"] == "email" && e["code"] == "too_long");
+    EXPECT_TRUE(too_long) << body.dump().substr(0, 400);
+}
+
 TEST_F(AuthFlowTest, loginWrongPasswordReturns401Generic) {
     // First register.
     auto reg = make_post({{"email", "carol@example.com"}, {"password", "rightpassword"}});

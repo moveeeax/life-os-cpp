@@ -217,11 +217,26 @@ inline std::optional<std::string> opt_string(const json& body, const std::string
     return std::nullopt;
 }
 
+/// Longest address SMTP can carry (RFC 5321 forward-path limit, 256 minus
+/// the angle brackets). Checked before the regex.
+inline constexpr std::size_t kEmailMaxLen = 254;
+
 inline void email(Errors& errs, const json& body, const std::string& field) {
+    // Length first: libstdc++'s std::regex_match recurses per character, so a
+    // megabyte-long string on an unauthenticated route (register, reset
+    // request) could exhaust the stack before any format check ran.
+    const auto* s = detail::as_string(errs, body, field);
+    if (!s)
+        return;
+    if (s->size() > kEmailMaxLen) {
+        errs.add(field, "too_long", "max length " + std::to_string(kEmailMaxLen));
+        return;
+    }
     // Pragmatic email regex — not a spec-compliant RFC 5322 parser, but
     // rejects the obvious bad inputs without blocking valid ones.
     static const std::regex re(R"(^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$)");
-    regex_match(errs, body, field, re, "email");
+    if (!std::regex_match(*s, re))
+        errs.add(field, "bad_format", "expected format: email");
 }
 
 inline void uuid(Errors& errs, const json& body, const std::string& field) {
