@@ -37,10 +37,10 @@ protected:
         TestHelpers::wipe_app_data();
     }
 
-    Security::Auth::AuthPrincipal seed_user(const std::string& email) {
+    Security::Auth::AuthPrincipal seed_user(const std::string& email, const std::string& role_name = "User") {
         Repositories::RoleRepository roles;
         Repositories::UserRepository users;
-        auto role = roles.find_by_name("User");
+        auto role = roles.find_by_name(role_name);
         EXPECT_TRUE(role.has_value());
         auto u = users.create(email, std::string("$argon2id$x"), std::nullopt, std::nullopt, role->id, true);
         Security::Auth::AuthPrincipal p;
@@ -99,6 +99,22 @@ TEST_F(ApiKeysTest, ListHidesSecretAndRevokeStopsAuth) {
     EXPECT_EQ(delResp->statusCode(), k200OK);
 
     EXPECT_FALSE(Security::ApiKeys::authenticate(with_key(key)).has_value());  // revoked
+}
+
+TEST_F(ApiKeysTest, AdminKeyCarriesNoAdminBitAndIsMarkedAsAKey) {
+    auto admin = seed_user("key-admin@example.com", "Administrator");
+    const std::string key = create_key(admin, "admin-script")["key"];
+
+    auto principal = Security::ApiKeys::authenticate(with_key(key));
+    ASSERT_TRUE(principal.has_value());
+    EXPECT_TRUE(principal->via_api_key);
+    EXPECT_EQ(principal->raw_claims.value("api_key", false), true);
+    const auto perms = principal->raw_claims["permissions"].get<std::int64_t>();
+    EXPECT_EQ(perms & Security::Auth::kAdminPermissionBits, 0);
+
+    // The admin guard sees the masked bitmask and refuses.
+    auto req = TestHelpers::authed(*principal);
+    EXPECT_NE(Security::Auth::require_admin(req), nullptr);
 }
 
 TEST_F(ApiKeysTest, RevokeIsOwnerScoped) {

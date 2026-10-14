@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -69,10 +70,36 @@ inline bool request_has_key(const drogon::HttpRequestPtr& req) {
     return !extract_key(req).empty();
 }
 
+namespace detail {
+
+/// @p path is @p root itself or lies under it ("/x" matches "/x" and "/x/y",
+/// not "/xy").
+inline bool path_under(std::string_view path, std::string_view root) {
+    if (!path.starts_with(root))
+        return false;
+    return path.size() == root.size() || path[root.size()] == '/';
+}
+
+}  // namespace detail
+
+/**
+ * @brief Whether an API key may authenticate a request to @p path. Keys are
+ *        for machine clients reading and writing the owner's data; they may
+ *        not manage the account (password, email, the keys themselves under
+ *        /api/v1/account/api-keys) or reach the admin surface. A leaked key
+ *        must not be able to mint more keys or take over the account.
+ *        The middleware answers 401 key_not_allowed on a refused path.
+ */
+inline bool path_allows_key(std::string_view path) {
+    return !detail::path_under(path, "/api/v1/account") && !detail::path_under(path, "/api/v1/admin") &&
+           !detail::path_under(path, "/api/v1/api-keys");
+}
+
 /**
  * @brief Authenticate the request's API key. Returns a principal carrying the
- *        owning user's subject + role permissions, or nullopt if the key is
- *        absent / unknown / revoked.
+ *        owning user's subject + role permissions (with the admin bit masked
+ *        out, via_api_key set), or nullopt if the key is absent / unknown /
+ *        revoked.
  *
  * Runs on PRIMARY (a just-issued key must authenticate immediately — no replica
  * lag). last_used_at is stamped THROTTLED: a single CTE always returns the auth
@@ -108,10 +135,14 @@ inline std::optional<Security::Auth::AuthPrincipal> authenticate(const drogon::H
             if (r.empty())
                 return std::nullopt;
             const auto user_id = r[0]["user_id"].template as<std::string>();
-            const auto permissions = r[0]["permissions"].template as<long long>();
+            // The owner's role permissions minus the admin bit: an admin's key
+            // acts with the admin's data permissions, never as an admin.
+            const auto permissions = static_cast<std::uint32_t>(r[0]["permissions"].template as<long long>()) &
+                                     ~Security::Auth::kAdminPermissionBits;
             Security::Auth::AuthPrincipal p;
             p.subject = user_id;
-            p.raw_claims = json{{"sub", user_id}, {"permissions", permissions}};
+            p.via_api_key = true;
+            p.raw_claims = json{{"sub", user_id}, {"permissions", permissions}, {"api_key", true}};
             return p;
         });
     } catch (const std::exception& e) {

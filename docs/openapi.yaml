@@ -21,6 +21,10 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    # API keys (cpk_..., in X-API-Key or as the Bearer token) authenticate
+    # like BearerAuth on data routes, with the owner's permissions minus the
+    # admin bit. /api/v1/account/* (including the api-keys routes) and
+    # /api/v1/admin/* answer 401 key_not_allowed to a key.
     # Browser-SPA session: the access JWT travels in an HttpOnly
     # __Host- cookie set by POST /api/auth/login (auth.cookies.* in
     # config/config.json). Same-origin only — the SPA never reads it

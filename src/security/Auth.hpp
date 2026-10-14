@@ -78,6 +78,10 @@ struct AuthPrincipal {
     // empty value as fail-closed "no org access", never "unscoped access".
     std::string org;
     json raw_claims;
+    // True when the request authenticated with an API key (cpk_...), not a
+    // session. Key principals never carry the admin bit and are refused on
+    // the account / admin surface (Security::ApiKeys::path_allows_key).
+    bool via_api_key = false;
 };
 
 /**

@@ -414,6 +414,42 @@ TEST(HttpE2E, RegistrationProbeIsPublic) {
     expect_matches_schema(resp, "GET", "/api/v1/auth/registration");
 }
 
+TEST(HttpE2E, ApiKeyIsRefusedOnTheAccountSurface) {
+    // A key may read the owner's data but never manage the account: with a
+    // leaked key one could otherwise mint more keys.
+    REQUIRE_E2E_ENV();
+    auto sc = register_and_login("e2e-keys@example.com", "password-e2e-1");
+    auto create = json_post("/api/v1/account/api-keys", {{"name", "e2e"}});
+    attach_session(create, sc);
+    auto created = send(create);
+    ASSERT_EQ(created->statusCode(), k201Created) << created->getBody();
+    const std::string key = body_of(created)["key"];
+
+    auto list = HttpRequest::newHttpRequest();
+    list->setPath("/api/v1/account/api-keys");
+    list->addHeader("X-API-Key", key);
+    auto refused = send(list);
+    EXPECT_EQ(refused->statusCode(), k401Unauthorized) << refused->getBody();
+    EXPECT_EQ(body_of(refused)["error"], "key_not_allowed");
+
+    auto mint = json_post("/api/v1/account/api-keys", {{"name", "second"}});
+    mint->addHeader("X-API-Key", key);
+    auto mint_resp = send(mint);
+    EXPECT_EQ(mint_resp->statusCode(), k401Unauthorized) << mint_resp->getBody();
+
+    auto admin = HttpRequest::newHttpRequest();
+    admin->setPath("/api/v1/admin/users");
+    admin->addHeader("X-API-Key", key);
+    EXPECT_EQ(send(admin)->statusCode(), k401Unauthorized);
+
+    // The same key still works where keys belong.
+    auto me = HttpRequest::newHttpRequest();
+    me->setPath("/api/v1/auth/me");
+    me->addHeader("X-API-Key", key);
+    auto me_resp = send(me);
+    EXPECT_EQ(me_resp->statusCode(), k200OK) << me_resp->getBody();
+}
+
 TEST(HttpE2E, IdempotencyKeyReplaysResponse) {
     REQUIRE_E2E_ENV();
     const json body = {{"email", "e2e-idem@example.com"}, {"password", "password-e2e-1"}};

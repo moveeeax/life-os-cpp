@@ -27266,7 +27266,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 397720,
-  "source_fnv1a64": "66d6e3193c9b2c3c"
+  "source_bytes": 398002,
+  "source_fnv1a64": "bb7258b52885558c"
  }
 }
