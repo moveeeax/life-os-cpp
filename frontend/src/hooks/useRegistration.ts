@@ -13,9 +13,10 @@ interface RegistrationState {
  * While unknown, or when the server does not answer the probe, sign-up
  * counts as open: the register call itself still has the last word.
  */
-export function useRegistrationOpen(): boolean {
+export function useRegistrationOpen(enabled = true): boolean {
   const probe = useQuery({
     queryKey: qk.registration(),
+    enabled,
     staleTime: 10 * 60_000,
     retry: false,
     queryFn: async ({ signal }) => {

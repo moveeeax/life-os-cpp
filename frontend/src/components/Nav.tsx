@@ -39,7 +39,7 @@ export function Nav() {
   // is logged out on a 5xx/network error (isSuccess stays false then).
   const showAuthButtons = me.isSuccess && !user;
   // Invite-only servers hide Register; unknown counts as open.
-  const registrationOpen = useRegistrationOpen();
+  const registrationOpen = useRegistrationOpen(showAuthButtons);
 
   // Nav links come straight from the routes manifest — every route that
   // declares a navLabel, filtered by what this user is allowed to see.
