@@ -815,6 +815,13 @@ select.k-input option {
     display: none;
   }
 }
+/* A small select inside a tools-row label ("Hide under $10"). */
+.k-input.k-select-inline {
+  width: auto;
+  padding: 2px 8px;
+  font-size: 13px;
+  border-radius: 999px;
+}
 /* A segmented control that may hold more options than the row has room for. */
 .k-seg-scroll {
   max-width: 100%;
