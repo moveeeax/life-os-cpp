@@ -8,6 +8,8 @@
  */
 export const qk = {
   me: () => ['me'] as const,
+  /** Whether sign-up is open (public probe). */
+  registration: () => ['registration'] as const,
   billing: {
     packages: () => ['billing', 'packages'] as const,
     /** Own wallet balance + ledger page. usePagedQuery-style: page appended by callers. */

@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/toaster';
 import { BRAND } from '@/lib/brand';
 import { useLogout } from '@/hooks/useAuthMutations';
 import { useMe } from '@/hooks/useMe';
+import { useRegistrationOpen } from '@/hooks/useRegistration';
 import { useThemeToggle } from '@/hooks/useThemeToggle';
 import { useWalletSummary } from '@/hooks/useWallet';
 import { cn } from '@/lib/utils';
@@ -37,6 +38,8 @@ export function Nav() {
   // Register" while /me is still pending, and still never claims the user
   // is logged out on a 5xx/network error (isSuccess stays false then).
   const showAuthButtons = me.isSuccess && !user;
+  // Invite-only servers hide Register; unknown counts as open.
+  const registrationOpen = useRegistrationOpen();
 
   // Nav links come straight from the routes manifest — every route that
   // declares a navLabel, filtered by what this user is allowed to see.
@@ -137,9 +140,11 @@ export function Nav() {
                 <Button size="sm" variant="ghost" asChild>
                   <Link to="/login">Log in</Link>
                 </Button>
-                <Button size="sm" asChild>
-                  <Link to="/register">Register</Link>
-                </Button>
+                {registrationOpen && (
+                  <Button size="sm" asChild>
+                    <Link to="/register">Register</Link>
+                  </Button>
+                )}
               </>
             )}
           </div>
@@ -225,11 +230,13 @@ export function Nav() {
                     Log in
                   </Link>
                 </Button>
-                <Button asChild>
-                  <Link to="/register" onClick={() => setMenuOpen(false)}>
-                    Register
-                  </Link>
-                </Button>
+                {registrationOpen && (
+                  <Button asChild>
+                    <Link to="/register" onClick={() => setMenuOpen(false)}>
+                      Register
+                    </Link>
+                  </Button>
+                )}
               </div>
             )}
           </div>
