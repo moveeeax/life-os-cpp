@@ -6,6 +6,28 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-10-14
+
+### Added
+- Now: an Arrange sheet sets the weather city (geocoded once, weather from
+  Open-Meteo, cached for an hour) and which chip sits in which corner, a corner
+  may stay empty; a note of the day under the focus with yesterday's below; the
+  Food and money panel takes one line of text and adds the parsed meal to the
+  day or the parsed spend to the Money inbox.
+- Travel: a Documents tab for the family's passports, visas and insurance with
+  their expiry; a trip warns about a passport valid less than six months past
+  its end and a visa or insurance that ends before it does.
+
+### Fixed
+- The frontend nginx takes the client address from Traefik's X-Forwarded-For,
+  so the login throttle and the failed-login audit see the client, not the
+  Traefik pod; until now every login shared one bucket per Traefik pod.
+- Travel: a flight can be marked as needing no border crossing (domestic, or one
+  you are not on) and the trip page stops asking for one; a trip total shows a
+  rate day only when a rate was used; a spend linked to one trip is not moved to
+  another by linking; creating or editing a trip answers in the asked currency;
+  a counter past an "over" threshold reads "Threshold met".
+
 ## [1.24.0] - 2026-10-13
 
 ### Added
