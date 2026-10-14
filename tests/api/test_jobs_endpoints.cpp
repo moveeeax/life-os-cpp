@@ -79,10 +79,8 @@ TEST_F(JobsEndpointTest, SubmitJobWithMaxRetries) {
 
 TEST_F(JobsEndpointTest, SubmitRefusesTypesTheAppEnqueuesItself) {
     // webhook.deliver from the admin API is an SSRF probe; email.send a relay.
-    for (const std::string type : {std::string(Webhooks::kJobType),
-                                   std::string(Email::SendEmail::kJobType),
-                                   std::string(Email::AccountEmails::kJobType),
-                                   std::string("no_such_handler")}) {
+    for (const char* type :
+         {Webhooks::kJobType, Email::SendEmail::kJobType, Email::AccountEmails::kJobType, "no_such_handler"}) {
         auto body = submit({{"type", type}, {"payload", {{"url", "http://169.254.169.254/"}}}});
         EXPECT_EQ(body["_status"], 400) << type;
         EXPECT_EQ(body["error"], "job_type_not_allowed") << type;
