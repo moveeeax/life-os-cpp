@@ -8,6 +8,7 @@ const TABS: TabItem[] = [
   { to: '/travel', label: 'Trips', end: true },
   { to: '/travel/days', label: 'Days' },
   { to: '/travel/rules', label: 'Rules' },
+  { to: '/travel/documents', label: 'Documents' },
 ];
 
 /** Frame of every Travel page on the calm sheet. */

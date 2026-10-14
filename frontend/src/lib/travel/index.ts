@@ -1,4 +1,11 @@
-import type { TravelCounter, TravelCrossing, TravelTrip, TravelTripItem } from './types';
+import type {
+  TravelCounter,
+  TravelCrossing,
+  TravelDocument,
+  TravelDocumentWarning,
+  TravelTrip,
+  TravelTripItem,
+} from './types';
 
 export type * from './types';
 
@@ -90,4 +97,23 @@ export function whereNow(
     .filter((c) => c.date <= today && c.to_country === here[0])
     .reduce<string | null>((a, c) => (a && a > c.date ? a : c.date), null);
   return { country: here[0], since: into };
+}
+
+export const DOCUMENT_KIND: Record<TravelDocument['kind'], string> = {
+  passport: 'Passport',
+  visa: 'Visa',
+  insurance: 'Insurance',
+  other: 'Document',
+};
+
+/** Six months, the window the passport rule asks for: such a document deserves a look. */
+export const DOCUMENT_SOON_DAYS = 180;
+
+/** The line of a trip warning: "Maksim's passport is valid until 1 May 2027, less than six months after the trip". */
+export function documentWarningLine(w: TravelDocumentWarning, today: string): string {
+  const kind = (DOCUMENT_KIND[w.kind as TravelDocument['kind']] ?? 'Document').toLowerCase();
+  const until = shortDay(w.valid_until, today);
+  return w.reason === 'passport_6_months'
+    ? `${w.holder}'s ${kind} is valid until ${until}, less than six months after the trip`
+    : `${w.holder}'s ${kind} ends on ${until}, before the trip does`;
 }

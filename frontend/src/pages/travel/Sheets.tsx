@@ -1,8 +1,20 @@
 import { useState, type FormEvent } from 'react';
 
-import { useSaveCrossing, useSaveItem, useSaveRule, useSaveTrip } from '@/hooks/useTravel';
+import {
+  useSaveCrossing,
+  useSaveDocument,
+  useSaveItem,
+  useSaveRule,
+  useSaveTrip,
+} from '@/hooks/useTravel';
 import { crossingBody, itemBody, ruleBody, tripBody, type ItemForm } from '@/lib/travel/bodies';
-import type { TravelCrossing, TravelRule, TravelTrip, TravelTripItem } from '@/lib/travel';
+import type {
+  TravelCrossing,
+  TravelDocument,
+  TravelRule,
+  TravelTrip,
+  TravelTripItem,
+} from '@/lib/travel';
 import { Sheet } from '@/shell/kit';
 
 function Actions({
@@ -361,6 +373,81 @@ export function RuleSheet({ rule, onClose }: { rule?: TravelRule; onClose: () =>
         </label>
         <ErrorLine error={save.error} />
         <Actions busy={save.isPending} label={rule ? 'Save' : 'Add'} onCancel={onClose} />
+      </form>
+    </Sheet>
+  );
+}
+
+/** Add or edit a travel document. */
+export function DocumentSheet({
+  document,
+  onClose,
+}: {
+  document?: TravelDocument;
+  onClose: () => void;
+}) {
+  const [f, setF] = useState({
+    holder: document?.holder ?? '',
+    kind: document?.kind ?? ('passport' as TravelDocument['kind']),
+    number: document?.number ?? '',
+    valid_until: document?.valid_until ?? '',
+    note: document?.note ?? '',
+  });
+  const save = useSaveDocument(document?.id ?? null, onClose);
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) =>
+    setF({ ...f, [k]: e.target.value });
+  return (
+    <Sheet title={document ? 'Edit the document' : 'New document'} onClose={onClose} width={440}>
+      <form
+        className="k-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate({
+            holder: f.holder.trim(),
+            kind: f.kind,
+            number: f.number.trim(),
+            valid_until: f.valid_until,
+            note: f.note.trim(),
+          });
+        }}
+      >
+        <div className="k-fields">
+          <label className="k-field">
+            <span>Whose</span>
+            <input
+              required
+              maxLength={80}
+              placeholder="Olesia"
+              value={f.holder}
+              onChange={set('holder')}
+            />
+          </label>
+          <label className="k-field">
+            <span>Kind</span>
+            <select value={f.kind} onChange={set('kind')}>
+              <option value="passport">Passport</option>
+              <option value="visa">Visa</option>
+              <option value="insurance">Insurance</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+        </div>
+        <div className="k-fields">
+          <label className="k-field">
+            <span>Number</span>
+            <input maxLength={60} value={f.number} onChange={set('number')} />
+          </label>
+          <label className="k-field">
+            <span>Valid until</span>
+            <input type="date" required value={f.valid_until} onChange={set('valid_until')} />
+          </label>
+        </div>
+        <label className="k-field">
+          <span>Note</span>
+          <input maxLength={500} value={f.note} onChange={set('note')} />
+        </label>
+        <ErrorLine error={save.error} />
+        <Actions busy={save.isPending} label={document ? 'Save' : 'Add'} onCancel={onClose} />
       </form>
     </Sheet>
   );

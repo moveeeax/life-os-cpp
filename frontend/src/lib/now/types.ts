@@ -11,3 +11,7 @@ export type WallpaperUpload = S['WallpaperUpload'];
 export type Sound = S['Sound'];
 export type AdminSound = S['AdminSound'];
 export type SoundCreate = S['SoundCreate'];
+export type NowSettings = S['NowSettings'];
+export type NowSettingsInput = S['NowSettingsInput'];
+export type NowCorners = S['NowCorners'];
+export type NowWeather = S['NowWeather'];

@@ -102,6 +102,9 @@ const TravelDaysPage = lazy(() =>
 const TravelRulesPage = lazy(() =>
   import('@/pages/travel/Rules').then((m) => ({ default: m.TravelRulesPage })),
 );
+const TravelDocumentsPage = lazy(() =>
+  import('@/pages/travel/Documents').then((m) => ({ default: m.TravelDocumentsPage })),
+);
 const TravelTripPage = lazy(() =>
   import('@/pages/travel/Trip').then((m) => ({ default: m.TravelTripPage })),
 );
@@ -308,6 +311,12 @@ export const routes: RouteEntry[] = [
   { path: '/travel', element: <TravelTripsPage />, guard: 'confirmed', layout: 'shell' },
   { path: '/travel/days', element: <TravelDaysPage />, guard: 'confirmed', layout: 'shell' },
   { path: '/travel/rules', element: <TravelRulesPage />, guard: 'confirmed', layout: 'shell' },
+  {
+    path: '/travel/documents',
+    element: <TravelDocumentsPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
   { path: '/travel/trips/:id', element: <TravelTripPage />, guard: 'confirmed', layout: 'shell' },
 
   // ── Admin — gated by Permission.Administer (0x40000000 sentinel) ────────

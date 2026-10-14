@@ -9,6 +9,7 @@ import {
   formatDate,
   formatGrams,
   formatKcal,
+  mealByHour,
   parseDateParam,
   percent,
   shiftDate,
@@ -87,11 +88,6 @@ function Macros({ day }: { day: FoodDay }) {
       <Macro label="Carbs" value={day.totals.carbs_g} target={t?.carbs_g ?? null} />
     </div>
   );
-}
-
-/** The meal to describe into by the hour: breakfast before 11, lunch before 16, dinner before 21. */
-function mealByHour(hour: number): FoodMeal {
-  return hour < 11 ? 'breakfast' : hour < 16 ? 'lunch' : hour < 21 ? 'dinner' : 'snack';
 }
 
 /** The diary of one day: the totals against the goals and the four meals. */

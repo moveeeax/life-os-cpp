@@ -14,6 +14,9 @@ import {
   type Sound,
   type SoundCreate,
   type FocusInput,
+  type NowSettings,
+  type NowSettingsInput,
+  type NowWeather,
   type Today,
   type Wallpaper,
   type WallpaperCreate,
@@ -108,6 +111,49 @@ export function useFocusDone() {
       (await api.postJson<{ data: Focus }>(`${TODAY}/focus/done`, { body })).data,
     { invalidate: AFTER_FOCUS },
   );
+}
+
+// ── the note, settings and weather ─────────────────────────────────────────
+
+/** Saves the note of a day; an empty text clears it. */
+export function useSaveNote() {
+  return useApiMutation(
+    async ({ date, text }: { date: string; text: string }) => {
+      if (text.trim() === '') return del(`${TODAY}/note`, { date });
+      await api.putJson<unknown>(`${TODAY}/note`, { body: { date, text: text.trim() } });
+    },
+    { invalidate: [qk.now.all()] },
+  );
+}
+
+export function useNowSettings(enabled = true) {
+  return useQuery({
+    queryKey: qk.now.settings(),
+    enabled,
+    staleTime: 10 * 60_000,
+    queryFn: async ({ signal }) =>
+      (await api.getJson<{ data: NowSettings }>('/api/v1/now/settings', { signal })).data,
+  });
+}
+
+export function useSaveNowSettings(onSuccess?: () => void) {
+  return useApiMutation(
+    async (body: NowSettingsInput) =>
+      (await api.putJson<{ data: NowSettings }>('/api/v1/now/settings', { body })).data,
+    { invalidate: [qk.now.settings(), qk.now.weather()], onSuccess },
+  );
+}
+
+/** The weather of the settings city; null without one. Quiet on failure: Now paints without it. */
+export function useWeather(enabled: boolean) {
+  return useQuery({
+    queryKey: qk.now.weather(),
+    enabled,
+    staleTime: 15 * 60_000,
+    retry: false,
+    queryFn: async ({ signal }) =>
+      (await api.getJson<{ data: NowWeather | null }>('/api/v1/now/weather', { signal })).data,
+  });
 }
 
 // ── admin ───────────────────────────────────────────────────────────────────
