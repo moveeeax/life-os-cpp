@@ -442,6 +442,21 @@ TEST(HttpE2E, ApiKeyIsRefusedOnTheAccountSurface) {
     admin->addHeader("X-API-Key", key);
     EXPECT_EQ(send(admin)->statusCode(), k401Unauthorized);
 
+    // Other spellings of the refused paths are refused too (the middleware
+    // canonicalizes before deciding).
+    for (const char* path : {"/API/v1/admin/users",
+                             "//api/v1/admin/users",
+                             "/api/v1/./admin/users",
+                             "/api/v1/x/../admin/users",
+                             "/api/v1/Account/api-keys"}) {
+        auto odd = HttpRequest::newHttpRequest();
+        odd->setPath(path);
+        odd->addHeader("X-API-Key", key);
+        auto odd_resp = send(odd);
+        EXPECT_EQ(odd_resp->statusCode(), k401Unauthorized) << path << " " << odd_resp->getBody();
+        EXPECT_EQ(body_of(odd_resp)["error"], "key_not_allowed") << path;
+    }
+
     // The same key still works where keys belong.
     auto me = HttpRequest::newHttpRequest();
     me->setPath("/api/v1/auth/me");

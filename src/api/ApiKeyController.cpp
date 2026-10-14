@@ -19,6 +19,7 @@
 namespace Api {
 
 void ApiKeyController::list(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
+    API_REFUSE_API_KEY(req, callback);
     API_REQUIRE_OWNER(req, callback, owner);
     Repositories::ApiKeyRepository repo;
     auto keys = repo.list_for_user(owner);
@@ -27,6 +28,7 @@ void ApiKeyController::list(const HttpRequestPtr& req, std::function<void(const 
 }
 
 void ApiKeyController::create(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
+    API_REFUSE_API_KEY(req, callback);
     API_REQUIRE_OWNER(req, callback, owner);
     json body;
     if (!Validation::parse_body(req, body, callback))
@@ -54,6 +56,7 @@ void ApiKeyController::create(const HttpRequestPtr& req, std::function<void(cons
 void ApiKeyController::remove(const HttpRequestPtr& req,
                               std::function<void(const HttpResponsePtr&)>&& callback,
                               const std::string& id) {
+    API_REFUSE_API_KEY(req, callback);
     API_REQUIRE_OWNER(req, callback, owner);
     Repositories::ApiKeyRepository repo;
     if (!repo.revoke(id, owner)) {

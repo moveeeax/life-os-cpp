@@ -23,6 +23,7 @@
 namespace Api {
 
 void AuditController::listAudit(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
+    API_REFUSE_API_KEY(req, callback);
     API_REQUIRE_PERMISSION(req, callback, Domain::Permission::kAuditRead);
 
     const auto pp = parse_page_params(req, /*default_limit=*/50, /*max_limit=*/200);

@@ -117,6 +117,27 @@ TEST_F(ApiKeysTest, AdminKeyCarriesNoAdminBitAndIsMarkedAsAKey) {
     EXPECT_NE(Security::Auth::require_admin(req), nullptr);
 }
 
+TEST_F(ApiKeysTest, KeyPrincipalCannotManageKeysEvenPastTheMiddleware) {
+    // The controller refuses a key principal itself, whatever path spelling
+    // got the request routed here.
+    auto user = seed_user("key-self@example.com");
+    const std::string key = create_key(user, "k")["key"];
+    auto principal = Security::ApiKeys::authenticate(with_key(key));
+    ASSERT_TRUE(principal.has_value());
+
+    HttpResponsePtr resp;
+    controller.create(TestHelpers::authed_json(*principal, {{"name", "more"}}),
+                      [&](const HttpResponsePtr& r) { resp = r; });
+    ASSERT_NE(resp, nullptr);
+    EXPECT_EQ(resp->statusCode(), k401Unauthorized);
+    EXPECT_EQ(json::parse(std::string(resp->body()))["error"], "key_not_allowed");
+
+    HttpResponsePtr listed;
+    controller.list(TestHelpers::authed(*principal), [&](const HttpResponsePtr& r) { listed = r; });
+    ASSERT_NE(listed, nullptr);
+    EXPECT_EQ(listed->statusCode(), k401Unauthorized);
+}
+
 TEST_F(ApiKeysTest, RevokeIsOwnerScoped) {
     auto alice = seed_user("alice@example.com");
     auto bob = seed_user("bob@example.com");
