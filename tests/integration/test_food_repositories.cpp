@@ -4,9 +4,9 @@
  *        numbers, archive-on-delete, day and week views, the Mi scale weight.
  */
 
-#include <thread>
 #include <chrono>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <gtest/gtest.h>

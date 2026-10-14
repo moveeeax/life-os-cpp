@@ -6,10 +6,10 @@
  *        reopening the task, a focus whose task is gone.
  */
 
-#include <thread>
 #include <chrono>
 #include <optional>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 

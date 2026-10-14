@@ -3,9 +3,9 @@
  * @brief Idempotent upsert of daily activity: added, then updated.
  */
 
-#include <thread>
 #include <chrono>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <gtest/gtest.h>

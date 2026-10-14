@@ -138,8 +138,7 @@ public:
                         "LIMIT 1",
                         id);
                     if (!used.empty()) {
-                        txn.exec_params(
-                            "UPDATE money_accounts SET archived = true WHERE id = $1::uuid", id);
+                        txn.exec_params("UPDATE money_accounts SET archived = true WHERE id = $1::uuid", id);
                         return "archived";
                     }
                     txn.exec_params("DELETE FROM money_accounts WHERE id = $1::uuid", id);

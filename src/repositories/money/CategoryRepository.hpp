@@ -145,8 +145,7 @@ public:
                     auto used =
                         txn.exec_params("SELECT 1 FROM money_transactions WHERE category_id = $1::uuid LIMIT 1", id);
                     if (!used.empty()) {
-                        txn.exec_params(
-                            "UPDATE money_categories SET archived = true WHERE id = $1::uuid", id);
+                        txn.exec_params("UPDATE money_categories SET archived = true WHERE id = $1::uuid", id);
                         return "archived";
                     }
                     txn.exec_params("UPDATE money_merchants SET category_id = NULL WHERE category_id = $1::uuid", id);

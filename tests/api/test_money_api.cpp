@@ -1219,8 +1219,13 @@ TEST_F(MoneyApiTest, FewerDecimalsAreRefusedWhileAnAccountKeepsTheCurrency) {
     const auto refused = patch(kAnna, json{{"decimals", 1}});
     ASSERT_EQ(refused->statusCode(), k409Conflict) << refused->body();
     EXPECT_EQ(body_of(refused)["error"], "decimals_in_use");
-    EXPECT_EQ(body_of(call_id(&Api::MoneyController::getCurrency, user(kAnna), Get, "XAU"))["data"]["decimals"], 2)
-        << "nothing changed";
+    int kept = -1;
+    for (const auto& c : body_of(call(&Api::MoneyController::listCurrencies, user(kAnna), Get))["data"]) {
+        if (c["code"] == "XAU") {
+            kept = c["decimals"].get<int>();
+        }
+    }
+    EXPECT_EQ(kept, 2) << "nothing changed";
 
     EXPECT_EQ(body_of(patch(kAnna, json{{"decimals", 2}}))["data"]["decimals"], 2) << "the same is not a change";
     EXPECT_EQ(body_of(patch(kAnna, json{{"decimals", 4}}))["data"]["decimals"], 4) << "more decimals fit every row";

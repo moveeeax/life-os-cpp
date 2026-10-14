@@ -7,9 +7,9 @@
  *        leaving its notes unlinked.
  */
 
-#include <thread>
 #include <chrono>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -235,9 +235,8 @@ TEST_F(NotesApiTest, UpdatedAtMovesByTheTriggerAlone) {
     const std::string sql = std::string("SELECT ") + kUpdatedAtFormat + " FROM notes WHERE id = $1::uuid";
     const std::string before = updated_at_of(sql, id);
     std::this_thread::sleep_for(std::chrono::milliseconds(2));
-    auto edited = call(kAnna, Patch, json{{"body", "More words"}}, [&](auto req, auto cb) {
-        c.updateNote(req, std::move(cb), id);
-    });
+    auto edited = call(
+        kAnna, Patch, json{{"body", "More words"}}, [&](auto req, auto cb) { c.updateNote(req, std::move(cb), id); });
     ASSERT_EQ(edited->statusCode(), k200OK) << std::string(edited->body());
     EXPECT_GT(updated_at_of(sql, id), before) << "notes_touch_updated_at";
 }

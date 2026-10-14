@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 #
-# Scaffold a full CRUD domain resource end to end, following docs/CONVENTIONS.md:
-#   - src/domain/<Entity>.hpp            (struct + from_row + to_json)
-#   - src/repositories/<Entity>Repository.hpp  (typed exceptions + find/list/count/create/remove)
-#   - src/api/<Entity>sController.hpp     (list/create/get/delete, with_repo_errors)
+# Scaffold a full CRUD domain resource end to end, following docs/CONVENTIONS.md
+# and the module layout of docs/ARCHITECTURE.md §4:
+#   - src/domain/<Entity>.hpp                            (struct + from_row + to_json)
+#   - src/repositories/<module>/<Entity>Repository.hpp   (typed exceptions + find/list/count/create/remove,
+#                                                         namespace Repositories::<Module>)
+#   - src/api/<Entity>sController.hpp + .cpp             (routes + declarations in the header, bodies in
+#                                                         the .cpp: list/create/get/delete, with_repo_errors)
 #   - wires the #include into src/api/Api.hpp
 #   - adds the routes to Api::get_endpoints() in src/api/Endpoints.hpp
-#   - appends a path + schema block to docs/openapi.yaml
+#   - appends a path block to docs/openapi.yaml whose responses reference a
+#     components/schemas/<Entity> schema (inserted too)
+#   - declares the include edges in docs/module-deps.txt
 #   - tests/integration/test_<entity>.cpp     (Postgres/Redis-backed flow)
 #   - tests/unit/test_<entity>_domain.cpp     (serialization; runs WITHOUT infra)
 #
@@ -22,9 +27,14 @@
 # from_row / to_json / SQL in sync).
 #
 # Usage:
-#   ./scripts/new-resource.sh <Entity> [--owned]   # singular PascalCase
-#   ./scripts/new-resource.sh Product              # admin-gated, global
-#   ./scripts/new-resource.sh Note --owned         # per-user, owner-scoped
+#   ./scripts/new-resource.sh <Entity> [--owned] [--module <name>]   # singular PascalCase
+#   ./scripts/new-resource.sh Product                 # admin-gated, global, repositories/products/
+#   ./scripts/new-resource.sh Note --owned            # per-user, owner-scoped
+#   ./scripts/new-resource.sh Trip --module travel    # the repository joins src/repositories/travel/
+#
+# --module names the directory under src/repositories/ (and the namespace
+# Repositories::<Module>) the repository goes into; the default is the plural
+# of the entity (Product -> repositories/products/, Repositories::Products).
 #
 set -euo pipefail
 
@@ -34,25 +44,36 @@ set -euo pipefail
 # Without it you get the default ADMIN-gated, global-scoped resource.
 OWNED=0
 ENTITY=""
-for arg in "$@"; do
-    case "$arg" in
+MODULE=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
     --owned) OWNED=1 ;;
+    --module)
+        if [[ $# -lt 2 ]]; then
+            echo "ERROR: --module requires a value" >&2
+            exit 2
+        fi
+        MODULE="$2"
+        shift
+        ;;
+    --module=*) MODULE="${1#--module=}" ;;
     -*)
-        echo "ERROR: unknown flag '$arg'" >&2
+        echo "ERROR: unknown flag '$1'" >&2
         exit 2
         ;;
     *)
         if [[ -n "$ENTITY" ]]; then
-            echo "ERROR: unexpected extra argument '$arg'" >&2
+            echo "ERROR: unexpected extra argument '$1'" >&2
             exit 2
         fi
-        ENTITY="$arg"
+        ENTITY="$1"
         ;;
     esac
+    shift
 done
 
 if [[ -z "$ENTITY" ]]; then
-    echo "Usage: $0 <Entity> [--owned]   (singular PascalCase, e.g. Product)" >&2
+    echo "Usage: $0 <Entity> [--owned] [--module <name>]   (singular PascalCase, e.g. Product)" >&2
     exit 2
 fi
 if [[ ! "$ENTITY" =~ ^[A-Z][A-Za-z0-9]+$ ]]; then
@@ -65,6 +86,18 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # Derivations: lower-case singular, naive plural (append s), table = plural.
 LOWER="$(printf '%s' "$ENTITY" | tr '[:upper:]' '[:lower:]')"
 PLURAL="${LOWER}s"
+MODULE="${MODULE:-$PLURAL}"
+if [[ ! "$MODULE" =~ ^[a-z][a-z0-9_]*$ ]]; then
+    echo "ERROR: --module must be lower snake_case [a-z0-9_], got '$MODULE'" >&2
+    exit 2
+fi
+# The repository namespace: Repositories::<Module> (travel -> Travel, money -> Money).
+MODULE_NS=""
+for part in ${MODULE//_/ }; do
+    first="$(printf '%s' "$part" | cut -c1 | tr '[:lower:]' '[:upper:]')"
+    rest="$(printf '%s' "$part" | cut -c2-)"
+    MODULE_NS+="${first}${rest}"
+done
 # API version prefix — see docs/ARCHITECTURE.md §7. Bumping the default
 # major is a one-line edit here; routes are emitted correct-by-construction.
 API_VERSION="v1"
@@ -73,15 +106,18 @@ ROUTE="${API_PREFIX}/${PLURAL}"
 CONTROLLER="${ENTITY}sController"
 
 DOMAIN_FILE="$ROOT/src/domain/${ENTITY}.hpp"
-REPO_FILE="$ROOT/src/repositories/${ENTITY}Repository.hpp"
+REPO_DIR="$ROOT/src/repositories/${MODULE}"
+REPO_FILE="$REPO_DIR/${ENTITY}Repository.hpp"
 CTRL_FILE="$ROOT/src/api/${CONTROLLER}.hpp"
+CTRL_CPP="$ROOT/src/api/${CONTROLLER}.cpp"
 TEST_FILE="$ROOT/tests/integration/test_${LOWER}.cpp"
 UNIT_TEST_FILE="$ROOT/tests/unit/test_${LOWER}_domain.cpp"
 API_HPP="$ROOT/src/api/Api.hpp"
 ENDPOINTS_HPP="$ROOT/src/api/Endpoints.hpp"
 OPENAPI="$ROOT/docs/openapi.yaml"
+DEPS="$ROOT/docs/module-deps.txt"
 
-for f in "$DOMAIN_FILE" "$REPO_FILE" "$CTRL_FILE"; do
+for f in "$DOMAIN_FILE" "$REPO_FILE" "$CTRL_FILE" "$CTRL_CPP"; do
     if [[ -e "$f" ]]; then
         echo "ERROR: $f already exists — refusing to overwrite" >&2
         exit 1
@@ -213,7 +249,8 @@ ${OWNER_TOJSON}        {"name", e.name},
 EOF
 echo "==> Created $DOMAIN_FILE"
 
-# ── 2. Repository ───────────────────────────────────────────────────────
+# ── 2. Repository (src/repositories/<module>/, namespace Repositories::<Module>) ──
+mkdir -p "$REPO_DIR"
 cat >"$REPO_FILE" <<EOF
 /**
  * @file ${ENTITY}Repository.hpp
@@ -235,7 +272,7 @@ ${REPO_BASE_INCLUDE}
 #include "repositories/RepoErrors.hpp"
 #include "repositories/SqlErrors.hpp"
 
-namespace Repositories {
+namespace Repositories::${MODULE_NS} {
 
 // Derive from the generic repo bases so Api::with_repo_errors maps them to
 // 409 / 404 instead of a bare 500 (see RepoErrors.hpp / HandlerSupport.hpp).
@@ -278,21 +315,60 @@ ${REPO_KOWNER}
     }
 };
 
-}  // namespace Repositories
+}  // namespace Repositories::${MODULE_NS}
 EOF
 echo "==> Created $REPO_FILE"
 
-# ── 3. Controller ───────────────────────────────────────────────────────
+# ── 3. Controller: routes + declarations in the .hpp, bodies in the .cpp ──
 cat >"$CTRL_FILE" <<EOF
 /**
  * @file ${CONTROLLER}.hpp
- * @brief ${ENTITY} CRUD endpoints. Generated by scripts/new-resource.sh.
- *        ${DOC_GATING}; follows docs/CONVENTIONS.md.
+ * @brief ${ROUTE}: ${ENTITY} CRUD routes. Generated by scripts/new-resource.sh.
+ *        ${DOC_GATING}; follows docs/CONVENTIONS.md. Routes and declarations
+ *        only; the bodies live in ${CONTROLLER}.cpp (docs/ARCHITECTURE.md §4).
  */
 
 #pragma once
 
+#include <functional>
+#include <string>
+
 #include <drogon/HttpController.h>
+
+namespace Api {
+
+using namespace drogon;
+
+class ${CONTROLLER} : public HttpController<${CONTROLLER}> {
+public:
+    METHOD_LIST_BEGIN
+    ADD_METHOD_TO(${CONTROLLER}::list${ENTITY}s, "${ROUTE}", Get);
+    ADD_METHOD_TO(${CONTROLLER}::create${ENTITY}, "${ROUTE}", Post);
+    ADD_METHOD_TO(${CONTROLLER}::get${ENTITY}, "${ROUTE}/{id}", Get);
+    ADD_METHOD_TO(${CONTROLLER}::delete${ENTITY}, "${ROUTE}/{id}", Delete);
+    METHOD_LIST_END
+
+    using Callback = std::function<void(const HttpResponsePtr&)>;
+
+    void list${ENTITY}s(const HttpRequestPtr& req, Callback&& callback);
+    void create${ENTITY}(const HttpRequestPtr& req, Callback&& callback);
+    void get${ENTITY}(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void delete${ENTITY}(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+};
+
+}  // namespace Api
+EOF
+cat >"$CTRL_CPP" <<EOF
+/**
+ * @file ${CONTROLLER}.cpp
+ * @brief ${ENTITY} CRUD handlers. Generated by scripts/new-resource.sh;
+ *        compiled once into app_core.
+ */
+
+#include "api/${CONTROLLER}.hpp"
+
+#include <string>
+
 #include <drogon/drogon.h>
 
 #include <nlohmann/json.hpp>
@@ -302,86 +378,80 @@ cat >"$CTRL_FILE" <<EOF
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "domain/${ENTITY}.hpp"
-#include "repositories/${ENTITY}Repository.hpp"
+#include "repositories/${MODULE}/${ENTITY}Repository.hpp"
 #include "utils/ErrorResponse.hpp"
 
 namespace Api {
 
-using namespace drogon;
+namespace {
+
 using json = nlohmann::json;
+using Repositories::${MODULE_NS}::${ENTITY}Repository;
 
-class ${CONTROLLER} : public HttpController<${CONTROLLER}> {
-public:
-    METHOD_LIST_BEGIN
-    ADD_METHOD_TO(${CONTROLLER}::list${ENTITY}s, "${ROUTE}", Get);
-    ADD_METHOD_TO(${CONTROLLER}::create${ENTITY}, "${ROUTE}", Post);
-    ADD_METHOD_TO(${CONTROLLER}::get${ENTITY}, "${ROUTE}/{1}", Get);
-    ADD_METHOD_TO(${CONTROLLER}::delete${ENTITY}, "${ROUTE}/{1}", Delete);
-    METHOD_LIST_END
+}  // namespace
 
-    void list${ENTITY}s(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
-        ${CTRL_GUARD_READ}
-        const auto page = parse_page_params(req, /*default_limit=*/50, /*max_limit=*/200);
-        with_repo_errors(callback, "list${ENTITY}s", [&] {
-            Repositories::${ENTITY}Repository repo;
-            auto items = ${CTRL_LIST};
-            long total = ${CTRL_COUNT};
-            callback(Response::paginated(to_json_array(items), total, page.limit, page.offset));
-        });
+void ${CONTROLLER}::list${ENTITY}s(const HttpRequestPtr& req, Callback&& callback) {
+    ${CTRL_GUARD_READ}
+    const auto page = parse_page_params(req, /*default_limit=*/50, /*max_limit=*/200);
+    with_repo_errors(callback, "list${ENTITY}s", [&] {
+        ${ENTITY}Repository repo;
+        auto items = ${CTRL_LIST};
+        long total = ${CTRL_COUNT};
+        callback(Response::paginated(to_json_array(items), total, page.limit, page.offset));
+    });
+}
+
+void ${CONTROLLER}::create${ENTITY}(const HttpRequestPtr& req, Callback&& callback) {
+    ${CTRL_GUARD_WRITE}
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
     }
+    Validation::Errors errs;
+    Validation::require(errs, body, "name");
+    Validation::string_length(errs, body, "name", 1, 255);
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    with_repo_errors(callback, "create${ENTITY}", [&] {
+        ${ENTITY}Repository repo;
+        auto created = ${CTRL_CREATE};
+        callback(Response::created({{"data", json(created)}}));
+    });
+}
 
-    void create${ENTITY}(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
-        ${CTRL_GUARD_WRITE}
-        json body;
-        if (!Validation::parse_body(req, body, callback)) return;
-        Validation::Errors errs;
-        Validation::require(errs, body, "name");
-        Validation::string_length(errs, body, "name", 1, 255);
-        if (errs.any()) {
-            callback(Validation::response_400(errs));
+void ${CONTROLLER}::get${ENTITY}(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    ${CTRL_GUARD_READ}
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "get${ENTITY}", [&] {
+        ${ENTITY}Repository repo;
+        auto found = ${CTRL_FIND};
+        if (!found) {
+            callback(ErrorResponse::not_found("${LOWER}"));
             return;
         }
-        with_repo_errors(callback, "create${ENTITY}", [&] {
-            Repositories::${ENTITY}Repository repo;
-            auto created = ${CTRL_CREATE};
-            callback(Response::created({{"data", json(created)}}));
-        });
-    }
+        callback(Response::ok({{"data", json(*found)}}));
+    });
+}
 
-    void get${ENTITY}(const HttpRequestPtr& req,
-                      std::function<void(const HttpResponsePtr&)>&& callback,
-                      const std::string& id) {
-        ${CTRL_GUARD_READ}
-        if (!require_valid_uuid(id, callback))
-            return;
-        with_repo_errors(callback, "get${ENTITY}", [&] {
-            Repositories::${ENTITY}Repository repo;
-            auto found = ${CTRL_FIND};
-            if (!found) {
-                callback(ErrorResponse::not_found("${LOWER}"));
-                return;
-            }
-            callback(Response::ok({{"data", json(*found)}}));
-        });
+void ${CONTROLLER}::delete${ENTITY}(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    ${CTRL_GUARD_WRITE}
+    if (!require_valid_uuid(id, callback)) {
+        return;
     }
-
-    void delete${ENTITY}(const HttpRequestPtr& req,
-                         std::function<void(const HttpResponsePtr&)>&& callback,
-                         const std::string& id) {
-        ${CTRL_GUARD_WRITE}
-        if (!require_valid_uuid(id, callback))
-            return;
-        with_repo_errors(callback, "delete${ENTITY}", [&] {
-            Repositories::${ENTITY}Repository repo;
-            ${CTRL_REMOVE};
-            callback(Response::ok({{"message", "${ENTITY} deleted"}}));
-        });
-    }
-};
+    with_repo_errors(callback, "delete${ENTITY}", [&] {
+        ${ENTITY}Repository repo;
+        ${CTRL_REMOVE};
+        callback(Response::ok({{"message", "${ENTITY} deleted"}}));
+    });
+}
 
 }  // namespace Api
 EOF
-echo "==> Created $CTRL_FILE"
+echo "==> Created $CTRL_FILE and $CTRL_CPP"
 
 # ── 4. Wire #include into Api.hpp ───────────────────────────────────────
 if ! grep -q "#include \"api/${CONTROLLER}.hpp\"" "$API_HPP"; then
@@ -413,7 +483,40 @@ add_route "GET" "${ROUTE}/{id}" "Get ${LOWER}"
 add_route "DELETE" "${ROUTE}/{id}" "Delete ${LOWER}"
 echo "==> Added 4 routes to $ENDPOINTS_HPP"
 
-# ── 6. OpenAPI block ────────────────────────────────────────────────────
+# ── 6. OpenAPI: the paths, and the ${ENTITY} schema they reference ──────
+# Every success response references components/schemas/${ENTITY}: a
+# schema-less `{ description: OK }` generates no frontend type and lets the
+# handler's shape drift unseen.
+if ! grep -qE "^    ${ENTITY}:$" "$OPENAPI"; then
+    SCHEMA_TMP="$(mktemp)"
+    {
+        printf '    %s:\n' "$ENTITY"
+        printf '      type: object\n'
+        printf '      required: [id, name, created_at]\n'
+        printf '      properties:\n'
+        printf '        id: { type: string, format: uuid }\n'
+        if [[ $OWNED -eq 1 ]]; then
+            printf '        owner_id: { type: string, format: uuid }\n'
+        fi
+        printf '        name: { type: string }\n'
+        printf '        created_at: { type: string, format: date-time }\n'
+    } >"$SCHEMA_TMP"
+    awk -v schemafile="$SCHEMA_TMP" '
+        { print }
+        /^  schemas:$/ && !done {
+            while ((getline sline < schemafile) > 0) print sline;
+            close(schemafile);
+            done=1
+        }
+    ' "$OPENAPI" >"$OPENAPI.tmp" && mv "$OPENAPI.tmp" "$OPENAPI"
+    rm -f "$SCHEMA_TMP"
+    if grep -qE "^    ${ENTITY}:$" "$OPENAPI"; then
+        echo "==> Added components/schemas/${ENTITY} to $OPENAPI"
+    else
+        echo "ERROR: no '  schemas:' anchor in $OPENAPI — add components/schemas/${ENTITY} by hand" >&2
+        exit 1
+    fi
+fi
 if ! grep -q "^  ${ROUTE}:" "$OPENAPI"; then
     cat >>"$OPENAPI" <<EOF
 
@@ -426,7 +529,18 @@ if ! grep -q "^  ${ROUTE}:" "$OPENAPI"; then
         - { name: limit,  in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
-        '200': { description: "{ data, total, limit, offset }" }
+        '200':
+          description: A page of ${PLURAL}
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, total, limit, offset]
+                properties:
+                  data: { type: array, items: { \$ref: '#/components/schemas/${ENTITY}' } }
+                  total: { type: integer }
+                  limit: { type: integer }
+                  offset: { type: integer }
         '403': { description: ${DESC_403} }
     post:
       summary: Create ${LOWER} (${SUMMARY_GATE})
@@ -441,7 +555,15 @@ if ! grep -q "^  ${ROUTE}:" "$OPENAPI"; then
               required: [name]
               properties: { name: { type: string, minLength: 1, maxLength: 255 } }
       responses:
-        '201': { description: Created }
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { \$ref: '#/components/schemas/${ENTITY}' }
         '400': { description: Validation failed }
         '403': { description: ${DESC_403} }
         '409': { description: Already exists }
@@ -453,18 +575,44 @@ if ! grep -q "^  ${ROUTE}:" "$OPENAPI"; then
       tags: [${PLURAL}]
       security: [{ BearerAuth: [] }]
       responses:
-        '200': { description: OK }
+        '200':
+          description: The ${LOWER}
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { \$ref: '#/components/schemas/${ENTITY}' }
         '404': { description: Not found }
     delete:
-      summary: Delete ${LOWER} (admin)
+      summary: Delete ${LOWER} (${SUMMARY_GATE})
       tags: [${PLURAL}]
       security: [{ BearerAuth: [] }]
       responses:
-        '200': { description: Deleted }
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string }
         '404': { description: Not found }
 EOF
     echo "==> Appended OpenAPI block to $OPENAPI"
 fi
+
+# ── 6b. Include edges of the generated files (docs/module-deps.txt) ───────
+# Appended, never re-sorted; scripts/check-module-deps.sh verifies them.
+for edge in "repositories/${MODULE} -> database" "repositories/${MODULE} -> domain" \
+    "repositories/${MODULE} -> repositories" "api -> repositories/${MODULE}"; do
+    if ! grep -qxF "$edge" "$DEPS"; then
+        printf '%s\n' "$edge" >>"$DEPS"
+        echo "==> docs/module-deps.txt: added '$edge'"
+    fi
+done
 
 # ── 7. Integration test skeleton ────────────────────────────────────────
 if [[ ! -e "$TEST_FILE" ]]; then
@@ -577,14 +725,17 @@ fi
 cat <<EOF
 
 Done. Next steps (manual):
-  1. Edit src/domain/${ENTITY}.hpp + ${ENTITY}Repository.hpp for your real
-     columns, then mirror them in the generated migration (the table ships
+  1. Edit src/domain/${ENTITY}.hpp + src/repositories/${MODULE}/${ENTITY}Repository.hpp
+     for your real columns, mirror them in components/schemas/${ENTITY}
+     (docs/openapi.yaml) and in the generated migration (the table ships
      with the stub {id, name, created_at, updated_at} shape).
-  2. Nothing to register: tests/integration/ is globbed by directory, so the
-     new suite compiles as-is. ./scripts/check-test-buckets.sh just verifies it
-     sits in the right bucket (no name clash with a unit suite).
-  3. Frontend: types via 'make frontend-gen-api', page under src/pages/admin/.
-  4. Verify:  ./scripts/check-openapi-drift.sh  &&  make test
+  2. Nothing to register: src/**/*.cpp and tests/integration/ are globbed by
+     directory, so the .cpp and the new suite compile as-is.
+     ./scripts/check-test-buckets.sh just verifies the suite sits in the
+     right bucket (no name clash with a unit suite).
+  3. clang-format -i the generated C++ files; ./scripts/check-module-deps.sh.
+  4. Frontend: types via 'make frontend-gen-api', page under src/pages/admin/.
+  5. Verify:  ./scripts/check-openapi-drift.sh  &&  make test
 EOF
 
 if [[ $OWNED -eq 1 ]]; then

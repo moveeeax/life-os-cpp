@@ -5,10 +5,10 @@
  *        closing the goal, deleting a goal unlinking its tasks, the owner scope.
  */
 
-#include <thread>
 #include <chrono>
 #include <optional>
 #include <string>
+#include <thread>
 
 #include <gtest/gtest.h>
 
