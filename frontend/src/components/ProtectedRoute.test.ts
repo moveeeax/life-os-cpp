@@ -29,6 +29,25 @@ describe('guardDecision', () => {
     expect(d.kind).not.toBe('redirect');
   });
 
+  it('a failed background refetch keeps a cached user signed in', () => {
+    expect(guardDecision(state({ isError: true, data: { confirmed: true } }), {}, always)).toEqual({
+      kind: 'allow',
+    });
+    expect(
+      guardDecision(
+        state({ isError: true, data: { confirmed: false } }),
+        { requireConfirmed: true },
+        always,
+      ),
+    ).toEqual({ kind: 'redirect', to: '/unconfirmed' });
+  });
+
+  it('a failed refetch after a 401 (cached null) still shows the error, not /login', () => {
+    expect(guardDecision(state({ isError: true, data: null }), {}, always)).toEqual({
+      kind: 'error',
+    });
+  });
+
   it('data === null (401) → redirect to /login', () => {
     expect(guardDecision(state({ data: null }), {}, always)).toEqual({
       kind: 'redirect',
