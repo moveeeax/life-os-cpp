@@ -176,7 +176,7 @@ public:
 
     /**
      * @brief Delete a role. Throws RoleNotFound if it doesn't exist,
-     *        RoleInUse on FK violation (SQLSTATE 23503) — the migration's
+     *        RoleInUse on FK violation (SQLSTATE 23503, or 23001 on PostgreSQL 18) — the migration's
      *        ON DELETE RESTRICT keeps the schema consistent.
      */
     void remove(int id) {
@@ -189,7 +189,7 @@ public:
                     return 0;
                 });
             },
-            detail::throw_on<RoleInUse>("23503"));
+            detail::throw_on_fk<RoleInUse>());
     }
 
 private:

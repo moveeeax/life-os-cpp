@@ -36,7 +36,7 @@ inline void translate(std::string_view sqlstate) {
     if (sqlstate == "23514") {  // check_violation
         throw Invariant("the row breaks a rule of the travel model");
     }
-    if (sqlstate == "23503") {  // foreign_key_violation
+    if (detail::is_fk_violation(sqlstate)) {  // foreign_key_violation, restrict_violation
         throw Invariant("the row refers to a trip that is not there");
     }
     if (sqlstate == "22008" || sqlstate == "22007") {  // datetime_field_overflow, invalid_datetime_format

@@ -895,7 +895,7 @@ TEST_F(MoneyParseApiTest, TextAndReceiptAreQueuedForTheCaller) {
     EXPECT_FALSE(row.contains("image")) << "the photo never leaves";
     const auto theirs = call_id(&Api::MoneyController::parseStatus, user(kBoris), Get, id);
     EXPECT_EQ(theirs->statusCode(), k404NotFound);
-    EXPECT_EQ(body_of(theirs)["error"], "parse_job") << "one code for a missing parse job in every module";
+    EXPECT_EQ(body_of(theirs)["message"], "parse_job not found") << "one name for a missing parse job";
     auto second = Jobs::get().pick({"money_parse"}, 1);
     ASSERT_TRUE(second.has_value());
     Jobs::get().complete(second->id, json::object());

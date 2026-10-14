@@ -621,7 +621,7 @@ TEST_F(FoodParseApiTest, EnqueuesAJobForTheCallerAndShowsItOnlyToThem) {
 
     const auto theirs = call_id(&Api::FoodController::parseStatus, user(kBoris), Get, id);
     EXPECT_EQ(theirs->statusCode(), k404NotFound);
-    EXPECT_EQ(body_of(theirs)["error"], "parse_job") << "one code for a missing parse job in every module";
+    EXPECT_EQ(body_of(theirs)["message"], "parse_job not found") << "one name for a missing parse job";
     EXPECT_EQ(call_id(&Api::FoodController::parseStatus, user(kAnna), Get, kMissingId)->statusCode(), k404NotFound);
     EXPECT_EQ(call_id(&Api::FoodController::parseStatus, user(kAnna), Get, "nope")->statusCode(), k400BadRequest);
 }
