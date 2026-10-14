@@ -14,6 +14,7 @@
 
 #include "api/ApiKeyController.hpp"
 #include "database/Database.hpp"
+#include "domain/Role.hpp"
 #include "repositories/RoleRepository.hpp"
 #include "repositories/UserRepository.hpp"
 #include "security/ApiKeys.hpp"
@@ -111,6 +112,12 @@ TEST_F(ApiKeysTest, AdminKeyCarriesNoAdminBitAndIsMarkedAsAKey) {
     EXPECT_EQ(principal->raw_claims.value("api_key", false), true);
     const auto perms = principal->raw_claims["permissions"].get<std::int64_t>();
     EXPECT_EQ(perms & Security::Auth::kAdminPermissionBits, 0);
+    // The Administrator role is the sentinel bit alone, so the key must still
+    // carry the data bits the sentinel implied, or it reads nothing.
+    EXPECT_EQ(perms & Domain::Permission::kGeneral, Domain::Permission::kGeneral);
+    EXPECT_EQ(perms & Domain::Permission::kFitnessRead, Domain::Permission::kFitnessRead);
+    EXPECT_EQ(perms & Domain::Permission::kFitnessSync, Domain::Permission::kFitnessSync);
+    EXPECT_EQ(perms & Domain::Permission::kAuditRead, 0);
 
     // The admin guard sees the masked bitmask and refuses.
     auto req = TestHelpers::authed(*principal);

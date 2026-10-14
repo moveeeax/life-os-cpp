@@ -29,6 +29,12 @@
 
 namespace Security::ApiKeys {
 
+/// The data permissions a key of an administrator keeps once the admin bit is
+/// masked: what the admin sentinel grants implicitly on the data routes.
+/// GENERAL | FITNESS_READ | FITNESS_SYNC of src/domain/Role.hpp (security does
+/// not depend on domain, so the value is spelled out as kAdminPermissionBits is).
+inline constexpr std::uint32_t kAdminKeyDataBits = 0x01u | 0x04u | 0x08u;
+
 using json = nlohmann::json;
 
 /// Distinguishes an API key from a JWT in the Authorization header.
@@ -196,9 +202,13 @@ inline std::optional<Security::Auth::AuthPrincipal> authenticate(const drogon::H
                 return std::nullopt;
             const auto user_id = r[0]["user_id"].template as<std::string>();
             // The owner's role permissions minus the admin bit: an admin's key
-            // acts with the admin's data permissions, never as an admin.
-            const auto permissions = static_cast<std::uint32_t>(r[0]["permissions"].template as<long long>()) &
-                                     ~Security::Auth::kAdminPermissionBits;
+            // acts with the admin's data permissions, never as an admin. The
+            // Administrator role holds only the sentinel bit (migration 004)
+            // and passes every data gate through it, so a key of an admin is
+            // given the data bits the sentinel stood for.
+            const auto role = static_cast<std::uint32_t>(r[0]["permissions"].template as<long long>());
+            const bool admin = (role & Security::Auth::kAdminPermissionBits) == Security::Auth::kAdminPermissionBits;
+            const auto permissions = (role & ~Security::Auth::kAdminPermissionBits) | (admin ? kAdminKeyDataBits : 0u);
             Security::Auth::AuthPrincipal p;
             p.subject = user_id;
             p.via_api_key = true;
