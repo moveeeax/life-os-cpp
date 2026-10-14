@@ -72,14 +72,16 @@ export function guardDecision(
  * Reads the user directly from the useMe() query — the TanStack Query
  * cache is the single source of truth for the session.
  */
-export function ProtectedRoute({ children, requirePermission, requireConfirmed }: ProtectedRouteProps) {
+export function ProtectedRoute({
+  children,
+  requirePermission,
+  requireConfirmed,
+}: ProtectedRouteProps) {
   const location = useLocation();
   const me = useMe();
 
-  const decision = guardDecision(
-    me,
-    { requirePermission, requireConfirmed },
-    (user, bit) => userCan(user, bit),
+  const decision = guardDecision(me, { requirePermission, requireConfirmed }, (user, bit) =>
+    userCan(user, bit),
   );
 
   switch (decision.kind) {
