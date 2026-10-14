@@ -18,6 +18,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 
 namespace Repositories {
 
@@ -206,8 +207,8 @@ public:
                 out[e.type] = nlohmann::json::parse(r[0][0].template as<std::string>());
             }
             auto s = txn.exec_params(
-                "SELECT COALESCE(json_object_agg(data_type, to_char(last_sync_at AT TIME ZONE 'UTC', "
-                "'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"')), '{}'::json) FROM sync_state WHERE xiaomi_user_id = $1",
+                "SELECT COALESCE(json_object_agg(data_type, " SQL_ISO_UTC("last_sync_at") "), '{}'::json) "
+                "FROM sync_state WHERE xiaomi_user_id = $1",
                 account_);
             const auto last = nlohmann::json::parse(s[0][0].template as<std::string>());
             for (auto& [type, entry] : out.items()) {
@@ -243,7 +244,7 @@ public:
 private:
     /// ISO UTC with an explicit +00:00: timestamptz goes out without losing meaning.
     static std::string iso(const std::string& column) {
-        return "to_char(" + column + " AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"')";
+        return "to_char(" + column + " AT TIME ZONE 'UTC', " SQL_ISO_UTC_FORMAT ")";
     }
 
     /// UTC days over timestamptz: a half-open interval, index friendly.

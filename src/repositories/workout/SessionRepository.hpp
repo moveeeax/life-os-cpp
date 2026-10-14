@@ -19,6 +19,7 @@
 #include "database/Database.hpp"
 #include "repositories/RepoErrors.hpp"
 #include "repositories/SqlErrors.hpp"
+#include "repositories/SqlTime.hpp"
 #include "repositories/workout/ExerciseRepository.hpp"
 #include "repositories/workout/RoutineRepository.hpp"
 
@@ -471,7 +472,7 @@ private:
     }
 
     static std::string iso(const std::string& expr) {
-        return "to_char(" + expr + " AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"')";
+        return "to_char(" + expr + " AT TIME ZONE 'UTC', " SQL_ISO_UTC_FORMAT ")";
     }
 
     // Reconciliation, one statement. The band data is that of the session

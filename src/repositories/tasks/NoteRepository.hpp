@@ -12,6 +12,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 #include "repositories/tasks/Errors.hpp"
 
 namespace Repositories::Tasks {
@@ -109,8 +110,8 @@ public:
 
     static constexpr const char* kColumns =
         "id, text, status, task_id, "
-        " to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-        " to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";
+        " " SQL_ISO_UTC("created_at") " AS created_at, "
+        " " SQL_ISO_UTC("updated_at") " AS updated_at";
 
 private:
     template <typename Txn>

@@ -13,6 +13,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 #include "repositories/money/CurrencyRepository.hpp"
 #include "repositories/money/Errors.hpp"
 
@@ -177,8 +178,8 @@ private:
         " (SELECT to_char(MAX(d), 'YYYY-MM-DD') FROM (SELECT MAX(t.date) AS d FROM money_transactions t "
         "   WHERE t.account_id = a.id AND t.status = 'posted' UNION ALL SELECT MAX(x.date) FROM money_transfers x "
         "   WHERE x.from_account_id = a.id OR x.to_account_id = a.id) m) AS last_activity, "
-        " to_char(a.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-        " to_char(a.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at "
+        " " SQL_ISO_UTC("a.created_at") " AS created_at, "
+        " " SQL_ISO_UTC("a.updated_at") " AS updated_at "
         "FROM money_accounts a";
 
     template <typename Txn>

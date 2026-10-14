@@ -18,6 +18,7 @@
 #include "database/Database.hpp"
 #include "repositories/RepoErrors.hpp"
 #include "repositories/SqlErrors.hpp"
+#include "repositories/SqlTime.hpp"
 
 namespace Repositories::Notes {
 
@@ -200,9 +201,9 @@ public:
 
 private:
     static constexpr const char* kTimes =
-        " to_char(n.published_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS published_at, "
-        " to_char(n.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-        " to_char(n.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";
+        " " SQL_ISO_UTC("n.published_at") " AS published_at, "
+        " " SQL_ISO_UTC("n.created_at") " AS created_at, "
+        " " SQL_ISO_UTC("n.updated_at") " AS updated_at";
     /// The project or course of a note, by name and kind, as tasks carry theirs.
     static constexpr const char* kLinks =
         " n.project_id, n.task_id, "
@@ -213,9 +214,9 @@ private:
         " n.project_id, n.task_id, "
         " (SELECT p.name FROM projects p WHERE p.id = n.project_id) AS project_title, "
         " (SELECT p.kind FROM projects p WHERE p.id = n.project_id) AS project_kind, "
-        " to_char(n.published_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS published_at, "
-        " to_char(n.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS created_at, "
-        " to_char(n.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') AS updated_at";
+        " " SQL_ISO_UTC("n.published_at") " AS published_at, "
+        " " SQL_ISO_UTC("n.created_at") " AS created_at, "
+        " " SQL_ISO_UTC("n.updated_at") " AS updated_at";
 
     static void translate(std::string_view sqlstate) {
         if (sqlstate == "23505") {  // unique_violation: (owner, slug)
