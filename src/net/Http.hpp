@@ -58,6 +58,10 @@ private:
 /// The transport the modules use: CurlTransport until a test overrides it.
 Transport& transport();
 
+/// A transport that gives up after 3 seconds, for calls made inside a request
+/// (the handler waits on them); the test override applies to it as well.
+Transport& quick_transport();
+
 /// Override in tests. nullptr restores the production one.
 void install_for_testing(Transport* transport);
 

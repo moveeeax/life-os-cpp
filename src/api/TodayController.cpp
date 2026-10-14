@@ -469,7 +469,8 @@ void TodayController::putSettings(const HttpRequestPtr& req, Callback&& callback
             place = std::optional<::Now::Weather::Place>();
         } else {
             try {
-                const auto found = ::Now::Weather::geocode(Net::Http::transport(), body["city"].get<std::string>());
+                const auto found =
+                    ::Now::Weather::geocode(Net::Http::quick_transport(), body["city"].get<std::string>());
                 if (!found) {
                     callback(ErrorResponse::unprocessable("city_not_found", "the geocoder knows no such city"));
                     return;
@@ -524,14 +525,23 @@ void TodayController::weather(const HttpRequestPtr& req, Callback&& callback) {
             }
         }
     }
+    // A call that failed a moment ago is not repeated: each one could hold a server thread for seconds.
+    const std::string down = ::Now::Weather::down_key(lat, lon);
+    if (Cache::is_initialized() && Cache::get().exists(down)) {
+        callback(ErrorResponse::service_unavailable("weather_unavailable", "the weather service is not answering"));
+        return;
+    }
     try {
-        const json block = ::Now::Weather::forecast(Net::Http::transport(), lat, lon, place);
+        const json block = ::Now::Weather::forecast(Net::Http::quick_transport(), lat, lon, place);
         if (Cache::is_initialized()) {
             Cache::get().set(key, block.dump(), ::Now::Weather::kCacheSeconds);
         }
         callback(Response::ok(json{{"data", block}, {"cached", false}}));
     } catch (const ::Now::Weather::Unavailable& e) {
         spdlog::warn("now: the weather is unavailable: {}", e.what());
+        if (Cache::is_initialized()) {
+            Cache::get().set(down, "1", ::Now::Weather::kDownSeconds);
+        }
         callback(ErrorResponse::service_unavailable("weather_unavailable", "the weather service is not answering"));
     }
 }

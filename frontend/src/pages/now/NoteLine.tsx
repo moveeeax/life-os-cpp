@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useSaveNote } from '@/hooks/useNow';
 
@@ -13,9 +13,14 @@ export function NoteLine({
   yesterday: string | null;
 }) {
   const [text, setText] = useState(today ?? '');
+  const editing = useRef(false);
+  // The day the edit began: a note typed before midnight is saved to that day.
+  const editDate = useRef(date);
   const save = useSaveNote();
-  // A new day, or the note saved in another tab, replaces the field while it is not being edited.
-  useEffect(() => setText(today ?? ''), [today, date]);
+  // The server's note replaces the field only while nobody is typing in it.
+  useEffect(() => {
+    if (!editing.current) setText(today ?? '');
+  }, [today, date]);
   return (
     <div className="n-note-box">
       <textarea
@@ -25,12 +30,22 @@ export function NoteLine({
         maxLength={2000}
         rows={text.includes('\n') ? 3 : 1}
         value={text}
+        onFocus={() => {
+          editing.current = true;
+          editDate.current = date;
+        }}
         onChange={(e) => setText(e.target.value)}
         onBlur={() => {
-          if (text.trim() !== (today ?? '').trim()) save.mutate({ date, text });
+          editing.current = false;
+          if (text.trim() !== (editDate.current === date ? (today ?? '') : '').trim())
+            save.mutate({ date: editDate.current, text });
         }}
       />
-      {save.error && <span className="n-note">The note was not saved: {save.error}</span>}
+      {save.error && (
+        <span role="alert" className="n-note">
+          The note was not saved: {save.error}
+        </span>
+      )}
       {yesterday && <span className="n-yesterday">Yesterday: {yesterday}</span>}
     </div>
   );

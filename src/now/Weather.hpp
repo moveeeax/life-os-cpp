@@ -35,6 +35,8 @@ struct Place {
 
 /// How long one forecast answer is kept, per coordinates.
 inline constexpr long kCacheSeconds = 3600;
+/// How long a failed call is remembered, so a down service is not asked on every open.
+inline constexpr long kDownSeconds = 300;
 
 /// Words for the WMO weather interpretation codes Open-Meteo returns
 /// (open-meteo.com/en/docs, "WMO Weather interpretation codes"); "" outside the table.
@@ -125,6 +127,13 @@ inline std::string forecast_url(double latitude, double longitude) {
 inline std::string cache_key(double latitude, double longitude) {
     char buf[64];
     std::snprintf(buf, sizeof buf, "now:weather:%.2f:%.2f", latitude, longitude);
+    return buf;
+}
+
+/// The key that remembers a failed call for these coordinates.
+inline std::string down_key(double latitude, double longitude) {
+    char buf[64];
+    std::snprintf(buf, sizeof buf, "now:weather:down:%.2f:%.2f", latitude, longitude);
     return buf;
 }
 

@@ -3,12 +3,15 @@
  * @brief Travel documents against the end of a trip. A passport should stay
  *        valid six months past the end (the rule many countries apply on
  *        entry, and the one the owner's Notion base used); a visa or an
- *        insurance must cover the whole trip. Other documents are not checked.
+ *        insurance must not end during the trip. Only each holder's latest
+ *        passport counts, and a visa that ended before the trip is an old one:
+ *        neither warns. Other documents are not checked.
  */
 
 #pragma once
 
 #include <chrono>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -18,6 +21,7 @@ namespace Travel {
 
 struct Document {
     std::string id;
+    std::string holder;
     std::string kind;         // passport | visa | insurance | other
     std::string valid_until;  // YYYY-MM-DD
 };
@@ -38,16 +42,29 @@ inline Day six_months_after(Day end) {
     return sys_days{target.year() / target.month() / (ymd.day() > last ? last : ymd.day())};
 }
 
-/// The documents that do not last for a trip ending on @p end, in their order.
-inline std::vector<DocumentWarning> warnings(const std::vector<Document>& docs, const std::string& end) {
+/// The documents that do not last for a trip from @p start to @p end, in their order.
+inline std::vector<DocumentWarning> warnings(const std::vector<Document>& docs,
+                                             const std::string& start,
+                                             const std::string& end) {
+    const Day first = day_of(start);
     const Day last = day_of(end);
     const Day passport_until = six_months_after(last);
+    std::map<std::string, Day> latest_passport;
+    for (const auto& d : docs) {
+        if (d.kind == "passport") {
+            const Day valid = day_of(d.valid_until);
+            auto [it, fresh] = latest_passport.try_emplace(d.holder, valid);
+            if (!fresh && it->second < valid) {
+                it->second = valid;
+            }
+        }
+    }
     std::vector<DocumentWarning> out;
     for (const auto& d : docs) {
         const Day valid = day_of(d.valid_until);
-        if (d.kind == "passport" && valid < passport_until) {
+        if (d.kind == "passport" && valid == latest_passport.at(d.holder) && valid < passport_until) {
             out.push_back({d.id, "passport_6_months"});
-        } else if ((d.kind == "visa" || d.kind == "insurance") && valid < last) {
+        } else if ((d.kind == "visa" || d.kind == "insurance") && first <= valid && valid < last) {
             out.push_back({d.id, "expires_during_trip"});
         }
     }

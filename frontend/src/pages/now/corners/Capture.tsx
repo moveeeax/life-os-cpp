@@ -35,7 +35,7 @@ export function Capture({ date, hour }: { date: string; hour: number }) {
     setText('');
     food.cancel();
     money.cancel();
-    void queryClient.invalidateQueries({ queryKey: qk.now.all() });
+    void queryClient.invalidateQueries({ queryKey: qk.now.days() });
   };
   const addMeal = useCreateEntries(refresh);
   const addSpend = useAcceptParse(money.job?.id, refresh);

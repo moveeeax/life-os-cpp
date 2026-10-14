@@ -660,8 +660,8 @@ void TravelController::getTrip(const HttpRequestPtr& req, Callback&& callback, c
             throw Repositories::Travel::NotFound("trip");
         }
         json view = trip_view(repo, owner, *row, *currency, true);
-        view["document_warnings"] =
-            Repositories::Travel::DocumentRepository().warnings(owner, (*row)["end_date"].get<std::string>());
+        view["document_warnings"] = Repositories::Travel::DocumentRepository().warnings(
+            owner, (*row)["start_date"].get<std::string>(), (*row)["end_date"].get<std::string>());
         view["allowed"] = Repositories::Travel::allowed_json(
             owner, (*row)["countries"].get<std::set<std::string>>(), (*row)["start_date"].get<std::string>(), *date);
         callback(Response::ok(json{{"data", view}}));

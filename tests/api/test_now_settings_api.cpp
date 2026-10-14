@@ -92,6 +92,7 @@ protected:
         Net::Http::install_for_testing(&meteo);
         if (Cache::is_initialized()) {
             Cache::get().del(Now::Weather::cache_key(43.25249, 76.9115));
+            Cache::get().del(Now::Weather::down_key(43.25249, 76.9115));
         }
         Database::get().execute_write([](auto& txn) {
             for (const char* id : {kAnna, kBoris}) {
@@ -199,10 +200,16 @@ TEST_F(NowSettingsApiTest, TheWeatherIsFetchedThenCached) {
     }
 }
 
-TEST_F(NowSettingsApiTest, TheWeatherDownIsA503) {
+TEST_F(NowSettingsApiTest, TheWeatherDownIsA503AndIsNotAskedAgainAtOnce) {
     ASSERT_EQ(put_settings({{"city", "Almaty"}})->statusCode(), k200OK);
+    meteo.urls.clear();
     meteo.down = true;
     EXPECT_EQ(call(&Api::TodayController::weather, Get)->statusCode(), k503ServiceUnavailable);
+    ASSERT_EQ(meteo.urls.size(), 1U);
+    if (Cache::is_initialized()) {
+        EXPECT_EQ(call(&Api::TodayController::weather, Get)->statusCode(), k503ServiceUnavailable);
+        EXPECT_EQ(meteo.urls.size(), 1U) << "a failure is remembered for a few minutes: no second slow call";
+    }
 }
 
 TEST_F(NowSettingsApiTest, TheNoteOfADayAndTheDayBefore) {

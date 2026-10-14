@@ -100,6 +100,7 @@ export const qk = {
   },
   now: {
     all: () => ['now'] as const,
+    days: () => ['now', 'today'] as const,
     today: (date: string, tz: string) => ['now', 'today', date, tz] as const,
     wallpapers: (device: string) => ['now', 'wallpapers', device] as const,
     adminWallpapers: () => ['now', 'admin-wallpapers'] as const,

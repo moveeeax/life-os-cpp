@@ -64,6 +64,10 @@ TEST(NowWeather, OneCacheKeyPerCoordinatesToTwoDecimals) {
     EXPECT_EQ(Now::Weather::cache_key(-33.8688, 151.2093), "now:weather:-33.87:151.21");
 }
 
+TEST(NowWeather, AFailureHasItsOwnKey) {
+    EXPECT_EQ(Now::Weather::down_key(43.25249, 76.9115), "now:weather:down:43.25:76.91");
+}
+
 TEST(NowWeather, TheCityGoesIntoTheUrlEscaped) {
     EXPECT_EQ(Now::Weather::geocode_url("Sankt Peterburg"),
               "https://geocoding-api.open-meteo.com/v1/search?name=Sankt%20Peterburg&count=1&language=en&format=json");
