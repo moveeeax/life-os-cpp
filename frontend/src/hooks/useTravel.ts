@@ -8,6 +8,8 @@ import type {
   TravelCounter,
   TravelCrossing,
   TravelCrossingInput,
+  TravelDocument,
+  TravelDocumentInput,
   TravelRule,
   TravelRuleInput,
   TravelSpend,
@@ -231,4 +233,29 @@ export function useTravelEnabled(signedIn: boolean): boolean {
     },
   });
   return probe.data ?? true;
+}
+
+export function useDocuments() {
+  return useQuery({
+    queryKey: qk.travel.documents(),
+    queryFn: async ({ signal }) =>
+      (await api.getJson<{ data: TravelDocument[] }>(`${BASE}/documents`, { signal })).data,
+  });
+}
+
+export function useSaveDocument(id: string | null, onSuccess?: () => void) {
+  return useApiMutation(
+    async (body: TravelDocumentInput) =>
+      id
+        ? (await api.patchJson<{ data: TravelDocument }>(`${BASE}/documents/${id}`, { body })).data
+        : (await api.postJson<{ data: TravelDocument }>(`${BASE}/documents`, { body })).data,
+    { invalidate: TRAVEL_WRITES, onSuccess },
+  );
+}
+
+export function useDeleteDocument(onSuccess?: () => void) {
+  return useApiMutation((id: string) => api.deleteJson<unknown>(`${BASE}/documents/${id}`), {
+    invalidate: TRAVEL_WRITES,
+    onSuccess,
+  });
 }

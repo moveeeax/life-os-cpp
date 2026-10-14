@@ -2,17 +2,19 @@ import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router';
 
 import { useMe } from '@/hooks/useMe';
-import { useSounds, useToday } from '@/hooks/useNow';
-import { FOCUS_LENGTHS, greeting, localDate } from '@/lib/now';
+import { useNowSettings, useSounds, useToday, useWeather } from '@/hooks/useNow';
+import { FOCUS_LENGTHS, greeting, localDate, weatherLine } from '@/lib/now';
 import { homeOf } from '@/shell/sections';
 import { useGlassNav } from '@/shell/useGlassNav';
 
+import { ArrangeSheet } from './ArrangeSheet';
 import { Corners } from './corners/Corners';
 import { FocusMode } from './focus/FocusMode';
 import { useFocusSession } from './focus/useFocusSession';
 import { useSoundPlayer } from './focus/useSoundPlayer';
 import { FocusLine } from './FocusLine';
 import { FocusPicker } from './FocusPicker';
+import { NoteLine } from './NoteLine';
 import './now.css';
 
 const LENGTH_KEY = 'now:focus:length';
@@ -94,6 +96,9 @@ function NowScreen() {
       ),
     ) % 24;
   const today = useToday(me?.id ?? null, date, tz);
+  const settings = useNowSettings(me !== null);
+  const weather = useWeather(Boolean(settings.data?.city));
+  const [arranging, setArranging] = useState(false);
   const [picking, setPicking] = useState(false);
   const session = useFocusSession(me?.id ?? null);
   const player = useSoundPlayer(useSounds(me !== null).data ?? []);
@@ -107,7 +112,22 @@ function NowScreen() {
 
   return (
     <div className="n-now">
-      <div className="n-where">{tz.replace(/_/g, ' ')}</div>
+      <div className="n-where">
+        {tz.replace(/_/g, ' ')}
+        {weather.data && (
+          <span className="n-weather">
+            {' · '}
+            {weatherLine(weather.data).place}{' '}
+            <span className="num">{weatherLine(weather.data).degrees}</span>{' '}
+            {weatherLine(weather.data).words}
+          </span>
+        )}
+        {settings.data && (
+          <button type="button" className="n-arrange" onClick={() => setArranging(true)}>
+            Arrange
+          </button>
+        )}
+      </div>
       <div className="n-center">
         <div className="n-clock" aria-label={`Time ${clock}`}>
           {clock}
@@ -134,13 +154,23 @@ function NowScreen() {
             player.play();
           }}
         />
+        {data && (
+          <NoteLine
+            date={date}
+            today={data.note?.today ?? null}
+            yesterday={data.note?.yesterday ?? null}
+          />
+        )}
         {today.isError && (
           <span className="n-note">
             {data ? 'Offline: showing the last answer' : 'Could not load the day'}
           </span>
         )}
       </div>
-      {data && <Corners today={data} hour={hour} date={date} />}
+      {data && <Corners today={data} hour={hour} date={date} corners={settings.data?.corners} />}
+      {arranging && settings.data && (
+        <ArrangeSheet settings={settings.data} onClose={() => setArranging(false)} />
+      )}
       {session.phase !== 'idle' && (
         <FocusMode
           phase={session.phase}

@@ -11,3 +11,6 @@ export type TravelTripInput = S['TravelTripInput'];
 export type TravelTripItem = S['TravelTripItem'];
 export type TravelTripItemInput = S['TravelTripItemInput'];
 export type TravelSpend = S['TravelSpend'];
+export type TravelDocument = S['TravelDocument'];
+export type TravelDocumentInput = S['TravelDocumentInput'];
+export type TravelDocumentWarning = S['TravelDocumentWarning'];

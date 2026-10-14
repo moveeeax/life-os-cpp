@@ -5,6 +5,7 @@ import {
   counterLine,
   countryName,
   flightsWithoutCrossing,
+  documentWarningLine,
   splitTrips,
   whereNow,
 } from './index';
@@ -130,5 +131,22 @@ describe('whereNow', () => {
     expect(whereNow(list, ['DE', 'KZ'], '2026-09-14')).toBeNull();
     expect(whereNow([], ['KZ'], '2026-10-13')).toEqual({ country: 'KZ', since: null });
     expect(whereNow([], [], '2026-10-13')).toBeNull();
+  });
+});
+
+describe('documentWarningLine', () => {
+  const w = { document_id: 'd', holder: 'Maksim', kind: 'passport', valid_until: '2027-05-01' };
+  it('names the passport rule', () => {
+    expect(documentWarningLine({ ...w, reason: 'passport_6_months' }, '2026-10-14')).toMatch(
+      /^Maksim's passport is valid until .*May.*2027, less than six months after the trip$/,
+    );
+  });
+  it('names a visa that ends during the trip', () => {
+    expect(
+      documentWarningLine(
+        { ...w, kind: 'visa', valid_until: '2026-11-10', reason: 'expires_during_trip' },
+        '2026-10-14',
+      ),
+    ).toMatch(/^Maksim's visa ends on .*Nov.*10, before the trip does$/);
   });
 });

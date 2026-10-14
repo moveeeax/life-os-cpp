@@ -19,6 +19,7 @@ import {
   countdownWords,
   countryName,
   daysBetween,
+  documentWarningLine,
   flightsWithoutCrossing,
   type TravelTrip,
   type TravelTripItem,
@@ -59,6 +60,11 @@ function Plan({ trip, today }: { trip: TravelTrip; today: string }) {
           Add to plan
         </button>
       </div>
+      {(trip.document_warnings ?? []).map((w) => (
+        <Banner key={w.document_id} to="/travel/documents" action="Documents">
+          {documentWarningLine(w, today)}
+        </Banner>
+      ))}
       {missing.slice(0, 1).map((f) => (
         <Banner key={f.id} action="Record" onAction={() => setCrossingFrom(f)}>
           {f.title} on {shortDay(f.date, today)} has no crossing yet

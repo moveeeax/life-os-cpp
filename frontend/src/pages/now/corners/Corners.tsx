@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { chips, type Chip, type Today } from '@/lib/now';
+import {
+  DEFAULT_CORNERS,
+  chips,
+  placeChips,
+  type Chip,
+  type NowCorners,
+  type Today,
+} from '@/lib/now';
 
 import { BodyPanel } from './BodyPanel';
 import { DayPanel } from './DayPanel';
@@ -9,19 +16,22 @@ import { Parts } from './Parts';
 import { TasksPanel } from './TasksPanel';
 import './corners.css';
 
-const SPOT: Record<Chip['key'], string> = {
-  body: 'c-tl',
-  goals: 'c-tr',
-  day: 'c-bl',
-  tasks: 'c-br',
-};
-
 /**
  * The four corners of Now. A chip is one quiet line; a click opens its glass
  * panel over the picture. One panel at a time; Escape, a click outside or the
  * chip again closes it and focus returns to the chip.
  */
-export function Corners({ today, hour, date }: { today: Today; hour: number; date: string }) {
+export function Corners({
+  today,
+  hour,
+  date,
+  corners = DEFAULT_CORNERS,
+}: {
+  today: Today;
+  hour: number;
+  date: string;
+  corners?: NowCorners;
+}) {
   const [open, setOpen] = useState<Chip['key'] | null>(null);
   const chipRefs = useRef<Partial<Record<Chip['key'], HTMLButtonElement | null>>>({});
   const panelRef = useRef<HTMLElement>(null);
@@ -56,17 +66,20 @@ export function Corners({ today, hour, date }: { today: Today; hour: number; dat
   }, [open]);
 
   const list = chips(today, hour, date);
+  // The user's layout: a chip without a corner is not shown at all.
+  const placed = placeChips(list, corners);
+  const openSpot = placed.find((p) => p.chip.key === open)?.spot;
   return (
     <>
       <div className="c-strip" data-open={open ? '' : undefined}>
-        {list.map((c) => (
+        {placed.map(({ chip: c, spot }) => (
           <button
             key={c.key}
             ref={(el) => {
               chipRefs.current[c.key] = el;
             }}
             type="button"
-            className={`c-chip ${SPOT[c.key]}`}
+            className={`c-chip ${spot}`}
             aria-expanded={open === c.key}
             aria-controls={`corner-${c.key}`}
             onClick={() => setOpen((o) => (o === c.key ? null : c.key))}
@@ -91,18 +104,18 @@ export function Corners({ today, hour, date }: { today: Today; hour: number; dat
           </button>
         ))}
       </div>
-      {open && (
+      {open && openSpot && (
         <section
           ref={panelRef}
           id={`corner-${open}`}
-          className={`c-panel ${SPOT[open]}`}
+          className={`c-panel ${openSpot}`}
           role="dialog"
           tabIndex={-1}
           aria-label={list.find((c) => c.key === open)?.title}
         >
           {open === 'body' && <BodyPanel today={today} />}
           {open === 'goals' && <GoalsPanel today={today} date={date} />}
-          {open === 'day' && <DayPanel today={today} />}
+          {open === 'day' && <DayPanel today={today} date={date} hour={hour} />}
           {open === 'tasks' && <TasksPanel today={today} date={date} />}
         </section>
       )}

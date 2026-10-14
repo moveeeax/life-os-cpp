@@ -224,3 +224,8 @@ export function weekSeries(week: FoodWeek): {
     target: week.targets?.kcal ?? null,
   };
 }
+
+/** The meal to describe into by the hour: breakfast before 11, lunch before 16, dinner before 21. */
+export function mealByHour(hour: number): FoodMeal {
+  return hour < 11 ? 'breakfast' : hour < 16 ? 'lunch' : hour < 21 ? 'dinner' : 'snack';
+}

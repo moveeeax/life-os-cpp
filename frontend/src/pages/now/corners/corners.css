@@ -376,3 +376,53 @@
     --c-origin: bottom center;
   }
 }
+
+/* Capture in the Food and money panel: Meal or Spend, one line, its lines, Add. */
+.c-capture {
+  display: grid;
+  gap: 8px;
+}
+.c-capture-kind {
+  display: inline-flex;
+  gap: 4px;
+  justify-self: start;
+}
+.c-capture-kind button {
+  padding: 3px 10px;
+  border: 1px solid var(--g-glass-line);
+  border-radius: 999px;
+  background: none;
+  color: var(--g-ink-soft);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.c-capture-kind button.c-on {
+  background: var(--g-glass-strong);
+  color: var(--g-ink);
+}
+.c-capture-input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--g-glass-line);
+  border-radius: 10px;
+  background: var(--g-glass);
+  color: var(--g-ink);
+  font: inherit;
+  font-size: 14px;
+}
+.c-add {
+  justify-self: start;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--g-ink);
+  color: #000;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.c-add:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

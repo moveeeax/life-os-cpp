@@ -104,6 +104,8 @@ export const qk = {
     wallpapers: (device: string) => ['now', 'wallpapers', device] as const,
     adminWallpapers: () => ['now', 'admin-wallpapers'] as const,
     sounds: () => ['now', 'sounds'] as const,
+    settings: () => ['now', 'settings'] as const,
+    weather: () => ['now', 'weather'] as const,
     adminSounds: () => ['now', 'admin-sounds'] as const,
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['now-enabled'] as const,
@@ -119,6 +121,7 @@ export const qk = {
     trip: (id: string, currency: string) => ['travel', 'trip', id, currency] as const,
     candidates: (id: string) => ['travel', 'candidates', id] as const,
     packing: (id: string) => ['travel', 'packing', id] as const,
+    documents: () => ['travel', 'documents'] as const,
   },
   goals: {
     all: () => ['goals'] as const,
