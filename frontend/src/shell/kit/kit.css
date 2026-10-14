@@ -787,10 +787,42 @@ select.k-input option {
   letter-spacing: 0.06em;
   margin-left: 6px;
 }
+/* A search box in a tools row: a quiet pill with a glass glyph, no native chrome. */
 .k-input.k-search {
-  width: min(240px, 100%);
-  padding: 4px 10px;
+  width: min(220px, 100%);
+  padding: 5px 12px 5px 30px;
   font-size: 13px;
+  border-radius: 999px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239aa3b8' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 10px center;
+}
+.k-input.k-search::-webkit-search-decoration,
+.k-input.k-search::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+/* Shown on one width only: a value that sits right of the title on a desk
+   and under it on a phone, where the title needs the room. */
+@media (max-width: 760px) {
+  .k-wide {
+    display: none;
+  }
+}
+@media (min-width: 761px) {
+  .k-narrow {
+    display: none;
+  }
+}
+/* A segmented control that may hold more options than the row has room for. */
+.k-seg-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.k-seg-scroll button {
+  white-space: nowrap;
 }
 .k-strike {
   text-decoration: line-through;

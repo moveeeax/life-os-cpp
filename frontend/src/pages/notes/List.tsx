@@ -29,9 +29,18 @@ function NoteRow({ n }: { n: Note }) {
         </Link>
       }
       sub={
-        <span data-num-ok>{[date, n.topic, n.tags.join(', ')].filter(Boolean).join(' · ')}</span>
+        <span data-num-ok>
+          {[date, n.topic, n.tags.join(', ')].filter(Boolean).join(' · ')}
+          {n.project_title && <span className="k-narrow"> · {n.project_title}</span>}
+        </span>
       }
-      right={n.project_title ? <span data-num-ok>{n.project_title}</span> : undefined}
+      right={
+        n.project_title ? (
+          <span className="k-wide" data-num-ok>
+            {n.project_title}
+          </span>
+        ) : undefined
+      }
     />
   );
 }
@@ -55,9 +64,41 @@ export function NotesPage() {
           <Num>{data?.total ?? 0}</Num> {data?.total === 1 ? 'note' : 'notes'}
         </>
       }
-      sub="private · ready to go to tarassov.me later"
+      sub="private for now"
       tools={
         <>
+          <input
+            className="k-input k-search"
+            type="search"
+            aria-label="Search notes"
+            placeholder="Search notes"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          {(data?.topics.length ?? 0) > 0 && (
+            <div className="k-seg k-seg-scroll" role="group" aria-label="Topic">
+              <button
+                type="button"
+                aria-pressed={topic === ''}
+                className={topic === '' ? 'k-seg-on' : undefined}
+                onClick={() => setTopic('')}
+              >
+                All
+              </button>
+              {data!.topics.map((t) => (
+                <button
+                  key={t.topic}
+                  type="button"
+                  aria-pressed={topic === t.topic}
+                  className={topic === t.topic ? 'k-seg-on' : undefined}
+                  onClick={() => setTopic(topic === t.topic ? '' : (t.topic ?? ''))}
+                  data-num-ok
+                >
+                  {t.topic}
+                </button>
+              ))}
+            </div>
+          )}
           <span className="k-grow" />
           <button type="button" className="k-btn k-solid" onClick={() => setAdding(true)}>
             New note
@@ -65,32 +106,6 @@ export function NotesPage() {
         </>
       }
     >
-      <input
-        className="k-input k-search"
-        type="search"
-        aria-label="Search notes"
-        placeholder="Search notes"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      {(data?.topics.length ?? 0) > 0 && (
-        <div className="k-chips" role="group" aria-label="Topic">
-          <button type="button" aria-pressed={topic === ''} onClick={() => setTopic('')}>
-            All
-          </button>
-          {data!.topics.map((t) => (
-            <button
-              key={t.topic}
-              type="button"
-              aria-pressed={topic === t.topic}
-              onClick={() => setTopic(topic === t.topic ? '' : (t.topic ?? ''))}
-              data-num-ok
-            >
-              {t.topic}
-            </button>
-          ))}
-        </div>
-      )}
       {notes.isPending ? (
         <Placeholder />
       ) : notes.isError ? (
