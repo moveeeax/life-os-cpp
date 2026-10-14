@@ -167,7 +167,7 @@ TEST_F(AuthTest, ScalarHeaderIsMalformedNotAnException) {
 
 TEST_F(AuthTest, NonStringAlgIsUnsupportedNotAnException) {
     Security::Auth::Authenticator auth(make_cfg());
-    for (const json header : {json{{"alg", 1}, {"typ", "JWT"}}, json{{"alg", "HS256"}, {"typ", 7}}}) {
+    for (const json& header : {json{{"alg", 1}, {"typ", "JWT"}}, json{{"alg", "HS256"}, {"typ", 7}}}) {
         json claims = {{"sub", "u"}};
         std::string token =
             Utils::Base64::url_encode(header.dump()) + "." + Utils::Base64::url_encode(claims.dump()) + ".";
