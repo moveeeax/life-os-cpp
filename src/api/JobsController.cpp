@@ -7,6 +7,10 @@
 
 #include "api/JobsController.hpp"
 
+#include <algorithm>
+#include <array>
+#include <string_view>
+
 #include <spdlog/spdlog.h>
 
 #include <nlohmann/json.hpp>
@@ -55,6 +59,11 @@ void JobsController::submitJob(const HttpRequestPtr& req, std::function<void(con
         }
 
         auto type = body["type"].get<std::string>();
+        if (!manual_type_allowed(type)) {
+            callback(ErrorResponse::bad_request("job_type_not_allowed",
+                                                "This job type is enqueued by the app, not by hand"));
+            return;
+        }
         auto payload = body.value("payload", json::object());
         int max_retries = body.value("max_retries", -1);
 
@@ -64,6 +73,13 @@ void JobsController::submitJob(const HttpRequestPtr& req, std::function<void(con
         spdlog::error("Error in POST /api/v1/jobs: {}", e.what());
         callback(ErrorResponse::internal_error());
     }
+}
+
+bool JobsController::manual_type_allowed(const std::string& type) {
+    // money_rates: jobs/MoneyRatesHandler.hpp kJobType (pinned by
+    // tests/api/test_jobs_endpoints.cpp, which includes the handler).
+    static constexpr std::array<std::string_view, 4> kManual{"echo", "slow", "fail", "money_rates"};
+    return std::find(kManual.begin(), kManual.end(), type) != kManual.end();
 }
 
 void JobsController::getJobStatus(const HttpRequestPtr& req,
