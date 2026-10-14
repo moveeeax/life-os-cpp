@@ -6,8 +6,12 @@
  *        read and write.
  */
 
+#include <chrono>
+#include <future>
 #include <optional>
+#include <pqxx/pqxx>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -425,6 +429,66 @@ TEST_F(MoneyRepositoriesTest, RemoveCascadesAdjustmentsAndArchivesWhatIsInUse) {
     EXPECT_EQ(categories.remove(kAnna, salary["id"]), "archived");
     EXPECT_EQ(categories.remove(kAnna, rent["id"]), "deleted");
     EXPECT_THROW(categories.remove(kBoris, food["id"]), NotFound);
+}
+
+namespace {
+
+/// Inserts an expense on @p account in @p category from a second connection and
+/// keeps it uncommitted until @p hold has passed: a delete that checks "is it
+/// used" in that window sees nothing, then its DELETE meets the committed row.
+std::thread insert_late(const std::string& owner,
+                        const std::string& account,
+                        const std::string& category,
+                        std::promise<void>& inserted,
+                        std::chrono::milliseconds hold) {
+    return std::thread([=, &inserted] {
+        pqxx::connection conn(TestHelpers::pg_conn_string());
+        pqxx::work w(conn);
+        w.exec_params(
+            "INSERT INTO money_transactions (owner_id, type, date, account_id, amount, name, category_id) "
+            "VALUES ($1::uuid, 'expense', '2026-10-05', $2::uuid, 10, 'Late', $3::uuid)",
+            owner,
+            account,
+            category);
+        inserted.set_value();
+        std::this_thread::sleep_for(hold);
+        w.commit();
+    });
+}
+
+}  // namespace
+
+TEST_F(MoneyRepositoriesTest, ADeleteThatLosesTheRaceToANewRowIsAConflict) {
+    const std::string account = freedom["id"].get<std::string>();
+    std::promise<void> inserted;
+    std::thread late = insert_late(kAnna, account, food["id"].get<std::string>(), inserted, std::chrono::seconds(2));
+    inserted.get_future().wait();
+    try {
+        accounts.remove(kAnna, account);
+        ADD_FAILURE() << "the delete cannot succeed: the new row refers to the account";
+    } catch (const InUse& e) {
+        EXPECT_EQ(e.code(), "in_use") << "409, not a raw 23503 as a 500";
+    } catch (const std::exception& e) {
+        ADD_FAILURE() << "unexpected: " << e.what();
+    }
+    late.join();
+    EXPECT_TRUE(accounts.find(kAnna, account).has_value());
+
+    // The same race on a category.
+    const json unused = categories.create(kAnna, [] {
+        CategoryRepository::Input c;
+        c.name = "Taxi";
+        return c;
+    }());
+    std::promise<void> inserted_again;
+    std::thread later = insert_late(kAnna,
+                                    kaspi["id"].get<std::string>(),
+                                    unused["id"].get<std::string>(),
+                                    inserted_again,
+                                    std::chrono::seconds(2));
+    inserted_again.get_future().wait();
+    EXPECT_THROW(categories.remove(kAnna, unused["id"]), InUse);
+    later.join();
 }
 
 TEST_F(MoneyRepositoriesTest, ReportRowsAndMerchantsBefore) {

@@ -17210,6 +17210,16 @@
         }
        }
       }
+     },
+     "409": {
+      "description": "A row referring to the account arrived during the delete (in_use); nothing changed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
      }
     }
    }
@@ -17607,6 +17617,16 @@
      },
      "404": {
       "description": "Money module disabled, or the row is not the caller's",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "A row referring to the category arrived during the delete (in_use); nothing changed",
       "content": {
        "application/json": {
         "schema": {
@@ -27266,7 +27286,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 398002,
-  "source_fnv1a64": "bb7258b52885558c"
+  "source_bytes": 398465,
+  "source_fnv1a64": "2191096e14b01535"
  }
 }

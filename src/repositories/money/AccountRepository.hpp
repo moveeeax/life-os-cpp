@@ -119,27 +119,33 @@ public:
             &detail::translate);
     }
 
-    /// Deletes an account without rows; archives one that has any. @throws NotFound.
+    /// Deletes an account without rows; archives one that has any. @throws NotFound,
+    /// InUse when a row referencing it is committed between the check and the delete.
     std::string remove(const std::string& owner, const std::string& id) {
-        return Database::get().execute_write([&](auto& txn) -> std::string {
-            auto own =
-                txn.exec_params("SELECT 1 FROM money_accounts WHERE owner_id = $1::uuid AND id = $2::uuid", owner, id);
-            if (own.empty()) {
-                throw NotFound("money_account");
-            }
-            auto used = txn.exec_params(
-                "SELECT 1 FROM money_transactions WHERE account_id = $1::uuid "
-                "UNION ALL SELECT 1 FROM money_transfers WHERE from_account_id = $1::uuid OR to_account_id = $1::uuid "
-                "LIMIT 1",
-                id);
-            if (!used.empty()) {
-                txn.exec_params("UPDATE money_accounts SET archived = true, updated_at = now() WHERE id = $1::uuid",
-                                id);
-                return "archived";
-            }
-            txn.exec_params("DELETE FROM money_accounts WHERE id = $1::uuid", id);
-            return "deleted";
-        });
+        return detail::translate_sql(
+            [&] {
+                return Database::get().execute_write([&](auto& txn) -> std::string {
+                    auto own = txn.exec_params(
+                        "SELECT 1 FROM money_accounts WHERE owner_id = $1::uuid AND id = $2::uuid", owner, id);
+                    if (own.empty()) {
+                        throw NotFound("money_account");
+                    }
+                    auto used = txn.exec_params(
+                        "SELECT 1 FROM money_transactions WHERE account_id = $1::uuid "
+                        "UNION ALL SELECT 1 FROM money_transfers WHERE from_account_id = $1::uuid OR to_account_id = "
+                        "$1::uuid "
+                        "LIMIT 1",
+                        id);
+                    if (!used.empty()) {
+                        txn.exec_params(
+                            "UPDATE money_accounts SET archived = true, updated_at = now() WHERE id = $1::uuid", id);
+                        return "archived";
+                    }
+                    txn.exec_params("DELETE FROM money_accounts WHERE id = $1::uuid", id);
+                    return "deleted";
+                });
+            },
+            detail::throw_on<InUse>("23503"));
     }
 
     /// The code of an owner's account, or nullopt when it is not theirs.

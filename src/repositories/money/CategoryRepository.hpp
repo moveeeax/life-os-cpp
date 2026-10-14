@@ -130,24 +130,30 @@ public:
             &detail::translate);
     }
 
-    /// Deletes a category without rows; archives one that has any. @throws NotFound.
+    /// Deletes a category without rows; archives one that has any. @throws NotFound,
+    /// InUse when a row referencing it is committed between the check and the delete.
     std::string remove(const std::string& owner, const std::string& id) {
-        return Database::get().execute_write([&](auto& txn) -> std::string {
-            auto own = txn.exec_params(
-                "SELECT 1 FROM money_categories WHERE owner_id = $1::uuid AND id = $2::uuid", owner, id);
-            if (own.empty()) {
-                throw NotFound("money_category");
-            }
-            auto used = txn.exec_params("SELECT 1 FROM money_transactions WHERE category_id = $1::uuid LIMIT 1", id);
-            if (!used.empty()) {
-                txn.exec_params("UPDATE money_categories SET archived = true, updated_at = now() WHERE id = $1::uuid",
-                                id);
-                return "archived";
-            }
-            txn.exec_params("UPDATE money_merchants SET category_id = NULL WHERE category_id = $1::uuid", id);
-            txn.exec_params("DELETE FROM money_categories WHERE id = $1::uuid", id);
-            return "deleted";
-        });
+        return detail::translate_sql(
+            [&] {
+                return Database::get().execute_write([&](auto& txn) -> std::string {
+                    auto own = txn.exec_params(
+                        "SELECT 1 FROM money_categories WHERE owner_id = $1::uuid AND id = $2::uuid", owner, id);
+                    if (own.empty()) {
+                        throw NotFound("money_category");
+                    }
+                    auto used =
+                        txn.exec_params("SELECT 1 FROM money_transactions WHERE category_id = $1::uuid LIMIT 1", id);
+                    if (!used.empty()) {
+                        txn.exec_params(
+                            "UPDATE money_categories SET archived = true, updated_at = now() WHERE id = $1::uuid", id);
+                        return "archived";
+                    }
+                    txn.exec_params("UPDATE money_merchants SET category_id = NULL WHERE category_id = $1::uuid", id);
+                    txn.exec_params("DELETE FROM money_categories WHERE id = $1::uuid", id);
+                    return "deleted";
+                });
+            },
+            detail::throw_on<InUse>("23503"));
     }
 
     /// The kind of an owner's category, or nullopt when it is not theirs.
