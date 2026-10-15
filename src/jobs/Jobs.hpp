@@ -237,7 +237,9 @@ public:
     /**
      * @brief Cancel a job (sets status to failed with "cancelled" error).
      *        The status check and the write are one compare-and-set in Redis:
-     *        of concurrent cancels of one job exactly one returns true.
+     *        of concurrent cancels of one job exactly one returns true. The id
+     *        leaves its live queue, the delayed set and its worker's
+     *        processing list, so nothing runs it afterwards.
      */
     bool cancel(const std::string& id);
 
