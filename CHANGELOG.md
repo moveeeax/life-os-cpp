@@ -6,6 +6,14 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.30.0] - 2026-10-15
+
+### Changed
+- Now shows the state of the day in one glass dock at the bottom, a tile per placed chip (Body, Goals, Food and money, Habits, in the Arrange order), and keeps the actions in the corners the way Momentum does: Add top left (a task, a meal or a spend in one line), the weather top right, Links bottom left, Tasks bottom right with its counts. The clock and the focus line are smaller. Quick links are a new field of the Now settings (`links`, migration 044, up to eight rows of title and a path or an http(s) URL), edited in Arrange, whose four selects now read as the dock order and no longer offer Tasks. The capture left the Food and money panel: the Add corner covers it. Hide numbers moved to the bottom right.
+
+### Fixed
+- The `migrate` init container of the API chart carries `AUTH_MODE` like the server container. Since 1.29.0 the ConfigMap renders `app.env: production`, and the boot-time guard refused the migrate step with `auth.mode=none with APP_ENV=production` before any migration ran, so the 1.29.0 API pod never left `Init`.
+
 ## [1.29.0] - 2026-10-15
 
 ### Added
