@@ -1,0 +1,1 @@
+The `migrate` init container of the API chart carries `AUTH_MODE` like the server container. Since 1.29.0 the ConfigMap renders `app.env: production`, and the boot-time guard refused the migrate step with `auth.mode=none with APP_ENV=production` before any migration ran, so the 1.29.0 API pod never left `Init`.

@@ -47,6 +47,12 @@ spec:
           env:
             - name: RUN_MIGRATIONS_ONLY
               value: "true"
+            # The boot-time config guard runs before the migrations and refuses
+            # auth.mode=none under app.env=production (rendered into the
+            # ConfigMap this container reads), so the migrate step carries the
+            # same auth mode as the server container.
+            - name: AUTH_MODE
+              value: {{ .Values.auth.mode | quote }}
             {{- if .Values.externalDatabase.password }}
             - name: DATABASE_PASSWORD
               valueFrom:
