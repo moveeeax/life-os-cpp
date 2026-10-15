@@ -15,6 +15,7 @@
 #include <fstream>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -385,7 +386,15 @@ void register_auth() {
             return unauthorized("missing_token");
 
         std::string err;
-        auto principal = auth.verify_jwt(token, err);
+        std::optional<Security::Auth::AuthPrincipal> principal;
+        try {
+            principal = auth.verify_jwt(token, err);
+        } catch (const std::exception& e) {
+            // The token is unauthenticated input; a shape the parser did not
+            // anticipate is a 401, never an exception out of the advice.
+            spdlog::warn("auth: token verification threw ({}): {}", req->path(), e.what());
+            return unauthorized("malformed_token");
+        }
         if (!principal)
             return unauthorized(err);
         req->attributes()->insert(Security::Auth::kPrincipalAttr, *principal);

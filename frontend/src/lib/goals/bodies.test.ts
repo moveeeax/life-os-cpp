@@ -31,6 +31,10 @@ describe('goalBody', () => {
     });
     expect(b).toMatchObject({ start_value: 92.4, target_value: 85, unit: 'kg' });
   });
+  it('a number goal may start below zero', () => {
+    const b = goalBody({ ...base, kind: 'number', from: '-1500', to: '0', unit: '$', count: '' });
+    expect(b).toMatchObject({ start_value: -1500, target_value: 0 });
+  });
   it('a count goal carries its target', () => {
     expect(
       goalBody({ ...base, kind: 'count', from: '', to: '', unit: '', count: '12' }).target_count,

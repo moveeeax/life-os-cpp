@@ -182,6 +182,14 @@ describe('the parse draft', () => {
     d[1].selected = false;
     expect(draftProblem(d)).toBeNull();
   });
+  it('reads a comma decimal and refuses a thousands comma', () => {
+    const d = draftFromJob(job([line]));
+    d[0].amount = '12,5';
+    expect(draftProblem(d)).toBeNull();
+    expect(linesToAccept(d)[0].amount).toBe(12.5);
+    d[0].amount = '1,234';
+    expect(draftProblem(d)).toBe('Line 1: the amount must be above 0.');
+  });
   it('becomes the accept body of the selected lines', () => {
     const d = draftFromJob(job([line, { ...line, name: 'Skip' }]));
     d[1].selected = false;

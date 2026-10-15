@@ -12,6 +12,7 @@ import {
   type Currency,
   type Transfer,
 } from '@/lib/ledger';
+import { parseAmount } from '@/lib/amounts';
 
 import { Group, Num, Row } from '@/shell/kit';
 import {
@@ -23,12 +24,7 @@ import {
   secondaryButton,
 } from '@/shell/kit/styles';
 
-const num = (v: string): number | null => {
-  const t = v.trim().replace(',', '.');
-  if (t === '') return null;
-  const n = Number(t);
-  return Number.isFinite(n) ? n : null;
-};
+const num = parseAmount;
 
 function TransferEditor({ transfer, onClose }: { transfer: Transfer; onClose: () => void }) {
   const cross = transfer.amount_received !== null;

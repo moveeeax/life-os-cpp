@@ -253,6 +253,46 @@ export function csrfHeader(method: string): Record<string, string> {
   return token ? { [CSRF_HEADER]: token } : {};
 }
 
+// ── Idempotency-Key ─────────────────────────────────────────────────────────
+// The backend's idempotency middleware (src/security/Idempotency.hpp) acts on
+// POST / PUT / PATCH / DELETE that carry an `Idempotency-Key` header: the
+// first response is cached per (principal, method, path, key) and replayed
+// on a repeat with the same key and body, so a retried mutation is applied
+// once. One key is minted per logical call, before the first attempt, and
+// the replay after a 401 + refresh reuses it. A caller's own key is kept.
+const IDEMPOTENCY_HEADER = 'Idempotency-Key';
+
+function hasHeader(headers: Record<string, string> | undefined, name: string): boolean {
+  if (!headers) return false;
+  const want = name.toLowerCase();
+  return Object.keys(headers).some((k) => k.toLowerCase() === want);
+}
+
+/**
+ * A fresh key: a UUID where the browser gives one; otherwise 32 hex digits
+ * from getRandomValues or, on a plain-HTTP LAN page without a secure context
+ * and without it, from the clock and Math.random. Uniqueness per client is all
+ * the middleware needs; the key is scoped to the caller on the server.
+ */
+export function newIdempotencyKey(): string {
+  const c = globalThis.crypto as Crypto | undefined;
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID();
+  if (c && typeof c.getRandomValues === 'function') {
+    const bytes = c.getRandomValues(new Uint8Array(16));
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  let s = Date.now().toString(16);
+  while (s.length < 32) s += Math.floor(Math.random() * 16).toString(16);
+  return s.slice(0, 32);
+}
+
+/** The caller's headers plus a minted key for a mutating request that has none. */
+function withIdempotencyKey(method: string, opts: RequestOptions): RequestOptions {
+  if (!UNSAFE_METHODS.has(method.toUpperCase())) return opts;
+  if (hasHeader(opts.headers, IDEMPOTENCY_HEADER)) return opts;
+  return { ...opts, headers: { ...opts.headers, [IDEMPOTENCY_HEADER]: newIdempotencyKey() } };
+}
+
 async function rawRequest(method: string, path: string, opts: RequestOptions): Promise<Response> {
   const init: RequestInit = {
     method,
@@ -284,9 +324,11 @@ function errorFromBody(status: number, parsed: unknown, fallbackMessage: string)
 async function request<T>(
   method: string,
   rawPath: string,
-  opts: RequestOptions = {},
+  rawOpts: RequestOptions = {},
 ): Promise<ApiResult<T>> {
-  const path = withQuery(rawPath, opts.query);
+  const path = withQuery(rawPath, rawOpts.query);
+  // Minted once, here, so the replay below sends the same key as the first try.
+  const opts = withIdempotencyKey(method, rawOpts);
   let response: Response;
   try {
     response = await rawRequest(method, path, opts);

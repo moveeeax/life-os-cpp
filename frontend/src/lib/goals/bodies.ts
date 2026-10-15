@@ -1,9 +1,12 @@
 /** The POST body of the new-goal form, as the form built it inline (pinned by bodies.test.ts). */
+import { parseAmount } from '@/lib/amounts';
 import type { Area } from '@/lib/tasks';
 
 import type { GoalInput, GoalKind } from './index';
 
-const num = (s: string) => Number(s.replace(',', '.'));
+// A goal value may be negative (a balance to climb out of); the form has
+// already refused what is not a number, so NaN here only means a bypassed form.
+const num = (s: string) => parseAmount(s, { signed: true }) ?? NaN;
 
 export function goalBody(i: {
   title: string;

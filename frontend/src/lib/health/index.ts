@@ -100,6 +100,11 @@ export function parseRange(params: URLSearchParams, end: string): ParsedRange {
   return { preset, ...rangeForDays(preset, end) };
 }
 
+/** The page title of a period: "Last 30 days" for a preset, the two dates for a custom range. */
+export function rangeHeadline(range: ParsedRange): string {
+  return range.preset === 'custom' ? `${range.from} – ${range.to}` : `Last ${range.preset} days`;
+}
+
 export interface DayStat {
   date: string;
   min: number;

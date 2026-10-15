@@ -31,6 +31,7 @@ import {
   mean,
   nights,
   parseRange,
+  rangeHeadline,
   today,
   validCustomRange,
   weightChange,
@@ -601,9 +602,10 @@ export function HealthPage() {
     );
   }
 
-  const { from, to, preset } = parseRange(params, today());
+  const parsed = parseRange(params, today());
+  const { from, to } = parsed;
   const range = { from, to };
-  const headline = preset ? `Last ${preset} days` : `${from} – ${to}`;
+  const headline = rangeHeadline(parsed);
 
   // Nothing is linked: there is no data to chart, only the way to get some.
   if (needsLink(mi.data)) {

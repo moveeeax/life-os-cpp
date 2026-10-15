@@ -5,6 +5,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 import { useAddMilestone, useAddSection, usePutCheckin, useSaveGoal } from '@/hooks/useGoals';
 import { useCreateTask, useUpdateTask } from '@/hooks/useTasks';
+import { parseAmount } from '@/lib/amounts';
 import { daysBetween, formatDay } from '@/lib/dates';
 import { formatValue, shelf, type GoalDetail } from '@/lib/goals';
 import { dueLabel, type Task } from '@/lib/tasks';
@@ -128,10 +129,11 @@ export function NumberPart({ goal, today }: { goal: GoalDetail; today: string })
   const [value, setValue] = useState('');
   const [date, setDate] = useState(today);
   const put = usePutCheckin(goal.id, () => setValue(''));
-  const v = Number(value.replace(',', '.'));
+  // A check-in may be negative, like the goal's own start and target.
+  const v = parseAmount(value, { signed: true });
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (value.trim() && Number.isFinite(v) && date) put.mutate({ value: v, date });
+    if (v !== null && date) put.mutate({ value: v, date });
   };
   return (
     <div className="grid gap-3">

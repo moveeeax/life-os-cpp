@@ -14,6 +14,7 @@ import {
 import { formatMoney, type Account, type AccountInput, type Currency } from '@/lib/ledger';
 import { decimalsOf } from '@/lib/ledger';
 import { SMALL_LIMITS, valueAccounts, viewAccounts, type Valued } from '@/lib/ledger/accountsView';
+import { parseAmount } from '@/lib/amounts';
 
 import {
   dangerButton,
@@ -52,12 +53,13 @@ function AccountForm({ account, onClose }: { account: Account | null; onClose: (
         : 'Archived: rows refer to it, so it is hidden instead of removed.',
     ),
   );
-  const openingValue = Number(opening.replace(',', '.'));
-  const ok = name.trim() !== '' && /^[0-9]{0,4}$/.test(last4) && Number.isFinite(openingValue);
+  // An opening balance may be negative (a card in debt on the day it was added).
+  const openingValue = parseAmount(opening, { signed: true });
+  const ok = name.trim() !== '' && /^[0-9]{0,4}$/.test(last4) && openingValue !== null;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!ok) return;
+    if (!ok || openingValue === null) return;
     const body = {
       name: name.trim(),
       bank: bank.trim(),

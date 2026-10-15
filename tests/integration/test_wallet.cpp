@@ -492,11 +492,48 @@ TEST_F(WalletTest, RefundAgainstFailedPaymentDoesNotOverwriteStatus) {
 
     auto result = Billing::refund_capture("CAPTURE-5D", "REFUND-5D", /*refunded_amount_cents=*/1000);
     EXPECT_TRUE(result.credited);  // recorded — nothing to refund since nothing was credited
-    EXPECT_EQ(refund_outcome("REFUND-5D"), "skipped_insufficient");  // balance is 0
+    EXPECT_EQ(refund_outcome("REFUND-5D"), "skipped_not_credited");
 
     auto found = payments.find_by_capture_id("CAPTURE-5D");
     ASSERT_TRUE(found.has_value());
     EXPECT_EQ(found->status, "failed");  // untouched
+}
+
+// The credits on a balance belong to the payments that were captured. A
+// refund of a payment that failed capture (nothing credited) must not take
+// them: with the sufficiency check alone, a positive balance from an earlier
+// top-up was debited for a refund that had nothing to reverse.
+TEST_F(WalletTest, RefundAgainstFailedPaymentLeavesOtherPaymentsCreditsAlone) {
+    auto user_id = seed_user("buyer5h@example.com");
+    seed_payment(user_id, "ORDER-5H-A", 1000, 1000);
+    ASSERT_TRUE(Billing::credit_capture("ORDER-5H-A", "CAPTURE-5H-A", 1000, "USD").credited);
+    ASSERT_EQ(Billing::balance_of(user_id), 1000);
+
+    seed_payment(user_id, "ORDER-5H-B", 1000, 1000);
+    ASSERT_FALSE(Billing::credit_capture("ORDER-5H-B", "CAPTURE-5H-B", /*captured_amount_cents=*/999, "USD").credited);
+    ASSERT_EQ(Billing::balance_of(user_id), 1000);
+
+    // The owner refunds B at the provider after the mismatch.
+    auto result = Billing::refund_capture("CAPTURE-5H-B", "REFUND-5H-B", /*refunded_amount_cents=*/1000);
+    EXPECT_TRUE(result.credited);  // recorded
+    EXPECT_EQ(result.balance, 1000);
+    EXPECT_EQ(Billing::balance_of(user_id), 1000) << "A's credits are not B's to refund";
+    EXPECT_EQ(refund_outcome("REFUND-5H-B"), "skipped_not_credited");
+
+    // Only the top-up from A is in the ledger.
+    auto hist = Billing::history(user_id, 10, 0);
+    ASSERT_EQ(hist.size(), 1u);
+    EXPECT_EQ(hist[0].kind, "topup");
+
+    auto found = payments.find_by_capture_id("CAPTURE-5H-B");
+    ASSERT_TRUE(found.has_value());
+    EXPECT_EQ(found->status, "failed");
+
+    // A redelivery is the usual idempotent no-op.
+    auto redelivered = Billing::refund_capture("CAPTURE-5H-B", "REFUND-5H-B", 1000);
+    EXPECT_FALSE(redelivered.credited);
+    EXPECT_EQ(Billing::balance_of(user_id), 1000);
+    EXPECT_EQ(refund_row_count(result.payment_id), 1);
 }
 
 // Once a refund id is durably recorded as skipped (insufficient balance), a

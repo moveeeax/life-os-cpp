@@ -299,7 +299,7 @@ outage can never affect the money path.
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
 | `WORKER_ID` | `worker.id` | string | `worker-1` | |
-| `WORKER_TYPES` | `worker.types` | csv | all registered handler types | Queues the worker pulls from. Unset everywhere → every type with a registered handler. When you DO set it (the compose stack ships `default,account_email`; `config.json` ships `default`), it MUST include `account_email`, `email.send`, and `webhook.deliver` or those jobs pile up undrained. |
+| `WORKER_TYPES` | `worker.types` | csv | all registered handler types | Queues the worker pulls from. Unset (prod leaves it unset) → every type with a registered handler. The nine handlers this binary registers: `account_email`, `email.send`, `webhook.deliver`, `fitness_sync`, `food_parse`, `money_parse`, `money_rates`, `money_advisor`, `tasks_parse`. When you DO set it, a type left out piles up undrained: the compose stack lists all nine, `config.json` ships `default` (no handler of that name; the startup guard warns). |
 | `WORKER_STRICT_TYPES` | `worker.strict_types` | bool | `false` | A `WORKER_TYPES` entry without a registered handler logs a warning; `true` upgrades it to a refusal to start |
 | `WORKER_CONCURRENCY` | `worker.concurrency` | int | `2` | |
 | `WORKER_HEALTH_PORT` | `worker.health_port` | int | `9091` | |

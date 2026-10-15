@@ -310,6 +310,12 @@ private:
     // clears the pending queue and gates the lrem on was_processing).
     void release_from_worker_(sw::redis::Redis& redis, const Job& job);
 
+    // completed, dead or failed (cancelled): a blob in one of these states is
+    // never run again, whatever list its id turns up on.
+    static bool is_terminal_status_(const std::string& status) {
+        return status == "completed" || status == "dead" || status == "failed";
+    }
+
     /**
      * @brief SCAN every list under @p prefix and return {type → LLEN}, where
      *        type is the key with the prefix stripped. Best-effort: swallows

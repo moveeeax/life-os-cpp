@@ -1,6 +1,60 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatAmount } from './amounts';
+import { formatAmount, parseAmount } from './amounts';
+
+// One parser behind the ten copies the money, goals, food and workout forms had.
+
+describe('parseAmount', () => {
+  it('reads whole numbers and dot decimals', () => {
+    expect(parseAmount('12')).toBe(12);
+    expect(parseAmount('12.5')).toBe(12.5);
+    expect(parseAmount('1.234')).toBe(1.234);
+    expect(parseAmount('0')).toBe(0);
+    expect(parseAmount('0.00')).toBe(0);
+  });
+
+  it('reads a comma as the decimal separator with one or two digits after it', () => {
+    expect(parseAmount('12,5')).toBe(12.5);
+    expect(parseAmount('12,50')).toBe(12.5);
+    expect(parseAmount('0,5')).toBe(0.5);
+  });
+
+  it('refuses a comma with three or more digits after it instead of guessing', () => {
+    expect(parseAmount('1,234')).toBeNull();
+    expect(parseAmount('1,2345')).toBeNull();
+    expect(parseAmount('12,345.67')).toBeNull();
+    expect(parseAmount('12.345,67')).toBeNull();
+  });
+
+  it('refuses what Number() would have read', () => {
+    expect(parseAmount('0x10')).toBeNull();
+    expect(parseAmount('1e3')).toBeNull();
+    expect(parseAmount('Infinity')).toBeNull();
+    expect(parseAmount('1 000')).toBeNull();
+    expect(parseAmount('1_000')).toBeNull();
+    expect(parseAmount('.5')).toBeNull();
+    expect(parseAmount('5.')).toBeNull();
+    expect(parseAmount('1.2.3')).toBeNull();
+    expect(parseAmount('+5')).toBeNull();
+  });
+
+  it('is null for an empty field and for text, and trims around a number', () => {
+    expect(parseAmount('')).toBeNull();
+    expect(parseAmount('   ')).toBeNull();
+    expect(parseAmount('abc')).toBeNull();
+    expect(parseAmount('  7 ')).toBe(7);
+  });
+
+  it('takes a leading minus only when asked', () => {
+    expect(parseAmount('-5')).toBeNull();
+    expect(parseAmount('-5', { signed: true })).toBe(-5);
+    expect(parseAmount('-12,5', { signed: true })).toBe(-12.5);
+    expect(parseAmount('-0', { signed: true })).toBe(0);
+    expect(parseAmount('--5', { signed: true })).toBeNull();
+    expect(parseAmount('- 5', { signed: true })).toBeNull();
+    expect(parseAmount('5-', { signed: true })).toBeNull();
+  });
+});
 
 // One formatter behind five old ones; each block pins what one caller printed.
 

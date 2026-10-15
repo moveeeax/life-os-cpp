@@ -305,10 +305,15 @@ CreditResult credit_capture(const std::string& provider_order_id,
  *      UPDATE` locks the user's balance row ONCE, up front, whatever the
  *      outcome — its value seeds the response in every branch below, and is
  *      also the sufficiency-decision input, so there is exactly one query
- *      here rather than a second one only some branches need. Two ways the
- *      credit application can be skipped, NEITHER of which may ever let the
+ *      here rather than a second one only some branches need. Three ways the
+ *      credit application can be skipped, NONE of which may ever let the
  *      wallet_entries/wallet_balances CHECK constraints fire (that's what
  *      silently 500'd before):
+ *        - the payment is not `captured` or `refunded`: it never credited
+ *          the wallet (a capture that failed the amount/currency check
+ *          keeps its provider_capture_id with status `failed`), so there is
+ *          nothing to take back; the credits on the balance belong to other
+ *          payments. Outcome: `skipped_not_credited`.
  *        - `refund_credits == 0`: the amount is too small to represent at
  *          this payment's credits_expected/amount_cents ratio (e.g. 10
  *          credits for a 1000-cent payment, refund of 1-99 cents floors to

@@ -48,9 +48,11 @@ x-mail-env: &mail-env
 services:
   # Application service
   app:
-    # Default: pull the public image GitLab CI builds on master. `make up-*`
-    # does `pull` (no local build). To build locally instead use `make up-build`
-    # (or `docker compose ... up --build`), which uses the build: block below.
+    # Default: pull the public image release.yml publishes on a `v*` tag (the
+    # last release, not this checkout). `make up-*` does `pull` (no local
+    # build). To run your own code use `make quickstart` / `make up-build` /
+    # `make dev` (or `docker compose ... up --build`), which use the build:
+    # block below.
     image: ${APP_IMAGE:-ghcr.io/moveeeax/life-os-cpp:latest}
     build:
       context: ..
@@ -223,12 +225,13 @@ services:
       REGISTRATION_OPEN: ${REGISTRATION_OPEN:-true}
       NOW_ENABLED: ${NOW_ENABLED:-false}
       WORKER_ID: ${WORKER_ID:-worker-1}
-      # Production-shaped default: only the real job types the app enqueues.
-      # The demo handlers `echo`/`slow`/`fail` live in src/worker_main.cpp for
-      # manual testing — opt them in explicitly when you want them, e.g.:
-      #   WORKER_TYPES=default,account_email,echo,slow,fail
+      # Every job type this binary registers a handler for (the same set an
+      # unset WORKER_TYPES resolves to; docs/CONFIG.md lists them). The demo
+      # handlers `echo`/`slow`/`fail` live in src/worker_main.cpp for manual
+      # testing — opt them in explicitly when you want them, e.g.:
+      #   WORKER_TYPES=account_email,echo,slow,fail
       # (The API job tests drain Redis directly and do NOT rely on this list.)
-      WORKER_TYPES: ${WORKER_TYPES:-default,account_email,fitness_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse}
+      WORKER_TYPES: ${WORKER_TYPES:-account_email,email.send,webhook.deliver,fitness_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
       WORKER_HEALTH_PORT: ${WORKER_HEALTH_PORT:-9091}
       WORKER_BRPOP_TIMEOUT: ${WORKER_BRPOP_TIMEOUT:-5}

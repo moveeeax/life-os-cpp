@@ -44,7 +44,8 @@ ENV     := --env-file docker/.env
 # ── Startup targets ──────────────────────────────────────────────
 
 # up-* targets PULL the prebuilt public images (app/worker/frontend) that
-# CI publishes on master, then start — no local compile on your mac.
+# release.yml publishes on a `v*` tag — the last release, not this checkout —
+# then start; no local compile on your mac.
 # Infra images (postgres/redis) pull as usual; the app uses `--pull
 # missing` so a locally built (or renamed) image isn't clobbered by the
 # published `:latest` — and a fresh clone gets a clear "build it" error rather

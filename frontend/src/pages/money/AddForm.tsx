@@ -29,6 +29,7 @@ import {
   type DraftLine,
 } from '@/lib/ledger';
 import { manualBody, transferBody } from '@/lib/ledger/bodies';
+import { parseAmount } from '@/lib/amounts';
 import { cn } from '@/lib/utils';
 
 import {
@@ -42,12 +43,7 @@ import {
 
 type Tab = 'manual' | 'describe' | 'receipt' | 'transfer';
 
-const num = (v: string): number | null => {
-  const t = v.trim().replace(',', '.');
-  if (t === '') return null;
-  const n = Number(t);
-  return Number.isFinite(n) ? n : null;
-};
+const num = parseAmount;
 
 const readLast = (): string => {
   try {
