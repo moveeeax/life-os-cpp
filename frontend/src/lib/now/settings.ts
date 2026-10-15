@@ -89,7 +89,7 @@ export function linkKind(url: string): 'path' | 'external' | null {
   // eslint-disable-next-line no-control-regex
   if (/[\\\x00-\x20\x7f]/.test(url)) return null;
   if (url.startsWith('/')) return url.startsWith('//') ? null : 'path';
-  return /^https?:\/\//.test(url) ? 'external' : null;
+  return /^https?:\/\//i.test(url) ? 'external' : null;
 }
 
 /** The links as the server keeps them: trimmed, no empty row, at most eight. */

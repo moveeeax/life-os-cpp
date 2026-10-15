@@ -142,6 +142,7 @@ describe('linkKind', () => {
     expect(linkKind('/money/summary')).toBe('path');
     expect(linkKind('https://bank.example')).toBe('external');
     expect(linkKind('http://x')).toBe('external');
+    expect(linkKind('HTTPS://Bank.example/')).toBe('external');
     expect(linkKind('//evil.example')).toBeNull();
     expect(linkKind('javascript:alert(1)')).toBeNull();
     expect(linkKind('money')).toBeNull();

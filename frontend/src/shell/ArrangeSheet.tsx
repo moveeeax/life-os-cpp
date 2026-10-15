@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 
 import { useHabitsEnabled } from '@/hooks/useHabits';
 import { useSaveNowSettings } from '@/hooks/useNow';
@@ -17,6 +17,8 @@ import {
   type NowSettings,
 } from '@/lib/now';
 import { Sheet } from '@/shell/kit';
+
+type LinkRow = NowLink & { id: number };
 
 /** The weather city, the order of the dock of Now and the quick links of its Links corner. */
 export function ArrangeSheet({
@@ -40,12 +42,17 @@ export function ArrangeSheet({
   // A chip of a module switched off is not offered; Tasks has its own corner.
   const habitsOn = useHabitsEnabled(true);
   const offered = DOCK_CHIPS.filter((c) => c !== 'habits' || habitsOn);
-  const [links, setLinks] = useState<NowLink[]>(() => settings.links ?? []);
-  const editLink = (i: number, patch: Partial<NowLink>) =>
-    setLinks(links.map((l, j) => (j === i ? { ...l, ...patch } : l)));
-  // A row with a URL that is neither a path nor http(s) blocks Save and says so.
+  // Rows carry an id of their own, so removing one keeps the others' fields in place.
+  const nextId = useRef(0);
+  const row = (l: NowLink): LinkRow => ({ id: nextId.current++, ...l });
+  const [links, setLinks] = useState<LinkRow[]>(() => (settings.links ?? []).map(row));
+  const editLink = (id: number, patch: Partial<NowLink>) =>
+    setLinks(links.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  // A row with a URL that is neither a path nor http(s), or with one of its two
+  // fields empty, blocks Save and says so; a row with both empty is dropped.
   const badUrl = (l: NowLink) => l.url.trim() !== '' && linkKind(l.url.trim()) === null;
-  const linksOk = links.every((l) => !badUrl(l));
+  const halfRow = (l: NowLink) => (l.title.trim() === '') !== (l.url.trim() === '');
+  const linksOk = links.every((l) => !badUrl(l) && !halfRow(l));
   const save = useSaveNowSettings(onClose);
   // Picking a chip already in another corner moves it: that corner turns empty.
   const pick = (corner: (typeof CORNER_KEYS)[number], value: string) => {
@@ -60,7 +67,7 @@ export function ArrangeSheet({
     if (!linksOk) return;
     const typed = city.trim();
     const cityChanged = typed !== (settings.city ?? '');
-    const clean = cleanLinks(links);
+    const clean = cleanLinks(links.map(({ title, url }) => ({ title, url })));
     const linksChanged = JSON.stringify(clean) !== JSON.stringify(settings.links ?? []);
     save.mutate({
       corners,
@@ -97,14 +104,14 @@ export function ArrangeSheet({
           ))}
         </div>
         <p className="k-sub">Links: up to eight places you open from the Links corner.</p>
-        {links.map((l, i) => (
-          <div key={i} className="k-fields">
+        {links.map((l) => (
+          <div key={l.id} className="k-fields">
             <label className="k-field">
               <span>Title</span>
               <input
                 maxLength={40}
                 value={l.title}
-                onChange={(e) => editLink(i, { title: e.target.value })}
+                onChange={(e) => editLink(l.id, { title: e.target.value })}
               />
             </label>
             <label className="k-field">
@@ -113,15 +120,18 @@ export function ArrangeSheet({
                 maxLength={2048}
                 placeholder="/money/summary"
                 value={l.url}
-                onChange={(e) => editLink(i, { url: e.target.value })}
+                onChange={(e) => editLink(l.id, { url: e.target.value })}
               />
             </label>
             {badUrl(l) && <p className="k-error">A path like /money or an http(s) address.</p>}
+            {!badUrl(l) && halfRow(l) && (
+              <p className="k-error">A title and a URL, or an empty row.</p>
+            )}
             <button
               type="button"
               className="k-btn"
               aria-label={`Remove ${l.title.trim() || 'link'}`}
-              onClick={() => setLinks(links.filter((_, j) => j !== i))}
+              onClick={() => setLinks(links.filter((x) => x.id !== l.id))}
             >
               Remove
             </button>
@@ -131,7 +141,7 @@ export function ArrangeSheet({
           <button
             type="button"
             className="k-btn"
-            onClick={() => setLinks([...links, { title: '', url: '' }])}
+            onClick={() => setLinks([...links, row({ title: '', url: '' })])}
           >
             Add a link
           </button>

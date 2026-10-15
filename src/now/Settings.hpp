@@ -95,7 +95,12 @@ inline bool link_url_ok(const std::string& url) {
     if (url[0] == '/') {
         return url.size() == 1 || url[1] != '/';
     }
-    return url.rfind("http://", 0) == 0 || url.rfind("https://", 0) == 0;
+    // The scheme whatever its case: a phone keyboard may capitalise it.
+    std::string head = url.substr(0, 8);
+    for (auto& c : head) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return head.rfind("http://", 0) == 0 || head.rfind("https://", 0) == 0;
 }
 
 /// What is wrong with a links list, or nullopt; @p clean then holds the
