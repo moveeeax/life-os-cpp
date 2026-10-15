@@ -1,5 +1,5 @@
 import type { Chip } from './corners';
-import type { NowCorners, NowWeather } from './types';
+import type { NowCorners, NowLink, NowWeather } from './types';
 
 /** Body top left, Goals top right, Food and money bottom left, Tasks bottom right. */
 export const DEFAULT_CORNERS: NowCorners = { tl: 'body', tr: 'goals', bl: 'day', br: 'tasks' };
@@ -55,6 +55,43 @@ export function withoutChip(corners: NowCorners, key: Chip['key']): NowCorners {
   const out = { ...corners };
   for (const k of CORNER_KEYS) if (out[k] === key) out[k] = null;
   return out;
+}
+
+/** The chips of the dock: Tasks lives in its own corner and is never offered. */
+export const DOCK_CHIPS: Chip['key'][] = ['body', 'goals', 'day', 'habits'];
+
+/** The four layout slots read as the order of the dock, top left first. */
+export const DOCK_LABEL: Record<CornerKey, string> = {
+  tl: 'Dock, first',
+  tr: 'Dock, second',
+  bl: 'Dock, third',
+  br: 'Dock, fourth',
+};
+
+/** The dock tiles in slot order; a slot with Tasks, an unknown chip or nothing is skipped. */
+export function dockChips(list: Chip[], corners: NowCorners): Chip[] {
+  const out: Chip[] = [];
+  for (const k of CORNER_KEYS) {
+    const chip = list.find((c) => c.key === corners[k]);
+    if (chip && chip.key !== 'tasks') out.push(chip);
+  }
+  return out;
+}
+
+export const LINKS_MAX = 8;
+
+/** A path of this app, an http(s) URL, or null for anything the page must not link. */
+export function linkKind(url: string): 'path' | 'external' | null {
+  if (url.startsWith('/')) return url.startsWith('//') ? null : 'path';
+  return /^https?:\/\//.test(url) ? 'external' : null;
+}
+
+/** The links as the server keeps them: trimmed, no empty row, at most eight. */
+export function cleanLinks(links: NowLink[]): NowLink[] {
+  return links
+    .map((l) => ({ title: l.title.trim(), url: l.url.trim() }))
+    .filter((l) => l.title !== '' && l.url !== '')
+    .slice(0, LINKS_MAX);
 }
 
 /** The chips that have a corner, each with the class of its corner, in the corner order. */
