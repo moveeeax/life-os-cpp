@@ -3,7 +3,7 @@
  "info": {
   "title": "life-os-cpp API",
   "description": "The REST API of Life OS, a C++20 service on Drogon with Postgres and\nRedis. Four families of routes: the probes and infrastructure (`/healthz`,\n`/ready`, `/health`, `/metrics`, the background-job queue and its DLQ under\n`/api/v1/jobs`); accounts and administration (`/api/v1/auth`,\n`/api/v1/account`, `/api/v1/admin`, API keys, the audit log); billing\n(PayPal top-ups into a credit wallet, `/api/v1/billing` and\n`/api/v1/admin/billing`); and the life modules, each behind its own\nswitch and answering 404 while off: fitness (Mi Fitness sync), workout,\nfood, money, tasks with projects, goals, now (`/api/v1/today`, wallpapers,\nsounds), travel, habits and notes. Every route except the probes is under\n`/api/v1`. Authentication is a JWT bearer, an API key (`X-API-Key`) or the\nHttpOnly session cookie the SPA uses; rate limiting and idempotency are\ndriven by headers (`Idempotency-Key` on writes). Maintained by one owner,\nsee the repository.\n",
-  "version": "1.28.0",
+  "version": "1.29.0",
   "contact": {
    "name": "life-os-cpp repository",
    "url": "https://github.com/moveeeax/life-os-cpp"
@@ -27384,6 +27384,6 @@
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
   "source_bytes": 401475,
-  "source_fnv1a64": "63c9321e0be44270"
+  "source_fnv1a64": "3e99216a86b90915"
  }
 }
