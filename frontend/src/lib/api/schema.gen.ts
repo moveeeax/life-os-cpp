@@ -7029,6 +7029,15 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
+                /** @description Fewer decimals than an account, a budget or a receipt in this currency keeps (decimals_in_use); nothing changed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
             };
         };
         trace?: never;
@@ -18428,7 +18437,7 @@ export interface components {
             /** @default false */
             archived: boolean;
         };
-        /** @description The decimals and minor_unit of a code in the built-in table do not change. */
+        /** @description The decimals and minor_unit of a code in the built-in table do not change; fewer decimals than an account, a budget or a receipt in the currency keeps are refused (409 decimals_in_use). */
         MoneyCurrencyPatch: {
             name?: string;
             /** @enum {string|null} */

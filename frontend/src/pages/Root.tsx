@@ -9,7 +9,9 @@ import { SignInPage } from './SignIn';
 export function RootPage() {
   const me = useMe();
   const target = rootTarget(me);
-  if (target === 'loading') return null;
+  // The same quiet "Loading…" the route guards show, not a blank page.
+  if (target === 'loading')
+    return <div className="container mx-auto py-8 text-muted-foreground">Loading…</div>;
   if (target === 'dashboard') return <Navigate to={DASHBOARD_HOME} replace />;
   return <SignInPage />;
 }

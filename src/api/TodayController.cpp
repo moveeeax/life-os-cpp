@@ -1,13 +1,14 @@
 /**
  * @file TodayController.cpp
- * @brief The /api/v1/today handlers: the digest assembled from the sections
- *        (Now::Today) and the focus of the day
- *        (docs/superpowers/specs/2026-10-12-now-shell-design.md §2).
+ * @brief The /api/v1/today handlers: the digest assembled (Now::Today) from
+ *        the parts each module hands over through its digest facade
+ *        (src/<module>/now/Digest.hpp), and the focus of the day
+ *        (docs/superpowers/specs/2026-10-12-now-shell-design.md §2). The
+ *        controller composes no module's repositories itself.
  */
 
 #include "api/TodayController.hpp"
 
-#include <chrono>
 #include <optional>
 #include <string>
 #include <vector>
@@ -23,37 +24,27 @@
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "cache/Cache.hpp"
-#include "core/Modules.hpp"
 #include "domain/Role.hpp"
-#include "goals/Progress.hpp"
-#include "habits/Habits.hpp"
-#include "money/Period.hpp"
+#include "fitness/now/Digest.hpp"
+#include "food/now/Digest.hpp"
+#include "goals/now/Digest.hpp"
+#include "habits/now/Digest.hpp"
+#include "money/now/Digest.hpp"
 #include "net/Http.hpp"
 #include "now/Settings.hpp"
 #include "now/Today.hpp"
 #include "now/Weather.hpp"
 #include "repositories/Zones.hpp"
-#include "repositories/fitness/HealthReadRepository.hpp"
-#include "repositories/fitness/MiAccountRepository.hpp"
-#include "repositories/food/EntryRepository.hpp"
-#include "repositories/food/GoalsBody.hpp"
-#include "repositories/food/GoalsRepository.hpp"
 #include "repositories/goals/GoalRepository.hpp"
-#include "repositories/habits/Days.hpp"
-#include "repositories/money/ReportBuilder.hpp"
-#include "repositories/money/SummaryRepository.hpp"
-#include "repositories/money/TransactionRepository.hpp"
 #include "repositories/now/FocusRepository.hpp"
 #include "repositories/now/NoteRepository.hpp"
 #include "repositories/now/SettingsRepository.hpp"
-#include "repositories/tasks/InboxRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
-#include "repositories/travel/Counters.hpp"
-#include "repositories/travel/TripRepository.hpp"
 #include "security/Auth.hpp"
-#include "tasks/Agenda.hpp"
-#include "utils/Date.hpp"
+#include "tasks/now/Digest.hpp"
+#include "travel/now/Digest.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Modules.hpp"
 
 namespace Api {
 
@@ -64,7 +55,6 @@ using Api::Fields::is_calendar_date;
 using Api::Fields::today_utc;
 using Repositories::Goals::GoalRepository;
 using Repositories::Now::FocusRepository;
-using Repositories::Tasks::InboxRepository;
 using Repositories::Tasks::TaskRepository;
 
 constexpr std::size_t kTextMax = 200;
@@ -99,127 +89,6 @@ json focus_out(const std::string& owner, json row) {
     return row;
 }
 
-json goals_with_progress(const std::string& owner, const std::string& date) {
-    GoalRepository repo;
-    const auto counts = repo.task_counts(owner);
-    const auto points = repo.checkin_points_all(owner);
-    json out = json::array();
-    for (auto row : repo.list(owner, "active")) {
-        const std::string id = row["id"].get<std::string>();
-        const auto goal = GoalRepository::progress_goal(row);
-        const auto c = counts.find(id);
-        const auto p = points.find(id);
-        row["progress"] = ::Goals::Progress::compute(
-            goal,
-            date,
-            p == points.end() || goal.kind != "number" ? std::vector<::Goals::Progress::Checkin>{} : p->second,
-            c == counts.end() ? ::Goals::Progress::Counts{0, 0} : c->second);
-        out.push_back(std::move(row));
-    }
-    return out;
-}
-
-json food_part(const std::string& owner, const std::string& date) {
-    const json totals = Repositories::EntryRepository().day(owner, date)["totals"];
-    const json targets = Repositories::food_goals_body(owner, date)["targets"];
-    const double kcal = totals.value("kcal", 0.0);
-    if (kcal == 0.0 && totals.value("protein_g", 0.0) == 0.0 && targets.is_null()) {
-        return json();
-    }
-    json eaten = json::object();
-    json target = targets.is_null() ? json() : json::object();
-    for (const char* k : {"kcal", "protein_g", "fat_g", "carbs_g"}) {
-        eaten[k] = totals.value(k, 0.0);
-        if (!targets.is_null()) {
-            target[k] = targets.contains(k) ? targets[k] : json();
-        }
-    }
-    return json{{"eaten", eaten}, {"target", target}};
-}
-
-json money_part(const std::string& owner, const std::string& date) {
-    using ::Money::Period::Kind;
-    Repositories::Money::TransactionRepository tx;
-    const json rows = tx.report_rows(owner, date, date);
-    const json report = Repositories::Money::ReportBuilder::build(
-        owner, Kind::month, "month", ::Money::Period::of(Kind::month, date), date, "");
-    const json currencies = ::Now::Today::money_block(rows, report);
-    Repositories::Money::TransactionRepository::Filter f;
-    f.from = date;
-    f.to = date;
-    f.type = "expense";
-    f.status = "posted";
-    f.limit = static_cast<long>(::Now::Today::kSpendsShown);
-    const json spends = ::Now::Today::spends_block(tx.list(owner, f).rows);
-    // All accounts in USD with the change over 30 days, for the corners and outside dashboards.
-    json net_worth;
-    if (const auto s = Repositories::Money::summary_json(owner, "USD", 30, date)) {
-        if (!(*s)["accounts"].empty() || !(*s)["not_converted"].empty()) {
-            net_worth = json{{"currency", "USD"},
-                             {"total", (*s)["total"]},
-                             {"partial", (*s)["partial"]},
-                             {"rate_date", (*s)["rate_date"]},
-                             {"change_30d", (*s)["change"]["total"]},
-                             {"change_partial", (*s)["change"]["partial"]}};
-        }
-    }
-    if (currencies.is_null() && spends.empty() && net_worth.is_null()) {
-        return json();
-    }
-    return json{{"currencies", currencies.is_null() ? json::array() : currencies},
-                {"spends_today", spends},
-                {"net_worth", net_worth}};
-}
-
-json health_part(const std::string& owner, const std::string& date) {
-    const std::string xiaomi = Repositories::MiAccountRepository("").xiaomi_id_of(owner).value_or("");
-    json summary_row;
-    json sleep_rows = json::array();
-    json body_rows = json::array();
-    if (!xiaomi.empty()) {
-        Repositories::HealthReadRepository health(xiaomi);
-        const long long offset = Repositories::region_offset_seconds(owner);
-        const auto summary = health.summary(date, date, 1, 0, offset).rows;
-        if (!summary.empty()) {
-            summary_row = summary[0];
-        }
-        const auto day = std::chrono::sys_days{Utils::Date::parse_ymd(date)};
-        // Sleep rows are filed by the UTC day of their end; the account's day may start hours earlier.
-        sleep_rows = ::Now::Today::sleep_on_local_day(
-            health.sleep(::Money::Period::detail::text_of(day - std::chrono::days{1}), date, 20, 0).rows, date, offset);
-        body_rows = health.body(::Money::Period::detail::text_of(day - std::chrono::days{8}), date, 50, 0).rows;
-    }
-    if (body_rows.empty()) {
-        // No weighing synced from the scale: the latest weight the food profile knows, if any.
-        if (const auto weight = Repositories::GoalsRepository().scale_weight(owner)) {
-            body_rows.push_back(json{{"timestamp", date + "T00:00:00Z"}, {"weight_kg", *weight}});
-        }
-    }
-    return ::Now::Today::health_block(summary_row, sleep_rows, body_rows);
-}
-
-/// The Now plate of the habits: the week of @p date read up to @p date; null without habits.
-json habits_part(const std::string& owner,
-                 const std::string& date,
-                 const std::string& tz,
-                 const Repositories::Habits::Access& access) {
-    const auto day = ::Habits::day_of(date);
-    const auto evaluated =
-        Repositories::Habits::evaluate(owner, ::Habits::monday_of(day), day, day, tz, access, /*history=*/false);
-    if (evaluated.empty()) {
-        return json();
-    }
-    std::vector<::Habits::PlateItem> items;
-    for (const auto& e : evaluated) {
-        items.push_back({e.habit.at("name").get<std::string>(),
-                         e.model.schedule,
-                         e.model.per_week,
-                         !e.days.empty() && e.days.back().second.done,
-                         e.week_done});
-    }
-    return ::Habits::plate(items);
-}
-
 }  // namespace
 
 void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
@@ -236,32 +105,20 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
             callback(ErrorResponse::bad_request("invalid_query", "tz must be an IANA zone like Asia/Almaty"));
             return;
         }
+        // Each module hands its part over through its digest facade; a part
+        // that throws lands in "errors" (Now::Today::assemble), never fails the whole.
         const std::vector<::Now::Today::Part> parts = {
-            {"tasks",
-             Core::tasks_enabled(),
-             [&] {
-                 const auto groups = ::Tasks::Agenda::group(TaskRepository().agenda_items(owner, date, tz), date);
-                 return ::Now::Today::tasks_block(groups, date, InboxRepository().count(owner, "inbox"));
-             }},
-            {"goals",
-             Core::goals_enabled(),
-             [&] { return ::Now::Today::goals_block(goals_with_progress(owner, date)); }},
-            {"food", Core::food_enabled(), [&] { return food_part(owner, date); }},
-            {"money", Core::money_enabled(), [&] { return money_part(owner, date); }},
-            {"health", Core::fitness_enabled() && fitness_read, [&] { return health_part(owner, date); }},
-            {"travel",
-             Core::travel_enabled(),
-             [&] {
-                 return ::Now::Today::travel_block(
-                     Repositories::Travel::TripRepository().next(owner, date).value_or(json()),
-                     Repositories::Travel::counters_json(owner, date),
-                     date);
-             }},
+            {"tasks", Core::tasks_enabled(), [&] { return ::Tasks::digest(owner, date, tz); }},
+            {"goals", Core::goals_enabled(), [&] { return ::Goals::digest(owner, date); }},
+            {"food", Core::food_enabled(), [&] { return ::Food::digest(owner, date); }},
+            {"money", Core::money_enabled(), [&] { return ::Money::digest(owner, date); }},
+            {"health", Core::fitness_enabled() && fitness_read, [&] { return ::Fitness::digest(owner, date); }},
+            {"travel", Core::travel_enabled(), [&] { return ::Travel::digest(owner, date); }},
             {"habits",
              Core::habits_enabled(),
              [&] {
-                 return habits_part(
-                     owner, date, tz, {Core::fitness_enabled() && fitness_read, Core::workout_enabled()});
+                 return ::Habits::digest(
+                     owner, date, tz, Core::fitness_enabled() && fitness_read, Core::workout_enabled());
              }},
         };
         const auto focus = FocusRepository().get(owner, date);
@@ -353,8 +210,7 @@ void TodayController::focusDone(const HttpRequestPtr& req, Callback&& callback) 
             if (kind == "task") {
                 // The task closes and reopens with the focus; a task already in
                 // that state is left alone (closed elsewhere, ticked twice).
-                TaskRepository tasks;
-                const auto task = tasks.get(owner, ref);
+                const auto task = TaskRepository().get(owner, ref);
                 if (!task) {  // deleted since the check above
                     callback(ErrorResponse::unprocessable("focus_ref_not_found", "the task of this focus is gone"));
                     return;
@@ -363,7 +219,18 @@ void TodayController::focusDone(const HttpRequestPtr& req, Callback&& callback) 
                 if (closed != done) {
                     TaskRepository::Patch p{};
                     p.status = done ? "done" : "open";
-                    tasks.update(owner, ref, p);
+                    // One transaction: a focus ticked without its task (or the
+                    // other way round) is a lie the Now screen would show.
+                    const json ticked = Repositories::Tasks::detail::translate_sql(
+                        [&] {
+                            return Database::get().execute_write([&](auto& txn) {
+                                TaskRepository::update_in(txn, owner, ref, p);
+                                return FocusRepository::set_done_in(txn, owner, date, done);
+                            });
+                        },
+                        &Repositories::Tasks::detail::translate);
+                    callback(Response::ok(json{{"data", focus_out(owner, ticked)}}));
+                    return;
                 }
             }
         }

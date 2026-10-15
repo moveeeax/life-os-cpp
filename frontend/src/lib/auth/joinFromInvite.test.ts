@@ -3,8 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiClientError } from '@/lib/api/client';
 
 /**
- * JoinFromInvitePage renders a form (no @testing-library in the stack), so we
- * test the load-bearing submit logic it delegates to: submitJoinFromInvite.
+ * The load-bearing submit logic of JoinFromInvitePage: submitJoinFromInvite.
  *   - error response  → ok:false with a user-facing message (the page shows
  *                       it in a destructive Alert)
  *   - success         → ok:true (the page flips to the "log in now" success
@@ -17,7 +16,7 @@ vi.mock('@/lib/api/client', async () => {
   return { ...actual, api: { POST: post } };
 });
 
-import { submitJoinFromInvite } from './JoinFromInvite';
+import { submitJoinFromInvite } from './joinFromInvite';
 
 afterEach(() => {
   post.mockReset();

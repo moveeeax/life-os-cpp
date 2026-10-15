@@ -59,8 +59,7 @@ public:
                         " json_array_elements_text($5::json) x), $6) "
                         "ON CONFLICT (owner_id) DO UPDATE SET view_currency = EXCLUDED.view_currency, "
                         " advisor_enabled = EXCLUDED.advisor_enabled, advisor_weekday = EXCLUDED.advisor_weekday, "
-                        " advisor_currencies = EXCLUDED.advisor_currencies, advisor_note = EXCLUDED.advisor_note, "
-                        " updated_at = now()",
+                        " advisor_currencies = EXCLUDED.advisor_currencies, advisor_note = EXCLUDED.advisor_note",
                         owner,
                         in.view_currency,
                         in.advisor_enabled,

@@ -30,7 +30,7 @@ public:
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params(
                 "INSERT INTO day_note (owner_id, date, text) VALUES ($1::uuid, $2::date, $3) "
-                "ON CONFLICT (owner_id, date) DO UPDATE SET text = EXCLUDED.text, updated_at = now()",
+                "ON CONFLICT (owner_id, date) DO UPDATE SET text = EXCLUDED.text",
                 owner,
                 date,
                 text);

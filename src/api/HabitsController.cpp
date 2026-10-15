@@ -21,7 +21,6 @@
 #include "api/HandlerSupport.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
-#include "core/Modules.hpp"
 #include "domain/Role.hpp"
 #include "habits/Habits.hpp"
 #include "repositories/habits/Days.hpp"
@@ -29,6 +28,7 @@
 #include "repositories/tasks/TaskRepository.hpp"
 #include "security/Auth.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Modules.hpp"
 
 namespace Api {
 

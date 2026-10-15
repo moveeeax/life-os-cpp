@@ -201,7 +201,8 @@ inline size_t read_cb(char* dest, size_t size, size_t nmemb, void* userp) {
  *
  * Body lives in Mailer.cpp (app_core) so this header no longer includes
  * jobs/Jobs.hpp — that include was the email→jobs half of the email↔jobs
- * header cycle (the jobs→email half died with BuiltinHandlers.cpp).
+ * header cycle; the jobs→email half is gone, the email handlers register
+ * from email/jobs/Register.cpp.
  */
 bool via_jobs();
 

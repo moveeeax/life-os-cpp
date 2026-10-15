@@ -7,7 +7,9 @@
  *        leaving its notes unlinked.
  */
 
+#include <chrono>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -91,13 +93,16 @@ protected:
     }
 
     HttpResponsePtr add(const char* who, const json& body) {
-        return call(who, Post, body, [&](auto req, auto cb) { c.createNote(req, std::move(cb)); });
+        auto r = call(who, Post, body, [&](auto req, auto cb) { c.createNote(req, std::move(cb)); });
+        TestHelpers::expect_2xx_matches_schema(r, "POST", "/api/v1/notes");
+        return r;
     }
 
     json list(const char* who, const std::vector<std::pair<std::string, std::string>>& params = {}) {
         auto r = call(
             who, Get, json::object(), [&](auto req, auto cb) { c.listNotes(req, std::move(cb)); }, params);
         EXPECT_EQ(r->statusCode(), k200OK) << std::string(r->body());
+        TestHelpers::expect_2xx_matches_schema(r, "GET", "/api/v1/notes");
         return body_of(r);
     }
 
@@ -204,12 +209,39 @@ TEST_F(NotesApiTest, EditAndADeletedProject) {
         c.updateNote(req, std::move(cb), id);
     });
     ASSERT_EQ(edited->statusCode(), k200OK) << std::string(edited->body());
+    TestHelpers::expect_matches_schema(edited, "PATCH", "/api/v1/notes/{id}");
     EXPECT_EQ(body_of(edited)["data"]["body"], "More words");
     EXPECT_EQ(body_of(edited)["data"]["title"], "Draft") << "untouched fields stay";
     call(kAnna, Delete, json::object(), [&](auto req, auto cb) { projects.deleteProject(req, std::move(cb), p); });
     auto left = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.getNote(req, std::move(cb), id); });
+    TestHelpers::expect_2xx_matches_schema(left, "GET", "/api/v1/notes/{id}");
     EXPECT_TRUE(body_of(left)["data"]["project_id"].is_null());
     EXPECT_EQ(call(kAnna, Delete, json::object(), [&](auto req, auto cb) { c.deleteNote(req, std::move(cb), id); })
                   ->statusCode(),
               k204NoContent);
+}
+
+namespace {
+
+/// updated_at of one row at microsecond precision; the text orders as time does.
+std::string updated_at_of(const std::string& sql, const std::string& param) {
+    return Database::get().execute_read(
+        [&](auto& txn) { return txn.exec_params(sql, param)[0][0].template as<std::string>(); });
+}
+
+constexpr const char* kUpdatedAtFormat = "to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS.US')";
+
+}  // namespace
+
+// The trigger of migration 042 bumps updated_at; NoteRepository::update no
+// longer sets the column by hand.
+TEST_F(NotesApiTest, UpdatedAtMovesByTheTriggerAlone) {
+    const auto id = body_of(add(kAnna, json{{"title", "Draft"}}))["data"]["id"].get<std::string>();
+    const std::string sql = std::string("SELECT ") + kUpdatedAtFormat + " FROM notes WHERE id = $1::uuid";
+    const std::string before = updated_at_of(sql, id);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    auto edited = call(
+        kAnna, Patch, json{{"body", "More words"}}, [&](auto req, auto cb) { c.updateNote(req, std::move(cb), id); });
+    ASSERT_EQ(edited->statusCode(), k200OK) << std::string(edited->body());
+    EXPECT_GT(updated_at_of(sql, id), before) << "notes_touch_updated_at";
 }

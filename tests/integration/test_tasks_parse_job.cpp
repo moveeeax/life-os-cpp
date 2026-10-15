@@ -13,13 +13,13 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/JobHandlers.hpp"
 #include "database/Database.hpp"
-#include "jobs/BuiltinHandlers.hpp"
 #include "jobs/Dispatcher.hpp"
-#include "jobs/TasksParseHandler.hpp"
 #include "net/Http.hpp"
 #include "repositories/tasks/ParseJobRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
+#include "tasks/jobs/ParseJob.hpp"
 #include "test_helpers.hpp"
 
 using json = nlohmann::json;
@@ -290,7 +290,7 @@ TEST_F(TasksParseJobTest, AQueuedRowTheQueueLostDoesNotHoldAParseSlot) {
 }
 
 TEST_F(TasksParseJobTest, TheQueueGivingUpFailsTheRow) {
-    Jobs::register_builtin_handlers();
+    Core::register_job_handlers();
     const std::string id = job("buy water");
     Jobs::Job dead;
     dead.id = "redis-job";

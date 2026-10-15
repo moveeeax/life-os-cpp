@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { guardDecision, type GuardSessionState } from './ProtectedRoute';
+import { guardDecision, type GuardSessionState } from './guardDecision';
 
 /**
  * ProtectedRoute renders JSX (no @testing-library in the stack), but its

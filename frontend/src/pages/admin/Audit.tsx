@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { onActivateKey } from '@/lib/a11y';
 import { usePagedQuery } from '@/hooks/usePagedQuery';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
@@ -49,6 +50,7 @@ export function AdminAuditPage() {
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
   const [applied, setApplied] = useState<Filters>(EMPTY_FILTERS);
   const [selected, setSelected] = useState<AuditEntry | null>(null);
+  const toggle = (e: AuditEntry) => setSelected(selected?.id === e.id ? null : e);
 
   // Only non-empty filters reach the URL — and dates are normalised to RFC3339.
   const query = useMemo<Record<string, string>>(() => {
@@ -90,7 +92,17 @@ export function AdminAuditPage() {
       header: 'Details',
       cell: (e) =>
         e.details && Object.keys(e.details).length > 0 ? (
-          <span className="text-primary underline-offset-2 hover:underline">view</span>
+          <button
+            type="button"
+            className="rounded text-primary underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+            aria-expanded={selected?.id === e.id}
+            onClick={(ev) => {
+              ev.stopPropagation();
+              toggle(e);
+            }}
+          >
+            view
+          </button>
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
@@ -177,7 +189,7 @@ export function AdminAuditPage() {
                 Clear
               </Button>
               {data && (
-                <span className="ml-auto self-center text-sm text-muted-foreground">
+                <span className="ml-auto self-center text-sm text-muted-foreground" data-num-ok>
                   {data.total} total
                 </span>
               )}
@@ -196,9 +208,13 @@ export function AdminAuditPage() {
             error={error}
             emptyText="No audit entries match these filters."
             isPlaceholder={isPlaceholderData}
+            // The row opens the details on a click, Enter or Space; the "view"
+            // button in the cell is the same action for assistive tech.
             rowProps={(e) => ({
-              className: `cursor-pointer hover:bg-accent ${selected?.id === e.id ? 'bg-accent' : ''}`,
-              onClick: () => setSelected(selected?.id === e.id ? null : e),
+              className: `cursor-pointer hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${selected?.id === e.id ? 'bg-accent' : ''}`,
+              tabIndex: 0,
+              onClick: () => toggle(e),
+              onKeyDown: onActivateKey(() => toggle(e)),
             })}
           />
           {data && (

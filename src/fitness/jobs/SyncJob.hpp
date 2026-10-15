@@ -1,5 +1,5 @@
 /**
- * @file FitnessSyncHandler.hpp
+ * @file SyncJob.hpp
  * @brief fitness_sync job handler: a full SyncService run in the worker.
  *
  * Payload: {run_id, owner_id, from, to, data_types}. Credentials are those of the linked
@@ -20,7 +20,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include "core/Modules.hpp"
 #include "fitness/sync/SyncService.hpp"
 #include "fitness/xiaomi/Service.hpp"
 #include "jobs/Jobs.hpp"
@@ -28,6 +27,7 @@
 #include "repositories/fitness/SyncRunRepository.hpp"
 #include "repositories/workout/SessionRepository.hpp"
 #include "utils/Config.hpp"
+#include "utils/Modules.hpp"
 
 namespace Jobs::FitnessSync {
 

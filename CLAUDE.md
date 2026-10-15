@@ -30,8 +30,12 @@ fragments and docs in this repository are in English.
 - Format C++ with clang-format 17 exactly (`.clang-format`); other major
   versions reformat unrelated lines and fail `lint-format`.
 - Run the gates before pushing: `scripts/check-routes-registered.sh`,
-  `check-openapi-drift.sh`, `check-module-deps.sh` (add edges to
-  `docs/module-deps.txt` minimally, never re-sort it), `check-test-buckets.sh`,
+  `check-openapi-drift.sh`, `check-openapi-breaking.sh` (needs the oasdiff
+  binary pinned in the `openapi-drift` CI job; the spec is additive-only
+  against master), `check-openapi-gen-fresh.sh` (after a spec edit, run
+  `gen-openapi-json.sh`), `check-module-deps.sh` (add edges to
+  `docs/module-deps.txt` minimally, never re-sort it; no new include cycle),
+  `check-test-buckets.sh`,
   `check-config-sync.sh`, `check-helm-render.sh`, `check-version-sync.sh`,
   `check-selftest.sh`, `lint-openapi.sh`, `assemble-changelog.sh --check`.
 - A new config key goes everywhere `check-config-sync.sh` looks:

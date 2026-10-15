@@ -9,14 +9,19 @@
 # with zero rules — green for months, checking nothing. So: for each of the ten
 # gate scripts, copy the subtree it reads into a scratch dir, plant a known
 # breakage, and require the gate to FAIL and to NAME what it found. Two planted
-# breakages per gate, with three exceptions: five for check-version-sync.sh,
+# breakages per gate, with four exceptions: five for check-version-sync.sh,
 # which also guards the helm image pins, Chart.yaml appVersions and the
 # openapi.yaml / frontend package versions; eight for check-helm-render.sh,
 # whose production floor has one case per assertion (fail-open limiter,
 # committed credential, open registration, dev APP_ENV, docs UI on, worker
-# lease off, missing automountServiceAccountToken, NetworkPolicy off); one
-# each for assemble-changelog.sh --check (the changelog-fragment format gate)
-# and prod-check.sh (the rendered production profile). Twenty-eight in all.
+# lease off, missing automountServiceAccountToken, NetworkPolicy off); three
+# for check-config-sync.sh (an unregistered key, a stale doc row, one knob
+# read with two defaults); three for check-module-deps.sh (two forbidden
+# edges, one declared include cycle); two for check-openapi-breaking.sh (a
+# removed path, a required response property made optional); one each for
+# check-openapi-gen-fresh.sh (a stale tests/e2e/openapi.gen.json),
+# assemble-changelog.sh --check (the changelog-fragment format gate) and
+# prod-check.sh (the rendered production profile). Thirty-three in all.
 #
 # Every case follows the same discipline (borrowed from the cyber-accountant
 # service's check-render-selftest.sh, which learned it the expensive way):
@@ -39,7 +44,11 @@
 # check script supports. The check-helm-render.sh and prod-check.sh cases
 # need helm + yq (same tools the helm-charts CI job installs); they are
 # REQUIRED, not skipped — a skipped case reports success, which is the exact
-# disease this script exists to cure.
+# disease this script exists to cure. Two tools are not required: oasdiff
+# (check-openapi-breaking.sh) and pyyaml (check-openapi-gen-fresh.sh). Their
+# cases print a SELFTEST SKIP line and are counted apart, never as caught;
+# the verdict names the skipped count so a run without them cannot read as
+# a full proof.
 #
 # Usage: ./scripts/check-selftest.sh
 set -uo pipefail
@@ -69,20 +78,31 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 failures=0
 cases=0
+skipped=0
+
+# skip_case <label> <reason> — a case whose tool is not installed here. Loud
+# on purpose: the line is printed, the count is reported in the verdict, and
+# the case is never counted among the caught ones.
+skip_case() {
+    skipped=$((skipped + 1))
+    echo "SELFTEST SKIP [$1]: $2"
+}
 
 # --- plumbing ----------------------------------------------------------------
 
-# copy_tree <dest> <path>... — copy the TRACKED files under the given repo
-# paths into <dest>, preserving layout. git ls-files, not cp -R: untracked
-# local litter (vendored charts/*.tgz, editor droppings) must not leak into
-# the control run, or the control stops proving what CI would see.
+# copy_tree <dest> <path>... — copy the files git sees under the given repo
+# paths into <dest>, preserving layout: tracked files plus untracked ones
+# that are not ignored (a file added on the branch and not yet committed is
+# what CI will see after the commit). git ls-files, not cp -R: ignored
+# litter (vendored charts/*.tgz, editor droppings) must not leak into the
+# control run, or the control stops proving what CI would see.
 copy_tree() {
     local dest="$1" f
     shift
     while IFS= read -r f; do
         mkdir -p "$dest/$(dirname "$f")"
         cp "$REPO/$f" "$dest/$f"
-    done < <(git -C "$REPO" ls-files -- "$@")
+    done < <(git -C "$REPO" ls-files --cached --others --exclude-standard -- "$@" | LC_ALL=C sort -u)
 }
 
 # tree_files <dir> — every regular file under <dir>, one per line, sorted.
@@ -606,6 +626,88 @@ with open(path, "a", encoding="utf-8") as fh:
 PY
 }
 
+# 14b. A cycle closed in the DECLARED graph: security -> api legalized in
+#      docs/module-deps.txt (api -> security is real) — the shape the old
+#      membership-only gate accepted for a year (email <-> jobs).
+break_module_dep_declared_cycle() {
+    python3 - "$1/docs/module-deps.txt" <<'PY'
+import sys
+path = sys.argv[1]
+planted = "security -> api"
+with open(path, encoding="utf-8") as fh:
+    text = fh.read()
+if planted in text:
+    sys.exit("break_module_dep_declared_cycle: %s already declares %r — the healthy tree is not healthy"
+             % (path, planted))
+if "api -> security" not in text:
+    sys.exit("break_module_dep_declared_cycle: %s no longer declares 'api -> security' — pick another"
+             " edge whose reverse closes a cycle" % path)
+with open(path, "a", encoding="utf-8") as fh:
+    fh.write("\n# planted by scripts/check-selftest.sh\n" + planted + "\n")
+PY
+}
+
+# 14c. The spec loses a whole path: every client of GET/POST /api/v1/jobs
+#      breaks. The additive-only rule (docs/ARCHITECTURE.md §7) as a gate.
+break_openapi_removed_path() {
+    python3 - "$1/docs/openapi.yaml" <<'PY'
+import sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as fh:
+    lines = fh.read().split("\n")
+out, removed, skipping = [], 0, False
+for line in lines:
+    if line == "  /api/v1/jobs:":
+        skipping, removed = True, removed + 1
+        continue
+    if skipping and line.startswith("  ") and not line.startswith("   ") and line.strip():
+        skipping = False
+    if not skipping:
+        out.append(line)
+if removed != 1:
+    sys.exit("break_openapi_removed_path: removed %d '/api/v1/jobs:' path block(s) in %s — expected exactly 1"
+             % (removed, path))
+with open(path, "w", encoding="utf-8") as fh:
+    fh.write("\n".join(out))
+PY
+}
+
+# 14d. A required response property quietly becomes optional (Job.id): the
+#      (method, path) gates see nothing, a typed client loses a guarantee.
+break_openapi_optional_field() {
+    python3 - "$1/docs/openapi.yaml" <<'PY'
+import sys
+path = sys.argv[1]
+anchor = "    Job:\n      type: object\n      required: [id, type, status, created_at]\n"
+with open(path, encoding="utf-8") as fh:
+    text = fh.read()
+n = text.count(anchor)
+if n != 1:
+    sys.exit("break_openapi_optional_field: expected exactly 1 Job schema anchor in %s, found %d" % (path, n))
+text = text.replace(anchor, anchor.replace("[id, type, status, created_at]", "[type, status, created_at]"))
+with open(path, "w", encoding="utf-8") as fh:
+    fh.write(text)
+PY
+}
+
+# 14e. docs/openapi.yaml edited, tests/e2e/openapi.gen.json not regenerated:
+#      the e2e schema checks would validate against the old spec.
+break_openapi_gen_stale() {
+    python3 - "$1/docs/openapi.yaml" <<'PY'
+import sys
+path = sys.argv[1]
+anchor = "      description: W3C Trace Context header.\n"
+with open(path, encoding="utf-8") as fh:
+    text = fh.read()
+n = text.count(anchor)
+if n != 1:
+    sys.exit("break_openapi_gen_stale: expected exactly 1 anchor line %r in %s, found %d" % (anchor, path, n))
+text = text.replace(anchor, "      description: W3C Trace Context header (planted by check-selftest).\n")
+with open(path, "w", encoding="utf-8") as fh:
+    fh.write(text)
+PY
+}
+
 # 15. A config knob read in code that config.json (and every other copy)
 #     never heard of — the "added the key, forgot the skeletons and docs"
 #     drift the config-sync gate exists to stop.
@@ -639,6 +741,27 @@ if n != 1:
              "— expected exactly 1" % (n, path))
 with open(path, "w", encoding="utf-8") as fh:
     fh.write(text)
+PY
+}
+
+# 16b. The same knob read twice with two different literal defaults — the
+#      worker.id drift (worker_main.cpp once read it in two places): the
+#      gate must name the key AND both sites. The planted read uses the
+#      literal-triple form against a site that reads the registry form
+#      (Config::Keys::worker_concurrency), so both parsers are exercised.
+break_config_default_mismatch() {
+    python3 - "$1/src/core/Core.cpp" <<'PY'
+import sys
+path = sys.argv[1]
+planted = 'cfg.get<int>("worker.concurrency", "WORKER_CONCURRENCY", 99);'
+with open(path, encoding="utf-8") as fh:
+    text = fh.read()
+if planted in text:
+    sys.exit("break_config_default_mismatch: %s already contains the planted read" % path)
+# Appended at EOF — never compiled, only parsed by the gate's extractor.
+with open(path, "a", encoding="utf-8") as fh:
+    fh.write("\n// planted by scripts/check-selftest.sh\n"
+             "static void selftest_planted_default_(Config::AppConfig& cfg) { " + planted + " }\n")
 PY
 }
 
@@ -679,6 +802,37 @@ run_case spec-method-flip check-openapi-drift.sh break_spec_method_flip \
     'get /api/v1/jobs' \
     'not registered in Api::get_endpoints()' \
     'put /api/v1/jobs'
+
+# check-openapi-breaking.sh diffs the copy against a baseline FILE here (the
+# copies are not git trees): the untouched spec, so the control compares the
+# spec with itself and the planted edit is the only difference.
+if command -v oasdiff >/dev/null 2>&1; then
+    export OPENAPI_BASE_SPEC="$REPO/docs/openapi.yaml"
+    run_case openapi-breaking-removed-path check-openapi-breaking.sh break_openapi_removed_path \
+        "docs/openapi.yaml" \
+        'BREAKING change(s) in docs/openapi.yaml' \
+        'api-path-removed-without-deprecation' \
+        'GET /api/v1/jobs' \
+        'additive-only'
+    run_case openapi-breaking-optional-field check-openapi-breaking.sh break_openapi_optional_field \
+        "docs/openapi.yaml" \
+        'BREAKING change(s) in docs/openapi.yaml' \
+        'response-property-became-optional' \
+        'GET /api/v1/jobs'
+    unset OPENAPI_BASE_SPEC
+else
+    skip_case openapi-breaking-removed-path 'oasdiff is not installed (version + sha256 in the Install oasdiff step of the openapi-drift CI job)'
+    skip_case openapi-breaking-optional-field 'oasdiff is not installed (version + sha256 in the Install oasdiff step of the openapi-drift CI job)'
+fi
+
+if python3 -c 'import yaml' >/dev/null 2>&1; then
+    run_case openapi-gen-stale check-openapi-gen-fresh.sh break_openapi_gen_stale \
+        "docs/openapi.yaml tests/e2e/openapi.gen.json" \
+        'tests/e2e/openapi.gen.json is STALE' \
+        'run scripts/gen-openapi-json.sh'
+else
+    skip_case openapi-gen-stale 'python3 has no yaml module (pyyaml), the generator cannot run here'
+fi
 
 run_case rogue-controller-route check-routes-registered.sh break_rogue_controller_route \
     "src/api" \
@@ -786,16 +940,26 @@ run_case prod-check-docs-on prod-check.sh break_prod_check_docs_on \
     'docs.enabled must be false in production' \
     'prod-check FAILED'
 
+# check-module-deps.sh reads these; the cycle allowlist may be absent once
+# the last tolerated cycle is gone (git ls-files then copies nothing for it).
+MODULE_DEPS_PATHS="src docs/module-deps.txt docs/module-cycles-allowlist.txt"
+
 run_case module-dep-cycle-edge check-module-deps.sh break_module_dep_cycle_edge \
-    "src docs/module-deps.txt" \
+    "$MODULE_DEPS_PATHS" \
     'forbidden edge webhooks -> email' \
     'src/webhooks/Webhooks.hpp' \
     'utils/CurlInit.hpp'
 
 run_case module-dep-core-hub check-module-deps.sh break_module_dep_core_hub \
-    "src docs/module-deps.txt" \
+    "$MODULE_DEPS_PATHS" \
     'forbidden include of the composition root: src/api/Guards.hpp includes "core/Core.hpp"' \
-    'include "core/Modules.hpp"'
+    'include "utils/Modules.hpp"'
+
+run_case module-dep-declared-cycle check-module-deps.sh break_module_dep_declared_cycle \
+    "$MODULE_DEPS_PATHS" \
+    'include cycle between src/ directories' \
+    'api -> security -> api' \
+    'docs/module-cycles-allowlist.txt'
 
 run_case changelog-broken-fragment 'assemble-changelog.sh --check' break_changelog_fragment_type \
     "changelog.d" \
@@ -815,6 +979,12 @@ run_case config-stale-doc-row check-config-sync.sh break_config_doc_row_removed 
     "$CONFIG_SYNC_PATHS" \
     "env 'MAIL_TIMEOUT_SEC' is read in src/ but not documented in docs/CONFIG.md"
 
+run_case config-default-mismatch check-config-sync.sh break_config_default_mismatch \
+    "$CONFIG_SYNC_PATHS" \
+    "default-mismatch: config key 'worker.concurrency' (env WORKER_CONCURRENCY)" \
+    '2 at src/worker_main.cpp:' \
+    '99 at src/core/Core.cpp:'
+
 # --- verdict -----------------------------------------------------------------
 
 if [[ "$failures" -gt 0 ]]; then
@@ -822,4 +992,8 @@ if [[ "$failures" -gt 0 ]]; then
     echo "  to catch anything. Fix this before trusting any green check-* run." >&2
     exit 1
 fi
-echo "check-selftest: $cases deliberate breakages, all planted, all caught, all named"
+if [[ "$skipped" -gt 0 ]]; then
+    echo "check-selftest: $cases deliberate breakages, all planted, all caught, all named; $skipped case(s) SKIPPED for a missing tool (see the SELFTEST SKIP lines) — not a full proof"
+else
+    echo "check-selftest: $cases deliberate breakages, all planted, all caught, all named"
+fi

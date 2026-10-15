@@ -13,11 +13,11 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/JobHandlers.hpp"
 #include "database/Database.hpp"
 #include "food/Http.hpp"
-#include "jobs/BuiltinHandlers.hpp"
+#include "food/jobs/ParseJob.hpp"
 #include "jobs/Dispatcher.hpp"
-#include "jobs/FoodParseHandler.hpp"
 #include "repositories/food/ItemRepository.hpp"
 #include "repositories/food/ParseJobRepository.hpp"
 #include "test_helpers.hpp"
@@ -421,7 +421,7 @@ TEST_F(FoodParseDisabledTest, DisabledModuleFailsTheJob) {
 }
 
 TEST(FoodParseHandler, IsRegisteredAmongBuiltins) {
-    Jobs::register_builtin_handlers();
+    Core::register_job_handlers();
     EXPECT_TRUE(Jobs::Dispatcher::get().has_handler(Jobs::FoodParse::kJobType));
     EXPECT_STREQ(Jobs::FoodParse::kJobType, "food_parse");
 }

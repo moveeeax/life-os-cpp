@@ -4,7 +4,9 @@
  *        numbers, archive-on-delete, day and week views, the Mi scale weight.
  */
 
+#include <chrono>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -353,4 +355,29 @@ TEST_F(FoodRepositoriesTest, ScaleWeightAndActiveKcalComeFromTheOwnersMiAccount)
     EXPECT_DOUBLE_EQ(goals.active_kcal(kAnna, "2026-10-06").value(), 321);
     EXPECT_FALSE(goals.active_kcal(kAnna, "2026-10-05").has_value());
     EXPECT_FALSE(goals.active_kcal(kBoris, "2026-10-06").has_value());
+}
+
+namespace {
+
+/// updated_at of one row at microsecond precision; the text orders as time does.
+std::string updated_at_of(const std::string& sql, const std::string& param) {
+    return Database::get().execute_read(
+        [&](auto& txn) { return txn.exec_params(sql, param)[0][0].template as<std::string>(); });
+}
+
+constexpr const char* kUpdatedAtFormat = "to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS.US')";
+
+}  // namespace
+
+// The trigger of migration 042 bumps updated_at; ItemRepository::update no
+// longer sets the column by hand.
+TEST_F(FoodRepositoriesTest, UpdatedAtMovesByTheTriggerAlone) {
+    const auto item = items.create(kAnna, egg());
+    const std::string sql = std::string("SELECT ") + kUpdatedAtFormat + " FROM food_items WHERE id = $1::uuid";
+    const std::string before = updated_at_of(sql, item["id"]);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    Repositories::ItemRepository::Patch touch;
+    touch.brand = "Fresh";
+    items.update(kAnna, item["id"], touch);
+    EXPECT_GT(updated_at_of(sql, item["id"]), before) << "food_items_touch_updated_at";
 }

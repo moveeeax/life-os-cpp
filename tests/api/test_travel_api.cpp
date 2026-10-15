@@ -98,6 +98,7 @@ protected:
                       json{{"name", "Thailand"}, {"start_date", "2026-11-01"}, {"end_date", "2026-11-20"}},
                       [&](auto req, auto cb) { c.createTrip(req, std::move(cb)); });
         EXPECT_EQ(r->statusCode(), k201Created) << std::string(r->body());
+        TestHelpers::expect_2xx_matches_schema(r, "POST", "/api/v1/travel/trips");
         return body_of(r)["data"];
     }
 
@@ -131,6 +132,7 @@ TEST_F(TravelApiTest, ACrossingIsRecordedAndChecked) {
                    json{{"date", "2026-08-03"}, {"from", "KZ"}, {"to", "GE"}, {"time", "23:40"}},
                    [&](auto req, auto cb) { c.createCrossing(req, std::move(cb)); });
     ASSERT_EQ(ok->statusCode(), k201Created) << std::string(ok->body());
+    TestHelpers::expect_matches_schema(ok, "POST", "/api/v1/travel/crossings");
     EXPECT_EQ(body_of(ok)["data"]["to_country"], "GE");
     for (const json& bad : {json{{"date", "2026-08-03"}, {"from", "kz"}, {"to", "GE"}},
                             json{{"date", "2026-02-30"}, {"from", "KZ"}, {"to", "GE"}},
@@ -208,6 +210,7 @@ TEST_F(TravelApiTest, AComingTripSaysHowLongAStayMayLast) {
                      [&](auto req, auto cb) { c.getTrip(req, std::move(cb), trip); },
                      {{"date", "2026-10-13"}});
     ASSERT_EQ(view->statusCode(), k200OK) << std::string(view->body());
+    TestHelpers::expect_matches_schema(view, "GET", "/api/v1/travel/trips/{id}");
     const auto allowed = body_of(view)["data"]["allowed"];
     ASSERT_EQ(allowed.size(), 1U) << "only the rolling at-most rule: " << allowed.dump();
     EXPECT_EQ(allowed[0]["rule"], "Schengen");
@@ -223,6 +226,7 @@ TEST_F(TravelApiTest, AFlightCanNeedNoCrossing) {
     };
     auto plain = add(json::object());
     ASSERT_EQ(plain->statusCode(), k201Created) << std::string(plain->body());
+    TestHelpers::expect_matches_schema(plain, "POST", "/api/v1/travel/trips/{id}/items");
     EXPECT_EQ(body_of(plain)["data"]["no_crossing"], false);
     auto domestic = add({{"no_crossing", true}});
     ASSERT_EQ(domestic->statusCode(), k201Created);
@@ -242,16 +246,19 @@ TEST_F(TravelApiTest, DocumentsAndTheirWarningsForATrip) {
               k400BadRequest);
     auto short_passport = add(kAnna, {{"holder", "Maksim"}, {"kind", "passport"}, {"valid_until", "2027-05-01"}});
     ASSERT_EQ(short_passport->statusCode(), k201Created) << std::string(short_passport->body());
+    TestHelpers::expect_matches_schema(short_passport, "POST", "/api/v1/travel/documents");
     const auto passport_id = body_of(short_passport)["data"]["id"].get<std::string>();
     add(kAnna, {{"holder", "Olesia"}, {"kind", "visa"}, {"number", "ETA-1"}, {"valid_until", "2026-11-10"}});
     add(kAnna, {{"holder", "Mikhail"}, {"kind", "passport"}, {"valid_until", "2030-01-21"}});
     add(kAnna, {{"holder", "Mikhail"}, {"kind", "other"}, {"valid_until", "2020-01-01"}});
     auto list = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.listDocuments(req, std::move(cb)); });
+    TestHelpers::expect_2xx_matches_schema(list, "GET", "/api/v1/travel/documents");
     ASSERT_EQ(body_of(list)["data"].size(), 4U);
     EXPECT_EQ(body_of(list)["data"][0]["kind"], "other") << "the soonest to expire first";
 
     const auto trip = created_trip(kAnna)["id"].get<std::string>();
     auto view = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.getTrip(req, std::move(cb), trip); });
+    TestHelpers::expect_2xx_matches_schema(view, "GET", "/api/v1/travel/trips/{id}");
     const auto warnings = body_of(view)["data"]["document_warnings"];
     ASSERT_EQ(warnings.size(), 2U) << warnings.dump();
     EXPECT_EQ(warnings[0]["reason"], "expires_during_trip");
@@ -272,6 +279,7 @@ TEST_F(TravelApiTest, DocumentsAndTheirWarningsForATrip) {
                         json{{"holder", "Maksim"}, {"kind", "passport"}, {"valid_until", "2032-03-11"}},
                         [&](auto req, auto cb) { c.updateDocument(req, std::move(cb), passport_id); });
     ASSERT_EQ(renewed->statusCode(), k200OK);
+    TestHelpers::expect_matches_schema(renewed, "PATCH", "/api/v1/travel/documents/{id}");
     EXPECT_EQ(body_of(renewed)["data"]["valid_until"], "2032-03-11");
     EXPECT_EQ(call(kAnna,
                    Delete,
@@ -299,6 +307,7 @@ TEST_F(TravelApiTest, TemplatesAndCounters) {
                   [&](auto req, auto cb) { c.counters(req, std::move(cb)); },
                   {{"date", "2026-02-15"}});
     ASSERT_EQ(r->statusCode(), k200OK) << std::string(r->body());
+    TestHelpers::expect_matches_schema(r, "GET", "/api/v1/travel/counters");
     const auto counters = body_of(r)["data"];
     ASSERT_EQ(counters.size(), 1U);
     EXPECT_EQ(counters[0]["used"], 30) << "Jan 1 – Jan 30 in France";
@@ -346,6 +355,7 @@ TEST_F(TravelApiTest, ARuleIsChecked) {
                           {"threshold_kind", "over"}},
                      [&](auto req, auto cb) { c.createRule(req, std::move(cb)); });
     ASSERT_EQ(year->statusCode(), k201Created) << std::string(year->body());
+    TestHelpers::expect_matches_schema(year, "POST", "/api/v1/travel/rules");
     EXPECT_EQ(body_of(year)["data"]["window_kind"], "calendar_year");
 }
 
@@ -355,11 +365,14 @@ TEST_F(TravelApiTest, SpendsInOneCurrencyArePartialWithoutARate) {
     const auto xyz = spend(kAnna, "2026-11-04", "XYZ", 1000);
     auto candidates =
         call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.candidateSpends(req, std::move(cb), trip); });
+    TestHelpers::expect_2xx_matches_schema(candidates, "GET", "/api/v1/travel/trips/{id}/candidate-spends");
     EXPECT_EQ(body_of(candidates)["data"].size(), 2U);
     auto linked = call(
         kAnna, Post, json{{"link", {usd, xyz}}}, [&](auto req, auto cb) { c.linkSpends(req, std::move(cb), trip); });
+    TestHelpers::expect_2xx_matches_schema(linked, "POST", "/api/v1/travel/trips/{id}/spends");
     EXPECT_EQ(body_of(linked)["data"]["changed"], 2);
     auto r = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.getTrip(req, std::move(cb), trip); });
+    TestHelpers::expect_2xx_matches_schema(r, "GET", "/api/v1/travel/trips/{id}");
     const auto spends = body_of(r)["data"]["spends"];
     EXPECT_EQ(spends["by_currency"].size(), 2U);
     EXPECT_DOUBLE_EQ(spends["total"]["amount"].get<double>(), 40.0) << "USD counts, XYZ has no rate";

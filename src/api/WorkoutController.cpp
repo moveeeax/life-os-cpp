@@ -20,12 +20,12 @@
 #include "api/HandlerSupport.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
-#include "core/Modules.hpp"
 #include "domain/Role.hpp"
 #include "repositories/workout/ExerciseRepository.hpp"
 #include "repositories/workout/RoutineRepository.hpp"
 #include "repositories/workout/SessionRepository.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Modules.hpp"
 
 namespace Api {
 

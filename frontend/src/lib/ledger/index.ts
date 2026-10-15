@@ -65,6 +65,37 @@ export function periodFromSearch(
   };
 }
 
+/** The ledger filters, kept in the URL so a reload, a link or the back button keep them. */
+export interface LedgerFilters {
+  view: 'ledger' | 'inbox';
+  account: string;
+  category: string;
+  type: string;
+}
+
+/** The filters in @p search; absent ones are the defaults (the ledger, everything). */
+export function filtersFromSearch(search: URLSearchParams): LedgerFilters {
+  return {
+    view: search.get('view') === 'inbox' ? 'inbox' : 'ledger',
+    account: search.get('account') ?? '',
+    category: search.get('category') ?? '',
+    type: search.get('type') ?? '',
+  };
+}
+
+/** @p search with @p patch applied; an empty value is a default and leaves the URL. */
+export function withSearch(
+  search: URLSearchParams,
+  patch: Record<string, string>,
+): URLSearchParams {
+  const next = new URLSearchParams(search);
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === '') next.delete(key);
+    else next.set(key, value);
+  }
+  return next;
+}
+
 /** The day `by` days from `date` (YYYY-MM-DD in, YYYY-MM-DD out). */
 export const shiftDay = shiftDays;
 

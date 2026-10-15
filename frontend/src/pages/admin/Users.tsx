@@ -52,7 +52,7 @@ export function AdminUsersPage() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>{data ? `${data.total} total` : 'Users'}</CardTitle>
+          <CardTitle data-num-ok>{data ? `${data.total} total` : 'Users'}</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <DataTable

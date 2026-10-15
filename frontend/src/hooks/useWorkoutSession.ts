@@ -22,6 +22,7 @@ import {
   writeQueue,
   writeRestEnd,
   type QueuedSet,
+  type SetStore,
 } from '@/lib/workout/session';
 import type {
   Exercise,
@@ -35,6 +36,21 @@ import type {
 } from '@/lib/workout/types';
 
 const BASE = '/api/v1/workout';
+
+/** A store that keeps nothing: the queue then lives in memory for this page. */
+const NO_STORE: SetStore = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+
+/**
+ * The browser's storage, or NO_STORE when it is blocked or absent (a locked
+ * down browser throws on the access itself; a render must not).
+ */
+function browserStore(): SetStore {
+  try {
+    return globalThis.localStorage ?? NO_STORE;
+  } catch {
+    return NO_STORE;
+  }
+}
 
 /**
  * Puts a session the server just returned into the cache: under its own key
@@ -265,7 +281,7 @@ export function useSetQueue(sessionId: string) {
   const qc = useQueryClient();
   const [queue, setQueue] = useState<QueuedSet[]>(() =>
     // Sets the server refused for another session are of no use here.
-    readQueue(localStorage).filter((q) => !(q.rejected && q.sessionId !== sessionId)),
+    readQueue(browserStore()).filter((q) => !(q.rejected && q.sessionId !== sessionId)),
   );
   const queueRef = useRef(queue);
   const sending = useRef(false);
@@ -274,7 +290,7 @@ export function useSetQueue(sessionId: string) {
 
   const update = useCallback((change: (q: QueuedSet[]) => QueuedSet[]) => {
     queueRef.current = change(queueRef.current);
-    writeQueue(localStorage, queueRef.current);
+    writeQueue(browserStore(), queueRef.current);
     if (alive.current) setQueue(queueRef.current);
   }, []);
 
@@ -402,12 +418,14 @@ function beep() {
  * moment (the visual flash).
  */
 export function useRestTimer() {
-  const [endsAt, setEndsAt] = useState<number | null>(() => readRestEnd(localStorage, Date.now()));
+  const [endsAt, setEndsAt] = useState<number | null>(() =>
+    readRestEnd(browserStore(), Date.now()),
+  );
   const [now, setNow] = useState(() => Date.now());
   const [justEnded, setJustEnded] = useState(false);
 
   const set = useCallback((value: number | null) => {
-    writeRestEnd(localStorage, value);
+    writeRestEnd(browserStore(), value);
     setNow(Date.now());
     setEndsAt(value);
   }, []);

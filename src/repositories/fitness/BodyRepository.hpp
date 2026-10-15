@@ -34,7 +34,7 @@ public:
                     "bone_mass_kg = EXCLUDED.bone_mass_kg, "
                     "visceral_fat_score = EXCLUDED.visceral_fat_score, "
                     "basal_metabolism_kcal = EXCLUDED.basal_metabolism_kcal, "
-                    "metabolic_age = EXCLUDED.metabolic_age, updated_at = now() "
+                    "metabolic_age = EXCLUDED.metabolic_age "
                     "RETURNING (xmax = 0) AS inserted",
                     b.user_id,
                     b.timestamp,

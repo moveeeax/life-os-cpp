@@ -32,7 +32,7 @@ public:
                 return Database::get().execute_write([&](auto& txn) {
                     txn.exec_params(
                         "INSERT INTO travel_settings (owner_id, home_country) VALUES ($1::uuid, $2) "
-                        "ON CONFLICT (owner_id) DO UPDATE SET home_country = EXCLUDED.home_country, updated_at = now()",
+                        "ON CONFLICT (owner_id) DO UPDATE SET home_country = EXCLUDED.home_country",
                         owner,
                         country);
                     return true;

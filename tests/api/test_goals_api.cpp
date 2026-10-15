@@ -75,6 +75,65 @@ protected:
                                                         const std::string&,
                                                         const std::string&);
 
+    // The spec path of each handler the suite drives, for the schema check
+    // in call* (tests/test_helpers.hpp expect_2xx_matches_schema); a handler
+    // missing here is not checked.
+    static const char* spec_path_of(Handler<Api::GoalsController> h) {
+        static const std::pair<Handler<Api::GoalsController>, const char*> kPaths[] = {
+            {&Api::GoalsController::listGoals, "/api/v1/goals"},
+            {&Api::GoalsController::createGoal, "/api/v1/goals"},
+        };
+        for (const auto& [handler, path] : kPaths)
+            if (handler == h)
+                return path;
+        return nullptr;
+    }
+    static const char* spec_path_of(Handler<Api::TasksController> h) {
+        static const std::pair<Handler<Api::TasksController>, const char*> kPaths[] = {
+            {&Api::TasksController::createItem, "/api/v1/tasks/items"},
+        };
+        for (const auto& [handler, path] : kPaths)
+            if (handler == h)
+                return path;
+        return nullptr;
+    }
+    static const char* spec_path_of(IdHandler<Api::GoalsController> h) {
+        static const std::pair<IdHandler<Api::GoalsController>, const char*> kPaths[] = {
+            {&Api::GoalsController::getGoal, "/api/v1/goals/{id}"},
+            {&Api::GoalsController::updateGoal, "/api/v1/goals/{id}"},
+            {&Api::GoalsController::deleteGoal, "/api/v1/goals/{id}"},
+            {&Api::GoalsController::putCheckin, "/api/v1/goals/{id}/checkins"},
+            {&Api::GoalsController::addSection, "/api/v1/goals/{id}/sections"},
+            {&Api::GoalsController::addMilestone, "/api/v1/goals/{id}/milestones"},
+        };
+        for (const auto& [handler, path] : kPaths)
+            if (handler == h)
+                return path;
+        return nullptr;
+    }
+    static const char* spec_path_of(IdHandler<Api::TasksController> h) {
+        static const std::pair<IdHandler<Api::TasksController>, const char*> kPaths[] = {
+            {&Api::TasksController::getItem, "/api/v1/tasks/items/{id}"},
+            {&Api::TasksController::updateItem, "/api/v1/tasks/items/{id}"},
+        };
+        for (const auto& [handler, path] : kPaths)
+            if (handler == h)
+                return path;
+        return nullptr;
+    }
+    static const char* spec_path_of(TwoIdHandler h) {
+        static const std::pair<TwoIdHandler, const char*> kPaths[] = {
+            {&Api::GoalsController::deleteCheckin, "/api/v1/goals/{id}/checkins/{child}"},
+            {&Api::GoalsController::updateSection, "/api/v1/goals/{id}/sections/{child}"},
+            {&Api::GoalsController::deleteSection, "/api/v1/goals/{id}/sections/{child}"},
+            {&Api::GoalsController::deleteMilestone, "/api/v1/goals/{id}/milestones/{child}"},
+        };
+        for (const auto& [handler, path] : kPaths)
+            if (handler == h)
+                return path;
+        return nullptr;
+    }
+
     template <typename C>
     HttpResponsePtr call(C& c,
                          Handler<C> h,
@@ -89,6 +148,8 @@ protected:
         HttpResponsePtr captured;
         (c.*h)(req, [&](const HttpResponsePtr& r) { captured = r; });
         EXPECT_TRUE(captured);
+        if (const char* path = spec_path_of(h))
+            TestHelpers::expect_2xx_matches_schema(captured, m, path);
         return captured;
     }
 
@@ -108,6 +169,8 @@ protected:
         (c.*h)(
             req, [&](const HttpResponsePtr& r) { captured = r; }, id);
         EXPECT_TRUE(captured);
+        if (const char* path = spec_path_of(h))
+            TestHelpers::expect_2xx_matches_schema(captured, m, path);
         return captured;
     }
 
@@ -120,6 +183,8 @@ protected:
             id,
             child);
         EXPECT_TRUE(captured);
+        if (const char* path = spec_path_of(h))
+            TestHelpers::expect_2xx_matches_schema(captured, m, path);
         return captured;
     }
 

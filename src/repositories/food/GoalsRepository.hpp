@@ -59,8 +59,7 @@ public:
                 " target_weight_kg = EXCLUDED.target_weight_kg, pace_kg_per_week = EXCLUDED.pace_kg_per_week, "
                 " manual_weight_kg = EXCLUDED.manual_weight_kg, profile_note = EXCLUDED.profile_note, "
                 " kcal_override = EXCLUDED.kcal_override, protein_override_g = EXCLUDED.protein_override_g, "
-                " fat_override_g = EXCLUDED.fat_override_g, carbs_override_g = EXCLUDED.carbs_override_g, "
-                " updated_at = now() "
+                " fat_override_g = EXCLUDED.fat_override_g, carbs_override_g = EXCLUDED.carbs_override_g "
                 "RETURNING row_to_json((SELECT t FROM (SELECT " +
                     kColumns + ") t))",
                 owner,

@@ -210,8 +210,7 @@ public:
                 " fiber_g = CASE WHEN $10::boolean THEN $11 ELSE fiber_g END, "
                 " sugar_g = CASE WHEN $12::boolean THEN $13 ELSE sugar_g END, "
                 " salt_g = CASE WHEN $14::boolean THEN $15 ELSE salt_g END, "
-                " servings = COALESCE($16::jsonb, servings), archived = COALESCE($17, archived), "
-                " updated_at = now() "
+                " servings = COALESCE($16::jsonb, servings), archived = COALESCE($17, archived) "
                 "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id::text",
                 owner,
                 id,
@@ -250,7 +249,7 @@ public:
                 throw FoodItemNotFound();
             }
             if (used[0][0].template as<bool>()) {
-                txn.exec_params("UPDATE food_items SET archived = true, updated_at = now() WHERE id = $1::uuid", id);
+                txn.exec_params("UPDATE food_items SET archived = true WHERE id = $1::uuid", id);
                 return "archived";
             }
             txn.exec_params("DELETE FROM food_items WHERE id = $1::uuid", id);

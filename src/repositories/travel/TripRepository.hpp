@@ -108,7 +108,7 @@ public:
                     auto r = txn.exec_params(
                         "UPDATE travel_trips SET name = COALESCE($3, name), "
                         " start_date = COALESCE($4::date, start_date), end_date = COALESCE($5::date, end_date), "
-                        " countries = COALESCE($6::text[], countries), note = COALESCE($7, note), updated_at = now() "
+                        " countries = COALESCE($6::text[], countries), note = COALESCE($7, note) "
                         "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
                         owner,
                         id,

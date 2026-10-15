@@ -14,6 +14,7 @@ import { qk } from '@/lib/api/queryKeys';
 import type { BillingPackage, PublicWalletEntry } from '@/lib/api/types';
 import { formatDateTime } from '@/lib/dates';
 import { creditsForAmount, dollarsToCents, formatCents } from '@/lib/money';
+import { Num } from '@/shell/kit/Num';
 
 const HISTORY_PER_PAGE = 20;
 
@@ -109,10 +110,10 @@ export function BillingPage() {
       header: 'Credits',
       className: 'font-mono text-right',
       cell: (e) => (
-        <span className={e.delta_credits < 0 ? 'text-destructive' : 'text-emerald-600'}>
+        <Num className={e.delta_credits < 0 ? 'text-destructive' : 'text-emerald-600'}>
           {e.delta_credits > 0 ? '+' : ''}
           {e.delta_credits.toLocaleString()}
-        </span>
+        </Num>
       ),
     },
     { header: 'Note', className: 'text-muted-foreground', cell: (e) => e.note || '—' },
@@ -136,7 +137,9 @@ export function BillingPage() {
         </CardHeader>
         <CardContent>
           <p className="text-4xl font-bold">
-            {walletQ.isLoading ? '…' : (walletQ.data?.data.balance.toLocaleString() ?? '—')}{' '}
+            <Num>
+              {walletQ.isLoading ? '…' : (walletQ.data?.data.balance.toLocaleString() ?? '—')}
+            </Num>{' '}
             <span className="text-base font-normal text-muted-foreground">credits</span>
           </p>
         </CardContent>
@@ -163,7 +166,8 @@ export function BillingPage() {
                 >
                   <div>
                     <p className="font-medium">{pkg.title}</p>
-                    <p className="text-sm text-muted-foreground">
+                    {/* A price list, the same for everyone: not personal. */}
+                    <p className="text-sm text-muted-foreground" data-num-ok>
                       ${formatCents(pkg.amount_cents)} → {pkg.credits.toLocaleString()} credits
                     </p>
                   </div>
@@ -200,7 +204,7 @@ export function BillingPage() {
                   {customError && <p className="text-xs text-destructive">{customError}</p>}
                   {customValid && customCreditsPreview !== null && (
                     <p className="text-xs text-muted-foreground">
-                      ≈ {customCreditsPreview.toLocaleString()} credits
+                      ≈ <Num>{customCreditsPreview.toLocaleString()}</Num> credits
                     </p>
                   )}
                 </div>
@@ -233,7 +237,9 @@ export function BillingPage() {
           />
           {(historyPage > 1 || hasNextHistoryPage) && (
             <div className="mt-4 flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Page {historyPage}</p>
+              <p className="text-sm text-muted-foreground" data-num-ok>
+                Page {historyPage}
+              </p>
               <div className="space-x-2">
                 <Button
                   variant="outline"

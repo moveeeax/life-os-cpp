@@ -50,7 +50,7 @@ public:
                 "INSERT INTO now_settings (owner_id, city, country_code, latitude, longitude, timezone) "
                 "VALUES ($1::uuid, $2, $3, $4, $5, $6) ON CONFLICT (owner_id) DO UPDATE SET city = EXCLUDED.city, "
                 " country_code = EXCLUDED.country_code, latitude = EXCLUDED.latitude, "
-                " longitude = EXCLUDED.longitude, timezone = EXCLUDED.timezone, updated_at = now()",
+                " longitude = EXCLUDED.longitude, timezone = EXCLUDED.timezone",
                 owner,
                 p ? std::optional(p->city) : std::nullopt,
                 p ? opt(p->country_code) : std::nullopt,
@@ -66,7 +66,7 @@ public:
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params(
                 "INSERT INTO now_settings (owner_id, corners) VALUES ($1::uuid, $2::jsonb) "
-                "ON CONFLICT (owner_id) DO UPDATE SET corners = EXCLUDED.corners, updated_at = now()",
+                "ON CONFLICT (owner_id) DO UPDATE SET corners = EXCLUDED.corners",
                 owner,
                 corners.dump());
             return true;

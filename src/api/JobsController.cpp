@@ -76,7 +76,7 @@ void JobsController::submitJob(const HttpRequestPtr& req, std::function<void(con
 }
 
 bool JobsController::manual_type_allowed(const std::string& type) {
-    // money_rates: jobs/MoneyRatesHandler.hpp kJobType (pinned by
+    // money_rates: money/jobs/RatesJob.hpp kJobType (pinned by
     // tests/api/test_jobs_endpoints.cpp, which includes the handler).
     static constexpr std::array<std::string_view, 4> kManual{"echo", "slow", "fail", "money_rates"};
     return std::find(kManual.begin(), kManual.end(), type) != kManual.end();

@@ -10,7 +10,7 @@
  * including TU — those includes moved to Core.cpp. Only the binary entry
  * points and api/HealthController.hpp may include this header
  * (check-module-deps rule 2); everyone else consults the tiny
- * core/Modules.hpp for the module switches / shutdown flag.
+ * utils/Modules.hpp for the module switches / shutdown flag.
  */
 
 #pragma once
@@ -23,8 +23,8 @@
 #include <utility>
 #include <vector>
 
-#include "core/Modules.hpp"
 #include "utils/Config.hpp"
+#include "utils/Modules.hpp"
 
 namespace Core {
 
@@ -245,7 +245,7 @@ void shutdown();
 bool health_check();
 
 // Feature-module switches (the Core::<module>_enabled() accessors) and
-// the shutdown flag (Core::is_shutting_down) live in core/Modules.hpp —
+// the shutdown flag (Core::is_shutting_down) live in utils/Modules.hpp —
 // included above — so controllers can consult them without pulling in this
 // composition root.
 

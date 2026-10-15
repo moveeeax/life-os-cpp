@@ -2,18 +2,14 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 
 import { useNoteList } from '@/hooks/useNotes';
-import { monthOf, type Note } from '@/lib/notes';
+import { dayOf, monthOf, type Note } from '@/lib/notes';
 import { Group, Num, Row } from '@/shell/kit';
 
 import { LoadError, NotesFrame, Placeholder } from './frame';
 import { NoteSheet } from './NoteSheet';
 
 function NoteRow({ n }: { n: Note }) {
-  const date = new Date(n.created_at).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  });
+  const date = dayOf(n.created_at);
   return (
     <Row
       dot={

@@ -19,12 +19,12 @@
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "billing/PayPalClient.hpp"
-#include "core/Modules.hpp"
 #include "email/BillingEmails.hpp"
 #include "repositories/BillingRepository.hpp"
 #include "repositories/UserRepository.hpp"
 #include "utils/Config.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Modules.hpp"
 #include "utils/Time.hpp"
 
 namespace Api {

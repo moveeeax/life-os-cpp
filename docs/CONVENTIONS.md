@@ -124,9 +124,15 @@ Per handler:
   `Api.hpp`) for every `ADD_METHOD_TO`.
 - Add the `#include "api/<Entity>Controller.hpp"` to `src/api/Api.hpp`.
 - Add the path block + `components/schemas/<Entity>` to `docs/openapi.yaml`
-  (hand-edited). Run `./scripts/check-openapi-drift.sh` — it verifies
-  `(method, path)` parity (it does **not** check schema bodies, so review
-  those by eye).
+  (hand-edited), then `./scripts/gen-openapi-json.sh`. Run
+  `./scripts/check-openapi-drift.sh` (`(method, path)` parity),
+  `./scripts/check-openapi-breaking.sh` (the spec stays additive against
+  master; needs oasdiff) and `./scripts/check-openapi-gen-fresh.sh` (the
+  committed `tests/e2e/openapi.gen.json` is regenerated). The bodies a
+  handler returns are checked against the schema in the tests: call
+  `TestHelpers::expect_matches_schema(resp, "GET", "/api/v1/<path>")` in the
+  api bucket (the module fixtures map handler pointers to spec paths and do
+  it in `call*`), `expect_matches_schema` in the e2e suite.
 
 ## 6. Frontend — `frontend/`
 
@@ -220,6 +226,8 @@ The scaffolding scripts are the entry points:
 | Regenerate frontend types | `make frontend-gen-api` |
 | Run "like CI" locally | `make ci-local` |
 | Check spec ↔ code drift | `./scripts/check-openapi-drift.sh` |
+| Check the spec is additive against master | `./scripts/check-openapi-breaking.sh` (oasdiff; `OPENAPI_BASE_SPEC=<file>` for a chosen baseline) |
+| Check `tests/e2e/openapi.gen.json` is regenerated | `./scripts/check-openapi-gen-fresh.sh` |
 | Validate Helm render | `make helm-validate` |
 | Must-not-lose event dispatch (outbox vs after-response) | `src/jobs/Outbox.hpp` (doc comment is the decision guide; gotcha 20 above has the worked example) |
 | Money / ledger / payment-provider reference | `src/billing/Wallet.hpp` (billing module: append-only ledger, idempotent capture/refund/spend — spend is reference-keyed via migration 009's partial unique index, no HTTP endpoint (charging is application-specific), integer-only money; best-effort emails in `src/email/BillingEmails.hpp`) |

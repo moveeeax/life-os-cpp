@@ -66,7 +66,7 @@ inline constexpr int kStaleClaimSec = 300;
  *        write. @p txn is the `auto& txn` every repository lambda receives
  *        from Database::execute_write / execute_transaction
  *        (Database::detail::TracingTxn — only exec/exec_params are used).
- *        @p kind must be a job type a worker handles (jobs/BuiltinHandlers.cpp
+ *        @p kind must be a job type a worker handles (core/JobHandlers.cpp
  *        or any other registered handler); @p payload is passed to Jobs::submit
  *        verbatim. Throws on SQL failure — which rolls the caller's
  *        transaction back, exactly the atomicity the pattern promises.

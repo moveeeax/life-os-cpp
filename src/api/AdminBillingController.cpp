@@ -18,7 +18,6 @@
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "billing/Wallet.hpp"
-#include "core/Modules.hpp"
 #include "domain/Billing.hpp"
 #include "email/BillingEmails.hpp"
 #include "repositories/BillingMetricsRepository.hpp"
@@ -27,6 +26,7 @@
 #include "security/Audit.hpp"
 #include "security/Auth.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Modules.hpp"
 
 namespace Api {
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 
-import { useCreateTask, useUpdateTask } from '@/hooks/useTasks';
+import { useCreateTask, useCreateTasks, useUpdateTask } from '@/hooks/useTasks';
 import {
   useCandidateSpends,
   useCrossings,
@@ -175,8 +175,8 @@ function Packing({ trip }: { trip: TravelTrip }) {
   const trips = useTrips();
   const [text, setText] = useState('');
   const create = useCreateTask(() => setText(''));
-  const copyOne = useCreateTask();
-  useErrorToast(create.error ?? copyOne.error);
+  const copy = useCreateTasks();
+  useErrorToast(create.error ?? copy.error);
   const [copying, setCopying] = useState(false);
   const others = (trips.data ?? []).filter((t) => t.id !== trip.id && t.packing.total > 0);
   const add = (title: string) =>
@@ -228,8 +228,13 @@ function Packing({ trip }: { trip: TravelTrip }) {
         <CopyPacking
           from={others}
           onPick={(titles) => {
-            titles.forEach((title) =>
-              copyOne.mutate({ title, area: 'travel', trip_id: trip.id, due: trip.start_date }),
+            copy.mutate(
+              titles.map((title) => ({
+                title,
+                area: 'travel',
+                trip_id: trip.id,
+                due: trip.start_date,
+              })),
             );
             setCopying(false);
           }}

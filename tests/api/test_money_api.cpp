@@ -74,6 +74,69 @@ protected:
                                                      Api::MoneyController::Callback&&,
                                                      const std::string&);
 
+    // The spec path of each handler the suite drives, for the schema check
+    // in call* (tests/test_helpers.hpp expect_2xx_matches_schema); a handler
+    // missing here is not checked.
+    static const char* spec_path_of(Handler h) {
+        static const std::pair<Handler, const char*> kPaths[] = {
+            {&Api::MoneyController::listCurrencies, "/api/v1/money/currencies"},
+            {&Api::MoneyController::upsertCurrency, "/api/v1/money/currencies"},
+            {&Api::MoneyController::listAccounts, "/api/v1/money/accounts"},
+            {&Api::MoneyController::createAccount, "/api/v1/money/accounts"},
+            {&Api::MoneyController::listCategories, "/api/v1/money/categories"},
+            {&Api::MoneyController::createCategory, "/api/v1/money/categories"},
+            {&Api::MoneyController::listTransactions, "/api/v1/money/transactions"},
+            {&Api::MoneyController::createTransaction, "/api/v1/money/transactions"},
+            {&Api::MoneyController::createTransactions, "/api/v1/money/transactions/batch"},
+            {&Api::MoneyController::inbox, "/api/v1/money/inbox"},
+            {&Api::MoneyController::listTransfers, "/api/v1/money/transfers"},
+            {&Api::MoneyController::createTransfer, "/api/v1/money/transfers"},
+            {&Api::MoneyController::merchants, "/api/v1/money/merchants"},
+            {&Api::MoneyController::patchMerchant, "/api/v1/money/merchants"},
+            {&Api::MoneyController::rate, "/api/v1/money/rates"},
+            {&Api::MoneyController::convert, "/api/v1/money/rates/convert"},
+            {&Api::MoneyController::refreshRates, "/api/v1/money/rates/refresh"},
+            {&Api::MoneyController::periodReport, "/api/v1/money/reports/period"},
+            {&Api::MoneyController::balances, "/api/v1/money/reports/balances"},
+            {&Api::MoneyController::summary, "/api/v1/money/summary"},
+            {&Api::MoneyController::parseText, "/api/v1/money/parse"},
+            {&Api::MoneyController::parseReceipt, "/api/v1/money/parse/receipt"},
+            {&Api::MoneyController::advisorReports, "/api/v1/money/advisor/reports"},
+            {&Api::MoneyController::advisorRun, "/api/v1/money/advisor/run"},
+            {&Api::MoneyController::getSettings, "/api/v1/money/settings"},
+            {&Api::MoneyController::putSettings, "/api/v1/money/settings"},
+        };
+        for (const auto& [handler, path] : kPaths)
+            if (handler == h)
+                return path;
+        return nullptr;
+    }
+    static const char* spec_path_of(IdHandler h) {
+        static const std::pair<IdHandler, const char*> kPaths[] = {
+            {&Api::MoneyController::patchCurrency, "/api/v1/money/currencies/{code}"},
+            {&Api::MoneyController::getAccount, "/api/v1/money/accounts/{id}"},
+            {&Api::MoneyController::updateAccount, "/api/v1/money/accounts/{id}"},
+            {&Api::MoneyController::deleteAccount, "/api/v1/money/accounts/{id}"},
+            {&Api::MoneyController::getCategory, "/api/v1/money/categories/{id}"},
+            {&Api::MoneyController::updateCategory, "/api/v1/money/categories/{id}"},
+            {&Api::MoneyController::deleteCategory, "/api/v1/money/categories/{id}"},
+            {&Api::MoneyController::getTransaction, "/api/v1/money/transactions/{id}"},
+            {&Api::MoneyController::updateTransaction, "/api/v1/money/transactions/{id}"},
+            {&Api::MoneyController::deleteTransaction, "/api/v1/money/transactions/{id}"},
+            {&Api::MoneyController::confirmTransaction, "/api/v1/money/transactions/{id}/confirm"},
+            {&Api::MoneyController::getTransfer, "/api/v1/money/transfers/{id}"},
+            {&Api::MoneyController::updateTransfer, "/api/v1/money/transfers/{id}"},
+            {&Api::MoneyController::deleteTransfer, "/api/v1/money/transfers/{id}"},
+            {&Api::MoneyController::parseStatus, "/api/v1/money/parse/{id}"},
+            {&Api::MoneyController::parseAccept, "/api/v1/money/parse/{id}/accept"},
+            {&Api::MoneyController::advisorReport, "/api/v1/money/advisor/reports/{id}"},
+        };
+        for (const auto& [handler, path] : kPaths)
+            if (handler == h)
+                return path;
+        return nullptr;
+    }
+
     HttpResponsePtr call(Handler h,
                          const Security::Auth::AuthPrincipal& p,
                          HttpMethod m,
@@ -85,6 +148,8 @@ protected:
         HttpResponsePtr captured;
         (controller.*h)(req, [&](const HttpResponsePtr& r) { captured = r; });
         EXPECT_TRUE(captured);
+        if (const char* path = spec_path_of(h))
+            TestHelpers::expect_2xx_matches_schema(captured, m, path);
         return captured;
     }
 
@@ -95,6 +160,8 @@ protected:
         HttpResponsePtr captured;
         (controller.*h)(TestHelpers::authed_json(p, body, m), [&](const HttpResponsePtr& r) { captured = r; });
         EXPECT_TRUE(captured);
+        if (const char* path = spec_path_of(h))
+            TestHelpers::expect_2xx_matches_schema(captured, m, path);
         return captured;
     }
 
@@ -107,6 +174,8 @@ protected:
         (controller.*h)(
             TestHelpers::authed_json(p, body, m), [&](const HttpResponsePtr& r) { captured = r; }, id);
         EXPECT_TRUE(captured);
+        if (const char* path = spec_path_of(h))
+            TestHelpers::expect_2xx_matches_schema(captured, m, path);
         return captured;
     }
 
@@ -868,6 +937,7 @@ TEST_F(MoneyParseApiTest, WithoutAHintDateTheParseTakesTodayInTheGivenZone) {
     controller.parseText(req, [&](const HttpResponsePtr& r) { resp = r; });
     ASSERT_TRUE(resp);
     ASSERT_EQ(resp->statusCode(), k202Accepted) << resp->body();
+    TestHelpers::expect_matches_schema(resp, "POST", "/api/v1/money/parse");
     const json row =
         body_of(call_id(&Api::MoneyController::parseStatus, user(kAnna), Get, body_of(resp)["data"]["id"]))["data"];
     EXPECT_EQ(row["hint_date"], local);
@@ -1081,6 +1151,7 @@ TEST_F(MoneyAdvisorApiTest, WithoutADateTheRunIsForThePeriodOfTodayInTheGivenZon
     controller.advisorRun(req, [&](const HttpResponsePtr& r) { resp = r; });
     ASSERT_TRUE(resp);
     ASSERT_EQ(resp->statusCode(), k202Accepted) << resp->body();
+    TestHelpers::expect_matches_schema(resp, "POST", "/api/v1/money/advisor/run");
     const auto week = Money::Period::of(Money::Period::Kind::week, local);
     EXPECT_EQ(body_of(resp)["data"]["period_start"], week.from);
     EXPECT_EQ(body_of(resp)["data"]["period_end"], week.to);
@@ -1200,4 +1271,45 @@ TEST_F(MoneyOutboxApiTest, WithADrainTheAdvisorRunRidesTheRowsTransaction) {
     ASSERT_TRUE(job.has_value());
     EXPECT_EQ(job->payload["report_id"], row["id"]);
     Jobs::get().complete(job->id, json::object());
+}
+
+// A currency's decimals cannot shrink under an account that keeps it: the
+// rows hold amounts at the current scale (check_scale_in). More decimals,
+// or the same, are fine; another user's accounts do not count.
+TEST_F(MoneyApiTest, FewerDecimalsAreRefusedWhileAnAccountKeepsTheCurrency) {
+    const auto xau = call_json(&Api::MoneyController::upsertCurrency,
+                               user(kAnna),
+                               json{{"code", "XAU"}, {"decimals", 3}, {"minor_unit", "milli-ounce"}});
+    ASSERT_EQ(xau->statusCode(), k200OK) << xau->body();
+    const auto patch = [&](const char* who, const json& body) {
+        return call_id(&Api::MoneyController::patchCurrency, user(who), Patch, "XAU", body);
+    };
+    EXPECT_EQ(body_of(patch(kAnna, json{{"decimals", 2}}))["data"]["decimals"], 2) << "no account yet: any change";
+    account(kAnna, "Gold", "XAU");
+
+    const auto refused = patch(kAnna, json{{"decimals", 1}});
+    ASSERT_EQ(refused->statusCode(), k409Conflict) << refused->body();
+    EXPECT_EQ(body_of(refused)["error"], "decimals_in_use");
+    int kept = -1;
+    // Bound to a local first: a range-for over `temporary["data"]` reads the
+    // temporary after it is gone (the loop keeps only the subobject alive).
+    const json listed = body_of(call(&Api::MoneyController::listCurrencies, user(kAnna), Get));
+    for (const auto& c : listed["data"]) {
+        if (c["code"] == "XAU") {
+            kept = c["decimals"].get<int>();
+        }
+    }
+    EXPECT_EQ(kept, 2) << "nothing changed";
+
+    EXPECT_EQ(body_of(patch(kAnna, json{{"decimals", 2}}))["data"]["decimals"], 2) << "the same is not a change";
+    EXPECT_EQ(body_of(patch(kAnna, json{{"decimals", 4}}))["data"]["decimals"], 4) << "more decimals fit every row";
+    EXPECT_EQ(body_of(patch(kAnna, json{{"name", "Gold"}}))["data"]["name"], "Gold") << "a patch without decimals";
+
+    // Boris keeps XAU too, without an account in it: his decimals are his.
+    ASSERT_EQ(call_json(&Api::MoneyController::upsertCurrency,
+                        user(kBoris),
+                        json{{"code", "XAU"}, {"decimals", 3}, {"minor_unit", "milli-ounce"}})
+                  ->statusCode(),
+              k200OK);
+    EXPECT_EQ(body_of(patch(kBoris, json{{"decimals", 1}}))["data"]["decimals"], 1);
 }

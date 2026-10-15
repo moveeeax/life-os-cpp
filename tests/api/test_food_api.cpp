@@ -116,6 +116,42 @@ protected:
                                                     Api::FoodController::Callback&&,
                                                     const std::string&);
 
+    // The spec path of each handler the suite drives, for the schema check
+    // in call* (tests/test_helpers.hpp expect_2xx_matches_schema).
+    static const char* spec_path_of(Handler h) {
+        static const std::pair<Handler, const char*> kPaths[] = {
+            {&Api::FoodController::getGoals, "/api/v1/food/goals"},
+            {&Api::FoodController::putGoals, "/api/v1/food/goals"},
+            {&Api::FoodController::listItems, "/api/v1/food/items"},
+            {&Api::FoodController::createItem, "/api/v1/food/items"},
+            {&Api::FoodController::itemFromOff, "/api/v1/food/items/from-off"},
+            {&Api::FoodController::recentItems, "/api/v1/food/recent"},
+            {&Api::FoodController::offSearch, "/api/v1/food/off/search"},
+            {&Api::FoodController::day, "/api/v1/food/day"},
+            {&Api::FoodController::week, "/api/v1/food/week"},
+            {&Api::FoodController::createEntry, "/api/v1/food/entries"},
+            {&Api::FoodController::createEntries, "/api/v1/food/entries/batch"},
+            {&Api::FoodController::parseStart, "/api/v1/food/parse"},
+        };
+        for (const auto& [handler, path] : kPaths)
+            if (handler == h)
+                return path;
+        return nullptr;
+    }
+    static const char* spec_path_of(IdHandler h) {
+        static const std::pair<IdHandler, const char*> kPaths[] = {
+            {&Api::FoodController::updateItem, "/api/v1/food/items/{id}"},
+            {&Api::FoodController::deleteItem, "/api/v1/food/items/{id}"},
+            {&Api::FoodController::updateEntry, "/api/v1/food/entries/{id}"},
+            {&Api::FoodController::deleteEntry, "/api/v1/food/entries/{id}"},
+            {&Api::FoodController::parseStatus, "/api/v1/food/parse/{id}"},
+        };
+        for (const auto& [handler, path] : kPaths)
+            if (handler == h)
+                return path;
+        return nullptr;
+    }
+
     HttpResponsePtr call(Handler h,
                          const Security::Auth::AuthPrincipal& p,
                          HttpMethod m,
@@ -127,6 +163,8 @@ protected:
         HttpResponsePtr captured;
         (controller.*h)(req, [&](const HttpResponsePtr& r) { captured = r; });
         EXPECT_TRUE(captured);
+        if (const char* path = spec_path_of(h))
+            TestHelpers::expect_2xx_matches_schema(captured, m, path);
         return captured;
     }
 
@@ -137,6 +175,8 @@ protected:
         HttpResponsePtr captured;
         (controller.*h)(TestHelpers::authed_json(p, body, m), [&](const HttpResponsePtr& r) { captured = r; });
         EXPECT_TRUE(captured);
+        if (const char* path = spec_path_of(h))
+            TestHelpers::expect_2xx_matches_schema(captured, m, path);
         return captured;
     }
 
@@ -149,6 +189,8 @@ protected:
         (controller.*h)(
             TestHelpers::authed_json(p, body, m), [&](const HttpResponsePtr& r) { captured = r; }, id);
         EXPECT_TRUE(captured);
+        if (const char* path = spec_path_of(h))
+            TestHelpers::expect_2xx_matches_schema(captured, m, path);
         return captured;
     }
 

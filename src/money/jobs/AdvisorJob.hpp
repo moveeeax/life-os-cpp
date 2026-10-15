@@ -1,5 +1,5 @@
 /**
- * @file MoneyAdvisorHandler.hpp
+ * @file AdvisorJob.hpp
  * @brief money_advisor job: the facts of a period (the Reports page's numbers,
  *        category names instead of ids, balances, the person's note) to the
  *        LLM, the written review and the facts into the report row.
@@ -21,7 +21,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include "core/Modules.hpp"
 #include "jobs/Jobs.hpp"
 #include "llm/Chat.hpp"
 #include "money/Llm.hpp"
@@ -32,6 +31,7 @@
 #include "repositories/money/CategoryRepository.hpp"
 #include "repositories/money/ReportBuilder.hpp"
 #include "repositories/money/SettingsRepository.hpp"
+#include "utils/Modules.hpp"
 #include "utils/Utf8.hpp"
 
 namespace Jobs::MoneyAdvisor {

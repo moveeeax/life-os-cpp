@@ -44,7 +44,7 @@ public:
                     "ON CONFLICT (user_id, date, device_id) DO UPDATE SET "
                     "steps = EXCLUDED.steps, distance_m = EXCLUDED.distance_m, "
                     "active_kcal = EXCLUDED.active_kcal, timezone = EXCLUDED.timezone, "
-                    "collected_at = EXCLUDED.collected_at, updated_at = now() "
+                    "collected_at = EXCLUDED.collected_at "
                     "RETURNING (xmax = 0) AS inserted",
                     day.user_id,
                     day.date,

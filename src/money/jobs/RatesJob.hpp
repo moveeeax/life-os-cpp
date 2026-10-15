@@ -1,5 +1,5 @@
 /**
- * @file MoneyRatesHandler.hpp
+ * @file RatesJob.hpp
  * @brief Worker job `money_rates`: fetch one day's quotes against the US
  *        dollar from the rates source and store the ones any user needs.
  *        Payload `{date?}`: "latest" (the default) or a "YYYY-MM-DD" snapshot
@@ -22,12 +22,12 @@
 
 #include <nlohmann/json.hpp>
 
-#include "core/Modules.hpp"
 #include "jobs/Jobs.hpp"
 #include "money/Period.hpp"
 #include "money/RatesSource.hpp"
 #include "net/Http.hpp"
 #include "repositories/money/FxRateRepository.hpp"
+#include "utils/Modules.hpp"
 
 namespace Jobs::MoneyRates {
 

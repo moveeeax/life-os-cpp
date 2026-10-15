@@ -113,54 +113,57 @@ public:
     /// @throws NotFound, Invariant, InvalidDate.
     nlohmann::json update(const std::string& owner, const std::string& id, const Patch& p) {
         return detail::translate_sql(
-            [&] {
-                return Database::get().execute_write([&](auto& txn) {
-                    auto r = txn.exec_params(
-                        "UPDATE task_items SET title = COALESCE($3, title), area = COALESCE($4, area), "
-                        " effort = CASE WHEN $5::boolean THEN $6 ELSE effort END, "
-                        " due = CASE WHEN $7::boolean THEN $8::date ELSE due END, "
-                        " next_step = COALESCE($9, next_step), note = COALESCE($10, note), "
-                        " status = COALESCE($11, status), "
-                        " completed_at = CASE WHEN COALESCE($11, status) = 'done' "
-                        "   THEN COALESCE(CASE WHEN status = 'done' THEN completed_at END, now()) END, "
-                        " source_kind = CASE WHEN $12::boolean THEN $13 ELSE source_kind END, "
-                        " source_ref = CASE WHEN $14::boolean THEN $15 ELSE source_ref END, "
-                        " goal_id = CASE WHEN $16::boolean THEN $17::uuid ELSE goal_id END, "
-                        " goal_section_id = CASE WHEN $18::boolean THEN $19::uuid ELSE goal_section_id END, "
-                        " trip_id = CASE WHEN $20::boolean THEN $21::uuid ELSE trip_id END, "
-                        " project_id = CASE WHEN $22::boolean THEN $23::uuid ELSE project_id END, "
-                        " updated_at = now() "
-                        "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
-                        owner,
-                        id,
-                        p.title,
-                        p.area,
-                        p.effort.has_value(),
-                        p.effort.has_value() ? *p.effort : std::optional<std::string>(),
-                        p.due.has_value(),
-                        p.due.has_value() ? *p.due : std::optional<std::string>(),
-                        p.next_step,
-                        p.note,
-                        p.status,
-                        p.source_kind.has_value(),
-                        p.source_kind.has_value() ? *p.source_kind : std::optional<std::string>(),
-                        p.source_ref.has_value(),
-                        p.source_ref.has_value() ? *p.source_ref : std::optional<std::string>(),
-                        p.goal_id.has_value(),
-                        p.goal_id.has_value() ? *p.goal_id : std::optional<std::string>(),
-                        p.goal_section_id.has_value(),
-                        p.goal_section_id.has_value() ? *p.goal_section_id : std::optional<std::string>(),
-                        p.trip_id.has_value(),
-                        p.trip_id.has_value() ? *p.trip_id : std::optional<std::string>(),
-                        p.project_id.has_value(),
-                        p.project_id.has_value() ? *p.project_id : std::optional<std::string>());
-                    if (r.empty()) {
-                        throw NotFound("task");
-                    }
-                    return *find_in(txn, owner, id);
-                });
-            },
+            [&] { return Database::get().execute_write([&](auto& txn) { return update_in(txn, owner, id, p); }); },
             &detail::translate);
+    }
+
+    /// update() inside the caller's transaction (the focus of the day closes
+    /// its task in the same one). The SQLSTATE translation is the caller's:
+    /// wrap in detail::translate_sql. @throws NotFound.
+    template <typename Txn>
+    static nlohmann::json update_in(Txn& txn, const std::string& owner, const std::string& id, const Patch& p) {
+        auto r = txn.exec_params(
+            "UPDATE task_items SET title = COALESCE($3, title), area = COALESCE($4, area), "
+            " effort = CASE WHEN $5::boolean THEN $6 ELSE effort END, "
+            " due = CASE WHEN $7::boolean THEN $8::date ELSE due END, "
+            " next_step = COALESCE($9, next_step), note = COALESCE($10, note), "
+            " status = COALESCE($11, status), "
+            " completed_at = CASE WHEN COALESCE($11, status) = 'done' "
+            "   THEN COALESCE(CASE WHEN status = 'done' THEN completed_at END, now()) END, "
+            " source_kind = CASE WHEN $12::boolean THEN $13 ELSE source_kind END, "
+            " source_ref = CASE WHEN $14::boolean THEN $15 ELSE source_ref END, "
+            " goal_id = CASE WHEN $16::boolean THEN $17::uuid ELSE goal_id END, "
+            " goal_section_id = CASE WHEN $18::boolean THEN $19::uuid ELSE goal_section_id END, "
+            " trip_id = CASE WHEN $20::boolean THEN $21::uuid ELSE trip_id END, "
+            " project_id = CASE WHEN $22::boolean THEN $23::uuid ELSE project_id END "
+            "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
+            owner,
+            id,
+            p.title,
+            p.area,
+            p.effort.has_value(),
+            p.effort.has_value() ? *p.effort : std::optional<std::string>(),
+            p.due.has_value(),
+            p.due.has_value() ? *p.due : std::optional<std::string>(),
+            p.next_step,
+            p.note,
+            p.status,
+            p.source_kind.has_value(),
+            p.source_kind.has_value() ? *p.source_kind : std::optional<std::string>(),
+            p.source_ref.has_value(),
+            p.source_ref.has_value() ? *p.source_ref : std::optional<std::string>(),
+            p.goal_id.has_value(),
+            p.goal_id.has_value() ? *p.goal_id : std::optional<std::string>(),
+            p.goal_section_id.has_value(),
+            p.goal_section_id.has_value() ? *p.goal_section_id : std::optional<std::string>(),
+            p.trip_id.has_value(),
+            p.trip_id.has_value() ? *p.trip_id : std::optional<std::string>(),
+            p.project_id.has_value(),
+            p.project_id.has_value() ? *p.project_id : std::optional<std::string>());
+        if (r.empty()) {
+            throw NotFound("task");
+        }
+        return *find_in(txn, owner, id);
     }
 
     void remove(const std::string& owner, const std::string& id) {

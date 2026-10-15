@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { LogOut, Menu, Moon, Sun, Wallet, X } from 'lucide-react';
+import { Eye, EyeOff, LogOut, Menu, Moon, Sun, Wallet, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toaster';
 import { BRAND } from '@/lib/brand';
 import { useLogout } from '@/hooks/useAuthMutations';
+import { useHideNumbers } from '@/hooks/useHideNumbers';
 import { useMe } from '@/hooks/useMe';
 import { useRegistrationOpen } from '@/hooks/useRegistration';
 import { useThemeToggle } from '@/hooks/useThemeToggle';
@@ -13,6 +14,7 @@ import { useWalletSummary } from '@/hooks/useWallet';
 import { cn } from '@/lib/utils';
 import { userCan } from '@/lib/auth/permissions';
 import { routes, guardPermission, type RouteEntry } from '@/routes/manifest';
+import { Num } from '@/shell/kit/Num';
 
 export function Nav() {
   const me = useMe();
@@ -31,6 +33,9 @@ export function Nav() {
   const walletQ = useWalletSummary(!!user);
 
   const { dark, toggleTheme } = useThemeToggle();
+  // Hide numbers works on the classic pages too: the class on <html> blurs
+  // every `.num` (index.css); the wallet balance below is one.
+  const [numbersHidden, setNumbersHidden] = useHideNumbers();
 
   // Show the logged-out auth buttons (Log in / Register) only once /me has
   // RESOLVED to "no session" — me.isSuccess && !user. Gating on isSuccess
@@ -106,6 +111,17 @@ export function Nav() {
           >
             {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
+          {user && (
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-pressed={numbersHidden}
+              aria-label={numbersHidden ? 'Show numbers' : 'Hide numbers'}
+              onClick={() => setNumbersHidden(!numbersHidden)}
+            >
+              {numbersHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
+          )}
           {/* Desktop account cluster */}
           <div className="hidden items-center gap-3 md:flex">
             {user && (
@@ -127,7 +143,7 @@ export function Nav() {
                     className="flex items-center gap-1 rounded text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     <Wallet className="h-3.5 w-3.5" />
-                    {walletQ.data.data.balance.toLocaleString()}
+                    <Num>{walletQ.data.data.balance.toLocaleString()}</Num>
                   </Link>
                 )}
                 <Button size="sm" variant="ghost" aria-label="Log out" onClick={logoutAndRedirect}>
@@ -206,7 +222,7 @@ export function Nav() {
                     className="flex items-center gap-2 rounded px-2 py-2 text-muted-foreground hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <Wallet className="h-4 w-4" />
-                    {walletQ.data.data.balance.toLocaleString()} credits
+                    <Num>{walletQ.data.data.balance.toLocaleString()}</Num> credits
                   </Link>
                 )}
                 <Button

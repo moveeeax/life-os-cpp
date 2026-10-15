@@ -204,8 +204,28 @@ jobs:
     # the heavier build job from going green if the spec is stale.
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0  # check-openapi-breaking.sh diffs against the merge base with origin/master
       - name: Check OpenAPI drift
         run: ./scripts/check-openapi-drift.sh
+      - name: Check tests/e2e/openapi.gen.json is regenerated from docs/openapi.yaml
+        run: ./scripts/check-openapi-gen-fresh.sh
+      - name: Install oasdiff
+        # Pinned by version AND sha256, same discipline as the helm/yq
+        # installs below. The checksum is the linux_amd64 line of the
+        # release's checksums.txt.
+        env:
+          OASDIFF_VERSION: 1.33.0
+          OASDIFF_SHA256: 43a4e328e2d13ba1552d760aa68d2485c75c5621f309f6ff64ae895188345247
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/oasdiff.tgz "https://github.com/oasdiff/oasdiff/releases/download/v${OASDIFF_VERSION}/oasdiff_${OASDIFF_VERSION}_linux_amd64.tar.gz"
+          echo "${OASDIFF_SHA256}  /tmp/oasdiff.tgz" | sha256sum -c -
+          tar -xzf /tmp/oasdiff.tgz -C /tmp oasdiff
+          sudo install -m 0755 /tmp/oasdiff /usr/local/bin/oasdiff
+          oasdiff --version
+      - name: Check OpenAPI breaking changes (spec vs merge base with master, additive-only)
+        run: ./scripts/check-openapi-breaking.sh
       - name: Check routes registered
         run: ./scripts/check-routes-registered.sh
       - name: Check test-bucket filter sync
@@ -304,7 +324,22 @@ jobs:
           sudo install -m 0755 /tmp/yq /usr/local/bin/yq
           helm version --short
           yq --version
-      - name: Gate selftest (28 planted breakages must be caught)
+      - name: Install oasdiff
+        if: steps.scope.outputs.relevant == 'true'
+        # Pinned by version AND sha256 (the linux_amd64 line of the
+        # release's checksums.txt); without it the two oasdiff selftest
+        # cases print SELFTEST SKIP instead of proving the gate bites.
+        env:
+          OASDIFF_VERSION: 1.33.0
+          OASDIFF_SHA256: 43a4e328e2d13ba1552d760aa68d2485c75c5621f309f6ff64ae895188345247
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/oasdiff.tgz "https://github.com/oasdiff/oasdiff/releases/download/v${OASDIFF_VERSION}/oasdiff_${OASDIFF_VERSION}_linux_amd64.tar.gz"
+          echo "${OASDIFF_SHA256}  /tmp/oasdiff.tgz" | sha256sum -c -
+          tar -xzf /tmp/oasdiff.tgz -C /tmp oasdiff
+          sudo install -m 0755 /tmp/oasdiff /usr/local/bin/oasdiff
+          oasdiff --version
+      - name: Gate selftest (33 planted breakages must be caught)
         if: steps.scope.outputs.relevant == 'true'
         run: ./scripts/check-selftest.sh
 
@@ -615,7 +650,10 @@ jobs:
         run: npm test
       - name: Lint
         if: steps.scope.outputs.relevant == 'true'
-        run: npm run lint  # flat config, zero-warning baseline
+        run: npm run lint  # flat config; --max-warnings 0 is in the package.json script
+      - name: Format check
+        if: steps.scope.outputs.relevant == 'true'
+        run: npm run format:check
       - name: Production build
         if: steps.scope.outputs.relevant == 'true'
         run: npm run build

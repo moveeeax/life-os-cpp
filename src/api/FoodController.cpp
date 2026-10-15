@@ -27,12 +27,11 @@
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "cache/Cache.hpp"
-#include "core/Modules.hpp"
 #include "food/Goals.hpp"
 #include "food/Http.hpp"
 #include "food/Llm.hpp"
 #include "food/OpenFoodFacts.hpp"
-#include "jobs/FoodParseHandler.hpp"
+#include "food/jobs/ParseJob.hpp"
 #include "jobs/Jobs.hpp"
 #include "jobs/Outbox.hpp"
 #include "repositories/JobRows.hpp"
@@ -43,6 +42,7 @@
 #include "repositories/food/ItemRepository.hpp"
 #include "repositories/food/ParseJobRepository.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Modules.hpp"
 #include "utils/Utf8.hpp"
 
 namespace Api {

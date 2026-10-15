@@ -37,7 +37,7 @@ public:
                     "max_heart_rate_bpm = EXCLUDED.max_heart_rate_bpm, "
                     "avg_pace_sec_per_km = EXCLUDED.avg_pace_sec_per_km, "
                     "max_pace_sec_per_km = EXCLUDED.max_pace_sec_per_km, "
-                    "total_steps = EXCLUDED.total_steps, updated_at = now() "
+                    "total_steps = EXCLUDED.total_steps "
                     "RETURNING (xmax = 0) AS inserted",
                     w.user_id,
                     w.workout_id,

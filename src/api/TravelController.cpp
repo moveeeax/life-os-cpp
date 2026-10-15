@@ -24,7 +24,6 @@
 #include "api/HandlerSupport.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
-#include "core/Modules.hpp"
 #include "money/Summary.hpp"
 #include "repositories/Zones.hpp"
 #include "repositories/money/SummaryRepository.hpp"
@@ -37,6 +36,7 @@
 #include "repositories/travel/TripRepository.hpp"
 #include "travel/Days.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Modules.hpp"
 
 namespace Api {
 

@@ -13,10 +13,10 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/JobHandlers.hpp"
 #include "database/Database.hpp"
-#include "jobs/BuiltinHandlers.hpp"
 #include "jobs/Dispatcher.hpp"
-#include "jobs/MoneyParseHandler.hpp"
+#include "money/jobs/ParseJob.hpp"
 #include "net/Http.hpp"
 #include "repositories/money/AccountRepository.hpp"
 #include "repositories/money/CategoryRepository.hpp"
@@ -283,7 +283,7 @@ TEST_F(MoneyParseJobTest, ARunningRowIsRetriedAndALateResultChangesNothing) {
 }
 
 TEST(MoneyParseHandler, IsRegisteredAmongBuiltins) {
-    Jobs::register_builtin_handlers();
+    Core::register_job_handlers();
     EXPECT_TRUE(Jobs::Dispatcher::get().has_handler(Jobs::MoneyParse::kJobType));
 }
 

@@ -15,9 +15,9 @@
 #include <drogon/HttpResponse.h>
 
 #include "api/RequestUtils.hpp"
-#include "core/Modules.hpp"
 #include "security/Auth.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Modules.hpp"
 
 /// Reject the request with 403 unless the principal is a full admin.
 /// No-op when auth is disabled (AUTH_MODE=none) — same as require_admin.

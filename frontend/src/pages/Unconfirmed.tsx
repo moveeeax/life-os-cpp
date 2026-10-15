@@ -14,16 +14,24 @@ import { api } from '@/lib/api/client';
 export function UnconfirmedPage() {
   const user = useMe().data ?? null;
   const [resent, setResent] = useState(false);
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Disabled while the request is out: a double click must not send two emails.
   const resend = async () => {
+    if (sending) return;
+    setSending(true);
     setError(null);
-    const { error: e } = await api.POST('/api/v1/account/confirm-resend');
-    if (e) {
-      setError('Could not resend the confirmation email. Try again later.');
-      return;
+    try {
+      const { error: e } = await api.POST('/api/v1/account/confirm-resend');
+      if (e) {
+        setError('Could not resend the confirmation email. Try again later.');
+        return;
+      }
+      setResent(true);
+    } finally {
+      setSending(false);
     }
-    setResent(true);
   };
 
   return (
@@ -47,8 +55,8 @@ export function UnconfirmedPage() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          <Button onClick={resend} className="w-full" variant="outline">
-            Resend confirmation email
+          <Button onClick={resend} disabled={sending} className="w-full" variant="outline">
+            {sending ? 'Sending…' : 'Resend confirmation email'}
           </Button>
         </CardContent>
       </Card>

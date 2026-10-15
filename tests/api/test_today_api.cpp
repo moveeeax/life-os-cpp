@@ -6,8 +6,10 @@
  *        reopening the task, a focus whose task is gone.
  */
 
+#include <chrono>
 #include <optional>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -137,6 +139,26 @@ protected:
     using Handler = void (Api::TodayController::*)(const HttpRequestPtr&,
                                                    std::function<void(const HttpResponsePtr&)>&&);
 
+    // The spec path of each handler the suite drives, for the schema check
+    // in call (tests/test_helpers.hpp expect_2xx_matches_schema).
+    static const char* spec_path_of(Handler h) {
+        static const std::pair<Handler, const char*> kPaths[] = {
+            {&Api::TodayController::today, "/api/v1/today"},
+            {&Api::TodayController::putFocus, "/api/v1/today/focus"},
+            {&Api::TodayController::deleteFocus, "/api/v1/today/focus"},
+            {&Api::TodayController::focusDone, "/api/v1/today/focus/done"},
+            {&Api::TodayController::putNote, "/api/v1/today/note"},
+            {&Api::TodayController::deleteNote, "/api/v1/today/note"},
+            {&Api::TodayController::getSettings, "/api/v1/now/settings"},
+            {&Api::TodayController::putSettings, "/api/v1/now/settings"},
+            {&Api::TodayController::weather, "/api/v1/now/weather"},
+        };
+        for (const auto& [handler, path] : kPaths)
+            if (handler == h)
+                return path;
+        return nullptr;
+    }
+
     HttpResponsePtr call(Handler h,
                          const std::string& who,
                          HttpMethod m,
@@ -149,6 +171,8 @@ protected:
         HttpResponsePtr captured;
         (c.*h)(req, [&](const HttpResponsePtr& r) { captured = r; });
         EXPECT_TRUE(captured);
+        if (const char* path = spec_path_of(h))
+            TestHelpers::expect_2xx_matches_schema(captured, m, path);
         return captured;
     }
 
@@ -367,4 +391,36 @@ TEST_F(TodayApiTest, TheNextTripCountsDown) {
     EXPECT_EQ(d["travel"]["next_trip"]["name"], "Thailand");
     EXPECT_EQ(d["travel"]["next_trip"]["days_to"], 19) << "from Oct 12 to Oct 31";
     EXPECT_FALSE(today(kBoris).contains("travel")) << "nothing to show for Boris";
+}
+
+namespace {
+
+/// updated_at of one row at microsecond precision; the text orders as time does.
+std::string updated_at_of(const std::string& sql, const std::string& param) {
+    return Database::get().execute_read(
+        [&](auto& txn) { return txn.exec_params(sql, param)[0][0].template as<std::string>(); });
+}
+
+constexpr const char* kUpdatedAtFormat = "to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS.US')";
+
+}  // namespace
+
+// Ticking a task focus closes the task and marks the focus in ONE transaction
+// (TaskRepository::update_in + FocusRepository::set_done_in): both land from
+// one call, and the focus row's updated_at moves by the trigger of migration
+// 042 alone (set_done_in no longer sets the column by hand).
+TEST_F(TodayApiTest, TickingATaskFocusLandsBothEffectsInOneCall) {
+    const std::string t = insert_task(kAnna, "Pay the rent", kDay, "open");
+    ASSERT_EQ(put_focus(json{{"date", kDay}, {"kind", "task"}, {"ref_id", t}})->statusCode(), k200OK);
+    const std::string sql = std::string("SELECT ") + kUpdatedAtFormat +
+                            " FROM day_focus WHERE owner_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaae7'::uuid AND "
+                            "date = $1::date";
+    const std::string before = updated_at_of(sql, kDay);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+
+    auto r = tick(true);
+    ASSERT_EQ(r->statusCode(), k200OK) << std::string(r->body());
+    EXPECT_EQ(body_of(r)["data"]["done"], true);
+    EXPECT_EQ(task_status(t), "done") << "the task closed in the same call";
+    EXPECT_GT(updated_at_of(sql, kDay), before) << "day_focus_touch_updated_at";
 }

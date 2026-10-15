@@ -1,100 +1,271 @@
 #!/usr/bin/env bash
 #
-# Scaffold a new background-job handler.
+# Scaffold a module's background-job handler in the current layout
+# (docs/ARCHITECTURE.md §4): the handler lives next to its module in
+# src/<module>/jobs/, the module registers it through <Module>::register_jobs()
+# and Core::register_job_handlers() (src/core/JobHandlers.cpp) calls that once
+# at worker startup. src/jobs/ holds only the queue, the dispatcher, the
+# outbox and the queue's own built-ins; it includes no module.
 #
 # Usage:
-#   ./scripts/new-job.sh <job-type> [HandlerName]
+#   ./scripts/new-job.sh <module> <job-type> [HandlerName]
 #
 # Example:
-#   ./scripts/new-job.sh reindex            # -> src/jobs/handlers/ReindexJob.hpp
-#   ./scripts/new-job.sh send_report SendReport
+#   ./scripts/new-job.sh food reindex          # -> src/food/jobs/ReindexJob.hpp, Jobs::Reindex
+#   ./scripts/new-job.sh money send_report SendReport
 #
-# Emits a header-only handler that self-registers with Jobs::Dispatcher via a
-# JobHandlerRegistrar (mirrors how controllers self-register with Drogon), then
-# tells you the ONE line to add to src/worker_main.cpp: an #include of the new
-# header. After that, a job submitted with that type is dispatched to your
-# handler; unknown types still go straight to the DLQ.
+# What it does:
+#   1. Writes src/<module>/jobs/<Name>Job.hpp: a header-only handler with the
+#      job type constant (the wire contract) and process_job(payload), in the
+#      namespace Jobs::<Name> the existing handlers use.
+#   2. Wires d.register_handler(...) into src/<module>/jobs/Register.cpp; for
+#      a module's first handler it creates Register.hpp/.cpp
+#      (<Module>::register_jobs) and adds the call to src/core/JobHandlers.cpp.
+#   3. Declares the include edges the new files need in docs/module-deps.txt
+#      (appended, never re-sorted; scripts/check-module-deps.sh verifies).
+#
+# Safe to re-run for another job type of the same module.
 set -euo pipefail
 
-if [[ $# -lt 1 ]]; then
-    echo "Usage: $0 <job-type> [HandlerName]" >&2
-    echo "Example: $0 reindex" >&2
+if [[ $# -lt 2 ]]; then
+    echo "Usage: $0 <module> <job-type> [HandlerName]" >&2
+    echo "Example: $0 food reindex" >&2
     exit 1
 fi
 
-JOB_TYPE="$1"
+MODULE="$1"
+JOB_TYPE="$2"
+if [[ ! "$MODULE" =~ ^[a-z][a-z0-9_]*$ ]]; then
+    echo "ERROR: module must be lower snake_case [a-z0-9_], got '$MODULE'" >&2
+    exit 2
+fi
 if [[ ! "$JOB_TYPE" =~ ^[a-z0-9_]+$ ]]; then
     echo "ERROR: job-type must be lower snake_case [a-z0-9_], got '$JOB_TYPE'" >&2
     exit 2
 fi
 
-# Derive PascalCase handler name from the job type unless given explicitly.
-if [[ $# -ge 2 ]]; then
-    NAME="$2"
-else
-    NAME=""
-    for part in ${JOB_TYPE//_/ }; do
+pascal() {
+    local out="" part first rest
+    for part in ${1//_/ }; do
         # PascalCase each underscore-delimited part (portable: bash 3.2 lacks ${part^}).
         first="$(printf '%s' "$part" | cut -c1 | tr '[:lower:]' '[:upper:]')"
         rest="$(printf '%s' "$part" | cut -c2-)"
-        NAME+="${first}${rest}"
+        out+="${first}${rest}"
     done
-fi
+    printf '%s' "$out"
+}
 
-# camelCase form of the PascalCase name (Foo -> foo), used as the handler fn name.
-# Portable lowercase-first-char (bash 3.2 lacks ${NAME,}).
-CAMEL_NAME="$(printf '%s' "$NAME" | cut -c1 | tr '[:upper:]' '[:lower:]')$(printf '%s' "$NAME" | cut -c2-)"
+# Derive the PascalCase handler name from the job type unless given explicitly.
+if [[ $# -ge 3 ]]; then
+    NAME="$3"
+else
+    NAME="$(pascal "$JOB_TYPE")"
+fi
+if [[ ! "$NAME" =~ ^[A-Z][A-Za-z0-9]*$ ]]; then
+    echo "ERROR: HandlerName must be PascalCase, got '$NAME'" >&2
+    exit 2
+fi
+MODULE_NS="$(pascal "$MODULE")" # the module's namespace: food -> Food, fitness -> Fitness
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DIR="$ROOT/src/jobs/handlers"
+MODULE_DIR="$ROOT/src/$MODULE"
+DIR="$MODULE_DIR/jobs"
 FILE="$DIR/${NAME}Job.hpp"
-mkdir -p "$DIR"
+REG_HPP="$DIR/Register.hpp"
+REG_CPP="$DIR/Register.cpp"
+CORE_CPP="$ROOT/src/core/JobHandlers.cpp"
+DEPS="$ROOT/docs/module-deps.txt"
 
+if [[ ! -d "$MODULE_DIR" ]]; then
+    echo "ERROR: src/$MODULE does not exist — a job handler belongs to a module." >&2
+    echo "       Create the module first (./scripts/new-module.sh $MODULE and its src/$MODULE/ domain)." >&2
+    exit 3
+fi
 if [[ -e "$FILE" ]]; then
     echo "ERROR: $FILE already exists" >&2
     exit 3
 fi
+# A job type is a wire contract: refuse one a handler already owns (the
+# kJobType constants and the inline built-ins of jobs/BuiltinHandlers.cpp).
+if grep -rqE "kJobType = \"${JOB_TYPE}\"|register_handler\(\"${JOB_TYPE}\"" "$ROOT/src" --include='*.hpp' --include='*.cpp'; then
+    echo "ERROR: a handler for the job type \"${JOB_TYPE}\" already exists in src/ — pick another type" >&2
+    exit 3
+fi
+mkdir -p "$DIR"
 
-GUARD_VAR="k_$(echo "$JOB_TYPE" | tr '[:upper:]' '[:lower:]')_job"
-
+# ── 1. The handler ──────────────────────────────────────────────────────
 cat >"$FILE" <<EOF
 /**
  * @file ${NAME}Job.hpp
- * @brief Handler for the "${JOB_TYPE}" background job. Self-registers with
- *        Jobs::Dispatcher at static-init — #include this header from
- *        src/worker_main.cpp (next to the other handler includes) and the
- *        worker will route "${JOB_TYPE}" jobs here.
+ * @brief ${JOB_TYPE} job handler of the ${MODULE} module. Generated by
+ *        scripts/new-job.sh; registered by ${MODULE_NS}::register_jobs()
+ *        (${MODULE}/jobs/Register.cpp).
+ *
+ * Payload: {...}. Document the fields here: the job type and the payload
+ * are the wire contract between the API and the worker.
+ *
+ * Outcomes: return the result JSON when the job is done; throw a
+ * std::exception for a retry (then the DLQ); throw Jobs::PermanentJobError
+ * to dead-letter at once; throw Jobs::DeferJob to wait without spending an
+ * attempt (see food/jobs/ParseJob.hpp for the full shape).
  */
 
 #pragma once
 
+#include <string>
+
+#include <nlohmann/json.hpp>
+
+#include "jobs/Jobs.hpp"
+#include "utils/Modules.hpp"
+
+namespace Jobs::${NAME} {
+
+inline constexpr const char* kJobType = "${JOB_TYPE}";
+
+inline nlohmann::json process_job(const nlohmann::json& payload) {
+    if (!Core::${MODULE}_enabled()) {
+        // The job reached a worker with the module off: say so instead of
+        // retrying into the DLQ.
+        return {{"status", "skipped"}, {"reason", "${MODULE}_disabled"}};
+    }
+    // TODO: implement. \`payload\` is whatever the producer passed to
+    // Jobs::get().submit(kJobType, payload).
+    (void)payload;
+    return {{"status", "done"}, {"message", "TODO: implement ${JOB_TYPE}"}};
+}
+
+}  // namespace Jobs::${NAME}
+EOF
+echo "==> Created $FILE"
+
+if ! grep -qF "inline bool ${MODULE}_enabled()" "$ROOT/src/utils/Modules.hpp"; then
+    echo "    NOTE: Core::${MODULE}_enabled() does not exist in src/utils/Modules.hpp —" >&2
+    echo "          run ./scripts/new-module.sh $MODULE or drop the switch check from the handler." >&2
+fi
+
+# ── 2. Registration ─────────────────────────────────────────────────────
+# Lines read from temp files so the multi-line blocks survive awk intact.
+HANDLER_LINE="    d.register_handler(Jobs::${NAME}::kJobType,
+                       [](const nlohmann::json& payload) { return Jobs::${NAME}::process_job(payload); });"
+INCLUDE_LINE="#include \"${MODULE}/jobs/${NAME}Job.hpp\""
+
+add_edge() {
+    # Append a declared edge unless present; the file is never re-sorted.
+    if ! grep -qxF "$1" "$DEPS"; then
+        printf '%s\n' "$1" >>"$DEPS"
+        echo "==> docs/module-deps.txt: added '$1'"
+    fi
+}
+
+if [[ ! -e "$REG_CPP" ]]; then
+    cat >"$REG_HPP" <<EOF
+/**
+ * @file Register.hpp
+ * @brief The ${MODULE} module's job handlers, registered into the dispatcher
+ *        by Core::register_job_handlers() (src/core/JobHandlers.cpp). The
+ *        handlers are the other headers of ${MODULE}/jobs/; this declaration
+ *        keeps the registration call free of their includes.
+ */
+
+#pragma once
+
+namespace Jobs {
+class Dispatcher;
+}
+
+namespace ${MODULE_NS} {
+
+/// Registers the ${MODULE} handlers into @p d.
+void register_jobs(Jobs::Dispatcher& d);
+
+}  // namespace ${MODULE_NS}
+EOF
+    cat >"$REG_CPP" <<EOF
+/**
+ * @file Register.cpp
+ * @brief Body for src/${MODULE}/jobs/Register.hpp — compiled once into app_core.
+ */
+
+#include "${MODULE}/jobs/Register.hpp"
+
 #include <nlohmann/json.hpp>
 
 #include "jobs/Dispatcher.hpp"
+${INCLUDE_LINE}
 
-namespace Jobs::Handlers {
+namespace ${MODULE_NS} {
 
-using json = nlohmann::json;
-
-/// Process one "${JOB_TYPE}" job. Throw std::exception to retry-then-DLQ, or
-/// Jobs::PermanentJobError to DLQ immediately (no retries).
-inline json ${CAMEL_NAME}_handler(const json& payload) {
-    // TODO: implement. \`payload\` is whatever the producer passed to
-    // Jobs::get().submit("${JOB_TYPE}", payload).
-    (void)payload;
-    return {{"message", "TODO: implement ${JOB_TYPE}"}};
+void register_jobs(Jobs::Dispatcher& d) {
+${HANDLER_LINE}
 }
 
-// Self-registration — runs before main() spawns worker threads.
-inline const Jobs::JobHandlerRegistrar ${GUARD_VAR}{"${JOB_TYPE}", &${CAMEL_NAME}_handler};
-
-}  // namespace Jobs::Handlers
+}  // namespace ${MODULE_NS}
 EOF
+    echo "==> Created $REG_HPP and $REG_CPP (${MODULE_NS}::register_jobs)"
 
-echo "==> Created $FILE"
-echo ""
-echo "Next:"
-echo "  1. Implement ${CAMEL_NAME}_handler() in $FILE"
-echo "  2. Add to src/worker_main.cpp (with the other handler includes):"
-echo "         #include \"jobs/handlers/${NAME}Job.hpp\""
-echo "  3. Add \"${JOB_TYPE}\" to WORKER_TYPES so the worker drains that queue."
+    # The composition root calls every module's register_jobs() once.
+    if grep -qF "${MODULE_NS}::register_jobs(d);" "$CORE_CPP"; then
+        echo "==> $CORE_CPP already calls ${MODULE_NS}::register_jobs"
+    else
+        awk -v inc="#include \"${MODULE}/jobs/Register.hpp\"" -v call="    ${MODULE_NS}::register_jobs(d);" '
+            /^#include "jobs\/Dispatcher.hpp"$/ && !inc_done { print inc; inc_done=1 }
+            /^    Jobs::register_builtin_handlers\(\);$/ && !call_done { print; print call; call_done=1; next }
+            { print }
+        ' "$CORE_CPP" >"$CORE_CPP.tmp" && mv "$CORE_CPP.tmp" "$CORE_CPP"
+        if grep -qF "${MODULE_NS}::register_jobs(d);" "$CORE_CPP"; then
+            echo "==> $CORE_CPP: calls ${MODULE_NS}::register_jobs"
+        else
+            echo "ERROR: could not wire ${MODULE_NS}::register_jobs(d) into $CORE_CPP — add the include and the call by hand" >&2
+            exit 1
+        fi
+    fi
+    add_edge "core -> ${MODULE}/jobs"
+else
+    if grep -qF "Jobs::${NAME}::kJobType" "$REG_CPP"; then
+        echo "==> $REG_CPP already registers Jobs::${NAME}"
+    else
+        BODY_TMP="$(mktemp)"
+        printf '%s\n' "$HANDLER_LINE" >"$BODY_TMP"
+        # The call goes right after the function's opening line, or after a
+        # `using` line that follows it, so the existing calls keep their order.
+        awk -v inc="$INCLUDE_LINE" -v bodyfile="$BODY_TMP" '
+            function emit_body() {
+                while ((getline bline < bodyfile) > 0) print bline
+                close(bodyfile)
+                call_done=1
+            }
+            /^#include "jobs\/Dispatcher.hpp"$/ && !inc_done { print; print inc; inc_done=1; next }
+            pending && !call_done {
+                pending=0
+                if ($0 ~ /^    using /) { print; emit_body(); next }
+                emit_body()
+            }
+            /^void register_jobs\(Jobs::Dispatcher& d\) \{$/ && !call_done { print; pending=1; next }
+            { print }
+        ' "$REG_CPP" >"$REG_CPP.tmp" && mv "$REG_CPP.tmp" "$REG_CPP"
+        rm -f "$BODY_TMP"
+        if grep -qF "Jobs::${NAME}::kJobType" "$REG_CPP"; then
+            echo "==> $REG_CPP: registers Jobs::${NAME}"
+        else
+            echo "ERROR: could not wire Jobs::${NAME} into $REG_CPP — add the include and the register_handler call by hand" >&2
+            exit 1
+        fi
+    fi
+fi
+
+# ── 3. Include edges the generated files use ────────────────────────────
+add_edge "${MODULE}/jobs -> jobs"
+add_edge "${MODULE}/jobs -> utils"
+
+cat <<EOF
+
+Done. Next:
+  1. Implement process_job() in src/${MODULE}/jobs/${NAME}Job.hpp and document the payload.
+  2. Submit from the API with Jobs::get().submit(Jobs::${NAME}::kJobType, payload)
+     (through Jobs::Outbox::enqueue_if_drained inside the row's transaction when
+     the row must not be left queued without a job — docs/CONVENTIONS.md gotcha 20).
+  3. Add "${JOB_TYPE}" to WORKER_TYPES (deploy/values-worker-prod.yaml) so the worker drains it.
+  4. clang-format -i the generated files, then ./scripts/check-module-deps.sh
+     (declare any further edge the handler's includes need in docs/module-deps.txt).
+EOF

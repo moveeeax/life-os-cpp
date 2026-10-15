@@ -233,8 +233,7 @@ public:
                         " name = COALESCE($11, name), "
                         " receipt_amount = CASE WHEN $12::boolean THEN $13 ELSE receipt_amount END, "
                         " receipt_currency = CASE WHEN $14::boolean THEN $15 ELSE receipt_currency END, "
-                        " fx_note = COALESCE($16, fx_note), trip = COALESCE($17, trip), note = COALESCE($18, note), "
-                        " updated_at = now() "
+                        " fx_note = COALESCE($16, fx_note), trip = COALESCE($17, trip), note = COALESCE($18, note) "
                         "WHERE owner_id = $1::uuid AND id = $2::uuid",
                         owner,
                         id,
@@ -281,7 +280,7 @@ public:
     nlohmann::json confirm(const std::string& owner, const std::string& id) {
         return Database::get().execute_write([&](auto& txn) {
             auto r = txn.exec_params(
-                "UPDATE money_transactions SET status = 'posted', updated_at = now() "
+                "UPDATE money_transactions SET status = 'posted' "
                 "WHERE owner_id = $1::uuid AND id = $2::uuid AND status = 'pending' RETURNING id",
                 owner,
                 id);

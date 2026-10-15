@@ -28,17 +28,16 @@
 #include "api/HandlerSupport.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
-#include "core/Modules.hpp"
 #include "jobs/Jobs.hpp"
-#include "jobs/MoneyAdvisorHandler.hpp"
-#include "jobs/MoneyParseHandler.hpp"
-#include "jobs/MoneyRatesHandler.hpp"
 #include "jobs/Outbox.hpp"
 #include "money/Currencies.hpp"
 #include "money/Llm.hpp"
 #include "money/Period.hpp"
 #include "money/Rates.hpp"
 #include "money/Reports.hpp"
+#include "money/jobs/AdvisorJob.hpp"
+#include "money/jobs/ParseJob.hpp"
+#include "money/jobs/RatesJob.hpp"
 #include "repositories/JobRows.hpp"
 #include "repositories/Zones.hpp"
 #include "repositories/money/AccountRepository.hpp"
@@ -55,6 +54,7 @@
 #include "repositories/money/TransactionRepository.hpp"
 #include "repositories/money/TransferRepository.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Modules.hpp"
 
 namespace Api {
 
@@ -251,6 +251,7 @@ void MoneyController::listCurrencies(const HttpRequestPtr& req, Callback&& callb
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     with_repo_errors(callback, "money.listCurrencies", [&] {
         Repo::CurrencyRepository repo;
+        // A read: the seed writes once, for a user with no currency yet.
         repo.seed_defaults(owner);
         callback(Response::ok(json{{"data", repo.list(owner, req->getParameter("archived") == "true")}}));
     });

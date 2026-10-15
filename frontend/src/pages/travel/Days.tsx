@@ -112,7 +112,9 @@ export function TravelDaysPage() {
           )}
         </Group>
       )}
-      {crossings.isError ? (
+      {crossings.isPending ? (
+        <Placeholder />
+      ) : crossings.isError ? (
         <LoadError error={crossings.error} onRetry={() => void crossings.refetch()} />
       ) : (
         years(crossings.data ?? []).map(([year, list]) => (

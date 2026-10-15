@@ -110,7 +110,7 @@ public:
                         " flexibility = COALESCE($5, flexibility), "
                         " budget_max = CASE WHEN $6::boolean THEN $7 ELSE budget_max END, "
                         " budget_currency = CASE WHEN $6::boolean THEN $8 ELSE budget_currency END, "
-                        " archived = COALESCE($9, archived), position = COALESCE($10, position), updated_at = now() "
+                        " archived = COALESCE($9, archived), position = COALESCE($10, position) "
                         "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
                         owner,
                         id,
@@ -145,8 +145,7 @@ public:
                     auto used =
                         txn.exec_params("SELECT 1 FROM money_transactions WHERE category_id = $1::uuid LIMIT 1", id);
                     if (!used.empty()) {
-                        txn.exec_params(
-                            "UPDATE money_categories SET archived = true, updated_at = now() WHERE id = $1::uuid", id);
+                        txn.exec_params("UPDATE money_categories SET archived = true WHERE id = $1::uuid", id);
                         return "archived";
                     }
                     txn.exec_params("UPDATE money_merchants SET category_id = NULL WHERE category_id = $1::uuid", id);

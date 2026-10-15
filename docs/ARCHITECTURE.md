@@ -21,7 +21,7 @@ State lives in Postgres (system of record) and Redis (cache, sessions, rate
 limits, idempotency keys, the job queue).
 
 Feature modules are compiled in always and switched at runtime. Each has a
-`Core::<name>_enabled()` switch in `src/core/Modules.hpp` that reads the
+`Core::<name>_enabled()` switch in `src/utils/Modules.hpp` that reads the
 config (`<name>.enabled`, env `<NAME>_ENABLED`, default off): `billing`,
 `fitness`, `workout`, `food`, `money`, `tasks`, `goals`, `now` (the Now
 screen, with the wallpaper and sound library behind it), `travel`, `habits`
@@ -35,7 +35,9 @@ Allowed include edges between `src/` directories are declared in
 `docs/module-deps.txt` and enforced by `scripts/check-module-deps.sh`. Three
 rules are hard-coded in the gate: `utils/` includes nothing outside itself,
 `core/Core.hpp` is included only by the entry points (everything else uses
-`core/Modules.hpp`), and `webhooks` never includes `email`.
+`utils/Modules.hpp`, which keeps the `Core::` namespace), and `webhooks`
+never includes `email`. The directory graph is a DAG: `core/` is the
+composition root and may name every module, a module never names `core/`.
 
 ## 2. HTTP layer
 
@@ -74,6 +76,39 @@ Drogon would cost more than the duplicate does.
 ## 4. Module layout
 
 A module is a header plus, when it has heavy bodies, a paired `.cpp`.
+
+A feature module is spread over a fixed set of directories, each a node of
+the include graph (`docs/module-deps.txt`):
+
+- `src/<module>/`: the domain of the module (parsers, field tables, period
+  and progress arithmetic). It depends on `utils/`, `llm/`, `net/` and
+  nothing above them; `repositories/<module>/` depends on it, not the
+  reverse.
+- `src/repositories/<module>/`: the SQL of the module.
+- `src/<module>/jobs/`: the module's job handlers (`food/jobs/ParseJob.hpp`,
+  `money/jobs/RatesJob.hpp`, `fitness/jobs/SyncJob.hpp`, ...) and a
+  `Register.hpp` declaring `<Module>::register_jobs(Jobs::Dispatcher&)`.
+  Handlers depend on `jobs/` (the queue), on the module's domain and its
+  repositories. `src/jobs/` itself holds the queue, the dispatcher, the
+  outbox and the queue's own built-ins (`webhook.deliver`, the echo / slow
+  / fail demo handlers); it includes no module. The email handlers
+  (`account_email`, `email.send`) register from `src/email/jobs/`.
+  `Core::register_job_handlers()` (`src/core/JobHandlers.cpp`) calls every
+  `register_jobs()` once at worker startup; a new module's handlers are one
+  more call there. `scripts/new-job.sh <module> <job-type>` scaffolds a
+  handler in this shape.
+- `src/<module>/now/Digest.hpp`: the module's part of the Now screen's
+  digest, one function (`<Module>::digest(owner, day, ...)`) returning the
+  JSON block of `GET /api/v1/today`. `api/TodayController.cpp` calls these
+  facades and `Now::Today::assemble()`; it composes no module's repositories
+  itself. The block shapes (`Now::Today::tasks_block` and the others) stay
+  in `src/now/Today.hpp`, the words of the Now screen.
+- `src/api/<Module>Controller.hpp` + `.cpp`: the routes (declarations in the
+  header, bodies in the `.cpp`).
+
+The module switches (`Core::<name>_enabled()`) and the shutdown flag live in
+`src/utils/Modules.hpp` so that a handler or a facade can read them without
+an edge to `core/`.
 
 Stays in the `.hpp`:
 
@@ -204,11 +239,19 @@ The auth and rate-limit allowlists (`public_paths`, `protected_paths` in
 paths and are read at runtime. No gate compares them with the registry, so
 they are updated by hand when a route moves.
 
-Additive-only is a review rule today. An `oasdiff` gate in CI (the spec of
-the PR against the spec on `master`, breaking changes fail) is the next
-step; it is planned for wave 3 of the 2026-10-14 review, since the route
-count has passed the point where a review catches a removed field reliably
-(§8).
+Additive-only is a gate, not a review rule: the `openapi-drift` job runs
+`scripts/check-openapi-breaking.sh`, which diffs the PR's `docs/openapi.yaml`
+against the spec on the merge base with `master` with `oasdiff breaking
+--fail-on WARN`. A removed path or operation, a response property that is no
+longer required, a tightened type or a removed enum value fails the job;
+adding is free. The same job runs `scripts/check-openapi-gen-fresh.sh`, so
+`tests/e2e/openapi.gen.json` cannot lag behind the YAML. Response bodies meet
+the schemas in the tests: the e2e suite over the wire and the api bucket
+in-process, both through `OpenApiCheck::expect_matches_schema`
+(`tests/e2e/openapi_check.hpp`, wrapped for handler responses in
+`tests/test_helpers.hpp`). Added in wave 3 of the 2026-10-14 review, once the
+route count had passed the point where a review catches a removed field
+reliably (§8).
 
 ## 8. What is deliberately absent
 
@@ -232,12 +275,14 @@ On 2026-10-14 the registry holds 243 routes served by 22 controllers (255
 describes 169 paths with 243 operations. The count condition has fired. The
 decision stays no for the generator: the scaffolder still writes the three
 surfaces from §7 and the two gates still catch method-and-path drift at
-this size. What the size changes is the second condition: the gates do not
-see a renamed field or a tightened type, so the next step is the `oasdiff`
-gate from §7 (wave 3), which checks the schemas instead of generating them.
+this size. What the size changes is the second condition: the (method,
+path) gates do not see a renamed field or a tightened type, so the
+`openapi-drift` job now runs `check-openapi-breaking.sh` (§7), which checks
+the schemas against master instead of generating them, and the api bucket
+validates handler bodies against the same schemas.
 
 Registering Drogon routes from `Endpoints.hpp`. The registry holds only
 `{method, path, description}` strings. Wiring handlers through it would make
 it include every controller, or would replace `HttpController` with lambda
-registration everywhere. Deferred, same as the DSL: it would buy nothing the
-`oasdiff` gate does not, and it costs the controller layout.
+registration everywhere. Deferred, same as the DSL: it would buy nothing
+`check-openapi-breaking.sh` does not, and it costs the controller layout.

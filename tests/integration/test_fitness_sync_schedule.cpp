@@ -16,8 +16,8 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "fitness/jobs/SyncJob.hpp"
 #include "fitness/sync/SyncService.hpp"
-#include "jobs/FitnessSyncHandler.hpp"
 #include "jobs/Jobs.hpp"
 #include "repositories/fitness/SyncRunRepository.hpp"
 #include "test_helpers.hpp"
