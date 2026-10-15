@@ -314,6 +314,12 @@ void TodayController::putSettings(const HttpRequestPtr& req, Callback&& callback
             errs.add("corners", "invalid", *problem);
         }
     }
+    json links;
+    if (body.contains("links")) {
+        if (const auto problem = ::Now::Settings::links_problem(body["links"], links)) {
+            errs.add("links", "invalid", *problem);
+        }
+    }
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;
@@ -347,6 +353,9 @@ void TodayController::putSettings(const HttpRequestPtr& req, Callback&& callback
         }
         if (body.contains("corners")) {
             repo.put_corners(owner, body["corners"]);
+        }
+        if (body.contains("links")) {
+            repo.put_links(owner, links);
         }
         callback(Response::ok(json{{"data", repo.get(owner)}}));
     });

@@ -4,7 +4,8 @@
  *        layout with a chip twice refused, the city geocoded through a fake
  *        Open-Meteo, an unknown city 422, the geocoder down 503, the weather
  *        fetched once and then served from the cache, no city no weather, the
- *        note of a day and of the day before in /today.
+ *        note of a day and of the day before in /today, the quick links kept
+ *        and checked.
  */
 
 #include <optional>
@@ -242,4 +243,40 @@ TEST_F(NowSettingsApiTest, TheNoteOfADayIsStoredButNotOnToday) {
     EXPECT_EQ(call(&Api::TodayController::deleteNote, Delete, json::object(), {{"date", kDay}})->statusCode(),
               k204NoContent);
     EXPECT_FALSE(Repositories::Now::NoteRepository().get(kAnna, kDay));
+}
+
+TEST_F(NowSettingsApiTest, LinksAreCheckedAndKept) {
+    auto none = call(&Api::TodayController::getSettings, Get);
+    EXPECT_EQ(body_of(none)["data"]["links"], json::array()) << "no row, no links";
+    auto ok = put_settings(
+        {{"links",
+          {{{"title", "Ledger"}, {"url", "/money"}}, {{"title", "Bank"}, {"url", "https://bank.example/login"}}}}});
+    ASSERT_EQ(ok->statusCode(), k200OK) << std::string(ok->body());
+    EXPECT_EQ(body_of(ok)["data"]["links"][1]["title"], "Bank");
+    EXPECT_EQ(body_of(call(&Api::TodayController::getSettings, Get))["data"]["links"].size(), 2u);
+    auto other = call(&Api::TodayController::getSettings, Get, json::object(), {}, kBoris);
+    EXPECT_EQ(body_of(other)["data"]["links"], json::array()) << "Boris has none";
+    auto cleared = put_settings({{"links", json::array()}});
+    ASSERT_EQ(cleared->statusCode(), k200OK);
+    EXPECT_EQ(body_of(cleared)["data"]["links"], json::array());
+}
+
+TEST_F(NowSettingsApiTest, ABadLinkIsA400) {
+    const auto bad = [&](const json& links) { return put_settings({{"links", links}})->statusCode(); };
+    EXPECT_EQ(bad(json::object()), k400BadRequest) << "not an array";
+    EXPECT_EQ(bad(json::array({{{"title", ""}, {"url", "/money"}}})), k400BadRequest) << "empty title";
+    EXPECT_EQ(bad(json::array({{{"title", "x"}, {"url", "javascript:alert(1)"}}})), k400BadRequest) << "scheme";
+    EXPECT_EQ(bad(json::array({{{"title", "x"}, {"url", "//evil.example"}}})), k400BadRequest) << "protocol-relative";
+    EXPECT_EQ(bad(json::array({{{"title", "x"}, {"url", "money"}}})), k400BadRequest) << "no slash";
+    EXPECT_EQ(bad(json::array({{{"title", std::string(41, 'a')}, {"url", "/money"}}})), k400BadRequest)
+        << "title too long";
+    json nine = json::array();
+    for (int i = 0; i < 9; ++i) {
+        nine.push_back({{"title", "a"}, {"url", "/a"}});
+    }
+    EXPECT_EQ(bad(nine), k400BadRequest) << "nine links";
+    auto trimmed = put_settings({{"links", json::array({{{"title", "  Ledger  "}, {"url", " /money "}}})}});
+    ASSERT_EQ(trimmed->statusCode(), k200OK) << "a trimmed title is fine";
+    EXPECT_EQ(body_of(trimmed)["data"]["links"][0]["title"], "Ledger");
+    EXPECT_EQ(body_of(trimmed)["data"]["links"][0]["url"], "/money");
 }
