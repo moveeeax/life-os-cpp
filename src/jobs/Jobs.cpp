@@ -505,10 +505,13 @@ bool JobQueue::cancel(const std::string& id) {
             continue;  // the blob changed after the read: decide again on the new state
         }
 
-        // Drop it from wherever it currently lives: the pending queue, or — if a
-        // worker already claimed it — that worker's processing list, so crash
-        // recovery won't resurrect a cancelled job.
+        // Drop it from wherever it currently lives: the pending queue, the
+        // delayed set (a retry waiting out its backoff, or a deferred job) or —
+        // if a worker already claimed it — that worker's processing list, so
+        // neither promote_due_jobs() nor crash recovery resurrects a cancelled
+        // job.
         redis.lrem(queue_key(job.type), 0, id);
+        redis.zrem(delayed_key(), id);
         if (was_processing && !job.worker_id.empty())
             redis.lrem(processing_key(job.worker_id), 0, id);
         clear_lease_(redis, id);

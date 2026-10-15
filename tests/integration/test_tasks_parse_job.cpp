@@ -232,6 +232,32 @@ TEST_F(TasksParseJobTest, AFailBeforeTheClaimClosesAQueuedRow) {
     EXPECT_EQ((*jobs.get(kAnna, id))["status"], "failed");
 }
 
+TEST_F(TasksParseJobTest, AFailBeforeTheClaimLeavesALiveRunningRowAlone) {
+    const std::string id = job("buy water");
+    ASSERT_EQ(jobs.start(id), 1) << "a worker holds the row";
+
+    // The queue gave up on a redelivery while the first worker still runs the
+    // row (its provider call is slow, not dead): that worker's own result must land.
+    jobs.fail(id, "queue_gave_up", "visibility timeout exceeded");
+    EXPECT_EQ((*jobs.get(kAnna, id))["status"], "running");
+    jobs.finish(
+        id, /*attempt=*/1, json::array({json{{"title", "Buy water"}, {"area", "projects"}}}), "gpt-6-luna", 1, 1);
+    EXPECT_EQ((*jobs.get(kAnna, id))["status"], "done");
+
+    // A running row past the stale window has no live worker: the same fail closes it.
+    const std::string stale = job("call parents");
+    ASSERT_EQ(jobs.start(stale), 1);
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE task_parse_jobs SET started_at = now() - interval '11 minutes' WHERE id = $1::uuid",
+                        stale);
+        return true;
+    });
+    jobs.fail(stale, "queue_gave_up", "visibility timeout exceeded");
+    const json row = *jobs.get(kAnna, stale);
+    EXPECT_EQ(row["status"], "failed");
+    EXPECT_EQ(row["error"].get<std::string>().rfind("queue_gave_up", 0), 0u) << row.dump();
+}
+
 TEST_F(TasksParseJobTest, AQueuedRowTheQueueLostDoesNotHoldAParseSlot) {
     for (int i = 0; i < 3; ++i) {
         job("buy water");
