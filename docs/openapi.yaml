@@ -830,9 +830,15 @@ components:
         tr: { type: [string, 'null'], enum: [body, goals, day, tasks, habits, null] }
         bl: { type: [string, 'null'], enum: [body, goals, day, tasks, habits, null] }
         br: { type: [string, 'null'], enum: [body, goals, day, tasks, habits, null] }
+    NowLink:
+      type: object
+      required: [title, url]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 40 }
+        url: { type: string, minLength: 1, maxLength: 2048, description: 'A path of this app (/money) or an http(s) URL' }
     NowSettings:
       type: object
-      required: [city, country_code, latitude, longitude, timezone, corners]
+      required: [city, country_code, latitude, longitude, timezone, corners, links]
       properties:
         city: { type: [string, 'null'], description: The place the geocoder found }
         country_code: { type: [string, 'null'] }
@@ -840,11 +846,21 @@ components:
         longitude: { type: [number, 'null'] }
         timezone: { type: [string, 'null'] }
         corners: { $ref: '#/components/schemas/NowCorners' }
+        links:
+          type: array
+          maxItems: 8
+          description: The quick links of the Links corner, in order
+          items: { $ref: '#/components/schemas/NowLink' }
     NowSettingsInput:
       type: object
       properties:
         city: { type: [string, 'null'], minLength: 1, maxLength: 120, description: 'Geocoded with Open-Meteo; null clears the city' }
         corners: { $ref: '#/components/schemas/NowCorners' }
+        links:
+          type: array
+          maxItems: 8
+          description: Replaces the quick links; an empty array clears them
+          items: { $ref: '#/components/schemas/NowLink' }
     NowWeather:
       type: object
       required: [place, temperature, min, max, code, words, is_day, time]
@@ -8521,7 +8537,7 @@ paths:
         '404': { description: Now module disabled }
   /api/v1/now/settings:
     get:
-      summary: The weather city and the corner layout of Now
+      summary: The weather city, the corner layout and the quick links of Now
       tags: [now]
       security: [{ BearerAuth: [] }]
       responses:
@@ -8537,7 +8553,7 @@ paths:
         '401': { description: Not authenticated }
         '404': { description: Now module disabled }
     put:
-      summary: Set the weather city (geocoded) and or the corner layout
+      summary: Set the weather city (geocoded), the corner layout and or the quick links
       tags: [now]
       security: [{ BearerAuth: [] }]
       requestBody:

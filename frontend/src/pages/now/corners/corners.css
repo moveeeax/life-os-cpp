@@ -1,25 +1,89 @@
-/* The corners of Now: four chips over the picture, each one quiet line, and
-   one glass panel at a time anchored to its corner. From the approved sketch
-   (docs/superpowers/designs/2026-10-12-now-corners-sketch.html, not shipped). */
-.c-chip {
+/* The dock and the corners of Now: one glass strip of tiles at the bottom for
+   the state of the day, quiet labels in the corners for the actions, and one
+   glass panel at a time anchored to its opener. From the approved canvas
+   "Now page variants", row "B reworked" (2026-10-15). */
+
+/* A corner in rest: a label in the air, glass on hover and while open. */
+.n-corner {
   position: fixed;
   z-index: 20;
-  display: grid;
-  gap: 2px;
-  max-width: min(300px, 40vw);
-  padding: 10px 14px;
-  border-radius: 16px;
-  text-align: left;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 14px;
+  color: var(--g-ink-soft);
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.4);
   transition: background 0.2s;
 }
-.c-chip:hover,
-.c-chip[aria-expanded='true'] {
+.n-corner:hover,
+.n-corner[aria-expanded='true'] {
+  color: var(--g-ink);
   background: var(--g-glass);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  text-shadow: none;
 }
-.c-chip .c-k {
+.n-corner svg {
+  flex: none;
+}
+.n-corner-s {
+  color: var(--g-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.n-tl {
+  left: 16px;
+  top: calc(max(14px, env(safe-area-inset-top, 0px)) + 62px);
+}
+.n-bl {
+  left: 16px;
+  bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 118px);
+}
+.n-br {
+  right: 16px;
+  bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 118px);
+}
+
+/* The dock: equal tiles in one strip. */
+.n-dock {
+  position: fixed;
+  z-index: 20;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: max(24px, env(safe-area-inset-bottom, 0px));
+  /* Room on the right for the Hide numbers pill on a narrow desktop. */
+  width: min(1000px, 100vw - 280px);
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 4px;
+  padding: 6px;
+  border-radius: 22px;
+  background: var(--g-glass);
+  border: 1px solid var(--g-glass-line);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  text-shadow: none;
+}
+.n-dock:empty {
+  display: none;
+}
+.n-tile {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px 16px;
+  border-radius: 16px;
+  text-align: left;
+  color: var(--g-ink);
+  transition: background 0.2s;
+}
+.n-tile:hover,
+.n-tile[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.08);
+}
+.n-tile .c-k {
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -28,17 +92,16 @@
   gap: 7px;
   align-items: center;
 }
-.c-chip .c-v,
-.c-chip .c-s {
+.n-tile .c-v,
+.n-tile .c-s {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.c-chip .c-v {
+.n-tile .c-v {
   font-size: 16px;
-  color: var(--g-ink);
 }
-.c-chip .c-s {
+.n-tile .c-s {
   font-size: 13px;
   color: var(--g-ink-soft);
 }
@@ -48,31 +111,10 @@
   border-radius: 50%;
   background: var(--g-warn);
   display: inline-block;
+  flex: none;
 }
 .c-dot.c-late {
   background: var(--g-late);
-}
-.c-tl,
-.c-tr {
-  top: calc(max(14px, env(safe-area-inset-top, 0px)) + 54px);
-}
-.c-bl,
-.c-br {
-  bottom: max(16px, env(safe-area-inset-bottom, 0px));
-}
-.c-tl,
-.c-bl {
-  left: 16px;
-}
-.c-tr,
-.c-br {
-  right: 16px;
-  text-align: right;
-  justify-items: end;
-}
-.c-tr .c-k,
-.c-br .c-k {
-  justify-content: flex-end;
 }
 
 /* The panel takes the focus when it opens; the sheet itself needs no ring. */
@@ -116,12 +158,33 @@
   justify-items: stretch;
 }
 .c-panel.c-tl,
+.c-panel.c-bl {
+  left: 16px;
+}
+.c-panel.c-tr,
+.c-panel.c-br {
+  right: 16px;
+}
+.c-panel.c-tl,
 .c-panel.c-tr {
   top: calc(max(14px, env(safe-area-inset-top, 0px)) + 120px);
 }
 .c-panel.c-bl,
 .c-panel.c-br {
-  bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 76px);
+  bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 162px);
+}
+.c-panel.c-dock {
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(max(24px, env(safe-area-inset-bottom, 0px)) + 96px);
+  --c-origin: bottom center;
+  animation: c-pop-centred 0.18s ease-out;
+}
+@keyframes c-pop-centred {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.96);
+  }
 }
 .c-panel.c-tl {
   --c-origin: top left;
@@ -321,54 +384,75 @@
   background: transparent;
 }
 
-/* Phone: the chips line up 2×2 above the bottom; a panel is a sheet from the bottom. */
-.c-strip {
-  display: contents;
-}
+/* Phone: the corners fold into one row above the dock, the dock is a list,
+   a panel is a sheet from the bottom. */
 @media (max-width: 640px) {
-  .c-strip {
+  .n-corners {
     position: fixed;
     z-index: 20;
-    left: 16px;
-    right: 16px;
-    bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 44px);
+    left: 12px;
+    right: 12px;
+    bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 280px);
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
   }
-  .c-chip {
+  .n-corner,
+  .n-tl,
+  .n-bl,
+  .n-br {
     position: static;
-    max-width: none;
-    padding: 8px 10px;
+    justify-content: center;
+    padding: 11px 8px;
+    border-radius: 14px;
     background: var(--g-glass);
     border: 1px solid var(--g-glass-line);
-    text-align: left;
-    justify-items: start;
+    color: var(--g-ink);
+    text-shadow: none;
     min-width: 0;
   }
-  .c-tr .c-k,
-  .c-br .c-k {
-    justify-content: flex-start;
-  }
-  .c-chip .c-v {
-    font-size: 14px;
-  }
-  .c-chip .c-s {
+  .n-corner-s {
     display: none;
   }
-  /* The sheet covers the strip while it is open. */
-  .c-strip[data-open] {
+  .n-dock {
+    /* Above the Hide numbers pill. */
+    bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 44px);
+    width: calc(100vw - 24px);
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .n-tile {
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 12px;
+    align-items: baseline;
+    padding: 9px 14px;
+    border-radius: 14px;
+  }
+  .n-tile .c-v {
+    font-size: 15px;
+  }
+  .n-tile .c-s {
+    display: none;
+  }
+  /* The sheet covers the row and the dock while it is open. */
+  .n-corners[data-open],
+  .n-dock[data-open] {
     visibility: hidden;
   }
   .c-panel,
   .c-panel.c-tl,
   .c-panel.c-tr,
   .c-panel.c-bl,
-  .c-panel.c-br {
+  .c-panel.c-br,
+  .c-panel.c-dock {
     top: auto;
     left: 8px;
     right: 8px;
     width: auto;
+    transform: none;
+    animation: c-pop 0.18s ease-out;
     /* Above the Hide numbers button. */
     bottom: calc(max(8px, env(safe-area-inset-bottom, 0px)) + 44px);
     max-height: 68vh;

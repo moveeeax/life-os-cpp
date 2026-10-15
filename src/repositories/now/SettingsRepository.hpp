@@ -1,7 +1,8 @@
 /**
  * @file SettingsRepository.hpp
- * @brief The owner's Now settings: the weather city (as the geocoder found it)
- *        and the corner layout. No row means no city and the default layout.
+ * @brief The owner's Now settings: the weather city (as the geocoder found it),
+ *        the corner layout and the quick links. No row means no city, the
+ *        default layout and no links.
  */
 
 #pragma once
@@ -19,11 +20,11 @@ namespace Repositories::Now {
 
 class SettingsRepository {
 public:
-    /// {city, country_code, latitude, longitude, timezone, corners}.
+    /// {city, country_code, latitude, longitude, timezone, corners, links}.
     nlohmann::json get(const std::string& owner) {
         return Database::get().execute_read([&](auto& txn) {
             auto r = txn.exec_params(
-                "SELECT row_to_json(t) FROM (SELECT city, country_code, latitude, longitude, timezone, corners "
+                "SELECT row_to_json(t) FROM (SELECT city, country_code, latitude, longitude, timezone, corners, links "
                 "FROM now_settings WHERE owner_id = $1::uuid) t",
                 owner);
             nlohmann::json out = {{"city", nullptr},
@@ -31,12 +32,16 @@ public:
                                   {"latitude", nullptr},
                                   {"longitude", nullptr},
                                   {"timezone", nullptr},
-                                  {"corners", nullptr}};
+                                  {"corners", nullptr},
+                                  {"links", nullptr}};
             if (!r.empty()) {
                 out = nlohmann::json::parse(r[0][0].template as<std::string>());
             }
             if (out["corners"].is_null()) {
                 out["corners"] = ::Now::Settings::default_corners();
+            }
+            if (out["links"].is_null()) {
+                out["links"] = nlohmann::json::array();
             }
             return out;
         });
@@ -69,6 +74,18 @@ public:
                 "ON CONFLICT (owner_id) DO UPDATE SET corners = EXCLUDED.corners",
                 owner,
                 corners.dump());
+            return true;
+        });
+    }
+
+    /// Stores a list already checked with Now::Settings::links_problem.
+    void put_links(const std::string& owner, const nlohmann::json& links) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params(
+                "INSERT INTO now_settings (owner_id, links) VALUES ($1::uuid, $2::jsonb) "
+                "ON CONFLICT (owner_id) DO UPDATE SET links = EXCLUDED.links",
+                owner,
+                links.dump());
             return true;
         });
     }

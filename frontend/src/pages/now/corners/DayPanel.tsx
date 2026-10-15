@@ -3,11 +3,10 @@ import { Link } from 'react-router';
 import { MONEY_ABOVE_USUAL, formatMoney, type Today } from '@/lib/now';
 import { rateDay } from '@/lib/networth';
 
-import { Capture } from './Capture';
 import { n0 } from './format';
 import { Meter } from './Parts';
 
-export function DayPanel({ today, date, hour }: { today: Today; date: string; hour: number }) {
+export function DayPanel({ today, date }: { today: Today; date: string }) {
   const f = today.food;
   const m = today.money;
   const above = (m?.currencies ?? []).filter(
@@ -103,8 +102,6 @@ export function DayPanel({ today, date, hour }: { today: Today; date: string; ho
           </span>
         </Link>
       )}
-      <h2>Add</h2>
-      <Capture date={date} hour={hour} />
     </>
   );
 }

@@ -3170,6 +3170,26 @@
      }
     }
    },
+   "NowLink": {
+    "type": "object",
+    "required": [
+     "title",
+     "url"
+    ],
+    "properties": {
+     "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+     },
+     "url": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "description": "A path of this app (/money) or an http(s) URL"
+     }
+    }
+   },
    "NowSettings": {
     "type": "object",
     "required": [
@@ -3178,7 +3198,8 @@
      "latitude",
      "longitude",
      "timezone",
-     "corners"
+     "corners",
+     "links"
     ],
     "properties": {
      "city": {
@@ -3214,6 +3235,14 @@
      },
      "corners": {
       "$ref": "#/components/schemas/NowCorners"
+     },
+     "links": {
+      "type": "array",
+      "maxItems": 8,
+      "description": "The quick links of the Links corner, in order",
+      "items": {
+       "$ref": "#/components/schemas/NowLink"
+      }
      }
     }
    },
@@ -3231,6 +3260,14 @@
      },
      "corners": {
       "$ref": "#/components/schemas/NowCorners"
+     },
+     "links": {
+      "type": "array",
+      "maxItems": 8,
+      "description": "Replaces the quick links; an empty array clears them",
+      "items": {
+       "$ref": "#/components/schemas/NowLink"
+      }
      }
     }
    },
@@ -24148,7 +24185,7 @@
   },
   "/api/v1/now/settings": {
    "get": {
-    "summary": "The weather city and the corner layout of Now",
+    "summary": "The weather city, the corner layout and the quick links of Now",
     "tags": [
      "now"
     ],
@@ -24185,7 +24222,7 @@
     }
    },
    "put": {
-    "summary": "Set the weather city (geocoded) and or the corner layout",
+    "summary": "Set the weather city (geocoded), the corner layout and or the quick links",
     "tags": [
      "now"
     ],
@@ -27383,7 +27420,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 401475,
-  "source_fnv1a64": "3e99216a86b90915"
+  "source_bytes": 402158,
+  "source_fnv1a64": "ec65e2a156aed0d2"
  }
 }

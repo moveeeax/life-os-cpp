@@ -26,9 +26,11 @@ type Kind = 'meal' | 'spend';
  * One line of text into the Food or Money parse, its lines here and one Add.
  * A meal goes into the day; a spend lands in the Money inbox. A spend the
  * parse could not finish (no account, no category) is finished on Money.
+ * With @p kind given the caller owns the switch and none is drawn here.
  */
-export function Capture({ date, hour }: { date: string; hour: number }) {
-  const [kind, setKind] = useState<Kind>('meal');
+export function Capture({ date, hour, kind: fixed }: { date: string; hour: number; kind?: Kind }) {
+  const [chosen, setKind] = useState<Kind>('meal');
+  const kind = fixed ?? chosen;
   const [text, setText] = useState('');
   const food = useFoodParse();
   const money = useMoneyParse();
@@ -81,19 +83,21 @@ export function Capture({ date, hour }: { date: string; hour: number }) {
 
   return (
     <div className="c-capture">
-      <div className="c-capture-kind" role="group" aria-label="What to add">
-        {(['meal', 'spend'] as const).map((k) => (
-          <button
-            key={k}
-            type="button"
-            aria-pressed={kind === k}
-            className={kind === k ? 'c-on' : undefined}
-            onClick={() => switchTo(k)}
-          >
-            {k === 'meal' ? 'Meal' : 'Spend'}
-          </button>
-        ))}
-      </div>
+      {fixed === undefined && (
+        <div className="c-capture-kind" role="group" aria-label="What to add">
+          {(['meal', 'spend'] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              aria-pressed={kind === k}
+              className={kind === k ? 'c-on' : undefined}
+              onClick={() => switchTo(k)}
+            >
+              {k === 'meal' ? 'Meal' : 'Spend'}
+            </button>
+          ))}
+        </div>
+      )}
       <input
         ref={input}
         className="c-capture-input"

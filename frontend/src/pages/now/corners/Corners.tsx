@@ -3,51 +3,109 @@ import { useEffect, useRef, useState } from 'react';
 import {
   DEFAULT_CORNERS,
   chips,
-  placeChips,
+  dockChips,
   type Chip,
   type NowCorners,
+  type NowLink,
   type Today,
 } from '@/lib/now';
 
+import { AddPanel } from './AddPanel';
 import { BodyPanel } from './BodyPanel';
 import { DayPanel } from './DayPanel';
 import { GoalsPanel } from './GoalsPanel';
 import { HabitsPanel } from './HabitsPanel';
+import { LinksPanel } from './LinksPanel';
 import { Parts } from './Parts';
 import { TasksPanel } from './TasksPanel';
 import './corners.css';
 
+/** What a panel shows: a chip of the dock, or one of the action corners. */
+type PanelId = Chip['key'] | 'add' | 'links';
+
+/** Where a panel sits: its corner, or above the dock. */
+function spotOf(id: PanelId): string {
+  if (id === 'add') return 'c-tl';
+  if (id === 'links') return 'c-bl';
+  if (id === 'tasks') return 'c-br';
+  return 'c-dock';
+}
+
+function PlusIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    >
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function LinkIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
+      <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
+    </svg>
+  );
+}
+
 /**
- * The corners of Now. A chip is one quiet line; a click opens its glass
- * panel over the picture. One panel at a time; Escape, a click outside or the
- * chip again closes it and focus returns to the chip.
+ * The dock and the corners of Now. The dock is one glass strip at the bottom
+ * with a tile per placed chip (Body, Goals, Food and money, Habits); the
+ * corners hold the actions: Add top left, Links bottom left, Tasks bottom
+ * right (the weather, top right, is drawn by Now itself). A click opens one
+ * glass panel over the picture, one at a time; Escape, a click outside or the
+ * opener again closes it and the focus returns to the opener.
  */
 export function Corners({
   today,
   hour,
   date,
   corners = DEFAULT_CORNERS,
+  links,
 }: {
   today: Today;
   hour: number;
   date: string;
   corners?: NowCorners;
+  links: NowLink[];
 }) {
-  const [open, setOpen] = useState<Chip['key'] | null>(null);
-  const chipRefs = useRef<Partial<Record<Chip['key'], HTMLButtonElement | null>>>({});
+  const [open, setOpen] = useState<PanelId | null>(null);
+  const openerRefs = useRef<Partial<Record<PanelId, HTMLButtonElement | null>>>({});
   const panelRef = useRef<HTMLElement>(null);
 
-  // An opened panel takes the focus, so the keyboard and a screen reader land in it.
+  // An opened panel takes the focus, so the keyboard and a screen reader land
+  // in it; the Add panel is for typing, so its field takes it instead.
   useEffect(() => {
-    if (open) panelRef.current?.focus({ preventScroll: true });
+    if (!open) return;
+    const field = open === 'add' ? panelRef.current?.querySelector('input') : null;
+    (field ?? panelRef.current)?.focus({ preventScroll: true });
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const close = () => {
       setOpen(null);
-      // After the repaint: on a phone the strip is hidden while the sheet is open.
-      requestAnimationFrame(() => chipRefs.current[open]?.focus());
+      // After the repaint: on a phone the openers are hidden while the sheet is open.
+      requestAnimationFrame(() => openerRefs.current[open]?.focus());
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close();
@@ -55,7 +113,7 @@ export function Corners({
     const onDown = (e: MouseEvent) => {
       const target = e.target as Node;
       if (panelRef.current?.contains(target)) return;
-      if (Object.values(chipRefs.current).some((b) => b?.contains(target))) return;
+      if (Object.values(openerRefs.current).some((b) => b?.contains(target))) return;
       setOpen(null);
     };
     document.addEventListener('keydown', onKey);
@@ -67,33 +125,65 @@ export function Corners({
   }, [open]);
 
   const list = chips(today, hour, date);
-  // The user's layout: a chip without a corner is not shown at all.
-  const placed = placeChips(list, corners);
-  const openSpot = placed.find((p) => p.chip.key === open)?.spot;
+  const tasks = list.find((c) => c.key === 'tasks');
+  const tasksEmpty = (today.tasks?.today ?? []).length === 0 && !(today.tasks?.late_count ?? 0);
+  const toggle = (id: PanelId) => setOpen((o) => (o === id ? null : id));
+  const opener = (id: PanelId) => ({
+    ref: (el: HTMLButtonElement | null) => {
+      openerRefs.current[id] = el;
+    },
+    'aria-expanded': open === id,
+    'aria-controls': `corner-${id}`,
+    onClick: () => toggle(id),
+  });
+  const title: Record<PanelId, string> = {
+    add: 'Add',
+    links: 'Links',
+    body: 'Body',
+    goals: 'Goals',
+    day: 'Food and money',
+    tasks: 'Tasks',
+    habits: 'Habits',
+  };
+
   return (
     <>
-      <div className="c-strip" data-open={open ? '' : undefined}>
-        {placed.map(({ chip: c, spot }) => (
-          <button
-            key={c.key}
-            ref={(el) => {
-              chipRefs.current[c.key] = el;
-            }}
-            type="button"
-            className={`c-chip ${spot}`}
-            aria-expanded={open === c.key}
-            aria-controls={`corner-${c.key}`}
-            onClick={() => setOpen((o) => (o === c.key ? null : c.key))}
-          >
+      <div className="n-corners" data-open={open ? '' : undefined}>
+        <button type="button" className="n-corner n-tl" {...opener('add')}>
+          <PlusIcon />
+          Add
+        </button>
+        <button type="button" className="n-corner n-bl" {...opener('links')}>
+          <LinkIcon />
+          Links
+        </button>
+        <button type="button" className="n-corner n-br" {...opener('tasks')}>
+          {tasks?.dot && (
+            <span
+              className={tasks.dot === 'late' ? 'c-dot c-late' : 'c-dot'}
+              aria-label="needs a look"
+            />
+          )}{' '}
+          Tasks{' '}
+          {tasks && !tasksEmpty && (
+            <span className="n-corner-s">
+              <Parts parts={tasks.main} />
+            </span>
+          )}
+        </button>
+      </div>
+      <div className="n-dock" data-open={open ? '' : undefined}>
+        {dockChips(list, corners).map((c) => (
+          <button key={c.key} type="button" className="n-tile" {...opener(c.key)}>
             <span className="c-k">
               {c.dot && (
                 <span
                   className={c.dot === 'late' ? 'c-dot c-late' : 'c-dot'}
                   aria-label="needs a look"
                 />
-              )}
+              )}{' '}
               {c.title}
-            </span>
+            </span>{' '}
             <span className="c-v">
               <Parts parts={c.main} />
             </span>
@@ -105,18 +195,20 @@ export function Corners({
           </button>
         ))}
       </div>
-      {open && openSpot && (
+      {open && (
         <section
           ref={panelRef}
           id={`corner-${open}`}
-          className={`c-panel ${openSpot}`}
+          className={`c-panel ${spotOf(open)}`}
           role="dialog"
           tabIndex={-1}
-          aria-label={list.find((c) => c.key === open)?.title}
+          aria-label={title[open]}
         >
+          {open === 'add' && <AddPanel date={date} hour={hour} />}
+          {open === 'links' && <LinksPanel links={links} />}
           {open === 'body' && <BodyPanel today={today} />}
           {open === 'goals' && <GoalsPanel today={today} date={date} />}
-          {open === 'day' && <DayPanel today={today} date={date} hour={hour} />}
+          {open === 'day' && <DayPanel today={today} date={date} />}
           {open === 'tasks' && <TasksPanel today={today} date={date} />}
           {open === 'habits' && <HabitsPanel date={date} />}
         </section>

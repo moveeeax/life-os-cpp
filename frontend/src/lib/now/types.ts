@@ -14,4 +14,5 @@ export type SoundCreate = S['SoundCreate'];
 export type NowSettings = S['NowSettings'];
 export type NowSettingsInput = S['NowSettingsInput'];
 export type NowCorners = S['NowCorners'];
+export type NowLink = S['NowLink'];
 export type NowWeather = S['NowWeather'];

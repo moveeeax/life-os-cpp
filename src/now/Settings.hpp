@@ -1,18 +1,23 @@
 /**
  * @file Settings.hpp
- * @brief The corner layout of Now: which chip sits in which corner, a corner
- *        possibly empty, every chip at most once.
+ * @brief The corner layout of Now (which chip sits in which corner, a corner
+ *        possibly empty, every chip at most once) and the quick links of the
+ *        Links corner.
  */
 
 #pragma once
 
 #include <array>
+#include <cctype>
+#include <cstddef>
 #include <optional>
 #include <set>
 #include <string>
 #include <string_view>
 
 #include <nlohmann/json.hpp>
+
+#include "utils/Utf8.hpp"
 
 namespace Now::Settings {
 
@@ -54,6 +59,69 @@ inline std::optional<std::string> corners_problem(const nlohmann::json& corners)
         if (!seen.insert(chip).second) {
             return "a chip sits in one corner at most";
         }
+    }
+    return std::nullopt;
+}
+
+inline constexpr std::size_t kLinksMax = 8;
+inline constexpr std::size_t kLinkTitleMax = 40;
+inline constexpr std::size_t kLinkUrlMax = 2048;
+
+/// @p s without ASCII whitespace at either end.
+inline std::string trimmed(std::string s) {
+    const auto space = [](char c) { return std::isspace(static_cast<unsigned char>(c)) != 0; };
+    while (!s.empty() && space(s.back())) {
+        s.pop_back();
+    }
+    std::size_t i = 0;
+    while (i < s.size() && space(s[i])) {
+        ++i;
+    }
+    return s.substr(i);
+}
+
+/// A path of this app ("/money", never "//host") or an http(s) URL. A
+/// backslash reads as a slash in a browser and a control character or a
+/// space is dropped by its URL parser, so none of them may appear anywhere.
+inline bool link_url_ok(const std::string& url) {
+    if (url.empty() || url.size() > kLinkUrlMax) {
+        return false;
+    }
+    for (const unsigned char c : url) {
+        if (c <= 0x20 || c == 0x7f || c == '\\') {
+            return false;
+        }
+    }
+    if (url[0] == '/') {
+        return url.size() == 1 || url[1] != '/';
+    }
+    return url.rfind("http://", 0) == 0 || url.rfind("https://", 0) == 0;
+}
+
+/// What is wrong with a links list, or nullopt; @p clean then holds the
+/// trimmed copy to store: an array of at most eight {title, url}.
+inline std::optional<std::string> links_problem(const nlohmann::json& links, nlohmann::json& clean) {
+    if (!links.is_array()) {
+        return "links must be an array";
+    }
+    if (links.size() > kLinksMax) {
+        return "at most 8 links";
+    }
+    clean = nlohmann::json::array();
+    for (const auto& l : links) {
+        if (!l.is_object() || !l.contains("title") || !l.contains("url") || !l["title"].is_string() ||
+            !l["url"].is_string()) {
+            return "a link is {title, url}";
+        }
+        const std::string title = trimmed(l["title"].get<std::string>());
+        const std::string url = trimmed(l["url"].get<std::string>());
+        if (title.empty() || Utils::Utf8::length(title) > kLinkTitleMax) {
+            return "a link title is 1 to 40 characters";
+        }
+        if (!link_url_ok(url)) {
+            return "a link url is a path of this app or an http(s) URL";
+        }
+        clean.push_back({{"title", title}, {"url", url}});
     }
     return std::nullopt;
 }

@@ -4,7 +4,10 @@ import type { Chip } from './corners';
 import {
   DEFAULT_CORNERS,
   cleanCorners,
+  cleanLinks,
+  dockChips,
   isPlaced,
+  linkKind,
   placeChips,
   weatherGlyph,
   weatherLine,
@@ -122,5 +125,42 @@ describe('weatherGlyph', () => {
     expect(weatherGlyph(73, true)).toBe('❄\uFE0E');
     expect(weatherGlyph(95, true)).toBe('ϟ');
     expect(weatherGlyph(42, true)).toBe('');
+  });
+});
+
+describe('dockChips', () => {
+  it('orders the tiles by slot and never shows Tasks', () => {
+    expect(dockChips(all, DEFAULT_CORNERS).map((c) => c.key)).toEqual(['body', 'goals', 'day']);
+    expect(
+      dockChips(all, { tl: 'habits', tr: 'tasks', bl: null, br: 'body' }).map((c) => c.key),
+    ).toEqual(['habits', 'body']);
+  });
+});
+
+describe('linkKind', () => {
+  it('tells a path from an external URL and refuses the rest', () => {
+    expect(linkKind('/money/summary')).toBe('path');
+    expect(linkKind('https://bank.example')).toBe('external');
+    expect(linkKind('http://x')).toBe('external');
+    expect(linkKind('//evil.example')).toBeNull();
+    expect(linkKind('javascript:alert(1)')).toBeNull();
+    expect(linkKind('money')).toBeNull();
+    expect(linkKind('/\\evil.example')).toBeNull();
+    expect(linkKind('/\t/evil.example')).toBeNull();
+    expect(linkKind('https://a.example/a b')).toBeNull();
+  });
+});
+
+describe('cleanLinks', () => {
+  it('trims, drops empty rows and keeps eight', () => {
+    const nine = Array.from({ length: 9 }, (_, i) => ({ title: `t${i}`, url: `/p${i}` }));
+    expect(cleanLinks(nine)).toHaveLength(8);
+    expect(
+      cleanLinks([
+        { title: '  A ', url: ' /a ' },
+        { title: '', url: '/b' },
+        { title: 'C', url: ' ' },
+      ]),
+    ).toEqual([{ title: 'A', url: '/a' }]);
   });
 });

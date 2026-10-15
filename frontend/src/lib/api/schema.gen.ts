@@ -13171,7 +13171,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The weather city and the corner layout of Now */
+        /** The weather city, the corner layout and the quick links of Now */
         get: {
             parameters: {
                 query?: never;
@@ -13208,7 +13208,7 @@ export interface paths {
                 };
             };
         };
-        /** Set the weather city (geocoded) and or the corner layout */
+        /** Set the weather city (geocoded), the corner layout and or the quick links */
         put: {
             parameters: {
                 query?: never;
@@ -17067,6 +17067,11 @@ export interface components {
             /** @enum {string|null} */
             br: "body" | "goals" | "day" | "tasks" | "habits" | null;
         };
+        NowLink: {
+            title: string;
+            /** @description A path of this app (/money) or an http(s) URL */
+            url: string;
+        };
         NowSettings: {
             /** @description The place the geocoder found */
             city: string | null;
@@ -17075,11 +17080,15 @@ export interface components {
             longitude: number | null;
             timezone: string | null;
             corners: components["schemas"]["NowCorners"];
+            /** @description The quick links of the Links corner, in order */
+            links: components["schemas"]["NowLink"][];
         };
         NowSettingsInput: {
             /** @description Geocoded with Open-Meteo; null clears the city */
             city?: string | null;
             corners?: components["schemas"]["NowCorners"];
+            /** @description Replaces the quick links; an empty array clears them */
+            links?: components["schemas"]["NowLink"][];
         };
         NowWeather: {
             place: string;
