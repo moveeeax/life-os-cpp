@@ -205,7 +205,7 @@ done
 np_count="$(printf '%s' "$PROD_RENDERED" | yq 'select(.kind=="NetworkPolicy") | .metadata.name' | grep -v '^---$' | grep -c . || true)"
 [ "$np_count" = "1" ] ||
     fail "deploy/values-prod.yaml: no NetworkPolicy rendered for the API pods — networkPolicy.enabled must stay true (got $np_count)."
-printf '%s' "$PROD_RENDERED" | yq 'select(.kind=="NetworkPolicy") | .spec.egress[].ports[].port' | grep -qx 5432 ||
+printf '%s' "$PROD_RENDERED" | yq 'select(.kind=="NetworkPolicy") | .spec.egress[].ports[].port' | grep -x 5432 >/dev/null ||
     fail "deploy/values-prod.yaml: the NetworkPolicy egress has no rule for Postgres (5432) — the pods could not reach the database."
 
 # 8. …but that env check can only ever see the plain `.value` path, and every
