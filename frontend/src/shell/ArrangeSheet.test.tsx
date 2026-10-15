@@ -25,7 +25,7 @@ const settings: NowSettings = {
   latitude: null,
   longitude: null,
   timezone: null,
-  corners: { tl: 'body', tr: 'goals', bl: 'day', br: 'tasks' },
+  corners: { tl: 'body', tr: 'goals', bl: 'day', br: 'habits' },
   links: [{ title: 'Summary', url: '/money/summary' }],
 };
 
@@ -50,7 +50,7 @@ describe('the dock slots', () => {
     expect(first.value).toBe('body');
     const options = Array.from(first.options).map((o) => o.textContent);
     expect(options).toEqual(['Nothing', 'Body', 'Goals', 'Food and money', 'Habits']);
-    expect((screen.getByLabelText('Dock, fourth') as HTMLSelectElement).value).toBe('');
+    expect((screen.getByLabelText('Dock, fourth') as HTMLSelectElement).value).toBe('habits');
   });
 });
 
@@ -73,6 +73,26 @@ describe('the links', () => {
         { title: 'Summary', url: '/money/summary' },
         { title: 'Bank', url: 'https://bank.example/' },
       ],
+    });
+  });
+
+  it('turns the Tasks slot of an older layout into an empty one on save', () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <ArrangeSheet
+          settings={{ ...settings, corners: { tl: 'body', tr: 'goals', bl: 'day', br: 'tasks' } }}
+          onClose={() => {}}
+        />
+      </QueryClientProvider>,
+    );
+    expect((screen.getByLabelText('Dock, fourth') as HTMLSelectElement).value).toBe('');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(mutate.mock.calls[0][0].corners).toEqual({
+      tl: 'body',
+      tr: 'goals',
+      bl: 'day',
+      br: null,
     });
   });
 

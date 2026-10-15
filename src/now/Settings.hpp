@@ -17,6 +17,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "utils/Utf8.hpp"
+
 namespace Now::Settings {
 
 inline constexpr std::array<std::string_view, 4> kCorners = {"tl", "tr", "bl", "br"};
@@ -78,10 +80,17 @@ inline std::string trimmed(std::string s) {
     return s.substr(i);
 }
 
-/// A path of this app ("/money", never "//host") or an http(s) URL.
+/// A path of this app ("/money", never "//host") or an http(s) URL. A
+/// backslash reads as a slash in a browser and a control character or a
+/// space is dropped by its URL parser, so none of them may appear anywhere.
 inline bool link_url_ok(const std::string& url) {
     if (url.empty() || url.size() > kLinkUrlMax) {
         return false;
+    }
+    for (const unsigned char c : url) {
+        if (c <= 0x20 || c == 0x7f || c == '\\') {
+            return false;
+        }
     }
     if (url[0] == '/') {
         return url.size() == 1 || url[1] != '/';
@@ -106,7 +115,7 @@ inline std::optional<std::string> links_problem(const nlohmann::json& links, nlo
         }
         const std::string title = trimmed(l["title"].get<std::string>());
         const std::string url = trimmed(l["url"].get<std::string>());
-        if (title.empty() || title.size() > kLinkTitleMax) {
+        if (title.empty() || Utils::Utf8::length(title) > kLinkTitleMax) {
             return "a link title is 1 to 40 characters";
         }
         if (!link_url_ok(url)) {

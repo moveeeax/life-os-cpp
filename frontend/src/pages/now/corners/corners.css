@@ -52,7 +52,8 @@
   left: 50%;
   transform: translateX(-50%);
   bottom: max(24px, env(safe-area-inset-bottom, 0px));
-  width: min(1000px, 100vw - 32px);
+  /* Room on the right for the Hide numbers pill on a narrow desktop. */
+  width: min(1000px, 100vw - 280px);
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);

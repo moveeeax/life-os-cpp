@@ -145,6 +145,9 @@ describe('linkKind', () => {
     expect(linkKind('//evil.example')).toBeNull();
     expect(linkKind('javascript:alert(1)')).toBeNull();
     expect(linkKind('money')).toBeNull();
+    expect(linkKind('/\\evil.example')).toBeNull();
+    expect(linkKind('/\t/evil.example')).toBeNull();
+    expect(linkKind('https://a.example/a b')).toBeNull();
   });
 });
 

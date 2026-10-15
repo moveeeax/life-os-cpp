@@ -27,6 +27,7 @@
 #include "now/Weather.hpp"
 #include "repositories/now/NoteRepository.hpp"
 #include "test_helpers.hpp"
+#include "utils/Utf8.hpp"
 
 using json = nlohmann::json;
 using namespace drogon;
@@ -268,6 +269,12 @@ TEST_F(NowSettingsApiTest, ABadLinkIsA400) {
     EXPECT_EQ(bad(json::array({{{"title", "x"}, {"url", "javascript:alert(1)"}}})), k400BadRequest) << "scheme";
     EXPECT_EQ(bad(json::array({{{"title", "x"}, {"url", "//evil.example"}}})), k400BadRequest) << "protocol-relative";
     EXPECT_EQ(bad(json::array({{{"title", "x"}, {"url", "money"}}})), k400BadRequest) << "no slash";
+    EXPECT_EQ(bad(json::array({{{"title", "x"}, {"url", "/\\evil.example"}}})), k400BadRequest)
+        << "a backslash reads as a slash in a browser";
+    EXPECT_EQ(bad(json::array({{{"title", "x"}, {"url", "/\t/evil.example"}}})), k400BadRequest)
+        << "a tab inside is dropped by a browser";
+    EXPECT_EQ(bad(json::array({{{"title", "x"}, {"url", "https://a.example/a b"}}})), k400BadRequest)
+        << "a space inside";
     EXPECT_EQ(bad(json::array({{{"title", std::string(41, 'a')}, {"url", "/money"}}})), k400BadRequest)
         << "title too long";
     json nine = json::array();
@@ -275,6 +282,10 @@ TEST_F(NowSettingsApiTest, ABadLinkIsA400) {
         nine.push_back({{"title", "a"}, {"url", "/a"}});
     }
     EXPECT_EQ(bad(nine), k400BadRequest) << "nine links";
+    const std::string cyrillic40 = "Сорок букв кириллицей в одной строке тут";  // 40 code points, 74 bytes
+    ASSERT_EQ(Utils::Utf8::length(cyrillic40), 40u);
+    EXPECT_EQ(put_settings({{"links", json::array({{{"title", cyrillic40}, {"url", "/a"}}})}})->statusCode(), k200OK)
+        << "the title limit counts characters, not bytes";
     auto trimmed = put_settings({{"links", json::array({{{"title", "  Ledger  "}, {"url", " /money "}}})}});
     ASSERT_EQ(trimmed->statusCode(), k200OK) << "a trimmed title is fine";
     EXPECT_EQ(body_of(trimmed)["data"]["links"][0]["title"], "Ledger");

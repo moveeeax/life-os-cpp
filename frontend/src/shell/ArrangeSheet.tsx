@@ -31,9 +31,12 @@ export function ArrangeSheet({
 }) {
   const [city, setCity] = useState(settings.city ?? '');
   // A chip an older or newer client saved, unknown here, is offered as an empty corner.
-  const [corners, setCorners] = useState<NowCorners>(() =>
-    cleanCorners(initialCorners ?? settings.corners),
-  );
+  // Tasks has its own corner now: a slot an older layout gave it reads as empty.
+  const [corners, setCorners] = useState<NowCorners>(() => {
+    const c = cleanCorners(initialCorners ?? settings.corners);
+    for (const k of CORNER_KEYS) if (c[k] === 'tasks') c[k] = null;
+    return c;
+  });
   // A chip of a module switched off is not offered; Tasks has its own corner.
   const habitsOn = useHabitsEnabled(true);
   const offered = DOCK_CHIPS.filter((c) => c !== 'habits' || habitsOn);

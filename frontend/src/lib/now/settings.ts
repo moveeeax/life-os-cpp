@@ -80,8 +80,14 @@ export function dockChips(list: Chip[], corners: NowCorners): Chip[] {
 
 export const LINKS_MAX = 8;
 
-/** A path of this app, an http(s) URL, or null for anything the page must not link. */
+/**
+ * A path of this app, an http(s) URL, or null for anything the page must not
+ * link: a backslash reads as a slash in a browser and a control character or
+ * a space is dropped by its URL parser, so none of them may appear anywhere.
+ */
 export function linkKind(url: string): 'path' | 'external' | null {
+  // eslint-disable-next-line no-control-regex
+  if (/[\\\x00-\x20\x7f]/.test(url)) return null;
   if (url.startsWith('/')) return url.startsWith('//') ? null : 'path';
   return /^https?:\/\//.test(url) ? 'external' : null;
 }
