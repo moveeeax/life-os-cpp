@@ -6,6 +6,77 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.29.0] - 2026-10-15
+
+### Added
+- Three CI gates from wave 3 of the 2026-10-14 review, all in the `openapi-drift` job: `scripts/check-openapi-breaking.sh` runs the pinned oasdiff 1.33.0 (sha256 checked) over `docs/openapi.yaml` against the merge base with master and fails on any breaking change, so the API contract is additive-only by machine; `scripts/check-openapi-gen-fresh.sh` fails when `tests/e2e/openapi.gen.json` lags behind the YAML; `scripts/check-module-deps.sh` now runs Tarjan over the declared include edges and fails on any cycle not listed in `docs/module-cycles-allowlist.txt` (today only the composition root `api,core,root`). The api test bucket validates handler responses against the OpenAPI schemas through `TestHelpers::expect_matches_schema` (the money, food, tasks, goals, today, billing, jobs, habits, travel, notes, projects, sounds and wallpapers suites); `check-selftest.sh` plants four more breakages for the new checks (33 in all) and prints a visible SKIP where oasdiff or pyyaml is missing.
+
+### Changed
+- One production profile. `config/config.production.json` is gone: nothing deployed it, and it had drifted from the chart the pods run (its `jobs.visibility_timeout_sec: 300` never reached the worker, its `api.public_paths` override dropped the PayPal webhook). `make prod-check` now renders `helm/life-os-cpp` with `deploy/values-prod.yaml` and checks the result; `scripts/check-helm-render.sh` asserts the wider floor in CI (`REGISTRATION_OPEN=false`, `APP_ENV=production`, docs UI off, HSTS on, worker lease on, `WORKER_ID` from the pod name, `automountServiceAccountToken: false` on every pod, NetworkPolicy rendered, the gated CronJob and PrometheusRule templates still render) and refuses a non-mikefarah `yq`; `check-selftest.sh` plants seven more breakages for those assertions (28 in all). Of the keys only that file carried: `jobs.visibility_timeout_sec=300` moved to the worker chart (`jobs.visibilityTimeoutSec`, 300 in production), `security.hsts=true` and `docs.enabled=false` to the API chart (`security.hsts`, `docs.enabled`), `app.env` is rendered into the ConfigMap; `server.max_body_bytes`, `database.acquire_timeout_ms`, `database.statement_timeout_ms`, `jobs.retry_backoff_max_ms`, `auth.cookies.*_ttl_sec`, `rate_limit.protected_requests` and `security.hsts_max_age` were dropped because each equalled the code default in `docs/CONFIG.md`; the `api.public_paths` override was dropped on purpose (the built-in list is right); `cache.url` built from `REDIS_HOST`/`REDIS_PORT` was dropped because the chart renders it from `externalRedis.url`. Charts: `WORKER_ID` defaults to the pod name (`worker.id` still pins it), the worker's uploads emptyDir is capped at 256Mi like the API's, the outbox relay is on in production (`outbox.drainIntervalSec: 5`), a `checksum/extra-env` pod annotation plus a `secretsVersion` value roll the pods after a secret rotation, the API NetworkPolicy is enabled in `deploy/values-prod.yaml` (ingress from the frontend pods, egress to namespace `db`, DNS and 443), the PrometheusRule alerts carry the names of `docs/SLO.md` (`High5xxRate`, `HighP99Latency`, `ReplicationLagHigh`, `DeadLetterQueueGrowing`, `JobsQueueBacklog`, `DbPoolSaturationHigh`, `RetriesExhaustedSpike`, `ApiTargetDown`, `WorkerTargetDown`) with its thresholds (5 % 5xx, 60 s lag, DLQ above 0 for 15 m, 0.1 exhausted retries/s), the monitoring blocks are present but off in both prod overlays with the exact keys to flip once prometheus-operator is confirmed, and a disabled `backup-mirror` CronJob (`rclone copy` of the barman bucket to an off-cluster bucket) is ready to enable. Compose and CI run `postgres:18-alpine` like production (the compose primary names `PGDATA` because the 18 image moved its data dir). `migrations/README.md` states the expand/contract rule and the PR template asks for it. `scripts/env-check.sh` no longer accepts an exported empty value as set.
+- Configuration keys live in one registry, `src/utils/ConfigKeys.hpp` (one `Config::Keys::<name>` per knob, 153 at the time), read as `cfg.get(Keys::name, default)`; the eleven module switches of `Modules.hpp` share one function over it and the worker reads its id and concurrency by entry. `scripts/check-config-sync.sh` parses the registry (every literal triple has an entry, every entry is read, every `Keys::name` is declared) and fails when two sites read the same knob with two different literal defaults, naming both sites; the selftest plants that case.
+- Module layout: each module's job handlers moved from `src/jobs/` next to their module (`src/food/jobs/ParseJob.hpp`, `src/money/jobs/{ParseJob,AdvisorJob,RatesJob}.hpp`, `src/tasks/jobs/ParseJob.hpp`, `src/fitness/jobs/SyncJob.hpp`; job types and payloads unchanged) and register through `<Module>::register_jobs()`, called once by `Core::register_job_handlers()` (`src/core/JobHandlers.cpp`); the email handlers register from `src/email/jobs/`, so `src/jobs/` holds only the queue, the dispatcher, the outbox and the webhook and demo handlers and includes no module. `core/Modules.hpp` moved to `utils/Modules.hpp` (same `Core::` names). The email/jobs/core include cycle is gone. `GET /api/v1/today` reads each module through one digest facade (`src/<module>/now/Digest.hpp`) instead of composing eight modules' repositories in the controller; the response is unchanged. Scaffolders follow the current shape: `new-job.sh <module> <job-type>` writes the handler into `src/<module>/jobs/` and wires its registration, `new-resource.sh` emits a `.hpp` + `.cpp` controller pair and a repository under `src/repositories/<module>/`, `new-endpoint.sh` emits a `.hpp` + `.cpp` pair and an OpenAPI response with a schema reference, `new-migration.sh` no longer offers a `your_table` skeleton to copy.
+
+### Fixed
+- CI on master runs once per commit: back-to-back merges no longer cancel the
+  pending run of an earlier commit, which had left the 1.28.0 release commit
+  without a CI run and failed release.yml's ci-green check.
+- The three minors left from the 1.27 review. Cancelling a job also removes it
+  from the delayed set, so a retry waiting out its backoff or a deferred job is
+  not promoted and run after the cancel. A parse or advisor row failed before
+  its claim (module off, queue gave up) closes only a queued row or a stale
+  running one; a running row a live worker holds keeps its own outcome.
+  `config/config.sample.json` lists `/api/v1/account/join-from-invite/*` in
+  `api.public_paths` like `config.json` and the built-in default do.
+- A refund of a payment that never credited the wallet (a capture that failed
+  the amount or currency check keeps its capture id with status `failed`) is
+  recorded with the outcome `skipped_not_credited` and no longer debits the
+  credits that other payments put on the balance (migration 041 widens the
+  `billing_refunds.outcome` check).
+- The `runbook_url` of every alert points at this repository on GitHub instead
+  of a GitLab host; `docs/CONFIG.md` lists the nine job types a worker
+  registers and the compose stack subscribes to all of them (`email.send` and
+  `webhook.deliver` were missing); the README quick start says that `make up`
+  runs the last release image and names the targets that build the checkout.
+- Frontend: one amount parser (`src/lib/amounts.ts`) replaces the ten copies
+  in money, goals, food and workout forms, so `1,234` is refused instead of
+  being read as 1.234 and `0x10` or `1e3` are not numbers; the Body page names
+  a custom period by its dates instead of "Last custom days"; every POST, PUT,
+  PATCH and DELETE carries an `Idempotency-Key`, minted once per call and
+  reused on the replay after a token refresh, so a retried batch or parse is
+  applied once.
+- `fail()`, `defer()` and `dead_letter()` put the job on its next list (live
+  queue, delayed set or DLQ) before releasing it from the worker's processing
+  list, so a crash between the two writes duplicates the job instead of losing
+  it; `pick()`, `recover_processing()` and `promote_due_jobs()` skip a job
+  whose blob is already completed, dead or cancelled, so a cancel that lost a
+  race with a pop, or a crash right after a completion, cannot run the job
+  again.
+- Every "today" default in the API now reads the day in `?tz=` (UTC without it), the way the agenda, the digest and the habits already did: `GET /food/day`, the food targets behind `GET`/`PUT /food/goals`, `/food/week` and the day, `POST /goals/{id}/checkins` without a `date`, `GET /money/summary`, `GET /money/rates`, `GET /money/rates/convert`, the `date` of `POST /money/advisor/run`, and `done_since` of `GET /tasks/items`, which starts the day in `tz` instead of UTC. A task linked to a money ledger row is checked for ownership whether the money module is on or not. `GET /money/transfers` answers `total` next to `count` so a client can page (the ledger page loads more transfers on demand). `GET /tasks/items?status=` documents `in_progress`. A parse job that is not the caller's answers `parse_job` in every module (food already did; money said `money_parse`, tasks `task_parse`).
+- Documentation of the 2026-10-14 review, wave 2. `docs/RUNBOOK.md` gains "Rotate a secret" (JWT, the Mi Fitness token key, the S3 key, the PayPal secret, the database role password: what each one reaches and the restart through `secretsVersion`), a "Job types" table of the nine handler types with producer, payload and retry contract, the off-cluster backup mirror, a restore drill, the monitoring enablement check and the first rollout of the API NetworkPolicy; `make tail-trace` is described as the log grep it is. `docs/SLO.md` carries the chart thresholds and names `helm/life-os-cpp/values.yaml` and `docker/prometheus-rules.yml` as their source. `docs/CONFIG.md` has one heading per module instead of everything under "Food module", says what the Default column shows, and gives the code defaults of `MAIL_SMTP_HOST` and `DATABASE_PRIMARY_URL`. `docs/ARCHITECTURE.md` §8 replaces "75 routes in 10 controllers" with the counted 243 routes in 22 controllers and records that the next step is an `oasdiff` gate. `CONTRIBUTING.md` states the real commit rule (plain subjects, `chore(release): x.y.z`), drops the required reviewers and the security team, lists every bump point of `release.sh` and says the coverage floor is local-only. The fitness design note is marked historical, `THIRD_PARTY_NOTICES.md` lists the vendored inja, the OpenAPI `info` block names the module families and the real host, the `0xff` admin comments in `Role.hpp` and `Guards.hpp` describe the sentinel bit, `docs/INDEX.md`, `docs/BENCHMARKS.md`, `docs/CI-PROFILES.md`, `docs/CONVENTIONS.md`, `changelog.d/README.md` and the README lose their stale statements (`make docs`, four presets, the quick gate job, `config.production.json`, the one-shot modes, the de-inlined inventory, "existing flows are not routed through the outbox"), `docs/Doxyfile` reads 1.28.0 and the gate selftest step labels say 28 planted breakages.
+- The LLM job rows (food, money and tasks parse jobs, the money advisor review) now write their queue job into the transactional outbox inside the same transaction as the row when `OUTBOX_DRAIN_INTERVAL_SEC` is set, so a crash or a Redis outage right after the commit can no longer leave a row `queued` with no job behind it (with the drain off the direct submit after the commit stays as before); a `queued` row nobody picked for ten minutes reads as `failed` with `queue_lost` instead of queued forever, and a late delivery still runs it; and a worker subscribed to several job types moves each id from its queue into the processing list with one Redis command (BRPOPLPUSH per type in rotation) instead of a BRPOP followed by an RPUSH, which lost the id when the worker died in between.
+- A delete refused by an `ON DELETE RESTRICT` foreign key answers 409 (`in_use`,
+  `role_in_use`, billing history) on PostgreSQL 18 too: that major reports the
+  violation as SQLSTATE 23001 (`restrict_violation`), which the code treated as
+  an unknown error and turned into a 500. Tests and compose now run Postgres 18,
+  which is how it showed up.
+- Migration 042 attaches the shared `touch_updated_at()` trigger to the 26 tables that had an `updated_at` column and no trigger (fitness, food, money, tasks, goals, now, travel, notes, projects, wallet balances), and the repositories stop setting the column by hand; a test asserts every such table carries it. Migration 043 adds the `(quote, date)` index `money_fx_rates` is read by. `GET /money/currencies` reads before it seeds, so only a new user's first call writes. `PATCH /money/currencies/{code}` answers 409 `decimals_in_use` to fewer decimals while an account, a budget or a receipt keeps the currency. Ticking a task focus (`POST /today/focus/done`) closes the task and marks the focus in one transaction. The notes search uses the shared `escape_like`.
+- Frontend: Hide numbers now covers the classic pages too (the toggle sits in
+  the top nav, the wallet balance and the billing figures wear `Num`); a
+  sign-in returns to the full location with its query string; "Post all" and
+  "Copy packing" run as one sequential batch that reports "N of M failed";
+  notes dates render in the browser zone; admin tables and tab strips work
+  from the keyboard; ledger filters live in the URL; the workout session
+  survives a blocked localStorage; rendered-hook tests cover the parse job,
+  the set queue and the sign-in round trip; eslint runs with zero warnings and
+  prettier is checked in CI.
+
+### Security
+- A JWT whose header or payload is not a JSON object, or whose `alg`/`typ` is
+  not a string, answers 401 (`malformed_header`, `unsupported_alg`,
+  `malformed_payload`) instead of throwing out of the auth middleware before
+  the signature check; the middleware also turns any exception from token
+  verification into 401 `malformed_token`.
+
 ## [1.28.0] - 2026-10-14
 
 ### Added
