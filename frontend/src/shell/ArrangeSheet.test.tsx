@@ -112,6 +112,27 @@ describe('the links', () => {
     expect(screen.getByText('A path like /money or an http(s) address.')).toBeTruthy();
   });
 
+  it('refuses a half-filled row instead of dropping it', () => {
+    renderSheet();
+    fireEvent.click(screen.getByRole('button', { name: 'Add a link' }));
+    fireEvent.change(screen.getAllByLabelText('Title')[1], { target: { value: 'Bank' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(mutate).not.toHaveBeenCalled();
+    expect(screen.getByText('A title and a URL, or an empty row.')).toBeTruthy();
+  });
+
+  it('keeps the other rows in place when one is removed', () => {
+    renderSheet();
+    fireEvent.click(screen.getByRole('button', { name: 'Add a link' }));
+    fireEvent.change(screen.getAllByLabelText('Title')[1], { target: { value: 'Bank' } });
+    fireEvent.change(screen.getAllByLabelText('URL or path')[1], {
+      target: { value: 'https://bank.example/' },
+    });
+    const bank = screen.getByDisplayValue('Bank');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Summary' }));
+    expect(screen.getByDisplayValue('Bank')).toBe(bank);
+  });
+
   it('removes a row', () => {
     renderSheet();
     fireEvent.click(screen.getByRole('button', { name: 'Remove Summary' }));

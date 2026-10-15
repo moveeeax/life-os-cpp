@@ -286,6 +286,9 @@ TEST_F(NowSettingsApiTest, ABadLinkIsA400) {
     ASSERT_EQ(Utils::Utf8::length(cyrillic40), 40u);
     EXPECT_EQ(put_settings({{"links", json::array({{{"title", cyrillic40}, {"url", "/a"}}})}})->statusCode(), k200OK)
         << "the title limit counts characters, not bytes";
+    auto upper = put_settings({{"links", json::array({{{"title", "Bank"}, {"url", "HTTPS://Bank.example/"}}})}});
+    ASSERT_EQ(upper->statusCode(), k200OK) << "the scheme is read whatever its case";
+    EXPECT_EQ(body_of(upper)["data"]["links"][0]["url"], "HTTPS://Bank.example/");
     auto trimmed = put_settings({{"links", json::array({{{"title", "  Ledger  "}, {"url", " /money "}}})}});
     ASSERT_EQ(trimmed->statusCode(), k200OK) << "a trimmed title is fine";
     EXPECT_EQ(body_of(trimmed)["data"]["links"][0]["title"], "Ledger");
