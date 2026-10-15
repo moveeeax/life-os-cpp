@@ -92,9 +92,12 @@ export function Corners({
   const openerRefs = useRef<Partial<Record<PanelId, HTMLButtonElement | null>>>({});
   const panelRef = useRef<HTMLElement>(null);
 
-  // An opened panel takes the focus, so the keyboard and a screen reader land in it.
+  // An opened panel takes the focus, so the keyboard and a screen reader land
+  // in it; the Add panel is for typing, so its field takes it instead.
   useEffect(() => {
-    if (open) panelRef.current?.focus({ preventScroll: true });
+    if (!open) return;
+    const field = open === 'add' ? panelRef.current?.querySelector('input') : null;
+    (field ?? panelRef.current)?.focus({ preventScroll: true });
   }, [open]);
 
   useEffect(() => {

@@ -157,6 +157,14 @@
   justify-items: stretch;
 }
 .c-panel.c-tl,
+.c-panel.c-bl {
+  left: 16px;
+}
+.c-panel.c-tr,
+.c-panel.c-br {
+  right: 16px;
+}
+.c-panel.c-tl,
 .c-panel.c-tr {
   top: calc(max(14px, env(safe-area-inset-top, 0px)) + 120px);
 }
@@ -383,7 +391,7 @@
     z-index: 20;
     left: 12px;
     right: 12px;
-    bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 236px);
+    bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 280px);
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
@@ -406,7 +414,8 @@
     display: none;
   }
   .n-dock {
-    bottom: max(16px, env(safe-area-inset-bottom, 0px));
+    /* Above the Hide numbers pill. */
+    bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 44px);
     width: calc(100vw - 24px);
     grid-auto-flow: row;
     grid-auto-columns: auto;
