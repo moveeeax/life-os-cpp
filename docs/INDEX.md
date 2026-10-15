@@ -21,14 +21,14 @@ tree.
 | [`CONVENTIONS.md`](CONVENTIONS.md) | Canonical "add a domain entity" checklist (what `new-resource.sh` follows) + what NOT to abstract |
 | [`CONFIG.md`](CONFIG.md) | Single table mapping every JSON key ↔ env var ↔ default |
 | [`TESTING.md`](TESTING.md) | Test buckets (unit/integration/api/e2e), day-to-day loops incl. the `.devcontainer` zero-setup inner loop, coverage, nightly libFuzzer targets (`tests/fuzz/`), the disabled-race note |
-| [`fitness/2026-09-29-mi-fitness-api-cpp-design.md`](fitness/2026-09-29-mi-fitness-api-cpp-design.md) | Fitness module (Mi Fitness -> Postgres): design of the C++ port of mi-fitness-api, data model, sync and export |
+| [`fitness/2026-09-29-mi-fitness-api-cpp-design.md`](fitness/2026-09-29-mi-fitness-api-cpp-design.md) | Historical design (2026-09-29) of the C++ port of mi-fitness-api; the shipped module differs (MIT, per-user accounts, `src/fitness/xiaomi/`), see its banner and the README's fitness section |
 | [`wallpapers.md`](wallpapers.md) | Wallpapers and focus sounds: S3 settings, bucket CORS and policy, file limits, the prod MinIO setup, a manual check |
 | [`BENCHMARKS.md`](BENCHMARKS.md) | How to measure latency/throughput/footprint (`make bench` + presets) + a results template |
 | [`../src/billing/Wallet.hpp`](../src/billing/Wallet.hpp) | Billing module core (PayPal top-ups → credit wallet): append-only ledger, idempotent capture/refund — the canonical example of the no-self-referencing-upsert accumulation pattern. Controllers in `src/api/BillingController.hpp` / `AdminBillingController.hpp`, transactional emails in `src/email/BillingEmails.hpp` |
 | [`openapi.yaml`](openapi.yaml) | OpenAPI 3.1 spec for every registered route. `scripts/check-openapi-drift.sh` keeps it honest; `frontend/npm run gen:api` consumes it for typed client |
 | [`module-deps.txt`](module-deps.txt) | Allowed include edges between `src/` directories — the declared architecture `scripts/check-module-deps.sh` enforces (utils is the bottom layer; `core/Core.hpp` only from binary entry points; no `webhooks -> email`) |
 | [`config-sync-allowlist.txt`](config-sync-allowlist.txt) | Commented exceptions for `scripts/check-config-sync.sh`: config reads the extractor regex can't see, and keys deliberately absent from the config jsons |
-| [`Doxyfile`](Doxyfile) | `make docs` configuration; output goes to `docs/html/` (gitignored) |
+| [`Doxyfile`](Doxyfile) | Doxygen configuration; there is no make target, run `doxygen docs/Doxyfile` from the repo root and read `docs/html/` (gitignored). `PROJECT_NUMBER` is bumped by hand, `release.sh` does not touch it |
 
 ## Frontend
 
@@ -54,7 +54,7 @@ tree.
 | File | What's there |
 |---|---|
 | [`../CMakeLists.txt`](../CMakeLists.txt) | Build graph, common libs, ASan/coverage/Werror options |
-| [`../CMakePresets.json`](../CMakePresets.json) | `dev`, `dev-asan`, `release`, `coverage` presets (vcpkg toolchain) |
+| [`../CMakePresets.json`](../CMakePresets.json) | Seven configure presets on the vcpkg toolchain: `base` (hidden parent), `dev`, `devcontainer`, `dev-asan`, `release`, `ci`, `coverage`; build presets for all but `base` and `ci` |
 | [`../vcpkg.json`](../vcpkg.json) | Manifest-mode dependency list with pinned baseline |
 | [`../Makefile`](../Makefile) | Single entry point — `make help` lists every target |
 | [`../envrc.sample`](../envrc.sample) | Sample direnv config for native build (VCPKG_ROOT, TEST_PG_HOST, etc.) |
@@ -63,7 +63,7 @@ tree.
 
 | File | What's there |
 |---|---|
-| [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml) | GitHub Actions CI: build + test + format + secret-scan |
+| [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml) | GitHub Actions CI, eleven jobs: `build-and-test`, `lint-format` (clang-format, shellcheck), `secret-scan` (gitleaks), `openapi-drift` (every `check-*` gate, the changelog fragment check and the Spectral lint), `gate-selftest`, `runtime-smoke`, `helm-charts`, `frontend`, `clang-tidy`, `sanitizers`, `tsan`; the heavy jobs scope themselves to the diff (`CI-PROFILES.md`) |
 | [`CI-PROFILES.md`](CI-PROFILES.md) | Hosted vs self-hosted runner profiles: serialize-vs-parallel, cache layers, honest timeouts, retry policy, arm64 on native runners, never QEMU |
 | [`../.github/workflows/release.yml`](../.github/workflows/release.yml) | Tag-driven image build (tag on master, CI green on its SHA) → Trivy gate (fixable CRITICAL/HIGH) → SPDX SBOM + cosign keyless sign/attest → promote → GitHub Release (verify: [`../SECURITY.md`](../SECURITY.md)) |
 | [`RUNBOOK.md`](RUNBOOK.md) | Operator runbook: what to do when an alert fires (each alert's `runbook_url` anchors here) |
@@ -88,15 +88,15 @@ tree.
 | `check-openapi-drift.sh` | Verify `Api::get_endpoints()` (src/api/Endpoints.hpp) ↔ `docs/openapi.yaml` (method, path) |
 | `check-routes-registered.sh` | Verify every controller ADD_METHOD_TO route is in `Api::get_endpoints()` (symmetric to the OpenAPI drift check) |
 | `check-test-buckets.sh` | Verify test suites sit in the right bucket — classified by DIRECTORY, fails on a suite-name clash across unit/integration |
-| `check-version-sync.sh` | Verify `project(VERSION …)` in CMakeLists.txt, the helm image-tag pins (`helm/cpp-env/values.yaml` and the three `deploy/values-*prod.yaml`) and the `Chart.yaml` `appVersion` fields all match the newest released CHANGELOG heading (`[Unreleased]` on top stays green) |
-| `release.sh` | One-command release: folds `changelog.d/` fragments into `[Unreleased]`, retitles it to `## [<ver>] — date` (accepts a hand-retitled heading too), bumps every version point (CMakeLists + helm tag pins incl. `deploy/values-*prod.yaml` + appVersions); verifies with check-version-sync.sh, commits nothing |
-| `assemble-changelog.sh` | Fold `changelog.d/<topic>.<type>.md` fragments into CHANGELOG's `[Unreleased]` (creates `###` sections in Keep-a-Changelog order, deletes consumed fragments); `--check` validates fragment format only — CI runs it, fragments themselves stay optional |
+| `check-version-sync.sh` | Verify `project(VERSION …)` in CMakeLists.txt, the helm image-tag pins (`helm/cpp-env/values.yaml` and the three `deploy/values-*prod.yaml`), the four `Chart.yaml` `appVersion` fields, `docs/openapi.yaml` `info.version` and the `frontend/package.json` + `package-lock.json` root versions all match the newest released CHANGELOG heading (`[Unreleased]` on top stays green) |
+| `release.sh` | One-command release: folds `changelog.d/` fragments into `[Unreleased]`, retitles it to `## [<ver>] - date` (accepts a hand-retitled heading too), bumps every version point (CMakeLists, the helm tag pins incl. `deploy/values-*prod.yaml`, the four appVersions, `docs/openapi.yaml` `info.version` with `tests/e2e/openapi.gen.json` regenerated, `frontend/package.json` + `package-lock.json`); verifies with check-version-sync.sh, commits nothing |
+| `assemble-changelog.sh` | Fold `changelog.d/<topic>.<type>.md` fragments into CHANGELOG's `[Unreleased]` (creates `###` sections in Keep-a-Changelog order, deletes consumed fragments); `--check` validates fragment format only, run by the gates job (`openapi-drift` in ci.yml); fragments themselves stay optional |
 | `check-frontend-nginx-sync.sh` | Verify `frontend/nginx.conf` and the helm cpp-frontend ConfigMap agree on the proxied backend routes |
 | `check-module-deps.sh` | Verify every cross-directory `#include` in `src/` is an edge declared in `docs/module-deps.txt`; hard-forbids `utils -> *`, non-entry-point includes of `core/Core.hpp`, and `webhooks -> email` |
 | `check-config-sync.sh` | Verify every config read in `src/` (`cfg.get<T>("path", "ENV", …)` + getenv) exists in `config/config.json` AND `config/config.sample.json` and is documented in `docs/CONFIG.md`; flags stale doc rows and stale helm env lines (exceptions: `docs/config-sync-allowlist.txt`) |
 | `check-helm-render.sh` | Render the cpp-env umbrella with CI values and assert deploy-path invariants (ports, hosts, empty credential defaults); render the prod releases from `deploy/values-*prod.yaml` and assert the prod security floor (rate limit on and fail-closed, CSRF, idempotency, JWT, Secure cookies) |
 | `check-selftest.sh` | Prove the gate scripts bite (the `check-*` gates + `assemble-changelog.sh --check`): plant known breakages in scratch copies, require each gate to fail AND name it (control-pass first, counted mutators, a no-op mutation is itself a failure; needs helm+yq) |
-| `prod-check.sh` | Pre-deploy assertions on a production config (auth, secrets, TLS, fail-closed) |
+| `prod-check.sh` | `make prod-check`: renders the production release (`helm/life-os-cpp` + `deploy/values-prod.yaml`) and asserts the floor on the rendered ConfigMap and Deployment env: auth on, cookies Secure + CSRF, limiter fail-closed, docs off, HSTS on, no public-path override, credentials only from a Secret |
 | `lint-openapi.sh` | Spectral lint with project ruleset |
 | `make-jwt.sh` | Mint a dev HS256 JWT (no Python/Node deps) |
 | `smoke.sh` | curl through critical endpoints (health, traceparent, validation, metrics) |

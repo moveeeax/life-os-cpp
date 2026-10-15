@@ -1,12 +1,21 @@
 # Production values of life-os-cpp in cluster oci-k3s,
 # namespace life-os. No secrets here: everything sensitive lives in the
 # Secret life-os-app and arrives via extraEnvFrom.
+#
+# This file plus the chart is the only description of the production API
+# config: `make prod-check` renders it and checks the result,
+# scripts/check-helm-render.sh asserts the security floor in CI.
 
 image:
   repository: ghcr.io/moveeeax/life-os-cpp
   tag: "1.28.0"
 
 replicaCount: 1
+
+# After rotating a key in life-os-app (or any Secret below), bump this string
+# and upgrade: the pods restart with the new value (the chart hashes only its
+# own ConfigMap). Same string in deploy/values-worker-prod.yaml.
+secretsVersion: ""
 
 extraEnvFrom:
   - secretRef:
@@ -93,10 +102,25 @@ rateLimit:
 idempotency:
   enabled: true
 
+# TLS ends at the ingress; the API's own responses carry
+# Strict-Transport-Security too, so a proxied /api/ answer never downgrades it.
+security:
+  hsts: true
+
+# The Swagger UI stays off: it exposes the whole surface.
+docs:
+  enabled: false
+
 # Enqueueing sync jobs requires an initialized queue on the API side too;
 # the jobs themselves are executed by the worker.
 jobs:
   enabled: true
+
+# Outbox relay: rows the API writes into the outbox table inside the request's
+# transaction reach the Redis queue within this many seconds, so a crash
+# between the row and the enqueue no longer leaves a job `queued` forever.
+outbox:
+  drainIntervalSec: 5
 
 fitness:
   enabled: true
@@ -156,3 +180,93 @@ mail:
 
 tracing:
   enabled: false
+
+# Pod-level firewall (templates/networkpolicy.yaml). The API has no ingress of
+# its own: only the frontend pods of release life-os-cpp-frontend proxy to it.
+# Egress: Postgres and Redis in namespace db, DNS (built into the template),
+# and HTTPS anywhere (s3.tarassov.me for wallpapers, the LLM providers of the
+# food/money/tasks parse, Xiaomi for the fitness sync, Open Food Facts).
+# Mail, OTLP and Sentinel are off in production, so no ports for them.
+# Verify on the first rollout that the probes stay green (the kubelet's
+# probes come from the node; k3s's policy controller lets them through, but
+# check it) and that the migrate init container still reaches Postgres.
+networkPolicy:
+  enabled: true
+  ingress:
+    fromSelectors:
+      - podSelector:
+          matchLabels:
+            app.kubernetes.io/name: cpp-frontend
+            app.kubernetes.io/instance: life-os-cpp-frontend
+    # PLACEHOLDER: the namespace of the Prometheus that will scrape :9090 is
+    # not known from this repository. `monitoring` is the chart default and
+    # harmless while no such namespace exists; set the real one together with
+    # serviceMonitor.enabled below.
+    metricsFromSelectors:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: monitoring
+  egress:
+    extra:
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: db
+        ports:
+          - port: 5432
+            protocol: TCP
+          - port: 6379
+            protocol: TCP
+      - ports:
+          - port: 443
+            protocol: TCP
+
+# Monitoring. Everything stays OFF until the owner confirms that
+# prometheus-operator (the ServiceMonitor and PrometheusRule CRDs) runs on
+# oci-k3s: `kubectl --context oci-k3s get crd servicemonitors.monitoring.coreos.com
+# prometheusrules.monitoring.coreos.com`. The repository cannot tell, and a
+# helm upgrade that renders these kinds against a cluster without the CRDs
+# fails. Once confirmed, flip exactly these:
+#   serviceMonitor.enabled: true
+#   monitoring.alertsEnabled: true
+#   monitoring.jobsAlerts: true
+#   monitoring.targetSelector: the label set the cluster's Prometheus puts on
+#     this Service's targets (open Prometheus > Targets and copy it; the
+#     chart default is service="life-os-cpp"), e.g. 'namespace="life-os", service="life-os-cpp"'
+#   networkPolicy.ingress.metricsFromSelectors: the Prometheus namespace (above)
+serviceMonitor:
+  enabled: false
+monitoring:
+  alertsEnabled: false
+  jobsAlerts: false
+  targetSelector: ""
+
+# Off-cluster copy of the CNPG barman store (templates/backup-mirror-cronjob.yaml).
+# Off until a destination bucket exists. The source is the live backup bucket
+# of docs/RUNBOOK.md "Backups"; its credentials live in Secret
+# minio-backups-creds in namespace db and must be copied into a Secret in
+# this namespace (a CronJob cannot read another namespace's Secret).
+backupMirror:
+  enabled: false
+  mode: copy
+  source:
+    endpoint: "http://minio.minio.svc.cluster.local:9000"
+    provider: Minio
+    bucket: tarassov-me-backups
+    prefix: "cnpg/"
+    pathStyle: true
+    credentialsSecret:
+      name: ""                       # PLACEHOLDER: copy of minio-backups-creds in namespace life-os
+      accessKeyIdKey: ACCESS_KEY_ID
+      secretAccessKeyKey: ACCESS_SECRET_KEY
+  destination:
+    endpoint: ""                     # PLACEHOLDER: the external provider's S3 endpoint (empty for AWS)
+    provider: AWS                    # PLACEHOLDER: AWS, Minio, Other, ... (rclone s3 provider)
+    region: ""
+    bucket: ""                       # PLACEHOLDER: the off-cluster bucket
+    prefix: "cnpg/"
+    pathStyle: false
+    credentialsSecret:
+      name: ""                       # PLACEHOLDER: Secret in namespace life-os with the destination keys
+      accessKeyIdKey: access-key-id
+      secretAccessKeyKey: secret-access-key

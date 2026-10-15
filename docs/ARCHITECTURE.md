@@ -204,8 +204,11 @@ The auth and rate-limit allowlists (`public_paths`, `protected_paths` in
 paths and are read at runtime. No gate compares them with the registry, so
 they are updated by hand when a route moves.
 
-Additive-only is a review rule today. An `oasdiff` gate in CI is the next step
-once the API has consumers outside the owner's control.
+Additive-only is a review rule today. An `oasdiff` gate in CI (the spec of
+the PR against the spec on `master`, breaking changes fail) is the next
+step; it is planned for wave 3 of the 2026-10-14 review, since the route
+count has passed the point where a review catches a removed field reliably
+(§8).
 
 ## 8. What is deliberately absent
 
@@ -220,13 +223,21 @@ A DI container, or passing subsystem references through every handler. See
 §5: `install_for_testing` already provides the substitution points the tests
 use, and a container would add ceremony on top of them.
 
-A DSL or code generator as the single source of routes. With roughly 75 routes
-in 10 controllers, the scaffolder writes the three surfaces from §7 and two
-fast gates catch drift. Reconsider if the route count grows several-fold, or
-if drift in request and response schemas (which the gates do not check)
-becomes a recurring source of bugs.
+A DSL or code generator as the single source of routes. This answer was
+written at roughly 75 routes in 10 controllers with the condition "reconsider
+if the route count grows several-fold, or if drift in request and response
+schemas (which the gates do not check) becomes a recurring source of bugs".
+On 2026-10-14 the registry holds 243 routes served by 22 controllers (255
+`ADD_METHOD_TO` lines in `src/api/*Controller.hpp`), and `docs/openapi.yaml`
+describes 169 paths with 243 operations. The count condition has fired. The
+decision stays no for the generator: the scaffolder still writes the three
+surfaces from §7 and the two gates still catch method-and-path drift at
+this size. What the size changes is the second condition: the gates do not
+see a renamed field or a tightened type, so the next step is the `oasdiff`
+gate from §7 (wave 3), which checks the schemas instead of generating them.
 
 Registering Drogon routes from `Endpoints.hpp`. The registry holds only
 `{method, path, description}` strings. Wiring handlers through it would make
 it include every controller, or would replace `HttpController` with lambda
-registration everywhere. Same reconsideration conditions as the DSL.
+registration everywhere. Deferred, same as the DSL: it would buy nothing the
+`oasdiff` gate does not, and it costs the controller layout.

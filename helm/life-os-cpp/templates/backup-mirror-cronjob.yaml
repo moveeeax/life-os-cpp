@@ -1,0 +1,107 @@
+{{- /*
+  Off-cluster copy of the database backups: `rclone copy` (or sync) from the
+  bucket the CNPG barman store writes into (in-cluster MinIO in production,
+  docs/RUNBOOK.md "Backups") to a bucket on another provider. Off by default;
+  see backupMirror in values.yaml. Both remotes are configured through
+  RCLONE_CONFIG_<REMOTE>_* variables, so no config file is written and the
+  credentials stay in the two Secrets.
+*/}}
+{{- if .Values.backupMirror.enabled }}
+{{- $m := .Values.backupMirror }}
+{{- range $side, $r := dict "source" $m.source "destination" $m.destination }}
+{{- if not $r.bucket }}
+{{- fail (printf "backupMirror.%s.bucket is required when backupMirror.enabled=true" $side) }}
+{{- end }}
+{{- if not $r.credentialsSecret.name }}
+{{- fail (printf "backupMirror.%s.credentialsSecret.name is required when backupMirror.enabled=true" $side) }}
+{{- end }}
+{{- end }}
+{{- if not (has $m.mode (list "copy" "sync")) }}
+{{- fail "backupMirror.mode must be copy or sync" }}
+{{- end }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "life-os-cpp.fullname" . }}-backup-mirror
+  labels:
+    {{- include "life-os-cpp.labels" . | nindent 4 }}
+spec:
+  schedule: {{ $m.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ $m.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ $m.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: {{ $m.activeDeadlineSeconds }}
+      template:
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: rclone
+              image: {{ $m.image | quote }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              args:
+                - {{ $m.mode }}
+                - "src:{{ $m.source.bucket }}/{{ $m.source.prefix }}"
+                - "dst:{{ $m.destination.bucket }}/{{ $m.destination.prefix }}"
+                - --fast-list
+                - --stats=1m
+                - --stats-one-line
+                - -v
+                {{- range $m.extraArgs }}
+                - {{ . | quote }}
+                {{- end }}
+              env:
+                # rclone writes nothing but still resolves a config path; keep
+                # it on the writable /tmp mount (read-only root, uid 1000).
+                - name: HOME
+                  value: /tmp
+                - name: RCLONE_CONFIG
+                  value: /tmp/rclone.conf
+                {{- range $name, $r := dict "SRC" $m.source "DST" $m.destination }}
+                - name: RCLONE_CONFIG_{{ $name }}_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_{{ $name }}_PROVIDER
+                  value: {{ $r.provider | default "Other" | quote }}
+                {{- with $r.endpoint }}
+                - name: RCLONE_CONFIG_{{ $name }}_ENDPOINT
+                  value: {{ . | quote }}
+                {{- end }}
+                {{- with $r.region }}
+                - name: RCLONE_CONFIG_{{ $name }}_REGION
+                  value: {{ . | quote }}
+                {{- end }}
+                - name: RCLONE_CONFIG_{{ $name }}_FORCE_PATH_STYLE
+                  value: {{ $r.pathStyle | default false | quote }}
+                - name: RCLONE_CONFIG_{{ $name }}_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $r.credentialsSecret.name }}
+                      key: {{ $r.credentialsSecret.accessKeyIdKey | default "access-key-id" }}
+                - name: RCLONE_CONFIG_{{ $name }}_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $r.credentialsSecret.name }}
+                      key: {{ $r.credentialsSecret.secretAccessKeyKey | default "secret-access-key" }}
+                {{- end }}
+              resources:
+                {{- toYaml $m.resources | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+{{- end }}

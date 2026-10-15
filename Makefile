@@ -457,8 +457,8 @@ migrate-reset:     ## DESTRUCTIVE: drop the appdb schema and re-apply all migrat
 		"DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;"
 	$(MAKE) migrate
 
-prod-check:        ## Validate production config + env semantics (auth on, fail-closed, secrets)
-	@./scripts/prod-check.sh config/config.production.json
+prod-check:        ## Render helm/life-os-cpp with deploy/values-prod.yaml and assert the production floor (auth on, fail-closed, docs off)
+	@./scripts/prod-check.sh deploy/values-prod.yaml
 
 env-check:         ## Verify required env vars referenced in config/config.json are set
 	@./scripts/env-check.sh $(or $(CONFIG),config/config.json)

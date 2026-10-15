@@ -15,9 +15,19 @@
 
 #include "database/Database.hpp"
 #include "jobs/Jobs.hpp"
+#include "utils/Config.hpp"
 
 namespace Jobs {
 namespace Outbox {
+
+bool drain_configured() {
+    if (!Config::is_initialized() || !Jobs::is_initialized()) {
+        return false;
+    }
+    // The same key Core::register_outbox_drain_ reads; 0 (the default) means
+    // no drain anywhere, so a row written here would sit in the table forever.
+    return Config::get().get<int>("outbox.drain_interval_sec", "OUTBOX_DRAIN_INTERVAL_SEC", 0) > 0;
+}
 
 namespace {
 

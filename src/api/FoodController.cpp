@@ -34,7 +34,9 @@
 #include "food/OpenFoodFacts.hpp"
 #include "jobs/FoodParseHandler.hpp"
 #include "jobs/Jobs.hpp"
+#include "jobs/Outbox.hpp"
 #include "repositories/JobRows.hpp"
+#include "repositories/Zones.hpp"
 #include "repositories/food/EntryRepository.hpp"
 #include "repositories/food/GoalsBody.hpp"
 #include "repositories/food/GoalsRepository.hpp"
@@ -213,7 +215,9 @@ bool entry_input(Validation::Errors& errs,
 void FoodController::getGoals(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     with_repo_errors(callback, "food.getGoals", [&] {
-        callback(Response::ok(json{{"data", Repositories::food_goals_body(owner, today_utc())}}));
+        callback(Response::ok(json{
+            {"data",
+             Repositories::food_goals_body(owner, local_today(req, &Repositories::Zones::today_in, today_utc()))}}));
     });
 }
 
@@ -270,7 +274,9 @@ void FoodController::putGoals(const HttpRequestPtr& req, Callback&& callback) {
 
     with_repo_errors(callback, "food.putGoals", [&] {
         Repositories::GoalsRepository().put(owner, p);
-        callback(Response::ok(json{{"data", Repositories::food_goals_body(owner, today_utc())}}));
+        callback(Response::ok(json{
+            {"data",
+             Repositories::food_goals_body(owner, local_today(req, &Repositories::Zones::today_in, today_utc()))}}));
     });
 }
 
@@ -497,7 +503,8 @@ void FoodController::itemFromOff(const HttpRequestPtr& req, Callback&& callback)
 
 void FoodController::day(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
-    const std::string date = req->getParameter("date").empty() ? today_utc() : req->getParameter("date");
+    const std::string today = local_today(req, &Repositories::Zones::today_in, today_utc());
+    const std::string date = req->getParameter("date").empty() ? today : req->getParameter("date");
     if (!is_calendar_date(date)) {
         callback(ErrorResponse::bad_request("invalid_date", "date must be a calendar day as YYYY-MM-DD"));
         return;
@@ -506,7 +513,7 @@ void FoodController::day(const HttpRequestPtr& req, Callback&& callback) {
         json out = Repositories::EntryRepository().day(owner, date);
         const auto active = Repositories::GoalsRepository().active_kcal(owner, date);
         out["active_kcal"] = active ? json(*active) : json();
-        out["targets"] = Repositories::food_goals_body(owner, today_utc())["targets"];
+        out["targets"] = Repositories::food_goals_body(owner, today)["targets"];
         callback(Response::ok(json{{"data", out}}));
     });
 }
@@ -519,10 +526,13 @@ void FoodController::week(const HttpRequestPtr& req, Callback&& callback) {
         return;
     }
     with_repo_errors(callback, "food.week", [&] {
-        callback(Response::ok(json{{"data",
-                                    {{"from", from},
-                                     {"days", Repositories::EntryRepository().week(owner, from)},
-                                     {"targets", Repositories::food_goals_body(owner, today_utc())["targets"]}}}}));
+        callback(Response::ok(
+            json{{"data",
+                  {{"from", from},
+                   {"days", Repositories::EntryRepository().week(owner, from)},
+                   {"targets",
+                    Repositories::food_goals_body(
+                        owner, local_today(req, &Repositories::Zones::today_in, today_utc()))["targets"]}}}}));
     });
 }
 
@@ -643,6 +653,16 @@ void FoodController::parseStart(const HttpRequestPtr& req, Callback&& callback) 
     }
     Repositories::ParseJobRepository repo;
     std::string id;
+    // The worker may run with another retry limit; the job carries the one it was submitted with.
+    const int max_attempts = Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries;
+    const auto payload = [&](const std::string& job_id) {
+        return json{{"job_id", job_id}, {"owner_id", owner}, {"max_attempts", max_attempts}};
+    };
+    // The job rides the row's transaction as an outbox row when a drain is configured
+    // (Jobs::Outbox::enqueue_if_drained): a crash after the commit cannot leave the row
+    // queued with no job behind it. With the drain off (OUTBOX_DRAIN_INTERVAL_SEC=0: the
+    // compose stack, the test suites) the direct submit below follows the commit, as before.
+    bool via_outbox = false;
     try {
         // Each parse costs provider tokens: a few in flight per user is plenty.
         if (repo.open_count(owner) >= Repositories::JobRows::kOpenMax) {
@@ -652,8 +672,14 @@ void FoodController::parseStart(const HttpRequestPtr& req, Callback&& callback) 
                                           json{{"retry_after_sec", 30}}}));
             return;
         }
-        const json job = repo.create(
-            owner, body["text"].get<std::string>(), body["meal"].get<std::string>(), body["date"].get<std::string>());
+        const json job = repo.create(owner,
+                                     body["text"].get<std::string>(),
+                                     body["meal"].get<std::string>(),
+                                     body["date"].get<std::string>(),
+                                     [&](auto& txn, const std::string& job_id) {
+                                         via_outbox = Jobs::Outbox::enqueue_if_drained(
+                                             txn, Jobs::FoodParse::kJobType, payload(job_id));
+                                     });
         id = job["id"].get<std::string>();
     } catch (const std::exception& e) {
         spdlog::warn("food parse create failed: {}", e.what());
@@ -661,10 +687,9 @@ void FoodController::parseStart(const HttpRequestPtr& req, Callback&& callback) 
         return;
     }
     try {
-        // The worker may run with another retry limit; the job carries the one it was submitted with.
-        Jobs::get().submit(
-            Jobs::FoodParse::kJobType,
-            json{{"job_id", id}, {"owner_id", owner}, {"max_attempts", Jobs::get().default_max_retries()}});
+        if (!via_outbox) {
+            Jobs::get().submit(Jobs::FoodParse::kJobType, payload(id));
+        }
     } catch (const std::exception& e) {
         spdlog::warn("food parse enqueue unavailable: {}", e.what());
         // Nothing will ever run it: the row must not look queued to the page.

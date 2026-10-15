@@ -110,7 +110,7 @@ networkPolicy:
             protocol: TCP
           - port: 6379
             protocol: TCP
-          - port: 26379
+          - port: 26379   # Redis Sentinel; drop when externalRedis.useSentinel=false
             protocol: TCP
 
 # ---------------------------------------------------------------
@@ -141,15 +141,17 @@ monitoring:
   # relabel_configs. If in doubt, open Prometheus → Targets and look at the
   # actual label set on your pod.
   targetSelector: ""
+  # The numbers follow the table in docs/SLO.md (the same rules run in
+  # docker/prometheus-rules.yml for the compose stack); change both places.
   thresholds:
-    errorRate: 0.01                 # Fraction of 5xx allowed (1 %)
-    latencyP99Sec: 1                # p99 seconds
-    dlqDepth: 10                    # total job_dlq_depth above this pages
-    queueDepth: 100                 # total jobs_queue_depth above this warns
-    dbPoolSaturation: 0.9           # db_pool_active/size ratio above this warns (90 %)
-    replicaLagSec: 10               # read-replica lag (s) above this warns
-    dlqPerTypeDepth: 5              # single-type DLQ depth that pages
-    retriesExhaustedPerSec: 0.5     # sustained "gave up" retries per second
+    errorRate: 0.05                 # Fraction of 5xx that fires High5xxRate (5 % for 5m)
+    latencyP99Sec: 1                # HighP99Latency: p99 seconds (10m)
+    dlqDepth: 0                     # DeadLetterQueueGrowing: total jobs_dlq_depth above this for 15m
+    queueDepth: 100                 # JobsQueueBacklog: total jobs_queue_depth above this for 10m
+    dbPoolSaturation: 0.9           # DbPoolSaturationHigh: active/size ratio above this (90 %)
+    replicaLagSec: 60               # ReplicationLagHigh: read-replica lag in seconds
+    dlqPerTypeDepth: 5              # DeadLetterQueueSpikeByType: one type's DLQ depth
+    retriesExhaustedPerSec: 0.1     # RetriesExhaustedSpike: exhausted retries per second, sustained 5m
 
 # ---------------------------------------------------------------
 # External Secrets Operator — pull secrets from Vault / AWS SSM / GCP SM
@@ -227,6 +229,16 @@ jobs:
   # Delay before the first retry of a failed job, doubling per retry (capped
   # at 60 s by the app). 0 requeues at once.
   retryBackoffBaseMs: 2000
+
+# ---------------------------------------------------------------
+# Transactional outbox (src/jobs/Outbox.hpp). Rows a request writes into the
+# outbox table in its own transaction are relayed to the Redis queue by the
+# API pod every drainIntervalSec seconds. 0 leaves the relay off and the rows
+# sit in Postgres. Needs jobs.enabled=true. Rendered into config.json as
+# outbox.drain_interval_sec (OUTBOX_DRAIN_INTERVAL_SEC).
+# ---------------------------------------------------------------
+outbox:
+  drainIntervalSec: 0
 
 # ---------------------------------------------------------------
 # fitness module — wired by hand on the new-module.sh pattern (there is
@@ -363,6 +375,23 @@ rateLimit:
   trustedProxyCount: 1
   failOpen: true           # Redis down → allow (don't blackhole) requests
   whitelist: ""            # comma-separated IPs/subjects exempt from limiting
+
+# ---------------------------------------------------------------
+# Security headers. hsts=true adds Strict-Transport-Security to the API's
+# responses (SECURITY_HSTS); only meaningful behind TLS, so the chart default
+# is off and production turns it on. Rendered into config.json.
+# ---------------------------------------------------------------
+security:
+  hsts: false
+  hstsMaxAge: 31536000
+
+# ---------------------------------------------------------------
+# API docs UI (/api/v1/docs + /api/v1/openapi.yaml). Off: the Swagger UI
+# exposes the whole surface. Rendered into config.json as docs.enabled;
+# scripts/check-helm-render.sh refuses a production render with it on.
+# ---------------------------------------------------------------
+docs:
+  enabled: false
 
 # ---------------------------------------------------------------
 # Idempotency — de-duplicates retried mutating requests carrying an
@@ -505,6 +534,18 @@ tolerations: []
 affinity: {}
 
 # ---------------------------------------------------------------
+# Secret rotation. The pod template hashes the ConfigMap, so a values change
+# rolls the pods, but the credentials arrive through extraEnvFrom from a
+# Secret the chart does not render (life-os-app in production): rotating a
+# key in that Secret changes nothing in the template, and the running pods
+# keep the old value until something restarts them. The checksum/extra-env
+# annotation covers the names of the extraEnvFrom sources plus this string:
+# after rotating a secret, bump it (a date or a counter) and upgrade, and
+# every pod restarts with the new values. Same knob on the worker chart.
+# ---------------------------------------------------------------
+secretsVersion: ""
+
+# ---------------------------------------------------------------
 # Postgres logical backup (pg_dump → S3-compatible storage)
 # Off by default. STARTER-grade: fine to a few GB; past that move to
 # pgBackRest / WAL-G for incremental + PITR. Restore is manual — see
@@ -539,3 +580,52 @@ backup:
   resources:
     requests: { cpu: 100m, memory: 128Mi }
     limits: { cpu: 500m, memory: 256Mi }
+
+# ---------------------------------------------------------------
+# Off-cluster copy of the database backups (templates/backup-mirror-cronjob.yaml).
+# The CNPG barman store of production sits on the cluster's own MinIO, so a
+# lost cluster loses the data and its backups together (docs/RUNBOOK.md
+# "Backups"). This CronJob runs `rclone <mode>` from that bucket to a bucket
+# somewhere else. Off by default: it needs a destination bucket and two
+# credential Secrets in this namespace (a Secret of another namespace cannot
+# be mounted; copy the MinIO backup credentials into this one).
+#   mode: copy  — adds new objects, never deletes at the destination (a wiped
+#                 source cannot wipe the copy; apply retention on the
+#                 destination bucket with a lifecycle rule).
+#   mode: sync  — mirrors deletions too; the copy equals the source.
+# The pod runs as 1000 with a read-only root; rclone keeps its state in /tmp.
+# ---------------------------------------------------------------
+backupMirror:
+  enabled: false
+  schedule: "30 1 * * *"       # daily, after the 00:00 UTC base backup has landed
+  image: rclone/rclone:1.70.3
+  mode: copy                   # copy | sync
+  extraArgs: []                # e.g. ["--transfers", "8", "--bwlimit", "20M"]
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  activeDeadlineSeconds: 7200
+  source:
+    endpoint: ""               # REQUIRED: http://minio.minio.svc.cluster.local:9000
+    provider: Minio            # rclone s3 provider name: Minio, AWS, Other, ...
+    region: ""
+    bucket: ""                 # REQUIRED
+    prefix: ""                 # e.g. cnpg/
+    pathStyle: true
+    credentialsSecret:
+      name: ""                 # REQUIRED: Secret in this namespace
+      accessKeyIdKey: access-key-id
+      secretAccessKeyKey: secret-access-key
+  destination:
+    endpoint: ""               # empty for AWS S3, otherwise the provider's endpoint
+    provider: AWS
+    region: ""
+    bucket: ""                 # REQUIRED
+    prefix: ""
+    pathStyle: false
+    credentialsSecret:
+      name: ""                 # REQUIRED
+      accessKeyIdKey: access-key-id
+      secretAccessKeyKey: secret-access-key
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: "1", memory: 512Mi }

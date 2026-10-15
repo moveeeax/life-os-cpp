@@ -6,13 +6,17 @@
 # `exit 0`, and this project's own history has both failure modes on record:
 # check-test-buckets.sh read only its first directory argument (tests/api was
 # never scanned), and a sibling service shipped a gitleaks config that scanned
-# with zero rules — green for months, checking nothing. So: for each of the nine
+# with zero rules — green for months, checking nothing. So: for each of the ten
 # gate scripts, copy the subtree it reads into a scratch dir, plant a known
 # breakage, and require the gate to FAIL and to NAME what it found. Two planted
-# breakages per gate (five for check-version-sync.sh, which also guards the
-# helm image pins, Chart.yaml appVersions and the openapi.yaml / frontend
-# package versions; one for assemble-changelog.sh --check, the
-# changelog-fragment format gate), twenty-one in all.
+# breakages per gate, with three exceptions: five for check-version-sync.sh,
+# which also guards the helm image pins, Chart.yaml appVersions and the
+# openapi.yaml / frontend package versions; eight for check-helm-render.sh,
+# whose production floor has one case per assertion (fail-open limiter,
+# committed credential, open registration, dev APP_ENV, docs UI on, worker
+# lease off, missing automountServiceAccountToken, NetworkPolicy off); one
+# each for assemble-changelog.sh --check (the changelog-fragment format gate)
+# and prod-check.sh (the rendered production profile). Twenty-eight in all.
 #
 # Every case follows the same discipline (borrowed from the cyber-accountant
 # service's check-render-selftest.sh, which learned it the expensive way):
@@ -32,10 +36,10 @@
 #      missing file, unrelated assertion) does not count as a catch.
 #
 # The gates run against the scratch copies via the REPO_ROOT override each
-# check script supports. The two check-helm-render.sh cases need helm + yq
-# (same tools the helm-charts CI job installs); they are REQUIRED, not
-# skipped — a skipped case reports success, which is the exact disease this
-# script exists to cure.
+# check script supports. The check-helm-render.sh and prod-check.sh cases
+# need helm + yq (same tools the helm-charts CI job installs); they are
+# REQUIRED, not skipped — a skipped case reports success, which is the exact
+# disease this script exists to cure.
 #
 # Usage: ./scripts/check-selftest.sh
 set -uo pipefail
@@ -49,9 +53,9 @@ for tool in python3 git; do
         exit 1
     }
 done
-# helm + yq are hard requirements, not a skip: the two check-helm-render.sh
-# cases are the only proof that gate bites, and a silently skipped case is a
-# green rubber stamp ("skipped job reports success").
+# helm + yq are hard requirements, not a skip: the check-helm-render.sh and
+# prod-check.sh cases are the only proof those gates bite, and a silently
+# skipped case is a green rubber stamp ("skipped job reports success").
 for tool in helm yq; do
     command -v "$tool" >/dev/null 2>&1 || {
         echo "check-selftest: $tool required — the check-helm-render.sh cases cannot run" >&2
@@ -474,6 +478,98 @@ with open(path, "w", encoding="utf-8") as fh:
 PY
 }
 
+# 12b. The production floor of check-helm-render.sh, one case per assertion
+#      added in the wave-2 review. Each flips the exact key in the tracked
+#      prod overlay (deploy/values-*prod.yaml) or the chart template that the
+#      gate reads, so a case also breaks when that key moves.
+break_helm_registration_open() {
+    python3 - "$1/deploy/values-prod.yaml" <<'PY'
+import re, sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as fh:
+    text = fh.read()
+text, n = re.subn(r"(?m)^registration:\n  open: false$", "registration:\n  open: true", text)
+if n != 1:
+    sys.exit("break_helm_registration_open: flipped %d registration.open key(s) in %s — expected exactly 1" % (n, path))
+with open(path, "w", encoding="utf-8") as fh:
+    fh.write(text)
+PY
+}
+
+break_helm_app_env_dev() {
+    python3 - "$1/deploy/values-prod.yaml" <<'PY'
+import re, sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as fh:
+    text = fh.read()
+if re.search(r"(?m)^app:", text):
+    sys.exit("break_helm_app_env_dev: %s already has a top-level app block — flip app.env inside it instead of appending" % path)
+with open(path, "a", encoding="utf-8") as fh:
+    fh.write("\n# planted by scripts/check-selftest.sh\napp:\n  env: development\n")
+PY
+}
+
+break_helm_docs_enabled() {
+    python3 - "$1/deploy/values-prod.yaml" <<'PY'
+import re, sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as fh:
+    text = fh.read()
+text, n = re.subn(r"(?m)^docs:\n  enabled: false$", "docs:\n  enabled: true", text)
+if n != 1:
+    sys.exit("break_helm_docs_enabled: flipped %d docs.enabled key(s) in %s — expected exactly 1" % (n, path))
+with open(path, "w", encoding="utf-8") as fh:
+    fh.write(text)
+PY
+}
+
+break_helm_worker_lease_off() {
+    python3 - "$1/deploy/values-worker-prod.yaml" <<'PY'
+import re, sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as fh:
+    text = fh.read()
+text, n = re.subn(r"(?m)^(\s+visibilityTimeoutSec:\s*)[1-9][0-9]*$", r"\g<1>0", text)
+if n != 1:
+    sys.exit("break_helm_worker_lease_off: flipped %d visibilityTimeoutSec key(s) in %s — expected exactly 1" % (n, path))
+with open(path, "w", encoding="utf-8") as fh:
+    fh.write(text)
+PY
+}
+
+break_helm_automount_token() {
+    python3 - "$1/helm/life-os-cpp/templates/deployment.yaml" <<'PY'
+import re, sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as fh:
+    text = fh.read()
+text, n = re.subn(r"(?m)^\s*automountServiceAccountToken: false\n", "", text)
+if n != 1:
+    sys.exit("break_helm_automount_token: removed %d automountServiceAccountToken line(s) from %s — expected exactly 1" % (n, path))
+with open(path, "w", encoding="utf-8") as fh:
+    fh.write(text)
+PY
+}
+
+break_helm_networkpolicy_off() {
+    python3 - "$1/deploy/values-prod.yaml" <<'PY'
+import re, sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as fh:
+    text = fh.read()
+text, n = re.subn(r"(?m)^networkPolicy:\n  enabled: true$", "networkPolicy:\n  enabled: false", text)
+if n != 1:
+    sys.exit("break_helm_networkpolicy_off: flipped %d networkPolicy.enabled key(s) in %s — expected exactly 1" % (n, path))
+with open(path, "w", encoding="utf-8") as fh:
+    fh.write(text)
+PY
+}
+
+# 12c. prod-check.sh reads the same overlay through `helm template`; the docs
+#      UI switched on is the planted breakage (same mutator as the helm
+#      floor case, different gate and diagnostic).
+break_prod_check_docs_on() { break_helm_docs_enabled "$1"; }
+
 # 13. The webhooks -> email include edge resurrected — the exact edge whose
 #     removal broke the email/jobs/webhooks cycle in the phase-1 hub split.
 break_module_dep_cycle_edge() {
@@ -655,6 +751,40 @@ run_case helm-fail-open check-helm-render.sh break_helm_fail_open \
 run_case helm-committed-jwt check-helm-render.sh break_helm_committed_jwt \
     "helm deploy" \
     'rendered Secret carries a committed credential (jwt-secret)'
+
+run_case helm-registration-open check-helm-render.sh break_helm_registration_open \
+    "helm deploy" \
+    'REGISTRATION_OPEN != false' \
+    'Set registration.open=false.'
+
+run_case helm-app-env-dev check-helm-render.sh break_helm_app_env_dev \
+    "helm deploy" \
+    'APP_ENV != production' \
+    'Set app.env=production.'
+
+run_case helm-docs-enabled check-helm-render.sh break_helm_docs_enabled \
+    "helm deploy" \
+    'docs.enabled != false' \
+    'Set docs.enabled=false.'
+
+run_case helm-worker-lease-off check-helm-render.sh break_helm_worker_lease_off \
+    "helm deploy" \
+    'JOBS_VISIBILITY_TIMEOUT_SEC is 0' \
+    'Set jobs.visibilityTimeoutSec=300.'
+
+run_case helm-automount-token check-helm-render.sh break_helm_automount_token \
+    "helm deploy" \
+    'without automountServiceAccountToken: false in the pod spec: life-os-cpp'
+
+run_case helm-networkpolicy-off check-helm-render.sh break_helm_networkpolicy_off \
+    "helm deploy" \
+    'no NetworkPolicy rendered for the API pods' \
+    'networkPolicy.enabled must stay true'
+
+run_case prod-check-docs-on prod-check.sh break_prod_check_docs_on \
+    "helm/life-os-cpp deploy/values-prod.yaml" \
+    'docs.enabled must be false in production' \
+    'prod-check FAILED'
 
 run_case module-dep-cycle-edge check-module-deps.sh break_module_dep_cycle_edge \
     "src docs/module-deps.txt" \

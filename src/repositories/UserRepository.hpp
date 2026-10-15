@@ -367,7 +367,7 @@ public:
                 return 0;
             });
         } catch (const pqxx::sql_error& e) {
-            if (std::string_view(e.sqlstate()) == "23503" && is_billing_violation(e.what()))
+            if (Repositories::detail::is_fk_violation(e.sqlstate()) && is_billing_violation(e.what()))
                 throw UserHasBillingHistory{};
             throw;
         }

@@ -1,16 +1,12 @@
 # Benchmarks
 
-The pitch for a C++ service is latency and footprint. Those numbers are
-**hardware- and workload-specific**, so this repo ships the *harness* to
-measure them on your machine rather than a marketing number you can't reproduce.
-The "10x vs a managed runtime" framing in the README is the general reason to
-reach for C++ here; the absolute numbers below are what you should verify for
-your own deployment.
-
-> Status: this file documents the methodology. Fill the results table in for your
-> hardware — `make bench` does the work. Maintainer baseline numbers will be
-> published here once measured on reference hardware; until then, treat the table
-> as a template, not a claim.
+Latency and footprint numbers are hardware- and workload-specific, so this
+repo ships the harness to measure them on your machine rather than a number
+you cannot reproduce. This file is the methodology; the numbers come from
+two places: the nightly trend on GitHub-hosted runners (section "Continuous
+benchmarks" below, the maintainer's running baseline, noisy by nature) and
+the results table at the end, which you fill in for your own hardware with
+`make bench`. There is no separate baseline on reference hardware.
 
 ## What to measure
 

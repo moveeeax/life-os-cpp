@@ -9,6 +9,11 @@ Every knob has three ways in, tried in order:
 Set `CONFIG_FILE` to point at a different JSON file (e.g.
 `config/worker.json` for the worker binary).
 
+The Default column shows the built-in code default, what the binary uses
+when neither the env var nor the JSON key is set. `config/config.json` may
+set a different placeholder for the compose stack (`${MAIL_SMTP_HOST:-mailpit}`
+for example); where it does, the Notes column says so.
+
 ---
 
 ## App
@@ -85,7 +90,7 @@ Set `CONFIG_FILE` to point at a different JSON file (e.g.
 | `SECURITY_CSRF_ENABLED` | `security.csrf.enabled` | bool | `false` | Double-submit CSRF check for cookie-auth mutations; production config validation warns if cookie auth is on without it |
 | `SECURITY_CSRF_COOKIE` | `security.csrf.cookie_name` | string | `csrf-token` | Readable (non-HttpOnly) cookie the SPA mirrors |
 | `SECURITY_CSRF_HEADER` | `security.csrf.header_name` | string | `X-CSRF-Token` | Header the mirrored token must arrive in |
-| `SECURITY_HSTS` | `security.hsts` | bool | `false` | Emit `Strict-Transport-Security` (only makes sense behind TLS) |
+| `SECURITY_HSTS` | `security.hsts` | bool | `false` | Emit `Strict-Transport-Security` (only makes sense behind TLS). Helm: `security.hsts`; production sets `true` |
 | `SECURITY_HSTS_MAX_AGE` | `security.hsts_max_age` | int | `31536000` | `max-age` in seconds (1 year) |
 
 ## Idempotency
@@ -102,7 +107,7 @@ Set `CONFIG_FILE` to point at a different JSON file (e.g.
 
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
-| `DOCS_ENABLED` | `docs.enabled` | bool | `false` | Mount `/api/v1/docs` + `/api/v1/openapi.yaml` — dev only |
+| `DOCS_ENABLED` | `docs.enabled` | bool | `false` | Mount `/api/v1/docs` + `/api/v1/openapi.yaml` — dev only. Helm: `docs.enabled`; `scripts/check-helm-render.sh` refuses a production render with it on |
 | `DOCS_OPENAPI_PATH` | `docs.openapi_path` | string | `docs/openapi.yaml` | Path served at `/api/v1/openapi.yaml` |
 
 ## Observability
@@ -122,7 +127,7 @@ Set `CONFIG_FILE` to point at a different JSON file (e.g.
 
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
-| `DATABASE_PRIMARY_URL` | `database.primary` | string | `postgresql://localhost:5432/appdb` | Connection string |
+| `DATABASE_PRIMARY_URL` | `database.primary` | string | `""` | Full connection string. Empty (the code default) makes the server assemble a DSN from `DATABASE_HOST` (`localhost`), `DATABASE_PORT` (`5432`), `DATABASE_USER` (`app`), `DATABASE_NAME` (`app`) and `DATABASE_PASSWORD`, so the password never sits in a URL env var. `config.json` builds `postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD}@${DATABASE_HOST:-localhost}:${DATABASE_PORT:-5432}/${DATABASE_NAME:-appdb}`; `--verify-migrations` alone falls back to `postgresql://localhost:5432/app` |
 | `DATABASE_REPLICA_URLS` | `database.replicas` | csv | — | Read replicas (full URLs) |
 | `DATABASE_REPLICA_HOSTS` | — | csv | — | Replica HOSTS only (env-only; checked when `DATABASE_REPLICA_URLS` is unset): each host is assembled into a DSN with the primary's `DATABASE_PORT`/`DATABASE_USER`/`DATABASE_NAME`/`DATABASE_PASSWORD`, so the password is never baked into a URL env var |
 | `DB_POOL_SIZE` | `database.pool_size` | int | `10` | Per-pool connections (primary + each replica). Keep ≥ `server.threads`: a smaller pool makes IO threads queue on `acquire()`; a much larger pool leaves the extra connections inert (and the `db_pool` saturation gauge under-reports). |
@@ -179,10 +184,10 @@ For URL components: `REDIS_HOST`, `REDIS_PORT`.
 | `JOBS_MAX_RETRIES` | `jobs.max_retries` | int | `3` | |
 | `JOBS_RETRY_BACKOFF_BASE_MS` | `jobs.retry_backoff_base_ms` | int | `2000` | Delay before a failed job is retried (exponential, capped by the max below). `0` brings back the immediate requeue, which lets a job spend its retries within milliseconds |
 | `JOBS_RETRY_BACKOFF_MAX_MS` | `jobs.retry_backoff_max_ms` | int | `60000` | Cap on the retry backoff |
-| `JOBS_VISIBILITY_TIMEOUT_SEC` | `jobs.visibility_timeout_sec` | int | `0` | Processing lease: a job whose worker dies is re-queued after this many seconds. `0` disables leases (legacy behaviour) |
+| `JOBS_VISIBILITY_TIMEOUT_SEC` | `jobs.visibility_timeout_sec` | int | `0` | Processing lease: a job whose worker dies is re-queued after this many seconds. `0` disables leases (legacy behaviour). Helm: `jobs.visibilityTimeoutSec` on the worker chart; production sets `300` (`deploy/values-worker-prod.yaml`) |
 | `JOBS_DLQ_METRIC_REFRESH_SEC` | `jobs.dlq_metric_refresh_sec` | int | `10` | Exports `jobs_dlq_depth{type="..."}` plus an aggregate `type="_total"` |
 | `JOBS_QUEUE_METRIC_REFRESH_SEC` | `jobs.queue_metric_refresh_sec` | int | `10` | Same bookkeeping for the waiting queue: `jobs_queue_depth{type="..."}` plus `type="_total"` |
-| `OUTBOX_DRAIN_INTERVAL_SEC` | `outbox.drain_interval_sec` | int | `0` | Transactional outbox (`src/jobs/Outbox.hpp`): how often the API pod relays `outbox` table rows to the job queue. `0` (default) disables draining — the pattern is opt-in; rows written via `Outbox::enqueue` sit in Postgres until a deploy enables this. Needs `jobs.enabled=true`. |
+| `OUTBOX_DRAIN_INTERVAL_SEC` | `outbox.drain_interval_sec` | int | `0` | Transactional outbox (`src/jobs/Outbox.hpp`): how often the API pod relays `outbox` table rows to the job queue. `0` (default) disables draining — the pattern is opt-in; rows written via `Outbox::enqueue` sit in Postgres until a deploy enables this. Needs `jobs.enabled=true`. Helm: `outbox.drainIntervalSec` on the API chart; production sets `5` (`deploy/values-prod.yaml`) |
 | `DB_REPLICA_LAG_METRIC_REFRESH_SEC` | `database.replica_lag_metric_refresh_sec` | int | `15` | Refresh interval for the `db_replica_lag_seconds` gauge. Only registered when read replicas are configured (primary has no replay timestamp). |
 
 ## Billing module
@@ -239,6 +244,17 @@ outage can never affect the money path.
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
 | `FOOD_ENABLED` | `food.enabled` | bool | `false` | Master switch for the food module (`Core::food_enabled()`): products, the diary, goals, Open Food Facts search, the LLM parse job. Routes stay registered, handlers 404 while off. Needs no fitness permission; the weight for the goals and the active kcal of a day come from the user's Mi account when one is linked. |
+| `FOOD_LLM_BASE_URL` | `food.llm.base_url` | string | `""` | Base URL of an OpenAI-compatible chat completions API for the `food_parse` job, e.g. `https://api.openai.com/v1`. The worker calls `{base_url}/chat/completions`. With any of the four `FOOD_LLM_*` settings below empty the parse is `not_configured` and the add form hides it. Prod: ConfigMap `life-os-food-llm` |
+| `FOOD_LLM_API_KEY` | `food.llm.api_key` | string | `""` | Bearer token of the provider. Prod: Secret `life-os-food-llm`. Never log or commit |
+| `FOOD_LLM_MODEL` | `food.llm.model` | string | `""` | Model name as the provider expects it |
+| `FOOD_LLM_PROMPT` | `food.llm.prompt` | string | `""` | The system prompt of the parse, whole; `docs/food/prompt.example.md` has the one prod uses |
+| `FOOD_LLM_TIMEOUT_SECONDS` | `food.llm.timeout_seconds` | int | `60` | Limit of one request to the provider |
+| `FOOD_LLM_MAX_TOKENS` | `food.llm.max_tokens` | int | `1500` | `max_tokens` of the request; 50 lines of the answer schema fit |
+
+## Money module
+
+| Env | JSON key | Type | Default | Notes |
+|---|---|---|---|---|
 | `MONEY_ENABLED` | `money.enabled` | bool | `false` | Master switch for the money module (`Core::money_enabled()`): currencies, accounts, the ledger, transfers, categories with budgets, merchant memory, reports per currency, daily rates (`money_rates` job). Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
 | `MONEY_RATES_SCHEDULE_HOURS` | `money.rates_schedule_hours` | int | `0` | Period in hours of the `money_rates` job that stores the day's quotes against the US dollar (runs in the API pod, enqueues the job). `0` (default) disables the schedule. |
 | `MONEY_LLM_BASE_URL` | `money.llm.base_url` | string | `""` | Base URL of an OpenAI-compatible chat completions API for the `money_parse` job (and the advisor later). With any of base URL, key, model or the parse prompt empty the parse is `not_configured`. Prod: ConfigMap `life-os-money-llm` |
@@ -250,6 +266,11 @@ outage can never affect the money path.
 | `MONEY_ADVISOR_HOUR_UTC` | `money.advisor_hour_utc` | int | `7` | Hour (UTC) the API pod enqueues each user's weekly review on their weekday; `-1` switches the schedule off ("Run now" still works) |
 | `MONEY_LLM_TIMEOUT_SECONDS` | `money.llm.timeout_seconds` | int | `60` | Provider timeout per call (at least 5) |
 | `MONEY_LLM_MAX_TOKENS` | `money.llm.max_tokens` | int | `2500` | Token cap of an answer (at least 100) |
+
+## Tasks module
+
+| Env | JSON key | Type | Default | Notes |
+|---|---|---|---|---|
 | `TASKS_ENABLED` | `tasks.enabled` | bool | `false` | Master switch for the tasks module (`Core::tasks_enabled()`): personal tasks, the day's agenda, the inbox, the one-phrase parse (`tasks_parse` job). Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
 | `TASKS_LLM_BASE_URL` | `tasks.llm.base_url` | string | `""` | Provider of the `tasks_parse` job. With base URL, key or model empty the job uses the money provider (`MONEY_LLM_BASE_URL`, `MONEY_LLM_API_KEY`, `MONEY_LLM_MODEL`) with the tasks prompt |
 | `TASKS_LLM_API_KEY` | `tasks.llm.api_key` | string | `""` | Bearer key of that provider; prod leaves it empty and shares the money key |
@@ -257,11 +278,41 @@ outage can never affect the money path.
 | `TASKS_LLM_PROMPT_PARSE` | `tasks.llm.prompt_parse` | string | `""` | System prompt of the tasks parse; example in `docs/tasks/prompt-parse.example.md`. Empty: the parse is `not_configured` and the page saves tasks as typed. Prod: ConfigMap `life-os-tasks-llm` |
 | `TASKS_LLM_TIMEOUT_SECONDS` | `tasks.llm.timeout_seconds` | int | `60` | Provider timeout per call (at least 5) |
 | `TASKS_LLM_MAX_TOKENS` | `tasks.llm.max_tokens` | int | `1500` | Token cap of an answer (at least 100) |
+
+## Goals module
+
+| Env | JSON key | Type | Default | Notes |
+|---|---|---|---|---|
 | `GOALS_ENABLED` | `goals.enabled` | bool | `false` | Master switch for the goals module (`Core::goals_enabled()`): goals of four kinds, check-ins, sections, milestones, the progress and pace computed at the caller's date, and the goal link of tasks. Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
+
+## Travel module
+
+| Env | JSON key | Type | Default | Notes |
+|---|---|---|---|---|
 | `TRAVEL_ENABLED` | `travel.enabled` | bool | `false` | Master switch for the travel module (`Core::travel_enabled()`): border crossings, day counters for tax residency, Schengen and visa limits, trips with a day plan, packing tasks and linked spends. Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
+
+## Habits module
+
+| Env | JSON key | Type | Default | Notes |
+|---|---|---|---|---|
 | `HABITS_ENABLED` | `habits.enabled` | bool | `false` | Master switch for the habits module (`Core::habits_enabled()`): habits every day or N times a week, ticked by hand or from Mi Fitness (sleep, steps, active kcal) and Training sessions, their streaks, and the habits part of `/api/v1/today`. Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
+
+## Notes module
+
+| Env | JSON key | Type | Default | Notes |
+|---|---|---|---|---|
 | `NOTES_ENABLED` | `notes.enabled` | bool | `false` | Master switch for the notes module (`Core::notes_enabled()`): private Markdown notes with the fields of a tarassov.me blog post, linked to a project, course or task. Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
+
+## Now module
+
+| Env | JSON key | Type | Default | Notes |
+|---|---|---|---|---|
 | `NOW_ENABLED` | `now.enabled` | bool | `false` | Master switch for the now module (`Core::now_enabled()`): `GET /api/v1/today` (the day's digest for the Now screen), the focus of the day, and the wallpaper library. Routes stay registered, handlers 404 while off. |
+
+## Storage (S3)
+
+| Env | JSON key | Type | Default | Notes |
+|---|---|---|---|---|
 | `S3_ENDPOINT` | `storage.s3.endpoint` | string | `""` | Origin of the S3-compatible store, e.g. `https://storage.example.com`, no trailing slash. Setup in `docs/wallpapers.md` |
 | `S3_REGION` | `storage.s3.region` | string | `""` | Region used in the SigV4 signature |
 | `S3_BUCKET` | `storage.s3.bucket` | string | `""` | Bucket of the wallpapers. Empty: the wallpaper routes answer 503 `storage_not_configured` and the app paints a gradient |
@@ -270,12 +321,6 @@ outage can never affect the money path.
 | `S3_SECRET_ACCESS_KEY` | `storage.s3.secret_access_key` | string | `""` | Its secret. Never log or commit |
 | `S3_PUBLIC_BASE_URL` | `storage.s3.public_base_url` | string | `""` | Origin the browser reads objects from (public bucket or CDN); a wallpaper's URL is this plus the object key. Empty: 503 as above |
 | `S3_PATH_STYLE` | `storage.s3.path_style` | bool | `true` | `true`: `endpoint/bucket/key` (MinIO and most S3-compatible stores); `false`: `bucket.endpoint-host/key` |
-| `FOOD_LLM_BASE_URL` | `food.llm.base_url` | string | `""` | Base URL of an OpenAI-compatible chat completions API for the `food_parse` job, e.g. `https://api.openai.com/v1`. The worker calls `{base_url}/chat/completions`. With any of the four `FOOD_LLM_*` settings below empty the parse is `not_configured` and the add form hides it. Prod: ConfigMap `life-os-food-llm` |
-| `FOOD_LLM_API_KEY` | `food.llm.api_key` | string | `""` | Bearer token of the provider. Prod: Secret `life-os-food-llm`. Never log or commit |
-| `FOOD_LLM_MODEL` | `food.llm.model` | string | `""` | Model name as the provider expects it |
-| `FOOD_LLM_PROMPT` | `food.llm.prompt` | string | `""` | The system prompt of the parse, whole; `docs/food/prompt.example.md` has the one prod uses |
-| `FOOD_LLM_TIMEOUT_SECONDS` | `food.llm.timeout_seconds` | int | `60` | Limit of one request to the provider |
-| `FOOD_LLM_MAX_TOKENS` | `food.llm.max_tokens` | int | `1500` | `max_tokens` of the request; 50 lines of the answer schema fit |
 
 ## Mail (SMTP)
 
@@ -283,7 +328,7 @@ outage can never affect the money path.
 |---|---|---|---|---|
 | `MAIL_ENABLED` | `mail.enabled` | bool | `false` | Off → links are logged at INFO instead of sent |
 | `MAIL_VIA_JOBS` | `mail.via_jobs` | bool | `true` | Route account emails through the `account_email` job queue when Jobs is enabled (worker must subscribe to that type); falls back to inline send when Jobs is off or enqueue fails |
-| `MAIL_SMTP_HOST` | `mail.smtp_host` | string | `mailpit` | `config.json` default targets the Mailpit dev sidecar |
+| `MAIL_SMTP_HOST` | `mail.smtp_host` | string | `localhost` | `config.json` sets `${MAIL_SMTP_HOST:-mailpit}` so the compose stack hits the Mailpit sidecar |
 | `MAIL_SMTP_PORT` | `mail.smtp_port` | int | `1025` | |
 | `MAIL_SMTP_USERNAME` | `mail.smtp_username` | string | — | Empty → anonymous |
 | `MAIL_SMTP_PASSWORD` | `mail.smtp_password` | string | — | |
@@ -298,7 +343,7 @@ outage can never affect the money path.
 
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
-| `WORKER_ID` | `worker.id` | string | `worker-1` | |
+| `WORKER_ID` | `worker.id` | string | `worker-1` | Names the Redis processing list of this instance. Helm: the pod name (`metadata.name`) unless `worker.id` is set, so replicas never share a list |
 | `WORKER_TYPES` | `worker.types` | csv | all registered handler types | Queues the worker pulls from. Unset (prod leaves it unset) → every type with a registered handler. The nine handlers this binary registers: `account_email`, `email.send`, `webhook.deliver`, `fitness_sync`, `food_parse`, `money_parse`, `money_rates`, `money_advisor`, `tasks_parse`. When you DO set it, a type left out piles up undrained: the compose stack lists all nine, `config.json` ships `default` (no handler of that name; the startup guard warns). |
 | `WORKER_STRICT_TYPES` | `worker.strict_types` | bool | `false` | A `WORKER_TYPES` entry without a registered handler logs a warning; `true` upgrades it to a refusal to start |
 | `WORKER_CONCURRENCY` | `worker.concurrency` | int | `2` | |

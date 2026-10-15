@@ -477,7 +477,7 @@ CreditResult adjust(const std::string& user_id,
             // unreachable except for an extremely narrow TOCTOU race (a user
             // deleted between the check and this write). Attribute to
             // user_id, the more common cause, rather than silently 500ing.
-            if (ss == "23503")
+            if (Repositories::detail::is_fk_violation(ss))
                 throw UnknownUser{};
             if (ss == "22P02")
                 throw MalformedUserId{};
@@ -574,7 +574,7 @@ CreditResult spend(const std::string& user_id,
         // 23503 a narrow TOCTOU (user deleted between check and write).
         if (ss == "23514")
             throw InsufficientCredits{};
-        if (ss == "23503")
+        if (Repositories::detail::is_fk_violation(ss))
             throw UnknownUser{};
         if (ss != "23505")
             throw;

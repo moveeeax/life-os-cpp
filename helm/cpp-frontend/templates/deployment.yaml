@@ -24,6 +24,8 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      # nginx never talks to the Kubernetes API.
+      automountServiceAccountToken: false
       {{- if .Values.podSecurityContext.enabled }}
       securityContext:
         runAsNonRoot: {{ .Values.podSecurityContext.runAsNonRoot }}

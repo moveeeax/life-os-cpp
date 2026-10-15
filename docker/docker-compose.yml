@@ -156,7 +156,7 @@ services:
   # TRUNCATE tables, which used to wipe dev users on the shared instance.
   # No volume → fresh data every `up`, gone on `down`. Port not published.
   test-postgres:
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     container_name: life_os_cpp_test_postgres
     environment:
       - POSTGRES_USER=postgres
@@ -261,12 +261,16 @@ services:
 
   # PostgreSQL database (primary)
   postgres:
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     container_name: life_os_cpp_postgres
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=appdb
+      # postgres:18 moved its default data dir to /var/lib/postgresql/18/docker
+      # and its entrypoint refuses to start with an unused mount at the old
+      # path; keep the existing volume by naming the path explicitly.
+      - PGDATA=/var/lib/postgresql/data
     ports:
       - "5432:5432"
     volumes:
@@ -292,7 +296,7 @@ services:
 
   # PostgreSQL read replica (streaming replication from primary)
   postgres_replica:
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     container_name: life_os_cpp_postgres_replica
     environment:
       - POSTGRES_USER=postgres

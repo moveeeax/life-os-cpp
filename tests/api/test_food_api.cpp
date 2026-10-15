@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -22,6 +23,7 @@
 #include "domain/Role.hpp"
 #include "food/Http.hpp"
 #include "jobs/Jobs.hpp"
+#include "jobs/Outbox.hpp"
 #include "test_helpers.hpp"
 
 using json = nlohmann::json;
@@ -320,6 +322,26 @@ TEST_F(FoodApiTest, DayHoldsTheFourMealsWithTotalsAndTargets) {
     EXPECT_EQ(call_id(&Api::FoodController::deleteEntry, user(kAnna), Delete, entry_id)->statusCode(), k404NotFound);
 }
 
+TEST_F(FoodApiTest, WithoutADateTheDayIsTodayInTheGivenZone) {
+    // Kiritimati is UTC+14 and Pago Pago UTC-11: at any hour one of them is on another date than UTC.
+    const auto [zone, local, utc] = Database::get().execute_read([](auto& txn) {
+        auto r = txn.exec(
+            "SELECT z, to_char(now() AT TIME ZONE z, 'YYYY-MM-DD'), to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD') "
+            "FROM unnest(ARRAY['Pacific/Kiritimati', 'Pacific/Pago_Pago']) AS z "
+            "WHERE (now() AT TIME ZONE z)::date <> (now() AT TIME ZONE 'UTC')::date LIMIT 1");
+        return std::make_tuple(
+            r[0][0].template as<std::string>(), r[0][1].template as<std::string>(), r[0][2].template as<std::string>());
+    });
+    ASSERT_NE(local, utc);
+    const auto day = [&](const std::vector<std::pair<std::string, std::string>>& params) {
+        return body_of(call(&Api::FoodController::day, user(kAnna), Get, params))["data"]["date"];
+    };
+    EXPECT_EQ(day({{"tz", zone}}), local);
+    EXPECT_EQ(day({}), utc) << "no tz: UTC";
+    EXPECT_EQ(day({{"tz", "Mars/Olympus"}}), utc) << "not a zone: UTC";
+    EXPECT_EQ(day({{"tz", zone}, {"date", "2026-10-06"}}), "2026-10-06") << "a given date wins";
+}
+
 TEST_F(FoodApiTest, EntryInputIsValidated) {
     const auto post = [&](const json& b) {
         return call_json(&Api::FoodController::createEntry, user(kAnna), b)->statusCode();
@@ -597,7 +619,9 @@ TEST_F(FoodParseApiTest, EnqueuesAJobForTheCallerAndShowsItOnlyToThem) {
     EXPECT_EQ(row["meal"], "lunch");
     EXPECT_TRUE(row["result"].is_null());
 
-    EXPECT_EQ(call_id(&Api::FoodController::parseStatus, user(kBoris), Get, id)->statusCode(), k404NotFound);
+    const auto theirs = call_id(&Api::FoodController::parseStatus, user(kBoris), Get, id);
+    EXPECT_EQ(theirs->statusCode(), k404NotFound);
+    EXPECT_EQ(body_of(theirs)["message"], "parse_job not found") << "one name for a missing parse job";
     EXPECT_EQ(call_id(&Api::FoodController::parseStatus, user(kAnna), Get, kMissingId)->statusCode(), k404NotFound);
     EXPECT_EQ(call_id(&Api::FoodController::parseStatus, user(kAnna), Get, "nope")->statusCode(), k400BadRequest);
 }
@@ -632,4 +656,84 @@ TEST_F(FoodParseApiTest, AFewOpenParsesPerUserAreEnough) {
     const auto job = Jobs::get().pick({"food_parse"}, 1);
     ASSERT_TRUE(job.has_value());
     EXPECT_EQ(job->payload["max_attempts"], Jobs::get().default_max_retries());
+}
+
+namespace {
+
+/// With a drain configured the job goes through the outbox, inside the row's transaction.
+class FoodParseOutboxApiTest : public FoodParseApiTest {
+protected:
+    std::string config_file_name() const override { return "food_parse_outbox_api_test_config.json"; }
+
+    void config_overrides(nlohmann::json& cfg) override {
+        FoodParseApiTest::config_overrides(cfg);
+        // An hourly tick never fires during the test: every drain below is an explicit call.
+        cfg["outbox"]["drain_interval_sec"] = 3600;
+    }
+
+    void SetUp() override {
+        FoodParseApiTest::SetUp();
+        if (::testing::Test::IsSkipped())
+            return;
+        truncate_outbox();
+        TestHelpers::drain_jobs({"food_parse"});
+    }
+
+    void TearDown() override {
+        if (Database::is_initialized()) {
+            try {
+                truncate_outbox();
+            } catch (...) {}
+        }
+        FoodParseApiTest::TearDown();
+    }
+
+    static void truncate_outbox() {
+        Database::get().execute_write([](auto& txn) {
+            txn.exec("TRUNCATE TABLE outbox");
+            return true;
+        });
+    }
+
+    static json outbox_rows() {
+        return Database::get().execute_read_primary([](auto& txn) {
+            auto r = txn.exec(
+                "SELECT COALESCE(json_agg(json_build_object('kind', kind, 'payload', payload)), '[]') FROM outbox");
+            return json::parse(r[0][0].template as<std::string>());
+        });
+    }
+};
+
+}  // namespace
+
+TEST_F(FoodParseOutboxApiTest, WithADrainTheJobRidesTheRowsTransaction) {
+    ASSERT_TRUE(Jobs::Outbox::drain_configured());
+    const auto started = call_json(&Api::FoodController::parseStart,
+                                   user(kAnna),
+                                   json{{"text", "tea"}, {"meal", "snack"}, {"date", "2026-10-06"}});
+    ASSERT_EQ(started->statusCode(), k202Accepted) << started->body();
+    const std::string id = body_of(started)["data"]["id"];
+    EXPECT_EQ(body_of(started)["data"]["status"], "queued");
+
+    // Nothing was submitted directly: the event waits in the outbox, committed with the row.
+    const auto depth = Jobs::get().queue_depth_by_type();
+    EXPECT_EQ(depth.count("food_parse") ? depth.at("food_parse") : 0, 0);
+    const json rows = outbox_rows();
+    ASSERT_EQ(rows.size(), 1u) << rows.dump();
+    EXPECT_EQ(rows[0]["kind"], "food_parse");
+    EXPECT_EQ(rows[0]["payload"]["job_id"], id);
+    EXPECT_EQ(rows[0]["payload"]["owner_id"], kAnna);
+    EXPECT_EQ(rows[0]["payload"]["max_attempts"], Jobs::get().default_max_retries());
+
+    // The drain relays it; the worker then sees the same job the direct submit would have made.
+    const auto stats = Jobs::Outbox::drain();
+    EXPECT_EQ(stats.submitted, 1);
+    EXPECT_EQ(stats.failed, 0);
+    EXPECT_EQ(outbox_rows().size(), 0u);
+    auto job = Jobs::get().pick({"food_parse"}, 1);
+    ASSERT_TRUE(job.has_value());
+    EXPECT_EQ(job->payload["job_id"], id);
+    Jobs::get().complete(job->id, json::object());
+    EXPECT_EQ(body_of(call_id(&Api::FoodController::parseStatus, user(kAnna), Get, id))["data"]["status"], "queued")
+        << "the row is the worker's to claim";
 }

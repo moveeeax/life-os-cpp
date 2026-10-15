@@ -37,23 +37,20 @@ pre-commit run --all-files
 3. Run `make test` locally before pushing (`make test-local NAME='Foo*'`
    is the fast native TDD loop; `make test-rerun` only re-runs the
    already-built image — flake triage, not verification).
-4. Open a PR; CI will run build, tests, sanitizers, and linters.
-5. Wait for required reviewers (see `CODEOWNERS`).
+4. Open a PR against `master`; CI runs the build, the tests, the sanitizers
+   and the linters.
+5. One owner reviews (`CODEOWNERS` lists a single person for every path)
+   and merges with `--admin` once CI is green. There is no second reviewer
+   and no separate security team.
 
 ## Commit messages
 
-Follow [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-type(scope): short summary
-
-Longer body if needed — explain *why*, not *what*.
-
-Closes #123
-```
-
-Types: `feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `build`, `ci`,
-`chore`. Scope is optional but recommended (e.g. `feat(auth):`, `fix(jobs):`).
+Plain subjects: one imperative line that says what the commit does, as in
+`git log` ("Fix the first wave of the 2026-10-14 review", "Run master CI
+once per commit"), a body only when the why is not obvious. No Conventional
+Commits prefixes, no attribution trailers (`Co-Authored-By`, "Generated
+with" and the like), whatever a tool suggests. The one fixed form is the
+release commit, `chore(release): x.y.z`.
 
 ## Changelog
 
@@ -79,7 +76,9 @@ Fragments are folded into `[Unreleased]` (and deleted) at release time by
 
 ## Code style
 
-- C++20. Header-only modules under `src/`, single `main.cpp` per binary.
+- C++20. Leaves and templates stay header-only; heavy module bodies live in
+  a paired `.cpp` compiled into `app_core` (`docs/CONVENTIONS.md`, gotcha
+  1); one `main.cpp` per binary.
 - `clang-format` (`.clang-format` in repo) is enforced by CI — run locally
   before pushing.
 - `clang-tidy` config in `.clang-tidy` — new code should not regress the lint
@@ -96,25 +95,31 @@ Fragments are folded into `[Unreleased]` (and deleted) at release time by
 - Failing a new test is a blocker; flaky tests must be either fixed, marked
   `DISABLED_`, or filed as an issue.
 - Coverage floor (`COVERAGE_MIN` in the Makefile) is a ratchet: it only goes
-  up. When real coverage climbs, bump the floor to (actual − 3–5 pp) in the
-  same PR. Never lower it to make a PR pass.
+  up. When real coverage climbs, bump the floor to (actual minus 3 to 5 pp)
+  in the same PR. Never lower it to make a PR pass. The floor is checked
+  only by a local `make coverage`; no CI workflow runs it.
 
 ## Security
 
 - Never commit secrets. `config/*.json` must use `${VAR}` placeholders.
-- Anything touching `src/security/` requires review by the security team
-  (see `CODEOWNERS`).
+- `src/security/` and `src/api/Api.hpp` are listed separately in
+  `CODEOWNERS` so a change there is visible as such; the reviewer is the
+  same owner.
 - Report vulnerabilities privately per `SECURITY.md`.
 
 ## Pull requests
 
 The PR template covers:
 
-- **What** — one-sentence description.
-- **Why** — motivation / linked ticket.
-- **How** — design notes only if non-obvious.
-- **Tests** — which tests cover the change.
-- **Breaking changes** — list them explicitly (config keys, API routes,
+- **What**: one-sentence description.
+- **Why**: motivation / linked ticket.
+- **How**: design notes only if non-obvious.
+- **Tests**: which tests cover the change.
+- **Security**: no secrets, no new auth bypass, input validated at the
+  boundary.
+- **Migrations**: every migration works under the previous binary
+  (`migrations/README.md`).
+- **Breaking changes**: list them explicitly (config keys, API routes,
   response shapes).
 
 ## CI pipeline
@@ -136,18 +141,24 @@ one edit can reach by hand (that is how three releases shipped with a stale
 1. `./scripts/release.sh <ver>` — validates semver + monotonicity, then:
    folds any `changelog.d/` fragments into `## [Unreleased]`
    (`assemble-changelog.sh`, deleting the consumed fragments), retitles that
-   section to `## [<ver>] — YYYY-MM-DD` keeping a fresh empty
+   section to `## [<ver>] - YYYY-MM-DD` keeping a fresh empty
    `## [Unreleased]` on top (a heading you already retitled by hand is
-   accepted too; an empty `[Unreleased]` with no fragments aborts — write
+   accepted too; an empty `[Unreleased]` with no fragments aborts, so write
    the notes first), and bumps every remaining version point in one command:
    `CMakeLists.txt project(VERSION …)`, the image-tag pins in
    `helm/cpp-env/values.yaml` and in the prod values
-   `deploy/values-{,worker-,frontend-}prod.yaml`, and the `Chart.yaml`
-   `appVersion` fields. It re-runs `scripts/check-version-sync.sh` (which
-   gates all of those in CI) and prints the diff. It commits nothing; the
-   changelog *content* stays human-written — the script only moves it.
+   `deploy/values-{,worker-,frontend-}prod.yaml`, the four `Chart.yaml`
+   `appVersion` fields, `docs/openapi.yaml` `info.version` (and it
+   regenerates `tests/e2e/openapi.gen.json`, which embeds the spec's hash),
+   and `frontend/package.json` plus the two root entries of
+   `frontend/package-lock.json`. It re-runs `scripts/check-version-sync.sh`
+   (which gates all of those in CI) and prints the diff. It commits nothing;
+   the changelog content stays human-written, the script only moves it.
+   Not bumped by the script and not gated: `PROJECT_NUMBER` in
+   `docs/Doxyfile`, edited by hand when someone cares about the Doxygen
+   title.
 2. Review `git diff`, then commit changelog + fragment deletions + bumps as
-   ONE commit: `chore(release): <ver> — <one-line summary>`.
+   ONE commit: `chore(release): <ver>`.
 3. After it lands on `master`, `git tag v<ver> && git push origin v<ver>`.
    A tag matching `v*.*.*` triggers `.github/workflows/release.yml`, which
    builds the app, worker and frontend images, pushes them to

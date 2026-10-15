@@ -146,7 +146,7 @@ public:
                     return "deleted";
                 });
             },
-            detail::throw_on<InUse>("23503"));
+            Repositories::detail::throw_on_fk<InUse>());
     }
 
     /// The code of an owner's account, or nullopt when it is not theirs.

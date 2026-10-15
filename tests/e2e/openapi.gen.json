@@ -2,20 +2,21 @@
  "openapi": "3.1.0",
  "info": {
   "title": "life-os-cpp API",
-  "description": "Infrastructure endpoints of life-os-cpp: health probes\nand a background-job API. Authentication is opt-in (auth.mode=jwt|bearer|none).\nRate-limiting and idempotency are driven by headers.\n",
+  "description": "The REST API of Life OS, a C++20 service on Drogon with Postgres and\nRedis. Four families of routes: the probes and infrastructure (`/healthz`,\n`/ready`, `/health`, `/metrics`, the background-job queue and its DLQ under\n`/api/v1/jobs`); accounts and administration (`/api/v1/auth`,\n`/api/v1/account`, `/api/v1/admin`, API keys, the audit log); billing\n(PayPal top-ups into a credit wallet, `/api/v1/billing` and\n`/api/v1/admin/billing`); and the life modules, each behind its own\nswitch and answering 404 while off: fitness (Mi Fitness sync), workout,\nfood, money, tasks with projects, goals, now (`/api/v1/today`, wallpapers,\nsounds), travel, habits and notes. Every route except the probes is under\n`/api/v1`. Authentication is a JWT bearer, an API key (`X-API-Key`) or the\nHttpOnly session cookie the SPA uses; rate limiting and idempotency are\ndriven by headers (`Idempotency-Key` on writes). Maintained by one owner,\nsee the repository.\n",
   "version": "1.28.0",
   "contact": {
-   "name": "Platform team"
+   "name": "life-os-cpp repository",
+   "url": "https://github.com/moveeeax/life-os-cpp"
   }
  },
  "servers": [
   {
    "url": "http://localhost:8080",
-   "description": "Local dev"
+   "description": "Local dev (make up)"
   },
   {
-   "url": "https://api.example.com",
-   "description": "Production"
+   "url": "https://life-os.tarassov.me",
+   "description": "Production, through the frontend's nginx, which proxies /api/ to the API pod"
   }
  ],
  "components": {
@@ -15082,6 +15083,17 @@
       "BearerAuth": []
      }
     ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the age behind the targets is counted on today there"
+     }
+    ],
     "responses": {
      "200": {
       "description": "The goals",
@@ -15133,6 +15145,17 @@
     "security": [
      {
       "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the age behind the targets is counted on today there"
      }
     ],
     "requestBody": {
@@ -15827,7 +15850,16 @@
        "type": "string",
        "format": "date"
       },
-      "description": "Defaults to today (UTC)"
+      "description": "The local day; today in tz by default"
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the default day is today there"
      }
     ],
     "responses": {
@@ -15912,6 +15944,15 @@
        "type": "string",
        "format": "date"
       }
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the age behind the targets is counted on today there"
      }
     ],
     "responses": {
@@ -16522,7 +16563,7 @@
       }
      },
      "404": {
-      "description": "Food module disabled, or the job is not the caller's",
+      "description": "Food module disabled, or the job is not the caller's (parse_job)",
       "content": {
        "application/json": {
         "schema": {
@@ -18442,7 +18483,8 @@
          "type": "object",
          "required": [
           "data",
-          "count"
+          "count",
+          "total"
          ],
          "properties": {
           "data": {
@@ -18452,7 +18494,13 @@
            }
           },
           "count": {
-           "type": "integer"
+           "type": "integer",
+           "description": "Rows in this page"
+          },
+          "total": {
+           "type": "integer",
+           "description": "Rows matching the filter",
+           "for paging": null
           }
          }
         }
@@ -19022,7 +19070,7 @@
        "type": "string",
        "format": "date"
       },
-      "description": "Defaults to today (UTC)"
+      "description": "The local day; today in tz by default"
      },
      {
       "name": "quote",
@@ -19032,6 +19080,15 @@
        "type": "string",
        "pattern": "^[A-Z]{3}$"
       }
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the default day is today there"
      }
     ],
     "responses": {
@@ -19140,7 +19197,17 @@
       "schema": {
        "type": "string",
        "format": "date"
-      }
+      },
+      "description": "The local day; today in tz by default"
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the default day is today there"
      }
     ],
     "responses": {
@@ -19923,7 +19990,7 @@
       }
      },
      "404": {
-      "description": "Money module disabled, or the job is not the caller's",
+      "description": "Money module disabled, or the job is not the caller's (parse_job)",
       "content": {
        "application/json": {
         "schema": {
@@ -20037,7 +20104,7 @@
       }
      },
      "404": {
-      "description": "Money module disabled, or the job is not the caller's",
+      "description": "Money module disabled, or the job is not the caller's (parse_job)",
       "content": {
        "application/json": {
         "schema": {
@@ -20236,6 +20303,17 @@
       "BearerAuth": []
      }
     ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the default day is today there"
+     }
+    ],
     "requestBody": {
      "required": true,
      "content": {
@@ -20255,7 +20333,7 @@
          "date": {
           "type": "string",
           "format": "date",
-          "description": "A day of the period; defaults to today (UTC)"
+          "description": "A day of the period; today in tz by default"
          }
         }
        }
@@ -21135,6 +21213,7 @@
        "type": "string",
        "enum": [
         "open",
+        "in_progress",
         "done"
        ]
       }
@@ -21168,7 +21247,17 @@
       "schema": {
        "type": "string",
        "format": "date"
-      }
+      },
+      "description": "Tasks completed on or after this day, read in tz"
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the day done_since starts in"
      },
      {
       "name": "trip",
@@ -21243,7 +21332,7 @@
       }
      },
      "400": {
-      "description": "A filter is not a known value or day (invalid_query)",
+      "description": "A filter is not a known value, day or zone (invalid_query)",
       "content": {
        "application/json": {
         "schema": {
@@ -22246,7 +22335,7 @@
       }
      },
      "404": {
-      "description": "Tasks module disabled, or the row is not the caller's",
+      "description": "Tasks module disabled, or the job is not the caller's (parse_job)",
       "content": {
        "application/json": {
         "schema": {
@@ -22357,7 +22446,7 @@
       }
      },
      "404": {
-      "description": "Tasks module disabled, or the row is not the caller's",
+      "description": "Tasks module disabled, or the job is not the caller's (parse_job)",
       "content": {
        "application/json": {
         "schema": {
@@ -22841,6 +22930,17 @@
       "BearerAuth": []
      }
     ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the default day is today there"
+     }
+    ],
     "requestBody": {
      "required": true,
      "content": {
@@ -22857,7 +22957,7 @@
          "date": {
           "type": "string",
           "format": "date",
-          "description": "Defaults to today in UTC"
+          "description": "The local day; today in tz by default"
          },
          "note": {
           "type": "string",
@@ -24552,7 +24652,16 @@
        "type": "string",
        "format": "date"
       },
-      "description": "The last day; today in UTC by default"
+      "description": "The last day; today in tz by default"
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the default day is today there"
      }
     ],
     "responses": {
@@ -27264,7 +27373,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 398206,
-  "source_fnv1a64": "8fb3173e3b867597"
+  "source_bytes": 401102,
+  "source_fnv1a64": "e30aef950453cc6e"
  }
 }

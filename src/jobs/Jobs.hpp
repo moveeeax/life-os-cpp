@@ -12,6 +12,8 @@
 
 #pragma once
 
+#include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -69,6 +71,9 @@ private:
     // sites live in Jobs.cpp, and shared_ptr's type-erased deleter keeps the
     // implicit ~JobQueue() valid against the incomplete type.
     std::shared_ptr<sw::redis::Redis> blocking_client_;  // for BRPOP (long socket_timeout)
+    // Where the next multi-type pick starts its round over the types; every
+    // call advances it, so no type is always asked first (move_one_of_).
+    std::atomic<std::size_t> pick_rotation_{0};
 
 public:
     void initialize(long result_ttl = 86400, int max_retries = kDefaultMaxRetries);
@@ -115,17 +120,18 @@ public:
 
     /**
      * @brief Pick the next job from one or more queues (blocking pop).
-     * @details Uses BRPOPLPUSH (or multi-key BRPOP + RPUSH fallback) to move
-     *          the id atomically from the live queue into the worker's
-     *          per-worker processing list, so a worker crashing between
+     * @details The id moves from the live queue into the worker's per-worker
+     *          processing list in one Redis command (BRPOPLPUSH, or RPOPLPUSH
+     *          for a queue that is not empty), so a worker crashing between
      *          "got id" and "set status=processing" doesn't lose the job:
-     *          recover_processing() on startup pushes leftovers back.
-     *          Only single-type picks get true atomicity; multi-type picks
-     *          fall back to BRPOP + explicit RPUSH to processing list
-     *          (a narrow window remains but shrinks from "full processing"
-     *          to a single command — acceptable trade-off).
-     * @param types Queue types to pop from
-     * @param timeout_sec BRPOP timeout (0 = block forever)
+     *          recover_processing() on startup pushes leftovers back. With
+     *          one type that is a single BRPOPLPUSH for the whole timeout;
+     *          with several, the types are tried in rotation in one-second
+     *          slices (a non-blocking pass over all of them, then a blocking
+     *          wait on one), so the move stays atomic and a busy type cannot
+     *          starve the others, at the cost of up to a slice of latency.
+     * @param types Queue types to pop from (empty = nothing to pick)
+     * @param timeout_sec How long to wait in all (0 = block forever)
      * @param worker_id Worker claiming this job
      * @return Job if one was available, nullopt on timeout
      */
@@ -284,6 +290,17 @@ public:
 
 private:
     void check_initialized() const;
+
+    /**
+     * @brief The multi-type half of pick(): move one id from the first
+     *        non-empty queue among @p types into @p proc_list, one
+     *        RPOPLPUSH / BRPOPLPUSH at a time (see the body for the rotation
+     *        and the slices). nullopt once @p timeout_sec has passed.
+     */
+    std::optional<std::string> move_one_of_(sw::redis::Redis& redis,
+                                            const std::vector<std::string>& types,
+                                            const std::string& proc_list,
+                                            long timeout_sec);
 
     // Drop a job's visibility lease (no-op when the feature is off or the lease
     // is already gone). Called from every terminal/transition path so the reaper

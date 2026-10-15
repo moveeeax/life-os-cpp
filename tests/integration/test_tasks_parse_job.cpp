@@ -232,6 +232,23 @@ TEST_F(TasksParseJobTest, AFailBeforeTheClaimClosesAQueuedRow) {
     EXPECT_EQ((*jobs.get(kAnna, id))["status"], "failed");
 }
 
+TEST_F(TasksParseJobTest, AQueuedRowTheQueueLostReadsAsFailedUntilADeliveryClaimsIt) {
+    const std::string id = job("buy water");
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE task_parse_jobs SET created_at = now() - interval '11 minutes' WHERE id = $1::uuid",
+                        id);
+        return true;
+    });
+    const json polled = *jobs.get(kAnna, id);
+    EXPECT_EQ(polled["status"], "failed") << "a page polling a row the queue lost must stop waiting";
+    EXPECT_EQ(polled["error"].get<std::string>().rfind("queue_lost", 0), 0u) << polled.dump();
+
+    // The row stayed queued underneath: a late delivery still claims and finishes it.
+    provider.replies.push_back({200, completion(json{{"lines", {{{"title", "Buy water"}, {"area", "projects"}}}}})});
+    EXPECT_EQ(run(id)["status"], "done");
+    EXPECT_EQ((*jobs.get(kAnna, id))["status"], "done");
+}
+
 TEST_F(TasksParseJobTest, AFailBeforeTheClaimLeavesALiveRunningRowAlone) {
     const std::string id = job("buy water");
     ASSERT_EQ(jobs.start(id), 1) << "a worker holds the row";

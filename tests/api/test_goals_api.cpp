@@ -7,6 +7,7 @@
  */
 
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -197,6 +198,35 @@ TEST_F(GoalsApiTest, ANumberGoalWithCheckinsOnePerDate) {
                   ->statusCode(),
               k400BadRequest)
         << "work is not an area";
+}
+
+TEST_F(GoalsApiTest, ACheckinWithoutADateLandsOnTodayInTheGivenZone) {
+    // Kiritimati is UTC+14 and Pago Pago UTC-11: at any hour one of them is on another date than UTC.
+    const auto [zone, local, utc] = Database::get().execute_read([](auto& txn) {
+        auto r = txn.exec(
+            "SELECT z, to_char(now() AT TIME ZONE z, 'YYYY-MM-DD'), to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD') "
+            "FROM unnest(ARRAY['Pacific/Kiritimati', 'Pacific/Pago_Pago']) AS z "
+            "WHERE (now() AT TIME ZONE z)::date <> (now() AT TIME ZONE 'UTC')::date LIMIT 1");
+        return std::make_tuple(
+            r[0][0].template as<std::string>(), r[0][1].template as<std::string>(), r[0][2].template as<std::string>());
+    });
+    ASSERT_NE(local, utc);
+    const json g = goal({{"title", "Weight 75 kg"},
+                         {"area", "health"},
+                         {"kind", "number"},
+                         {"start_date", "2020-01-01"},
+                         {"due", "2030-12-31"},
+                         {"start_value", 93},
+                         {"target_value", 75},
+                         {"unit", "kg"}});
+    const auto there =
+        call_id(goals, &Api::GoalsController::putCheckin, kAnna, Post, g["id"], json{{"value", 90}}, {{"tz", zone}});
+    ASSERT_EQ(there->statusCode(), k201Created) << there->body();
+    EXPECT_EQ(body_of(there)["data"]["date"], local);
+    const auto plain = call_id(goals, &Api::GoalsController::putCheckin, kAnna, Post, g["id"], json{{"value", 89}});
+    ASSERT_EQ(plain->statusCode(), k201Created) << plain->body();
+    EXPECT_EQ(body_of(plain)["data"]["date"], utc) << "no tz: UTC";
+    EXPECT_EQ(detail(g["id"])["checkins"].size(), 2u) << "two days, two check-ins";
 }
 
 TEST_F(GoalsApiTest, StepsAndCountByTheirTasks) {

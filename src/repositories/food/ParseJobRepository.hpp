@@ -30,6 +30,18 @@ public:
                           const std::string& text,
                           const std::string& meal,
                           const std::string& date) {
+        return create(owner, text, meal, date, [](auto&, const std::string&) {});
+    }
+
+    /// A queued job, with @p in_txn(txn, id) run in the same transaction right
+    /// after the insert: the outbox row of its queue job rides the commit
+    /// (Jobs::Outbox::enqueue_if_drained), so a crash leaves no row without a job.
+    template <typename InTxn>
+    nlohmann::json create(const std::string& owner,
+                          const std::string& text,
+                          const std::string& meal,
+                          const std::string& date,
+                          InTxn&& in_txn) {
         return Database::get().execute_write([&](auto& txn) {
             auto r = txn.exec_params(
                 "INSERT INTO food_parse_jobs (owner_id, text, meal, date) VALUES ($1::uuid, $2, $3, $4::date) "
@@ -38,7 +50,9 @@ public:
                 text,
                 meal,
                 date);
-            return *find_in(txn, owner, r[0][0].template as<std::string>());
+            const std::string id = r[0][0].template as<std::string>();
+            in_txn(txn, id);
+            return *find_in(txn, owner, id);
         });
     }
 
@@ -67,7 +81,7 @@ public:
     /// The row's status now; nullopt when the row is gone.
     std::optional<std::string> status(const std::string& id) { return JobRows::status(kTable, id); }
 
-    /// Jobs of the owner that are queued or running (a stale running row is not counted).
+    /// Jobs of the owner that are queued or running (a stale queued or running row is not counted).
     long open_count(const std::string& owner) { return JobRows::open_count(kTable, owner); }
 
     /// running -> queued, for an outage the queue will retry; only by the holder of @p attempt.

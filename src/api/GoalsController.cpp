@@ -355,7 +355,8 @@ void GoalsController::putCheckin(const HttpRequestPtr& req, Callback&& callback,
         callback(Validation::response_400(errs));
         return;
     }
-    const std::string date = Validation::opt_string(body, "date").value_or(today_utc());
+    const std::string date =
+        Validation::opt_string(body, "date").value_or(local_today(req, &Repositories::Zones::today_in, today_utc()));
     with_repo_errors(callback, "goals.putCheckin", [&] {
         const json row = GoalRepository().put_checkin(
             owner, id, date, *opt_number(body, "value"), Validation::opt_string(body, "note").value_or(""));

@@ -31,6 +31,18 @@ public:
                           const std::string& text,
                           const std::string& hint_date,
                           const std::optional<std::string>& note_id) {
+        return create(owner, text, hint_date, note_id, [](auto&, const std::string&) {});
+    }
+
+    /// With @p in_txn(txn, id) run in the same transaction right after the
+    /// insert: the outbox row of its queue job rides the commit
+    /// (Jobs::Outbox::enqueue_if_drained), so a crash leaves no row without a job.
+    template <typename InTxn>
+    nlohmann::json create(const std::string& owner,
+                          const std::string& text,
+                          const std::string& hint_date,
+                          const std::optional<std::string>& note_id,
+                          InTxn&& in_txn) {
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
@@ -44,7 +56,9 @@ public:
                         text,
                         hint_date,
                         note_id);
-                    return *find_in(txn, owner, r[0][0].template as<std::string>());
+                    const std::string id = r[0][0].template as<std::string>();
+                    in_txn(txn, id);
+                    return *find_in(txn, owner, id);
                 });
             },
             &detail::translate);
@@ -146,7 +160,7 @@ public:
             &detail::translate);
     }
 
-    /// Jobs of the owner that are queued or running (a stale running row is not counted).
+    /// Jobs of the owner that are queued or running (a stale queued or running row is not counted).
     long open_count(const std::string& owner) { return JobRows::open_count(kTable, owner); }
 
     /// The note a job came from, if any.

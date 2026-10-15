@@ -2,10 +2,12 @@
  * @file Role.hpp
  * @brief Role + Permission bitmask.
  *
- * Add new permissions by carving out unused bits (0x02, 0x04, ...). Keep
- * ADMINISTER = 0xff so existing admin checks automatically authorise any
- * permission you add — until you explicitly want a permission that admins
- * shouldn't have, in which case carve it out and document it here.
+ * Add new permissions by carving out unused low bits (0x10, 0x20, ...).
+ * ADMINISTER is the dedicated sentinel bit 0x40000000, not "all bits":
+ * Security::Auth::current_user_can (security/Auth.cpp) short-circuits to
+ * true when the principal holds it, so an admin passes every permission
+ * check without the feature bits being set on the role. A permission that
+ * admins must not have would need an explicit exclusion there; none exists.
  */
 
 #pragma once
@@ -26,7 +28,7 @@ namespace Domain {
 namespace Permission {
 inline constexpr std::uint32_t kNone = 0x00;
 inline constexpr std::uint32_t kGeneral = 0x01;      // GENERAL
-inline constexpr std::uint32_t kAuditRead = 0x02;    // read the audit trail (GET /api/admin/audit)
+inline constexpr std::uint32_t kAuditRead = 0x02;    // read the audit trail (GET /api/v1/admin/audit)
 inline constexpr std::uint32_t kFitnessRead = 0x04;  // read /api/v1/fitness/* (data routes)
 inline constexpr std::uint32_t kFitnessSync = 0x08;  // fitness probe + sync enqueue/status
 // ADMINISTER is a DEDICATED sentinel bit, not 0xff "all bits": with the old

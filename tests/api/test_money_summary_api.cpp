@@ -8,6 +8,7 @@
  */
 
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -240,6 +241,22 @@ TEST_F(MoneySummaryApiTest, DaysBeforeTheFirstRateArePartial) {
     EXPECT_EQ(d["days"].size(), 90u);
     EXPECT_TRUE(d["days"].front()["partial"].get<bool>()) << "KZT had no quote yet";
     EXPECT_FALSE(d["days"].back()["partial"].get<bool>());
+}
+
+TEST_F(MoneySummaryApiTest, WithoutADateTheSummaryEndsOnTodayInTheGivenZone) {
+    // Kiritimati is UTC+14 and Pago Pago UTC-11: at any hour one of them is on another date than UTC.
+    const auto [zone, local, utc] = Database::get().execute_read([](auto& txn) {
+        auto r = txn.exec(
+            "SELECT z, to_char(now() AT TIME ZONE z, 'YYYY-MM-DD'), to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD') "
+            "FROM unnest(ARRAY['Pacific/Kiritimati', 'Pacific/Pago_Pago']) AS z "
+            "WHERE (now() AT TIME ZONE z)::date <> (now() AT TIME ZONE 'UTC')::date LIMIT 1");
+        return std::make_tuple(
+            r[0][0].template as<std::string>(), r[0][1].template as<std::string>(), r[0][2].template as<std::string>());
+    });
+    ASSERT_NE(local, utc);
+    EXPECT_EQ(ok({{"tz", zone}})["date"], local);
+    EXPECT_EQ(ok({})["date"], utc) << "no tz: UTC";
+    EXPECT_EQ(ok({{"tz", zone}, {"date", kDay}})["date"], kDay) << "a given date wins";
 }
 
 TEST_F(MoneySummaryApiTest, BadQueries) {

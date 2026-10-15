@@ -21,6 +21,28 @@ run inside a transaction (`CREATE INDEX CONCURRENTLY`, …) opts out with a
 `-- migrate:no-transaction` marker anywhere in the file — that file is then
 applied in autocommit mode.
 
+## Expand and contract
+
+Migration N runs against binary N-1. In production the API's init container
+applies the new files while the previous API pod still serves requests, and
+the worker is upgraded later, after the API (`docs/RUNBOOK.md`, "Upgrade
+order"); a rollback keeps the new schema under the old binary, because
+migrations are forward-only. So every migration must leave the previous
+release working:
+
+- A release may only *expand* the schema: add a table, add a nullable column
+  or one with a default, add an index (`CONCURRENTLY` with
+  `-- migrate:no-transaction` on a large table), add a constraint as
+  `NOT VALID` and validate it in a later statement, backfill in batches.
+- A destructive step (`DROP TABLE`, `DROP COLUMN`, `RENAME`, `NOT NULL` on an
+  existing column, `ALTER COLUMN ... TYPE` on a large table, tightening a
+  `CHECK`) goes into a *later* release, after no deployed binary reads or
+  writes the old shape. Two releases, two migrations.
+- A migration that must not run while the old binary serves (a long lock on a
+  hot table) is a reason to scale the API to 0 first, written down in the PR.
+
+The PR template asks for this in its "Migrations" line.
+
 ## Ops
 
 - `./life_os_cpp --verify-migrations` — list pending files without

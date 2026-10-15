@@ -28,7 +28,8 @@ subsections in Keep-a-Changelog order when missing — and deletes the
 consumed files; the deletions are committed with the release.
 
 `./scripts/assemble-changelog.sh --check` validates fragment format
-without touching anything; CI runs it in the quick gate job. Fragments are
+without touching anything; CI runs it in the gates job (`openapi-drift` in
+`.github/workflows/ci.yml`, next to the other `check-*` scripts). Fragments are
 OPTIONAL: editing `[Unreleased]` directly remains legal (a fragment is
 preferred because it cannot conflict). This README is ignored by the
 assembler.

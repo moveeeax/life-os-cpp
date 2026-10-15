@@ -42,7 +42,9 @@ protected:
                                               "leaseq",
                                               "deferq",
                                               "hookq",
-                                              "hookq-throws"};
+                                              "hookq-throws",
+                                              "multiq-a",
+                                              "multiq-b"};
 
     std::vector<std::string> job_ids_to_cleanup;
 
@@ -522,6 +524,50 @@ TEST_F(JobsIntegrationTest, VisibilityTimeoutReapsExpiredLease) {
     auto p2 = Jobs::get().pick({"leaseq"}, 2, "wkr-1");
     ASSERT_TRUE(p2);
     EXPECT_EQ(p2->id, job.id);
+}
+
+// Several types: the id moves from whichever queue holds it straight into the
+// worker's processing list, one command, no window for a crash to lose it.
+TEST_F(JobsIntegrationTest, MultiTypePickTakesTheSecondTypeWhenTheFirstQueueIsEmpty) {
+    auto job = Jobs::get().submit("multiq-b", {{"n", 2}});
+    track(job.id);
+
+    auto picked = Jobs::get().pick({"multiq-a", "multiq-b"}, 2, "mw-0");
+    ASSERT_TRUE(picked);
+    EXPECT_EQ(picked->id, job.id);
+    EXPECT_EQ(picked->type, "multiq-b");
+    EXPECT_EQ(picked->status, "processing");
+    EXPECT_EQ(picked->worker_id, "mw-0");
+
+    // Right after the pick the id is on the processing list and nowhere else.
+    std::vector<std::string> proc;
+    Cache::get().get_client().lrange(Jobs::processing_key("mw-0"), 0, -1, std::back_inserter(proc));
+    EXPECT_EQ(proc, std::vector<std::string>{job.id});
+    std::vector<std::string> queue;
+    Cache::get().get_client().lrange(Jobs::queue_key("multiq-b"), 0, -1, std::back_inserter(queue));
+    EXPECT_TRUE(queue.empty());
+    Jobs::get().complete(job.id, {{"ok", true}});
+
+    // Two empty queues: the pick waits out its timeout and returns nothing.
+    EXPECT_FALSE(Jobs::get().pick({"multiq-a", "multiq-b"}, 1, "mw-0"));
+}
+
+// The start of the round rotates per call: with both queues busy, two picks
+// take one job of each type, so the first type listed cannot starve the other.
+TEST_F(JobsIntegrationTest, MultiTypePickRotatesBetweenBusyTypes) {
+    auto a = Jobs::get().submit("multiq-a", {{"n", 1}});
+    track(a.id);
+    auto b = Jobs::get().submit("multiq-b", {{"n", 2}});
+    track(b.id);
+
+    auto first = Jobs::get().pick({"multiq-a", "multiq-b"}, 2, "mw-1");
+    auto second = Jobs::get().pick({"multiq-a", "multiq-b"}, 2, "mw-1");
+    ASSERT_TRUE(first);
+    ASSERT_TRUE(second);
+    const std::set<std::string> types{first->type, second->type};
+    EXPECT_EQ(types, (std::set<std::string>{"multiq-a", "multiq-b"}));
+    Jobs::get().complete(first->id, {{"ok", true}});
+    Jobs::get().complete(second->id, {{"ok", true}});
 }
 
 TEST_F(JobsIntegrationTest, CompleteClearsVisibilityLease) {

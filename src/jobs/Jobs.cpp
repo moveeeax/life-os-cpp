@@ -9,7 +9,9 @@
 
 #include "jobs/Jobs.hpp"
 
+#include <algorithm>
 #include <chrono>
+#include <cstddef>
 #include <iterator>
 #include <stdexcept>
 #include <utility>
@@ -128,6 +130,9 @@ std::optional<Job> JobQueue::pick(const std::vector<std::string>& types,
     const std::string proc_list = processing_key(worker_id);
     std::string job_id;
 
+    if (types.empty()) {
+        return std::nullopt;
+    }
     if (types.size() == 1) {
         // BRPOPLPUSH is atomic: id moves from queue → processing list in
         // one round-trip. redis-plus-plus exposes this as brpoplpush.
@@ -136,30 +141,12 @@ std::optional<Job> JobQueue::pick(const std::vector<std::string>& types,
             return std::nullopt;
         job_id = *moved;
     } else {
-        // Multi-key blocking pop has no atomic move variant in classic
-        // Redis (BLMPOP exists in 7.0+ but the client doesn't expose it
-        // uniformly). Accept a small window: BRPOP → RPUSH to processing.
-        std::vector<std::string> keys;
-        keys.reserve(types.size());
-        for (const auto& t : types)
-            keys.push_back(queue_key(t));
-        auto result = brpop_redis.brpop(keys.begin(), keys.end(), timeout_sec);
-        if (!result)
+        // Several types: one BRPOPLPUSH at a time, in rotation, so the move
+        // stays atomic here too (see move_one_of_).
+        auto moved = move_one_of_(brpop_redis, types, proc_list, timeout_sec);
+        if (!moved)
             return std::nullopt;
-        job_id = result->second;
-        try {
-            redis.rpush(proc_list, job_id);
-        } catch (...) {
-            // The id is already off the queue. If we can't record it in the
-            // processing list it would be stranded (neither queued nor
-            // tracked, so recovery can't rescue it) — put it back on its
-            // queue (result->first) instead of silently losing the job.
-            try {
-                redis.rpush(result->first, job_id);
-            } catch (...) {}
-            spdlog::warn("Job {} pick: failed to record in processing list — requeued", job_id);
-            return std::nullopt;
-        }
+        job_id = *moved;
     }
 
     // Fetch job data
@@ -617,6 +604,46 @@ void JobQueue::shutdown() {
 void JobQueue::check_initialized() const {
     if (!initialized_) {
         throw std::runtime_error("JobQueue not initialized");
+    }
+}
+
+std::optional<std::string> JobQueue::move_one_of_(sw::redis::Redis& redis,
+                                                  const std::vector<std::string>& types,
+                                                  const std::string& proc_list,
+                                                  long timeout_sec) {
+    // Redis has no blocking pop over several keys that also pushes (BLMPOP on
+    // 7.0+ does not, and the client's support for it is not pinned), and the
+    // old BRPOP + RPUSH pair had a window in which a crash lost the id. So
+    // the id always moves with one RPOPLPUSH / BRPOPLPUSH:
+    //   1. a pass over every queue without blocking, starting at a per-call
+    //      rotation, so a busy type cannot starve the others;
+    //   2. a blocking wait of one slice on the pass's first type; the next
+    //      pass starts one type later.
+    // A job that lands on any queue during the wait is taken by the next pass,
+    // so the added latency is at most one slice. The slice stays well under
+    // the blocking client's socket timeout (brpop_timeout + 2 s, see
+    // init_blocking_client), and the passes stop at the caller's timeout
+    // (0 = wait forever, as BRPOP did).
+    using clock = std::chrono::steady_clock;
+    constexpr long kSliceSec = 1;
+    const auto deadline = clock::now() + std::chrono::seconds(timeout_sec);
+    std::size_t start = pick_rotation_.fetch_add(1, std::memory_order_relaxed) % types.size();
+    for (;;) {
+        for (std::size_t i = 0; i < types.size(); ++i) {
+            const auto& type = types[(start + i) % types.size()];
+            if (auto moved = redis.rpoplpush(queue_key(type), proc_list))
+                return *moved;
+        }
+        long slice = kSliceSec;
+        if (timeout_sec > 0) {
+            const auto left = std::chrono::ceil<std::chrono::seconds>(deadline - clock::now()).count();
+            if (left <= 0)
+                return std::nullopt;
+            slice = std::min<long>(slice, static_cast<long>(left));
+        }
+        if (auto moved = redis.brpoplpush(queue_key(types[start]), proc_list, std::chrono::seconds(slice)))
+            return *moved;
+        start = (start + 1) % types.size();
     }
 }
 
