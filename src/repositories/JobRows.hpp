@@ -110,12 +110,15 @@ inline std::string while_claimed(int n) {
 
 /// Appended to a fail, with the attempt as parameter $n. Attempt 0 means the
 /// job failed before its claim (module off, no settings, queue down, queue
-/// gave up): a queued or running row fails. After a claim only the holder's
-/// own running row does. A done or failed row stays as it is.
+/// gave up): a queued row fails, and so does a stale running one. A running
+/// row within kStaleRunning belongs to a live worker, which finishes it on its
+/// own; a fail without the claim leaves it alone. After a claim only the
+/// holder's own running row fails. A done or failed row stays as it is.
 inline std::string while_open(int n) {
     const std::string p = "$" + std::to_string(n) + "::int";
-    return " AND ((" + p + " = 0 AND status IN ('queued', 'running')) OR (status = 'running' AND attempts = " + p +
-           "))";
+    return " AND ((" + p +
+           " = 0 AND (status = 'queued' OR (status = 'running' AND COALESCE(started_at, created_at) < " +
+           "now() - interval '" + kStaleRunning + "'))) OR (status = 'running' AND attempts = " + p + "))";
 }
 
 /// The status as a reader sees it: a `running` row past kStaleRunning was left

@@ -245,6 +245,26 @@ TEST_F(JobsIntegrationTest, PromoteSkipsACancelledJob) {
     EXPECT_TRUE(delayed.empty()) << "the spent entry is removed";
 }
 
+TEST_F(JobsIntegrationTest, CancelDropsADeferredJob) {
+    auto job = Jobs::get().submit("cancelq", {});
+    track(job.id);
+    ASSERT_TRUE(Jobs::get().pick({"cancelq"}, 2, "w1"));
+    Jobs::get().defer(job.id, /*delay_ms=*/1000, "the row is running elsewhere");
+
+    EXPECT_TRUE(Jobs::get().cancel(job.id));
+    EXPECT_EQ(Jobs::get().get_status(job.id)->status, "failed");
+
+    // The delayed set must not hand the job back to the queue once its wait is over.
+    std::vector<std::string> delayed;
+    Cache::get().get_client().zrange(Jobs::delayed_key(), 0, -1, std::back_inserter(delayed));
+    EXPECT_TRUE(delayed.empty()) << "a cancelled job left in jobs:delayed would be promoted and run";
+    std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+    EXPECT_EQ(Jobs::get().promote_due_jobs(), 0);
+    std::vector<std::string> queue_contents;
+    Cache::get().get_client().lrange(Jobs::queue_key("cancelq"), 0, -1, std::back_inserter(queue_contents));
+    EXPECT_TRUE(queue_contents.empty());
+}
+
 TEST_F(JobsIntegrationTest, CancelCompletedJobReturnsFalse) {
     auto job = Jobs::get().submit("cancelq", {});
     track(job.id);
