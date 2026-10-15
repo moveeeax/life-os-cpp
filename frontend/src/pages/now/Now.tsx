@@ -80,9 +80,9 @@ function useMinute(): Date {
 }
 
 /**
- * Now: the picture, the clock, a greeting, the day's one focus and up to
- * three quiet lines when something is off. Paints from the last answer of
- * the day at once.
+ * Now: the picture, the clock, a greeting, the day's one focus, the weather
+ * top right, the dock of the day's state at the bottom and the action
+ * corners. Paints from the last answer of the day at once.
  */
 export function NowPage() {
   const nav = useGlassNav();
@@ -124,20 +124,18 @@ function NowScreen() {
         {weather.data ? (
           // The weather takes the place of the zone: the city says where.
           <span className="n-weather">
-            {weatherLine(weather.data).place}{' '}
-            <span className="num">{weatherLine(weather.data).degrees}</span>{' '}
-            {weatherGlyph(weather.data.code, weather.data.is_day) ? (
-              <span
-                className="n-glyph"
-                role="img"
-                aria-label={weather.data.words}
-                title={weather.data.words}
-              >
-                {weatherGlyph(weather.data.code, weather.data.is_day)}
-              </span>
-            ) : (
-              weather.data.words
-            )}
+            <span className="n-deg num">{weatherLine(weather.data).degrees}</span>
+            <span className="n-place">
+              {weatherLine(weather.data).place}, {weather.data.words}
+              {weatherGlyph(weather.data.code, weather.data.is_day) && (
+                <>
+                  {' '}
+                  <span className="n-glyph" aria-hidden="true">
+                    {weatherGlyph(weather.data.code, weather.data.is_day)}
+                  </span>
+                </>
+              )}
+            </span>
           </span>
         ) : (
           tz.replace(/_/g, ' ')
@@ -185,6 +183,7 @@ function NowScreen() {
               ? withoutChip(settings.data.corners, 'habits')
               : settings.data?.corners
           }
+          links={settings.data?.links ?? []}
         />
       )}
       {session.phase !== 'idle' && (

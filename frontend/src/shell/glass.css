@@ -154,9 +154,8 @@
 .g-eye {
   position: fixed;
   z-index: 30;
-  /* Bottom centre: the bottom corners of Now hold its chips. */
-  left: 50%;
-  transform: translateX(-50%);
+  /* Bottom right, under the Tasks corner of Now; the dock takes the centre. */
+  right: 16px;
   bottom: max(16px, env(safe-area-inset-bottom, 0px));
   font-size: 13px;
   color: var(--g-ink-soft);
