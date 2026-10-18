@@ -61,6 +61,18 @@ export function splitTrips<T extends Pick<TravelTrip, 'start_date' | 'end_date'>
   return { coming, past };
 }
 
+/**
+ * The trip of the headline: one running today, else the soonest ahead. @p coming
+ * is splitTrips' list (end on or after today, soonest start first), so a running
+ * trip, when there is one, sorts first.
+ */
+export function headlineTrip<T extends Pick<TravelTrip, 'start_date'>>(
+  coming: T[],
+  today: string,
+): T | undefined {
+  return coming.find((t) => t.start_date <= today) ?? coming.find((t) => t.start_date > today);
+}
+
 /** "Nov 1" for a day of this year, "Nov 1, 2025" otherwise. */
 export function shortDay(iso: string, today: string): string {
   return formatDay(iso, { yearUnless: today });

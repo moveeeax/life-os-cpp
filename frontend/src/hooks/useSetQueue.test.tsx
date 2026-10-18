@@ -200,6 +200,44 @@ describe('useSetQueue', () => {
     expect(putJson.mock.calls[1][1]).toEqual({ body: { ...body(1), reps: 6 } });
   });
 
+  it('a set deleted while its PUT is in flight is deleted once the PUT lands', async () => {
+    const first = deferred<{ data: WorkoutSet }>();
+    putJson.mockImplementationOnce(() => first.promise);
+    deleteJson.mockResolvedValueOnce(undefined);
+    const { result } = renderHook(() => useSetQueue(SESSION), { wrapper });
+    act(() => result.current.put('a', body(1)));
+    await act(() => result.current.remove('a', false));
+    expect(result.current.queue).toEqual([]);
+    // No DELETE before the PUT settles: it could reach the server first.
+    expect(deleteJson).not.toHaveBeenCalled();
+
+    await act(async () => {
+      first.resolve({ data: savedSet('a', 1) });
+      await first.promise;
+    });
+    await waitFor(() => expect(deleteJson).toHaveBeenCalledWith('/api/v1/workout/sets/a'));
+    const cached = qc.getQueryData<WorkoutSession>(qk.workout.session(SESSION));
+    expect(cached?.exercises[0].sets).toEqual([]);
+  });
+
+  it('a set deleted while its PUT is out stays deleted when the PUT is lost', async () => {
+    const first = deferred<{ data: WorkoutSet }>();
+    putJson.mockImplementationOnce(() => first.promise);
+    deleteJson.mockRejectedValueOnce(new ApiClientError({ status: 404, message: 'gone' }));
+    const { result } = renderHook(() => useSetQueue(SESSION), { wrapper });
+    act(() => result.current.put('a', body(1)));
+    await act(() => result.current.remove('a', false));
+    await act(async () => {
+      first.reject(new ApiClientError({ status: 0, message: 'offline' }));
+      await first.promise.catch(() => undefined);
+    });
+    // The answer was lost, so the set may be stored: a DELETE goes out, a 404 is fine.
+    await waitFor(() => expect(deleteJson).toHaveBeenCalledTimes(1));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(putJson).toHaveBeenCalledTimes(1);
+    expect(result.current.queue).toEqual([]);
+  });
+
   it('drops rejected sets of other sessions on mount, keeps unsent ones', () => {
     localStorage.setItem(
       QUEUE_KEY,

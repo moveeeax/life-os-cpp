@@ -7,6 +7,7 @@ import {
   formatValue,
   KIND_LABEL,
   paceWord,
+  weeklyPace,
   type Goal,
   type GoalKind,
   type Tone,
@@ -46,14 +47,11 @@ function Facts({ goal }: { goal: Goal }) {
   const p = goal.progress;
   let facts: [string, string][] = [];
   if (goal.kind === 'number') {
-    const perWeek = p.per_week ?? 0;
+    const pace = weeklyPace(p.progress, p.per_week, goal.unit);
     facts = [
       [formatValue(p.current ?? 0, goal.unit), 'now'],
       [formatValue(p.expected ?? 0, goal.unit), 'expected today'],
-      [
-        `${perWeek > 0 ? '+' : '−'}${formatValue(Math.abs(perWeek), goal.unit)}`,
-        'a week to make it',
-      ],
+      [pace.value, pace.label],
     ];
   } else if (goal.kind === 'steps') {
     facts = [
@@ -357,7 +355,15 @@ export function GoalsPage() {
   return (
     <SectionFrame
       eyebrow="Goals"
-      headline={active.data ? <span data-num-ok>{active.data.length} active</span> : 'Goals'}
+      headline={
+        active.data ? (
+          <>
+            <Num>{active.data.length}</Num> active
+          </>
+        ) : (
+          'Goals'
+        )
+      }
       tools={
         <>
           <span className="k-grow" />
@@ -391,7 +397,7 @@ export function GoalsPage() {
       {closed.length > 0 && (
         <details className="k-details">
           <summary>
-            Done and dropped (<span data-num-ok>{closed.length}</span>)
+            Done and dropped (<Num>{closed.length}</Num>)
           </summary>
           <div className="k-group-rows">
             {closed.map((g) => (

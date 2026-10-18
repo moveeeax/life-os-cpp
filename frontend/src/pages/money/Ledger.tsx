@@ -435,7 +435,9 @@ export function MoneyLedgerPage() {
   };
 
   const currencies = useCurrencies().data;
-  const accounts = useAccounts().data ?? [];
+  // Archived accounts too: their rows still need a name, and the Accounts page
+  // links an archived account's rows here as ?account=<id>.
+  const accounts = useAccounts(true).data ?? [];
   const categories = useCategories(true).data ?? [];
   const inbox = useInbox();
   const list = useTransactions({
@@ -497,6 +499,7 @@ export function MoneyLedgerPage() {
                     {accounts.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.name}
+                        {a.archived ? ' (archived)' : ''}
                       </option>
                     ))}
                   </select>

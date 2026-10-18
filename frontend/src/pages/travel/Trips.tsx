@@ -6,6 +6,7 @@ import {
   countdownWords,
   countryName,
   daysBetween,
+  headlineTrip,
   splitTrips,
   type TravelTrip,
   shortDay,
@@ -77,7 +78,8 @@ export function TravelTripsPage() {
   const [adding, setAdding] = useState(false);
   const navigate = useNavigate();
   const { coming, past } = splitTrips(trips.data ?? [], today);
-  const next = coming.find((t) => t.start_date >= today) ?? coming[0];
+  // A running trip wins over the next one ahead.
+  const next = headlineTrip(coming, today);
   return (
     <TravelFrame
       title="Trips"

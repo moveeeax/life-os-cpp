@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { Modal } from '@/components/Modal';
 import { useUpdateTask } from '@/hooks/useTasks';
 import { useNotesEnabled } from '@/hooks/useNotes';
-import { areaOf, dueLabel, EFFORT_LABEL, safeLink, type Task } from '@/lib/tasks';
+import { areaOf, dueLabel, EFFORT_LABEL, isDueDate, safeLink, type Task } from '@/lib/tasks';
 import { cn } from '@/lib/utils';
 
 import { NoteSheet } from '../notes/NoteSheet';
@@ -139,31 +139,14 @@ export function TaskRow({
                 Move date
               </button>
             ) : (
-              <span className="flex items-center gap-2">
-                <input
-                  type="date"
-                  autoFocus
-                  defaultValue={task.due ?? ''}
-                  aria-label="New due date"
-                  onChange={(e) => {
-                    update.mutate({ due: e.target.value || null });
-                    setMoving(false);
-                  }}
-                  className="h-7 rounded-md border border-gray-200 bg-transparent px-2 text-theme-xs dark:border-white/10"
-                />
-                {task.due && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      update.mutate({ due: null });
-                      setMoving(false);
-                    }}
-                    className="text-theme-xs k-muted"
-                  >
-                    No date
-                  </button>
-                )}
-              </span>
+              <MoveDate
+                due={task.due ?? null}
+                onSave={(due) => {
+                  update.mutate({ due });
+                  setMoving(false);
+                }}
+                onCancel={() => setMoving(false)}
+              />
             )}
             <button
               type="button"
@@ -203,6 +186,64 @@ export function TaskRow({
         />
       )}
     </li>
+  );
+}
+
+/**
+ * The "Move date" editor. A date input reports a valid value after a single
+ * segment keystroke (typing "25" into the day emits the 2nd), so the value is
+ * kept here and saved only on Enter or with Save, never on change.
+ */
+export function MoveDate({
+  due,
+  onSave,
+  onCancel,
+}: {
+  due: string | null;
+  onSave: (due: string | null) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(due ?? '');
+  const ok = value === '' || isDueDate(value);
+  const changed = value !== (due ?? '');
+  return (
+    <form
+      className="flex items-center gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (ok && changed) onSave(value || null);
+        else if (!changed) onCancel();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          onCancel();
+        }
+      }}
+    >
+      <input
+        type="date"
+        autoFocus
+        value={value}
+        min="1900-01-01"
+        max="2100-12-31"
+        aria-label="New due date"
+        aria-invalid={!ok}
+        onChange={(e) => setValue(e.target.value)}
+        className="h-7 rounded-md border border-gray-200 bg-transparent px-2 text-theme-xs dark:border-white/10"
+      />
+      <button type="submit" disabled={!ok || !changed} className="text-theme-xs k-link">
+        Save
+      </button>
+      {due && (
+        <button type="button" onClick={() => onSave(null)} className="text-theme-xs k-muted">
+          No date
+        </button>
+      )}
+      <button type="button" onClick={onCancel} className="text-theme-xs k-muted">
+        Cancel
+      </button>
+    </form>
   );
 }
 

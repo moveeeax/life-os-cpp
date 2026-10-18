@@ -119,6 +119,16 @@ export function weekLine(monday: string): string {
   return `${f(monday)} – ${f(shift(monday, 6))}`;
 }
 
+/** How far back a tick reaches (kTickBackMax in HabitsController.cpp). */
+export const TICK_BACK_DAYS = 366;
+
+/** The oldest day a hand tick still reaches from @p today. */
+export const oldestTickDay = (today: string): string => shift(today, -TICK_BACK_DAYS);
+
+/** Whether the week before the one of @p monday still has a day a tick reaches. */
+export const canGoBack = (monday: string, today: string): boolean =>
+  shift(monday, -1) >= oldestTickDay(today);
+
 export type Cell = 'manual' | 'auto' | 'open' | 'future';
 
 /**

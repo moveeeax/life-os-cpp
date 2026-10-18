@@ -260,6 +260,15 @@ export function useRemoveSessionExercise(sessionId: string, onDone?: () => void)
 
 // ── sets: the unsent queue ──────────────────────────────────────────────────
 
+/** DELETE one set; already gone (404) is as good as deleted. */
+async function deleteSet(id: string) {
+  try {
+    await api.deleteJson<unknown>(`${BASE}/sets/${id}`);
+  } catch (e) {
+    if (!(e instanceof ApiClientError && e.status === 404)) throw e;
+  }
+}
+
 /**
  * Sets are written through a queue kept in localStorage. A set shows up at
  * once and is sent in the background; a failed send is retried with backoff
@@ -274,6 +283,10 @@ export function useSetQueue(sessionId: string) {
   );
   const queueRef = useRef(queue);
   const sending = useRef(false);
+  // The id whose PUT is out now, and the ids deleted while their PUT was out:
+  // that PUT may still land, so the set gets a DELETE once it settles.
+  const inFlight = useRef<string | null>(null);
+  const deletedInFlight = useRef(new Set<string>());
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const alive = useRef(true);
 
@@ -288,11 +301,21 @@ export function useSetQueue(sessionId: string) {
     const next = queueRef.current.find((q) => !q.rejected);
     if (!next) return;
     sending.current = true;
+    inFlight.current = next.id;
     let retryIn: number | null = null;
     try {
       const saved = (
         await api.putJson<{ data: WorkoutSet }>(`${BASE}/sets/${next.id}`, { body: next.body })
       ).data;
+      if (deletedInFlight.current.has(next.id)) {
+        // Deleted while this PUT was out: the set is on the server now, take it off.
+        await deleteSet(next.id).catch(() => undefined);
+        deletedInFlight.current.delete(next.id);
+        patchCachedSession(qc, next.sessionId, (s) => withoutSet(s, next.id));
+        void qc.invalidateQueries({ queryKey: qk.workout.sessions() });
+        retryIn = 0;
+        return;
+      }
       // A refetch that started before the write would bring the session back
       // without this set, after the queue has already let go of it.
       await Promise.all([
@@ -307,7 +330,11 @@ export function useSetQueue(sessionId: string) {
       retryIn = 0;
     } catch (e) {
       const status = e instanceof ApiClientError ? e.status : 0;
-      if (isPermanentFailure(status)) {
+      if (deletedInFlight.current.delete(next.id)) {
+        // A lost answer may still mean a stored set; a refused one means none.
+        if (!isPermanentFailure(status)) await deleteSet(next.id).catch(() => undefined);
+        retryIn = 0;
+      } else if (isPermanentFailure(status)) {
         update((q) => markFailed(q, next.id, apiErrorMessage(e, 'The server refused this set.')));
         retryIn = 0;
       } else {
@@ -316,11 +343,13 @@ export function useSetQueue(sessionId: string) {
       }
     } finally {
       sending.current = false;
+      inFlight.current = null;
+      if (alive.current) {
+        clearTimeout(timer.current);
+        if (retryIn === 0) void pump();
+        else if (retryIn !== null) timer.current = setTimeout(() => void pump(), retryIn);
+      }
     }
-    if (!alive.current) return;
-    clearTimeout(timer.current);
-    if (retryIn === 0) void pump();
-    else timer.current = setTimeout(() => void pump(), retryIn);
   }, [qc, update]);
 
   useEffect(() => {
@@ -348,17 +377,19 @@ export function useSetQueue(sessionId: string) {
     [pump, sessionId, update],
   );
 
-  /** Delete a set: an unsent one just leaves the queue. */
+  /**
+   * Delete a set: an unsent one just leaves the queue; one whose PUT is out
+   * gets its DELETE when that PUT settles.
+   */
   const remove = useCallback(
     async (id: string, onServer: boolean) => {
       update((q) => dropFromQueue(q, id));
-      if (!onServer) return;
-      try {
-        await api.deleteJson<unknown>(`${BASE}/sets/${id}`);
-      } catch (e) {
-        // Already gone is as good as deleted.
-        if (!(e instanceof ApiClientError && e.status === 404)) throw e;
+      if (inFlight.current === id) {
+        deletedInFlight.current.add(id);
+        return;
       }
+      if (!onServer) return;
+      await deleteSet(id);
       patchCachedSession(qc, sessionId, (s) => withoutSet(s, id));
       void qc.invalidateQueries({ queryKey: qk.workout.sessions() });
     },

@@ -7,7 +7,7 @@ import { useAddMilestone, useAddSection, usePutCheckin, useSaveGoal } from '@/ho
 import { useCreateTask, useUpdateTask } from '@/hooks/useTasks';
 import { parseAmount } from '@/lib/amounts';
 import { daysBetween, formatDay } from '@/lib/dates';
-import { formatValue, shelf, type GoalDetail } from '@/lib/goals';
+import { chartPoints, formatValue, shelf, type GoalDetail } from '@/lib/goals';
 import { dueLabel, type Task } from '@/lib/tasks';
 import { cn } from '@/lib/utils';
 import { Meter, Num } from '@/shell/kit';
@@ -29,14 +29,7 @@ function NumberChart({ goal, today }: { goal: GoalDetail; today: string }) {
   const W = 640;
   const H = 200;
   const P = { l: 46, r: 12, t: 12, b: 26 };
-  const points: [string, number][] = [
-    [goal.start_date, goal.start_value ?? 0],
-    ...goal.checkins
-      .slice()
-      .reverse()
-      .filter((c) => c.date !== goal.start_date)
-      .map((c): [string, number] => [c.date, c.value]),
-  ];
+  const points = chartPoints(goal.start_date, goal.start_value, goal.checkins);
   const from = goal.start_value ?? 0;
   const to = goal.target_value ?? 0;
   const values = points.map((p) => p[1]).concat([from, to]);

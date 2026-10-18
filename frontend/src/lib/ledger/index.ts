@@ -353,6 +353,25 @@ export function parseErrorText(error: string | null | undefined): string {
 export const transferNeedsReceived = (from?: string, to?: string): boolean =>
   !!from && !!to && from !== to;
 
+/**
+ * An exchange rate the way it reads: @p rate is @p from per one @p to; below 1
+ * it is turned over (KZT per USD, not 0.0019 USD per KZT), and the number keeps
+ * six significant digits, so a BTC pair does not print as 0.0000.
+ */
+export function rateLine(
+  rate: number,
+  from: string,
+  to: string,
+): { value: string; unit: string } | null {
+  if (!Number.isFinite(rate) || rate <= 0) return null;
+  const flip = rate < 1;
+  const v = flip ? 1 / rate : rate;
+  return {
+    value: v.toLocaleString('en-US', { maximumSignificantDigits: 6 }),
+    unit: flip ? `${to} per ${from}` : `${from} per ${to}`,
+  };
+}
+
 /** The size a photo is drawn at so its long side is at most `max`. */
 export function targetSize(
   width: number,
