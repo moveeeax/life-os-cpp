@@ -1,6 +1,9 @@
-// Row shapes of /api/v1/fitness/* as the API returns them. The OpenAPI spec
-// types `data` as an array of plain objects, so the fields are spelled out
-// here (source: src/repositories/fitness/HealthReadRepository.hpp).
+// Row shapes of /api/v1/fitness/* as the API returns them, taken from the
+// generated OpenAPI types (the *ListResponse schemas in docs/openapi.yaml,
+// which mirror src/repositories/fitness/HealthReadRepository.hpp). SyncRun
+// is still spelled out here.
+
+import type { components } from '@/lib/api/schema.gen';
 
 export interface Page<T> {
   data: T[];
@@ -8,96 +11,21 @@ export interface Page<T> {
   total: number;
 }
 
-export interface DailyActivity {
-  date: string; // YYYY-MM-DD, the device's local day
-  steps: number;
-  distance_m: number | null;
-  active_kcal: number | null;
-  total_kcal: number | null;
-  timezone: string;
-}
+type Schemas = components['schemas'];
+type Row<K extends keyof Schemas> = Schemas[K] extends { data: (infer R)[] } ? R : never;
 
-export interface SleepStage {
-  stage: string; // deep | light | rem | awake
-  minutes: number;
-}
+export type DailyActivity = Row<'DailyActivityListResponse'>;
+export type SleepSession = Row<'SleepListResponse'>;
+export type SleepStage = SleepSession['stages'][number];
+export type HeartRateSample = Row<'HeartRateListResponse'>;
+export type StressSample = Row<'StressListResponse'>;
+export type Spo2Sample = Row<'Spo2ListResponse'>;
+export type BodyMeasurement = Row<'BodyListResponse'>;
+export type Workout = Row<'WorkoutListResponse'>;
+export type DaySummary = Row<'SummaryListResponse'>;
 
-export interface SleepSession {
-  sleep_id: string;
-  start_at: string;
-  end_at: string;
-  duration_minutes: number;
-  time_asleep_minutes: number;
-  time_awake_minutes: number;
-  sleep_score: number | null;
-  sleep_score_source: string | null;
-  is_nap: boolean;
-  timezone: string;
-  stages: SleepStage[];
-}
-
-export interface HeartRateSample {
-  timestamp: string;
-  bpm: number;
-  sample_type: string; // passive | active | resting | manual
-}
-
-export interface StressSample {
-  timestamp: string;
-  stress_score: number;
-  level: string | null;
-}
-
-export interface Spo2Sample {
-  timestamp: string;
-  spo2_pct: number;
-}
-
-export interface BodyMeasurement {
-  timestamp: string;
-  weight_kg: number;
-  bmi: number | null;
-  body_fat_pct: number | null;
-  muscle_mass_kg: number | null;
-  water_pct: number | null;
-  bone_mass_kg: number | null;
-  visceral_fat_score: number | null;
-  basal_metabolism_kcal: number | null;
-  metabolic_age: number | null;
-}
-
-export interface Workout {
-  workout_id: string;
-  activity_type: string;
-  start_at: string;
-  end_at: string | null;
-  duration_minutes: number | null;
-  distance_m: number | null;
-  calories_kcal: number | null;
-  avg_heart_rate_bpm: number | null;
-  max_heart_rate_bpm: number | null;
-  avg_pace_sec_per_km: number | null;
-  max_pace_sec_per_km: number | null;
-  total_steps: number | null;
-}
-
-export interface DaySummary {
-  date: string;
-  steps: number;
-  distance_m: number | null;
-  active_kcal: number | null;
-  sleep_duration_minutes: number | null;
-  sleep_score: number | null;
-  resting_bpm: number | null;
-}
-
-export interface CoverageEntry {
-  first_date: string | null;
-  last_date: string | null;
-  last_sync_at: string | null;
-  records: number;
-}
-export type Coverage = Record<string, CoverageEntry>;
+export type Coverage = Schemas['CoverageResponse']['data'];
+export type CoverageEntry = Coverage[string];
 
 export interface SyncRun {
   id: number;

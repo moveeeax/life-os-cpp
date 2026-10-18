@@ -14,14 +14,14 @@
 # openapi.yaml / frontend package versions; eight for check-helm-render.sh,
 # whose production floor has one case per assertion (fail-open limiter,
 # committed credential, open registration, dev APP_ENV, docs UI on, worker
-# lease off, missing automountServiceAccountToken, NetworkPolicy off); three
+# lease off, missing automountServiceAccountToken, NetworkPolicy off); four
 # for check-config-sync.sh (an unregistered key, a stale doc row, one knob
-# read with two defaults); three for check-module-deps.sh (two forbidden
+# read with two defaults, a chart env missing from compose); three for check-module-deps.sh (two forbidden
 # edges, one declared include cycle); two for check-openapi-breaking.sh (a
 # removed path, a required response property made optional); one each for
 # check-openapi-gen-fresh.sh (a stale tests/e2e/openapi.gen.json),
 # assemble-changelog.sh --check (the changelog-fragment format gate) and
-# prod-check.sh (the rendered production profile). Thirty-three in all.
+# prod-check.sh (the rendered production profile). Thirty-four in all.
 #
 # Every case follows the same discipline (borrowed from the cyber-accountant
 # service's check-render-selftest.sh, which learned it the expensive way):
@@ -744,6 +744,24 @@ with open(path, "w", encoding="utf-8") as fh:
 PY
 }
 
+# 16c. An env the worker chart sets dropped from the compose worker service:
+#      `make up` would run without a knob prod has (the review of 2026-10-18
+#      found three such envs on the worker and twenty on the app).
+break_config_compose_missing_env() {
+    python3 - "$1/docker/docker-compose.yml" <<'PY'
+import re, sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as fh:
+    text = fh.read()
+text, n = re.subn(r"(?m)^\s+JOBS_VISIBILITY_TIMEOUT_SEC:.*\n", "", text)
+if n != 1:
+    sys.exit("break_config_compose_missing_env: removed %d JOBS_VISIBILITY_TIMEOUT_SEC line(s) "
+             "in %s — expected exactly 1" % (n, path))
+with open(path, "w", encoding="utf-8") as fh:
+    fh.write(text)
+PY
+}
+
 # 16b. The same knob read twice with two different literal defaults — the
 #      worker.id drift (worker_main.cpp once read it in two places): the
 #      gate must name the key AND both sites. The planted read uses the
@@ -966,7 +984,7 @@ run_case changelog-broken-fragment 'assemble-changelog.sh --check' break_changel
     'changelog.d/selftest-planted.badtype.md' \
     "unknown type 'badtype'"
 
-CONFIG_SYNC_PATHS="src config/config.json config/config.sample.json docs/CONFIG.md docs/config-sync-allowlist.txt helm/life-os-cpp/templates/deployment.yaml helm/life-os-cpp-worker/templates/deployment.yaml"
+CONFIG_SYNC_PATHS="src config/config.json config/config.sample.json docs/CONFIG.md docs/config-sync-allowlist.txt docker/docker-compose.yml helm/life-os-cpp/templates/deployment.yaml helm/life-os-cpp-worker/templates/deployment.yaml"
 
 run_case config-unregistered-key check-config-sync.sh break_config_unregistered_key \
     "$CONFIG_SYNC_PATHS" \
@@ -984,6 +1002,10 @@ run_case config-default-mismatch check-config-sync.sh break_config_default_misma
     "default-mismatch: config key 'worker.concurrency' (env WORKER_CONCURRENCY)" \
     '2 at src/worker_main.cpp:' \
     '99 at src/core/Core.cpp:'
+
+run_case config-compose-missing-env check-config-sync.sh break_config_compose_missing_env \
+    "$CONFIG_SYNC_PATHS" \
+    "sets env 'JOBS_VISIBILITY_TIMEOUT_SEC' but docker/docker-compose.yml service 'worker' does not"
 
 # --- verdict -----------------------------------------------------------------
 

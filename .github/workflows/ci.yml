@@ -190,10 +190,12 @@ jobs:
       # moving this repo under an org would ship a permanently red gate). The
       # scanner itself is open source, so run the CLI directly: same rules,
       # same .gitleaks.toml, no license and no secrets.
+      # Pinned by digest (the v8.21.2 index): a re-pushed tag cannot swap the
+      # scanner under the gate.
       - name: Run gitleaks
         run: |
           docker run --rm -v "$PWD:/repo" -w /repo \
-            zricethezav/gitleaks:v8.21.2 detect \
+            zricethezav/gitleaks:v8.21.2@sha256:0e99e8821643ea5b235718642b93bb32486af9c8162c8b8731f7cbdc951a7f46 detect \
               --source=/repo --config=/repo/.gitleaks.toml \
               --redact --verbose --exit-code 1
 
@@ -494,8 +496,11 @@ jobs:
         if: steps.scope.outputs.relevant == 'true'
         run: |
           docker network create smoke
+          # postgres:18-alpine pinned by digest (the index on 2026-10-18), so
+          # the smoke runs against the same server until the pin is bumped.
           docker run -d --name smoke-pg --network smoke \
-            -e POSTGRES_USER=app -e POSTGRES_PASSWORD=smoke -e POSTGRES_DB=app postgres:18-alpine
+            -e POSTGRES_USER=app -e POSTGRES_PASSWORD=smoke -e POSTGRES_DB=app \
+            postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
           # The image's entrypoint first starts a temporary server for the init
           # scripts, stops it, then starts the real one: pg_isready answers the
           # temporary server too, and the connection right after it was refused.
