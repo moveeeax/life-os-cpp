@@ -87,7 +87,7 @@ protected:
         });
         Database::get().execute_write([](auto& txn) {
             const std::string o = kOwner;
-            for (const std::string who : {std::string(kOwner), std::string(kBoris)}) {
+            for (const std::string& who : {std::string(kOwner), std::string(kBoris)}) {
                 txn.exec_params("DELETE FROM money_transfers WHERE owner_id = $1::uuid", who);
                 txn.exec_params("DELETE FROM money_transactions WHERE owner_id = $1::uuid", who);
                 txn.exec_params("DELETE FROM money_accounts WHERE owner_id = $1::uuid", who);

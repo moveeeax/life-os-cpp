@@ -467,10 +467,10 @@ TEST_F(AdminBillingApiTest, CreditsRateAndAdjustDeltaAreBounded) {
     EXPECT_EQ(resp->statusCode(), k400BadRequest);
     EXPECT_EQ(settings.get().credits_per_unit, 100);
 
-    for (const json delta : {json(std::numeric_limits<std::int64_t>::max()),
-                             json(std::numeric_limits<std::int64_t>::min()),
-                             json(std::uint64_t{1} << 63),
-                             json(1'000'000'000'001LL)}) {
+    for (const json& delta : {json(std::numeric_limits<std::int64_t>::max()),
+                              json(std::numeric_limits<std::int64_t>::min()),
+                              json(std::uint64_t{1} << 63),
+                              json(1'000'000'000'001LL)}) {
         controller.adjustWallet(
             TestHelpers::authed_json(admin, json{{"delta_credits", delta}, {"note", "huge"}}),
             [&](const HttpResponsePtr& r) { resp = r; },
