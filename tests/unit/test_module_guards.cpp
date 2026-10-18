@@ -9,6 +9,7 @@
 #include <chrono>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 #include <gtest/gtest.h>
 #include <trantor/net/EventLoop.h>
@@ -61,23 +62,31 @@ TEST(TasksGuardTest, CancelUnknownReturnsFalse) {
 TEST(TasksScheduleTest, FirstRunFiresOnceBeforeTheFirstInterval) {
     if (Tasks::is_initialized())
         Tasks::shutdown();
-    // A loop owned and run by this thread: no cross-thread wakeups, which
-    // TSan reports inside trantor's eventfd handling.
-    trantor::EventLoop loop;
-    Tasks::detail::loop_override() = &loop;
-    Tasks::initialize();
+    // The main thread already owns Drogon's loop, and waking a loop from
+    // another thread trips TSan inside trantor's eventfd handling: the loop,
+    // the scheduling and the run all live on one thread of the test's own.
     int with_first = 0;
     int without = 0;
-    ASSERT_TRUE(Tasks::schedule_recurring(
-        "first-run", std::chrono::hours(1), [&] { ++with_first; }, std::chrono::milliseconds(10)));
-    ASSERT_TRUE(Tasks::schedule_recurring("no-first-run", std::chrono::hours(1), [&] { ++without; }));
-    loop.runAfter(0.5, [&] { loop.quit(); });
-    loop.loop();
+    bool scheduled = false;
+    bool cancelled = false;
+    std::thread runner([&] {
+        trantor::EventLoop loop;
+        Tasks::detail::loop_override() = &loop;
+        Tasks::initialize();
+        scheduled = Tasks::schedule_recurring(
+                        "first-run", std::chrono::hours(1), [&] { ++with_first; }, std::chrono::milliseconds(10)) &&
+                    Tasks::schedule_recurring("no-first-run", std::chrono::hours(1), [&] { ++without; });
+        loop.runAfter(0.5, [&] { loop.quit(); });
+        loop.loop();
+        cancelled = Tasks::cancel("first-run");
+        Tasks::shutdown();
+        Tasks::detail::loop_override() = nullptr;
+    });
+    runner.join();
+    EXPECT_TRUE(scheduled);
     EXPECT_EQ(with_first, 1);
     EXPECT_EQ(without, 0) << "runEvery alone waits a whole interval";
-    EXPECT_TRUE(Tasks::cancel("first-run"));
-    Tasks::shutdown();
-    Tasks::detail::loop_override() = nullptr;
+    EXPECT_TRUE(cancelled);
 }
 
 // ---- the worker's rate-limited maintenance log ------------------------------
