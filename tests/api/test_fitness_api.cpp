@@ -379,6 +379,10 @@ TEST_F(SyncApiTest, EnqueueRejectsARangeWiderThanAYear) {
     EXPECT_FALSE(runs.any_running("1234567890"));
     // A full year is still one request.
     EXPECT_EQ(post_sync({{"from", "2025-09-23"}, {"to", "2026-09-23"}})->statusCode(), k202Accepted);
+    // Its job is taken off the queue: a suite that runs later counts the jobs it finds there.
+    auto job = Jobs::get().pick({"fitness_sync"}, 1);
+    ASSERT_TRUE(job.has_value());
+    Jobs::get().complete(job->id, json::object());
 }
 
 TEST_F(SyncApiTest, EnqueueRejectsMalformedRange) {
