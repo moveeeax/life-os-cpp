@@ -43,6 +43,7 @@ function AccountForm({ account, onClose }: { account: Account | null; onClose: (
   const [currency, setCurrency] = useState(account?.currency ?? 'KZT');
   const [last4, setLast4] = useState(account?.last4 ?? '');
   const [opening, setOpening] = useState(String(account?.opening_balance ?? 0));
+  const [archived, setArchived] = useState(account?.archived ?? false);
   const [confirm, setConfirm] = useState(false);
   const [outcome, setOutcome] = useState<string | null>(null);
   const save = useSaveAccount(account?.id ?? null, onClose);
@@ -67,7 +68,7 @@ function AccountForm({ account, onClose }: { account: Account | null; onClose: (
       last4,
       opening_balance: openingValue,
     };
-    save.mutate(account ? body : { ...body, currency, position: 0 });
+    save.mutate(account ? { ...body, archived } : { ...body, currency, position: 0 });
   };
 
   if (outcome) {
@@ -177,6 +178,16 @@ function AccountForm({ account, onClose }: { account: Account | null; onClose: (
               className={inputClass}
             />
           </div>
+          {account && (
+            <label className="flex items-center gap-2 self-end pb-2 text-theme-sm">
+              <input
+                type="checkbox"
+                checked={archived}
+                onChange={(e) => setArchived(e.target.checked)}
+              />
+              Archived (hidden from pickers and totals)
+            </label>
+          )}
         </div>
         {(save.error || remove.error) && (
           <p role="alert" className="mt-3 text-theme-sm text-error-500">

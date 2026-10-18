@@ -174,13 +174,16 @@
 .n-lengths button[aria-pressed='true'] {
   color: var(--g-ink);
 }
-/* Room for the dock at the bottom; on a phone for the corner row and the dock list. */
+/* Room for the fixed dock at the bottom; on a phone the dock is in the flow
+   (corners.css), so only the Hide numbers pill needs room, and the screen is
+   measured with the browser bars shown (svh) so a day that fits does not scroll. */
 .n-now {
   padding-bottom: 130px;
 }
 @media (max-width: 640px) {
   .n-now {
-    padding-bottom: 364px;
+    min-height: 100svh;
+    padding-bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 44px);
   }
   .n-where {
     justify-self: center;
