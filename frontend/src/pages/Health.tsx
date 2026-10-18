@@ -43,7 +43,7 @@ import { needsLink } from '@/lib/mi';
 import { ChartCard } from './health/ChartCard';
 import { SyncPanel } from './health/SyncPanel';
 import { Banner, Facts, Group, Num, Row, SectionFrame } from '@/shell/kit';
-import { TimeChart } from './health/TimeChart';
+import { TimeChart } from './health/LazyTimeChart';
 
 // Series colours on the dark glass sheet.
 const C = {

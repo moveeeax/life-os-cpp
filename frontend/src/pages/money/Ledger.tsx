@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -248,7 +248,12 @@ function TransactionEditor({
   );
 }
 
-function LedgerRow({
+/**
+ * One ledger row. Memoized: with a few hundred rows loaded, a change elsewhere
+ * on the page (a filter, the editor) does not render every row again. Its
+ * props are the cached row, lookups from id maps and a stable onOpen.
+ */
+const LedgerRow = memo(function LedgerRow({
   row,
   account,
   category,
@@ -258,7 +263,7 @@ function LedgerRow({
   row: Transaction;
   account?: Account;
   category?: Category;
-  onOpen: () => void;
+  onOpen: (row: Transaction) => void;
   currencies: ReturnType<typeof useCurrencies>['data'];
 }) {
   const adjustment = row.type === 'fx_adjustment';
@@ -285,11 +290,44 @@ function LedgerRow({
       )}
       {row.note && <span>{row.note}</span>}
       <span className="k-actions">
-        <button type="button" className="k-link" onClick={onOpen}>
+        <button type="button" className="k-link" onClick={() => onOpen(row)}>
           Edit or delete
         </button>
       </span>
     </KitRow>
+  );
+});
+
+/**
+ * The search field. It keeps the typed text and its 300 ms debounce to
+ * itself and lifts only the settled query, so a keystroke renders this field,
+ * not the ledger. It lives in the Filter sheet: closing the sheet sends what
+ * was typed at once, and a cleared filter empties it.
+ */
+function SearchBox({ q, onSearch }: { q: string; onSearch: (q: string) => void }) {
+  const [text, setText] = useState(q);
+  const latest = useRef(q);
+  useEffect(() => {
+    const t = setTimeout(() => onSearch(text.trim()), 300);
+    return () => clearTimeout(t);
+  }, [text, onSearch]);
+  useEffect(() => {
+    if (q !== latest.current.trim()) {
+      latest.current = q;
+      setText(q);
+    }
+  }, [q]);
+  useEffect(() => () => onSearch(latest.current.trim()), [onSearch]);
+  return (
+    <input
+      type="search"
+      value={text}
+      onChange={(e) => {
+        latest.current = e.target.value;
+        setText(e.target.value);
+      }}
+      placeholder="Name or merchant"
+    />
   );
 }
 
@@ -411,12 +449,7 @@ export function MoneyLedgerPage() {
   const setAccount = (v: string) => setFilter('account', v);
   const setCategory = (v: string) => setFilter('category', v);
   const setType = (v: string) => setFilter('type', v);
-  const [text, setText] = useState('');
   const [q, setQ] = useState('');
-  useEffect(() => {
-    const t = setTimeout(() => setQ(text.trim()), 300);
-    return () => clearTimeout(t);
-  }, [text]);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
   // ?row=<id>: a link (from a task) that opens one row of the ledger.
@@ -437,8 +470,12 @@ export function MoneyLedgerPage() {
   const currencies = useCurrencies().data;
   // Archived accounts too: their rows still need a name, and the Accounts page
   // links an archived account's rows here as ?account=<id>.
-  const accounts = useAccounts(true).data ?? [];
-  const categories = useCategories(true).data ?? [];
+  const accountsData = useAccounts(true).data;
+  const categoriesData = useCategories(true).data;
+  const accounts = useMemo(() => accountsData ?? [], [accountsData]);
+  const categories = useMemo(() => categoriesData ?? [], [categoriesData]);
+  const accountById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
+  const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
   const inbox = useInbox();
   const list = useTransactions({
     from: range.from,
@@ -471,7 +508,7 @@ export function MoneyLedgerPage() {
   const filterCount = [account, category, type, q].filter((v) => v !== '').length;
   const clearFilters = () => {
     setParams((p) => withSearch(p, { account: '', category: '', type: '' }), { replace: true });
-    setText('');
+    setQ('');
   };
 
   return (
@@ -533,12 +570,7 @@ export function MoneyLedgerPage() {
                 </label>
                 <label className="k-field">
                   <span>Search</span>
-                  <input
-                    type="search"
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    placeholder="Name or merchant"
-                  />
+                  <SearchBox q={q} onSearch={setQ} />
                 </label>
               </Filters>
             )}
@@ -603,10 +635,10 @@ export function MoneyLedgerPage() {
                     <LedgerRow
                       key={r.id}
                       row={r}
-                      account={accounts.find((a) => a.id === r.account_id)}
-                      category={categories.find((c) => c.id === r.category_id)}
+                      account={accountById.get(r.account_id)}
+                      category={r.category_id ? categoryById.get(r.category_id) : undefined}
                       currencies={currencies}
-                      onOpen={() => setEditing(r)}
+                      onOpen={setEditing}
                     />
                   ))}
                 </Group>
