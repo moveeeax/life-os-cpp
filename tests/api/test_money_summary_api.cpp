@@ -103,8 +103,11 @@ protected:
                 "('c0000000-0000-4000-8000-0000000000b2', $1::uuid, 'Boris Wise', 'USD', 7777)",
                 b);
             txn.exec_params(
-                "INSERT INTO money_transactions (owner_id, type, date, account_id, amount, name) VALUES "
-                "($1::uuid, 'income', '2026-10-05', 'c0000000-0000-4000-8000-0000000000b2', 1000, 'Boris pay')",
+                "WITH c AS (INSERT INTO money_categories (owner_id, name, kind) VALUES ($1::uuid, 'Pay', 'income') "
+                " RETURNING id) "
+                "INSERT INTO money_transactions (owner_id, type, date, account_id, category_id, amount, name) "
+                "SELECT $1::uuid, 'income', '2026-10-05', 'c0000000-0000-4000-8000-0000000000b2', c.id, 1000, "
+                "'Boris pay' FROM c",
                 b);
             txn.exec("DELETE FROM money_fx_rates WHERE quote IN ('KZT', 'EUR', 'THB')");
             txn.exec_params(
@@ -307,9 +310,18 @@ TEST_F(MoneySummaryApiTest, APendingRowMovesNothingUntilConfirmed) {
     const double kaspi_before = kaspi_balance();
     EXPECT_NEAR(kaspi_before, 100000.0, 1e-6);
 
+    const std::string food = Database::get().execute_write([](auto& txn) {
+        return txn
+            .exec_params(
+                "INSERT INTO money_categories (owner_id, name, kind) VALUES ($1::uuid, 'Food', 'expense') "
+                "RETURNING id::text",
+                std::string(kOwner))[0][0]
+            .template as<std::string>();
+    });
     HttpResponsePtr created;
     c.createTransaction(TestHelpers::authed_json(owner(),
                                                  json{{"date", "2026-10-12"},
+                                                      {"category_id", food},
                                                       {"account_id", "c0000000-0000-4000-8000-000000000001"},
                                                       {"amount", 4900},
                                                       {"name", "Dinner"},
