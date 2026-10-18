@@ -16,7 +16,7 @@ info:
     HttpOnly session cookie the SPA uses; rate limiting and idempotency are
     driven by headers (`Idempotency-Key` on writes). Maintained by one owner,
     see the repository.
-  version: 1.31.0
+  version: 1.31.1
   contact:
     name: life-os-cpp repository
     url: https://github.com/moveeeax/life-os-cpp

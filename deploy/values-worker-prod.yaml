@@ -7,7 +7,7 @@ secretsVersion: ""
 
 image:
   repository: ghcr.io/moveeeax/life-os-cpp-worker
-  tag: "1.31.0"
+  tag: "1.31.1"
 
 replicaCount: 1
 

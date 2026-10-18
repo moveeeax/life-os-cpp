@@ -1,1 +1,0 @@
-A field of the wrong type answers 400 instead of 500 on `POST /tasks/projects` (`kind`), `POST /admin/billing/packages` (`active`, `sort`) and `POST /jobs` (`max_retries`, now 0 to 20 as the spec says, and `payload`).
