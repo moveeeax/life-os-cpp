@@ -299,7 +299,9 @@ TEST_F(MoneySummaryApiTest, APendingRowMovesNothingUntilConfirmed) {
         HttpResponsePtr captured;
         c.balances(req, [&](const HttpResponsePtr& r) { captured = r; });
         EXPECT_TRUE(captured);
-        for (const auto& group : body_of(captured)["data"]) {
+        // Bound to a local: a range-for over `temporary["data"]` reads freed memory.
+        const json groups = body_of(captured)["data"];
+        for (const auto& group : groups) {
             if (group["currency"] == "KZT") {
                 return group["total"].get<double>();
             }
