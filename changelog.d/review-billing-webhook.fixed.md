@@ -1,1 +1,0 @@
-The PayPal capture webhook answers 5xx when a credit fails for a known order (a dropped connection, a deadlock), so PayPal redelivers it; before, it acked 200 and a buyer who closed the tab before `/capture` paid and got no credits. An unknown order or a foreign capture id still acks 200.

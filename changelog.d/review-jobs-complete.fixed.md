@@ -1,1 +1,0 @@
-The worker records a success outside the handler's error path, so a Redis error in `complete()` no longer sends a finished job back to the queue (a second email or webhook delivery); `fail()` on a completed or cancelled job (a stale lease reaped later) leaves it alone, and a lease that cannot be cleared is logged.

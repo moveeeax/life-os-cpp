@@ -6,6 +6,23 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.31.1] - 2026-10-18
+
+### Removed
+- Seven unused module-probe hooks, the `CORNER_LABEL` map and `tools/fitness/compare_with_python_bridge.py`; stale paths in the README and the crypto test are corrected.
+
+### Fixed
+- A field of the wrong type answers 400 instead of 500 on `POST /tasks/projects` (`kind`), `POST /admin/billing/packages` (`active`, `sort`) and `POST /jobs` (`max_retries`, now 0 to 20 as the spec says, and `payload`).
+- The PayPal capture webhook answers 5xx when a credit fails for a known order (a dropped connection, a deadlock), so PayPal redelivers it; before, it acked 200 and a buyer who closed the tab before `/capture` paid and got no credits. An unknown order or a foreign capture id still acks 200.
+- Hide numbers keeps one state for the whole page, so the bar pill and the account menu never disagree.
+- The worker records a success outside the handler's error path, so a Redis error in `complete()` no longer sends a finished job back to the queue (a second email or webhook delivery); `fail()` on a completed or cancelled job (a stale lease reaped later) leaves it alone, and a lease that cannot be cleared is logged.
+- A 5xx or 429 on Xiaomi's serviceToken redirect is a retryable error, no longer a refusal that marks the link for re-auth and sends the owner to scan the QR again.
+- A bank adjustment with a `category_id` is refused (400): the id went unchecked, so it could point at another owner's category, which that owner then could not delete. Picking a merchant no longer fills in an account archived since.
+- Now on a phone: a dock tile lifts for a drag after a 300 ms press, so a swipe over the dock scrolls the page; a new dock order shows at once and a second drag before the first answer no longer snaps the tiles back; Focus mode hides the dock and the corner buttons again (keyboard focus included); the page no longer scrolls a little under the address bar; a sound cut mid fade-out (pause, resume, a volume drag) stops instead of looping on.
+
+### Security
+- A read-only API key is refused (403 `key_read_only`) on `GET /fitness/account/link/{id}`, the one GET that writes: it completes the Mi link and enqueues a sync.
+
 ## [1.31.0] - 2026-10-18
 
 ### Added
