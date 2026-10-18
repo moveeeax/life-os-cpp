@@ -5,16 +5,31 @@ import { shiftDays } from '@/lib/dates';
 import { jobErrorText } from '@/lib/parseJob';
 
 import type {
+  Category,
   Currency,
   Merchant,
   ParseJob,
   ParseLine,
+  Report,
   Transaction,
   TransactionInput,
 } from './types';
 
 export * from './types';
 export { formatDay, isDay, todayLocal } from '@/lib/dates';
+
+/**
+ * A category's spend in a report, in its budget's currency: the block of that
+ * currency, not the first one. 0 without a budget currency or a report.
+ */
+export function spentIn(
+  report: Pick<Report, 'blocks'> | undefined,
+  category: Pick<Category, 'id' | 'budget_currency'>,
+): number {
+  if (!report || !category.budget_currency) return 0;
+  const block = report.blocks.find((b) => b.currency === category.budget_currency);
+  return block?.categories.find((c) => c.category_id === category.id)?.spent ?? 0;
+}
 
 /** The account the add form picked last, kept in the browser. */
 export const LAST_ACCOUNT_KEY = 'money:last-account';

@@ -60,9 +60,11 @@ export function MoneyFrame({ title, actions, children }: MoneyFrameProps) {
       sub={
         has ? (
           <>
-            {s.partial ? 'partial · ' : ''}rates of {rateDay(s.rate_date, s.date)} ·{' '}
-            <Num>{(s.change.total >= 0 ? '+' : '−') + formatTotal(Math.abs(s.change.total))}</Num>{' '}
-            in 30 days{s.change.partial ? ' (partial)' : ''}
+            <span data-num-ok>
+              {s.partial ? 'partial · ' : ''}rates of {rateDay(s.rate_date, s.date)}
+            </span>{' '}
+            · <Num>{(s.change.total >= 0 ? '+' : '−') + formatTotal(Math.abs(s.change.total))}</Num>{' '}
+            <span data-num-ok>in 30 days{s.change.partial ? ' (partial)' : ''}</span>
             <span className="sr-only"> · {title}</span>
           </>
         ) : (

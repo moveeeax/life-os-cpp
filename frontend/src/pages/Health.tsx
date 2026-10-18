@@ -127,7 +127,9 @@ function Tiles({ range }: { range: DateRange }) {
         ]}
       />
       <p className="k-sub">
-        {sNote ?? `Means of ${days_(Math.max(steps.n, sleep.n, resting.n))} with data`}
+        <span data-num-ok>
+          {sNote ?? `Means of ${days_(Math.max(steps.n, sleep.n, resting.n))} with data`}
+        </span>
         {' · weight '}
         {bNote ?? (
           <>
@@ -448,7 +450,7 @@ function Tables({ range }: { range: DateRange }) {
             title={<span className="k-cap">{r.activity_type}</span>}
             sub={
               <>
-                {when(r.start_at)}
+                <span data-num-ok>{when(r.start_at)}</span>
                 {r.duration_minutes !== null && (
                   <>
                     {' '}
@@ -483,7 +485,9 @@ function Tables({ range }: { range: DateRange }) {
             <div className="k-scroll">
               {[...spo2Rows].reverse().map((r) => (
                 <div key={r.timestamp} className="k-kv">
-                  <span className="k-muted">{when(r.timestamp)}</span>
+                  <span className="k-muted" data-num-ok>
+                    {when(r.timestamp)}
+                  </span>
                   <Num>{r.spo2_pct}%</Num>
                 </div>
               ))}
@@ -535,6 +539,7 @@ function PeriodPicker() {
               aria-pressed={range.preset === p}
               onClick={() => setParams({ days: String(p) }, { replace: true })}
               className={range.preset === p ? 'k-seg-on' : undefined}
+              data-num-ok
             >
               {`${p} days`}
             </button>
@@ -617,7 +622,12 @@ export function HealthPage() {
   }
 
   return (
-    <SectionFrame eyebrow="Body" headline={headline} sub="from the band" tools={<PeriodPicker />}>
+    <SectionFrame
+      eyebrow="Body"
+      headline={<span data-num-ok>{headline}</span>}
+      sub="from the band"
+      tools={<PeriodPicker />}
+    >
       {mi.data?.status === 'reauth_required' && (
         <Banner to="/account" action="Link again in profile">
           Xiaomi asks you to sign in again. Syncing is paused; the data below is what was synced

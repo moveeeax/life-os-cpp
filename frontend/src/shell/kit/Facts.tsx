@@ -6,7 +6,8 @@ export function Facts({ items }: { items: { label: string; value: ReactNode }[] 
     <dl className="k-facts">
       {items.map((f) => (
         <div key={f.label}>
-          <dt>{f.label}</dt>
+          {/* A label names the fact ("In 90 days"); the value is what Hide numbers blurs. */}
+          <dt data-num-ok>{f.label}</dt>
           <dd>{f.value}</dd>
         </div>
       ))}

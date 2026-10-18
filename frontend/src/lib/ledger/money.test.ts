@@ -21,6 +21,7 @@ import {
   shiftPeriod,
   signedAmount,
   smallestUnit,
+  spentIn,
   targetSize,
   totalsByCurrency,
   transferNeedsReceived,
@@ -356,5 +357,25 @@ describe('rateLine', () => {
     expect(rateLine(1.08345678, 'USD', 'EUR')).toEqual({ value: '1.08346', unit: 'USD per EUR' });
     expect(rateLine(0.00001534, 'BTC', 'USD')).toEqual({ value: '65,189', unit: 'USD per BTC' });
     expect(rateLine(0, 'USD', 'KZT')).toBeNull();
+  });
+});
+
+describe('spentIn', () => {
+  const block = (currency: string, spent: number) =>
+    ({
+      currency,
+      categories: [{ category_id: 'food', spent, budget: null, budget_share: null }],
+    }) as never;
+  const report = { blocks: [block('KZT', 84_000), block('USD', 120)] };
+
+  it('reads the block of the budget currency, not the first one', () => {
+    expect(spentIn(report, { id: 'food', budget_currency: 'USD' })).toBe(120);
+    expect(spentIn(report, { id: 'food', budget_currency: 'KZT' })).toBe(84_000);
+  });
+  it('is 0 without a budget currency, a block, a line or a report', () => {
+    expect(spentIn(report, { id: 'food', budget_currency: null })).toBe(0);
+    expect(spentIn(report, { id: 'food', budget_currency: 'EUR' })).toBe(0);
+    expect(spentIn(report, { id: 'rent', budget_currency: 'USD' })).toBe(0);
+    expect(spentIn(undefined, { id: 'food', budget_currency: 'USD' })).toBe(0);
   });
 });

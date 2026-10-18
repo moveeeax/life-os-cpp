@@ -1,0 +1,1 @@
+Accessibility: the More menu of the tabs closes when the focus leaves it; a sheet opens with the focus on its first field (on a touch screen on the sheet itself, so no keyboard pops up) instead of the Close button; aria-controls on the tabs, the corners, the account menu, the classic nav and expandable rows points only at a panel that is open.

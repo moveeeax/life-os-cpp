@@ -1,0 +1,1 @@
+Goals: a count goal's "behind N" follows the server's pace (done against the floor of expected), so 2 done of 3.2 expected reads "behind 1", not 2. A number goal at or past its target says "reached" instead of "−0 kg a week" or a negative pace, and its chart starts at a check-in dated on the start day, as the "now" fact does.
