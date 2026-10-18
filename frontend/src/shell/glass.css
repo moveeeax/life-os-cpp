@@ -74,14 +74,43 @@
   -webkit-backdrop-filter: blur(16px);
   border-radius: 999px;
 }
+.g-navwrap {
+  padding: 4px;
+  max-width: 100%;
+  min-width: 0;
+}
 .g-nav {
   display: flex;
   gap: 2px;
-  padding: 4px;
   overflow-x: auto;
-  max-width: 100%;
   scrollbar-width: none;
   min-width: 0;
+}
+/* The edge that hides more sections fades, so a cut label reads as "more"
+   and not as a broken pill. The glass stays: the mask is on the scroller. */
+.g-nav[data-more='right'] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+}
+.g-nav[data-more='left'] {
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
+}
+.g-nav[data-more='both'] {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 32px,
+    #000 calc(100% - 32px),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 32px,
+    #000 calc(100% - 32px),
+    transparent
+  );
 }
 .g-nav a {
   padding: 6px 14px;

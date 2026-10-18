@@ -384,18 +384,17 @@
   background: transparent;
 }
 
-/* Phone: the corners fold into one row above the dock, the dock is a list,
-   a panel is a sheet from the bottom. */
+/* Phone: the corners fold into one row, the dock is a list, and both sit in
+   the flow of the page under the focus rather than fixed over it: the dock's
+   height depends on the tiles placed and their wrapping, and a phone's
+   viewport is short, so a fixed stack covered the focus picker. The page
+   scrolls when the day does not fit. A panel is a sheet from the bottom. */
 @media (max-width: 640px) {
   .n-corners {
-    position: fixed;
-    z-index: 20;
-    left: 12px;
-    right: 12px;
-    bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 280px);
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
+    margin-top: 28px;
   }
   .n-corner,
   .n-tl,
@@ -415,9 +414,10 @@
     display: none;
   }
   .n-dock {
-    /* Above the Hide numbers pill. */
-    bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 44px);
-    width: calc(100vw - 24px);
+    position: static;
+    transform: none;
+    width: auto;
+    margin-top: 6px;
     grid-auto-flow: row;
     grid-auto-columns: auto;
     grid-template-columns: minmax(0, 1fr);
