@@ -21,8 +21,8 @@ const BASE = '/api/v1/fitness';
 
 /** Every row of a paged fitness route for a date range. */
 function fetchRows<T>(route: string, range: DateRange, signal?: AbortSignal): Promise<T[]> {
-  // The string cast picks the client's untyped overload: the spec types
-  // `data` as plain objects, the row types live in lib/health/types.ts.
+  // The string cast picks the client's untyped overload, so one helper
+  // serves every route; the row types come from lib/health/types.ts.
   const path: string = `${BASE}/${route}`;
   return fetchAllPages<T>((limit, offset) =>
     api.getJson<Page<T>>(path, {

@@ -3913,6 +3913,10 @@
       "type": "string",
       "description": "W3C trace id of the submitting request — deep-link into Jaeger"
      },
+     "traceparent": {
+      "type": "string",
+      "description": "W3C traceparent of the submitting request; the worker continues that trace (empty when there was none)"
+     },
      "retry_count": {
       "type": "integer"
      },
@@ -3930,6 +3934,91 @@
       "description": "Epoch seconds"
      }
     }
+   },
+   "ApiKey": {
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "prefix",
+     "scope",
+     "last_used_at",
+     "revoked_at",
+     "created_at"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "name": {
+      "type": "string"
+     },
+     "prefix": {
+      "type": "string",
+      "description": "The first characters of the key",
+      "to tell keys apart": null
+     },
+     "scope": {
+      "type": "string",
+      "enum": [
+       "full",
+       "read"
+      ]
+     },
+     "last_used_at": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "revoked_at": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "created_at": {
+      "type": "string"
+     }
+    }
+   },
+   "ApiKeyListResponse": {
+    "type": "object",
+    "required": [
+     "data",
+     "total"
+    ],
+    "properties": {
+     "data": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/ApiKey"
+      }
+     },
+     "total": {
+      "type": "integer"
+     }
+    }
+   },
+   "ApiKeyCreated": {
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/ApiKey"
+     },
+     {
+      "type": "object",
+      "required": [
+       "key"
+      ],
+      "properties": {
+       "key": {
+        "type": "string",
+        "description": "The plaintext key (cpk_...); shown only in this response"
+       }
+      }
+     }
+    ]
    },
    "Role": {
     "type": "object",
@@ -4942,6 +5031,14 @@
       "type": "array",
       "items": {
        "type": "object",
+       "required": [
+        "date",
+        "steps",
+        "distance_m",
+        "active_kcal",
+        "total_kcal",
+        "timezone"
+       ],
        "properties": {
         "date": {
          "type": "string",
@@ -4989,6 +5086,19 @@
       "type": "array",
       "items": {
        "type": "object",
+       "required": [
+        "sleep_id",
+        "start_at",
+        "end_at",
+        "duration_minutes",
+        "time_asleep_minutes",
+        "time_awake_minutes",
+        "sleep_score",
+        "sleep_score_source",
+        "is_nap",
+        "timezone",
+        "stages"
+       ],
        "properties": {
         "sleep_id": {
          "type": "string"
@@ -5025,7 +5135,20 @@
         "stages": {
          "type": "array",
          "items": {
-          "type": "object"
+          "type": "object",
+          "required": [
+           "stage",
+           "minutes"
+          ],
+          "properties": {
+           "stage": {
+            "type": "string",
+            "description": "deep, light, rem or awake"
+           },
+           "minutes": {
+            "type": "integer"
+           }
+          }
          }
         }
        }
@@ -5052,6 +5175,11 @@
       "type": "array",
       "items": {
        "type": "object",
+       "required": [
+        "timestamp",
+        "bpm",
+        "sample_type"
+       ],
        "properties": {
         "timestamp": {
          "type": "string"
@@ -5086,6 +5214,11 @@
       "type": "array",
       "items": {
        "type": "object",
+       "required": [
+        "timestamp",
+        "stress_score",
+        "level"
+       ],
        "properties": {
         "timestamp": {
          "type": "string"
@@ -5120,6 +5253,10 @@
       "type": "array",
       "items": {
        "type": "object",
+       "required": [
+        "timestamp",
+        "spo2_pct"
+       ],
        "properties": {
         "timestamp": {
          "type": "string"
@@ -5151,6 +5288,18 @@
       "type": "array",
       "items": {
        "type": "object",
+       "required": [
+        "timestamp",
+        "weight_kg",
+        "bmi",
+        "body_fat_pct",
+        "muscle_mass_kg",
+        "water_pct",
+        "bone_mass_kg",
+        "visceral_fat_score",
+        "basal_metabolism_kcal",
+        "metabolic_age"
+       ],
        "properties": {
         "timestamp": {
          "type": "string"
@@ -5214,6 +5363,20 @@
       "type": "array",
       "items": {
        "type": "object",
+       "required": [
+        "workout_id",
+        "activity_type",
+        "start_at",
+        "end_at",
+        "duration_minutes",
+        "distance_m",
+        "calories_kcal",
+        "avg_heart_rate_bpm",
+        "max_heart_rate_bpm",
+        "avg_pace_sec_per_km",
+        "max_pace_sec_per_km",
+        "total_steps"
+       ],
        "properties": {
         "workout_id": {
          "type": "string"
@@ -5282,6 +5445,15 @@
       "type": "array",
       "items": {
        "type": "object",
+       "required": [
+        "date",
+        "steps",
+        "distance_m",
+        "active_kcal",
+        "sleep_duration_minutes",
+        "sleep_score",
+        "resting_bpm"
+       ],
        "properties": {
         "date": {
          "type": "string",
@@ -5333,6 +5505,12 @@
       "type": "array",
       "items": {
        "type": "object",
+       "required": [
+        "event_id",
+        "start_at",
+        "end_at",
+        "duration_seconds"
+       ],
        "properties": {
         "event_id": {
          "type": "string"
@@ -5362,6 +5540,12 @@
       "type": "object",
       "additionalProperties": {
        "type": "object",
+       "required": [
+        "first_date",
+        "last_date",
+        "records",
+        "last_sync_at"
+       ],
        "properties": {
         "first_date": {
          "type": "string",
@@ -9737,6 +9921,16 @@
         }
        }
       }
+     },
+     "503": {
+      "description": "The default role is missing from the database (misconfigured)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
      }
     }
    }
@@ -9844,6 +10038,16 @@
         }
        }
       }
+     },
+     "503": {
+      "description": "The session could not be minted (session_unavailable)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
      }
     }
    }
@@ -9902,6 +10106,16 @@
         }
        }
       }
+     },
+     "503": {
+      "description": "The new session could not be minted (session_unavailable)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
      }
     }
    }
@@ -9930,6 +10144,16 @@
      },
      "401": {
       "description": "Not authenticated"
+     },
+     "404": {
+      "description": "The token's user no longer exists (user)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
      }
     }
    }
@@ -10246,7 +10470,14 @@
     ],
     "responses": {
      "200": {
-      "description": "Array of API key metadata under data[]"
+      "description": "Array of API key metadata under data[]",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiKeyListResponse"
+        }
+       }
+      }
      },
      "401": {
       "description": "Not authenticated"
@@ -10292,7 +10523,14 @@
     },
     "responses": {
      "201": {
-      "description": "Key created; `key` field holds the one-time secret, `scope` its scope"
+      "description": "Key created; `key` field holds the one-time secret, `scope` its scope",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiKeyCreated"
+        }
+       }
+      }
      },
      "400": {
       "description": "Validation failed (an unknown scope)"
@@ -19540,7 +19778,16 @@
        "type": "string",
        "format": "date"
       },
-      "description": "A day of the period (week, month, quarter); defaults to today"
+      "description": "A day of the period (week, month, quarter); defaults to today in tz, else UTC"
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the default day is today there"
      },
      {
       "name": "from",
@@ -19722,6 +19969,17 @@
       "BearerAuth": []
      }
     ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the default day is today there"
+     }
+    ],
     "requestBody": {
      "required": true,
      "content": {
@@ -19740,7 +19998,8 @@
          "hint_date": {
           "type": "string",
           "format": "date",
-          "description": "The date of a line without one; defaults to today (UTC)"
+          "description": "The date of a line without one; defaults to today in tz",
+          "else UTC": null
          }
         }
        }
@@ -19856,6 +20115,17 @@
       "BearerAuth": []
      }
     ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the default day is today there"
+     }
+    ],
     "requestBody": {
      "required": true,
      "content": {
@@ -19872,7 +20142,9 @@
          },
          "hint_date": {
           "type": "string",
-          "format": "date"
+          "format": "date",
+          "description": "The date of a line without one; defaults to today in tz",
+          "else UTC": null
          }
         }
        }
@@ -22199,6 +22471,17 @@
       "BearerAuth": []
      }
     ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the default day is today there"
+     }
+    ],
     "requestBody": {
      "required": true,
      "content": {
@@ -22216,7 +22499,9 @@
          },
          "hint_date": {
           "type": "string",
-          "format": "date"
+          "format": "date",
+          "description": "The reference day of the parse; defaults to today in tz",
+          "else UTC": null
          },
          "note_id": {
           "type": "string",
@@ -22460,7 +22745,8 @@
         "schema": {
          "type": "object",
          "required": [
-          "data"
+          "data",
+          "count"
          ],
          "properties": {
           "data": {
@@ -22468,6 +22754,9 @@
            "items": {
             "$ref": "#/components/schemas/Task"
            }
+          },
+          "count": {
+           "type": "integer"
           }
          }
         }
@@ -24973,7 +25262,10 @@
         "schema": {
          "type": "object",
          "required": [
-          "data"
+          "data",
+          "total",
+          "limit",
+          "offset"
          ],
          "properties": {
           "data": {
@@ -24981,6 +25273,15 @@
            "items": {
             "$ref": "#/components/schemas/TravelCrossing"
            }
+          },
+          "total": {
+           "type": "integer"
+          },
+          "limit": {
+           "type": "integer"
+          },
+          "offset": {
+           "type": "integer"
           }
          }
         }
@@ -27432,7 +27733,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 402620,
-  "source_fnv1a64": "8f36a503780527e0"
+  "source_bytes": 407465,
+  "source_fnv1a64": "6ee7467c6cb93665"
  }
 }

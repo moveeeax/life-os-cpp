@@ -244,6 +244,15 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
+                /** @description The default role is missing from the database (misconfigured) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
             };
         };
         delete?: never;
@@ -350,6 +359,15 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
+                /** @description The session could not be minted (session_unavailable) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
             };
         };
         delete?: never;
@@ -435,6 +453,15 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
+                /** @description The new session could not be minted (session_unavailable) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
             };
         };
         delete?: never;
@@ -475,6 +502,15 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content?: never;
+                };
+                /** @description The token's user no longer exists (user) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
                 };
             };
         };
@@ -887,7 +923,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ApiKeyListResponse"];
+                    };
                 };
                 /** @description Not authenticated */
                 401: {
@@ -928,7 +966,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ApiKeyCreated"];
+                    };
                 };
                 /** @description Validation failed (an unknown scope) */
                 400: {
@@ -9119,8 +9159,10 @@ export interface paths {
             parameters: {
                 query?: {
                     kind?: "week" | "month" | "quarter" | "custom";
-                    /** @description A day of the period (week, month, quarter); defaults to today */
+                    /** @description A day of the period (week, month, quarter); defaults to today in tz, else UTC */
                     date?: string;
+                    /** @description IANA zone of the caller: the default day is today there */
+                    tz?: string;
                     /** @description Custom period start */
                     from?: string;
                     /** @description Custom period end */
@@ -9271,7 +9313,10 @@ export interface paths {
         /** Send a bank mail, an SMS or a list of purchases to the LLM parse job */
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description IANA zone of the caller: the default day is today there */
+                    tz?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -9282,7 +9327,7 @@ export interface paths {
                         text: string;
                         /**
                          * Format: date
-                         * @description The date of a line without one; defaults to today (UTC)
+                         * @description The date of a line without one; defaults to today in tz
                          */
                         hint_date?: string;
                     };
@@ -9379,7 +9424,10 @@ export interface paths {
         /** Send a receipt photo (a jpeg, png or webp data URL, at most 4 MB decoded) to the LLM parse job */
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description IANA zone of the caller: the default day is today there */
+                    tz?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -9389,7 +9437,10 @@ export interface paths {
                     "application/json": {
                         /** @description data:image/jpeg;base64,... */
                         image: string;
-                        /** Format: date */
+                        /**
+                         * Format: date
+                         * @description The date of a line without one; defaults to today in tz
+                         */
                         hint_date?: string;
                     };
                 };
@@ -11373,7 +11424,10 @@ export interface paths {
         /** Queue one phrase for the tasks_parse job */
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description IANA zone of the caller: the default day is today there */
+                    tz?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -11382,7 +11436,10 @@ export interface paths {
                 content: {
                     "application/json": {
                         text: string;
-                        /** Format: date */
+                        /**
+                         * Format: date
+                         * @description The reference day of the parse; defaults to today in tz
+                         */
                         hint_date?: string;
                         /** Format: uuid */
                         note_id?: string;
@@ -11585,6 +11642,7 @@ export interface paths {
                     content: {
                         "application/json": {
                             data: components["schemas"]["Task"][];
+                            count: number;
                         };
                     };
                 };
@@ -13989,6 +14047,9 @@ export interface paths {
                     content: {
                         "application/json": {
                             data: components["schemas"]["TravelCrossing"][];
+                            total: number;
+                            limit: number;
+                            offset: number;
                         };
                     };
                 };
@@ -17279,6 +17340,8 @@ export interface components {
             worker_id?: string;
             /** @description W3C trace id of the submitting request — deep-link into Jaeger */
             trace_id?: string;
+            /** @description W3C traceparent of the submitting request; the worker continues that trace (empty when there was none) */
+            traceparent?: string;
             retry_count?: number;
             max_retries?: number;
             /**
@@ -17291,6 +17354,26 @@ export interface components {
              * @description Epoch seconds
              */
             updated_at?: number;
+        };
+        ApiKey: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description The first characters of the key */
+            prefix: string;
+            /** @enum {string} */
+            scope: "full" | "read";
+            last_used_at: string | null;
+            revoked_at: string | null;
+            created_at: string;
+        };
+        ApiKeyListResponse: {
+            data: components["schemas"]["ApiKey"][];
+            total: number;
+        };
+        ApiKeyCreated: components["schemas"]["ApiKey"] & {
+            /** @description The plaintext key (cpk_...); shown only in this response */
+            key: string;
         };
         Role: {
             id: number;
@@ -17641,12 +17724,12 @@ export interface components {
             total: number;
             data: {
                 /** Format: date */
-                date?: string;
-                steps?: number;
-                distance_m?: number | null;
-                active_kcal?: number | null;
-                total_kcal?: number | null;
-                timezone?: string;
+                date: string;
+                steps: number;
+                distance_m: number | null;
+                active_kcal: number | null;
+                total_kcal: number | null;
+                timezone: string;
             }[];
         };
         SleepListResponse: {
@@ -17654,17 +17737,21 @@ export interface components {
             /** @description Rows in the whole range, ignoring limit/offset */
             total: number;
             data: {
-                sleep_id?: string;
-                start_at?: string;
-                end_at?: string;
-                duration_minutes?: number;
-                time_asleep_minutes?: number;
-                time_awake_minutes?: number;
-                sleep_score?: number | null;
-                sleep_score_source?: string | null;
-                is_nap?: boolean;
-                timezone?: string;
-                stages?: Record<string, never>[];
+                sleep_id: string;
+                start_at: string;
+                end_at: string;
+                duration_minutes: number;
+                time_asleep_minutes: number;
+                time_awake_minutes: number;
+                sleep_score: number | null;
+                sleep_score_source: string | null;
+                is_nap: boolean;
+                timezone: string;
+                stages: {
+                    /** @description deep, light, rem or awake */
+                    stage: string;
+                    minutes: number;
+                }[];
             }[];
         };
         HeartRateListResponse: {
@@ -17672,9 +17759,9 @@ export interface components {
             /** @description Rows in the whole range, ignoring limit/offset */
             total: number;
             data: {
-                timestamp?: string;
-                bpm?: number;
-                sample_type?: string;
+                timestamp: string;
+                bpm: number;
+                sample_type: string;
             }[];
         };
         StressListResponse: {
@@ -17682,9 +17769,9 @@ export interface components {
             /** @description Rows in the whole range, ignoring limit/offset */
             total: number;
             data: {
-                timestamp?: string;
-                stress_score?: number;
-                level?: string;
+                timestamp: string;
+                stress_score: number;
+                level: string;
             }[];
         };
         Spo2ListResponse: {
@@ -17692,8 +17779,8 @@ export interface components {
             /** @description Rows in the whole range, ignoring limit/offset */
             total: number;
             data: {
-                timestamp?: string;
-                spo2_pct?: number;
+                timestamp: string;
+                spo2_pct: number;
             }[];
         };
         BodyListResponse: {
@@ -17701,16 +17788,16 @@ export interface components {
             /** @description Rows in the whole range, ignoring limit/offset */
             total: number;
             data: {
-                timestamp?: string;
-                weight_kg?: number;
-                bmi?: number | null;
-                body_fat_pct?: number | null;
-                muscle_mass_kg?: number | null;
-                water_pct?: number | null;
-                bone_mass_kg?: number | null;
-                visceral_fat_score?: number | null;
-                basal_metabolism_kcal?: number | null;
-                metabolic_age?: number | null;
+                timestamp: string;
+                weight_kg: number;
+                bmi: number | null;
+                body_fat_pct: number | null;
+                muscle_mass_kg: number | null;
+                water_pct: number | null;
+                bone_mass_kg: number | null;
+                visceral_fat_score: number | null;
+                basal_metabolism_kcal: number | null;
+                metabolic_age: number | null;
             }[];
         };
         WorkoutListResponse: {
@@ -17718,18 +17805,18 @@ export interface components {
             /** @description Rows in the whole range, ignoring limit/offset */
             total: number;
             data: {
-                workout_id?: string;
-                activity_type?: string;
-                start_at?: string;
-                end_at?: string;
-                duration_minutes?: number;
-                distance_m?: number | null;
-                calories_kcal?: number | null;
-                avg_heart_rate_bpm?: number | null;
-                max_heart_rate_bpm?: number | null;
-                avg_pace_sec_per_km?: number | null;
-                max_pace_sec_per_km?: number | null;
-                total_steps?: number | null;
+                workout_id: string;
+                activity_type: string;
+                start_at: string;
+                end_at: string;
+                duration_minutes: number;
+                distance_m: number | null;
+                calories_kcal: number | null;
+                avg_heart_rate_bpm: number | null;
+                max_heart_rate_bpm: number | null;
+                avg_pace_sec_per_km: number | null;
+                max_pace_sec_per_km: number | null;
+                total_steps: number | null;
             }[];
         };
         SummaryListResponse: {
@@ -17738,34 +17825,34 @@ export interface components {
             total: number;
             data: {
                 /** Format: date */
-                date?: string;
-                steps?: number;
-                distance_m?: number | null;
-                active_kcal?: number | null;
-                sleep_duration_minutes?: number | null;
-                sleep_score?: number | null;
-                resting_bpm?: number | null;
+                date: string;
+                steps: number;
+                distance_m: number | null;
+                active_kcal: number | null;
+                sleep_duration_minutes: number | null;
+                sleep_score: number | null;
+                resting_bpm: number | null;
             }[];
         };
         AbnormalListResponse: {
             count: number;
             total: number;
             data: {
-                event_id?: string;
-                start_at?: string;
-                end_at?: string;
-                duration_seconds?: number | null;
+                event_id: string;
+                start_at: string;
+                end_at: string;
+                duration_seconds: number | null;
             }[];
         };
         CoverageResponse: {
             data: {
                 [key: string]: {
                     /** Format: date */
-                    first_date?: string | null;
+                    first_date: string | null;
                     /** Format: date */
-                    last_date?: string | null;
-                    records?: number;
-                    last_sync_at?: string | null;
+                    last_date: string | null;
+                    records: number;
+                    last_sync_at: string | null;
                 };
             };
         };
