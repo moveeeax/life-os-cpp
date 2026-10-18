@@ -68,6 +68,25 @@ export const DOCK_LABEL: Record<CornerKey, string> = {
   br: 'Dock, fourth',
 };
 
+/**
+ * The dock after a drag: the chip at dock position @p from lands at @p to.
+ * Positions count only the slots the dock shows (a chip that is not Tasks);
+ * a slot holding Tasks, an unknown chip or nothing stays where it is.
+ */
+export function reorderDock(corners: NowCorners, from: number, to: number): NowCorners {
+  const slots = CORNER_KEYS.filter((k) => corners[k] && corners[k] !== 'tasks');
+  const chips = slots.map((k) => corners[k]);
+  if (from < 0 || from >= chips.length || to < 0 || to >= chips.length || from === to)
+    return corners;
+  const [moved] = chips.splice(from, 1);
+  chips.splice(to, 0, moved);
+  const out = { ...corners };
+  slots.forEach((k, i) => {
+    out[k] = chips[i];
+  });
+  return out;
+}
+
 /** The dock tiles in slot order; a slot with Tasks, an unknown chip or nothing is skipped. */
 export function dockChips(list: Chip[], corners: NowCorners): Chip[] {
   const out: Chip[] = [];

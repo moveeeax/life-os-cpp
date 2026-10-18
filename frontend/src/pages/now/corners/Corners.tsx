@@ -18,6 +18,7 @@ import { HabitsPanel } from './HabitsPanel';
 import { LinksPanel } from './LinksPanel';
 import { Parts } from './Parts';
 import { TasksPanel } from './TasksPanel';
+import { useDockDrag } from './useDockDrag';
 import './corners.css';
 
 /** What a panel shows: a chip of the dock, or one of the action corners. */
@@ -81,14 +82,19 @@ export function Corners({
   date,
   corners = DEFAULT_CORNERS,
   links,
+  onReorder,
 }: {
   today: Today;
   hour: number;
   date: string;
   corners?: NowCorners;
   links: NowLink[];
+  /** A tile dragged from one dock position to another. */
+  onReorder?: (from: number, to: number) => void;
 }) {
   const [open, setOpen] = useState<PanelId | null>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
+  const drag = useDockDrag(dockRef, onReorder ?? (() => {}));
   const openerRefs = useRef<Partial<Record<PanelId, HTMLButtonElement | null>>>({});
   const panelRef = useRef<HTMLElement>(null);
 
@@ -127,7 +133,11 @@ export function Corners({
   const list = chips(today, hour, date);
   const tasks = list.find((c) => c.key === 'tasks');
   const tasksEmpty = (today.tasks?.today ?? []).length === 0 && !(today.tasks?.late_count ?? 0);
-  const toggle = (id: PanelId) => setOpen((o) => (o === id ? null : id));
+  const toggle = (id: PanelId) => {
+    // The click that ends a drag opens nothing.
+    if (drag.consumeClick()) return;
+    setOpen((o) => (o === id ? null : id));
+  };
   const opener = (id: PanelId) => ({
     ref: (el: HTMLButtonElement | null) => {
       openerRefs.current[id] = el;
@@ -172,9 +182,21 @@ export function Corners({
           )}
         </button>
       </div>
-      <div className="n-dock" data-open={open ? '' : undefined}>
-        {dockChips(list, corners).map((c) => (
-          <button key={c.key} type="button" className="n-tile" {...opener(c.key)}>
+      <div
+        className="n-dock"
+        ref={dockRef}
+        data-open={open ? '' : undefined}
+        data-dragging={drag.dragging ? '' : undefined}
+      >
+        {dockChips(list, corners).map((c, i) => (
+          <button
+            key={c.key}
+            type="button"
+            className="n-tile"
+            style={drag.styleOf(i)}
+            onPointerDown={onReorder ? drag.onPointerDown(i) : undefined}
+            {...opener(c.key)}
+          >
             <span className="c-k">
               {c.dot && (
                 <span

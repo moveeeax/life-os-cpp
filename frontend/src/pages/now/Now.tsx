@@ -3,11 +3,19 @@ import { Navigate } from 'react-router';
 
 import { useHabitsEnabled } from '@/hooks/useHabits';
 import { useMe } from '@/hooks/useMe';
-import { useNowSettings, useSounds, useToday, useWeather } from '@/hooks/useNow';
 import {
+  useNowSettings,
+  useSaveNowSettings,
+  useSounds,
+  useToday,
+  useWeather,
+} from '@/hooks/useNow';
+import {
+  CORNER_KEYS,
   FOCUS_LENGTHS,
   greeting,
   localDate,
+  reorderDock,
   weatherGlyph,
   weatherLine,
   withoutChip,
@@ -112,6 +120,17 @@ function NowScreen() {
   const player = useSoundPlayer(useSounds(me !== null).data ?? []);
   const data = today.data;
   const focus = data?.focus ?? null;
+  const saveSettings = useSaveNowSettings();
+  // The dock shows the corners without Habits when that module is off; a
+  // drag reorders what is shown and the hidden slot keeps its chip.
+  const raw = settings.data?.corners;
+  const shown = raw && !habitsOn ? withoutChip(raw, 'habits') : raw;
+  const reorder = (from: number, to: number) => {
+    if (!raw || !shown) return;
+    const next = reorderDock(shown, from, to);
+    for (const k of CORNER_KEYS) if (next[k] == null && raw[k]) next[k] = raw[k];
+    saveSettings.mutate({ corners: next });
+  };
   const clock = new Intl.DateTimeFormat('en-GB', {
     timeZone: tz,
     hour: '2-digit',
@@ -178,12 +197,9 @@ function NowScreen() {
           today={data}
           hour={hour}
           date={date}
-          corners={
-            settings.data && !habitsOn
-              ? withoutChip(settings.data.corners, 'habits')
-              : settings.data?.corners
-          }
+          corners={shown}
           links={settings.data?.links ?? []}
+          onReorder={raw ? reorder : undefined}
         />
       )}
       {session.phase !== 'idle' && (
