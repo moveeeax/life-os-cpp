@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   useInfiniteQuery,
   useQuery,
@@ -432,26 +432,55 @@ function beep() {
   }
 }
 
+// The rest end lives outside React: the page starts it from a tap, and only
+// RestBar, which ticks, subscribes. The page itself does not re-render 4 times
+// a second during rest.
+const restListeners = new Set<() => void>();
+let restEnd: number | null | undefined; // undefined until read from storage
+
+function getRestEnd(): number | null {
+  if (restEnd === undefined) restEnd = readRestEnd(browserStore(), Date.now());
+  return restEnd;
+}
+
+function setRestEnd(value: number | null) {
+  writeRestEnd(browserStore(), value);
+  restEnd = value;
+  restListeners.forEach((f) => f());
+}
+
+function subscribeRest(f: () => void) {
+  restListeners.add(f);
+  return () => {
+    restListeners.delete(f);
+  };
+}
+
+/** Start the rest countdown (0 stops it). Called from a tap, so a sound may follow. */
+export function startRest(seconds: number) {
+  armSound();
+  setRestEnd(seconds > 0 ? Date.now() + seconds * 1000 : null);
+}
+
+/** Stop the rest countdown (finish, discard). */
+export function stopRest() {
+  setRestEnd(null);
+}
+
 /**
- * Rest timer of the session page. The end time is stored, so a reload keeps
- * the countdown. When it ends the page beeps and `justEnded` is true for a
- * moment (the visual flash).
+ * The rest countdown, for the component that shows it. The end time is
+ * stored, so a reload keeps the countdown. When it ends the page beeps and
+ * `justEnded` is true for a moment (the visual flash).
  */
 export function useRestTimer() {
-  const [endsAt, setEndsAt] = useState<number | null>(() =>
-    readRestEnd(browserStore(), Date.now()),
-  );
+  const endsAt = useSyncExternalStore(subscribeRest, getRestEnd);
   const [now, setNow] = useState(() => Date.now());
   const [justEnded, setJustEnded] = useState(false);
 
-  const set = useCallback((value: number | null) => {
-    writeRestEnd(browserStore(), value);
-    setNow(Date.now());
-    setEndsAt(value);
-  }, []);
-
   useEffect(() => {
     if (endsAt === null) return;
+    setJustEnded(false);
+    setNow(Date.now());
     const tick = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(tick);
   }, [endsAt]);
@@ -460,11 +489,11 @@ export function useRestTimer() {
 
   useEffect(() => {
     if (endsAt === null || remaining > 0) return;
-    set(null);
+    setRestEnd(null);
     beep();
     navigator.vibrate?.([200, 100, 200]);
     setJustEnded(true);
-  }, [endsAt, remaining, set]);
+  }, [endsAt, remaining]);
 
   useEffect(() => {
     if (!justEnded) return;
@@ -476,15 +505,10 @@ export function useRestTimer() {
     running: endsAt !== null && remaining > 0,
     remaining,
     justEnded,
-    start: (seconds: number) => {
-      armSound();
-      setJustEnded(false);
-      set(seconds > 0 ? Date.now() + seconds * 1000 : null);
-    },
     add: (seconds: number) => {
-      if (endsAt !== null) set(endsAt + seconds * 1000);
+      if (endsAt !== null) setRestEnd(endsAt + seconds * 1000);
     },
-    stop: () => set(null),
+    stop: () => setRestEnd(null),
   };
 }
 

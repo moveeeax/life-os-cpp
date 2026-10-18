@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router';
 
@@ -10,6 +10,8 @@ import {
   useNow,
   usePatchSession,
   useRemoveSessionExercise,
+  startRest,
+  stopRest,
   useRestTimer,
   useSetQueue,
 } from '@/hooks/useWorkoutSession';
@@ -27,12 +29,9 @@ import { dangerButton, primaryButton, secondaryButton } from '@/shell/kit/styles
 
 type Confirm = 'finish' | 'discard' | 'remove' | null;
 
-interface RestBarProps {
-  rest: ReturnType<typeof useRestTimer>;
-}
-
-/** The countdown between sets; stays in view at the bottom of the page. */
-function RestBar({ rest }: RestBarProps) {
+/** The countdown between sets; stays in view at the bottom of the page. It ticks alone. */
+function RestBar() {
+  const rest = useRestTimer();
   if (!rest.running && !rest.justEnded) return null;
   return (
     <div role="status" className={cn('k-rest', !rest.running && 'k-rest-done')}>
@@ -54,6 +53,12 @@ function RestBar({ rest }: RestBarProps) {
   );
 }
 
+/** The elapsed time; the once-a-second tick re-renders this, not the page. */
+function ElapsedStat({ startedAt }: { startedAt: string }) {
+  const now = useNow(1000);
+  return <Stat label="Time" value={formatClock((now - Date.parse(startedAt)) / 1000)} />;
+}
+
 /** Where a reload lands: the first exercise that still has sets to do. */
 function firstOpenExercise(session: WorkoutSession): number {
   const open = session.exercises.findIndex((e) => e.sets.length < (e.target_sets ?? 1));
@@ -63,8 +68,6 @@ function firstOpenExercise(session: WorkoutSession): number {
 function ActiveSession({ session }: { session: WorkoutSession }) {
   const navigate = useNavigate();
   const { queue, put, remove } = useSetQueue(session.id);
-  const rest = useRestTimer();
-  const now = useNow(1000);
 
   const [position, setPosition] = useState(() => firstOpenExercise(session));
   const [picking, setPicking] = useState(false);
@@ -75,10 +78,13 @@ function ActiveSession({ session }: { session: WorkoutSession }) {
   const exercise = count > 0 ? session.exercises[index] : null;
 
   // What the user sees, unsent sets included.
-  const shown: WorkoutSession = {
-    ...session,
-    exercises: session.exercises.map((e) => ({ ...e, sets: mergeSets(e.sets, queue, e.id) })),
-  };
+  const shown: WorkoutSession = useMemo(
+    () => ({
+      ...session,
+      exercises: session.exercises.map((e) => ({ ...e, sets: mergeSets(e.sets, queue, e.id) })),
+    }),
+    [session, queue],
+  );
   const unsent = queue.filter((q) => q.sessionId === session.id).length;
 
   const finish = usePatchSession(session.id, (s) => navigate(`/workout/history/${s.id}`));
@@ -101,7 +107,7 @@ function ActiveSession({ session }: { session: WorkoutSession }) {
           </button>
         </div>
         <div className="k-facts">
-          <Stat label="Time" value={formatClock((now - Date.parse(session.started_at)) / 1000)} />
+          <ElapsedStat startedAt={session.started_at} />
           <Stat label="Work sets" value={String(workSetCount(shown))} />
           <Stat label="Volume" value={formatVolume(sessionVolume(shown))} />
         </div>
@@ -140,7 +146,7 @@ function ActiveSession({ session }: { session: WorkoutSession }) {
           queue={queue}
           onPut={put}
           onRemove={remove}
-          onLogged={() => rest.start(exercise.rest_seconds)}
+          onLogged={() => startRest(exercise.rest_seconds)}
         />
       ) : (
         <p className="k-empty">This workout has no exercises yet. Add the first one.</p>
@@ -194,7 +200,7 @@ function ActiveSession({ session }: { session: WorkoutSession }) {
         </p>
       )}
 
-      <RestBar rest={rest} />
+      <RestBar />
 
       {picking && (
         <Sheet title="Add exercise" onClose={() => setPicking(false)} width={720}>
@@ -212,7 +218,7 @@ function ActiveSession({ session }: { session: WorkoutSession }) {
           confirmLabel="Finish"
           busy={finish.isPending}
           onConfirm={() => {
-            rest.stop();
+            stopRest();
             finish.mutate({ finish: true });
           }}
           onClose={() => setConfirm(null)}
@@ -226,7 +232,7 @@ function ActiveSession({ session }: { session: WorkoutSession }) {
           destructive
           busy={discard.isPending}
           onConfirm={() => {
-            rest.stop();
+            stopRest();
             discard.mutate();
           }}
           onClose={() => setConfirm(null)}
