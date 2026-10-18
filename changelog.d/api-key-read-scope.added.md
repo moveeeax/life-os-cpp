@@ -1,1 +1,0 @@
-API keys take a `scope`: `full` (the default, reads and writes the owner's data) or `read` (GET, HEAD and OPTIONS only; any other method is answered 403 `key_read_only` by the middleware). Migration 045 adds the column; every existing key stays `full`. An agent can now be given a key of the owner that reads everything and changes nothing.
