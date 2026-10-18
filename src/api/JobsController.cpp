@@ -53,6 +53,9 @@ void JobsController::submitJob(const HttpRequestPtr& req, std::function<void(con
         Validation::Errors errs;
         Validation::require(errs, body, "type");
         Validation::string_length(errs, body, "type", 1, 255);
+        Validation::int_range(errs, body, "max_retries", 0, 20);
+        if (body.contains("payload") && !body["payload"].is_null() && !body["payload"].is_object())
+            errs.add("payload", "not_object", "must be an object");
         if (errs.any()) {
             callback(Validation::response_400(errs));
             return;
@@ -64,8 +67,9 @@ void JobsController::submitJob(const HttpRequestPtr& req, std::function<void(con
                                                 "This job type is enqueued by the app, not by hand"));
             return;
         }
-        auto payload = body.value("payload", json::object());
-        int max_retries = body.value("max_retries", -1);
+        const json payload = body.contains("payload") && body["payload"].is_object() ? body["payload"] : json::object();
+        const int max_retries =
+            body.contains("max_retries") && !body["max_retries"].is_null() ? body["max_retries"].get<int>() : -1;
 
         auto job = Jobs::get().submit(type, payload, max_retries);
         callback(Response::created({{"data", job.to_json()}, {"message", "Job submitted"}}));

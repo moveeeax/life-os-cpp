@@ -394,6 +394,24 @@ TEST_F(JobsIntegrationTest, SetTraceIdPersistsOnBlob) {
     EXPECT_EQ(status->trace_id, trace);
 }
 
+TEST_F(JobsIntegrationTest, FailAfterCompleteLeavesTheJobDone) {
+    // A lease left by complete() and reaped later calls fail(): the job must
+    // stay completed and never return to the queue.
+    auto job = Jobs::get().submit("donefailq", {});
+    track(job.id);
+    ASSERT_TRUE(Jobs::get().pick({"donefailq"}, 2, "w1"));
+    Jobs::get().complete(job.id, json{{"ok", true}});
+    Jobs::get().fail(job.id, "visibility timeout exceeded");
+
+    auto after = Jobs::get().get_status(job.id);
+    ASSERT_TRUE(after);
+    EXPECT_EQ(after->status, "completed");
+    EXPECT_EQ(after->retry_count, 0);
+    std::vector<std::string> q;
+    Cache::get().get_client().lrange(Jobs::queue_key("donefailq"), 0, -1, std::back_inserter(q));
+    EXPECT_TRUE(q.empty());
+}
+
 TEST_F(JobsIntegrationTest, BackoffDelaysRequeueUntilDue) {
     Jobs::get().set_retry_backoff(/*base_ms=*/200, /*max_ms=*/1000);
 

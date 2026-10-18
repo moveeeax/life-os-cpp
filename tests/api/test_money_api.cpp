@@ -294,6 +294,9 @@ TEST_F(MoneyApiTest, TransactionsKeepTheInvariants) {
     json other = adj;
     other["account_id"] = freedom["id"];
     EXPECT_EQ(post(other), k400BadRequest) << "an adjustment sits on its original's account";
+    json categorised = adj;
+    categorised["category_id"] = food["id"];
+    EXPECT_EQ(post(categorised), k400BadRequest) << "an adjustment has no category";
 
     const json row = body_of(call_id(&Api::MoneyController::getTransaction, user(kAnna), Get, t1["id"]))["data"];
     EXPECT_DOUBLE_EQ(row["final_amount"].get<double>(), 13255.61);

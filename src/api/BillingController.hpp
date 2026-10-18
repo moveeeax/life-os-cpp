@@ -124,7 +124,8 @@ public:
     //   - 5xx: EITHER PayPal's OWN verify-webhook-signature API was
     //     unreachable/non-2xx (verify_webhook_signature() THROWS for this —
     //     see PayPalClient.hpp's class doc comment) OR processing a
-    //     signature-VALID body failed for any reason at all — malformed
+    //     signature-VALID body failed for any reason at all — a failed
+    //     credit for a known order (database error), malformed
     //     shape (e.g. "id" arriving as a number, not a string), an
     //     unresolvable refund/reversal capture id, or Billing::refund_capture
     //     itself throwing (notably Repositories::PaymentNotFound, which can
@@ -285,6 +286,12 @@ private:
     // genuinely malformed/unexpected payload).
     static std::string extract_capture_id_from_links(const json& resource);
 
+    /// The error line for a capture that can never be credited as sent.
+    static void log_unreconciled_capture(const std::string& order_id,
+                                         const std::string& capture_id,
+                                         const std::string& event_id,
+                                         const char* what);
+
     // PAYMENT.CAPTURE.COMPLETED → credit. Handles BOTH "the user never
     // returned, this webhook is the only signal we ever get" AND "a capture
     // that was PENDING at return-flow time (BillingController::capture left
@@ -292,7 +299,9 @@ private:
     // into the exact same Billing::credit_capture call, whose own guarded
     // UPDATE (WHERE provider_capture_id IS NULL) makes a capture already
     // credited via the return flow a true no-op here (credited=false, same
-    // balance, no second ledger row).
+    // balance, no second ledger row). An unknown order or a capture id of
+    // another order acks 200; any other failure propagates so the webhook
+    // answers 5xx and PayPal redelivers.
     static void handleCaptureCompleted(const json& event,
                                        const std::string& event_id,
                                        std::function<void(bool)> respond);

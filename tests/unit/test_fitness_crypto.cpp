@@ -3,7 +3,7 @@
  * @brief The Xiaomi crypto port against golden vectors from the Python implementation.
  *
  * The vectors in tests/fixtures/xiaomi_crypto_vectors.json were captured from
- * upstream with tools/gen_crypto_vectors.py. They are the whole point: Xiaomi's
+ * upstream with tools/fitness/gen_crypto_vectors.py. They are the whole point: Xiaomi's
  * RC4 is non-standard (1024 bytes of keystream are dropped after key setup),
  * and the signature assembly order cannot be verified by reasoning. The vectors
  * catch a porting error without a network and without a live account.
@@ -26,7 +26,7 @@ nlohmann::json load_vectors() {
     // Path from the repository root: the e2e tests read the spec the same way.
     std::ifstream in("tests/fixtures/xiaomi_crypto_vectors.json");
     if (!in) {
-        throw std::runtime_error("fixture not found; run tools/gen_crypto_vectors.py from the repo root");
+        throw std::runtime_error("fixture not found; run tools/fitness/gen_crypto_vectors.py from the repo root");
     }
     nlohmann::json j;
     in >> j;

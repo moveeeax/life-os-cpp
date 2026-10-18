@@ -2,7 +2,6 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { useBatchMutation } from '@/hooks/useBatchMutation';
-import { useModuleProbe } from '@/hooks/useModuleProbe';
 import { useParseJob } from '@/hooks/useParseJob';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
@@ -224,11 +223,6 @@ export function useMoneySettings() {
 
 /** [query key, url] of the probe that says whether the module is on. */
 export const MONEY_PROBE = [qk.money.enabled(), `${BASE}/settings`] as const;
-
-/** Whether the money module answers at all (404 while switched off). */
-export function useMoneyEnabled(signedIn: boolean): boolean {
-  return useModuleProbe(...MONEY_PROBE, signedIn) ?? true;
-}
 
 // ── writes ─────────────────────────────────────────────────────────────────
 

@@ -164,7 +164,8 @@ mean "own data" and "own sync". The default role `User` has both (migration
 API key inherits the permissions of its user's role and reads that user's
 data: an agent needs a key of the user whose data it reads, from
 `POST /api/v1/account/api-keys`. Sync runs as a job per account
-(`src/jobs/FitnessSyncHandler.hpp`) on the worker; an optional timer in the
+(`src/fitness/jobs/SyncJob.hpp`, registered in
+`src/fitness/jobs/Register.hpp`) on the worker; an optional timer in the
 API pod enqueues one for every linked account every
 `MI_FITNESS_SYNC_SCHEDULE_HOURS`. The historical design note of the port
 (2026-09-29, before the per-user accounts and the MIT license) is in

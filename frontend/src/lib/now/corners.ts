@@ -1,6 +1,6 @@
-// The four corners of Now: one main line and one small line each, a dot when
+// The dock tiles of Now: one main line and one small line each, a dot when
 // something is off (the rules of the quiet lines), and the countdowns of the
-// Goals corner.
+// Goals tile.
 import { formatAmount } from '@/lib/amounts';
 import { daysBetween } from '@/lib/dates';
 import { paceWord, type Tone } from '@/lib/goals';
@@ -222,7 +222,7 @@ function habitsChip(t: Today, hour: number): Chip {
   };
 }
 
-/** Every chip in the default order: the four corners, then Habits (placed through Arrange). */
+/** Every chip in the default dock order, Habits last (placed through Arrange). */
 export function chips(today: Today, hour: number, todayDate: string): Chip[] {
   return [
     bodyChip(today),

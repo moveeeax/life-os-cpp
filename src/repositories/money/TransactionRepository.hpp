@@ -426,6 +426,11 @@ private:
             if (in.amount == 0) {
                 throw Invariant("an adjustment of 0 says nothing");
             }
+            // Unchecked, a category here could be any id, another owner's too,
+            // and that owner could then never delete it (the FK holds it).
+            if (in.category_id.has_value()) {
+                throw Invariant("an adjustment has no category");
+            }
         } else {
             if (in.adjusts_id.has_value()) {
                 throw Invariant("only an adjustment points at another row");

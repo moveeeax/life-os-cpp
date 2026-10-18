@@ -787,6 +787,16 @@ TEST_F(BillingApiTest, WebhookCreditsWhenUserNeverReturned) {
     EXPECT_EQ(*payment->provider_capture_id, "CAPTURE-NEVERRETURNED-1");
 }
 
+// An order this database never saw can never be credited: the webhook still
+// acks 200 so PayPal stops redelivering it. Other failures answer 5xx.
+TEST_F(BillingApiTest, WebhookForAnUnknownOrderAcks200) {
+    int status = 0;
+    auto body =
+        do_webhook(capture_completed_event("WH-UNKNOWN-1", "ORDER-UNKNOWN-1", "CAPTURE-UNKNOWN-1", "10.00"), &status);
+    EXPECT_EQ(status, k200OK);
+    EXPECT_TRUE(body["data"]["handled"].get<bool>());
+}
+
 // The return flow already credited this order (fake->next_capture_id is the
 // capture id BillingController::capture recorded) — the webhook redelivering
 // (or independently reporting) the same completed capture must be a true

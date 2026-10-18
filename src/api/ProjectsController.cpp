@@ -167,7 +167,9 @@ void ProjectsController::createProject(const HttpRequestPtr& req, Callback&& cal
     if (body.contains("kind")) {
         Validation::one_of(errs, body, "kind", kKinds);
     }
-    const std::string kind = body.value("kind", std::string("project")) == "course" ? "course" : "project";
+    // opt_string: a null or non-string kind is the one_of error above, not a throw.
+    const std::string kind =
+        Validation::opt_string(body, "kind").value_or("project") == "course" ? "course" : "project";
     common_fields(errs, body, kind);
     if (errs.any()) {
         callback(Validation::response_400(errs));

@@ -166,13 +166,12 @@ void worker_loop(const std::string& worker_id, const std::vector<std::string>& t
                 }
             };
 
+            // complete() stays outside the handler's try: a Redis error while
+            // recording a success must not fail() the job and run it again
+            // (a second email, a second webhook delivery).
+            std::optional<json> result;
             try {
-                auto result = process_job(*job);
-                Jobs::get().complete(job->id, result);
-                span->SetStatus(opentelemetry::trace::StatusCode::kOk);
-                span->End();
-                record_done("success");
-                spdlog::info("Job completed: id={}", job->id);
+                result = process_job(*job);
             } catch (const Jobs::DeferJob& e) {
                 // Not a failure: the job waits (e.g. its row is held by another
                 // delivery) and comes back without spending an attempt.
@@ -205,6 +204,20 @@ void worker_loop(const std::string& worker_id, const std::vector<std::string>& t
                 span->End();
                 Jobs::get().fail(job->id, "non-std exception in handler");
                 record_done("failure");
+            }
+            if (result) {
+                try {
+                    Jobs::get().complete(job->id, *result);
+                } catch (const std::exception& e) {
+                    // The work is done; the blob still says processing. The
+                    // lease reaper may hand it out again after the visibility
+                    // timeout, the at-least-once contract, but never at once.
+                    spdlog::error("Job succeeded but complete() failed: id={} error={}", job->id, e.what());
+                }
+                span->SetStatus(opentelemetry::trace::StatusCode::kOk);
+                span->End();
+                record_done("success");
+                spdlog::info("Job completed: id={}", job->id);
             }
         } catch (const std::exception& e) {
             if (shutdown_requested.load())

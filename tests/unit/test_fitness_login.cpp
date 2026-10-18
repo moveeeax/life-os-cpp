@@ -133,6 +133,18 @@ TEST(XiaomiLogin, MissingServiceTokenCookieIsRejected) {
     EXPECT_THROW(client.login(), Xiaomi::MiFitnessAuthError);
 }
 
+// A 5xx or 429 on the serviceToken redirect is a busy sts host, not dead
+// credentials: the sync retries instead of marking the link for re-auth.
+TEST(XiaomiLogin, RedirectHttp5xxIsAProtocolError) {
+    for (const int status : {429, 503}) {
+        FakeHttpTransport transport;
+        transport.reply({200, login_body("NEWTOKEN"), {}});
+        transport.reply({status, "", {}});
+        Xiaomi::CloudClient client(transport, seed(), [](const auto&) {});
+        EXPECT_THROW(client.login(), Xiaomi::MiFitnessProtocolError) << status;
+    }
+}
+
 // Rotation already happened on the Xiaomi side, but there is nowhere to store
 // it: the database is down. The session must carry on with the new token,
 // otherwise it is lost for good.

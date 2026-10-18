@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
-import { useModuleProbe } from '@/hooks/useModuleProbe';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import type { Task } from '@/lib/tasks';
@@ -223,11 +222,6 @@ export function usePacking(tripId: string) {
 
 /** [query key, url] of the probe that says whether the module is on. */
 export const TRAVEL_PROBE = [qk.travel.enabled(), `${BASE}/settings`] as const;
-
-/** Whether the travel module answers at all (404 while switched off). */
-export function useTravelEnabled(signedIn: boolean): boolean {
-  return useModuleProbe(...TRAVEL_PROBE, signedIn) ?? true;
-}
 
 export function useDocuments() {
   return useQuery({
