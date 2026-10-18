@@ -516,10 +516,18 @@ void TasksController::parse(const HttpRequestPtr& req, Callback&& callback) {
                          hint,
                          note_id,
                          [&](auto& txn, const std::string& job_id) {
+                             // The cap again, under the lock: two creates at once cannot both pass the count above.
+                             Repositories::JobRows::hold_slot(txn, Repo::ParseJobRepository::kTable, owner);
                              via_outbox =
                                  Jobs::Outbox::enqueue_if_drained(txn, Jobs::TasksParse::kJobType, payload(job_id));
                          })["id"]
                  .get<std::string>();
+    } catch (const Repositories::JobRows::SlotsTaken&) {
+        callback(ErrorResponse::make({k429TooManyRequests,
+                                      "too_many_parses",
+                                      "wait for your running parses to finish",
+                                      json{{"retry_after_sec", 30}}}));
+        return;
     } catch (const Repositories::NotFoundError&) {
         callback(ErrorResponse::not_found("task_note"));
         return;

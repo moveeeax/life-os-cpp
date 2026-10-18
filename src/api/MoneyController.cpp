@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <map>
 #include <optional>
 #include <pqxx/pqxx>
@@ -57,6 +58,30 @@
 #include "utils/Modules.hpp"
 
 namespace Api {
+
+namespace {
+
+/// A ?tz= that is not an IANA zone answers 400, as /today and the agenda do
+/// (local_today alone falls back to UTC and would file the day wrongly).
+/// True when the request was answered. A zone list the database cannot read
+/// lets the request through; local_today then falls back to UTC.
+bool refused_tz(const drogon::HttpRequestPtr& req, const std::function<void(const drogon::HttpResponsePtr&)>& callback) {
+    const std::string tz = req->getParameter("tz");
+    if (tz.empty()) {
+        return false;
+    }
+    try {
+        if (Repositories::Zones::is_zone(tz)) {
+            return false;
+        }
+    } catch (const std::exception&) {
+        return false;
+    }
+    callback(ErrorResponse::bad_request("invalid_query", "tz must be an IANA zone like Asia/Almaty"));
+    return true;
+}
+
+}  // namespace
 
 namespace {
 
@@ -932,6 +957,9 @@ json rate_json(const Repo::FxRateRepository::Rate& r) {
 
 void MoneyController::rate(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    if (refused_tz(req, callback)) {
+        return;
+    }
     const std::string date = request_day(req, &Repositories::Zones::today_in, today_utc());
     const std::string quote = req->getParameter("quote");
     if (!is_calendar_date(date) || !std::regex_match(quote, kCodeRe)) {
@@ -950,6 +978,9 @@ void MoneyController::rate(const HttpRequestPtr& req, Callback&& callback) {
 
 void MoneyController::convert(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    if (refused_tz(req, callback)) {
+        return;
+    }
     const std::string date = request_day(req, &Repositories::Zones::today_in, today_utc());
     const std::string from = req->getParameter("from");
     const std::string to = req->getParameter("to");
@@ -1062,6 +1093,9 @@ void MoneyController::refreshRates(const HttpRequestPtr& req, Callback&& callbac
 
 void MoneyController::periodReport(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    if (refused_tz(req, callback)) {
+        return;
+    }
     const std::string kind_text = req->getParameter("kind").empty() ? "month" : req->getParameter("kind");
     if (std::find(kPeriodKinds.begin(), kPeriodKinds.end(), kind_text) == kPeriodKinds.end()) {
         callback(ErrorResponse::bad_request("invalid_kind", "kind must be week, month, quarter or custom"));
@@ -1112,6 +1146,9 @@ void MoneyController::periodReport(const HttpRequestPtr& req, Callback&& callbac
 
 void MoneyController::summary(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    if (refused_tz(req, callback)) {
+        return;
+    }
     const std::string currency = req->getParameter("currency").empty() ? "USD" : req->getParameter("currency");
     if (!std::regex_match(currency, kCodeRe)) {
         callback(ErrorResponse::bad_request("invalid_currency", "currency must be an ISO code like USD"));
@@ -1246,9 +1283,17 @@ void start_parse(const std::string& owner, MoneyController::Callback& callback, 
         }
         id = create(repo,
                     [&](auto& txn, const std::string& job_id) {
+                        // The cap again, under the lock: two creates at once cannot both pass the count above.
+                        Repositories::JobRows::hold_slot(txn, Repo::ParseJobRepository::kTable, owner);
                         via_outbox = Jobs::Outbox::enqueue_if_drained(txn, Jobs::MoneyParse::kJobType, payload(job_id));
                     })["id"]
                  .template get<std::string>();
+    } catch (const Repositories::JobRows::SlotsTaken&) {
+        callback(ErrorResponse::make({k429TooManyRequests,
+                                      "too_many_parses",
+                                      "wait for your running parses to finish",
+                                      json{{"retry_after_sec", 30}}}));
+        return;
     } catch (const Repositories::ValidationError& e) {
         callback(ErrorResponse::bad_request(e.code(), e.message()));
         return;
@@ -1288,6 +1333,9 @@ void start_parse(const std::string& owner, MoneyController::Callback& callback, 
 
 void MoneyController::parseText(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    if (refused_tz(req, callback)) {
+        return;
+    }
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -1315,6 +1363,9 @@ void MoneyController::parseText(const HttpRequestPtr& req, Callback&& callback) 
 
 void MoneyController::parseReceipt(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    if (refused_tz(req, callback)) {
+        return;
+    }
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -1436,6 +1487,9 @@ void MoneyController::advisorReport(const HttpRequestPtr& req, Callback&& callba
 
 void MoneyController::advisorRun(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    if (refused_tz(req, callback)) {
+        return;
+    }
     json body;
     if (!parse_object(req, body, callback)) {
         return;

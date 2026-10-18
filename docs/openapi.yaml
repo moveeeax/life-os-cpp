@@ -5769,6 +5769,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: The code exists and fewer decimals are asked while an account, a budget or a receipt keeps it (decimals_in_use); nothing changed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /api/v1/money/currencies/{code}:
     parameters:
@@ -6824,6 +6829,7 @@ paths:
         - { name: from, in: query, schema: { type: string, format: date }, description: Custom period start }
         - { name: to, in: query, schema: { type: string, format: date }, description: Custom period end }
         - { name: as_if, in: query, schema: { type: string, pattern: '^[A-Z]{3}$' }, description: Defaults to the settings' view_currency }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there; a name that is not a zone answers 400 invalid_query' }
       responses:
         '200':
           description: The report
@@ -6885,11 +6891,13 @@ paths:
       summary: Send a bank mail, an SMS or a list of purchases to the LLM parse job
       tags: [money]
       security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: hint_date defaults to today there; a name that is not a zone answers 400 invalid_query' }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 8000 }, hint_date: { type: string, format: date, description: The date of a line without one; defaults to today (UTC) } } }
+            schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 8000 }, hint_date: { type: string, format: date, description: The date of a line without one; defaults to today in tz (UTC without it) } } }
       responses:
         '202':
           description: Queued
@@ -6931,6 +6939,8 @@ paths:
       summary: Send a receipt photo (a jpeg, png or webp data URL, at most 4 MB decoded) to the LLM parse job
       tags: [money]
       security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: hint_date defaults to today there; a name that is not a zone answers 400 invalid_query' }
       requestBody:
         required: true
         content:

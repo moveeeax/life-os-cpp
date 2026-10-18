@@ -11,6 +11,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "database/Database.hpp"
 
@@ -61,6 +62,46 @@ public:
         return Database::get().execute_read([&](auto& txn) {
             auto r = txn.exec_params("SELECT 1 FROM money_fx_rates WHERE date = $1::date LIMIT 1", date);
             return !r.empty();
+        });
+    }
+
+    /// The days in [from, to] that need a fetch, oldest first: a day with no
+    /// quote at all, or one that lacks a quote of @p needed which the source
+    /// has published for some other day. The second rule gives a currency
+    /// added after rates exist its history (the daily job stores it from the
+    /// day it is kept); a quote the source never had is not asked for again
+    /// and again. USD is never stored (it reads as 1).
+    std::vector<std::string> missing_days(const std::string& from,
+                                          const std::string& to,
+                                          const std::set<std::string>& needed) {
+        std::string codes = "{";
+        for (const auto& q : needed) {
+            if (q == "USD") {
+                continue;
+            }
+            if (codes.size() > 1) {
+                codes += ",";
+            }
+            codes += "\"" + q + "\"";
+        }
+        codes += "}";
+        return Database::get().execute_read([&](auto& txn) {
+            auto r = txn.exec_params(
+                "WITH want AS (SELECT DISTINCT quote FROM money_fx_rates WHERE quote = ANY($3::text[])) "
+                "SELECT to_char(d, 'YYYY-MM-DD') FROM generate_series($1::date, $2::date, interval '1 day') AS d "
+                "WHERE NOT EXISTS (SELECT 1 FROM money_fx_rates r WHERE r.date = d::date) "
+                "   OR EXISTS (SELECT 1 FROM want w WHERE NOT EXISTS ("
+                "        SELECT 1 FROM money_fx_rates r WHERE r.date = d::date AND r.quote = w.quote)) "
+                "ORDER BY d",
+                from,
+                to,
+                codes);
+            std::vector<std::string> out;
+            out.reserve(r.size());
+            for (const auto& row : r) {
+                out.push_back(row[0].template as<std::string>());
+            }
+            return out;
         });
     }
 

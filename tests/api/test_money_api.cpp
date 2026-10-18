@@ -461,6 +461,40 @@ TEST_F(MoneyApiTest, WithoutADateTheRateIsOfTodayInTheGivenZone) {
     EXPECT_EQ(convert({{"tz", zone}, {"date", utc}}), utc) << "a given date wins";
 }
 
+// A tz that is not a zone is refused, as /today and the agenda refuse it,
+// instead of quietly filing the day under UTC.
+TEST_F(MoneyApiTest, ATzThatIsNotAZoneIsRefused) {
+    const std::vector<std::pair<std::string, std::string>> bad{{"tz", "Mars/Olympus"}};
+    const auto get = [&](Handler h, std::vector<std::pair<std::string, std::string>> params) {
+        params.insert(params.end(), bad.begin(), bad.end());
+        return call(h, user(kAnna), Get, params);
+    };
+    for (const auto& resp : {get(&Api::MoneyController::rate, {{"quote", "KZT"}}),
+                             get(&Api::MoneyController::convert, {{"amount", "1"}, {"from", "USD"}, {"to", "KZT"}}),
+                             get(&Api::MoneyController::periodReport, {}),
+                             get(&Api::MoneyController::summary, {{"currency", "USD"}})}) {
+        ASSERT_EQ(resp->statusCode(), k400BadRequest) << resp->body();
+        EXPECT_EQ(body_of(resp)["error"], "invalid_query");
+    }
+    const auto post = [&](Handler h, const json& body) {
+        auto req = TestHelpers::authed_json(user(kAnna), body, Post);
+        req->setParameter("tz", "Mars/Olympus");
+        HttpResponsePtr captured;
+        (controller.*h)(req, [&](const HttpResponsePtr& r) { captured = r; });
+        return captured;
+    };
+    for (const auto& resp : {post(&Api::MoneyController::parseText, json{{"text", "coffee 1500"}}),
+                             post(&Api::MoneyController::advisorRun, json::object())}) {
+        ASSERT_TRUE(resp);
+        ASSERT_EQ(resp->statusCode(), k400BadRequest) << resp->body();
+        EXPECT_EQ(body_of(resp)["error"], "invalid_query");
+    }
+    EXPECT_EQ(call(&Api::MoneyController::rate, user(kAnna), Get, {{"quote", "USD"}, {"tz", "Asia/Almaty"}})
+                  ->statusCode(),
+              k200OK)
+        << "a zone passes";
+}
+
 TEST_F(MoneyApiTest, InboxAndMerchantMemory) {
     const json kaspi = account(kAnna, "Kaspi", "KZT");
     const json food = category(kAnna, json{{"name", "Food"}});
@@ -1307,6 +1341,18 @@ TEST_F(MoneyApiTest, FewerDecimalsAreRefusedWhileAnAccountKeepsTheCurrency) {
     EXPECT_EQ(body_of(patch(kAnna, json{{"decimals", 2}}))["data"]["decimals"], 2) << "the same is not a change";
     EXPECT_EQ(body_of(patch(kAnna, json{{"decimals", 4}}))["data"]["decimals"], 4) << "more decimals fit every row";
     EXPECT_EQ(body_of(patch(kAnna, json{{"name", "Gold"}}))["data"]["name"], "Gold") << "a patch without decimals";
+
+    // POST on the existing code updates it: the same rule holds there.
+    const auto upsert = [&](const json& body) {
+        return call_json(&Api::MoneyController::upsertCurrency, user(kAnna), body);
+    };
+    const auto shrunk = upsert(json{{"code", "XAU"}, {"decimals", 1}, {"minor_unit", "deci-ounce"}});
+    ASSERT_EQ(shrunk->statusCode(), k409Conflict) << shrunk->body();
+    EXPECT_EQ(body_of(shrunk)["error"], "decimals_in_use");
+    EXPECT_EQ(body_of(patch(kAnna, json{{"name", "Gold"}}))["data"]["decimals"], 4) << "the upsert changed nothing";
+    const auto wider = upsert(json{{"code", "XAU"}, {"decimals", 5}, {"minor_unit", "ounce/100000"}});
+    ASSERT_EQ(wider->statusCode(), k200OK) << wider->body();
+    EXPECT_EQ(body_of(wider)["data"]["decimals"], 5);
 
     // Boris keeps XAU too, without an account in it: his decimals are his.
     ASSERT_EQ(call_json(&Api::MoneyController::upsertCurrency,
