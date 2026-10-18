@@ -556,7 +556,9 @@ TEST(HttpE2E, IdempotencyKeyReplaysResponse) {
     attach_session(third, sc);
     auto r3 = send(third);
     EXPECT_EQ(r3->statusCode(), k422UnprocessableEntity);
-    expect_matches_schema(r3, "POST", "/api/v1/account/api-keys");
+    // The 422 comes from the middleware; the spec of this operation does not
+    // list it, so the body is checked by hand.
+    EXPECT_EQ(body_of(r3)["error"], "idempotency_key_conflict") << r3->getBody();
 }
 
 TEST(HttpE2E, AuthPublicRoutesAreNeverReplayed) {
