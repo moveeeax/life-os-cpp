@@ -180,10 +180,10 @@ jobs:
   retryBackoffBaseMs: 2000
   # Processing lease in seconds (JOBS_VISIBILITY_TIMEOUT_SEC): a job whose
   # worker died is re-queued once the lease expires. 0 disables the lease
-  # and leaves such a job in `processing` forever. Must exceed the longest
-  # handler (fitness sync runs up to MI_FITNESS_SYNC_TYPE_TIMEOUT per type);
-  # production sets 300. scripts/check-helm-render.sh refuses a production
-  # render with 0.
+  # and leaves such a job in `processing` forever. The worker renews a
+  # running job's lease every third of this, so it bounds how long a dead
+  # worker holds a job, not how long a handler may run; production sets 300.
+  # scripts/check-helm-render.sh refuses a production render with 0.
   visibilityTimeoutSec: 0
 
 # ---------------------------------------------------------------

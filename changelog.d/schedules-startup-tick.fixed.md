@@ -1,0 +1,1 @@
+The fitness sync, money rates and money advisor schedules also run once 30 s after the API starts, so a schedule whose interval is longer than the time between deploys fires at all; the weekly advisor queues from `MONEY_ADVISOR_HOUR_UTC` to the end of the day instead of in that hour only, so a restart around the hour no longer skips the week.

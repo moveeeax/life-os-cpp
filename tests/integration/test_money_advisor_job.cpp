@@ -222,6 +222,18 @@ TEST_F(MoneyAdvisorJobTest, TheWeeklyEnqueueHappensOncePerUserAndWeek) {
     Jobs::get().complete(job->id, json::object());
 }
 
+// The hourly tick queues from the target hour on, not in that hour alone: a
+// restart that skipped the 07:00 tick is caught by the next one (or by the
+// startup run), and the row's unique key keeps the later ticks a no-op.
+TEST_F(MoneyAdvisorJobTest, TheTickIsDueFromTheTargetHourToTheEndOfTheDay) {
+    EXPECT_FALSE(Jobs::MoneyAdvisor::tick_due(6, 7));
+    EXPECT_TRUE(Jobs::MoneyAdvisor::tick_due(7, 7));
+    EXPECT_TRUE(Jobs::MoneyAdvisor::tick_due(8, 7)) << "the hour after a missed tick";
+    EXPECT_TRUE(Jobs::MoneyAdvisor::tick_due(23, 7));
+    EXPECT_TRUE(Jobs::MoneyAdvisor::tick_due(0, 0));
+    // The repeated ticks are no-ops: TheWeeklyEnqueueHappensOncePerUserAndWeek.
+}
+
 TEST_F(MoneyAdvisorJobTest, ARunningReviewIsRetriedAndALateResultChangesNothing) {
     const auto [row, queued] = reports.create_or_get(kAnna, "month", "2026-09-01", "2026-09-30");
     ASSERT_EQ(reports.start(row["id"]), 1) << "a worker claimed the row and died";

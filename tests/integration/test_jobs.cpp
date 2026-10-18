@@ -3,13 +3,18 @@
  * @brief Integration tests for JobQueue: submit / pick / complete / fail-retry / cancel.
  * @details Requires live Redis. Tests cover the retry path and the cancel
  *          semantics (completed/failed jobs cannot be cancelled), including
- *          concurrent cancels of one job: exactly one of them wins.
+ *          concurrent cancels of one job: exactly one of them wins; the
+ *          worker's outcome mapping (Jobs::run_one), the lease heartbeat and
+ *          the maintenance pass (jobs/Worker.hpp). Due times are checked with
+ *          an explicit clock passed to promote_due_jobs / reap_expired_leases
+ *          rather than with sleeps.
  */
 
 #include <atomic>
 #include <chrono>
 #include <fstream>
 #include <iterator>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -23,7 +28,9 @@
 
 #include "jobs/Dispatcher.hpp"
 #include "jobs/Jobs.hpp"
+#include "jobs/Worker.hpp"
 #include "test_helpers.hpp"
+#include "utils/Time.hpp"
 
 using json = nlohmann::json;
 
@@ -44,7 +51,11 @@ protected:
                                               "hookq",
                                               "hookq-throws",
                                               "multiq-a",
-                                              "multiq-b"};
+                                              "multiq-b",
+                                              "runq",
+                                              "beatq",
+                                              "trimq",
+                                              "promoteq"};
 
     std::vector<std::string> job_ids_to_cleanup;
 
@@ -92,6 +103,29 @@ protected:
     }
 
     void track(const std::string& id) { job_ids_to_cleanup.push_back(id); }
+
+    static std::vector<std::string> list(const std::string& key) {
+        std::vector<std::string> out;
+        Cache::get().get_client().lrange(key, 0, -1, std::back_inserter(out));
+        return out;
+    }
+
+    static std::optional<double> lease_of(const std::string& id) {
+        auto score = Cache::get().get_client().zscore(Jobs::leases_key(), id);
+        if (!score)
+            return std::nullopt;
+        return *score;
+    }
+
+    // Submit one job of @p type and pick it as @p worker.
+    Jobs::Job picked(const std::string& type, const std::string& worker) {
+        auto job = Jobs::get().submit(type, {{"n", 1}});
+        track(job.id);
+        auto p = Jobs::get().pick({type}, 2, worker);
+        if (!p || p->id != job.id)
+            throw std::runtime_error("the job was not picked");
+        return *p;
+    }
 };
 
 TEST_F(JobsIntegrationTest, SubmitPickComplete) {
@@ -260,8 +294,8 @@ TEST_F(JobsIntegrationTest, CancelDropsADeferredJob) {
     std::vector<std::string> delayed;
     Cache::get().get_client().zrange(Jobs::delayed_key(), 0, -1, std::back_inserter(delayed));
     EXPECT_TRUE(delayed.empty()) << "a cancelled job left in jobs:delayed would be promoted and run";
-    std::this_thread::sleep_for(std::chrono::milliseconds(1100));
-    EXPECT_EQ(Jobs::get().promote_due_jobs(), 0);
+    // Past the defer window, without sleeping through it.
+    EXPECT_EQ(Jobs::get().promote_due_jobs(Utils::Time::now_epoch_millis() + 5000), 0);
     std::vector<std::string> queue_contents;
     Cache::get().get_client().lrange(Jobs::queue_key("cancelq"), 0, -1, std::back_inserter(queue_contents));
     EXPECT_TRUE(queue_contents.empty());
@@ -420,6 +454,9 @@ TEST_F(JobsIntegrationTest, BackoffDelaysRequeueUntilDue) {
 
     auto p1 = Jobs::get().pick({"backoffq"}, 2, "w1");
     ASSERT_TRUE(p1);
+    // The job is due 200 ms after fail(), so it is not due at any time up to
+    // this moment, however slow the runner is.
+    const int64_t before_fail = Utils::Time::now_epoch_millis();
     Jobs::get().fail(job.id, "boom");
 
     // Retry was counted and the job stays "pending", but with backoff enabled it
@@ -434,11 +471,11 @@ TEST_F(JobsIntegrationTest, BackoffDelaysRequeueUntilDue) {
     EXPECT_TRUE(q.empty());
 
     // Before the delay elapses, promotion moves nothing.
-    EXPECT_EQ(Jobs::get().promote_due_jobs(), 0);
+    EXPECT_EQ(Jobs::get().promote_due_jobs(before_fail), 0);
 
-    // After the backoff window, the job is promoted back and pickable again.
-    std::this_thread::sleep_for(std::chrono::milliseconds(250));
-    EXPECT_EQ(Jobs::get().promote_due_jobs(), 1);
+    // After the backoff window (at most max_ms = 1 s), the job is promoted
+    // back and pickable again.
+    EXPECT_EQ(Jobs::get().promote_due_jobs(Utils::Time::now_epoch_millis() + 5000), 1);
 
     auto p2 = Jobs::get().pick({"backoffq"}, 2, "w1");
     ASSERT_TRUE(p2);
@@ -467,8 +504,8 @@ TEST_F(JobsIntegrationTest, DeferParksTheJobWithoutCountingAnAttempt) {
     EXPECT_TRUE(proc.empty()) << "a restart of the worker must not run it early";
     EXPECT_EQ(Jobs::get().promote_due_jobs(), 0);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(1100));
-    EXPECT_EQ(Jobs::get().promote_due_jobs(), 1) << "promoted with retry backoff off too";
+    EXPECT_EQ(Jobs::get().promote_due_jobs(Utils::Time::now_epoch_millis() + 5000), 1)
+        << "promoted with retry backoff off too";
     auto p2 = Jobs::get().pick({"deferq"}, 2, "dwrk-0");
     ASSERT_TRUE(p2);
     EXPECT_EQ(p2->id, job.id);
@@ -605,6 +642,251 @@ TEST_F(JobsIntegrationTest, CompleteClearsVisibilityLease) {
     // Completing the job clears its lease so the reaper can't resurrect it.
     EXPECT_FALSE(static_cast<bool>(Cache::get().get_client().zscore(Jobs::leases_key(), job.id)));
     EXPECT_EQ(Jobs::get().reap_expired_leases(), 0);
+}
+
+// ---- the worker's outcome mapping (Jobs::run_one) --------------------------
+
+TEST_F(JobsIntegrationTest, RunOneCompletesAJobWhoseHandlerReturns) {
+    const auto job = picked("runq", "run-0");
+    int calls = 0;
+    const auto run = Jobs::run_one(Jobs::get(), job, [&](const Jobs::Job&) {
+        ++calls;
+        return json{{"ok", true}};
+    });
+    EXPECT_EQ(calls, 1);
+    EXPECT_EQ(run.outcome, Jobs::Outcome::success);
+    EXPECT_TRUE(run.recorded);
+    EXPECT_STREQ(Jobs::outcome_label(run.outcome), "success");
+    const auto after = Jobs::get().get_status(job.id);
+    ASSERT_TRUE(after);
+    EXPECT_EQ(after->status, "completed");
+    EXPECT_EQ(after->result.at("ok").get<bool>(), true);
+    EXPECT_TRUE(list(Jobs::processing_key("run-0")).empty());
+}
+
+// The bug run_one exists to rule out: complete() inside the handler's try sent
+// a Redis error while recording a success to fail(), which ran the job again.
+TEST_F(JobsIntegrationTest, RunOneNeverFailsAJobWhoseCompleteThrew) {
+    const auto job = picked("runq", "run-1");
+    const auto run = Jobs::run_one(Jobs::get(), job, [](const Jobs::Job& j) {
+        // complete() now throws ("Job not found"), and so would fail().
+        Cache::get().del(Jobs::job_key(j.id));
+        return json{{"sent", 1}};
+    });
+    EXPECT_EQ(run.outcome, Jobs::Outcome::success) << "a success stays a success";
+    EXPECT_FALSE(run.recorded);
+    EXPECT_TRUE(run.error.empty());
+    EXPECT_TRUE(list(Jobs::queue_key("runq")).empty()) << "not requeued";
+    EXPECT_TRUE(list(Jobs::dlq_key("runq")).empty()) << "not dead-lettered";
+    EXPECT_EQ(list(Jobs::processing_key("run-1")), std::vector<std::string>{job.id})
+        << "left for the reaper or startup recovery, the at-least-once path";
+    Cache::get().get_client().del(Jobs::processing_key("run-1"));
+}
+
+TEST_F(JobsIntegrationTest, RunOneDefersOnDeferJobWithoutCountingAnAttempt) {
+    const auto job = picked("runq", "run-2");
+    const auto run = Jobs::run_one(
+        Jobs::get(), job, [](const Jobs::Job&) -> json { throw Jobs::DeferJob("the row is held", 1500); });
+    EXPECT_EQ(run.outcome, Jobs::Outcome::deferred);
+    EXPECT_TRUE(run.recorded);
+    EXPECT_EQ(run.defer_ms, 1500);
+    const auto after = Jobs::get().get_status(job.id);
+    ASSERT_TRUE(after);
+    EXPECT_EQ(after->status, "pending");
+    EXPECT_EQ(after->retry_count, 0);
+    EXPECT_TRUE(static_cast<bool>(Cache::get().get_client().zscore(Jobs::delayed_key(), job.id)));
+    EXPECT_TRUE(list(Jobs::queue_key("runq")).empty());
+}
+
+TEST_F(JobsIntegrationTest, RunOneDeadLettersAPermanentErrorWithoutRetries) {
+    const auto job = picked("runq", "run-3");
+    const auto run =
+        Jobs::run_one(Jobs::get(), job, [](const Jobs::Job&) -> json { throw Jobs::PermanentJobError("no handler"); });
+    EXPECT_EQ(run.outcome, Jobs::Outcome::permanent_failure);
+    EXPECT_EQ(run.error, "no handler");
+    const auto after = Jobs::get().get_status(job.id);
+    ASSERT_TRUE(after);
+    EXPECT_EQ(after->status, "dead");
+    EXPECT_EQ(after->retry_count, 0) << "the retry budget is not spent";
+    EXPECT_EQ(list(Jobs::dlq_key("runq")), std::vector<std::string>{job.id});
+}
+
+TEST_F(JobsIntegrationTest, RunOneFailsAJobWhoseHandlerThrows) {
+    const auto job = picked("runq", "run-4");
+    const auto run =
+        Jobs::run_one(Jobs::get(), job, [](const Jobs::Job&) -> json { throw std::runtime_error("boom"); });
+    EXPECT_EQ(run.outcome, Jobs::Outcome::failure);
+    EXPECT_EQ(run.error, "boom");
+    const auto after = Jobs::get().get_status(job.id);
+    ASSERT_TRUE(after);
+    EXPECT_EQ(after->status, "pending");
+    EXPECT_EQ(after->retry_count, 1);
+    EXPECT_EQ(list(Jobs::queue_key("runq")), std::vector<std::string>{job.id}) << "backoff is off here";
+}
+
+TEST_F(JobsIntegrationTest, RunOneFailsAJobWhoseHandlerThrowsANonStdType) {
+    const auto job = picked("runq", "run-5");
+    const auto run = Jobs::run_one(Jobs::get(), job, [](const Jobs::Job&) -> json { throw 42; });
+    EXPECT_EQ(run.outcome, Jobs::Outcome::failure);
+    EXPECT_EQ(run.error, "non-std exception in handler");
+    const auto after = Jobs::get().get_status(job.id);
+    ASSERT_TRUE(after);
+    EXPECT_EQ(after->retry_count, 1);
+    EXPECT_EQ(after->error, "non-std exception in handler");
+}
+
+// ---- the lease heartbeat -------------------------------------------------
+
+// A handler that outlives the visibility timeout keeps its lease: the
+// heartbeat moves it ahead, and the reaper, at a time past the first lease,
+// leaves the job alone.
+TEST_F(JobsIntegrationTest, RunOneRenewsTheLeaseWhileTheHandlerRuns) {
+    Jobs::get().set_visibility_timeout(/*sec=*/1);  // renewed every ~333 ms
+    const auto job = picked("beatq", "beat-0");
+    const auto first = lease_of(job.id);
+    ASSERT_TRUE(first);
+
+    long reaped = -1;
+    const auto run = Jobs::run_one(Jobs::get(), job, [&](const Jobs::Job& j) {
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+        while (std::chrono::steady_clock::now() < deadline) {
+            const auto now = lease_of(j.id);
+            if (now && *now > *first)
+                break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+        // Past the lease pick() wrote, before the renewed one.
+        reaped = Jobs::get().reap_expired_leases(static_cast<int64_t>(*first) + 1);
+        return json{{"ok", true}};
+    });
+    EXPECT_EQ(reaped, 0) << "a renewed lease is not reaped";
+    EXPECT_EQ(run.outcome, Jobs::Outcome::success);
+    const auto after = Jobs::get().get_status(job.id);
+    ASSERT_TRUE(after);
+    EXPECT_EQ(after->status, "completed");
+    EXPECT_EQ(after->retry_count, 0);
+    EXPECT_FALSE(lease_of(job.id)) << "the heartbeat stopped before complete() cleared the lease";
+}
+
+// The heartbeat never extends a job that is no longer this worker's: one the
+// reaper took back and another worker picked, or one whose lease is gone.
+TEST_F(JobsIntegrationTest, RenewLeaseLeavesAJobAnotherWorkerTookOver) {
+    Jobs::get().set_visibility_timeout(/*sec=*/100);
+    const auto job = picked("beatq", "beat-1");
+    EXPECT_TRUE(Jobs::get().renew_lease(job.id, "beat-1"));
+
+    // The reaper takes it back, another worker picks it.
+    Cache::get().get_client().zadd(Jobs::leases_key(), job.id, 1.0);
+    ASSERT_EQ(Jobs::get().reap_expired_leases(), 1);
+    auto again = Jobs::get().pick({"beatq"}, 2, "beat-2");
+    ASSERT_TRUE(again);
+    const auto theirs = lease_of(job.id);
+    ASSERT_TRUE(theirs);
+
+    EXPECT_FALSE(Jobs::get().renew_lease(job.id, "beat-1"));
+    EXPECT_EQ(lease_of(job.id), theirs) << "the new owner's lease is untouched";
+    EXPECT_TRUE(Jobs::get().renew_lease(job.id, "beat-2"));
+
+    // A lease that is gone is not recreated.
+    Cache::get().get_client().zrem(Jobs::leases_key(), job.id);
+    EXPECT_FALSE(Jobs::get().renew_lease(job.id, "beat-2"));
+    EXPECT_FALSE(lease_of(job.id));
+}
+
+TEST_F(JobsIntegrationTest, AStoppedHeartbeatRenewsNothing) {
+    Jobs::get().set_visibility_timeout(/*sec=*/100);
+    const auto job = picked("beatq", "beat-3");
+    Jobs::LeaseHeartbeat beat(Jobs::get(), job.id, "beat-3", std::chrono::milliseconds(100));
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (beat.renewals() == 0 && std::chrono::steady_clock::now() < deadline)
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    ASSERT_GT(beat.renewals(), 0);
+    beat.stop();
+    const int renewals = beat.renewals();
+    const auto lease = lease_of(job.id);
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    EXPECT_EQ(beat.renewals(), renewals);
+    EXPECT_EQ(lease_of(job.id), lease);
+}
+
+TEST_F(JobsIntegrationTest, AHeartbeatOfAnotherWorkerRenewsNothing) {
+    Jobs::get().set_visibility_timeout(/*sec=*/100);
+    const auto job = picked("beatq", "beat-4");
+    const auto lease = lease_of(job.id);
+    Jobs::LeaseHeartbeat beat(Jobs::get(), job.id, "someone-else", std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(400));
+    EXPECT_EQ(beat.renewals(), 0);
+    EXPECT_EQ(lease_of(job.id), lease) << "beat-4's lease is untouched";
+}
+
+// ---- promote, recover and the maintenance pass ---------------------------
+
+TEST_F(JobsIntegrationTest, PromoteMovesADueJobOnceAndDropsAnExpiredBlob) {
+    auto job = Jobs::get().submit("promoteq", {});
+    track(job.id);
+    Cache::get().get_client().del(Jobs::queue_key("promoteq"));
+    Cache::get().get_client().zadd(Jobs::delayed_key(), job.id, 1.0);
+    Cache::get().get_client().zadd(Jobs::delayed_key(), "no-such-job", 1.0);
+
+    EXPECT_EQ(Jobs::get().promote_due_jobs(), 1);
+    EXPECT_EQ(Jobs::get().promote_due_jobs(), 0) << "a second pass finds nothing";
+    EXPECT_EQ(list(Jobs::queue_key("promoteq")), std::vector<std::string>{job.id});
+    std::vector<std::string> delayed;
+    Cache::get().get_client().zrange(Jobs::delayed_key(), 0, -1, std::back_inserter(delayed));
+    EXPECT_TRUE(delayed.empty()) << "the entry of a missing blob is spent";
+}
+
+TEST_F(JobsIntegrationTest, RecoverRequeuesTheLiveIdAndDropsASpentOne) {
+    auto live = Jobs::get().submit("promoteq", {});
+    track(live.id);
+    ASSERT_TRUE(Jobs::get().pick({"promoteq"}, 2, "rec-0"));
+    Cache::get().get_client().rpush(Jobs::processing_key("rec-0"), "no-such-job");
+
+    EXPECT_EQ(Jobs::get().recover_processing("rec-0"), 1);
+    EXPECT_TRUE(list(Jobs::processing_key("rec-0")).empty());
+    EXPECT_EQ(list(Jobs::queue_key("promoteq")), std::vector<std::string>{live.id});
+    EXPECT_EQ(Jobs::get().get_status(live.id)->status, "pending");
+}
+
+TEST_F(JobsIntegrationTest, TrimIndexesDropsEntriesOlderThanTheResultTtl) {
+    auto old_job = Jobs::get().submit("trimq", {});
+    auto new_job = Jobs::get().submit("trimq", {});
+    track(old_job.id);
+    track(new_job.id);
+    // Created long before result_ttl (3600 s in this suite).
+    const double long_ago = static_cast<double>(Jobs::now_epoch() - 10 * 3600);
+    Cache::get().get_client().zadd(Jobs::index_key(), old_job.id, long_ago);
+    Cache::get().get_client().zadd(Jobs::index_key_for("trimq"), old_job.id, long_ago);
+
+    EXPECT_GE(Jobs::get().trim_indexes(), 2);
+    auto& redis = Cache::get().get_client();
+    EXPECT_FALSE(static_cast<bool>(redis.zscore(Jobs::index_key(), old_job.id)));
+    EXPECT_FALSE(static_cast<bool>(redis.zscore(Jobs::index_key_for("trimq"), old_job.id)));
+    EXPECT_TRUE(static_cast<bool>(redis.zscore(Jobs::index_key(), new_job.id)));
+    EXPECT_TRUE(static_cast<bool>(redis.zscore(Jobs::index_key_for("trimq"), new_job.id)));
+}
+
+TEST_F(JobsIntegrationTest, MaintenanceTrimsOncePerIntervalAndPromotesEveryPass) {
+    Jobs::Maintenance maintenance(std::chrono::seconds(600));
+    const auto t0 = std::chrono::steady_clock::now();
+    auto job = Jobs::get().submit("trimq", {});
+    track(job.id);
+    Cache::get().get_client().zadd(
+        Jobs::index_key_for("trimq"), job.id, static_cast<double>(Jobs::now_epoch() - 10 * 3600));
+    Cache::get().get_client().del(Jobs::queue_key("trimq"));
+    Cache::get().get_client().zadd(Jobs::delayed_key(), job.id, 1.0);
+
+    const auto first = maintenance.run(Jobs::get(), t0);
+    EXPECT_EQ(first.errors, 0);
+    EXPECT_EQ(first.promoted, 1);
+    EXPECT_GE(first.trimmed, 1);
+
+    Cache::get().get_client().zadd(
+        Jobs::index_key_for("trimq"), job.id, static_cast<double>(Jobs::now_epoch() - 10 * 3600));
+    const auto second = maintenance.run(Jobs::get(), t0 + std::chrono::seconds(60));
+    EXPECT_EQ(second.trimmed, 0) << "not again within the interval";
+    const auto third = maintenance.run(Jobs::get(), t0 + std::chrono::seconds(601));
+    EXPECT_GE(third.trimmed, 1);
 }
 
 }  // namespace

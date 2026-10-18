@@ -619,7 +619,22 @@ TEST_F(WorkoutSessionsTest, AStartRacingAnotherIsAConflictNotAServerError) {
     pqxx::work hold(side);
     hold.exec("INSERT INTO workout_sessions (owner_id) VALUES ('" + std::string(kOwner) + "'::uuid)");
     auto racing = std::async(std::launch::async, [&] { return start(owner()); });
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    // Commit only once start() is waiting on the index: a fixed sleep let the
+    // test pass through the plain pre-check instead when start() came late,
+    // leaving the 23505-to-409 branch unexercised.
+    pqxx::connection watch(TestHelpers::pg_conn_string());
+    bool waiting = false;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (!waiting && std::chrono::steady_clock::now() < deadline) {
+        pqxx::nontransaction look(watch);
+        waiting = look.exec(
+                          "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' "
+                          "AND datname = current_database() AND pid <> pg_backend_pid()")[0][0]
+                      .as<long>() > 0;
+        if (!waiting)
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    EXPECT_TRUE(waiting) << "start() never waited on the one-active-session index";
     hold.commit();
     const auto resp = racing.get();
     ASSERT_TRUE(resp);
