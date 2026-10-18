@@ -1,1 +1,0 @@
-Now on a phone: the Add, Links and Tasks row and the dock sit in the flow of the page under the focus instead of fixed over it, so they no longer cover the focus picker on a short viewport (iOS Safari with its bars); the pill nav fades the edge that hides more sections instead of cutting a label.

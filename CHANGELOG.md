@@ -6,6 +6,12 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.30.1] - 2026-10-18
+
+### Fixed
+- Money accounts: the editor has an Archived checkbox, so an archived account can be brought back (the API accepted `archived: false` already, the form never sent it).
+- Now on a phone: the Add, Links and Tasks row and the dock sit in the flow of the page under the focus instead of fixed over it, so they no longer cover the focus picker on a short viewport (iOS Safari with its bars); the pill nav fades the edge that hides more sections instead of cutting a label.
+
 ## [1.30.0] - 2026-10-15
 
 ### Changed
