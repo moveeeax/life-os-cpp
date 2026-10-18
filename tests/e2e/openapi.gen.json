@@ -10255,6 +10255,7 @@
    },
    "post": {
     "summary": "Create an API key — the secret is returned ONCE in this response",
+    "description": "`scope` is `full` (the default: reads and writes the owner's data) or `read` (GET, HEAD and OPTIONS only; any other method with the key is answered 403 `key_read_only`). The key's metadata carries its `scope`.",
     "tags": [
      "account"
     ],
@@ -10275,6 +10276,14 @@
         "properties": {
          "name": {
           "type": "string"
+         },
+         "scope": {
+          "type": "string",
+          "enum": [
+           "full",
+           "read"
+          ],
+          "default": "full"
          }
         }
        }
@@ -10283,7 +10292,10 @@
     },
     "responses": {
      "201": {
-      "description": "Key created; `key` field holds the one-time secret"
+      "description": "Key created; `key` field holds the one-time secret, `scope` its scope"
+     },
+     "400": {
+      "description": "Validation failed (an unknown scope)"
      },
      "401": {
       "description": "Not authenticated"
@@ -27420,7 +27432,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 402158,
-  "source_fnv1a64": "e4d2a20564e7c5ff"
+  "source_bytes": 402554,
+  "source_fnv1a64": "68feb09b5417fe82"
  }
 }

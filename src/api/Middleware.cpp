@@ -375,6 +375,11 @@ void register_auth() {
             auto key_principal = Security::ApiKeys::authenticate(req);
             if (!key_principal)
                 return unauthorized("invalid_api_key");
+            // A read key answers the safe methods only; decided here, before
+            // any handler, so no write of any module needs its own check.
+            if (key_principal->key_read_only && !Security::ApiKeys::read_key_allows(req->method()))
+                return short_circuit(
+                    req, ErrorResponse::forbidden("key_read_only", "This API key may only read (GET, HEAD, OPTIONS)"));
             req->attributes()->insert(Security::Auth::kPrincipalAttr, *key_principal);
             return {};
         }

@@ -481,6 +481,37 @@ TEST(HttpE2E, ApiKeyIsRefusedOnTheAccountSurface) {
     EXPECT_EQ(me_resp->statusCode(), k200OK) << me_resp->getBody();
 }
 
+TEST(HttpE2E, ReadKeyReadsButNeverWrites) {
+    // A key of scope read answers GET and refuses every writing method with
+    // 403 key_read_only, decided by the middleware before any handler.
+    REQUIRE_E2E_ENV();
+    auto sc = register_and_login("e2e-readkey@example.com", "password-e2e-1");
+    auto create = json_post("/api/v1/account/api-keys", {{"name", "reader"}, {"scope", "read"}});
+    attach_session(create, sc);
+    auto created = send(create);
+    ASSERT_EQ(created->statusCode(), k201Created) << created->getBody();
+    EXPECT_EQ(body_of(created)["scope"], "read");
+    const std::string key = body_of(created)["key"];
+
+    auto me = HttpRequest::newHttpRequest();
+    me->setPath("/api/v1/auth/me");
+    me->addHeader("X-API-Key", key);
+    auto me_resp = send(me);
+    EXPECT_EQ(me_resp->statusCode(), k200OK) << me_resp->getBody();
+
+    auto write = json_post("/api/v1/tasks/items", {{"title", "never"}});
+    write->addHeader("X-API-Key", key);
+    auto refused = send(write);
+    EXPECT_EQ(refused->statusCode(), k403Forbidden) << refused->getBody();
+    EXPECT_EQ(body_of(refused)["error"], "key_read_only");
+
+    auto head = HttpRequest::newHttpRequest();
+    head->setMethod(Head);
+    head->setPath("/api/v1/auth/me");
+    head->addHeader("X-API-Key", key);
+    EXPECT_NE(send(head)->statusCode(), k403Forbidden);
+}
+
 TEST(HttpE2E, IdempotencyKeyReplaysResponse) {
     REQUIRE_E2E_ENV();
     const json body = {{"email", "e2e-idem@example.com"}, {"password", "password-e2e-1"}};

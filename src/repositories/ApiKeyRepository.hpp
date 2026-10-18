@@ -20,21 +20,23 @@ namespace Repositories {
 class ApiKeyRepository {
 public:
     // Metadata columns only — key_hash is write-only from here.
-    static constexpr const char* kColumns = "id, user_id, name, prefix, last_used_at, revoked_at, created_at";
+    static constexpr const char* kColumns = "id, user_id, name, prefix, scope, last_used_at, revoked_at, created_at";
 
     Domain::ApiKey create(const std::string& user_id,
                           const std::string& name,
                           const std::string& key_hash,
-                          const std::string& prefix) {
+                          const std::string& prefix,
+                          const std::string& scope = "full") {
         return Database::get().execute_write([&](auto& txn) {
             auto r = txn.exec_params(
-                std::string("INSERT INTO api_keys (user_id, name, key_hash, prefix) VALUES ($1, $2, $3, $4) "
+                std::string("INSERT INTO api_keys (user_id, name, key_hash, prefix, scope) VALUES ($1, $2, $3, $4, $5) "
                             "RETURNING ") +
                     kColumns,
                 user_id,
                 name,
                 key_hash,
-                prefix);
+                prefix,
+                scope);
             return Domain::ApiKey::from_row(r[0]);
         });
     }

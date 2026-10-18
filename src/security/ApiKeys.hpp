@@ -79,6 +79,13 @@ inline bool request_has_key(const drogon::HttpRequestPtr& req) {
     return !extract_key(req).empty();
 }
 
+/// Whether a key of scope "read" may make a request with this method: the
+/// safe methods only. A read key that tries to write is answered 403
+/// key_read_only by the middleware before any handler runs.
+inline bool read_key_allows(drogon::HttpMethod method) {
+    return method == drogon::Get || method == drogon::Head || method == drogon::Options;
+}
+
 namespace detail {
 
 /**
@@ -185,7 +192,7 @@ inline std::optional<Security::Auth::AuthPrincipal> authenticate(const drogon::H
         return Database::get().execute_write([&](auto& txn) -> std::optional<Security::Auth::AuthPrincipal> {
             auto r = txn.exec_params(
                 "WITH authed AS ("
-                "  SELECT k.id, k.user_id, r.permissions "
+                "  SELECT k.id, k.user_id, k.scope, r.permissions "
                 "  FROM api_keys k "
                 "  JOIN users u ON u.id = k.user_id "
                 "  JOIN roles r ON r.id = u.role_id "
@@ -195,7 +202,7 @@ inline std::optional<Security::Auth::AuthPrincipal> authenticate(const drogon::H
                 "  WHERE id = (SELECT id FROM authed) "
                 "    AND (last_used_at IS NULL OR last_used_at < now() - make_interval(secs => $2)) "
                 ") "
-                "SELECT user_id, permissions FROM authed",
+                "SELECT user_id, scope, permissions FROM authed",
                 key_hash,
                 kLastUsedThrottleSecs);
             if (r.empty())
@@ -209,10 +216,13 @@ inline std::optional<Security::Auth::AuthPrincipal> authenticate(const drogon::H
             const auto role = static_cast<std::uint32_t>(r[0]["permissions"].template as<long long>());
             const bool admin = (role & Security::Auth::kAdminPermissionBits) == Security::Auth::kAdminPermissionBits;
             const auto permissions = (role & ~Security::Auth::kAdminPermissionBits) | (admin ? kAdminKeyDataBits : 0u);
+            const auto scope = r[0]["scope"].template as<std::string>();
             Security::Auth::AuthPrincipal p;
             p.subject = user_id;
             p.via_api_key = true;
-            p.raw_claims = json{{"sub", user_id}, {"permissions", permissions}, {"api_key", true}};
+            p.key_read_only = scope == "read";
+            p.raw_claims =
+                json{{"sub", user_id}, {"permissions", permissions}, {"api_key", true}, {"key_scope", scope}};
             return p;
         });
     } catch (const std::exception& e) {

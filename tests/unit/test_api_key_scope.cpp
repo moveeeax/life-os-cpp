@@ -15,6 +15,7 @@
 namespace {
 
 using Security::ApiKeys::path_allows_key;
+using Security::ApiKeys::read_key_allows;
 
 TEST(ApiKeyScope, RefusesAccountAdminAndKeyManagement) {
     EXPECT_FALSE(path_allows_key("/api/v1/account/api-keys"));
@@ -63,6 +64,17 @@ TEST(ApiKeyScope, AllowsTheDataRoutes) {
     // "/api/v1/account".
     EXPECT_TRUE(path_allows_key("/api/v1/accounts"));
     EXPECT_TRUE(path_allows_key("/api/v1/administrivia"));
+}
+
+TEST(ApiKeyScope, ReadKeyMethods) {
+    // A read key keeps to the safe methods; everything that could write is out.
+    EXPECT_TRUE(read_key_allows(drogon::Get));
+    EXPECT_TRUE(read_key_allows(drogon::Head));
+    EXPECT_TRUE(read_key_allows(drogon::Options));
+    EXPECT_FALSE(read_key_allows(drogon::Post));
+    EXPECT_FALSE(read_key_allows(drogon::Put));
+    EXPECT_FALSE(read_key_allows(drogon::Patch));
+    EXPECT_FALSE(read_key_allows(drogon::Delete));
 }
 
 }  // namespace
