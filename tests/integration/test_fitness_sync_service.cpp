@@ -6,6 +6,7 @@
  * type, the auth error class, mutual exclusion of runs, sync_state updates.
  */
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -16,6 +17,7 @@
 #include "database/Database.hpp"
 #include "fitness/FakeHttpTransport.hpp"
 #include "fitness/sync/SyncService.hpp"
+#include "fitness/xiaomi/Crypto.hpp"
 #include "fitness/xiaomi/Regions.hpp"
 #include "repositories/fitness/SyncRunRepository.hpp"
 #include "test_helpers.hpp"
@@ -359,6 +361,160 @@ TEST_F(SyncServiceTest, RunOfAnotherAccountDoesNotBlockOrGetInterrupted) {
     EXPECT_FALSE(runs.any_running(kAccount));
     // The run is invisible under another account's id.
     EXPECT_FALSE(runs.get(id, "5555555555").has_value());
+}
+
+// review-fitness 7: a login that fails on the network is not repeated for each
+// type: one request for the whole run, every type closed with the same class.
+TEST_F(SyncServiceTest, ALoginNetworkFailureIsTriedOncePerRun) {
+    Repositories::SyncRunRepository runs;
+    transport.reply_transport_error("connection refused");
+
+    const std::vector<std::string> types{"daily_activity", "sleep", "heart_rate"};
+    const long id = runs.create(kAccount, "2026-09-22", "2026-09-22", types);
+    auto svc = service();
+    svc.run(id, "2026-09-22", "2026-09-22", types);
+
+    const auto row = runs.get(id, kAccount);
+    ASSERT_TRUE(row.has_value());
+    EXPECT_EQ((*row)["status"], "failed");
+    for (const auto& type : types) {
+        EXPECT_EQ((*row)["result"][type]["error"], "protocol") << type;
+    }
+    EXPECT_EQ(transport.requests().size(), 1u);
+    // Xiaomi never answered: the link status is left as it was.
+    EXPECT_EQ(svc.login_outcome(), Sync::SyncService::Login::NotAttempted);
+}
+
+// review-fitness 2: steps are bucketed by the device's zone, the window by the
+// region's. The activity fetch takes a day of margin on both sides, so the
+// local early hours of `from` (a device ahead of the region) and the late
+// hours of `to` (a device behind) are inside it.
+TEST_F(SyncServiceTest, ActivityFetchHasADayOfMarginOnBothSides) {
+    Repositories::SyncRunRepository runs;
+    transport.reply_login();
+    transport.reply_encrypted(steps_page(100));
+    transport.reply_encrypted(empty_page());
+
+    const long id = runs.create(kAccount, "2026-09-22", "2026-09-22", {"daily_activity"});
+    service().run(id, "2026-09-22", "2026-09-22", {"daily_activity"});
+
+    // Two login requests, then steps and calories.
+    ASSERT_EQ(transport.requests().size(), 4u);
+    const auto expected = Xiaomi::range_to_timestamps("2026-09-21", "2026-09-23", "cn");
+    for (const std::size_t i : {std::size_t{2}, std::size_t{3}}) {
+        const auto& req = transport.requests()[i];
+        const std::string nonce = Xiaomi::Crypto::b64_decode(FakeHttpTransport::form_value(req.body, "_nonce"));
+        const std::string signed_nonce = Xiaomi::Crypto::signed_nonce(FakeHttpTransport::kSsecurityB64, nonce);
+        const auto payload = json::parse(Xiaomi::Crypto::rc4(
+            signed_nonce, Xiaomi::Crypto::b64_decode(FakeHttpTransport::form_value(req.body, "data"))));
+        EXPECT_EQ(payload["start_time"].get<long long>(), expected.first) << i;
+        EXPECT_EQ(payload["end_time"].get<long long>(), expected.second) << i;
+    }
+    // Only the requested day is stored.
+    const long rows = Database::get().execute_read(
+        [](auto& txn) { return txn.exec("SELECT COUNT(*) FROM daily_activity")[0][0].template as<long>(); });
+    EXPECT_EQ(rows, 1);
+}
+
+// review-jobs 4: a worker killed mid-run leaves its row running. The job comes
+// back and takes its own run over once the heartbeat is quiet, instead of
+// finishing as skipped and blocking the account for hours.
+TEST_F(SyncServiceTest, ItsOwnQuietRunningRowIsTakenOver) {
+    Repositories::SyncRunRepository runs;
+    const long id = runs.create(kAccount, "2026-09-22", "2026-09-22", {"daily_activity"});
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params(
+            "UPDATE sync_runs SET status = 'running', started_at = now() - interval '1 hour', "
+            "heartbeat_at = now() - interval '1 hour' WHERE id = $1",
+            id);
+        return true;
+    });
+    transport.reply_login();
+    transport.reply_encrypted(steps_page(100));
+    transport.reply_encrypted(empty_page());
+
+    auto svc = service();
+    const auto result = svc.run(id, "2026-09-22", "2026-09-22", {"daily_activity"});
+
+    EXPECT_EQ(svc.start_outcome(), Sync::SyncService::Start::Started);
+    EXPECT_FALSE(result.contains("skipped_reason"));
+    EXPECT_EQ((*runs.get(id, kAccount))["status"], "succeeded");
+}
+
+// ...and while the row still beats, another delivery holds it: nothing is
+// touched and the caller learns how long to wait.
+TEST_F(SyncServiceTest, ItsOwnRowThatStillBeatsIsHeldElsewhere) {
+    Repositories::SyncRunRepository runs;
+    const long id = runs.create(kAccount, "2026-09-22", "2026-09-22", {"daily_activity"});
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE sync_runs SET status = 'running', heartbeat_at = now() WHERE id = $1", id);
+        return true;
+    });
+
+    auto svc = service();
+    const auto result = svc.run(id, "2026-09-22", "2026-09-22", {"daily_activity"});
+
+    EXPECT_EQ(svc.start_outcome(), Sync::SyncService::Start::HeldElsewhere);
+    EXPECT_GT(svc.retry_in_ms(), 0);
+    EXPECT_TRUE(transport.requests().empty()) << "must not reach the cloud";
+    const auto row = runs.get(id, kAccount);
+    EXPECT_EQ((*row)["status"], "running");
+    EXPECT_TRUE((*row)["result"].empty());
+    EXPECT_TRUE(result.empty());
+}
+
+// A run of the same account whose heartbeat went quiet no longer holds the
+// slot for the hours of the old stale rule.
+TEST_F(SyncServiceTest, AQuietRunOfTheAccountIsInterruptedLongBeforeTheOldStaleLimit) {
+    Repositories::SyncRunRepository runs;
+    Database::get().execute_write([](auto& txn) {
+        txn.exec(
+            "INSERT INTO sync_runs (status, started_at, heartbeat_at, requested_start, requested_end, xiaomi_user_id) "
+            "VALUES ('running', now() - interval '20 minutes', now() - interval '20 minutes', "
+            "'2026-09-01', '2026-09-02', '1234567890')");
+        return true;
+    });
+    transport.reply_login();
+    transport.reply_encrypted(steps_page(100));
+    transport.reply_encrypted(empty_page());
+
+    const long id = runs.create(kAccount, "2026-09-22", "2026-09-22", {"daily_activity"});
+    service().run(id, "2026-09-22", "2026-09-22", {"daily_activity"});
+
+    EXPECT_EQ((*runs.get(id, kAccount))["status"], "succeeded");
+    const std::string quiet = Database::get().execute_read([](auto& txn) {
+        return txn.exec("SELECT status FROM sync_runs WHERE requested_start = '2026-09-01'")[0][0]
+            .template as<std::string>();
+    });
+    EXPECT_EQ(quiet, "interrupted");
+}
+
+// review-jobs 5: only the unique violation means "another run is in progress".
+// Any other database error while claiming propagates (the queue retries), and
+// the run is not marked skipped.
+TEST_F(SyncServiceTest, ADatabaseErrorWhileClaimingIsNotASkip) {
+    Repositories::SyncRunRepository runs;
+    const long id = runs.create(kAccount, "1999-01-01", "1999-01-01", {"daily_activity"});
+    const auto sql = [](const char* statement) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec(statement);
+            return true;
+        });
+    };
+    sql("CREATE OR REPLACE FUNCTION test_sync_claim_fails() RETURNS trigger AS $$ BEGIN "
+        "IF NEW.requested_start = DATE '1999-01-01' AND NEW.status = 'running' THEN "
+        "RAISE EXCEPTION 'claim refused by the test'; END IF; RETURN NEW; END $$ LANGUAGE plpgsql");
+    sql("DROP TRIGGER IF EXISTS test_sync_claim_fails ON sync_runs");
+    sql("CREATE TRIGGER test_sync_claim_fails BEFORE UPDATE ON sync_runs "
+        "FOR EACH ROW EXECUTE FUNCTION test_sync_claim_fails()");
+
+    auto svc = service();
+    EXPECT_ANY_THROW(svc.run(id, "1999-01-01", "1999-01-01", {"daily_activity"}));
+
+    sql("DROP TRIGGER IF EXISTS test_sync_claim_fails ON sync_runs");
+    sql("DROP FUNCTION IF EXISTS test_sync_claim_fails()");
+    EXPECT_EQ((*runs.get(id, kAccount))["status"], "queued");
+    EXPECT_TRUE(transport.requests().empty());
 }
 
 TEST_F(SyncServiceTest, LoginOutcomeIsReported) {

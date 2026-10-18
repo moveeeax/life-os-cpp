@@ -219,29 +219,64 @@ public:
         return out;
     }
 
-    /// All rows of a type over the range, unpaginated: the export page.
+    /// All rows of a type over the range, unpaginated, as JSON values (the CSV
+    /// export). The caller bounds the size first with export_count().
     nlohmann::json export_rows(const std::string& type, const std::string& from, const std::string& to) {
-        const long kNoLimit = 100000000;
-        if (type == "daily_activity")
-            return daily_activity(from, to, kNoLimit, 0).rows;
-        if (type == "sleep")
-            return sleep(from, to, kNoLimit, 0).rows;
-        if (type == "heart_rate")
-            return heart_rate(from, to, "", kNoLimit, 0).rows;
-        if (type == "stress")
-            return stress(from, to, kNoLimit, 0).rows;
-        if (type == "spo2")
-            return spo2(from, to, kNoLimit, 0).rows;
-        if (type == "body_measurements")
-            return body(from, to, kNoLimit, 0).rows;
-        if (type == "workouts")
-            return workouts(from, to, kNoLimit, 0).rows;
-        if (type == "abnormal_heart_beat")
-            return abnormal_heart_beat(from, to, kNoLimit, 0).rows;
-        return nlohmann::json::array();
+        return read_all(type, from, to).rows;
+    }
+
+    /// How many rows of a type the range holds: the export's size check, run
+    /// before any row is read. Only the COUNT statement goes to the database.
+    long export_count(const std::string& type, const std::string& from, const std::string& to) {
+        const ModeScope scope(*this, Mode::CountOnly);
+        return read_all(type, from, to).total;
+    }
+
+    /// All rows of a type over the range as the JSON array text Postgres built
+    /// (the JSON export): the text goes into the response as it is, without a
+    /// JSON tree of every row in between. "[]" for an unknown type.
+    std::string export_json(const std::string& type, const std::string& from, const std::string& to) {
+        const ModeScope scope(*this, Mode::RawRows);
+        raw_rows_.clear();
+        read_all(type, from, to);
+        return raw_rows_.empty() ? std::string("[]") : std::move(raw_rows_);
     }
 
 private:
+    /// What page() does: a page with its total (the read routes), the total
+    /// only, or the rows as JSON text into raw_rows_ without the total.
+    enum class Mode { Page, CountOnly, RawRows };
+
+    struct ModeScope {
+        HealthReadRepository& repo;
+        ModeScope(HealthReadRepository& r, Mode m) : repo(r) { repo.mode_ = m; }
+        ~ModeScope() { repo.mode_ = Mode::Page; }
+        ModeScope(const ModeScope&) = delete;
+        ModeScope& operator=(const ModeScope&) = delete;
+    };
+
+    /// Every row of one exported type over the range.
+    Page read_all(const std::string& type, const std::string& from, const std::string& to) {
+        const long kNoLimit = 100000000;
+        if (type == "daily_activity")
+            return daily_activity(from, to, kNoLimit, 0);
+        if (type == "sleep")
+            return sleep(from, to, kNoLimit, 0);
+        if (type == "heart_rate")
+            return heart_rate(from, to, "", kNoLimit, 0);
+        if (type == "stress")
+            return stress(from, to, kNoLimit, 0);
+        if (type == "spo2")
+            return spo2(from, to, kNoLimit, 0);
+        if (type == "body_measurements")
+            return body(from, to, kNoLimit, 0);
+        if (type == "workouts")
+            return workouts(from, to, kNoLimit, 0);
+        if (type == "abnormal_heart_beat")
+            return abnormal_heart_beat(from, to, kNoLimit, 0);
+        return {};
+    }
+
     /// ISO UTC with an explicit +00:00: timestamptz goes out without losing meaning.
     static std::string iso(const std::string& column) {
         return "to_char(" + column + " AT TIME ZONE 'UTC', " SQL_ISO_UTC_FORMAT ")";
@@ -282,15 +317,21 @@ private:
         const std::string total_sql = with_account(count_sql, 3 + extras);
         Page out;
         Database::get().execute_read([&](auto& txn) {
-            auto agg = txn.exec_params(
-                "SELECT COALESCE(json_agg(t), '[]'::json) FROM (" + select_sql + " LIMIT $3 OFFSET $4) t",
-                from,
-                to,
-                limit,
-                offset,
-                extra...,
-                account_);
-            out.rows = nlohmann::json::parse(agg[0][0].template as<std::string>());
+            if (mode_ != Mode::CountOnly) {
+                auto agg = txn.exec_params(
+                    "SELECT COALESCE(json_agg(t), '[]'::json) FROM (" + select_sql + " LIMIT $3 OFFSET $4) t",
+                    from,
+                    to,
+                    limit,
+                    offset,
+                    extra...,
+                    account_);
+                if (mode_ == Mode::RawRows) {
+                    raw_rows_ = agg[0][0].template as<std::string>();
+                    return 0;
+                }
+                out.rows = nlohmann::json::parse(agg[0][0].template as<std::string>());
+            }
             auto total = txn.exec_params(total_sql, from, to, extra..., account_);
             out.total = total[0][0].template as<long>();
             return 0;
@@ -299,6 +340,8 @@ private:
     }
 
     std::string account_;
+    Mode mode_ = Mode::Page;
+    std::string raw_rows_;
 };
 
 }  // namespace Repositories

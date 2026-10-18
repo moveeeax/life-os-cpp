@@ -8,6 +8,10 @@
  * prefixes = + - @ TAB CR, only string values are escaped.
  */
 
+#include <string>
+#include <utility>
+#include <vector>
+
 #include <gtest/gtest.h>
 
 #include <nlohmann/json.hpp>
@@ -56,4 +60,20 @@ TEST(FitnessExport, TypesListMatchesTheBridgeOrder) {
     ASSERT_EQ(t.size(), 8u);
     EXPECT_EQ(t.front(), "daily_activity");
     EXPECT_EQ(t.back(), "abnormal_heart_beat");
+}
+
+// review-perf 2: the JSON export splices the rows Postgres built into the
+// envelope as text. The result is the same document the tree gave.
+TEST(FitnessExport, EnvelopeTextIsTheEnvelopeWithTheRowsSpliced) {
+    const std::vector<std::pair<std::string, std::string>> raw = {
+        {"daily_activity", R"([{"date":"2026-09-21","steps":5000}])"}, {"sleep", "[]"}};
+    const json records = {{"daily_activity", json::parse(raw[0].second)}, {"sleep", json::array()}};
+
+    const json spliced = json::parse(Fitness::Export::envelope_text(raw, "", "2026-09-21", "2026-09-22", 1790000000LL));
+    EXPECT_EQ(spliced, Fitness::Export::envelope(records, "", "2026-09-21", "2026-09-22", 1790000000LL));
+
+    const json one = json::parse(Fitness::Export::envelope_text(
+        {{"heart_rate", R"([{"bpm":60}])"}}, "heart_rate", "2026-09-21", "2026-09-21", 1790000000LL));
+    EXPECT_EQ(one["filters"]["dataset"], "heart_rate");
+    EXPECT_EQ(one["records"]["heart_rate"][0]["bpm"], 60);
 }

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <pqxx/pqxx>
 #include <set>
 #include <utility>
 
@@ -17,6 +18,7 @@
 #include "fitness/xiaomi/CloudClient.hpp"
 #include "fitness/xiaomi/Normalize.hpp"
 #include "fitness/xiaomi/Regions.hpp"
+#include "fitness/xiaomi/Service.hpp"
 #include "repositories/fitness/ActivityRepository.hpp"
 #include "repositories/fitness/BodyRepository.hpp"
 #include "repositories/fitness/SamplesRepository.hpp"
@@ -62,37 +64,102 @@ std::vector<Chunk> split_range(const std::string& from, const std::string& to, i
     return chunks;
 }
 
-/// Atomic queued -> running transition. false when another run of the same
-/// account is already in progress; runs of other accounts do not matter.
+using Repositories::SyncRunRepository;
+
+struct Claim {
+    SyncService::Start outcome = SyncService::Start::Skipped;
+    long long retry_in_ms = 0;
+};
+
+/// Atomic transition to running. Skipped when another run of the same account
+/// is in progress or the run is closed; runs of other accounts do not matter.
 ///
-/// Before claiming, stale running rows are marked interrupted: a worker killed
-/// mid-sync (OOM, node eviction) never clears its own row, and without this
-/// step the partial index one_running_sync_run_per_account would block every
-/// future run of that account forever (Critical 2 of the final review). The stale threshold exceeds the
-/// longest honest duration: the per-type ceiling times the number of types,
-/// plus a margin.
-bool try_start(long run_id, long stale_seconds) {
+/// Before claiming, quiet running rows of the account are marked interrupted:
+/// a worker killed mid-sync (OOM, node eviction) never clears its own row, and
+/// without this step the partial index one_running_sync_run_per_account would
+/// block the account's runs (Critical 2 of the final review). The run's own row
+/// is not interrupted but taken over when it is quiet: that is this job again,
+/// redelivered after its worker died. While it still beats, another delivery
+/// holds it (HeldElsewhere) and this one waits.
+Claim try_start(long run_id, long stale_seconds, long quiet_seconds) {
     try {
-        return Database::get().execute_write([&](auto& txn) {
-            txn.exec_params(
-                "UPDATE sync_runs SET status = 'interrupted', finished_at = now() "
-                "WHERE status = 'running' AND started_at < now() - make_interval(secs => $1::double precision) "
-                "AND xiaomi_user_id = (SELECT xiaomi_user_id FROM sync_runs WHERE id = $2)",
-                stale_seconds,
-                run_id);
-            // Only from queued: a redelivered job must not revive a closed run
-            // or overwrite its journal (Important 4).
+        return Database::get().execute_write([&](auto& txn) -> Claim {
+            txn.exec_params(std::string("UPDATE sync_runs SET status = 'interrupted', finished_at = now() "
+                                        "WHERE status = 'running' AND id <> $3 AND ") +
+                                SyncRunRepository::kQuietSql +
+                                " AND xiaomi_user_id = (SELECT xiaomi_user_id FROM sync_runs WHERE id = $3)",
+                            stale_seconds,
+                            quiet_seconds,
+                            run_id);
+            // From queued, or from its own quiet running row. A closed run is
+            // never revived: a redelivered job must not overwrite its journal
+            // (Important 4).
             auto r = txn.exec_params(
-                "UPDATE sync_runs SET status = 'running', started_at = now() "
-                "WHERE id = $1 AND status = 'queued' RETURNING id",
+                std::string("UPDATE sync_runs SET status = 'running', started_at = now(), heartbeat_at = now() "
+                            "WHERE id = $3 AND (status = 'queued' OR (status = 'running' AND ") +
+                    SyncRunRepository::kQuietSql + ")) RETURNING id",
+                stale_seconds,
+                quiet_seconds,
                 run_id);
-            return !r.empty();
+            if (!r.empty()) {
+                return {SyncService::Start::Started, 0};
+            }
+            auto held = txn.exec_params(
+                "SELECT GREATEST(0, CEIL(EXTRACT(EPOCH FROM (CASE WHEN heartbeat_at IS NULL "
+                " THEN started_at + make_interval(secs => $1::double precision) "
+                " ELSE heartbeat_at + make_interval(secs => $2::double precision) END - now())) * 1000))::bigint "
+                "FROM sync_runs WHERE id = $3 AND status = 'running'",
+                stale_seconds,
+                quiet_seconds,
+                run_id);
+            if (!held.empty()) {
+                // A second of margin: at the deadline itself the row is not quiet yet.
+                return {SyncService::Start::HeldElsewhere, held[0][0].template as<long long>() + 1000};
+            }
+            return {SyncService::Start::Skipped, 0};
         });
-    } catch (const std::exception&) {
-        // Violation of the partial unique index one_running_sync_run_per_account.
-        return false;
+    } catch (const pqxx::unique_violation&) {
+        // one_running_sync_run_per_account: another run of the account is live.
+        return {SyncService::Start::Skipped, 0};
+    } catch (const std::exception& e) {
+        // Anything else is the database failing, not a run in progress: the
+        // queue retries the job, the journal still says queued.
+        spdlog::warn("sync run {}: could not be claimed: {}", run_id, e.what());
+        throw;
     }
 }
+
+/// The transport of one run: before each request to the cloud it refreshes
+/// the run's heartbeat (at most every kHeartbeatEverySeconds), so a live run
+/// never looks quiet to a redelivery of its job.
+class HeartbeatTransport : public Xiaomi::HttpTransport {
+public:
+    HeartbeatTransport(Xiaomi::HttpTransport& inner, long run_id)
+        : inner_(inner), run_id_(run_id), last_beat_(std::chrono::steady_clock::now()) {}
+
+    Xiaomi::HttpResponse send(const Xiaomi::HttpRequest& request) override {
+        const auto now = std::chrono::steady_clock::now();
+        if (now - last_beat_ >= std::chrono::seconds(SyncService::kHeartbeatEverySeconds)) {
+            last_beat_ = now;
+            try {
+                Database::get().execute_write([&](auto& txn) {
+                    txn.exec_params("UPDATE sync_runs SET heartbeat_at = now() WHERE id = $1 AND status = 'running'",
+                                    run_id_);
+                    return true;
+                });
+            } catch (const std::exception& e) {
+                // A missed beat only shortens the time a redelivery waits.
+                spdlog::warn("sync run {}: heartbeat not recorded: {}", run_id_, e.what());
+            }
+        }
+        return inner_.send(request);
+    }
+
+private:
+    Xiaomi::HttpTransport& inner_;
+    long run_id_;
+    std::chrono::steady_clock::time_point last_beat_;
+};
 
 /// YYYY-MM-DD date shifted by days. The caller has already validated the format.
 std::string shift_date(const std::string& date, int days) {
@@ -131,6 +198,19 @@ SyncService::SyncService(Xiaomi::HttpTransport& transport,
                          std::function<void(const Xiaomi::Credentials&)> on_rotate)
     : transport_(transport), credentials_(std::move(credentials)), on_rotate_(std::move(on_rotate)) {}
 
+long SyncService::quiet_after_seconds() {
+    return 3 * Xiaomi::Service::http_timeout_seconds() + 120;
+}
+
+long SyncService::stale_after_seconds() {
+    long type_timeout = 180;
+    if (Config::is_initialized()) {
+        type_timeout =
+            Config::get().get<long>("fitness.xiaomi.sync_type_timeout_seconds", "MI_FITNESS_SYNC_TYPE_TIMEOUT", 180);
+    }
+    return type_timeout * static_cast<long>(kAllDataTypes.size()) + 600;
+}
+
 nlohmann::json SyncService::run(long run_id,
                                 const std::string& from,
                                 const std::string& to,
@@ -150,8 +230,17 @@ nlohmann::json SyncService::run(long run_id,
             Config::get().get<long>("fitness.xiaomi.sync_type_timeout_seconds", "MI_FITNESS_SYNC_TYPE_TIMEOUT", 180);
     }
 
-    const long stale_seconds = type_timeout * static_cast<long>(kAllDataTypes.size()) + 600;
-    if (!try_start(run_id, stale_seconds)) {
+    const long stale_seconds = stale_after_seconds();
+    login_outcome_ = Login::NotAttempted;
+    retry_in_ms_ = 0;
+    const Claim claim = try_start(run_id, stale_seconds, quiet_after_seconds());
+    start_outcome_ = claim.outcome;
+    if (claim.outcome == Start::HeldElsewhere) {
+        // The same run is alive in another delivery: neither the cloud nor the journal is touched.
+        retry_in_ms_ = claim.retry_in_ms;
+        return result;
+    }
+    if (claim.outcome == Start::Skipped) {
         // Another run holds running: honest skipped, the cloud is not touched.
         // Only a queued run gets its journal updated: a redelivered job must
         // not overwrite a finished run.
@@ -160,30 +249,50 @@ nlohmann::json SyncService::run(long run_id,
         return result;
     }
 
-    Xiaomi::CloudClient client(transport_, credentials_, on_rotate_);
-    login_outcome_ = Login::NotAttempted;
+    HeartbeatTransport transport(transport_, run_id);
+    Xiaomi::CloudClient client(transport, credentials_, on_rotate_);
     bool logged_in = false;
-    bool auth_dead = false;
+    // The error class of a failed login. One sign-in per run: whatever the
+    // failure, the remaining types are closed without touching the network,
+    // otherwise a Xiaomi that is down gets eight sign-ins per run.
+    std::string login_error;
     bool any_failed = false;
 
     for (const auto& data_type : data_types) {
         auto& entry = result[data_type];
         const auto type_started = std::chrono::steady_clock::now();
-        // An auth failure is fixed by a fresh token, not by retrying: after
-        // the first auth failure the remaining types are closed without
-        // touching the network, otherwise one run burns up to eight logins
-        // with a dead token (Important 5 of the final review).
-        if (auth_dead) {
+        // A failed login is not retried within the run: an auth failure is
+        // fixed by a fresh token (Important 5 of the final review), a network
+        // or protocol failure by time. The remaining types are closed with the
+        // same error class without touching the network.
+        if (!login_error.empty()) {
             any_failed = true;
-            entry["error"] = "auth";
+            entry["error"] = login_error;
             continue;
         }
-        try {
-            if (!logged_in) {
+        if (!logged_in) {
+            try {
                 client.login();
                 logged_in = true;
                 login_outcome_ = Login::Accepted;
+            } catch (const Xiaomi::MiFitnessAuthError& e) {
+                login_error = "auth";
+                login_outcome_ = Login::Refused;
+                spdlog::warn("sync {}: login refused: {}", data_type, e.what());
+            } catch (const Xiaomi::MiFitnessProtocolError& e) {
+                login_error = "protocol";
+                spdlog::warn("sync {}: login failed: {}", data_type, e.what());
+            } catch (const std::exception& e) {
+                login_error = "other";
+                spdlog::warn("sync {}: login failed: {}", data_type, e.what());
             }
+            if (!logged_in) {
+                any_failed = true;
+                entry["error"] = login_error;
+                continue;
+            }
+        }
+        try {
             Repositories::UpsertCounts counts;
             long skipped = 0;
             long suppressed = 0;
@@ -196,7 +305,17 @@ nlohmann::json SyncService::run(long run_id,
             std::vector<nlohmann::json> activity_steps;
             std::vector<nlohmann::json> activity_calories;
 
-            for (const auto& chunk : split_range(from, to, chunk_days)) {
+            auto chunks = split_range(from, to, chunk_days);
+            if (data_type == "daily_activity" && !chunks.empty()) {
+                // The window is cut in the region's zone, the device may live
+                // ahead of it or behind: local minutes of `from` and `to` fall
+                // before and after the window. A day of margin on both sides
+                // makes the edge days whole; days outside [from, to] are
+                // dropped after normalizing, as before.
+                chunks.front().from = shift_date(chunks.front().from, -1);
+                chunks.back().to = shift_date(chunks.back().to, 1);
+            }
+            for (const auto& chunk : chunks) {
                 const auto elapsed =
                     std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - type_started)
                         .count();
@@ -314,10 +433,6 @@ nlohmann::json SyncService::run(long run_id,
             bump_sync_state(credentials_.user_id, data_type, counts.added);
         } catch (const Xiaomi::MiFitnessAuthError& e) {
             any_failed = true;
-            auth_dead = !logged_in;
-            if (auth_dead) {
-                login_outcome_ = Login::Refused;
-            }
             entry["error"] = "auth";
             spdlog::warn("sync {}: auth failure: {}", data_type, e.what());
         } catch (const Xiaomi::MiFitnessProtocolError& e) {

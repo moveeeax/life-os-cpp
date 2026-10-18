@@ -10,6 +10,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json_fwd.hpp>
@@ -30,5 +31,19 @@ nlohmann::json envelope(const nlohmann::json& records,
                         const std::string& from,
                         const std::string& to,
                         long long now_epoch);
+
+/// Most rows one export request may carry, over all its types. A year of
+/// minute heart rate is about 525k rows; a wider request is refused with a
+/// 400 before any row is read, so the response stays a few tens of MB.
+inline constexpr long kMaxRows = 200000;
+
+/// The same envelope as text, with @p records_by_type spliced in as they
+/// are: each value is the JSON array text of one dataset, keys in the order
+/// given. No JSON tree of the rows is built.
+std::string envelope_text(const std::vector<std::pair<std::string, std::string>>& records_by_type,
+                          const std::string& type,
+                          const std::string& from,
+                          const std::string& to,
+                          long long now_epoch);
 
 }  // namespace Fitness::Export
