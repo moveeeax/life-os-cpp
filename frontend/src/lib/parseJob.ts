@@ -10,6 +10,32 @@ export interface JobLike {
   error?: string | null;
 }
 
+/**
+ * A readable sentence for a failed list parse's `error` ("<code>: <detail>"),
+ * shared by food and money; @p words names what differs per module.
+ */
+export function jobErrorText(
+  error: string | null | undefined,
+  words: { notConfigured: string; disabledCode: string; disabled: string },
+): string {
+  if (!error) return 'The parse failed.';
+  const colon = error.indexOf(':');
+  const code = colon === -1 ? error : error.slice(0, colon);
+  const detail = colon === -1 ? '' : error.slice(colon + 1).trim();
+  if (code === 'invalid_answer')
+    return `The model did not answer with a usable list${detail ? `: ${detail}` : '.'}`;
+  if (code === 'not_configured') return words.notConfigured;
+  if (code === words.disabledCode) return words.disabled;
+  if (code === 'provider_refused') return 'The language model provider refused the request.';
+  if (code === 'provider_unavailable')
+    return 'The language model provider did not answer after several tries. Try again later.';
+  if (code === 'parse_timeout') return 'The parse is taking too long. Try again in a minute.';
+  const status = /^provider_error_(\d+)$/.exec(code);
+  if (status)
+    return `The language model provider answered with an error (${status[1]})${detail ? `: ${detail}` : '.'}`;
+  return detail || code;
+}
+
 /** The end a poll answer reached, or null to keep polling. */
 export function afterPoll(
   job: Pick<JobLike, 'status' | 'error'>,

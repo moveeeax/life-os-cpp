@@ -2,6 +2,7 @@
 // parse draft, small rules. Amounts of different currencies are never added.
 import { formatAmount, parseAmount } from '@/lib/amounts';
 import { shiftDays } from '@/lib/dates';
+import { jobErrorText } from '@/lib/parseJob';
 
 import type {
   Currency,
@@ -328,24 +329,13 @@ export function linesToAccept(lines: DraftLine[]): AcceptLine[] {
     }));
 }
 
-export function parseErrorText(error: string | null | undefined): string {
-  if (!error) return 'The parse failed.';
-  const colon = error.indexOf(':');
-  const code = colon === -1 ? error : error.slice(0, colon);
-  const detail = colon === -1 ? '' : error.slice(colon + 1).trim();
-  if (code === 'invalid_answer')
-    return `The model did not answer with a usable list${detail ? `: ${detail}` : '.'}`;
-  if (code === 'not_configured') return 'Parsing is not configured on the server.';
-  if (code === 'money_disabled') return 'The money module is switched off on the server.';
-  if (code === 'provider_refused') return 'The language model provider refused the request.';
-  if (code === 'provider_unavailable')
-    return 'The language model provider did not answer. Try again later.';
-  if (code === 'parse_timeout') return 'The parse is taking too long. Try again in a minute.';
-  const status = /^provider_error_(\d+)$/.exec(code);
-  if (status)
-    return `The provider answered with an error (${status[1]})${detail ? `: ${detail}` : '.'}`;
-  return detail || code;
-}
+/** A readable sentence for a parse or advisor job's `error` ("<code>: <detail>"). */
+export const parseErrorText = (error: string | null | undefined): string =>
+  jobErrorText(error, {
+    notConfigured: 'Parsing is not configured on the server.',
+    disabledCode: 'money_disabled',
+    disabled: 'The money module is switched off on the server.',
+  });
 
 // ── small rules ────────────────────────────────────────────────────────────
 

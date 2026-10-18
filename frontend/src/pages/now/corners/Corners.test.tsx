@@ -76,6 +76,16 @@ describe('the dock', () => {
 });
 
 describe('the corners', () => {
+  it('point aria-controls only at a panel that is open', () => {
+    renderCorners();
+    const body = screen.getByRole('button', { name: /^Body/ });
+    expect(body.getAttribute('aria-controls')).toBeNull();
+    fireEvent.click(body);
+    const id = body.getAttribute('aria-controls');
+    expect(id).toBeTruthy();
+    expect(document.getElementById(id ?? '')).toBe(screen.getByRole('dialog', { name: 'Body' }));
+  });
+
   it('open one panel at a time and give the focus back on Escape', () => {
     renderCorners();
     fireEvent.click(screen.getByRole('button', { name: /^Body/ }));

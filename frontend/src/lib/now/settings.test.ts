@@ -8,7 +8,6 @@ import {
   dockChips,
   isPlaced,
   linkKind,
-  placeChips,
   reorderDock,
   weatherGlyph,
   weatherLine,
@@ -19,39 +18,14 @@ import {
 const chip = (key: Chip['key']): Chip => ({ key, title: key, main: [], small: [], dot: null });
 const all = [chip('body'), chip('goals'), chip('day'), chip('tasks'), chip('habits')];
 
-describe('placeChips', () => {
-  it('puts each chip in its corner, in the corner order', () => {
-    expect(placeChips(all, DEFAULT_CORNERS).map((p) => `${p.chip.key}@${p.spot}`)).toEqual([
-      'body@c-tl',
-      'goals@c-tr',
-      'day@c-bl',
-      'tasks@c-br',
-    ]);
-  });
-  it('moves chips and leaves a hidden one out', () => {
-    const placed = placeChips(all, { tl: 'tasks', tr: null, bl: 'day', br: 'body' });
-    expect(placed.map((p) => `${p.chip.key}@${p.spot}`)).toEqual([
-      'tasks@c-tl',
-      'day@c-bl',
-      'body@c-br',
-    ]);
-  });
-});
-
 describe('the Habits plate', () => {
   it('is not placed by default', () => {
     expect(isPlaced(DEFAULT_CORNERS, 'habits')).toBe(false);
-    expect(placeChips(all, DEFAULT_CORNERS).map((p) => p.chip.key)).not.toContain('habits');
   });
   it('takes the bottom right when every corner is full, and Tasks leaves Now', () => {
     const next = withChip(DEFAULT_CORNERS, 'habits');
     expect(next).toEqual({ tl: 'body', tr: 'goals', bl: 'day', br: 'habits' });
-    expect(placeChips(all, next).map((p) => `${p.chip.key}@${p.spot}`)).toEqual([
-      'body@c-tl',
-      'goals@c-tr',
-      'day@c-bl',
-      'habits@c-br',
-    ]);
+    expect(isPlaced(next, 'tasks')).toBe(false);
   });
   it('takes the first empty corner, and stays where it is once placed', () => {
     expect(withChip({ tl: 'body', tr: null, bl: 'day', br: 'tasks' }, 'habits').tr).toBe('habits');

@@ -87,11 +87,7 @@ const shift = shiftDays;
 
 export const addDays = shift;
 
-/** The Monday of the week (Monday to Sunday) of @p iso. */
-export function mondayOf(iso: string): string {
-  const day = new Date(`${iso}T00:00:00Z`).getUTCDay(); // Sunday 0
-  return shift(iso, -((day + 6) % 7));
-}
+export { mondayOf } from '@/lib/dates';
 
 /** The seven days of the week that starts on @p monday. */
 export function weekDates(monday: string): string[] {

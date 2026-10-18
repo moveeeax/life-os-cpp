@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { daysBetween, formatDateTime, formatDay, isDay, shiftDays, todayLocal } from './dates';
+import {
+  daysBetween,
+  formatDateTime,
+  formatDay,
+  isDay,
+  mondayOf,
+  shiftDays,
+  todayLocal,
+} from './dates';
 
 // The copies these helpers replace: ledger/food/travel/tasks/health counted
 // "today" from the browser's clock; Now from a named zone. The day maths of
@@ -105,5 +113,14 @@ describe('formatDateTime', () => {
   it("is the browser's date and time of an instant (billing pages)", () => {
     const iso = '2026-10-14T09:30:00Z';
     expect(formatDateTime(iso)).toBe(new Date(iso).toLocaleString());
+  });
+});
+
+describe('mondayOf', () => {
+  // Food took it on a local Date, habits in UTC: one copy now, the same days.
+  it('gives the Monday of the week, across a month and a year', () => {
+    expect(mondayOf('2026-10-18')).toBe('2026-10-12'); // a Sunday
+    expect(mondayOf('2026-10-12')).toBe('2026-10-12');
+    expect(mondayOf('2027-01-02')).toBe('2026-12-28');
   });
 });

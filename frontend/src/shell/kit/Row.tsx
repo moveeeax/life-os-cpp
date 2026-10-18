@@ -44,7 +44,7 @@ export function Row({ title, sub, right, dot, children, open, onToggle, id, acti
             type="button"
             className="k-row-head"
             aria-expanded={isOpen}
-            aria-controls={detailsId}
+            aria-controls={isOpen ? detailsId : undefined}
             onClick={toggle}
           >
             {body}

@@ -112,16 +112,6 @@ export function cleanLinks(links: NowLink[]): NowLink[] {
     .slice(0, LINKS_MAX);
 }
 
-/** The chips that have a corner, each with the class of its corner, in the corner order. */
-export function placeChips(list: Chip[], corners: NowCorners): { chip: Chip; spot: string }[] {
-  const out: { chip: Chip; spot: string }[] = [];
-  for (const corner of CORNER_KEYS) {
-    const chip = list.find((c) => c.key === corners[corner]);
-    if (chip) out.push({ chip, spot: `c-${corner}` });
-  }
-  return out;
-}
-
 /**
  * A text glyph for a WMO weather code, in the type of the page (U+FE0E asks
  * for the text form, not the colour emoji); the moon for a clear night.

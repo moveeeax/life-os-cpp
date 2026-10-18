@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FocusEvent as ReactFocusEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import { NavLink, useLocation } from 'react-router';
 
 import { splitTabs, type TabItem } from './logic';
@@ -11,7 +18,8 @@ function active(pathname: string, t: TabItem): boolean {
  * Underline tabs; more than @p max fold into "More ▾", a menu the keyboard
  * can walk: ArrowDown or ArrowUp on the button opens it on the first or the
  * last item, the arrows move with wrap, Home and End jump, Escape closes and
- * returns the focus to the button, Tab leaves and closes.
+ * returns the focus to the button, Tab leaves and closes. Focus that moves
+ * anywhere outside the menu (a screen reader, a click elsewhere) closes it too.
  */
 export function Tabs({ items, max = 5, label }: { items: TabItem[]; max?: number; label: string }) {
   const { pathname } = useLocation();
@@ -22,6 +30,7 @@ export function Tabs({ items, max = 5, label }: { items: TabItem[]; max?: number
   const box = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
+  const menuId = useId();
   useEffect(() => setOpen(false), [pathname]);
   useEffect(() => {
     if (!open) return;
@@ -78,6 +87,14 @@ export function Tabs({ items, max = 5, label }: { items: TabItem[]; max?: number
     } else if (e.key === 'Tab') close(false);
   };
 
+  // Focus gone to an element outside the box closes the menu. A null target
+  // (a click on nothing, or Safari not focusing a clicked link) is left to the
+  // mousedown handler, so a click on an item still lands.
+  const onBoxBlur = (e: ReactFocusEvent<HTMLDivElement>) => {
+    const to = e.relatedTarget as Node | null;
+    if (to && !box.current?.contains(to)) setOpen(false);
+  };
+
   const inMore = more.find((t) => active(pathname, t));
   const link = (t: TabItem) => (
     <NavLink
@@ -94,20 +111,21 @@ export function Tabs({ items, max = 5, label }: { items: TabItem[]; max?: number
     <nav className="k-tabs" aria-label={label}>
       {shown.map(link)}
       {more.length > 0 && (
-        <div className="k-more" ref={box}>
+        <div className="k-more" ref={box} onBlur={onBoxBlur}>
           <button
             ref={button}
             type="button"
             className={inMore ? 'k-tab k-on' : 'k-tab'}
             aria-expanded={open}
             aria-haspopup="menu"
+            aria-controls={open ? menuId : undefined}
             onClick={() => setOpen((v) => !v)}
             onKeyDown={onButtonKey}
           >
             {inMore ? inMore.label : 'More'} ▾
           </button>
           {open && (
-            <div className="k-menu" role="menu" ref={menu} onKeyDown={onMenuKey}>
+            <div id={menuId} className="k-menu" role="menu" ref={menu} onKeyDown={onMenuKey}>
               {more.map((t) => (
                 <NavLink
                   key={t.to}

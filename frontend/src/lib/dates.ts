@@ -39,6 +39,12 @@ export function shiftDays(date: string, by: number): string {
   return new Date(t.getTime() + by * DAY_MS).toISOString().slice(0, 10);
 }
 
+/** The Monday of the week (Monday to Sunday) @p date is in; a broken @p date counts from today. */
+export function mondayOf(date: string): string {
+  const t = utcOf(date) ?? utcOf(todayLocal())!;
+  return shiftDays(t.toISOString().slice(0, 10), -((t.getUTCDay() + 6) % 7));
+}
+
 /** Whole calendar days from @p from to @p to (negative when @p to is earlier); NaN for a broken day. */
 export function daysBetween(from: string, to: string): number {
   const a = utcOf(from);

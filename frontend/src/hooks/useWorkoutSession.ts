@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
+import { browserStore as browserStorage } from '@/lib/browserStore';
 import { ApiClientError, api, apiErrorMessage } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import {
@@ -39,17 +40,8 @@ const BASE = '/api/v1/workout';
 /** A store that keeps nothing: the queue then lives in memory for this page. */
 const NO_STORE: SetStore = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 
-/**
- * The browser's storage, or NO_STORE when it is blocked or absent (a locked
- * down browser throws on the access itself; a render must not).
- */
-function browserStore(): SetStore {
-  try {
-    return globalThis.localStorage ?? NO_STORE;
-  } catch {
-    return NO_STORE;
-  }
-}
+/** The browser's storage, or NO_STORE when it is blocked or absent. */
+const browserStore = (): SetStore => browserStorage() ?? NO_STORE;
 
 /**
  * Puts a session the server just returned into the cache: under its own key
