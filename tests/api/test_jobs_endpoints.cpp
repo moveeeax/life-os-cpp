@@ -122,6 +122,14 @@ TEST_F(JobsEndpointTest, SubmitJobEmptyType) {
     EXPECT_EQ(captured->statusCode(), k400BadRequest);
 }
 
+TEST_F(JobsEndpointTest, SubmitJobWrongFieldTypesAre400) {
+    // A string max_retries and an array payload used to throw out of body.value() as 500.
+    EXPECT_EQ(submit({{"type", "echo"}, {"max_retries", "5"}})["_status"], 400);
+    EXPECT_EQ(submit({{"type", "echo"}, {"max_retries", 21}})["_status"], 400);
+    EXPECT_EQ(submit({{"type", "echo"}, {"payload", json::array({1})}})["_status"], 400);
+    EXPECT_EQ(submit({{"type", "echo"}, {"max_retries", nullptr}})["_status"], 201);
+}
+
 TEST_F(JobsEndpointTest, GetJobStatus) {
     auto submit_body = submit({{"type", "echo"}, {"payload", {{"x", 1}}}});
     ASSERT_EQ(submit_body["_status"], 201);

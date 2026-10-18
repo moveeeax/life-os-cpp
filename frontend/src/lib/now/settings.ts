@@ -7,13 +7,6 @@ export const DEFAULT_CORNERS: NowCorners = { tl: 'body', tr: 'goals', bl: 'day',
 export const CORNER_KEYS = ['tl', 'tr', 'bl', 'br'] as const;
 export type CornerKey = (typeof CORNER_KEYS)[number];
 
-export const CORNER_LABEL: Record<CornerKey, string> = {
-  tl: 'Top left',
-  tr: 'Top right',
-  bl: 'Bottom left',
-  br: 'Bottom right',
-};
-
 export const CHIP_LABEL: Record<Chip['key'], string> = {
   body: 'Body',
   goals: 'Goals',

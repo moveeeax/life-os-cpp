@@ -18,6 +18,8 @@
   --g-brand: #a5b4fc;
   position: relative;
   min-height: 100vh;
+  /* The small viewport: a phone's address bar does not push Now into a scroll. */
+  min-height: 100svh;
   color: var(--g-ink);
   background: #1b2140;
   color-scheme: dark;
@@ -212,6 +214,7 @@
   position: relative;
   z-index: 1;
   min-height: 100vh;
+  min-height: 100svh;
 }
 .g-page {
   padding: 84px 16px 80px;

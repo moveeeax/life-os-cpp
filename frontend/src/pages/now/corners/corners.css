@@ -85,7 +85,7 @@
 }
 /* Dragging a tile: it follows the pointer, the others slide to make room. */
 .n-tile {
-  touch-action: none;
+  -webkit-touch-callout: none;
   transition:
     background 0.2s,
     transform 0.15s ease-out;

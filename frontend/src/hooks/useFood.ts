@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
-import { useModuleProbe } from '@/hooks/useModuleProbe';
 import { useParseJob } from '@/hooks/useParseJob';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
@@ -104,11 +103,6 @@ export function useOffSearch(q: string, enabled: boolean) {
 
 /** [query key, url] of the probe that says whether the module is on. */
 export const FOOD_PROBE = [qk.food.enabled(), `${BASE}/goals`] as const;
-
-/** Whether the food module answers at all (404 while switched off). */
-export function useFoodEnabled(canRead: boolean): boolean {
-  return useModuleProbe(...FOOD_PROBE, canRead) ?? true;
-}
 
 // ── diary writes ───────────────────────────────────────────────────────────
 

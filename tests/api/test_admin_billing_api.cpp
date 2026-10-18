@@ -355,6 +355,19 @@ TEST_F(AdminBillingApiTest, CreatePackageRejectsInvalidFields) {
     EXPECT_EQ(resp->statusCode(), k400BadRequest);
 }
 
+TEST_F(AdminBillingApiTest, CreatePackageRejectsWrongFieldTypes) {
+    // A string active or sort used to throw out of body.value() as 500.
+    auto admin = seed_admin();
+    for (const auto& extra : {json{{"active", "yes"}}, json{{"sort", "1"}}, json{{"sort", 4294967297LL}}}) {
+        json body = {{"title", "Starter"}, {"amount_cents", 500}, {"credits", 100}};
+        body.update(extra);
+        HttpResponsePtr resp;
+        controller.createPackage(TestHelpers::authed_json(admin, body), [&](const HttpResponsePtr& r) { resp = r; });
+        ASSERT_NE(resp, nullptr);
+        EXPECT_EQ(resp->statusCode(), k400BadRequest) << extra.dump();
+    }
+}
+
 TEST_F(AdminBillingApiTest, UpdatePackageRejectsEmptyPatchAndUnknownId) {
     auto admin = seed_admin();
     auto pkg = seed_package("Existing", 500, 500);

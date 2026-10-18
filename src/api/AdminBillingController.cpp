@@ -8,6 +8,7 @@
 #include "api/AdminBillingController.hpp"
 
 #include <cstdint>
+#include <limits>
 
 #include <spdlog/spdlog.h>
 
@@ -93,12 +94,14 @@ void AdminBillingController::createPackage(const HttpRequestPtr& req,
     if (body.contains("credits") && !body["credits"].is_null() &&
         (!body["credits"].is_number_integer() || body["credits"].get<std::int64_t>() <= 0))
         errs.add("credits", "invalid", "credits must be a positive integer");
+    Validation::boolean(errs, body, "active");
+    Validation::int_range(errs, body, "sort", std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;
     }
-    const bool active = body.value("active", true);
-    const int sort = body.value("sort", 0);
+    const bool active = !body.contains("active") || body["active"].is_null() || body["active"].get<bool>();
+    const int sort = body.contains("sort") && !body["sort"].is_null() ? body["sort"].get<int>() : 0;
 
     with_repo_errors(callback, "admin billing createPackage", [&] {
         Repositories::PackageRepository repo;

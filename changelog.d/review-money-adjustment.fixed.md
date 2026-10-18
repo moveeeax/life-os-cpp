@@ -1,0 +1,1 @@
+A bank adjustment with a `category_id` is refused (400): the id went unchecked, so it could point at another owner's category, which that owner then could not delete. Picking a merchant no longer fills in an account archived since.

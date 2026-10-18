@@ -265,7 +265,10 @@ function ManualTab({
                           categories.some((c) => c.id === m.category_id && c.kind === type)
                         )
                           setCategory(m.category_id);
-                        if (m.account_id && !account) setAccount(m.account_id);
+                        // The remembered account may be archived since: then the
+                        // select stays on "Pick the account".
+                        if (m.account_id && !account && accounts.some((a) => a.id === m.account_id))
+                          setAccount(m.account_id);
                       }}
                       className="k-btn k-chip"
                     >

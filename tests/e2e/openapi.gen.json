@@ -10255,7 +10255,7 @@
    },
    "post": {
     "summary": "Create an API key — the secret is returned ONCE in this response",
-    "description": "`scope` is `full` (the default: reads and writes the owner's data) or `read` (GET, HEAD and OPTIONS only; any other method with the key is answered 403 `key_read_only`). The key's metadata carries its `scope`.",
+    "description": "`scope` is `full` (the default: reads and writes the owner's data) or `read` (GET, HEAD and OPTIONS only; any other method with the key, and the GET of a Mi account link step, which completes the link, is answered 403 `key_read_only`). The key's metadata carries its `scope`.",
     "tags": [
      "account"
     ],
@@ -27432,7 +27432,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 402554,
-  "source_fnv1a64": "3d8e4931ae876ee6"
+  "source_bytes": 402620,
+  "source_fnv1a64": "bcc299ada8a00d03"
  }
 }

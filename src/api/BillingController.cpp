@@ -304,8 +304,8 @@ void BillingController::paypalWebhook(const HttpRequestPtr& req,
         // above), and anything handleCaptureRefunded lets propagate
         // (see its doc comment — a refund/reversal that "can't be
         // applied" is deliberately NOT swallowed into a 200 here).
-        // handleCaptureCompleted, by contrast, still catches its own
-        // failures locally and acks 200 — unaffected by this catch.
+        // handleCaptureCompleted acks only an unknown order or a foreign
+        // capture id; its transient failures land here too.
         spdlog::error("billing webhook: failed to process signature-verified event body: {}", e.what());
         callback(ErrorResponse::internal_error());
     }
@@ -485,6 +485,17 @@ std::string BillingController::extract_capture_id_from_links(const json& resourc
     return {};
 }
 
+void BillingController::log_unreconciled_capture(const std::string& order_id,
+                                                 const std::string& capture_id,
+                                                 const std::string& event_id,
+                                                 const char* what) {
+    spdlog::error("billing webhook: credit_capture failed for order {} capture {} (event {}): {}",
+                  order_id,
+                  capture_id,
+                  event_id,
+                  what);
+}
+
 void BillingController::handleCaptureCompleted(const json& event,
                                                const std::string& event_id,
                                                std::function<void(bool)> respond) {
@@ -534,19 +545,20 @@ void BillingController::handleCaptureCompleted(const json& event,
             dispatchReceiptEmail(result);
         else
             dispatchFailedEmailIfJustTransitioned(result, was_failed_before);
-    } catch (const std::exception& e) {
-        // An unknown order id, a capture id already claimed by a
-        // different order, or any other repository-layer anomaly: log
-        // loudly for manual reconciliation but still ack 200 — retrying
-        // this exact event can never resolve a structural mismatch, and
-        // a non-2xx here just means PayPal hammers this endpoint for
-        // days over a condition that will never change on its own.
-        spdlog::error("billing webhook: credit_capture failed for order {} capture {} (event {}): {}",
-                      order_id,
-                      capture_id,
-                      event_id,
-                      e.what());
+    } catch (const Repositories::PaymentNotFound& e) {
+        // An unknown order id or a capture id already claimed by a
+        // different order: log loudly for manual reconciliation but still
+        // ack 200, since retrying this exact event cannot resolve a
+        // structural mismatch.
+        log_unreconciled_capture(order_id, capture_id, event_id, e.what());
+    } catch (const Billing::DuplicateCaptureId& e) {
+        log_unreconciled_capture(order_id, capture_id, event_id, e.what());
     }
+    // Anything else (a dropped connection, a deadlock, a timeout) propagates
+    // to paypalWebhook's catch and answers 5xx: PayPal redelivers, and
+    // credit_capture is idempotent on the capture id. Acking it would take
+    // the money of a buyer who closed the tab before /capture and add no
+    // credits.
     respond(true);
 }
 

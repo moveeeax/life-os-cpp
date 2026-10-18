@@ -215,6 +215,14 @@ void JobQueue::fail(const std::string& id, const std::string& error) {
     auto& redis = Cache::get().get_client();
 
     auto job = load_job_or_throw_(redis, id);
+    if (is_terminal_status_(job.status)) {
+        // A lease left behind by complete() or cancel() (a pod killed between
+        // the blob write and the ZREM) reaped later: the outcome stands, the
+        // job must not run again.
+        spdlog::info("Job {} fail({}) ignored: already {}", id, error, job.status);
+        release_from_worker_(redis, job);
+        return;
+    }
     job.retry_count++;
     job.updated_at = now_epoch();
 
@@ -652,7 +660,11 @@ void JobQueue::clear_lease_(sw::redis::Redis& redis, const std::string& id) {
         return;
     try {
         redis.zrem(leases_key(), id);
-    } catch (...) {}
+    } catch (const std::exception& e) {
+        // A lease left here is reaped after the visibility timeout; fail()
+        // then sees the terminal status and leaves the job alone.
+        spdlog::warn("Job {}: could not clear its lease: {}", id, e.what());
+    }
 }
 
 std::optional<Job> JobQueue::load_job_(sw::redis::Redis& redis, const std::string& id) {

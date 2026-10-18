@@ -39,9 +39,16 @@ export function useSoundPlayer(sounds: Sound[]) {
   const [state, setState] = useState<PlayerState>('off');
   const sound = sounds.find((s) => s.id === soundId) ?? sounds[0] ?? null;
 
+  // The end of a fade-out under way: a cut fade still stops its element, or
+  // the old loop would play on with nothing pointing at it.
+  const fadingOut = useRef<(() => void) | null>(null);
+
   const stopFade = () => {
     if (fade.current !== null) cancelAnimationFrame(fade.current);
     fade.current = null;
+    const end = fadingOut.current;
+    fadingOut.current = null;
+    end?.();
   };
 
   const ramp = useCallback(
@@ -54,9 +61,11 @@ export function useSoundPlayer(sounds: Sound[]) {
         if (elapsed < FADE_MS) fade.current = requestAnimationFrame(step);
         else {
           fade.current = null;
+          fadingOut.current = null;
           done?.();
         }
       };
+      if (direction === 'out') fadingOut.current = done ?? null;
       fade.current = requestAnimationFrame(step);
     },
     [],

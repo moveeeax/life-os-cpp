@@ -141,6 +141,14 @@ TEST_F(TaskProjectsApiTest, StatusesFollowTheKind) {
         << "the kind does not change";
 }
 
+TEST_F(TaskProjectsApiTest, AWrongKindTypeIs400) {
+    // A null or numeric kind used to throw out of body.value() as 500.
+    EXPECT_EQ(create(kAnna, json{{"name", "X"}, {"kind", 5}})->statusCode(), k400BadRequest);
+    auto nulled = create(kAnna, json{{"name", "Y"}, {"kind", nullptr}});
+    ASSERT_EQ(nulled->statusCode(), k201Created) << std::string(nulled->body());
+    EXPECT_EQ(body_of(nulled)["data"]["kind"], "project") << "a null kind is the default";
+}
+
 TEST_F(TaskProjectsApiTest, ACodeIsMadeFromTheNameAndKeptUnique) {
     auto a = create(kAnna, json{{"name", "Small.kz — Platform Engineering"}});
     // "small" "-" "kz" "-" "platform" "-" "engine": cut at 24 characters.

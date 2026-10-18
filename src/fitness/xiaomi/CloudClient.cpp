@@ -202,6 +202,12 @@ void CloudClient::login() {
     redirect.url = location;
     redirect.headers.emplace_back("User-Agent", std::string(kUserAgent));
     const HttpResponse redirect_response = transport_.send(redirect);
+    // The same rule as the login itself: a busy or failing sts host is not a
+    // refusal, or one bad minute there would send the owner to re-link by QR.
+    if (redirect_response.status == 429 || redirect_response.status >= 500) {
+        throw MiFitnessProtocolError("Xiaomi serviceToken redirect failed: HTTP " +
+                                     std::to_string(redirect_response.status));
+    }
 
     std::string cookies;
     bool has_service_token = false;

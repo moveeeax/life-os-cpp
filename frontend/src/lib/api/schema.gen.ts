@@ -901,7 +901,7 @@ export interface paths {
         put?: never;
         /**
          * Create an API key — the secret is returned ONCE in this response
-         * @description `scope` is `full` (the default: reads and writes the owner's data) or `read` (GET, HEAD and OPTIONS only; any other method with the key is answered 403 `key_read_only`). The key's metadata carries its `scope`.
+         * @description `scope` is `full` (the default: reads and writes the owner's data) or `read` (GET, HEAD and OPTIONS only; any other method with the key, and the GET of a Mi account link step, which completes the link, is answered 403 `key_read_only`). The key's metadata carries its `scope`.
          */
         post: {
             parameters: {

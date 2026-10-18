@@ -3,13 +3,7 @@ import { Navigate } from 'react-router';
 
 import { useHabitsEnabled } from '@/hooks/useHabits';
 import { useMe } from '@/hooks/useMe';
-import {
-  useNowSettings,
-  useSaveNowSettings,
-  useSounds,
-  useToday,
-  useWeather,
-} from '@/hooks/useNow';
+import { useNowSettings, useSaveDockOrder, useSounds, useToday, useWeather } from '@/hooks/useNow';
 import {
   CORNER_KEYS,
   FOCUS_LENGTHS,
@@ -120,7 +114,7 @@ function NowScreen() {
   const player = useSoundPlayer(useSounds(me !== null).data ?? []);
   const data = today.data;
   const focus = data?.focus ?? null;
-  const saveSettings = useSaveNowSettings();
+  const saveOrder = useSaveDockOrder(me?.id ?? null);
   // The dock shows the corners without Habits when that module is off; a
   // drag reorders what is shown and the hidden slot keeps its chip.
   const raw = settings.data?.corners;
@@ -129,7 +123,7 @@ function NowScreen() {
     if (!raw || !shown) return;
     const next = reorderDock(shown, from, to);
     for (const k of CORNER_KEYS) if (next[k] == null && raw[k]) next[k] = raw[k];
-    saveSettings.mutate({ corners: next });
+    saveOrder(next);
   };
   const clock = new Intl.DateTimeFormat('en-GB', {
     timeZone: tz,

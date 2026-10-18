@@ -4,7 +4,8 @@
 .focus-mode .g-eye,
 .focus-mode .n-center,
 .focus-mode .n-where,
-.focus-mode .c-strip,
+.focus-mode .n-dock,
+.focus-mode .n-corners,
 .focus-mode .c-panel {
   opacity: 0;
   visibility: hidden;
@@ -138,7 +139,8 @@
   .focus-mode .g-bar,
   .focus-mode .g-eye,
   .focus-mode .n-center,
-  .focus-mode .c-strip {
+  .focus-mode .n-dock,
+  .focus-mode .n-corners {
     transition: none;
   }
 }

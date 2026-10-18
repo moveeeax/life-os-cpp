@@ -79,13 +79,6 @@ inline bool request_has_key(const drogon::HttpRequestPtr& req) {
     return !extract_key(req).empty();
 }
 
-/// Whether a key of scope "read" may make a request with this method: the
-/// safe methods only. A read key that tries to write is answered 403
-/// key_read_only by the middleware before any handler runs.
-inline bool read_key_allows(drogon::HttpMethod method) {
-    return method == drogon::Get || method == drogon::Head || method == drogon::Options;
-}
-
 namespace detail {
 
 /**
@@ -166,6 +159,24 @@ inline bool path_allows_key(std::string_view path) {
         return true;
     const std::string& area = segs[idx];
     return area != "account" && area != "admin" && !area.starts_with("api-keys");
+}
+
+/**
+ * @brief Whether a key of scope "read" may make this request: the safe
+ *        methods only, and never a GET that writes. One does: a step of the
+ *        Mi account link (/fitness/account/link/{id}) completes the link and
+ *        enqueues a sync. A read key that tries to write is answered 403
+ *        key_read_only by the middleware before any handler runs.
+ */
+inline bool read_key_allows(drogon::HttpMethod method, std::string_view path) {
+    if (method != drogon::Get && method != drogon::Head && method != drogon::Options)
+        return false;
+    const auto segs = detail::canonical_segments(path);
+    const auto has = [&](std::size_t i, std::string_view v) { return i < segs.size() && segs[i] == v; };
+    for (std::size_t i = 0; i + 2 < segs.size(); ++i)
+        if (has(i, "fitness") && has(i + 1, "account") && has(i + 2, "link"))
+            return false;
+    return true;
 }
 
 /**

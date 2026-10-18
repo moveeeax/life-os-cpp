@@ -68,13 +68,21 @@ TEST(ApiKeyScope, AllowsTheDataRoutes) {
 
 TEST(ApiKeyScope, ReadKeyMethods) {
     // A read key keeps to the safe methods; everything that could write is out.
-    EXPECT_TRUE(read_key_allows(drogon::Get));
-    EXPECT_TRUE(read_key_allows(drogon::Head));
-    EXPECT_TRUE(read_key_allows(drogon::Options));
-    EXPECT_FALSE(read_key_allows(drogon::Post));
-    EXPECT_FALSE(read_key_allows(drogon::Put));
-    EXPECT_FALSE(read_key_allows(drogon::Patch));
-    EXPECT_FALSE(read_key_allows(drogon::Delete));
+    EXPECT_TRUE(read_key_allows(drogon::Get, "/api/v1/money/accounts"));
+    EXPECT_TRUE(read_key_allows(drogon::Head, "/api/v1/money/accounts"));
+    EXPECT_TRUE(read_key_allows(drogon::Options, "/api/v1/money/accounts"));
+    EXPECT_FALSE(read_key_allows(drogon::Post, "/api/v1/money/accounts"));
+    EXPECT_FALSE(read_key_allows(drogon::Put, "/api/v1/money/accounts"));
+    EXPECT_FALSE(read_key_allows(drogon::Patch, "/api/v1/money/accounts"));
+    EXPECT_FALSE(read_key_allows(drogon::Delete, "/api/v1/money/accounts"));
+}
+
+TEST(ApiKeyScope, ReadKeySkipsTheGetThatLinksAMiAccount) {
+    // A step of the QR link completes it and enqueues a sync: a write behind a GET.
+    EXPECT_FALSE(read_key_allows(drogon::Get, "/api/v1/fitness/account/link/0b7c"));
+    EXPECT_FALSE(read_key_allows(drogon::Get, "/API/v1//Fitness/./account/%6Cink/0b7c"));
+    EXPECT_TRUE(read_key_allows(drogon::Get, "/api/v1/fitness/account"));
+    EXPECT_TRUE(read_key_allows(drogon::Get, "/api/v1/fitness/sleep"));
 }
 
 }  // namespace

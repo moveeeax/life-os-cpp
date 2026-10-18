@@ -1,7 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
-import { useModuleProbe } from '@/hooks/useModuleProbe';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import {
@@ -39,14 +38,6 @@ const AFTER_FOCUS = [qk.now.all(), qk.tasks.all()] as const;
 
 /** [query key, url] of the probe that says whether the module is on. */
 export const NOW_PROBE = [qk.now.enabled(), '/api/v1/wallpapers?device=desktop'] as const;
-
-/**
- * Whether the now module answers at all: the wallpaper list is 404 only while
- * the module is off (503 means on, without storage). Undefined while asking.
- */
-export function useNowEnabled(signedIn: boolean): boolean | undefined {
-  return useModuleProbe(...NOW_PROBE, signedIn);
-}
 
 /**
  * The day's digest. The last answer for this user and day paints first
@@ -140,6 +131,35 @@ export function useSaveNowSettings(onSuccess?: () => void) {
       (await api.putJson<{ data: NowSettings }>('/api/v1/now/settings', { body })).data,
     { invalidate: [qk.now.settings(), qk.now.weather()], onSuccess },
   );
+}
+
+/**
+ * Save a new dock order. The order shows at once; the writes go one after
+ * another and the last answer is the one kept, so a second drag before the
+ * first answer neither snaps the tiles back nor loses either move.
+ */
+export function useSaveDockOrder(userId: string | null) {
+  const qc = useQueryClient();
+  const key = userId ? `now:settings:${userId}` : null;
+  const save = useApiMutation(
+    async (corners: NowSettings['corners']) =>
+      (await api.putJson<{ data: NowSettings }>('/api/v1/now/settings', { body: { corners } }))
+        .data,
+    {
+      scope: { id: 'now-settings' },
+      onSuccess: (data) => {
+        // A later move is still queued: its answer will be the one to keep.
+        if (qc.isMutating({ predicate: (m) => m.options.scope?.id === 'now-settings' }) > 1) return;
+        qc.setQueryData(qk.now.settings(), data);
+        if (key) writeCache(key, data);
+      },
+      onError: () => void qc.invalidateQueries({ queryKey: qk.now.settings() }),
+    },
+  );
+  return (corners: NowSettings['corners']) => {
+    qc.setQueryData<NowSettings>(qk.now.settings(), (old) => (old ? { ...old, corners } : old));
+    save.mutate(corners);
+  };
 }
 
 /** The weather of the settings city; null without one. Quiet on failure: Now paints without it. */

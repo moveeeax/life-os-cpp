@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
-import { useModuleProbe } from '@/hooks/useModuleProbe';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import type {
@@ -24,11 +23,6 @@ const ALL = GOAL_WRITES;
 
 /** [query key, url] of the probe that says whether the module is on. */
 export const GOALS_PROBE = [qk.goals.enabled(), `${BASE}?status=active`] as const;
-
-/** Whether the goals module answers at all (404 while switched off). */
-export function useGoalsEnabled(signedIn: boolean): boolean {
-  return useModuleProbe(...GOALS_PROBE, signedIn) ?? true;
-}
 
 export function useGoals(status: 'active' | 'done' | 'dropped', date: string) {
   return useQuery({
