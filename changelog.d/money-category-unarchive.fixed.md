@@ -1,0 +1,1 @@
+Money categories: the list has a Show archived switch and the editor an Archived checkbox, so an archived category can be seen and brought back (the API accepted `archived: false` already, the page never listed archived categories).

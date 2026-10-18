@@ -113,6 +113,7 @@ function CategoryForm({
     category?.budget_max == null ? '' : String(category.budget_max),
   );
   const [budgetCurrency, setBudgetCurrency] = useState(category?.budget_currency ?? 'KZT');
+  const [archived, setArchived] = useState(category?.archived ?? false);
   const [confirm, setConfirm] = useState(false);
   const [outcome, setOutcome] = useState<string | null>(null);
   const [moving, setMoving] = useState<Merchant | null>(null);
@@ -131,13 +132,14 @@ function CategoryForm({
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!ok) return;
-    save.mutate({
+    const body = {
       name: name.trim(),
       kind,
       flexibility: flex,
       budget_max: b,
       budget_currency: b === null ? null : budgetCurrency,
-    });
+    };
+    save.mutate(category ? { ...body, archived } : body);
   };
 
   if (outcome) {
@@ -229,6 +231,16 @@ function CategoryForm({
               ))}
             </select>
           </div>
+          {category && (
+            <label className="flex items-center gap-2 self-end pb-2 text-theme-sm">
+              <input
+                type="checkbox"
+                checked={archived}
+                onChange={(e) => setArchived(e.target.checked)}
+              />
+              Archived (hidden from pickers and the list)
+            </label>
+          )}
         </div>
         <p className="mt-2 text-theme-xs text-gray-500">
           A budget is compared only with the spend in its own currency.
@@ -325,7 +337,8 @@ const TONE = { ok: 'ok', near: 'warn', over: 'late' } as const;
 
 /** Expense and income categories, each budget against this month's spend. */
 export function MoneyCategoriesPage() {
-  const categories = useCategories();
+  const [showArchived, setShowArchived] = useState(false);
+  const categories = useCategories(showArchived);
   const currencies = useCurrencies().data;
   const report = useReport('month', todayLocal()).data;
   const byCategory = merchantsByCategory(useMerchantMemory().data);
@@ -336,6 +349,14 @@ export function MoneyCategoriesPage() {
       title="Categories"
       actions={
         <>
+          <label className="k-check">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(e) => setShowArchived(e.target.checked)}
+            />
+            Show archived
+          </label>
           <span className="k-grow" />
           <button type="button" onClick={() => setOpen('new')} className={primaryButton}>
             New category
@@ -362,10 +383,11 @@ export function MoneyCategoriesPage() {
                   <Row
                     key={c.id}
                     title={
-                      <>
+                      <span className={c.archived ? 'k-muted' : undefined}>
                         {c.name}
                         {c.flexibility === 'fixed' && <span className="k-muted"> · fixed</span>}
-                      </>
+                        {c.archived && <span className="k-muted"> · archived</span>}
+                      </span>
                     }
                     right={
                       c.budget_max != null && c.budget_currency ? (
