@@ -37,9 +37,11 @@ inline constexpr const char* kJobType = "money_rates";
 
 inline nlohmann::json process_job(const nlohmann::json& payload) {
     // find() on a non-object payload answers end(): the default applies.
-    const auto it = payload.find("date");
-    const bool has_date = it != payload.end() && !it->is_null();
-    const std::string date = !has_date ? std::string("latest") : it->is_string() ? it->get<std::string>() : "";
+    const auto date_it = payload.find("date");
+    const bool has_date = date_it != payload.end() && !date_it->is_null();
+    const std::string date = !has_date              ? std::string("latest")
+                             : date_it->is_string() ? date_it->get<std::string>()
+                                                    : "";
     if (!Money::RatesSource::valid_date_arg(date)) {
         return {{"status", "invalid_date"}};
     }
