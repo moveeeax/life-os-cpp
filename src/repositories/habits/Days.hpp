@@ -160,7 +160,15 @@ inline std::vector<Evaluated> evaluate(const std::string& owner,
                 hi);
         }
     }
-    const auto checks = repo.checks(owner);
+    // The ticks are read for the same span as the sources, not for all time: /today asks every
+    // load for this week only, and the streak and the best reach back kHistoryDays at most.
+    ::Habits::Day first = read_windows.front().first;
+    ::Habits::Day last = read_windows.front().second;
+    for (const auto& [lo, hi] : read_windows) {
+        first = std::min(first, lo);
+        last = std::max(last, hi);
+    }
+    const auto checks = repo.checks(owner, ::Habits::text_of(first), ::Habits::text_of(last));
     static const ::Habits::Checks kNoChecks;
     static const ::Habits::Values kNoValues;
 

@@ -101,9 +101,6 @@ export function useOffSearch(q: string, enabled: boolean) {
   });
 }
 
-/** [query key, url] of the probe that says whether the module is on. */
-export const FOOD_PROBE = [qk.food.enabled(), `${BASE}/goals`] as const;
-
 // ── diary writes ───────────────────────────────────────────────────────────
 
 /** A diary write moves the day, the week, the recent list and Now's digest. */

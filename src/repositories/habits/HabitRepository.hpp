@@ -179,14 +179,18 @@ public:
         });
     }
 
-    /// Every manual tick of the owner's habits, by habit id.
-    std::map<std::string, ::Habits::Checks> checks(const std::string& owner) {
+    /// The manual ticks of the owner's habits dated @p from..@p to (inclusive), by habit id.
+    std::map<std::string, ::Habits::Checks> checks(const std::string& owner,
+                                                   const std::string& from,
+                                                   const std::string& to) {
         return Database::get().execute_read([&](auto& txn) {
             std::map<std::string, ::Habits::Checks> out;
             for (const auto& row :
                  txn.exec_params("SELECT habit_id::text, date::text, value::double precision FROM habit_checks "
-                                 "WHERE owner_id = $1::uuid",
-                                 owner)) {
+                                 "WHERE owner_id = $1::uuid AND date BETWEEN $2::date AND $3::date",
+                                 owner,
+                                 from,
+                                 to)) {
                 const auto value = row[2].is_null() ? std::optional<double>() : row[2].template as<double>();
                 out[row[0].template as<std::string>()][::Habits::day_of(row[1].template as<std::string>())] = value;
             }

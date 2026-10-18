@@ -294,6 +294,39 @@ TEST_F(GoalsApiTest, ACheckinWithoutADateLandsOnTodayInTheGivenZone) {
     EXPECT_EQ(detail(g["id"])["checkins"].size(), 2u) << "two days, two check-ins";
 }
 
+TEST_F(GoalsApiTest, ACheckinAfterTheCallersTodayIsRefused) {
+    // Pago Pago is UTC-11: its tomorrow is never past today in Kiritimati (UTC+14), the bound without a tz.
+    const auto [tomorrow, far] = Database::get().execute_read([](auto& txn) {
+        auto r = txn.exec(
+            "SELECT to_char((now() AT TIME ZONE 'Pacific/Pago_Pago')::date + 1, 'YYYY-MM-DD'), "
+            "to_char((now() AT TIME ZONE 'UTC')::date + 2, 'YYYY-MM-DD')");
+        return std::make_pair(r[0][0].template as<std::string>(), r[0][1].template as<std::string>());
+    });
+    const json g = goal({{"title", "Weight 75 kg"},
+                         {"area", "health"},
+                         {"kind", "number"},
+                         {"start_date", "2020-01-01"},
+                         {"due", "2030-12-31"},
+                         {"start_value", 93},
+                         {"target_value", 75},
+                         {"unit", "kg"}});
+    const auto put = [&](const std::string& date, const std::vector<std::pair<std::string, std::string>>& params) {
+        return call_id(goals,
+                       &Api::GoalsController::putCheckin,
+                       kAnna,
+                       Post,
+                       g["id"],
+                       json{{"date", date}, {"value", 90}},
+                       params);
+    };
+    const auto there = put(tomorrow, {{"tz", "Pacific/Pago_Pago"}});
+    EXPECT_EQ(there->statusCode(), k400BadRequest) << "tomorrow in the caller's zone";
+    EXPECT_EQ(body_of(there)["error"], "future_date") << there->body();
+    EXPECT_EQ(put(far, {})->statusCode(), k400BadRequest) << "two days past UTC is past every zone";
+    EXPECT_EQ(put(tomorrow, {})->statusCode(), k201Created) << "without a tz the bound is UTC+14";
+    EXPECT_EQ(detail(g["id"])["checkins"].size(), 1u);
+}
+
 TEST_F(GoalsApiTest, StepsAndCountByTheirTasks) {
     const json course = goal({{"title", "SA Pro course"},
                               {"area", "growth"},

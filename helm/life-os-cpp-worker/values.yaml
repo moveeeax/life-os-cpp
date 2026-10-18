@@ -139,7 +139,7 @@ worker:
   # MUST include "account_email" (transactional confirm/reset/change-email) and
   # "email.send" (generic ad-hoc email) — a worker that only drains "default"
   # silently leaves those jobs to pile up in Redis and no mail is ever sent.
-  types: "account_email,email.send,webhook.deliver,fitness_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse"
+  types: "account_email,email.send,webhook.deliver,fitness_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,now_media_sweep"
   concurrency: 2
   healthPort: 9091
   brpopTimeout: 5
@@ -262,6 +262,24 @@ notes:
 now:
   enabled: false
 
+# ---------------------------------------------------------------
+# Wallpaper and sound storage — keep in sync with the life-os-cpp chart.
+# The worker's now_media_sweep job deletes the objects of rows left pending.
+# Env vars set: S3_ENDPOINT, S3_REGION, S3_BUCKET, S3_PREFIX,
+# S3_PUBLIC_BASE_URL, S3_PATH_STYLE, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY
+# ---------------------------------------------------------------
+storage:
+  s3:
+    endpoint: ""
+    region: ""
+    bucket: ""
+    prefix: "life-os/"
+    publicBaseUrl: ""
+    pathStyle: true
+    credentialsSecret:
+      name: ""            # secret holding the access key pair
+      accessKeyIdKey: access-key-id
+      secretAccessKeyKey: secret-access-key
 
 # ---------------------------------------------------------------
 # External PostgreSQL connection

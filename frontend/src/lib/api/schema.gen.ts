@@ -486,6 +486,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/modules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The module switches
+         * @description Whether each module is switched on. A module that is off answers 404 on its routes; the app reads this once to build its navigation instead of asking one data route per module.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One flag per module */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                billing: boolean;
+                                fitness: boolean;
+                                food: boolean;
+                                goals: boolean;
+                                habits: boolean;
+                                money: boolean;
+                                notes: boolean;
+                                now: boolean;
+                                tasks: boolean;
+                                travel: boolean;
+                                workout: boolean;
+                            };
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/account/confirm-resend": {
         parameters: {
             query?: never;
@@ -11090,6 +11152,8 @@ export interface paths {
             parameters: {
                 query?: {
                     status?: "inbox" | "archived";
+                    limit?: number;
+                    offset?: number;
                 };
                 header?: never;
                 path?: never;
@@ -14964,6 +15028,8 @@ export interface paths {
             parameters: {
                 query?: {
                     currency?: string;
+                    limit?: number;
+                    offset?: number;
                 };
                 header?: never;
                 path?: never;
@@ -16466,7 +16532,7 @@ export interface components {
         };
         /** @description A section key is absent when its module is off, the caller has nothing there, or it failed (then it is in errors) */
         Today: {
-            /** @description The next trip and the day counters near their threshold (within 14 days) */
+            /** @description The running trip (or else the next one) and the day counters near their threshold (within 14 days) */
             travel?: {
                 next_trip: {
                     /** Format: uuid */
@@ -16474,6 +16540,7 @@ export interface components {
                     name: string;
                     /** Format: date */
                     start_date: string;
+                    /** @description Days until the start; zero or negative while the trip runs */
                     days_to: number;
                 } | null;
                 near: {

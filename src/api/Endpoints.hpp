@@ -37,6 +37,7 @@ inline const std::vector<EndpointInfo>& get_endpoints() {
         {"POST", "/api/v1/auth/logout", "Log out (clears cookies + revokes refresh)"},
         {"POST", "/api/v1/auth/refresh", "Rotate access + refresh cookies"},
         {"GET", "/api/v1/auth/me", "Get the authenticated user"},
+        {"GET", "/api/v1/modules", "The module switches (a module that is off answers 404)"},
         {"POST", "/api/v1/account/confirm-resend", "Resend email confirmation link"},
         {"POST", "/api/v1/account/confirm/{token}", "Confirm an account from token"},
         {"POST", "/api/v1/account/reset-password-request", "Request a password-reset email"},

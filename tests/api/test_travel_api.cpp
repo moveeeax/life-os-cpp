@@ -173,6 +173,21 @@ TEST_F(TravelApiTest, AnotherOwnersIdsAreNotFound) {
     EXPECT_EQ(body_of(list)["data"].size(), 0U);
 }
 
+TEST_F(TravelApiTest, TheTripsComeInPages) {
+    created_trip(kAnna);
+    created_trip(kAnna);
+    const auto list = [&](const std::vector<std::pair<std::string, std::string>>& params) {
+        auto r = call(
+            kAnna, Get, json::object(), [&](auto req, auto cb) { c.listTrips(req, std::move(cb)); }, params);
+        TestHelpers::expect_2xx_matches_schema(r, "GET", "/api/v1/travel/trips");
+        return body_of(r)["data"];
+    };
+    EXPECT_EQ(list({}).size(), 2U) << "the default page holds every trip";
+    EXPECT_EQ(list({{"limit", "1"}}).size(), 1U);
+    EXPECT_EQ(list({{"limit", "1"}, {"offset", "1"}}).size(), 1U);
+    EXPECT_EQ(list({{"offset", "2"}}).size(), 0U);
+}
+
 TEST_F(TravelApiTest, AnItemLinkIsAWebAddress) {
     const auto trip = created_trip(kAnna)["id"].get<std::string>();
     const auto add = [&](const char* link) {
@@ -337,6 +352,16 @@ TEST_F(TravelApiTest, ARuleIsChecked) {
                                {"threshold_kind", "at_most"}},
                           [&](auto req, auto cb) { c.createRule(req, std::move(cb)); });
     EXPECT_EQ(no_window->statusCode(), k400BadRequest) << "a rolling window needs its days";
+    auto wrapped = call(kAnna,
+                        Post,
+                        json{{"name", "x"},
+                             {"countries", {"FR"}},
+                             {"window_kind", "rolling_days"},
+                             {"window_days", 4294967297LL},
+                             {"threshold_days", 4294967297LL},
+                             {"threshold_kind", "at_most"}},
+                        [&](auto req, auto cb) { c.createRule(req, std::move(cb)); });
+    EXPECT_EQ(wrapped->statusCode(), k400BadRequest) << "2^32+1 days is not 1 day";
     auto ok = call(kAnna,
                    Post,
                    json{{"name", "Thailand visa-free"},

@@ -35,6 +35,7 @@
 #include "jobs/Outbox.hpp"
 #include "money/jobs/AdvisorJob.hpp"
 #include "money/jobs/RatesJob.hpp"
+#include "now/jobs/MediaSweep.hpp"
 #include "observability/Observability.hpp"
 #include "security/Auth.hpp"
 #include "security/Idempotency.hpp"
@@ -578,6 +579,7 @@ void Application::init_jobs_(Config::AppConfig& cfg) {
     register_fitness_sync_schedule_(cfg);
     register_money_rates_schedule_(cfg);
     register_money_advisor_schedule_(cfg);
+    register_now_media_sweep_schedule_();
 }
 
 void Application::register_fitness_sync_schedule_(Config::AppConfig& cfg) {
@@ -653,6 +655,25 @@ void Application::register_money_advisor_schedule_(Config::AppConfig& cfg) {
             Jobs::MoneyAdvisor::enqueue_weekly(static_cast<int>(weekday), Money::Period::detail::text_of(day));
         } catch (const std::exception& e) {
             spdlog::warn("money advisor schedule tick failed: {}", e.what());
+        }
+    });
+}
+
+void Application::register_now_media_sweep_schedule_() {
+    // Same shape as the rates schedule: an hourly tick in the API pod queues the sweep, the
+    // worker runs it. Rows only turn stale an hour after their create, so an hour is enough.
+    if (!Tasks::is_initialized() || !Database::is_initialized() || !Jobs::is_initialized())
+        return;
+    if (!now_enabled())
+        return;
+    spdlog::info("now media sweep enabled: hourly");
+    Tasks::schedule_recurring("now_media_sweep_schedule", std::chrono::hours(1), [] {
+        if (!Jobs::is_initialized())
+            return;
+        try {
+            Jobs::get().submit(Jobs::NowMediaSweep::kJobType, nlohmann::json::object());
+        } catch (const std::exception& e) {
+            spdlog::warn("now media sweep schedule tick failed: {}", e.what());
         }
     });
 }

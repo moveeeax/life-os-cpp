@@ -21,9 +21,6 @@ const BASE = '/api/v1/goals';
 export const GOAL_WRITES = [qk.goals.all(), qk.tasks.all(), qk.now.all()] as const;
 const ALL = GOAL_WRITES;
 
-/** [query key, url] of the probe that says whether the module is on. */
-export const GOALS_PROBE = [qk.goals.enabled(), `${BASE}?status=active`] as const;
-
 export function useGoals(status: 'active' | 'done' | 'dropped', date: string) {
   return useQuery({
     queryKey: qk.goals.list(status, date),

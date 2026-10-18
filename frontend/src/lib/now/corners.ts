@@ -21,7 +21,7 @@ export interface Countdown {
   title: string;
   due: string;
   days: number;
-  /** "today" | "tomorrow" | "in N days" */
+  /** "today" | "tomorrow" | "in N days", or "now" for a running trip */
   words: string;
 }
 
@@ -61,13 +61,16 @@ export function countdowns(
   horizonDays = COUNTDOWN_DAYS,
 ): Countdown[] {
   const trip = today.travel?.next_trip;
+  // The server sends the running trip while it lasts (start before today): it sits at the top as "now".
+  const tripDays = trip ? daysBetween(todayDate, trip.start_date) : 0;
   const trips = trip
     ? [
         {
           id: `trip:${trip.id}`,
           title: trip.name,
           due: trip.start_date,
-          days: daysBetween(todayDate, trip.start_date),
+          days: Math.max(tripDays, 0),
+          running: tripDays < 0,
         },
       ]
     : [];
@@ -77,12 +80,13 @@ export function countdowns(
       title: g.title,
       due: g.due,
       days: daysBetween(todayDate, g.due),
+      running: false,
     })),
     ...trips,
   ]
     .filter((c) => c.days >= 0 && c.days <= horizonDays)
     .sort((a, b) => a.days - b.days || a.title.localeCompare(b.title))
-    .map((c) => ({ ...c, words: inDays(c.days) }));
+    .map(({ running, ...c }) => ({ ...c, words: running ? 'now' : inDays(c.days) }));
 }
 
 /** Joins non-empty groups of parts with " · ". */

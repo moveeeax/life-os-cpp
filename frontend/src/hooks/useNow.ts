@@ -36,9 +36,6 @@ async function del(path: string, query?: Record<string, string>): Promise<void> 
 /** The focus moves a task, so a focus write refreshes Tasks too. */
 const AFTER_FOCUS = [qk.now.all(), qk.tasks.all()] as const;
 
-/** [query key, url] of the probe that says whether the module is on. */
-export const NOW_PROBE = [qk.now.enabled(), '/api/v1/wallpapers?device=desktop'] as const;
-
 /**
  * The day's digest. The last answer for this user and day paints first
  * (a new tab opens at once); the server answer replaces it and is cached.

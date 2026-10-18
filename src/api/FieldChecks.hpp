@@ -9,6 +9,7 @@
 
 #include <chrono>
 #include <cstdio>
+#include <limits>
 #include <optional>
 #include <regex>
 #include <stdexcept>
@@ -127,11 +128,25 @@ inline std::optional<double> opt_number(const nlohmann::json& body, const std::s
     return std::nullopt;
 }
 
+/// An integer field that fits an int; nullopt when absent, not an integer, or out of the int range.
+/// get<int>() alone narrows 4294967297 to 1, which would then pass a 1..N range check.
 inline std::optional<int> opt_int(const nlohmann::json& body, const std::string& field) {
-    if (body.contains(field) && body[field].is_number_integer()) {
-        return body[field].get<int>();
+    if (!body.contains(field) || !body[field].is_number_integer()) {
+        return std::nullopt;
     }
-    return std::nullopt;
+    const auto& v = body[field];
+    if (v.is_number_unsigned()) {
+        const auto u = v.get<unsigned long long>();
+        if (u > static_cast<unsigned long long>(std::numeric_limits<int>::max())) {
+            return std::nullopt;
+        }
+        return static_cast<int>(u);
+    }
+    const auto s = v.get<long long>();
+    if (s < std::numeric_limits<int>::min() || s > std::numeric_limits<int>::max()) {
+        return std::nullopt;
+    }
+    return static_cast<int>(s);
 }
 
 inline std::string today_utc() {

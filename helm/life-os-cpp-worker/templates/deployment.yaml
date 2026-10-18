@@ -235,6 +235,34 @@ spec:
             # now module — master switch
             - name: NOW_ENABLED
               value: {{ .Values.now.enabled | quote }}
+            # S3-compatible storage of the wallpaper library: the now_media_sweep
+            # job deletes the objects of rows left pending. Same keys as the API chart.
+            - name: S3_ENDPOINT
+              value: {{ .Values.storage.s3.endpoint | quote }}
+            - name: S3_REGION
+              value: {{ .Values.storage.s3.region | quote }}
+            - name: S3_BUCKET
+              value: {{ .Values.storage.s3.bucket | quote }}
+            - name: S3_PREFIX
+              value: {{ .Values.storage.s3.prefix | quote }}
+            - name: S3_PUBLIC_BASE_URL
+              value: {{ .Values.storage.s3.publicBaseUrl | quote }}
+            - name: S3_PATH_STYLE
+              value: {{ .Values.storage.s3.pathStyle | quote }}
+            {{- with .Values.storage.s3.credentialsSecret }}
+            {{- if .name }}
+            - name: S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .name }}
+                  key: {{ .accessKeyIdKey }}
+            - name: S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .name }}
+                  key: {{ .secretAccessKeyKey }}
+            {{- end }}
+            {{- end }}
             # Worker. The id names this instance's Redis processing list;
             # the pod name keeps it unique per replica and per restart.
             - name: WORKER_ID

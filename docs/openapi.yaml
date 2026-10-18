@@ -297,7 +297,7 @@ components:
         travel:
           type: object
           required: [next_trip, near]
-          description: The next trip and the day counters near their threshold (within 14 days)
+          description: The running trip (or else the next one) and the day counters near their threshold (within 14 days)
           properties:
             next_trip:
               oneOf:
@@ -307,7 +307,7 @@ components:
                     id: { type: string, format: uuid }
                     name: { type: string }
                     start_date: { type: string, format: date }
-                    days_to: { type: integer }
+                    days_to: { type: integer, description: "Days until the start; zero or negative while the trip runs" }
                 - { type: 'null' }
             near:
               type: array
@@ -2917,6 +2917,44 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/MeResponse' }
         '401': { description: Not authenticated }
+
+  /api/v1/modules:
+    get:
+      summary: The module switches
+      description: >-
+        Whether each module is switched on. A module that is off answers 404 on its routes; the app reads
+        this once to build its navigation instead of asking one data route per module.
+      tags: [auth]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: One flag per module
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [billing, fitness, food, goals, habits, money, notes, now, tasks, travel, workout]
+                    properties:
+                      billing: { type: boolean }
+                      fitness: { type: boolean }
+                      food: { type: boolean }
+                      goals: { type: boolean }
+                      habits: { type: boolean }
+                      money: { type: boolean }
+                      notes: { type: boolean }
+                      now: { type: boolean }
+                      tasks: { type: boolean }
+                      travel: { type: boolean }
+                      workout: { type: boolean }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   # ── Account self-service ───────────────────────────────────────────────────
   /api/v1/account/confirm-resend:
@@ -7662,6 +7700,8 @@ paths:
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: status, in: query, schema: { type: string, enum: [inbox, archived], default: inbox } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 500 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
         '200':
           description: Notes, newest first
@@ -9312,6 +9352,8 @@ paths:
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: currency, in: query, schema: { type: string, default: USD } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 500 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
         '200':
           description: OK

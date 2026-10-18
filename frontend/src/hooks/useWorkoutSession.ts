@@ -169,9 +169,6 @@ export function useExercise(id: string, enabled: boolean) {
   });
 }
 
-/** [query key, url] of the probe that says whether the module is on. */
-export const WORKOUT_PROBE = [qk.workout.enabled(), `${BASE}/sessions/active`] as const;
-
 // ── session mutations ───────────────────────────────────────────────────────
 
 export function useStartSession(onStarted: (session: WorkoutSession) => void) {

@@ -71,21 +71,25 @@ public:
         return Database::get().execute_read([&](auto& txn) { return find_in(txn, owner, id); });
     }
 
-    /// Every trip of the owner, the latest start first.
-    nlohmann::json list(const std::string& owner) {
+    /// One page of the owner's trips, the latest start first.
+    nlohmann::json list(const std::string& owner, int limit, int offset) {
         return Database::get().execute_read([&](auto& txn) {
             auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
-                                         " FROM travel_trips WHERE owner_id = $1::uuid ORDER BY start_date DESC, id) t",
-                                     owner);
+                                         " FROM travel_trips WHERE owner_id = $1::uuid ORDER BY start_date DESC, id "
+                                         " LIMIT $2 OFFSET $3) t",
+                                     owner,
+                                     limit,
+                                     offset);
             return nlohmann::json::parse(r[0][0].template as<std::string>());
         });
     }
 
-    /// The trip starting first on or after @p date (the next one), if any.
+    /// The trip not yet over on @p date that starts first: the running one while it lasts, else
+    /// the next one, if any.
     std::optional<nlohmann::json> next(const std::string& owner, const std::string& date) {
         return Database::get().execute_read([&](auto& txn) -> std::optional<nlohmann::json> {
             auto r = txn.exec_params("SELECT row_to_json(t) FROM (SELECT " + std::string(kColumns) +
-                                         " FROM travel_trips WHERE owner_id = $1::uuid AND start_date >= $2::date "
+                                         " FROM travel_trips WHERE owner_id = $1::uuid AND end_date >= $2::date "
                                          " ORDER BY start_date, id LIMIT 1) t",
                                      owner,
                                      date);

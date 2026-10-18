@@ -78,6 +78,7 @@ core -> fitness/jobs
 core -> food/jobs
 core -> jobs
 core -> money/jobs
+core -> now/jobs
 core -> observability
 core -> root
 core -> security
@@ -145,6 +146,10 @@ jobs -> webhooks
 now -> net
 now -> tasks
 now -> utils
+now/jobs -> jobs
+now/jobs -> repositories/now
+now/jobs -> storage
+now/jobs -> utils
 observability -> utils
 repositories -> database
 repositories -> domain

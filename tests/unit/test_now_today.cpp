@@ -281,6 +281,13 @@ TEST(NowToday, TravelBlockCountsDownToTheNextTrip) {
     EXPECT_EQ(b["near"].size(), 0U);
 }
 
+TEST(NowToday, TravelBlockGivesARunningTripNegativeDays) {
+    const json trip = {{"id", "t1"}, {"name", "Thailand"}, {"start_date", "2026-10-10"}};
+    const json b = Now::Today::travel_block(trip, json::array(), "2026-10-13");
+    ASSERT_TRUE(b.is_object());
+    EXPECT_EQ(b["next_trip"]["days_to"], -3) << "started three days ago";
+}
+
 TEST(NowToday, TravelBlockListsRulesNearTheirThreshold) {
     const json counters = {
         {{"name", "Schengen"}, {"threshold_kind", "at_most"}, {"left", 6}, {"reached_on", "2026-10-18"}},
