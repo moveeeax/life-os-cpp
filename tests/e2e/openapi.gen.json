@@ -4756,6 +4756,9 @@
        "conversion",
        "refunds_cents",
        "refunds_count",
+       "refunds_skipped_cents",
+       "refunds_skipped_count",
+       "refunds_skipped",
        "outstanding_credits",
        "outstanding_value_cents",
        "series",
@@ -4821,6 +4824,64 @@
         "type": "integer",
         "format": "int64",
         "description": "Count of billing_refunds rows in-window, outcome='applied' only"
+       },
+       "refunds_skipped_cents": {
+        "type": "integer",
+        "format": "int64",
+        "description": "Sum of billing_refunds.amount_cents in-window that took no credits back (outcome skipped_*): money that left through PayPal while the wallet kept its credits"
+       },
+       "refunds_skipped_count": {
+        "type": "integer",
+        "format": "int64",
+        "description": "Count of those skipped_* refund rows in-window"
+       },
+       "refunds_skipped": {
+        "type": "array",
+        "description": "The newest skipped_* refund rows in-window (at most 20), newest first",
+        "items": {
+         "type": "object",
+         "required": [
+          "provider_refund_id",
+          "payment_id",
+          "user_id",
+          "email",
+          "amount_cents",
+          "outcome",
+          "created_at"
+         ],
+         "properties": {
+          "provider_refund_id": {
+           "type": "string"
+          },
+          "payment_id": {
+           "type": "string",
+           "format": "uuid"
+          },
+          "user_id": {
+           "type": "string",
+           "format": "uuid"
+          },
+          "email": {
+           "type": "string"
+          },
+          "amount_cents": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "outcome": {
+           "type": "string",
+           "enum": [
+            "skipped_insufficient",
+            "skipped_zero_credits",
+            "skipped_not_credited"
+           ]
+          },
+          "created_at": {
+           "type": "string",
+           "format": "date-time"
+          }
+         }
+        }
        },
        "outstanding_credits": {
         "type": "integer",
@@ -12909,7 +12970,7 @@
       "description": "Billing module disabled, or no such order for this caller"
      },
      "409": {
-      "description": "This payment is failed/refunded and cannot be captured (payment_not_capturable), or PayPal reports the order hasn't been approved yet (order_not_approved)"
+      "description": "This payment is failed/refunded and cannot be captured (payment_not_capturable), or PayPal reports the order hasn't been approved yet (order_not_approved), or an earlier capture of the order is still pending at PayPal (capture_pending)"
      }
     }
    }
@@ -16780,6 +16841,16 @@
         }
        }
       }
+     },
+     "409": {
+      "description": "The code exists and fewer decimals are asked while an account, a budget or a receipt keeps it (decimals_in_use); nothing changed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
      }
     }
    }
@@ -19568,6 +19639,15 @@
        "pattern": "^[A-Z]{3}$"
       },
       "description": "Defaults to the settings' view_currency"
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the default day is today there; a name that is not a zone answers 400 invalid_query"
      }
     ],
     "responses": {
@@ -19722,6 +19802,17 @@
       "BearerAuth": []
      }
     ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: hint_date defaults to today there; a name that is not a zone answers 400 invalid_query"
+     }
+    ],
     "requestBody": {
      "required": true,
      "content": {
@@ -19740,7 +19831,7 @@
          "hint_date": {
           "type": "string",
           "format": "date",
-          "description": "The date of a line without one; defaults to today (UTC)"
+          "description": "The date of a line without one; defaults to today in tz (UTC without it)"
          }
         }
        }
@@ -19854,6 +19945,17 @@
     "security": [
      {
       "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: hint_date defaults to today there; a name that is not a zone answers 400 invalid_query"
      }
     ],
     "requestBody": {
@@ -27432,7 +27534,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 402620,
-  "source_fnv1a64": "8f36a503780527e0"
+  "source_bytes": 404979,
+  "source_fnv1a64": "177be1efb3c02361"
  }
 }

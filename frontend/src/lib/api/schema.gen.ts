@@ -3442,7 +3442,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description This payment is failed/refunded and cannot be captured (payment_not_capturable), or PayPal reports the order hasn't been approved yet (order_not_approved) */
+                /** @description This payment is failed/refunded and cannot be captured (payment_not_capturable), or PayPal reports the order hasn't been approved yet (order_not_approved), or an earlier capture of the order is still pending at PayPal (capture_pending) */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -6958,6 +6958,15 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
+                /** @description The code exists and fewer decimals are asked while an account, a budget or a receipt keeps it (decimals_in_use); nothing changed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
             };
         };
         delete?: never;
@@ -9127,6 +9136,8 @@ export interface paths {
                     to?: string;
                     /** @description Defaults to the settings' view_currency */
                     as_if?: string;
+                    /** @description IANA zone of the caller: the default day is today there; a name that is not a zone answers 400 invalid_query */
+                    tz?: string;
                 };
                 header?: never;
                 path?: never;
@@ -9271,7 +9282,10 @@ export interface paths {
         /** Send a bank mail, an SMS or a list of purchases to the LLM parse job */
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description IANA zone of the caller: hint_date defaults to today there; a name that is not a zone answers 400 invalid_query */
+                    tz?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -9282,7 +9296,7 @@ export interface paths {
                         text: string;
                         /**
                          * Format: date
-                         * @description The date of a line without one; defaults to today (UTC)
+                         * @description The date of a line without one; defaults to today in tz (UTC without it)
                          */
                         hint_date?: string;
                     };
@@ -9379,7 +9393,10 @@ export interface paths {
         /** Send a receipt photo (a jpeg, png or webp data URL, at most 4 MB decoded) to the LLM parse job */
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description IANA zone of the caller: hint_date defaults to today there; a name that is not a zone answers 400 invalid_query */
+                    tz?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -17593,6 +17610,31 @@ export interface components {
                  * @description Count of billing_refunds rows in-window, outcome='applied' only
                  */
                 refunds_count: number;
+                /**
+                 * Format: int64
+                 * @description Sum of billing_refunds.amount_cents in-window that took no credits back (outcome skipped_*): money that left through PayPal while the wallet kept its credits
+                 */
+                refunds_skipped_cents: number;
+                /**
+                 * Format: int64
+                 * @description Count of those skipped_* refund rows in-window
+                 */
+                refunds_skipped_count: number;
+                /** @description The newest skipped_* refund rows in-window (at most 20), newest first */
+                refunds_skipped: {
+                    provider_refund_id: string;
+                    /** Format: uuid */
+                    payment_id: string;
+                    /** Format: uuid */
+                    user_id: string;
+                    email: string;
+                    /** Format: int64 */
+                    amount_cents: number;
+                    /** @enum {string} */
+                    outcome: "skipped_insufficient" | "skipped_zero_credits" | "skipped_not_credited";
+                    /** Format: date-time */
+                    created_at: string;
+                }[];
                 /**
                  * Format: int64
                  * @description SUM(wallet_balances.credits) — all-time liability, NOT windowed

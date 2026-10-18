@@ -1433,6 +1433,9 @@ components:
             - conversion
             - refunds_cents
             - refunds_count
+            - refunds_skipped_cents
+            - refunds_skipped_count
+            - refunds_skipped
             - outstanding_credits
             - outstanding_value_cents
             - series
@@ -1452,6 +1455,22 @@ components:
                 rate:     { type: number, format: double, description: "captured / created as a float ratio; 0 if created is 0" }
             refunds_cents:            { type: integer, format: int64, description: "Sum of billing_refunds.amount_cents in-window, outcome='applied' only" }
             refunds_count:            { type: integer, format: int64, description: "Count of billing_refunds rows in-window, outcome='applied' only" }
+            refunds_skipped_cents:    { type: integer, format: int64, description: "Sum of billing_refunds.amount_cents in-window that took no credits back (outcome skipped_*): money that left through PayPal while the wallet kept its credits" }
+            refunds_skipped_count:    { type: integer, format: int64, description: "Count of those skipped_* refund rows in-window" }
+            refunds_skipped:
+              type: array
+              description: "The newest skipped_* refund rows in-window (at most 20), newest first"
+              items:
+                type: object
+                required: [provider_refund_id, payment_id, user_id, email, amount_cents, outcome, created_at]
+                properties:
+                  provider_refund_id: { type: string }
+                  payment_id:         { type: string, format: uuid }
+                  user_id:            { type: string, format: uuid }
+                  email:              { type: string }
+                  amount_cents:       { type: integer, format: int64 }
+                  outcome:            { type: string, enum: [skipped_insufficient, skipped_zero_credits, skipped_not_credited] }
+                  created_at:         { type: string, format: date-time }
             outstanding_credits:      { type: integer, format: int64, description: "SUM(wallet_balances.credits) — all-time liability, NOT windowed" }
             outstanding_value_cents:  { type: integer, format: int64, description: "outstanding_credits * 100 / credits_per_unit (integer math, current billing_settings rate)" }
             series:
@@ -4071,7 +4090,7 @@ paths:
         '400': { description: order_id missing or not a string }
         '401': { description: Not authenticated }
         '404': { description: "Billing module disabled, or no such order for this caller" }
-        '409': { description: "This payment is failed/refunded and cannot be captured (payment_not_capturable), or PayPal reports the order hasn't been approved yet (order_not_approved)" }
+        '409': { description: "This payment is failed/refunded and cannot be captured (payment_not_capturable), or PayPal reports the order hasn't been approved yet (order_not_approved), or an earlier capture of the order is still pending at PayPal (capture_pending)" }
   /api/v1/billing/paypal/webhook:
     post:
       summary: PayPal webhook — capture/refund notifications

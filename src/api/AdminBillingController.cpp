@@ -94,6 +94,8 @@ void AdminBillingController::createPackage(const HttpRequestPtr& req,
     if (body.contains("credits") && !body["credits"].is_null() &&
         (!body["credits"].is_number_integer() || body["credits"].get<std::int64_t>() <= 0))
         errs.add("credits", "invalid", "credits must be a positive integer");
+    else
+        Validation::int_range(errs, body, "credits", 1, Billing::kMaxCredits);
     Validation::boolean(errs, body, "active");
     Validation::int_range(errs, body, "sort", std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
     if (errs.any()) {
@@ -152,12 +154,16 @@ void AdminBillingController::updatePackage(const HttpRequestPtr& req,
     if (body.contains("credits") && !body["credits"].is_null()) {
         if (!body["credits"].is_number_integer() || body["credits"].get<std::int64_t>() <= 0)
             errs.add("credits", "invalid", "credits must be a positive integer");
+        else if (body["credits"].get<std::int64_t>() > Billing::kMaxCredits)
+            errs.add("credits", "above_max", "max " + std::to_string(Billing::kMaxCredits));
         else
             credits = body["credits"].get<std::int64_t>();
     }
     if (body.contains("active") && body["active"].is_boolean())
         active = body["active"].get<bool>();
-    if (body.contains("sort") && body["sort"].is_number_integer())
+    // get<int>() would truncate 4294967297 to 1: the range is checked first.
+    Validation::int_range(errs, body, "sort", std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
+    if (!errs.any() && body.contains("sort") && body["sort"].is_number_integer())
         sort = body["sort"].get<int>();
     if (errs.any()) {
         callback(Validation::response_400(errs));
@@ -171,8 +177,15 @@ void AdminBillingController::updatePackage(const HttpRequestPtr& req,
 
     with_repo_errors(callback, "admin billing updatePackage", [&] {
         Repositories::PackageRepository repo;
+        // The row before the write goes into the audit, so a price change
+        // can be reconstructed from the log.
+        const auto before = repo.find(id, /*from_primary=*/true);
         auto updated = repo.update(id, title, amount_cents, credits, active, sort);
-        Security::Audit::record(actor_of(req), "billing.package.update", "billing_package", id);
+        Security::Audit::record(actor_of(req),
+                                "billing.package.update",
+                                "billing_package",
+                                id,
+                                {{"before", before ? json(*before) : json(nullptr)}, {"after", json(updated)}});
         callback(Response::ok({{"data", json(updated)}}));
     });
 }
@@ -187,8 +200,13 @@ void AdminBillingController::deletePackage(const HttpRequestPtr& req,
         return;
     with_repo_errors(callback, "admin billing deletePackage", [&] {
         Repositories::PackageRepository repo;
+        const auto before = repo.find(id, /*from_primary=*/true);
         repo.remove(id);  // throws PackageNotFound -> 404
-        Security::Audit::record(actor_of(req), "billing.package.delete", "billing_package", id);
+        Security::Audit::record(actor_of(req),
+                                "billing.package.delete",
+                                "billing_package",
+                                id,
+                                {{"before", before ? json(*before) : json(nullptr)}});
         callback(Response::ok({{"message", "Package deleted"}}));
     });
 }
@@ -227,6 +245,9 @@ void AdminBillingController::updateSettings(const HttpRequestPtr& req,
     if (body.contains("max_amount_cents") && !body["max_amount_cents"].is_null() &&
         (!body["max_amount_cents"].is_number_integer() || body["max_amount_cents"].get<std::int64_t>() <= 0))
         errs.add("max_amount_cents", "invalid", "max_amount_cents must be a positive integer");
+    Validation::int_range(errs, body, "credits_per_unit", 1, Billing::kMaxCreditsPerUnit);
+    Validation::int_range(errs, body, "min_amount_cents", 1, Billing::kMaxAmountCents);
+    Validation::int_range(errs, body, "max_amount_cents", 1, Billing::kMaxAmountCents);
     // The cross-field bound only makes sense once both individual fields
     // already checked out — deliberately gated on !errs.any(), unlike the
     // independent per-field checks above.
@@ -243,6 +264,7 @@ void AdminBillingController::updateSettings(const HttpRequestPtr& req,
 
     with_repo_errors(callback, "admin billing updateSettings", [&] {
         Repositories::BillingSettingsRepository repo;
+        const auto before = repo.get(/*from_primary=*/true);
         auto updated = repo.update(credits_per_unit, min_amount_cents, max_amount_cents);
         Security::Audit::record(actor_of(req),
                                 "billing.settings.update",
@@ -250,7 +272,9 @@ void AdminBillingController::updateSettings(const HttpRequestPtr& req,
                                 "1",
                                 {{"credits_per_unit", credits_per_unit},
                                  {"min_amount_cents", min_amount_cents},
-                                 {"max_amount_cents", max_amount_cents}});
+                                 {"max_amount_cents", max_amount_cents},
+                                 {"before", json(before)},
+                                 {"after", json(updated)}});
         callback(Response::ok({{"data", json(updated)}}));
     });
 }
@@ -271,6 +295,11 @@ void AdminBillingController::adjustWallet(const HttpRequestPtr& req,
     Validation::require(errs, body, "delta_credits");
     if (!errs.any() && !body["delta_credits"].is_number_integer())
         errs.add("delta_credits", "not_integer", "delta_credits must be an integer");
+    else if (!errs.any() && body["delta_credits"].is_number_unsigned() &&
+             body["delta_credits"].get<std::uint64_t>() > static_cast<std::uint64_t>(Billing::kMaxCredits))
+        errs.add("delta_credits", "above_max", "max " + std::to_string(Billing::kMaxCredits));
+    else
+        Validation::int_range(errs, body, "delta_credits", -Billing::kMaxCredits, Billing::kMaxCredits);
     Validation::require(errs, body, "note");
     Validation::string_length(errs, body, "note", 1, 2000);
     if (errs.any()) {
@@ -360,6 +389,16 @@ void AdminBillingController::metrics(const HttpRequestPtr& req,
                                  {"topup_credits", tu.topup_credits},
                                  {"revenue_cents", tu.revenue_cents}});
 
+        json refunds_skipped = json::array();
+        for (const auto& sr : m.refunds_skipped)
+            refunds_skipped.push_back({{"provider_refund_id", sr.provider_refund_id},
+                                       {"payment_id", sr.payment_id},
+                                       {"user_id", sr.user_id},
+                                       {"email", sr.email},
+                                       {"amount_cents", sr.amount_cents},
+                                       {"outcome", sr.outcome},
+                                       {"created_at", sr.created_at}});
+
         json conversion = {
             {"created", m.conversion_created}, {"captured", m.conversion_captured}, {"rate", m.conversion_rate}};
 
@@ -370,6 +409,9 @@ void AdminBillingController::metrics(const HttpRequestPtr& req,
                      {"conversion", conversion},
                      {"refunds_cents", m.refunds_cents},
                      {"refunds_count", m.refunds_count},
+                     {"refunds_skipped_cents", m.refunds_skipped_cents},
+                     {"refunds_skipped_count", m.refunds_skipped_count},
+                     {"refunds_skipped", refunds_skipped},
                      {"outstanding_credits", m.outstanding_credits},
                      {"outstanding_value_cents", m.outstanding_value_cents},
                      {"series", series},

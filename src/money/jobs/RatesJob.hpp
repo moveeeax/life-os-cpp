@@ -23,6 +23,7 @@
 #include <nlohmann/json.hpp>
 
 #include "jobs/Jobs.hpp"
+#include "money/DigestCache.hpp"
 #include "money/Period.hpp"
 #include "money/RatesSource.hpp"
 #include "net/Http.hpp"
@@ -61,6 +62,8 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         }
     }
     rates.put_day(day.date, keep);
+    // The net worth on /today reads these quotes: the cached digests go stale.
+    Money::DigestCache::touch_rates();
     nlohmann::json out{{"status", "done"}, {"date", day.date}, {"stored", keep.size()}};
     if (!missing.empty()) {
         out["missing"] = missing;

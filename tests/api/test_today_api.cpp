@@ -7,6 +7,7 @@
  */
 
 #include <chrono>
+#include <memory>
 #include <optional>
 #include <string>
 #include <thread>
@@ -19,9 +20,12 @@
 
 #include <nlohmann/json.hpp>
 
+#include "InMemoryCache.hpp"
 #include "api/TodayController.hpp"
+#include "cache/Cache.hpp"
 #include "database/Database.hpp"
 #include "domain/Role.hpp"
+#include "money/DigestCache.hpp"
 #include "test_helpers.hpp"
 
 using json = nlohmann::json;
@@ -134,6 +138,10 @@ protected:
             }
             return true;
         });
+        // The rows above were written behind the money API's back: fresh
+        // digest tokens, so a digest cached by an earlier test is not read.
+        Money::DigestCache::touch_owner(kAnna);
+        Money::DigestCache::touch_owner(kBoris);
     }
 
     using Handler = void (Api::TodayController::*)(const HttpRequestPtr&,
@@ -375,7 +383,63 @@ TEST_F(TodayApiTest, TheDigestCarriesTheCornerDetails) {
 
 TEST_F(TodayApiTest, ASpendOfSomeoneElseStaysTheirs) {
     insert_spend(kBoris, "Boris's lunch", 3000);
-    EXPECT_FALSE(today()["money"].is_object() && !today()["money"]["spends_today"].empty());
+    EXPECT_FALSE(today().contains("money")) << "Anna has no money rows: no money block at all";
+    insert_spend(kAnna, "Anna's coffee", 1500);
+    Money::DigestCache::touch_owner(kAnna);
+    const json anna = today();
+    ASSERT_TRUE(anna.contains("money")) << anna.dump();
+    ASSERT_EQ(anna["money"]["spends_today"].size(), 1u);
+    EXPECT_EQ(anna["money"]["spends_today"][0]["name"], "Anna's coffee");
+    const json boris = today(kBoris);
+    ASSERT_TRUE(boris.contains("money")) << boris.dump();
+    ASSERT_EQ(boris["money"]["spends_today"].size(), 1u);
+    EXPECT_EQ(boris["money"]["spends_today"][0]["name"], "Boris's lunch");
+}
+
+// The money part is cached per owner and day: a row written behind the
+// money API's back is not seen until the owner's token is replaced (every
+// money write of the API does that), and the cached answer is the same JSON
+// a computation without the cache gives.
+TEST_F(TodayApiTest, TheMoneyPartIsCachedUntilTheOwnersNextMoneyWrite) {
+    Cache::install_for_testing(std::make_unique<TestSupport::InMemoryCache>());
+    insert_spend(kAnna, "Groceries", 5000);
+    const json first = today();
+    ASSERT_TRUE(first.contains("money")) << first.dump();
+    insert_spend(kAnna, "Coffee", 1500);
+    EXPECT_EQ(today()["money"], first["money"]) << "served from the cache";
+    EXPECT_EQ(today(kBoris).contains("money"), false) << "Boris has his own entry";
+
+    Money::DigestCache::touch_owner(kAnna);
+    const json fresh = today();
+    ASSERT_EQ(fresh["money"]["spends_today"].size(), 2u) << fresh.dump();
+    EXPECT_EQ(today()["money"], fresh["money"]) << "cached again under the new token";
+
+    Money::DigestCache::touch_rates();
+    EXPECT_EQ(today()["money"], fresh["money"]) << "a new day of rates recomputes, same rows";
+
+    Cache::reset_for_testing();
+    EXPECT_EQ(today()["money"], fresh["money"]) << "identical to the answer without any cache";
+}
+
+namespace {
+
+/// Redis away: every read misses and every store fails (the fail-open
+/// wrappers' answers).
+class DownCache : public TestSupport::InMemoryCache {
+public:
+    bool set(const std::string&, const std::string&, long = 0) override { return false; }
+    std::optional<std::string> get(const std::string&) override { return std::nullopt; }
+};
+
+}  // namespace
+
+TEST_F(TodayApiTest, WithRedisDownTheMoneyPartIsComputed) {
+    Cache::install_for_testing(std::make_unique<DownCache>());
+    insert_spend(kAnna, "Groceries", 5000);
+    ASSERT_EQ(today()["money"]["spends_today"].size(), 1u);
+    insert_spend(kAnna, "Coffee", 1500);
+    EXPECT_EQ(today()["money"]["spends_today"].size(), 2u) << "nothing cached, nothing stale";
+    Cache::reset_for_testing();
 }
 
 TEST_F(TodayApiTest, TheNextTripCountsDown) {

@@ -5,6 +5,8 @@
  *        block, rates, settings, the module switch.
  */
 
+#include <memory>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -16,11 +18,14 @@
 
 #include <nlohmann/json.hpp>
 
+#include "InMemoryCache.hpp"
 #include "api/MoneyController.hpp"
+#include "cache/Cache.hpp"
 #include "database/Database.hpp"
 #include "domain/Role.hpp"
 #include "jobs/Jobs.hpp"
 #include "jobs/Outbox.hpp"
+#include "money/DigestCache.hpp"
 #include "money/Period.hpp"
 #include "repositories/money/FxRateRepository.hpp"
 #include "repositories/money/ParseJobRepository.hpp"
@@ -461,6 +466,29 @@ TEST_F(MoneyApiTest, WithoutADateTheRateIsOfTodayInTheGivenZone) {
     EXPECT_EQ(convert({{"tz", zone}, {"date", utc}}), utc) << "a given date wins";
 }
 
+// Every money write replaces the owner's digest token before it answers, so
+// the /today the page fetches next computes the money part afresh; a read
+// leaves it, and another owner's token is not touched.
+TEST_F(MoneyApiTest, AMoneyWriteReplacesTheOwnersDigestToken) {
+    Cache::install_for_testing(std::make_unique<TestSupport::InMemoryCache>());
+    const auto token = [](const char* who) { return Cache::get().get(Money::DigestCache::owner_version_key(who)); };
+    EXPECT_FALSE(token(kAnna).has_value());
+    std::optional<std::string> seen_before_answer;
+    {
+        auto req = TestHelpers::authed_json(user(kAnna), json{{"name", "Kaspi"}, {"currency", "KZT"}}, Post);
+        controller.createAccount(req, [&](const HttpResponsePtr&) { seen_before_answer = token(kAnna); });
+    }
+    ASSERT_TRUE(seen_before_answer.has_value()) << "replaced before the answer went out";
+    const auto after_write = token(kAnna);
+    call(&Api::MoneyController::listAccounts, user(kAnna), Get);
+    EXPECT_EQ(token(kAnna), after_write) << "a read keeps it";
+    EXPECT_FALSE(token(kBoris).has_value());
+    const json kaspi = body_of(call(&Api::MoneyController::listAccounts, user(kAnna), Get))["data"][0];
+    call_id(&Api::MoneyController::updateAccount, user(kAnna), Patch, kaspi["id"], json{{"name", "Kaspi Gold"}});
+    EXPECT_NE(token(kAnna), after_write) << "every write replaces it";
+    Cache::reset_for_testing();
+}
+
 // A tz that is not a zone is refused, as /today and the agenda refuse it,
 // instead of quietly filing the day under UTC.
 TEST_F(MoneyApiTest, ATzThatIsNotAZoneIsRefused) {
@@ -489,9 +517,9 @@ TEST_F(MoneyApiTest, ATzThatIsNotAZoneIsRefused) {
         ASSERT_EQ(resp->statusCode(), k400BadRequest) << resp->body();
         EXPECT_EQ(body_of(resp)["error"], "invalid_query");
     }
-    EXPECT_EQ(call(&Api::MoneyController::rate, user(kAnna), Get, {{"quote", "USD"}, {"tz", "Asia/Almaty"}})
-                  ->statusCode(),
-              k200OK)
+    EXPECT_EQ(
+        call(&Api::MoneyController::rate, user(kAnna), Get, {{"quote", "USD"}, {"tz", "Asia/Almaty"}})->statusCode(),
+        k200OK)
         << "a zone passes";
 }
 

@@ -14,6 +14,8 @@
  */
 
 #include <atomic>
+#include <cstdint>
+#include <limits>
 #include <random>
 #include <thread>
 
@@ -615,6 +617,46 @@ TEST_F(WalletTest, AdjustWritesAuditedEntryAndMovesBalance) {
     EXPECT_THROW(Billing::adjust(user_id, -1000, "oops", admin_id), Billing::InsufficientBalance);
     EXPECT_EQ(Billing::balance_of(user_id), 250);
     EXPECT_EQ(Billing::history(user_id, 10, 0).size(), 1u);
+}
+
+// A payment priced at a huge rate: credits_expected * refunded_amount_cents
+// (10^15 * 10^5) passes 2^63, which wrapped in int64 (UB) before the 128-bit
+// product. The full refund takes back exactly the credits granted.
+TEST_F(WalletTest, ARefundAtAHugeRateDoesNotOverflow) {
+    auto user_id = seed_user("buyer-huge-rate@example.com");
+    const std::int64_t credits = 1'000'000'000'000'000;  // 10^15
+    seed_payment(user_id, "ORDER-HUGE", /*amount_cents=*/100000, credits, /*rate_snapshot=*/1'000'000'000'000);
+    ASSERT_TRUE(Billing::credit_capture("ORDER-HUGE", "CAPTURE-HUGE", 100000, "USD").credited);
+    ASSERT_EQ(Billing::balance_of(user_id), credits);
+    auto half = Billing::refund_capture("CAPTURE-HUGE", "REFUND-HUGE-1", 50000);
+    EXPECT_EQ(half.balance, credits / 2);
+    auto rest = Billing::refund_capture("CAPTURE-HUGE", "REFUND-HUGE-2", 50000);
+    EXPECT_EQ(rest.balance, 0);
+    EXPECT_EQ(refund_outcome("REFUND-HUGE-2"), "applied");
+}
+
+// |delta| above 10^12 is refused, and so is a sum the balance cannot hold:
+// current + delta was a signed overflow (UB) before.
+TEST_F(WalletTest, AdjustRefusesAHugeDelta) {
+    auto user_id = seed_user("buyer-huge-delta@example.com");
+    auto admin_id = seed_user("admin-huge-delta@example.com");
+    ASSERT_EQ(Billing::adjust(user_id, 5, "seed", admin_id).balance, 5);
+    EXPECT_THROW(Billing::adjust(user_id, std::numeric_limits<std::int64_t>::max(), "too much", admin_id),
+                 Billing::AdjustmentTooLarge);
+    EXPECT_THROW(Billing::adjust(user_id, std::numeric_limits<std::int64_t>::min(), "too little", admin_id),
+                 Billing::AdjustmentTooLarge);
+    EXPECT_THROW(Billing::adjust(user_id, Billing::kMaxCredits + 1, "just over", admin_id),
+                 Billing::AdjustmentTooLarge);
+    EXPECT_EQ(Billing::adjust(user_id, Billing::kMaxCredits, "the bound itself", admin_id).balance,
+              Billing::kMaxCredits + 5);
+    EXPECT_EQ(Billing::history(user_id, 10, 0).size(), 2u);
+}
+
+TEST(BillingMulDiv, UsesA128BitProduct) {
+    EXPECT_EQ(Billing::mul_div(1'000'000'000'000'000, 100000, 100000), 1'000'000'000'000'000);
+    EXPECT_EQ(Billing::mul_div(1000, 50, 100), 500);
+    EXPECT_FALSE(Billing::mul_div(std::numeric_limits<std::int64_t>::max(), 1000, 100).has_value());
+    EXPECT_FALSE(Billing::mul_div(1, 1, 0).has_value());
 }
 
 TEST_F(WalletTest, AdjustRejectsZeroDelta) {

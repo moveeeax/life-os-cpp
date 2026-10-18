@@ -62,3 +62,6 @@ export type AdminPaymentListResponse = Schemas['AdminPaymentListResponse'];
 export type BillingSettings = Schemas['BillingSettings'];
 export type BillingSettingsResponse = Schemas['BillingSettingsResponse'];
 export type AdjustResponse = Schemas['AdjustResponse'];
+export type BillingMetricsResponse = Schemas['BillingMetricsResponse'];
+/** A refund that took no credits back (outcome skipped_*), from the metrics. */
+export type SkippedRefund = BillingMetricsResponse['data']['refunds_skipped'][number];

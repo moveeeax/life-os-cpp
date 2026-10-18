@@ -32,6 +32,7 @@
 #include "jobs/Jobs.hpp"
 #include "jobs/Outbox.hpp"
 #include "money/Currencies.hpp"
+#include "money/DigestCache.hpp"
 #include "money/Llm.hpp"
 #include "money/Period.hpp"
 #include "money/Rates.hpp"
@@ -65,7 +66,8 @@ namespace {
 /// (local_today alone falls back to UTC and would file the day wrongly).
 /// True when the request was answered. A zone list the database cannot read
 /// lets the request through; local_today then falls back to UTC.
-bool refused_tz(const drogon::HttpRequestPtr& req, const std::function<void(const drogon::HttpResponsePtr&)>& callback) {
+bool refused_tz(const drogon::HttpRequestPtr& req,
+                const std::function<void(const drogon::HttpResponsePtr&)>& callback) {
     const std::string tz = req->getParameter("tz");
     if (tz.empty()) {
         return false;
@@ -79,6 +81,19 @@ bool refused_tz(const drogon::HttpRequestPtr& req, const std::function<void(cons
     }
     callback(ErrorResponse::bad_request("invalid_query", "tz must be an IANA zone like Asia/Almaty"));
     return true;
+}
+
+/// The handler's callback with the owner's digest version replaced first:
+/// every answer of a money write is sent after its commit (the handlers run
+/// their queries synchronously), so the next GET /today, which the page
+/// sends right after, computes the money part afresh. A refused write
+/// replaces it too: one extra miss costs less than a missed write.
+std::function<void(const drogon::HttpResponsePtr&)> touching(
+    const std::string& owner, std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
+    return [owner, cb = std::move(callback)](const drogon::HttpResponsePtr& resp) {
+        Money::DigestCache::touch_owner(owner);
+        cb(resp);
+    };
 }
 
 }  // namespace
@@ -284,6 +299,7 @@ void MoneyController::listCurrencies(const HttpRequestPtr& req, Callback&& callb
 
 void MoneyController::upsertCurrency(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     seed_currencies(owner);
     json body;
     if (!parse_object(req, body, callback)) {
@@ -330,6 +346,7 @@ void MoneyController::upsertCurrency(const HttpRequestPtr& req, Callback&& callb
 
 void MoneyController::patchCurrency(const HttpRequestPtr& req, Callback&& callback, const std::string& code) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -401,6 +418,7 @@ void MoneyController::listAccounts(const HttpRequestPtr& req, Callback&& callbac
 
 void MoneyController::createAccount(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     seed_currencies(owner);
     json body;
     if (!parse_object(req, body, callback)) {
@@ -445,6 +463,7 @@ void MoneyController::getAccount(const HttpRequestPtr& req, Callback&& callback,
 
 void MoneyController::updateAccount(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -481,6 +500,7 @@ void MoneyController::updateAccount(const HttpRequestPtr& req, Callback&& callba
 
 void MoneyController::deleteAccount(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -525,6 +545,7 @@ void MoneyController::listCategories(const HttpRequestPtr& req, Callback&& callb
 
 void MoneyController::createCategory(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     seed_currencies(owner);
     json body;
     if (!parse_object(req, body, callback)) {
@@ -566,6 +587,7 @@ void MoneyController::getCategory(const HttpRequestPtr& req, Callback&& callback
 
 void MoneyController::updateCategory(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -598,6 +620,7 @@ void MoneyController::updateCategory(const HttpRequestPtr& req, Callback&& callb
 
 void MoneyController::deleteCategory(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -624,6 +647,7 @@ void MoneyController::listTransactions(const HttpRequestPtr& req, Callback&& cal
 
 void MoneyController::createTransaction(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -641,6 +665,7 @@ void MoneyController::createTransaction(const HttpRequestPtr& req, Callback&& ca
 
 void MoneyController::createTransactions(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -685,6 +710,7 @@ void MoneyController::getTransaction(const HttpRequestPtr& req, Callback&& callb
 
 void MoneyController::updateTransaction(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -744,6 +770,7 @@ void MoneyController::updateTransaction(const HttpRequestPtr& req, Callback&& ca
 
 void MoneyController::deleteTransaction(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -755,6 +782,7 @@ void MoneyController::deleteTransaction(const HttpRequestPtr& req, Callback&& ca
 
 void MoneyController::confirmTransaction(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -815,6 +843,7 @@ void transfer_fields(Validation::Errors& errs, const json& body) {
 
 void MoneyController::createTransfer(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -861,6 +890,7 @@ void MoneyController::getTransfer(const HttpRequestPtr& req, Callback&& callback
 
 void MoneyController::updateTransfer(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -897,6 +927,7 @@ void MoneyController::updateTransfer(const HttpRequestPtr& req, Callback&& callb
 
 void MoneyController::deleteTransfer(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -919,6 +950,7 @@ void MoneyController::merchants(const HttpRequestPtr& req, Callback&& callback) 
 
 void MoneyController::patchMerchant(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -1408,6 +1440,7 @@ void MoneyController::parseStatus(const HttpRequestPtr& req, Callback&& callback
 
 void MoneyController::parseAccept(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -1557,6 +1590,7 @@ void MoneyController::getSettings(const HttpRequestPtr& req, Callback&& callback
 
 void MoneyController::putSettings(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    callback = touching(owner, std::move(callback));  // /today computes the money part afresh
     seed_currencies(owner);
     json body;
     if (!parse_object(req, body, callback)) {

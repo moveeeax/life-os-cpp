@@ -672,18 +672,17 @@ void FoodController::parseStart(const HttpRequestPtr& req, Callback&& callback) 
                                           json{{"retry_after_sec", 30}}}));
             return;
         }
-        const json job = repo.create(owner,
-                                     body["text"].get<std::string>(),
-                                     body["meal"].get<std::string>(),
-                                     body["date"].get<std::string>(),
-                                     [&](auto& txn, const std::string& job_id) {
-                                         // The cap again, under the lock: two creates at once
-                                         // cannot both pass the count above.
-                                         Repositories::JobRows::hold_slot(
-                                             txn, Repositories::ParseJobRepository::kTable, owner);
-                                         via_outbox = Jobs::Outbox::enqueue_if_drained(
-                                             txn, Jobs::FoodParse::kJobType, payload(job_id));
-                                     });
+        const json job = repo.create(
+            owner,
+            body["text"].get<std::string>(),
+            body["meal"].get<std::string>(),
+            body["date"].get<std::string>(),
+            [&](auto& txn, const std::string& job_id) {
+                // The cap again, under the lock: two creates at once
+                // cannot both pass the count above.
+                Repositories::JobRows::hold_slot(txn, Repositories::ParseJobRepository::kTable, owner);
+                via_outbox = Jobs::Outbox::enqueue_if_drained(txn, Jobs::FoodParse::kJobType, payload(job_id));
+            });
         id = job["id"].get<std::string>();
     } catch (const Repositories::JobRows::SlotsTaken&) {
         callback(ErrorResponse::make({drogon::k429TooManyRequests,

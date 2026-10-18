@@ -1,0 +1,1 @@
+The money part of `GET /api/v1/today` is cached in Redis per owner and day for up to five minutes; every money write of the owner and every new day of rates makes the next call compute it afresh, and with Redis down it is computed as before. The response is unchanged.

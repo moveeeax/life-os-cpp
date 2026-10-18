@@ -104,6 +104,7 @@ food/jobs -> utils
 food/now -> repositories/food
 llm -> net
 llm -> utils
+money -> cache
 money -> llm
 money -> net
 money -> utils
@@ -113,6 +114,7 @@ money/jobs -> money
 money/jobs -> net
 money/jobs -> repositories/money
 money/jobs -> utils
+money/now -> cache
 money/now -> money
 money/now -> now
 money/now -> repositories/money

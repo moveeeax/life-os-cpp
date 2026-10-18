@@ -71,6 +71,8 @@
 #pragma once
 
 #include <cstdint>
+#include <limits>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -78,6 +80,39 @@
 #include "repositories/RepoErrors.hpp"
 
 namespace Billing {
+
+/// Upper bounds the admin inputs are held to (AdminBillingController), so the
+/// int64 products of the money math stay far from overflow: a package's
+/// credits and |adjust delta| at most 10^12, credits_per_unit at most 10^9
+/// and the top-up bounds at most 10^9 cents (amount_cents * credits_per_unit
+/// <= 10^18 < 2^63).
+inline constexpr std::int64_t kMaxCredits = 1'000'000'000'000;
+inline constexpr std::int64_t kMaxCreditsPerUnit = 1'000'000'000;
+inline constexpr std::int64_t kMaxAmountCents = 1'000'000'000;
+
+__extension__ typedef __int128 Int128;  // __extension__: no -Wpedantic warning for the GCC/Clang type
+
+/// (a * b) / c with a 128-bit product; nullopt when the quotient does not
+/// fit int64 (or c is not positive). For the credit math, whose inputs may
+/// predate the bounds above.
+inline std::optional<std::int64_t> mul_div(std::int64_t a, std::int64_t b, std::int64_t c) {
+    if (c <= 0)
+        return std::nullopt;
+    const Int128 q = static_cast<Int128>(a) * static_cast<Int128>(b) / c;
+    if (q > std::numeric_limits<std::int64_t>::max() || q < std::numeric_limits<std::int64_t>::min())
+        return std::nullopt;
+    return static_cast<std::int64_t>(q);
+}
+
+/**
+ * @brief → 400. A manual `adjust()` whose |delta| is above kMaxCredits, or
+ *        whose new balance would not fit the balance column.
+ */
+struct AdjustmentTooLarge : Repositories::ValidationError {
+    AdjustmentTooLarge()
+        : Repositories::ValidationError("adjustment_too_large",
+                                        "|delta_credits| must be at most 1000000000000 and the new balance must fit") {}
+};
 
 /**
  * @brief → 409. A manual `adjust()` whose negative delta would drive the
@@ -387,6 +422,8 @@ CreditResult refund_capture(const std::string& provider_capture_id,
  * SQL expression.
  *
  * @throws ZeroAdjustment if @p delta_credits is 0.
+ * @throws AdjustmentTooLarge if |@p delta_credits| > kMaxCredits, or the new
+ *         balance overflows int64.
  * @throws MalformedUserId / UnknownUser if @p user_id is malformed / unknown.
  * @throws MalformedAdminId / UnknownAdmin if @p admin_id is malformed / unknown.
  * @throws InsufficientBalance if a negative @p delta_credits would drive the
