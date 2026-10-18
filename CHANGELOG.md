@@ -6,6 +6,23 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-10-18
+
+### Added
+- API keys take a `scope`: `full` (the default, reads and writes the owner's data) or `read` (GET, HEAD and OPTIONS only; any other method is answered 403 `key_read_only` by the middleware). Migration 045 adds the column; every existing key stays `full`. An agent can now be given a key of the owner that reads everything and changes nothing.
+- The dock of Now can be reordered by dragging a tile (mouse or touch); the order is the same `corners` setting the Arrange sheet edits, so the sheet remains the keyboard way.
+- The app installs on a phone's home screen and opens standalone, without the browser's bars: a web manifest (`/manifest.json`, icons rendered from the favicon) and the Apple meta tags in `index.html`. Standalone Safari keeps its own cookies, so the first open asks to sign in once.
+
+### Changed
+- The glass bar (the section pill and the account button) is denser, so the text of a page scrolled under it no longer shows through.
+- A goal row no longer carries its kind ("number", "count", "steps") as a line of its own; the kind and the unit open with the row.
+- Hide numbers moved into the account menu as well; on a phone the floating pill is gone, since it sat over the last row of every long list.
+- Money Ledger on a phone: the period on one line, Filter and Add on the next, the period totals one currency per line.
+
+### Fixed
+- Money categories: the list has a Show archived switch and the editor an Archived checkbox, so an archived category can be seen and brought back (the API accepted `archived: false` already, the page never listed archived categories).
+- The More menu of a section's tabs works with the keyboard: ArrowDown or ArrowUp opens it on the first or the last item, the arrows walk it with wrap, Home and End jump, Escape closes it and returns the focus.
+
 ## [1.30.1] - 2026-10-18
 
 ### Fixed

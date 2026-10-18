@@ -1,1 +1,0 @@
-The app installs on a phone's home screen and opens standalone, without the browser's bars: a web manifest (`/manifest.json`, icons rendered from the favicon) and the Apple meta tags in `index.html`. Standalone Safari keeps its own cookies, so the first open asks to sign in once.
