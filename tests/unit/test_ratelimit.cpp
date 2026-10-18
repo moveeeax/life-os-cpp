@@ -95,3 +95,37 @@ TEST(RateLimitTest, ParseScopeAllVariants) {
     EXPECT_EQ(RL::parse_scope("user"), RL::Scope::IpOrUser);
     EXPECT_EQ(RL::parse_scope("anything-else"), RL::Scope::IpOrUser);
 }
+
+TEST(RateLimitTest, FailureTiersDisabledOrWhitelistedAllow) {
+    RL::Config cfg;
+    cfg.enabled = false;
+    cfg.auth_fail_requests = 1;
+    RL::Limiter off(cfg);
+    off.record_failure(RL::FailureTier::AuthFailure, "ip:1.2.3.4");  // no cache, no throw
+    EXPECT_TRUE(off.check_failures(RL::FailureTier::AuthFailure, "ip:1.2.3.4").allowed);
+
+    cfg.enabled = true;
+    cfg.whitelist.insert("10.0.0.1");
+    RL::Limiter on(std::move(cfg));
+    EXPECT_TRUE(on.check_failures(RL::FailureTier::AuthFailure, "ip:10.0.0.1").allowed);
+}
+
+TEST(RateLimitTest, FailureTierFollowsFailOpenWithoutCache) {
+    ASSERT_FALSE(Cache::is_initialized()) << "leaked Cache from a previous suite";
+    RL::Config cfg;
+    cfg.enabled = true;
+    cfg.fail_open = false;
+    RL::Limiter closed(cfg);
+    EXPECT_FALSE(closed.check_failures(RL::FailureTier::LoginEmail, "email:x").allowed);
+    cfg.fail_open = true;
+    RL::Limiter open(std::move(cfg));
+    EXPECT_TRUE(open.check_failures(RL::FailureTier::LoginEmail, "email:x").allowed);
+}
+
+TEST(RateLimitTest, EmailIdentityIgnoresCaseAndSpacesAndHidesTheAddress) {
+    const std::string id = RL::email_identity("Anna@Example.com");
+    EXPECT_EQ(id, RL::email_identity("  anna@example.com\t"));
+    EXPECT_NE(id, RL::email_identity("boris@example.com"));
+    EXPECT_EQ(id.rfind("email:", 0), 0u);
+    EXPECT_EQ(id.find("anna"), std::string::npos) << "the key must not carry the address";
+}

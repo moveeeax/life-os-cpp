@@ -361,12 +361,21 @@ billing:
 # Keys mirror config.json "rate_limit". Env: RATE_LIMIT_ENABLED,
 # RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW_SEC, RATE_LIMIT_SCOPE,
 # RATE_LIMIT_TRUST_PROXY, RATE_LIMIT_TRUSTED_PROXY_COUNT, RATE_LIMIT_FAIL_OPEN,
-# RATE_LIMIT_WHITELIST
+# RATE_LIMIT_WHITELIST, RATE_LIMIT_AUTH_FAIL_REQUESTS,
+# RATE_LIMIT_AUTH_FAIL_WINDOW_SEC, RATE_LIMIT_LOGIN_EMAIL_REQUESTS,
+# RATE_LIMIT_LOGIN_EMAIL_WINDOW_SEC
 # ---------------------------------------------------------------
 rateLimit:
   enabled: false           # set true in prod (values-prod.yaml does)
   requests: 60             # allowed requests per window
   windowSec: 60            # sliding window length in seconds
+  # Rejected credentials (unknown API key, forged JWT) per client IP; past the
+  # budget a request with credentials gets 429 before the key lookup.
+  authFailRequests: 20
+  authFailWindowSec: 60
+  # Failed logins per email address, from any IP.
+  loginEmailRequests: 5
+  loginEmailWindowSec: 900
   scope: ip_or_user        # ip | user | ip_or_user
   # Behind an ingress/proxy, set trustProxy=true and trustedProxyCount to the
   # number of proxies in front so the real client IP is taken from

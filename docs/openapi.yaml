@@ -2871,6 +2871,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: "Too many attempts: the per-IP budget of the auth surface, or too many failed logins for this email address (rate_limit.login_email_*; the right password is refused too until the window frees a slot). Retry-After says when."
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '415':
           description: Body content type is not application/json (content-type middleware — applies to every JSON API endpoint)
           content:
@@ -3048,7 +3053,7 @@ paths:
                 old_password: { type: string }
                 new_password: { type: string, minLength: 8, maxLength: 128 }
       responses:
-        '200': { description: Password updated }
+        '200': { description: "Password updated. Every session of the account ends, access tokens included; the caller gets a fresh session in Set-Cookie." }
         '401': { description: Wrong current password or not authenticated }
 
   /api/v1/account/api-keys:

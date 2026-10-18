@@ -7,7 +7,9 @@
  *        with the same numbers.
  *
  *        A source outage throws (the queue retries); a dated day the source
- *        never published finishes with `no_snapshot`, nothing to retry.
+ *        never published finishes with `no_snapshot`, nothing to retry; a
+ *        date that is neither finishes with `invalid_date` before any request
+ *        (POST /jobs takes the payload from an admin as is).
  */
 
 #pragma once
@@ -34,7 +36,13 @@ namespace Jobs::MoneyRates {
 inline constexpr const char* kJobType = "money_rates";
 
 inline nlohmann::json process_job(const nlohmann::json& payload) {
-    const std::string date = payload.value("date", std::string("latest"));
+    // find() on a non-object payload answers end(): the default applies.
+    const auto it = payload.find("date");
+    const bool has_date = it != payload.end() && !it->is_null();
+    const std::string date = !has_date ? std::string("latest") : it->is_string() ? it->get<std::string>() : "";
+    if (!Money::RatesSource::valid_date_arg(date)) {
+        return {{"status", "invalid_date"}};
+    }
     if (!Core::money_enabled()) {
         return {{"status", "skipped"}, {"reason", "money_disabled"}, {"date", date}};
     }

@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <cstdint>
 #include <memory>
 #include <stdexcept>
@@ -22,6 +23,7 @@
 #include "cache/Cache.hpp"
 #include "security/Auth.hpp"
 #include "utils/Config.hpp"
+#include "utils/Crypto.hpp"
 #include "utils/Strings.hpp"
 #include "utils/Time.hpp"
 
@@ -74,7 +76,122 @@ redis.call('PEXPIRE', key, window + 1000)
 return {1, count + 1, 0}
 )LUA";
 
+// Failure tiers, read side: drop stale entries and compare the count with the
+// budget, inserting nothing.
+const char* kFailurePeekLua = R"LUA(
+-- KEYS[1] = zset key
+-- ARGV[1] = now_ms, ARGV[2] = window_ms, ARGV[3] = limit
+-- Returns: { allowed(0|1), count, retry_after_ms }
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local limit = tonumber(ARGV[3])
+redis.call('ZREMRANGEBYSCORE', key, 0, now - window)
+local count = tonumber(redis.call('ZCARD', key) or 0)
+if count < limit then
+  return {1, count, 0}
+end
+-- A slot frees when the (count - limit + 1)-th oldest failure ages out.
+local idx = count - limit
+local entry = redis.call('ZRANGE', key, idx, idx, 'WITHSCORES')
+local score = tonumber(entry[2] or now)
+local retry_after_ms = (score + window) - now
+if retry_after_ms < 1 then retry_after_ms = 1 end
+return {0, count, retry_after_ms}
+)LUA";
+
+// Failure tiers, write side: add one failure, keep only the newest `limit`
+// inside the window, refresh the TTL.
+const char* kFailureRecordLua = R"LUA(
+-- KEYS[1] = zset key
+-- ARGV[1] = now_ms, ARGV[2] = window_ms, ARGV[3] = limit, ARGV[4] = member
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local limit = tonumber(ARGV[3])
+redis.call('ZADD', key, now, ARGV[4])
+redis.call('ZREMRANGEBYSCORE', key, 0, now - window)
+local count = tonumber(redis.call('ZCARD', key) or 0)
+if count > limit then
+  redis.call('ZREMRANGEBYRANK', key, 0, count - limit - 1)
+end
+redis.call('PEXPIRE', key, window + 1000)
+return count
+)LUA";
+
+struct FailureWindow {
+    int requests;
+    int window_sec;
+    const char* key_prefix;
+};
+
+FailureWindow failure_window(const Config& cfg, FailureTier tier) {
+    if (tier == FailureTier::LoginEmail)
+        return {cfg.login_email_requests, cfg.login_email_window_sec, "rl:login:"};
+    return {cfg.auth_fail_requests, cfg.auth_fail_window_sec, "rl:authfail:"};
+}
+
+/// ms timestamp + process-wide counter: two entries in the same millisecond
+/// from the same identity still get distinct zset members.
+std::string unique_member(int64_t now_ms) {
+    static std::atomic<uint64_t> counter{0};
+    return std::to_string(now_ms) + ":" + std::to_string(counter.fetch_add(1, std::memory_order_relaxed));
+}
+
 }  // namespace
+
+bool Limiter::whitelisted(const std::string& identity) const {
+    // identity is prefixed ("ip:1.2.3.4" / "user:abc") but the configured
+    // whitelist holds raw IPs / subjects — match against the bare value
+    // (and the prefixed form, for forgiving config).
+    if (cfg_.whitelist.count(identity) > 0)
+        return true;
+    const auto colon = identity.find(':');
+    return colon != std::string::npos && cfg_.whitelist.count(identity.substr(colon + 1)) > 0;
+}
+
+Decision Limiter::check_failures(FailureTier tier, const std::string& identity) const {
+    const FailureWindow w = failure_window(cfg_, tier);
+    if (!cfg_.enabled || whitelisted(identity))
+        return {true, w.requests, 0};
+    if (!Cache::is_initialized())
+        return fallback_("cache not initialized", w.requests);
+    try {
+        const int64_t now_ms = Utils::Time::now_epoch_millis();
+        std::vector<std::string> keys = {std::string(w.key_prefix) + identity};
+        std::vector<std::string> args = {std::to_string(now_ms),
+                                         std::to_string(static_cast<int64_t>(w.window_sec) * 1000),
+                                         std::to_string(w.requests)};
+        auto result = Cache::get().get_client().eval<std::vector<long long>>(
+            kFailurePeekLua, keys.begin(), keys.end(), args.begin(), args.end());
+        if (result.size() < 3)
+            return fallback_("failure window eval: short reply", w.requests);
+        const bool allowed = result[0] == 1;
+        const int remaining = std::max(0, w.requests - static_cast<int>(result[1]));
+        const int retry_after_sec = allowed ? 0 : static_cast<int>(std::max<long long>(1, (result[2] + 999) / 1000));
+        return {allowed, remaining, retry_after_sec};
+    } catch (const std::exception& e) {
+        return fallback_(e.what(), w.requests);
+    }
+}
+
+void Limiter::record_failure(FailureTier tier, const std::string& identity) const {
+    const FailureWindow w = failure_window(cfg_, tier);
+    if (!cfg_.enabled || whitelisted(identity) || !Cache::is_initialized())
+        return;
+    try {
+        const int64_t now_ms = Utils::Time::now_epoch_millis();
+        std::vector<std::string> keys = {std::string(w.key_prefix) + identity};
+        std::vector<std::string> args = {std::to_string(now_ms),
+                                         std::to_string(static_cast<int64_t>(w.window_sec) * 1000),
+                                         std::to_string(w.requests),
+                                         unique_member(now_ms)};
+        Cache::get().get_client().eval<long long>(
+            kFailureRecordLua, keys.begin(), keys.end(), args.begin(), args.end());
+    } catch (const std::exception& e) {
+        spdlog::warn("rate limiter: could not record a failure under {}: {}", w.key_prefix, e.what());
+    }
+}
 
 Decision Limiter::check(const std::string& identity) const {
     return check_window(identity, cfg_.requests, cfg_.window_sec, "rl:sw:");
@@ -88,18 +205,8 @@ Decision Limiter::check_window(const std::string& identity,
                                int requests,
                                int window_sec,
                                const char* key_prefix) const {
-    if (!cfg_.enabled)
+    if (!cfg_.enabled || whitelisted(identity))
         return {true, requests, 0};
-    // identity is prefixed ("ip:1.2.3.4" / "user:abc") but the configured
-    // whitelist holds raw IPs / subjects — match against the bare value
-    // (and the prefixed form, for forgiving config).
-    if (cfg_.whitelist.count(identity) > 0) {
-        return {true, requests, 0};
-    }
-    if (auto colon = identity.find(':');
-        colon != std::string::npos && cfg_.whitelist.count(identity.substr(colon + 1)) > 0) {
-        return {true, requests, 0};
-    }
     if (!Cache::is_initialized()) {
         return fallback_("cache not initialized", requests);
     }
@@ -107,11 +214,7 @@ Decision Limiter::check_window(const std::string& identity,
         const int64_t now_ms = Utils::Time::now_epoch_millis();
         const int64_t window_ms = static_cast<int64_t>(window_sec) * 1000;
         const std::string key = std::string(key_prefix) + identity;
-        // member uniqueness = ms ts + atomic counter; two requests in
-        // the same millisecond from the same identity get distinct members.
-        static std::atomic<uint64_t> counter{0};
-        const std::string member =
-            std::to_string(now_ms) + ":" + std::to_string(counter.fetch_add(1, std::memory_order_relaxed));
+        const std::string member = unique_member(now_ms);
 
         auto& redis = Cache::get().get_client();
         // Redis 7+ auto-caches scripts; re-EVAL is cheap (script SHA cached client-side).
@@ -161,6 +264,11 @@ Config load_config_from_global() {
     cfg.window_sec = c.get<int>("rate_limit.window_sec", "RATE_LIMIT_WINDOW_SEC", 60);
     cfg.protected_requests = c.get<int>("rate_limit.protected_requests", "RATE_LIMIT_PROTECTED_REQUESTS", 10);
     cfg.protected_window_sec = c.get<int>("rate_limit.protected_window_sec", "RATE_LIMIT_PROTECTED_WINDOW_SEC", 60);
+    cfg.auth_fail_requests = c.get<int>("rate_limit.auth_fail_requests", "RATE_LIMIT_AUTH_FAIL_REQUESTS", 20);
+    cfg.auth_fail_window_sec = c.get<int>("rate_limit.auth_fail_window_sec", "RATE_LIMIT_AUTH_FAIL_WINDOW_SEC", 60);
+    cfg.login_email_requests = c.get<int>("rate_limit.login_email_requests", "RATE_LIMIT_LOGIN_EMAIL_REQUESTS", 5);
+    cfg.login_email_window_sec =
+        c.get<int>("rate_limit.login_email_window_sec", "RATE_LIMIT_LOGIN_EMAIL_WINDOW_SEC", 900);
     cfg.trust_proxy = c.get<bool>("rate_limit.trust_proxy", "RATE_LIMIT_TRUST_PROXY", false);
     cfg.trusted_proxy_count = c.get<int>("rate_limit.trusted_proxy_count", "RATE_LIMIT_TRUSTED_PROXY_COUNT", 1);
     if (cfg.trusted_proxy_count < 1)
@@ -184,6 +292,14 @@ Config load_config_from_global() {
         cfg.protected_requests = 1;
     if (cfg.protected_window_sec <= 0)
         cfg.protected_window_sec = 1;
+    if (cfg.auth_fail_requests <= 0)
+        cfg.auth_fail_requests = 1;
+    if (cfg.auth_fail_window_sec <= 0)
+        cfg.auth_fail_window_sec = 1;
+    if (cfg.login_email_requests <= 0)
+        cfg.login_email_requests = 1;
+    if (cfg.login_email_window_sec <= 0)
+        cfg.login_email_window_sec = 1;
     return cfg;
 }
 
@@ -294,6 +410,14 @@ std::string identity_for(const drogon::HttpRequestPtr& req, const Config& cfg) {
 
 std::string ip_identity(const drogon::HttpRequestPtr& req, const Config& cfg) {
     return "ip:" + client_ip(req, cfg.trust_proxy, cfg.trusted_proxy_count);
+}
+
+std::string email_identity(const std::string& email) {
+    const auto a = email.find_first_not_of(" \t");
+    const auto b = email.find_last_not_of(" \t");
+    std::string norm = a == std::string::npos ? std::string() : email.substr(a, b - a + 1);
+    std::transform(norm.begin(), norm.end(), norm.begin(), [](unsigned char c) { return std::tolower(c); });
+    return "email:" + Utils::Crypto::sha256_hex(norm);
 }
 
 }  // namespace Security::RateLimit

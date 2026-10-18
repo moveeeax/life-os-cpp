@@ -81,6 +81,10 @@ for example); where it does, the Notes column says so.
 | `RATE_LIMIT_WHITELIST` | `rate_limit.whitelist` | csv | — | IPs / user IDs that bypass |
 | `RATE_LIMIT_PROTECTED_REQUESTS` | `rate_limit.protected_requests` | int | `10` | Stricter budget for the auth-public brute-force surfaces (login/register/refresh, token-bearing account links, public content — `Utils::Strings::kDefaultProtectedPathsCsv`), which the general limiter skips as public paths |
 | `RATE_LIMIT_PROTECTED_WINDOW_SEC` | `rate_limit.protected_window_sec` | int | `60` | Window for the protected-path budget |
+| `RATE_LIMIT_AUTH_FAIL_REQUESTS` | `rate_limit.auth_fail_requests` | int | `20` | Rejected credentials (unknown API key, forged or broken JWT; not an expired or missing token) allowed per client IP per window; past it a request with credentials gets 429 before the key lookup or signature check |
+| `RATE_LIMIT_AUTH_FAIL_WINDOW_SEC` | `rate_limit.auth_fail_window_sec` | int | `60` | Window for the rejected-credentials budget |
+| `RATE_LIMIT_LOGIN_EMAIL_REQUESTS` | `rate_limit.login_email_requests` | int | `5` | Failed logins allowed per email address (any IP) per window; past it the login answers 429, right password included |
+| `RATE_LIMIT_LOGIN_EMAIL_WINDOW_SEC` | `rate_limit.login_email_window_sec` | int | `900` | Window for the per-email login budget |
 | `RATE_LIMIT_PROTECTED_PATHS` | `rate_limit.protected_paths` | csv | `Utils::Strings::kDefaultProtectedPathsCsv` | The protected-budget path set (same matching rules as public paths). FULL override of the built-in default — env or code default only; deliberately NOT in `config/*.json` (a present-but-empty string value would silently empty the set, see `docs/config-sync-allowlist.txt`) |
 
 ## Security headers & CSRF

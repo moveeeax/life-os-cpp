@@ -107,6 +107,25 @@ void AuthController::login(const HttpRequestPtr& req, std::function<void(const H
     const std::string email = body["email"].get<std::string>();
     const std::string password = body["password"].get<std::string>();
 
+    // Per-email window on failed logins, on top of the per-IP protected tier
+    // the middleware applies: a guessing run spread over many addresses still
+    // hits one account's budget. Checked before the lookup and the argon2
+    // verify, so a refused attempt costs neither; it refuses the right
+    // password too, or the window would tell the guesser when it hit.
+    const Security::RateLimit::Limiter* limiter = nullptr;
+    if (Security::RateLimit::is_initialized() && Security::RateLimit::get().config().enabled)
+        limiter = &Security::RateLimit::get();
+    const std::string email_id = Security::RateLimit::email_identity(email);
+    if (limiter) {
+        const auto d = limiter->check_failures(Security::RateLimit::FailureTier::LoginEmail, email_id);
+        if (!d.allowed) {
+            auto resp = ErrorResponse::too_many_requests(d.retry_after_sec);
+            resp->addHeader("Retry-After", std::to_string(d.retry_after_sec));
+            callback(resp);
+            return;
+        }
+    }
+
     Repositories::UserRepository users;
     auto user = users.find_by_email(email);
 
@@ -127,6 +146,8 @@ void AuthController::login(const HttpRequestPtr& req, std::function<void(const H
         // trusted-IP resolver (honors rate_limit.trust_proxy) — NOT a raw
         // X-Real-IP read, which is client-spoofable when not behind a proxy.
         const std::string ip = Security::RateLimit::client_ip(req);
+        if (limiter)
+            limiter->record_failure(Security::RateLimit::FailureTier::LoginEmail, email_id);
         Security::Audit::record(
             /*actor_id=*/"", "auth.login_failed", "user", user ? user->id : "", {{"email", email}, {"ip", ip}});
         // Single message for missing-user + bad-password to defeat enumeration.
@@ -247,7 +268,11 @@ std::optional<AuthController::Session> AuthController::mint_session(const Domain
         spdlog::error("mint_session: JWT_SECRET unset");
         return std::nullopt;
     }
-    const long now = Utils::Time::now_epoch_seconds();
+    // iat_ms next to iat: the per-user "valid since" marker
+    // (Security::Sessions::access_revoked) compares in ms, so a session
+    // re-issued in the same second as a revocation is not refused with it.
+    const std::int64_t now_ms = Utils::Time::now_epoch_millis();
+    const long now = static_cast<long>(now_ms / 1000);
 
     // Roles claim — string array, even for a single role, so the
     // existing AuthPrincipal extractor parses it consistently.
@@ -263,6 +288,7 @@ std::optional<AuthController::Session> AuthController::mint_session(const Domain
     json access_claims = {
         {"sub", user.id},
         {"iat", now},
+        {"iat_ms", now_ms},
         {"exp", now + cfg.cookies.access_ttl_sec},
         {"typ", "access"},
         {"confirmed", user.confirmed},

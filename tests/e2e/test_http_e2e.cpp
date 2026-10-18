@@ -87,6 +87,19 @@ public:
         cfg["auth"]["cookies"]["enabled"] = true;
         cfg["auth"]["cookies"]["secure"] = false;  // plain http in the test net
         cfg["idempotency"]["enabled"] = true;
+        // Rate limiting on, with budgets no other test reaches, except the two
+        // failure tiers the throttling tests below drive. trust_proxy lets each
+        // of those tests be its own client via X-Real-IP; every other request
+        // comes from 127.0.0.1, which sees two counted rejections
+        // (MalformedBearerTokenIs401NotAnException) against a budget of five.
+        cfg["rate_limit"]["enabled"] = true;
+        cfg["rate_limit"]["trust_proxy"] = true;
+        cfg["rate_limit"]["requests"] = 100000;
+        cfg["rate_limit"]["protected_requests"] = 100000;
+        cfg["rate_limit"]["auth_fail_requests"] = 5;
+        cfg["rate_limit"]["auth_fail_window_sec"] = 60;
+        cfg["rate_limit"]["login_email_requests"] = 3;
+        cfg["rate_limit"]["login_email_window_sec"] = 60;
         cfg["mail"]["enabled"] = false;
         cfg["database"]["migrations_enabled"] = true;
         cfg["database"]["migrations_dir"] = "migrations";
@@ -514,32 +527,164 @@ TEST(HttpE2E, ReadKeyReadsButNeverWrites) {
 
 TEST(HttpE2E, IdempotencyKeyReplaysResponse) {
     REQUIRE_E2E_ENV();
-    const json body = {{"email", "e2e-idem@example.com"}, {"password", "password-e2e-1"}};
+    auto sc = register_and_login("e2e-idem@example.com", "password-e2e-1");
+    const json body = {{"name", "idem"}};
 
-    auto first = json_post("/api/v1/auth/register", body);
+    auto first = json_post("/api/v1/account/api-keys", body);
     first->addHeader("Idempotency-Key", "e2e-key-001");
+    attach_session(first, sc);
     auto r1 = send(first);
     ASSERT_EQ(r1->statusCode(), k201Created) << r1->getBody();
-    expect_matches_schema(r1, "POST", "/api/v1/auth/register");
+    expect_matches_schema(r1, "POST", "/api/v1/account/api-keys");
 
-    // Identical retry: without the middleware this would be 409 email_taken;
-    // with it, the cached 201 is replayed.
-    auto second = json_post("/api/v1/auth/register", body);
+    // Identical retry: without the middleware this would mint a second key;
+    // with it, the cached 201 (the same key) is replayed.
+    auto second = json_post("/api/v1/account/api-keys", body);
     second->addHeader("Idempotency-Key", "e2e-key-001");
+    attach_session(second, sc);
     auto r2 = send(second);
     EXPECT_EQ(r2->statusCode(), k201Created) << r2->getBody();
     EXPECT_EQ(r2->getHeader("x-idempotent-replayed"), "true");
+    EXPECT_EQ(body_of(r2)["key"], body_of(r1)["key"]);
     // The replayed body must STILL match the spec — a cached response is a
     // response.
-    expect_matches_schema(r2, "POST", "/api/v1/auth/register");
+    expect_matches_schema(r2, "POST", "/api/v1/account/api-keys");
 
     // Same key + DIFFERENT body → 422 conflict.
-    auto third =
-        json_post("/api/v1/auth/register", {{"email", "e2e-other@example.com"}, {"password", "password-e2e-1"}});
+    auto third = json_post("/api/v1/account/api-keys", {{"name", "other"}});
     third->addHeader("Idempotency-Key", "e2e-key-001");
+    attach_session(third, sc);
     auto r3 = send(third);
     EXPECT_EQ(r3->statusCode(), k422UnprocessableEntity);
-    expect_matches_schema(r3, "POST", "/api/v1/auth/register");
+    expect_matches_schema(r3, "POST", "/api/v1/account/api-keys");
+}
+
+TEST(HttpE2E, AuthPublicRoutesAreNeverReplayed) {
+    // An anonymous caller's entry would be scoped to its IP: a cached login
+    // 200 (the user object) would come back to anyone behind that address who
+    // repeats the key. The auth-public surface skips the middleware instead.
+    REQUIRE_E2E_ENV();
+    const json body = {{"email", "e2e-idem-public@example.com"}, {"password", "password-e2e-1"}};
+    auto first = json_post("/api/v1/auth/register", body);
+    first->addHeader("Idempotency-Key", "e2e-key-public");
+    ASSERT_EQ(send(first)->statusCode(), k201Created);
+    auto second = json_post("/api/v1/auth/register", body);
+    second->addHeader("Idempotency-Key", "e2e-key-public");
+    auto r2 = send(second);
+    EXPECT_EQ(r2->statusCode(), k409Conflict) << "a retry reaches the handler again: " << r2->getBody();
+    EXPECT_TRUE(r2->getHeader("x-idempotent-replayed").empty());
+
+    auto login = json_post("/api/v1/auth/login", body);
+    login->addHeader("Idempotency-Key", "e2e-key-login");
+    ASSERT_EQ(send(login)->statusCode(), k200OK);
+    auto replay = json_post("/api/v1/auth/login", body);
+    replay->addHeader("Idempotency-Key", "e2e-key-login");
+    auto r4 = send(replay);
+    EXPECT_EQ(r4->statusCode(), k200OK);
+    EXPECT_TRUE(r4->getHeader("x-idempotent-replayed").empty()) << "a login is never served from the cache";
+}
+
+TEST(HttpE2E, RejectedCredentialsAreThrottledPerIpBeforeTheLookup) {
+    // Each unknown API key costs a primary-DB lookup; the auth advice counts
+    // the rejections per client IP and, past the budget (5 here), refuses any
+    // request with credentials from that IP before looking anything up.
+    REQUIRE_E2E_ENV();
+    auto sc = register_and_login("e2e-authfail@example.com", "password-e2e-1");
+    auto from = [](const char* ip, const HttpRequestPtr& req) {
+        req->addHeader("X-Real-IP", ip);
+        return req;
+    };
+    for (int i = 0; i < 5; ++i) {
+        auto req = HttpRequest::newHttpRequest();
+        req->setPath("/api/v1/auth/me");
+        req->addHeader("X-API-Key", "cpk_e2e_unknown_key_" + std::to_string(i));
+        auto resp = send(from("198.51.100.7", req));
+        EXPECT_EQ(resp->statusCode(), k401Unauthorized) << i << " " << resp->getBody();
+        EXPECT_EQ(body_of(resp)["error"], "invalid_api_key");
+    }
+    auto bogus = HttpRequest::newHttpRequest();
+    bogus->setPath("/api/v1/auth/me");
+    bogus->addHeader("X-API-Key", "cpk_e2e_unknown_key_6");
+    auto refused = send(from("198.51.100.7", bogus));
+    EXPECT_EQ(refused->statusCode(), k429TooManyRequests) << refused->getBody();
+    EXPECT_FALSE(refused->getHeader("retry-after").empty());
+
+    // The budget is the IP's: a good session from that address waits too...
+    auto good_there = HttpRequest::newHttpRequest();
+    good_there->setPath("/api/v1/auth/me");
+    attach_session(good_there, sc);
+    EXPECT_EQ(send(from("198.51.100.7", good_there))->statusCode(), k429TooManyRequests);
+    // ...and from any other address it works.
+    auto good_elsewhere = HttpRequest::newHttpRequest();
+    good_elsewhere->setPath("/api/v1/auth/me");
+    attach_session(good_elsewhere, sc);
+    EXPECT_EQ(send(from("198.51.100.8", good_elsewhere))->statusCode(), k200OK);
+
+    // A request without credentials is never counted or refused by this tier.
+    auto bare = HttpRequest::newHttpRequest();
+    bare->setPath("/api/v1/auth/me");
+    auto bare_resp = send(from("198.51.100.7", bare));
+    EXPECT_EQ(bare_resp->statusCode(), k401Unauthorized);
+    EXPECT_EQ(body_of(bare_resp)["error"], "missing_token");
+}
+
+TEST(HttpE2E, FailedLoginsAreThrottledPerEmailAcrossIps) {
+    REQUIRE_E2E_ENV();
+    const std::string email = "e2e-lockout@example.com";
+    register_and_login(email, "password-e2e-1");
+    const char* ips[] = {"198.51.100.21", "198.51.100.22", "198.51.100.23"};
+    for (const char* ip : ips) {
+        auto wrong = json_post("/api/v1/auth/login", {{"email", email}, {"password", "wrong-password"}});
+        wrong->addHeader("X-Real-IP", ip);
+        auto resp = send(wrong);
+        EXPECT_EQ(resp->statusCode(), k401Unauthorized) << ip << " " << resp->getBody();
+    }
+    // Three failures from three addresses exhaust the address's budget of
+    // three: the right password from a fourth address is refused too.
+    auto right =
+        json_post("/api/v1/auth/login", {{"email", "E2E-Lockout@example.com"}, {"password", "password-e2e-1"}});
+    right->addHeader("X-Real-IP", "198.51.100.24");
+    auto refused = send(right);
+    EXPECT_EQ(refused->statusCode(), k429TooManyRequests) << refused->getBody();
+    EXPECT_FALSE(refused->getHeader("retry-after").empty());
+    expect_matches_schema(refused, "POST", "/api/v1/auth/login");
+
+    // Another account is unaffected.
+    auto other = register_and_login("e2e-lockout-other@example.com", "password-e2e-1");
+    EXPECT_FALSE(other.access.empty());
+}
+
+TEST(HttpE2E, PasswordChangeEndsOtherSessionsAtOnce) {
+    // Access JWTs are stateless; before the valid-since marker a stolen access
+    // token outlived a password change by up to its 15-minute TTL.
+    REQUIRE_E2E_ENV();
+    auto here = register_and_login("e2e-since@example.com", "password-e2e-1");
+    auto login2 =
+        send(json_post("/api/v1/auth/login", {{"email", "e2e-since@example.com"}, {"password", "password-e2e-1"}}));
+    ASSERT_EQ(login2->statusCode(), k200OK);
+    auto elsewhere = cookies_of(login2);
+
+    auto change = json_post("/api/v1/account/change-password",
+                            {{"old_password", "password-e2e-1"}, {"new_password", "password-e2e-2"}});
+    attach_session(change, here);
+    auto changed = send(change);
+    ASSERT_EQ(changed->statusCode(), k200OK) << changed->getBody();
+    auto fresh = cookies_of(changed);
+    ASSERT_FALSE(fresh.access.empty()) << "the caller gets a fresh session";
+
+    auto me = [](const SessionCookies& sc) {
+        auto req = HttpRequest::newHttpRequest();
+        req->setPath("/api/v1/auth/me");
+        SessionCookies access_only;
+        access_only.access = sc.access;
+        attach_session(req, access_only);
+        return send(req);
+    };
+    auto other = me(elsewhere);
+    EXPECT_EQ(other->statusCode(), k401Unauthorized) << other->getBody();
+    EXPECT_EQ(body_of(other)["error"], "session_revoked");
+    EXPECT_EQ(me(here)->statusCode(), k401Unauthorized) << "the caller's old access token is gone too";
+    EXPECT_EQ(me(fresh)->statusCode(), k200OK);
 }
 
 TEST(HttpE2E, AdminGateChecksPermissionBitmask) {

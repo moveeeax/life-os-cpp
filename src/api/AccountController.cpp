@@ -14,6 +14,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "api/AuthController.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
 #include "api/Validation.hpp"
@@ -285,12 +286,18 @@ void AccountController::changePassword(const HttpRequestPtr& req,
         Repositories::UserRepository repo;
         const std::string new_hash = Security::Password::hash(body["new_password"].get<std::string>());
         repo.update_password_hash(user->id, new_hash);
-        // Revoke other sessions on password change (the current client
-        // will re-auth on its next refresh). Closes the "changed my
-        // password but the thief stays logged in" gap.
-        Security::Sessions::revoke_all(Security::Auth::get().config().cookies, user->id);
+        // Revoke every session on password change, access tokens included
+        // (the valid-since marker), then hand THIS client a fresh session so
+        // it stays signed in. Closes the "changed my password but the thief
+        // stays logged in" gap. If the new session cannot be minted the
+        // password is still changed; the client signs in again.
+        const auto& cookie_cfg = Security::Auth::get().config().cookies;
+        Security::Sessions::revoke_all(cookie_cfg, user->id);
         Repositories::ApiKeyRepository().revoke_all_for_user(user->id);
-        callback(Response::ok({{"message", "Password updated"}}));
+        auto http = Response::ok({{"message", "Password updated"}});
+        if (auto session = AuthController::mint_session(*user))
+            Security::Auth::set_session_cookies(http, cookie_cfg, session->access, session->refresh);
+        callback(http);
     } catch (const std::exception& e) {
         spdlog::error("changePassword failed: {}", e.what());
         callback(ErrorResponse::internal_error());

@@ -27,9 +27,12 @@
 #include "repositories/UserRepository.hpp"
 #include "security/ApiKeys.hpp"
 #include "security/Auth.hpp"
+#include "security/Jwt.hpp"
 #include "security/Password.hpp"
+#include "security/SessionStore.hpp"
 #include "security/Tokens.hpp"
 #include "test_helpers.hpp"
+#include "utils/Time.hpp"
 
 using json = nlohmann::json;
 using namespace drogon;
@@ -250,6 +253,109 @@ TEST_F(AccountFlowTest, passwordResetAndChangeRevokeApiKeys) {
     auto req2 = HttpRequest::newHttpRequest();
     req2->addHeader("X-API-Key", gen2.plaintext);
     EXPECT_FALSE(Security::ApiKeys::authenticate(req2).has_value()) << "password change must revoke API keys";
+}
+
+// -- Every session dies at reset, invite redeem and password change --
+//
+// Sessions::revoke_all is what stands between a stolen refresh cookie (or a
+// stolen access token) and the account after the owner resets the password.
+// Each flow is checked for both halves: the refresh JTI recorded before the
+// flow can no longer be consumed, and an access token issued before it is
+// refused by the auth advice (Sessions::access_revoked).
+
+namespace {
+
+const Security::Auth::CookieConfig& cookie_cfg() {
+    return Security::Auth::get().config().cookies;
+}
+
+/// Claims of an access token issued a moment before the flow runs.
+Security::Auth::json earlier_access_claims(const std::string& sub) {
+    const auto now_ms = Utils::Time::now_epoch_millis() - 1000;
+    return {{"sub", sub}, {"iat", now_ms / 1000}, {"iat_ms", now_ms}, {"typ", "access"}};
+}
+
+}  // namespace
+
+TEST_F(AccountFlowTest, applyResetRevokesRefreshAndAccessTokens) {
+    ASSERT_EQ(register_user("revoke-reset@example.com", "originalpass")->statusCode(), k201Created);
+    auto user = Repositories::UserRepository().find_by_email("revoke-reset@example.com");
+    ASSERT_TRUE(user.has_value());
+    ASSERT_TRUE(Security::Sessions::record(cookie_cfg(), user->id, "jti-before-reset", 600));
+    const auto old_access = earlier_access_claims(user->id);
+    ASSERT_FALSE(Security::Sessions::access_revoked(cookie_cfg(), user->id, old_access));
+
+    HttpResponsePtr resp;
+    account.applyReset(
+        post_json({{"new_password", "newpassword42"}}),
+        [&](const HttpResponsePtr& r) { resp = r; },
+        reset_token(*user));
+    ASSERT_NE(resp, nullptr);
+    ASSERT_EQ(resp->statusCode(), k200OK) << resp->body();
+
+    EXPECT_FALSE(Security::Sessions::consume(cookie_cfg(), "jti-before-reset")) << "reset must revoke refresh";
+    EXPECT_TRUE(Security::Sessions::access_revoked(cookie_cfg(), user->id, old_access)) << "and access tokens";
+}
+
+TEST_F(AccountFlowTest, joinFromInviteRevokesRefreshAndAccessTokens) {
+    Repositories::RoleRepository roles;
+    auto role = roles.find_default();
+    ASSERT_TRUE(role.has_value());
+    auto invited = Repositories::UserRepository().create(
+        "revoke-invite@example.com", std::nullopt, std::nullopt, std::nullopt, role->id, /*confirmed=*/false);
+    ASSERT_TRUE(Security::Sessions::record(cookie_cfg(), invited.id, "jti-before-join", 600));
+    const auto old_access = earlier_access_claims(invited.id);
+
+    HttpResponsePtr resp;
+    account.joinFromInvite(
+        post_json({{"new_password", "newpassword1"}}),
+        [&](const HttpResponsePtr& r) { resp = r; },
+        Security::Tokens::issue(kSecret, invited.id, Security::Tokens::Purpose::Invite, std::chrono::hours(24)));
+    ASSERT_NE(resp, nullptr);
+    ASSERT_EQ(resp->statusCode(), k200OK) << resp->body();
+
+    EXPECT_FALSE(Security::Sessions::consume(cookie_cfg(), "jti-before-join")) << "invite join must revoke refresh";
+    EXPECT_TRUE(Security::Sessions::access_revoked(cookie_cfg(), invited.id, old_access)) << "and access tokens";
+}
+
+TEST_F(AccountFlowTest, changePasswordRevokesOtherSessionsAndKeepsThisOne) {
+    ASSERT_EQ(register_user("revoke-change@example.com", "originalpass")->statusCode(), k201Created);
+    auto user = Repositories::UserRepository().find_by_email("revoke-change@example.com");
+    ASSERT_TRUE(user.has_value());
+    ASSERT_TRUE(Security::Sessions::record(cookie_cfg(), user->id, "jti-before-change", 600));
+    const auto old_access = earlier_access_claims(user->id);
+
+    Security::Auth::AuthPrincipal p;
+    p.subject = user->id;
+    HttpResponsePtr resp;
+    account.changePassword(
+        TestHelpers::authed_json(p, {{"old_password", "originalpass"}, {"new_password", "newpassword42"}}),
+        [&](const HttpResponsePtr& r) { resp = r; });
+    ASSERT_NE(resp, nullptr);
+    ASSERT_EQ(resp->statusCode(), k200OK) << resp->body();
+
+    EXPECT_FALSE(Security::Sessions::consume(cookie_cfg(), "jti-before-change")) << "change must revoke refresh";
+    EXPECT_TRUE(Security::Sessions::access_revoked(cookie_cfg(), user->id, old_access)) << "and access tokens";
+
+    // The caller gets a fresh session that the marker does not touch.
+    std::string access;
+    std::string refresh;
+    for (const auto& [name, c] : resp->getCookies()) {
+        if (name == cookie_cfg().access_name)
+            access = c.value();
+        else if (name == cookie_cfg().refresh_name)
+            refresh = c.value();
+    }
+    ASSERT_FALSE(access.empty()) << "change-password must re-issue the caller's session";
+    ASSERT_FALSE(refresh.empty());
+    std::string err;
+    auto claims = Security::Auth::verify_hs256_jwt(access, kSecret, err);
+    ASSERT_TRUE(claims.has_value()) << err;
+    EXPECT_FALSE(Security::Sessions::access_revoked(cookie_cfg(), user->id, *claims));
+    auto refresh_claims = Security::Auth::verify_hs256_jwt(refresh, kSecret, err);
+    ASSERT_TRUE(refresh_claims.has_value()) << err;
+    EXPECT_TRUE(Security::Sessions::consume(cookie_cfg(), refresh_claims->value("jti", "")))
+        << "the new refresh token is live";
 }
 
 TEST_F(AccountFlowTest, applyResetRefusesShortPassword) {

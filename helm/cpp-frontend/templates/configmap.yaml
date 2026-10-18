@@ -20,6 +20,18 @@ data:
         # No nginx version in the Server header or on error pages.
         server_tokens off;
 
+        # Client address. The ingress controller in front sets X-Real-IP to the
+        # address it received the connection from; nginx takes that header as
+        # $remote_addr ONLY when the connection comes from realIp.trustedProxies
+        # (the ingress pods). From anywhere else the header is ignored and
+        # $remote_addr stays the real peer, so a caller that reaches this pod
+        # directly cannot choose the IP the API rate-limits and audits.
+{{- range .Values.realIp.trustedProxies }}
+        set_real_ip_from {{ . }};
+{{- end }}
+        real_ip_header    X-Real-IP;
+        real_ip_recursive off;
+
         # Compress the text the SPA is made of (index.html is always in
         # gzip_types). gzip_proxied any: every request arrives through the
         # ingress, and API JSON from the backend is compressed here too.
@@ -88,12 +100,10 @@ data:
             client_max_body_size 6m;
             proxy_pass http://{{ .Values.backend.service }}:{{ .Values.backend.port }};
             proxy_set_header Host              $host;
-            # Pass through the X-Real-IP the ingress set (the REAL client) — NOT
-            # $remote_addr, which is this hop's peer (the ingress pod) and would
-            # clobber the client IP the backend audits. When there's no upstream
-            # header (reached directly, not via ingress) this is empty and nginx
-            # omits it, so the backend falls back to X-Forwarded-For / peer.
-            proxy_set_header X-Real-IP         $http_x_real_ip;
+            # $remote_addr after the real_ip step above: the ingress's X-Real-IP
+            # when the request came through a trusted proxy, else the actual
+            # peer. Never the raw client-supplied header.
+            proxy_set_header X-Real-IP         $remote_addr;
             proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_http_version 1.1;

@@ -132,6 +132,17 @@ TEST_F(MoneyRatesJobTest, MissingSnapshotFinishesAndOutagesThrow) {
     EXPECT_THROW(Jobs::MoneyRates::process_job(json{{"date", "latest"}}), std::runtime_error) << "a transport failure";
 }
 
+TEST_F(MoneyRatesJobTest, AnInvalidDateFinishesWithoutARequest) {
+    for (const json& payload : {json{{"date", "../../other@1/x"}}, json{{"date", 20261004}}, json{{"date", ""}}}) {
+        EXPECT_EQ(Jobs::MoneyRates::process_job(payload)["status"], "invalid_date") << payload.dump();
+    }
+    EXPECT_TRUE(source.urls.empty()) << "nothing may be fetched for a refused date";
+    // No date, or null, is still "latest".
+    source.replies.push_back({200, fixture()});
+    EXPECT_EQ(Jobs::MoneyRates::process_job(json::object())["status"], "done");
+    EXPECT_EQ(source.urls.back(), Money::RatesSource::url_for("latest"));
+}
+
 TEST_F(MoneyRatesJobTest, BackfillEnqueuesOnlyTheMissingDays) {
     rates.put_day("2026-10-02", {{"KZT", 450}});
     const auto days = Jobs::MoneyRates::missing_days("2026-10-01", "2026-10-03");
