@@ -477,68 +477,72 @@ export function MoneyLedgerPage() {
       title="Ledger"
       actions={
         <>
-          {view === 'ledger' ? (
-            <PeriodRow kind={kind} date={date} onChange={setPeriod} />
-          ) : (
-            <button type="button" className="k-link" onClick={() => setView('ledger')}>
-              ← Back to the ledger
-            </button>
-          )}
+          <div className="k-tools-line">
+            {view === 'ledger' ? (
+              <PeriodRow kind={kind} date={date} onChange={setPeriod} />
+            ) : (
+              <button type="button" className="k-link" onClick={() => setView('ledger')}>
+                ← Back to the ledger
+              </button>
+            )}
+          </div>
           <span className="k-grow" />
-          {view === 'ledger' && (
-            <Filters active={filterCount} onClear={clearFilters}>
-              <label className="k-field">
-                <span>Account</span>
-                <select value={account} onChange={(e) => setAccount(e.target.value)}>
-                  <option value="">All accounts</option>
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="k-field">
-                <span>Type</span>
-                <select value={type} onChange={(e) => setType(e.target.value)}>
-                  <option value="">All types</option>
-                  <option value="expense">Expenses</option>
-                  <option value="income">Incomes</option>
-                  <option value="fx_adjustment">Bank adjustments</option>
-                </select>
-              </label>
-              <label className="k-field">
-                <span>Category</span>
-                <select value={category} onChange={(e) => setCategory(e.target.value)}>
-                  <option value="">All categories</option>
-                  {(['expense', 'income'] as const).map((k) => (
-                    <optgroup key={k} label={k === 'expense' ? 'Expense' : 'Income'}>
-                      {categories
-                        .filter((c) => c.kind === k)
-                        .map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                            {c.archived ? ' (archived)' : ''}
-                          </option>
-                        ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </label>
-              <label className="k-field">
-                <span>Search</span>
-                <input
-                  type="search"
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="Name or merchant"
-                />
-              </label>
-            </Filters>
-          )}
-          <button type="button" onClick={() => setAdding(true)} className={primaryButton}>
-            Add
-          </button>
+          <div className="k-tools-line k-tools-end">
+            {view === 'ledger' && (
+              <Filters active={filterCount} onClear={clearFilters}>
+                <label className="k-field">
+                  <span>Account</span>
+                  <select value={account} onChange={(e) => setAccount(e.target.value)}>
+                    <option value="">All accounts</option>
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="k-field">
+                  <span>Type</span>
+                  <select value={type} onChange={(e) => setType(e.target.value)}>
+                    <option value="">All types</option>
+                    <option value="expense">Expenses</option>
+                    <option value="income">Incomes</option>
+                    <option value="fx_adjustment">Bank adjustments</option>
+                  </select>
+                </label>
+                <label className="k-field">
+                  <span>Category</span>
+                  <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                    <option value="">All categories</option>
+                    {(['expense', 'income'] as const).map((k) => (
+                      <optgroup key={k} label={k === 'expense' ? 'Expense' : 'Income'}>
+                        {categories
+                          .filter((c) => c.kind === k)
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                              {c.archived ? ' (archived)' : ''}
+                            </option>
+                          ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </label>
+                <label className="k-field">
+                  <span>Search</span>
+                  <input
+                    type="search"
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder="Name or merchant"
+                  />
+                </label>
+              </Filters>
+            )}
+            <button type="button" onClick={() => setAdding(true)} className={primaryButton}>
+              Add
+            </button>
+          </div>
         </>
       }
     >

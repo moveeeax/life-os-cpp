@@ -9,6 +9,7 @@ import {
   isPlaced,
   linkKind,
   placeChips,
+  reorderDock,
   weatherGlyph,
   weatherLine,
   withChip,
@@ -163,5 +164,19 @@ describe('cleanLinks', () => {
         { title: 'C', url: ' ' },
       ]),
     ).toEqual([{ title: 'A', url: '/a' }]);
+  });
+});
+
+describe('reorderDock', () => {
+  it('moves the chip at a dock position to another, shifting the rest', () => {
+    const c = { tl: 'body', tr: 'goals', bl: 'day', br: 'habits' } as const;
+    expect(reorderDock(c, 0, 2)).toEqual({ tl: 'goals', tr: 'day', bl: 'body', br: 'habits' });
+    expect(reorderDock(c, 3, 0)).toEqual({ tl: 'habits', tr: 'body', bl: 'goals', br: 'day' });
+  });
+  it('keeps an empty or Tasks slot in place and ignores a bad index', () => {
+    const c = { tl: 'body', tr: null, bl: 'tasks', br: 'habits' } as const;
+    expect(reorderDock(c, 0, 1)).toEqual({ tl: 'habits', tr: null, bl: 'tasks', br: 'body' });
+    expect(reorderDock(c, 0, 5)).toBe(c);
+    expect(reorderDock(c, 1, 1)).toBe(c);
   });
 });

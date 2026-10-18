@@ -128,6 +128,23 @@
 .k-tools > .k-grow {
   flex: 1;
 }
+/* A toolbar in two halves: the period on the left, the actions on the right;
+   on a phone each half is its own line and the actions keep to the right. */
+.k-tools-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .k-tools:has(.k-tools-line) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .k-tools-line.k-tools-end {
+    justify-content: flex-end;
+  }
+}
 .k-stepper {
   display: inline-flex;
   align-items: center;
@@ -1062,4 +1079,13 @@ select.k-input option {
 .k-row-link:hover,
 .k-row-link:focus-visible {
   text-decoration: underline;
+}
+
+/* One currency per line under "This period" on a phone (after the inline
+   rules above, which it overrides). */
+@media (max-width: 640px) {
+  .k-sub .k-totals {
+    display: grid;
+    gap: 2px;
+  }
 }

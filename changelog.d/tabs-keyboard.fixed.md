@@ -1,0 +1,1 @@
+The More menu of a section's tabs works with the keyboard: ArrowDown or ArrowUp opens it on the first or the last item, the arrows walk it with wrap, Home and End jump, Escape closes it and returns the focus.

@@ -9,6 +9,8 @@
   --g-ink-ghost: rgba(255, 255, 255, 0.14);
   --g-glass: rgba(14, 20, 36, 0.5);
   --g-glass-strong: rgba(14, 20, 36, 0.66);
+  /* The bar's pills: denser than the sheets, so scrolled text never shows through. */
+  --g-bar: rgba(14, 20, 36, 0.88);
   --g-glass-line: rgba(255, 255, 255, 0.15);
   --g-ok: #6ee7b7;
   --g-warn: #fcd34d;
@@ -73,6 +75,12 @@
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-radius: 999px;
+}
+.g-navwrap,
+.g-account > button {
+  background: var(--g-bar);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
 }
 .g-navwrap {
   padding: 4px;
@@ -189,6 +197,13 @@
   font-size: 13px;
   color: var(--g-ink-soft);
   padding: 6px 12px;
+}
+/* On a phone the pill would sit over the last row of every list: the toggle
+   lives in the account menu there. */
+@media (max-width: 640px) {
+  .g-eye {
+    display: none;
+  }
 }
 /* The blur itself (.hide-numbers .num) lives in index.css: it covers the classic pages too. */
 

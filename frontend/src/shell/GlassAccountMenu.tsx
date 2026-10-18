@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router';
 
 import { useToast } from '@/components/ui/toaster';
 import { useLogout } from '@/hooks/useAuthMutations';
+import { useHideNumbers } from '@/hooks/useHideNumbers';
 import { useMe } from '@/hooks/useMe';
 import { useNowSettings } from '@/hooks/useNow';
 import { useWalletSummary } from '@/hooks/useWallet';
@@ -18,6 +19,9 @@ export function GlassAccountMenu() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [arranging, setArranging] = useState(false);
+  // Also here, because on a phone the fixed pill is hidden (it sat over the
+  // last row of every long list).
+  const [hidden, setHidden] = useHideNumbers();
   // Arrange belongs to Now: the weather city and the corners of that page.
   const onNow = useLocation().pathname === '/now';
   const settings = useNowSettings(onNow && user ? user.id : null);
@@ -104,6 +108,9 @@ export function GlassAccountMenu() {
               Billing
             </Link>
           )}
+          <button type="button" onClick={() => setHidden(!hidden)}>
+            {hidden ? 'Show numbers' : 'Hide numbers'}
+          </button>
           <button type="button" onClick={signOut}>
             Sign out
           </button>

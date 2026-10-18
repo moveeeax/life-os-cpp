@@ -83,6 +83,18 @@
 .n-tile[aria-expanded='true'] {
   background: rgba(255, 255, 255, 0.08);
 }
+/* Dragging a tile: it follows the pointer, the others slide to make room. */
+.n-tile {
+  touch-action: none;
+  transition:
+    background 0.2s,
+    transform 0.15s ease-out;
+}
+.n-dock[data-dragging] .n-tile {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
 .n-tile .c-k {
   font-size: 11px;
   letter-spacing: 0.14em;

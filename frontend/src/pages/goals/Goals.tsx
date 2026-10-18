@@ -80,6 +80,10 @@ function GoalMore({ goal, today }: { goal: Goal; today: string }) {
   const d = detail.data;
   return (
     <div className="k-row-more">
+      <span className="k-sub">
+        {KIND_LABEL[goal.kind]}
+        {goal.unit ? ` · ${goal.unit}` : ''}
+      </span>
       {goal.why && <p className="k-quote">{goal.why}</p>}
       <Facts goal={goal} />
       {detail.isError ? (
@@ -153,7 +157,6 @@ function GoalRow({
             <Num>{pace.text}</Num>
           </span>
         </span>
-        <span className="k-row-sub">{KIND_LABEL[goal.kind]}</span>
       </button>
       {open && <GoalMore goal={goal} today={today} />}
     </div>
