@@ -82,6 +82,9 @@ struct AuthPrincipal {
     // session. Key principals never carry the admin bit and are refused on
     // the account / admin surface (Security::ApiKeys::path_allows_key).
     bool via_api_key = false;
+    // True for an API key of scope "read": the middleware lets through GET,
+    // HEAD and OPTIONS only (Security::ApiKeys::read_key_allows).
+    bool key_read_only = false;
 };
 
 /**

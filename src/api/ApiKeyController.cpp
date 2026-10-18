@@ -37,14 +37,19 @@ void ApiKeyController::create(const HttpRequestPtr& req, std::function<void(cons
     // require_string: a non-string "name" would reach get<std::string>()
     // below and throw type_error.302 → bare 500 instead of a 400.
     Validation::require_string(errs, body, "name");
+    // scope: "full" (the default, reads and writes) or "read" (GET, HEAD and
+    // OPTIONS only; the middleware answers 403 key_read_only to the rest).
+    if (body.contains("scope"))
+        Validation::one_of(errs, body, "scope", {"full", "read"});
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;
     }
+    const std::string scope = body.contains("scope") ? body["scope"].get<std::string>() : "full";
 
     const auto gen = Security::ApiKeys::generate();
     Repositories::ApiKeyRepository repo;
-    auto key = repo.create(owner, body["name"].get<std::string>(), gen.key_hash, gen.prefix);
+    auto key = repo.create(owner, body["name"].get<std::string>(), gen.key_hash, gen.prefix, scope);
 
     // The plaintext key is surfaced ONCE here; it is never stored (only its
     // hash) and can never be shown again. The client must save it now.

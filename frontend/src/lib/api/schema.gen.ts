@@ -899,7 +899,10 @@ export interface paths {
             };
         };
         put?: never;
-        /** Create an API key — the secret is returned ONCE in this response */
+        /**
+         * Create an API key — the secret is returned ONCE in this response
+         * @description `scope` is `full` (the default: reads and writes the owner's data) or `read` (GET, HEAD and OPTIONS only; any other method with the key is answered 403 `key_read_only`). The key's metadata carries its `scope`.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -911,12 +914,24 @@ export interface paths {
                 content: {
                     "application/json": {
                         name: string;
+                        /**
+                         * @default full
+                         * @enum {string}
+                         */
+                        scope?: "full" | "read";
                     };
                 };
             };
             responses: {
-                /** @description Key created; `key` field holds the one-time secret */
+                /** @description Key created; `key` field holds the one-time secret, `scope` its scope */
                 201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed (an unknown scope) */
+                400: {
                     headers: {
                         [name: string]: unknown;
                     };

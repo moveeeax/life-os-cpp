@@ -4,6 +4,7 @@
  *        secret) → revoke (stops auth) → owner-scoping.
  */
 
+#include <algorithm>
 #include <functional>
 #include <string>
 
@@ -50,9 +51,14 @@ protected:
         return p;
     }
 
-    json create_key(const Security::Auth::AuthPrincipal& p, const std::string& name, int* status = nullptr) {
+    json create_key(const Security::Auth::AuthPrincipal& p,
+                    const std::string& name,
+                    int* status = nullptr,
+                    const json& extra = json::object()) {
+        json body = extra;
+        body["name"] = name;
         HttpResponsePtr resp;
-        controller.create(TestHelpers::authed_json(p, {{"name", name}}), [&](const HttpResponsePtr& r) { resp = r; });
+        controller.create(TestHelpers::authed_json(p, body), [&](const HttpResponsePtr& r) { resp = r; });
         if (status)
             *status = resp->statusCode();
         return json::parse(std::string(resp->body()));
@@ -122,6 +128,46 @@ TEST_F(ApiKeysTest, AdminKeyCarriesNoAdminBitAndIsMarkedAsAKey) {
     // The admin guard sees the masked bitmask and refuses.
     auto req = TestHelpers::authed(*principal);
     EXPECT_NE(Security::Auth::require_admin(req), nullptr);
+}
+
+TEST_F(ApiKeysTest, ReadScopeIsStoredAndMarksThePrincipal) {
+    auto user = seed_user("key-read@example.com");
+    int status = 0;
+    auto ro = create_key(user, "reader", &status, {{"scope", "read"}});
+    ASSERT_EQ(status, k201Created);
+    EXPECT_EQ(ro["scope"], "read");
+    auto principal = Security::ApiKeys::authenticate(with_key(ro["key"]));
+    ASSERT_TRUE(principal.has_value());
+    EXPECT_TRUE(principal->key_read_only);
+    EXPECT_EQ(principal->raw_claims.value("key_scope", ""), "read");
+
+    // Without a scope the key is full, as every key minted before 045.
+    auto full = create_key(user, "writer", &status);
+    ASSERT_EQ(status, k201Created);
+    EXPECT_EQ(full["scope"], "full");
+    auto p2 = Security::ApiKeys::authenticate(with_key(full["key"]));
+    ASSERT_TRUE(p2.has_value());
+    EXPECT_FALSE(p2->key_read_only);
+
+    // The list carries the scope of each key.
+    HttpResponsePtr listed;
+    controller.list(TestHelpers::authed(user), [&](const HttpResponsePtr& r) { listed = r; });
+    ASSERT_NE(listed, nullptr);
+    const auto rows = json::parse(std::string(listed->body()))["data"];
+    std::vector<std::string> scopes;
+    for (const auto& k : rows)
+        scopes.push_back(k["scope"]);
+    EXPECT_EQ(scopes.size(), 2u);
+    EXPECT_NE(std::find(scopes.begin(), scopes.end(), "read"), scopes.end());
+    EXPECT_NE(std::find(scopes.begin(), scopes.end(), "full"), scopes.end());
+}
+
+TEST_F(ApiKeysTest, CreateRefusesAnUnknownScope) {
+    auto user = seed_user("key-scope-bad@example.com");
+    int status = 0;
+    auto body = create_key(user, "odd", &status, {{"scope", "write"}});
+    EXPECT_EQ(status, k400BadRequest);
+    EXPECT_EQ(body["error"], "validation_failed");
 }
 
 TEST_F(ApiKeysTest, KeyPrincipalCannotManageKeysEvenPastTheMiddleware) {

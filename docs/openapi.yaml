@@ -3061,6 +3061,7 @@ paths:
         '401': { description: Not authenticated }
     post:
       summary: Create an API key — the secret is returned ONCE in this response
+      description: "`scope` is `full` (the default: reads and writes the owner's data) or `read` (GET, HEAD and OPTIONS only; any other method with the key is answered 403 `key_read_only`). The key's metadata carries its `scope`."
       tags: [account]
       security: [{ BearerAuth: [] }]
       requestBody:
@@ -3072,8 +3073,10 @@ paths:
               required: [name]
               properties:
                 name: { type: string }
+                scope: { type: string, enum: [full, read], default: full }
       responses:
-        '201': { description: Key created; `key` field holds the one-time secret }
+        '201': { description: "Key created; `key` field holds the one-time secret, `scope` its scope" }
+        '400': { description: Validation failed (an unknown scope) }
         '401': { description: Not authenticated }
 
   /api/v1/account/api-keys/{id}:
