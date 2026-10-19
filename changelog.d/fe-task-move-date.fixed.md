@@ -1,1 +1,0 @@
-Tasks: "Move date" keeps the typed date and saves it on Enter or with Save, not on the first change. A date input reports a value after one keystroke, so typing "25" into the day used to save the 2nd, and a half-typed year was refused with a 400.

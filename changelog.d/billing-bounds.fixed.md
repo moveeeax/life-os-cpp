@@ -1,1 +1,0 @@
-Admin billing inputs are bounded so the credit math cannot overflow: package credits and the adjust delta at most 10^12, `credits_per_unit` at most 10^9, the top-up bounds at most 10^9 cents; the refund proration and the custom top-up use a 128-bit product, the adjust sum an overflow check, and a package `sort` outside int answers 400 instead of being truncated.

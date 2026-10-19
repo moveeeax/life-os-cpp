@@ -1,1 +1,0 @@
-The worker logs a failing maintenance pass (promotion of due jobs, lease reaping) at warn, at most once a minute per thread with the count of failures in between, instead of swallowing it, and trims `jobs:index` and `jobs:index:<type>` entries older than `JOBS_RESULT_TTL` every ten minutes, so the listing indexes no longer grow with every job ever submitted.

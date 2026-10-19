@@ -1,1 +1,0 @@
-Money: exchange rates read the way round that is above 1 with six significant digits ("520 KZT per USD" instead of "0.0019 USD per KZT", no more 0.0000 for a BTC pair), on transfers and in the add form.

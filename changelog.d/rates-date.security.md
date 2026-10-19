@@ -1,1 +1,0 @@
-The `money_rates` job accepts only `latest` or a `YYYY-MM-DD` date (finishing with `invalid_date` otherwise), and the rates source refuses anything else before building the jsDelivr URL: the date from a `POST /jobs` payload was spliced into the path unchecked.

@@ -1,1 +1,0 @@
-The rates backfill counts a day as missing when it lacks a quote in use that the source publishes, so a currency added after rates exist (say GEL) gets its history; a quote the source never had is not asked for again and again.
