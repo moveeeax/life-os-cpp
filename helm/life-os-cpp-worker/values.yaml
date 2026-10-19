@@ -257,6 +257,12 @@ notes:
   enabled: false
 
 # ---------------------------------------------------------------
+# practice module — keep in sync with the life-os-cpp chart. Env var set: PRACTICE_ENABLED
+# ---------------------------------------------------------------
+practice:
+  enabled: false
+
+# ---------------------------------------------------------------
 # now module — keep in sync with the life-os-cpp chart. Env var set: NOW_ENABLED
 # ---------------------------------------------------------------
 now:

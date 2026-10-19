@@ -102,6 +102,7 @@ export const qk = {
     projects: (kind: string) => ['tasks', 'projects', kind] as const,
     project: (id: string) => ['tasks', 'project', id] as const,
     byProject: (id: string) => ['tasks', 'by-project', id] as const,
+    byDeal: (id: string) => ['tasks', 'by-deal', id] as const,
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['tasks-enabled'] as const,
   },
@@ -138,6 +139,18 @@ export const qk = {
     documents: () => ['travel', 'documents'] as const,
     /** Outside ['travel'], so a write in travel does not re-run the probe. */
     enabled: () => ['travel-enabled'] as const,
+  },
+  /** Practice section: the freelance practice. */
+  practice: {
+    all: () => ['practice'] as const,
+    clients: () => ['practice', 'clients'] as const,
+    deals: () => ['practice', 'deals'] as const,
+    deal: (id: string) => ['practice', 'deal', id] as const,
+    entries: (filter: string) => ['practice', 'entries', filter] as const,
+    months: (year: number) => ['practice', 'months', year] as const,
+    month: (month: string) => ['practice', 'month', month] as const,
+    /** Outside ['practice'], so a write in practice does not re-run the probe. */
+    enabled: () => ['practice-enabled'] as const,
   },
   /** Habits section. */
   habits: {

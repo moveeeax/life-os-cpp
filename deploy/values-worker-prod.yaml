@@ -103,6 +103,9 @@ habits:
 notes:
   enabled: true
 
+practice:
+  enabled: true
+
 # Invite-only: self sign-up is closed, admins invite people (POST /api/v1/admin/invite).
 registration:
   open: false

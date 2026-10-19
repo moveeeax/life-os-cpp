@@ -306,6 +306,13 @@ notes:
   enabled: false
 
 # ---------------------------------------------------------------
+# practice module — the freelance practice: clients, deals, incomes and
+# expenses, a month view. Env var set: PRACTICE_ENABLED.
+# ---------------------------------------------------------------
+practice:
+  enabled: false
+
+# ---------------------------------------------------------------
 # now module — the Now screen's digest, the focus of the day and the
 # wallpaper library. Env var set: NOW_ENABLED.
 # ---------------------------------------------------------------

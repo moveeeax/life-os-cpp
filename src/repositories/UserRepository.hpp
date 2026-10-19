@@ -323,6 +323,9 @@ public:
         "habits",
         "notes",
         "projects",
+        "practice_entries",
+        "practice_deals",
+        "practice_clients",
     };
 
     /// The foreign keys of the billing tables (migration 007, ON DELETE

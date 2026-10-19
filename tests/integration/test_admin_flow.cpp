@@ -253,6 +253,11 @@ void seed_module_rows(const std::string& owner) {
             "INSERT INTO habit_checks (owner_id, habit_id, date) SELECT $1::uuid, id, '2026-10-01' FROM h");
         run("INSERT INTO projects (owner_id, name, code, status) VALUES ($1::uuid, 'Life OS', 'life-os', 'active')");
         run("INSERT INTO notes (owner_id, slug, title) VALUES ($1::uuid, 'first-note', 'First note')");
+        run("WITH c AS (INSERT INTO practice_clients (owner_id, name) VALUES ($1::uuid, 'Acme') RETURNING id), "
+            "d AS (INSERT INTO practice_deals (owner_id, client_id, title) SELECT $1::uuid, id, 'Site' FROM c "
+            " RETURNING id, client_id) "
+            "INSERT INTO practice_entries (owner_id, kind, date, amount, currency, client_id, deal_id) "
+            "SELECT $1::uuid, 'income', '2026-10-01', 100, 'USD', client_id, id FROM d");
         run("WITH x AS (INSERT INTO exercises (id, name, source, owner_id) "
             " VALUES ('custom-' || $1::text, 'Mine', 'custom', $1::uuid) RETURNING id), "
             "r AS (INSERT INTO routines (owner_id, name) VALUES ($1::uuid, 'Push') RETURNING id), "
@@ -291,7 +296,7 @@ TEST_F(AdminFlowTest, deleteUserRemovesEveryModuleRowTheyOwn) {
     seed_module_rows(target.user.id);
     seed_module_rows(admin_user.user.id);
     const auto before = owned_rows(target.user.id);
-    ASSERT_GE(before.second, 36) << "every module table got a row";
+    ASSERT_GE(before.second, 39) << "every module table got a row";
 
     HttpResponsePtr resp;
     admin.deleteUser(
