@@ -6,6 +6,29 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-10-19
+
+### Added
+- A habit ticked by hand takes an optional daily `target`: a day counts as done only when the value of its tick reaches it, and `POST /api/v1/habits/{id}/checks/{date}/add` adds an amount to the day (water in ml); a habit without a target counts any tick, as before.
+- Body measurements by hand: waist, chest, hips, neck, arm and thigh in cm with a date and a note (`/api/v1/fitness/measurements`, table `tape_measurements` in migration 050), shown as a Measurements block on Body, also without a linked Mi account.
+- Mood check-ins: one per local day with a score from 1 to 5, tags from a fixed set of twelve and a short note (`GET /api/v1/habits/mood`, `PUT` and `DELETE /api/v1/habits/mood/{date}`, table `mood_checkins` in migration 050); a mood row on the Habits page and a mood line in the week view.
+- Notes take an optional `date`, the day a note is about; the list sorts by it, and an undated note by the day it was made.
+- The family medical archive (module `medical`, switch `MEDICAL_ENABLED`, migration 051): people of the family, doctors and clinics, visits with a follow-up date, records and medications under `/api/v1/medical`, each owner-scoped; a follow-up date or a medication end opens one task in area health (`POST .../task`). On the site it is the Records, Visits, Medicines and Family tabs of Body.
+- A task can name the deal of the practice it is a next step of (`deal_id` on `/api/v1/tasks`, the `deal` filter on the list); a deal answers with its open tasks, and deleting it leaves the tasks unlinked.
+- Practice module (switch `PRACTICE_ENABLED`, nav section Practice, migration 053): clients, deals with the stages lead, negotiation, active, done and lost, the incomes and expenses of the practice in their own currencies, linked to a client or a deal, and a month view under `/api/v1/practice` whose totals are per currency and never add two currencies together.
+- Private file attachments of medical records and travel documents (`/api/v1/files`): the browser uploads to `<prefix>private/<owner>/` through a presigned PUT, a file turns ready only when the bucket refuses an unsigned read of it, and every read is a presigned GET valid two minutes; another owner gets 404. Deletes keep the object keys in `private_file_purges` for the new hourly `files_sweep` job. The MinIO policy needs the private prefix first (`docs/RUNBOOK.md`, "Private files"); until then uploads answer 503.
+- Projects have a `deadline` and a `priority` (p1..p3), and every project or course row carries `progress`, the share of done tasks in percent over its tasks without a repeat rule. A course keeps its own dates and takes neither field. The Projects tab shows the priority, the progress and the deadline on each row; the project sheet edits them. Migration 049.
+- Repeating tasks: a task takes a `repeat` rule (daily, weekly on given ISO weekdays, monthly on a day, every N days); closing it creates the next occurrence once, due on the first day of the rule after the later of its due date and the day it was closed (`PATCH /api/v1/tasks/items/{id}?tz=` names the caller's day), and `next_id` points at it. A patch edits the rule or stops it with `null`; the task form has a Repeats field and the row a small mark. Migration 049.
+- Travel trips carry a purpose (leisure, business, family, relocation, other) and
+  a booked cost as an amount in its own currency, never converted; a stay in the
+  plan takes an end date (its check-out day); each trip keeps its contacts (name,
+  role, phone, email, link, note) and moments (date, text, place) under
+  `/api/v1/travel/trips/{id}/contacts` and `/moments`, shown on the trip page in
+  two new tabs (migration 052).
+
+### Fixed
+- The project sheet's code field no longer logs "Pattern attribute value is not a valid regular expression": browsers compile `pattern` with the `v` flag, where a bare `-` in a character class is an error, so the field checked nothing.
+
 ## [1.32.0] - 2026-10-19
 
 ### Added

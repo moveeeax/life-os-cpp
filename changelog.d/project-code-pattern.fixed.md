@@ -1,1 +1,0 @@
-The project sheet's code field no longer logs "Pattern attribute value is not a valid regular expression": browsers compile `pattern` with the `v` flag, where a bare `-` in a character class is an error, so the field checked nothing.
