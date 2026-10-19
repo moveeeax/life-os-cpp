@@ -30,6 +30,7 @@
 #include "database/Database.hpp"
 #include "database/Migrations.hpp"
 #include "email/Mailer.hpp"
+#include "files/jobs/Sweep.hpp"
 #include "fitness/jobs/SyncJob.hpp"
 #include "jobs/Jobs.hpp"
 #include "jobs/Outbox.hpp"
@@ -586,6 +587,7 @@ void Application::init_jobs_(Config::AppConfig& cfg) {
     register_money_rates_schedule_(cfg);
     register_money_advisor_schedule_(cfg);
     register_now_media_sweep_schedule_();
+    register_files_sweep_schedule_();
 }
 
 void Application::register_fitness_sync_schedule_(Config::AppConfig& cfg) {
@@ -698,6 +700,25 @@ void Application::register_now_media_sweep_schedule_() {
             Jobs::get().submit(Jobs::NowMediaSweep::kJobType, nlohmann::json::object());
         } catch (const std::exception& e) {
             spdlog::warn("now media sweep schedule tick failed: {}", e.what());
+        }
+    });
+}
+
+void Application::register_files_sweep_schedule_() {
+    // Same shape as the media sweep: an hourly tick in the API pod queues files_sweep, the worker
+    // runs it. Files hang on medical records and travel documents, so either module starts it.
+    if (!Tasks::is_initialized() || !Database::is_initialized() || !Jobs::is_initialized())
+        return;
+    if (!medical_enabled() && !travel_enabled())
+        return;
+    spdlog::info("files sweep enabled: hourly");
+    Tasks::schedule_recurring("files_sweep_schedule", std::chrono::hours(1), [] {
+        if (!Jobs::is_initialized())
+            return;
+        try {
+            Jobs::get().submit(Jobs::FilesSweep::kJobType, nlohmann::json::object());
+        } catch (const std::exception& e) {
+            spdlog::warn("files sweep schedule tick failed: {}", e.what());
         }
     });
 }

@@ -240,3 +240,16 @@ api -> practice
 api -> repositories/practice
 repositories/practice -> database
 repositories/practice -> repositories
+api -> repositories/files
+api -> repositories/medical
+repositories/files -> database
+repositories/files -> repositories
+repositories/medical -> database
+repositories/medical -> repositories
+repositories/medical -> repositories/tasks
+repositories/medical -> utils
+files/jobs -> jobs
+files/jobs -> repositories/files
+files/jobs -> storage
+files/jobs -> utils
+core -> files/jobs

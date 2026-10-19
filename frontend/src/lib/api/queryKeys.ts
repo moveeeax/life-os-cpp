@@ -152,6 +152,22 @@ export const qk = {
     /** Outside ['practice'], so a write in practice does not re-run the probe. */
     enabled: () => ['practice-enabled'] as const,
   },
+  /** The medical archive (the Records tabs of Body). */
+  medical: {
+    all: () => ['medical'] as const,
+    people: () => ['medical', 'people'] as const,
+    providers: () => ['medical', 'providers'] as const,
+    visits: () => ['medical', 'visits'] as const,
+    records: () => ['medical', 'records'] as const,
+    medications: () => ['medical', 'medications'] as const,
+    /** Outside ['medical'], so a write there does not re-run the probe. */
+    enabled: () => ['medical-enabled'] as const,
+  },
+  /** The private files of one record or document. */
+  files: {
+    all: () => ['files'] as const,
+    of: (kind: string, id: string) => ['files', kind, id] as const,
+  },
   /** Habits section. */
   habits: {
     all: () => ['habits'] as const,

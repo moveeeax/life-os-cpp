@@ -77,6 +77,7 @@ std::string presign(const Credentials& c, const Target& t, const Presign& p) {
         {"X-Amz-Expires", std::to_string(p.expires_seconds)},
         {"X-Amz-SignedHeaders", signed_headers},
     };
+    query.insert(query.end(), p.query.begin(), p.query.end());
     std::sort(query.begin(), query.end());
     std::string qs;
     for (const auto& [k, v] : query) {

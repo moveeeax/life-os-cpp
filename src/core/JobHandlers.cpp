@@ -7,6 +7,7 @@
 #include "core/JobHandlers.hpp"
 
 #include "email/jobs/Register.hpp"
+#include "files/jobs/Register.hpp"
 #include "fitness/jobs/Register.hpp"
 #include "food/jobs/Register.hpp"
 #include "jobs/BuiltinHandlers.hpp"
@@ -21,6 +22,7 @@ void register_job_handlers() {
     auto& d = Jobs::Dispatcher::get();
     Jobs::register_builtin_handlers();
     Email::register_jobs(d);
+    Files::register_jobs(d);
     Fitness::register_jobs(d);
     Food::register_jobs(d);
     Money::register_jobs(d);

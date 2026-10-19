@@ -269,6 +269,9 @@
   "practice": {
     "enabled": "${PRACTICE_ENABLED:-false}"
   },
+  "medical": {
+    "enabled": "${MEDICAL_ENABLED:-false}"
+  },
   "worker": {
     "id": "worker-1",
     "types": ["default"],

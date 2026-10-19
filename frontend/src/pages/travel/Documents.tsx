@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { Attachments } from '@/components/Attachments';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useDeleteDocument, useDocuments } from '@/hooks/useTravel';
 import { useErrorToast } from '@/hooks/useErrorToast';
@@ -79,6 +80,7 @@ export function TravelDocumentsPage() {
                   </span>
                 )}
                 {d.note && <span>{d.note}</span>}
+                <Attachments kind="travel_document" parentId={d.id} />
                 <span className="k-actions">
                   <button type="button" className="k-link" onClick={() => setEditing(d)}>
                     Edit
@@ -99,7 +101,7 @@ export function TravelDocumentsPage() {
       {deleting && (
         <ConfirmDialog
           title={`Delete ${deleting.holder}'s ${DOCUMENT_KIND[deleting.kind].toLowerCase()}?`}
-          description="Trips stop checking it. This cannot be undone."
+          description="Trips stop checking it, and its scans are deleted. This cannot be undone."
           confirmLabel="Delete"
           destructive
           busy={remove.isPending}

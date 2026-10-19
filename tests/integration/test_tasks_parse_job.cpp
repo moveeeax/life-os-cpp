@@ -81,7 +81,7 @@ protected:
             return;
         Net::Http::install_for_testing(&provider);
         Database::get().execute_write([](auto& txn) {
-            txn.exec("TRUNCATE TABLE notes, task_parse_jobs, task_notes, task_items");
+            txn.exec("TRUNCATE TABLE notes, task_parse_jobs, task_notes, task_items CASCADE");
             txn.exec_params(
                 "INSERT INTO users (id, email, confirmed, role_id) "
                 "VALUES ($1::uuid, $2, TRUE, (SELECT id FROM roles ORDER BY id LIMIT 1)) ON CONFLICT DO NOTHING",

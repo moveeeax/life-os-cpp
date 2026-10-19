@@ -80,5 +80,8 @@ inline bool notes_enabled() {
 inline bool practice_enabled() {
     return module_enabled(Config::Keys::practice_enabled);
 }
+inline bool medical_enabled() {
+    return module_enabled(Config::Keys::medical_enabled);
+}
 
 }  // namespace Core

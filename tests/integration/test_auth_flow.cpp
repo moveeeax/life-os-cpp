@@ -246,7 +246,9 @@ TEST_F(AuthModulesTest, modulesAnswersTheSwitchesTheRoutesObey) {
     const auto data = json::parse(std::string(resp->body()))["data"];
     EXPECT_EQ(data["money"], true);
     EXPECT_EQ(data["travel"], false);
-    EXPECT_EQ(data.size(), 12U) << "one flag per module";
+    EXPECT_TRUE(data.contains("medical"));
+    EXPECT_TRUE(data.contains("practice"));
+    EXPECT_EQ(data.size(), 13U) << "one flag per module";
 
     auto anonymous = HttpRequest::newHttpRequest();
     anonymous->setMethod(Get);

@@ -77,10 +77,12 @@ S3Client::S3Client(S3::Settings settings) : settings_(std::move(settings)) {}
 std::string S3Client::signed_url(const std::string& method,
                                  const std::string& key,
                                  long expires_seconds,
-                                 std::vector<std::pair<std::string, std::string>> headers) const {
-    return S3::presign(settings_.credentials,
-                       settings_.target,
-                       S3::Presign{method, key, expires_seconds, S3::amz_date_now(), std::move(headers)});
+                                 std::vector<std::pair<std::string, std::string>> headers,
+                                 std::vector<std::pair<std::string, std::string>> query) const {
+    return S3::presign(
+        settings_.credentials,
+        settings_.target,
+        S3::Presign{method, key, expires_seconds, S3::amz_date_now(), std::move(headers), std::move(query)});
 }
 
 std::string S3Client::upload_url(const std::string& key, const std::string& content_type, long long bytes) const {
@@ -116,6 +118,37 @@ std::string S3Client::public_url(const std::string& key) const {
 
 std::string S3Client::key_for(const std::string& folder, const std::string& id, const std::string& name) const {
     return settings_.prefix + folder + "/" + id + "/" + name;
+}
+
+std::string S3Client::private_key(const std::string& owner, const std::string& id, const std::string& name) const {
+    return settings_.prefix + "private/" + owner + "/" + id + "/" + name;
+}
+
+std::string S3Client::private_upload_url(const std::string& key,
+                                         const std::string& content_type,
+                                         long long bytes) const {
+    return signed_url("PUT",
+                      key,
+                      kUploadSeconds,
+                      {{"cache-control", kPrivateCacheControl},
+                       {"content-length", std::to_string(bytes)},
+                       {"content-type", content_type}});
+}
+
+std::string S3Client::download_url(const std::string& key, long seconds, const std::string& disposition) const {
+    return signed_url("GET", key, seconds, {}, {{"response-content-disposition", disposition}});
+}
+
+bool S3Client::publicly_readable(const std::string& key) const {
+    // No signature: this is the request anyone on the internet could send.
+    const Answer a = send("HEAD", public_url(key));
+    if (a.status >= 200 && a.status < 300) {
+        return true;
+    }
+    if (a.status >= 400 && a.status < 500) {
+        return false;
+    }
+    throw std::runtime_error("s3: anonymous HEAD answered HTTP " + std::to_string(a.status));
 }
 
 ObjectStore* object_store() {

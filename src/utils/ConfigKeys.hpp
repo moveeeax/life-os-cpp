@@ -176,6 +176,9 @@ inline constexpr ConfigKey mail_templates_dir{"mail.templates_dir", "MAIL_TEMPLA
 inline constexpr ConfigKey mail_timeout_sec{"mail.timeout_sec", "MAIL_TIMEOUT_SEC"};
 inline constexpr ConfigKey mail_via_jobs{"mail.via_jobs", "MAIL_VIA_JOBS"};
 
+// --- medical ---
+inline constexpr ConfigKey medical_enabled{"medical.enabled", "MEDICAL_ENABLED"};
+
 // --- money ---
 inline constexpr ConfigKey money_advisor_hour_utc{"money.advisor_hour_utc", "MONEY_ADVISOR_HOUR_UTC"};
 inline constexpr ConfigKey money_enabled{"money.enabled", "MONEY_ENABLED"};
