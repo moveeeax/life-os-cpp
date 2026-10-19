@@ -1,1 +1,0 @@
-Girths measured by hand (`/api/v1/fitness/measurements`) no longer need the fitness:read permission: they are the caller's own rows, like the medical archive, so any user account with the fitness module on can list, add, edit and delete them.
