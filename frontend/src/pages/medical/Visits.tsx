@@ -52,7 +52,7 @@ export function MedicalVisitsPage() {
   const details = (v: MedicalVisit) => (
     <>
       {v.provider_name && <span>{v.provider_name}</span>}
-      {v.outcome && <span className="k-pre">{v.outcome}</span>}
+      {v.outcome && <span className="k-pre num">{v.outcome}</span>}
       {v.follow_up && (
         <span className="k-actions">
           <span>Follow-up {day(v.follow_up)}</span>
@@ -101,7 +101,7 @@ export function MedicalVisitsPage() {
                 <Row
                   key={`ahead-${v.id}`}
                   dot="var(--g-warn)"
-                  title={`${v.person_name}: ${v.reason}`}
+                  title={<span data-num-ok>{`${v.person_name}: ${v.reason}`}</span>}
                   sub={<>follow-up {day(v.follow_up ?? '')}</>}
                 >
                   {details(v)}
@@ -113,7 +113,7 @@ export function MedicalVisitsPage() {
             {list.map((v) => (
               <Row
                 key={v.id}
-                title={v.reason}
+                title={<span data-num-ok>{v.reason}</span>}
                 sub={
                   <>
                     {`${v.person_name} · `}

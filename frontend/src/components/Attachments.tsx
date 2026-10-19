@@ -37,6 +37,7 @@ export function Attachments({ kind, parentId }: { kind: ParentKind; parentId: st
             <button
               type="button"
               className="k-link k-file-name"
+              data-num-ok
               onClick={() => void opener.open(f.id)}
             >
               {f.name}

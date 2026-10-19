@@ -27,7 +27,7 @@ export function MedicalMedicinesPage() {
   const row = (m: MedicalMedication) => (
     <Row
       key={m.id}
-      title={m.name}
+      title={<span data-num-ok>{m.name}</span>}
       sub={
         <>
           {m.person_name}
@@ -43,7 +43,7 @@ export function MedicalMedicinesPage() {
     >
       {m.schedule && <span className="num">{m.schedule}</span>}
       {m.start_date && <span>Since {day(m.start_date)}</span>}
-      {m.note && <span className="k-pre">{m.note}</span>}
+      {m.note && <span className="k-pre num">{m.note}</span>}
       {m.end_date && m.end_date >= today && (
         <span className="k-actions">
           <span>A task on the last day</span>

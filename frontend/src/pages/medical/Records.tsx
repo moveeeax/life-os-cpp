@@ -91,7 +91,7 @@ export function MedicalRecordsPage() {
                 key={r.id}
                 open={openId === r.id}
                 onToggle={(o) => setOpenId(o ? r.id : null)}
-                title={r.title}
+                title={<span data-num-ok>{r.title}</span>}
                 sub={
                   <>
                     {`${r.person_name} · ${RECORD_KIND[r.kind]} · `}
@@ -105,7 +105,7 @@ export function MedicalRecordsPage() {
                   </>
                 }
               >
-                {r.note && <span className="k-pre">{r.note}</span>}
+                {r.note && <span className="k-pre num">{r.note}</span>}
                 <Attachments kind="medical_record" parentId={r.id} />
                 <span className="k-actions">
                   <button type="button" className="k-link" onClick={() => setEditing(r)}>

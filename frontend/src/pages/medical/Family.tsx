@@ -63,7 +63,7 @@ export function MedicalFamilyPage() {
             ) : (
               people.data.map((p) => (
                 <Row key={p.id} title={p.name} sub={p.relation || undefined}>
-                  {p.note && <span className="k-pre">{p.note}</span>}
+                  {p.note && <span className="k-pre num">{p.note}</span>}
                   {actions(
                     () => setPerson(p),
                     () => setDeleting({ kind: 'person', row: p }),
@@ -98,7 +98,11 @@ export function MedicalFamilyPage() {
                     </a>
                   )}
                   {d.address && <span>{d.address}</span>}
-                  {d.note && <span className="k-pre">{d.note}</span>}
+                  {d.note && (
+                    <span className="k-pre" data-num-ok>
+                      {d.note}
+                    </span>
+                  )}
                   {actions(
                     () => setProvider(d),
                     () => setDeleting({ kind: 'provider', row: d }),
