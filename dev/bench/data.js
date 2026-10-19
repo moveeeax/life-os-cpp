@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792312026891,
+  "lastUpdate": 1792401803520,
   "repoUrl": "https://github.com/moveeeax/life-os-cpp",
   "entries": {
     "Throughput": [
@@ -63,6 +63,38 @@ window.BENCHMARK_DATA = {
           {
             "name": "jobs req/s",
             "value": 8245.93,
+            "unit": "req/s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Michael Tarassov",
+            "username": "moveeeax",
+            "email": "michael@tarassov.me"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "f323f3fa8aa065d7dd686cf1b74c303de403a9da",
+          "message": "chore(release): 1.33.0 — recurring tasks, mood and measurements, medical archive, travel details, practice (#152)",
+          "timestamp": "2026-10-19T09:22:11Z",
+          "url": "https://github.com/moveeeax/life-os-cpp/commit/f323f3fa8aa065d7dd686cf1b74c303de403a9da"
+        },
+        "date": 1792401802553,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "healthz req/s",
+            "value": 39451.49,
+            "unit": "req/s"
+          },
+          {
+            "name": "jobs req/s",
+            "value": 8288.12,
             "unit": "req/s"
           }
         ]
