@@ -198,7 +198,15 @@ inline constexpr ConfigKey observability_trace_stdout{"observability.trace_stdou
 inline constexpr ConfigKey outbox_drain_interval_sec{"outbox.drain_interval_sec", "OUTBOX_DRAIN_INTERVAL_SEC"};
 
 // --- rate_limit ---
+inline constexpr ConfigKey rate_limit_auth_fail_requests{"rate_limit.auth_fail_requests",
+                                                         "RATE_LIMIT_AUTH_FAIL_REQUESTS"};
+inline constexpr ConfigKey rate_limit_auth_fail_window_sec{"rate_limit.auth_fail_window_sec",
+                                                           "RATE_LIMIT_AUTH_FAIL_WINDOW_SEC"};
 inline constexpr ConfigKey rate_limit_enabled{"rate_limit.enabled", "RATE_LIMIT_ENABLED"};
+inline constexpr ConfigKey rate_limit_login_email_requests{"rate_limit.login_email_requests",
+                                                           "RATE_LIMIT_LOGIN_EMAIL_REQUESTS"};
+inline constexpr ConfigKey rate_limit_login_email_window_sec{"rate_limit.login_email_window_sec",
+                                                             "RATE_LIMIT_LOGIN_EMAIL_WINDOW_SEC"};
 inline constexpr ConfigKey rate_limit_fail_open{"rate_limit.fail_open", "RATE_LIMIT_FAIL_OPEN"};
 inline constexpr ConfigKey rate_limit_protected_paths{"rate_limit.protected_paths", "RATE_LIMIT_PROTECTED_PATHS"};
 inline constexpr ConfigKey rate_limit_protected_requests{"rate_limit.protected_requests",

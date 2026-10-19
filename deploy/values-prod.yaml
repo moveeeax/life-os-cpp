@@ -102,6 +102,11 @@ rateLimit:
   # Redis down → refuse rather than let the login go unthrottled; sessions live
   # in Redis too, so without it signing in fails either way.
   failOpen: false
+  # Rejected credentials per client IP, and failed logins per email address.
+  authFailRequests: 20
+  authFailWindowSec: 60
+  loginEmailRequests: 5
+  loginEmailWindowSec: 900
 
 # Retried mutating requests with an Idempotency-Key are answered once.
 idempotency:

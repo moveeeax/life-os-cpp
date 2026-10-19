@@ -305,6 +305,14 @@ spec:
               value: {{ .Values.rateLimit.scope | quote }}
             - name: RATE_LIMIT_FAIL_OPEN
               value: {{ .Values.rateLimit.failOpen | quote }}
+            - name: RATE_LIMIT_AUTH_FAIL_REQUESTS
+              value: {{ .Values.rateLimit.authFailRequests | quote }}
+            - name: RATE_LIMIT_AUTH_FAIL_WINDOW_SEC
+              value: {{ .Values.rateLimit.authFailWindowSec | quote }}
+            - name: RATE_LIMIT_LOGIN_EMAIL_REQUESTS
+              value: {{ .Values.rateLimit.loginEmailRequests | quote }}
+            - name: RATE_LIMIT_LOGIN_EMAIL_WINDOW_SEC
+              value: {{ .Values.rateLimit.loginEmailWindowSec | quote }}
             {{- with .Values.rateLimit.whitelist }}
             - name: RATE_LIMIT_WHITELIST
               value: {{ . | quote }}

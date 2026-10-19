@@ -117,24 +117,26 @@ public:
     // ---------------------------------------------------------------------
     void modules(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
 
-private:
     struct Session {
         std::string access;
         std::string refresh;
     };
 
-    static std::string make_jti();
-
-    /// auth.registration_open / REGISTRATION_OPEN, read per request (default true).
-    static bool registration_open();
-
     /**
      * @brief Mint access + refresh JWTs, write refresh JTI to Redis.
      *        Returns nullopt if Redis write fails — refresh would be
      *        unverifiable, so we'd rather refuse the login than mint a
-     *        permanently-invalid session.
+     *        permanently-invalid session. Public for AccountController's
+     *        password change, which re-issues the caller's own session after
+     *        revoking all of them.
      */
-    std::optional<Session> mint_session(const Domain::User& user);
+    static std::optional<Session> mint_session(const Domain::User& user);
+
+private:
+    static std::string make_jti();
+
+    /// auth.registration_open / REGISTRATION_OPEN, read per request (default true).
+    static bool registration_open();
 
     /// True when the refresh token carries an integer `exp` that has not
     /// passed (with the configured leeway). A token without `exp` is refused.

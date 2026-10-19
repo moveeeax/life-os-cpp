@@ -1,0 +1,1 @@
+The idempotency middleware skips the auth-public routes (login, register, refresh, password reset, token links). Their caller has no principal, so a login's 200 with the user object was cached under the client IP for 24 h and replayed to anyone behind that address who repeated the `Idempotency-Key`.

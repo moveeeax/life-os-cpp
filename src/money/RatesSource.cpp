@@ -1,6 +1,7 @@
 #include "money/RatesSource.hpp"
 
 #include <cctype>
+#include <stdexcept>
 #include <string>
 
 #include <nlohmann/json.hpp>
@@ -14,6 +15,9 @@ constexpr const char* kUserAgent = "LifeOS/1.11 (https://life-os.tarassov.me)";
 }  // namespace
 
 Day fetch(Net::Http::Transport& transport, const std::string& date_or_latest) {
+    if (!valid_date_arg(date_or_latest)) {
+        throw std::invalid_argument("rates date must be \"latest\" or YYYY-MM-DD");
+    }
     Net::Http::Response response;
     try {
         response = transport.get(url_for(date_or_latest), {{"User-Agent", kUserAgent}, {"Accept", "application/json"}});

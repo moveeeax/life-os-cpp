@@ -359,6 +359,15 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
+                /** @description Too many attempts: the per-IP budget of the auth surface, or too many failed logins for this email address (rate_limit.login_email_*; the right password is refused too until the window frees a slot). Retry-After says when. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
                 /** @description The session could not be minted (session_unavailable) */
                 503: {
                     headers: {
@@ -941,7 +950,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Password updated */
+                /** @description Password updated. Every session of the account ends, access tokens included; the caller gets a fresh session in Set-Cookie. */
                 200: {
                     headers: {
                         [name: string]: unknown;

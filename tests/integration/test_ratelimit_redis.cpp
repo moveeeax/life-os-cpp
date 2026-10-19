@@ -32,6 +32,8 @@ protected:
             std::vector<std::string> keys;
             r.keys("rl:sw:*", std::back_inserter(keys));
             r.keys("rl:auth:*", std::back_inserter(keys));
+            r.keys("rl:authfail:*", std::back_inserter(keys));
+            r.keys("rl:login:*", std::back_inserter(keys));
             for (const auto& k : keys)
                 r.del(k);
         } catch (...) {}
@@ -84,6 +86,46 @@ TEST_F(RateLimitRedisTest, ProtectedTierIsSeparateAndStricter) {
     // namespace ("rl:sw:" vs "rl:auth:"), so a throttled login doesn't also
     // lock the caller out of the normal API.
     EXPECT_TRUE(lim.check(id).allowed) << "general tier must not share the auth-tier counter";
+}
+
+TEST_F(RateLimitRedisTest, FailureTierCountsOnlyRecordedFailures) {
+    RL::Config c = cfg(/*requests=*/100);
+    c.auth_fail_requests = 2;
+    c.auth_fail_window_sec = 60;
+    RL::Limiter lim(std::move(c));
+    const std::string id = "ip:10.9.8.7";
+    const auto tier = RL::FailureTier::AuthFailure;
+
+    // Checks alone never spend the budget: a client that keeps presenting
+    // good credentials is never throttled by this tier.
+    for (int i = 0; i < 5; ++i)
+        EXPECT_TRUE(lim.check_failures(tier, id).allowed) << "check " << i;
+
+    lim.record_failure(tier, id);
+    EXPECT_TRUE(lim.check_failures(tier, id).allowed) << "one failure of two";
+    lim.record_failure(tier, id);
+    const auto refused = lim.check_failures(tier, id);
+    EXPECT_FALSE(refused.allowed) << "two failures exhaust a budget of two";
+    EXPECT_GT(refused.retry_after_sec, 0);
+    EXPECT_LE(refused.retry_after_sec, 60);
+
+    // Another IP, the general tier and the login tier keep their own counts.
+    EXPECT_TRUE(lim.check_failures(tier, "ip:10.9.8.6").allowed);
+    EXPECT_TRUE(lim.check(id).allowed);
+    EXPECT_TRUE(lim.check_failures(RL::FailureTier::LoginEmail, id).allowed);
+}
+
+TEST_F(RateLimitRedisTest, FailureTierIsTrimmedToItsBudget) {
+    RL::Config c = cfg(/*requests=*/100);
+    c.login_email_requests = 3;
+    c.login_email_window_sec = 60;
+    RL::Limiter lim(std::move(c));
+    const std::string id = RL::email_identity("trim@example.com");
+    for (int i = 0; i < 50; ++i)
+        lim.record_failure(RL::FailureTier::LoginEmail, id);
+    EXPECT_FALSE(lim.check_failures(RL::FailureTier::LoginEmail, id).allowed);
+    // A flood of failures keeps at most the budget's worth of entries.
+    EXPECT_EQ(Cache::get().get_client().zcard("rl:login:" + id), 3);
 }
 
 }  // namespace

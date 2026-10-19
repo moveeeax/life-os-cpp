@@ -10091,6 +10091,16 @@
        }
       }
      },
+     "429": {
+      "description": "Too many attempts: the per-IP budget of the auth surface, or too many failed logins for this email address (rate_limit.login_email_*; the right password is refused too until the window frees a slot). Retry-After says when.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
      "415": {
       "description": "Body content type is not application/json (content-type middleware — applies to every JSON API endpoint)",
       "content": {
@@ -10603,7 +10613,7 @@
     },
     "responses": {
      "200": {
-      "description": "Password updated"
+      "description": "Password updated. Every session of the account ends, access tokens included; the caller gets a fresh session in Set-Cookie."
      },
      "401": {
       "description": "Wrong current password or not authenticated"
@@ -27943,7 +27953,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 411868,
-  "source_fnv1a64": "409fa3ff4157f62c"
+  "source_bytes": 412350,
+  "source_fnv1a64": "acf6c7b0323c3d8e"
  }
 }

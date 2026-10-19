@@ -1,0 +1,1 @@
+Failed logins are also limited per email address, from any IP: `rate_limit.login_email_requests` per `rate_limit.login_email_window_sec` (5 per 15 min). Past it `POST /api/v1/auth/login` answers 429 with `Retry-After`, the right password included, before the user lookup and the argon2 check. The key is a hash of the lower-cased address.
