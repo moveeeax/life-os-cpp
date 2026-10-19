@@ -41,6 +41,22 @@ describe('glassNav', () => {
     ]);
   });
 
+  it('shows Body at the medical records without fitness:read while medical is on', () => {
+    const list = glassNav(user(Permission.General), new Set(), new Set(['medical']));
+    expect(list.filter((s) => s.key === 'health' || s.key === 'workout')).toEqual([
+      expect.objectContaining({ label: 'Body', to: '/health/records' }),
+    ]);
+  });
+
+  it('keeps Body at the band page with fitness:read while medical is on', () => {
+    const list = glassNav(
+      user(Permission.General | Permission.FitnessRead),
+      new Set(),
+      new Set(['medical']),
+    );
+    expect(list.find((s) => s.key === 'health')?.to).toBe('/health');
+  });
+
   it('shows Body and Training to an administrator through the sentinel bit', () => {
     expect(glassNav(user(Permission.Administer)).map((s) => s.label)).toContain('Training');
   });

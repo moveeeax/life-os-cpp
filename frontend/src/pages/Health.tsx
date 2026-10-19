@@ -599,13 +599,14 @@ export function HealthPage() {
 
   if (!canRead) {
     return (
-      <SectionFrame eyebrow="Body" headline="No access to Health" tabs={tabs}>
+      <SectionFrame eyebrow="Body" headline="No access to band data" tabs={tabs}>
         <div className="k-banner" role="alert">
           <span>
             <ShieldAlert className="k-inline-icon" aria-hidden="true" /> Your role does not include
             reading fitness data. Ask an administrator for the Fitness Reader role.
           </span>
         </div>
+        <Measurements />
       </SectionFrame>
     );
   }
