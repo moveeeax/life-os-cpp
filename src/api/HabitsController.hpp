@@ -2,7 +2,8 @@
  * @file HabitsController.hpp
  * @brief /api/v1/habits: the owner's habits, their manual ticks and the days
  *        evaluated with the values from Mi Fitness and Training
- *        (docs/superpowers/specs/2026-10-14-habits-design.md).
+ *        (docs/superpowers/specs/2026-10-14-habits-design.md), and the mood
+ *        check-in of each day.
  */
 
 #pragma once
@@ -22,11 +23,15 @@ public:
     ADD_METHOD_TO(HabitsController::list, "/api/v1/habits", Get);
     ADD_METHOD_TO(HabitsController::create, "/api/v1/habits", Post);
     ADD_METHOD_TO(HabitsController::days, "/api/v1/habits/days", Get);
+    ADD_METHOD_TO(HabitsController::listMood, "/api/v1/habits/mood", Get);
+    ADD_METHOD_TO(HabitsController::putMood, "/api/v1/habits/mood/{date}", Put);
+    ADD_METHOD_TO(HabitsController::deleteMood, "/api/v1/habits/mood/{date}", Delete);
     ADD_METHOD_TO(HabitsController::update, "/api/v1/habits/{id}", Patch);
     ADD_METHOD_TO(HabitsController::remove, "/api/v1/habits/{id}", Delete);
     ADD_METHOD_TO(HabitsController::archive, "/api/v1/habits/{id}/archive", Post);
     ADD_METHOD_TO(HabitsController::putCheck, "/api/v1/habits/{id}/checks/{date}", Put);
     ADD_METHOD_TO(HabitsController::deleteCheck, "/api/v1/habits/{id}/checks/{date}", Delete);
+    ADD_METHOD_TO(HabitsController::addCheck, "/api/v1/habits/{id}/checks/{date}/add", Post);
     METHOD_LIST_END
 
     using Callback = std::function<void(const HttpResponsePtr&)>;
@@ -39,6 +44,11 @@ public:
     void archive(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void putCheck(const HttpRequestPtr& req, Callback&& callback, const std::string& id, const std::string& date);
     void deleteCheck(const HttpRequestPtr& req, Callback&& callback, const std::string& id, const std::string& date);
+    void addCheck(const HttpRequestPtr& req, Callback&& callback, const std::string& id, const std::string& date);
+
+    void listMood(const HttpRequestPtr& req, Callback&& callback);
+    void putMood(const HttpRequestPtr& req, Callback&& callback, const std::string& date);
+    void deleteMood(const HttpRequestPtr& req, Callback&& callback, const std::string& date);
 };
 
 }  // namespace Api

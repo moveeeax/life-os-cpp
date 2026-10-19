@@ -38,6 +38,7 @@
 #include "api/HabitsController.hpp"
 #include "api/HealthController.hpp"
 #include "api/JobsController.hpp"
+#include "api/MeasurementsController.hpp"
 #include "api/Middleware.hpp"
 #include "api/MoneyController.hpp"
 #include "api/NotesController.hpp"

@@ -4,7 +4,8 @@
  *        hand or by a source meeting its goal, the daily streak with an open
  *        today across a month and a year boundary, the Monday-to-Sunday week
  *        and its streak across New Year, the best streak, sleep and workouts
- *        placed on the local day, and the Now plate. The worked numbers are
+ *        placed on the local day, the Now plate, a daily target on a habit
+ *        ticked by hand, and the tags of a mood check-in. The worked numbers are
  *        in the comments; 2026-10-14 is a Wednesday, 2026-01-01 a Thursday.
  */
 
@@ -19,6 +20,7 @@
 #include <nlohmann/json.hpp>
 
 #include "habits/Habits.hpp"
+#include "habits/Mood.hpp"
 
 using Habits::Day;
 using Habits::Habit;
@@ -41,11 +43,11 @@ std::set<Day> days(std::initializer_list<const char*> list) {
 }
 
 Habit daily(Source source = Source::Manual, std::optional<double> goal = std::nullopt) {
-    return Habit{Schedule::Daily, 0, goal, source};
+    return Habit{Schedule::Daily, 0, goal, source, std::nullopt};
 }
 
 Habit weekly(int per_week, Source source = Source::Manual) {
-    return Habit{Schedule::Weekly, per_week, std::nullopt, source};
+    return Habit{Schedule::Weekly, per_week, std::nullopt, source, std::nullopt};
 }
 
 }  // namespace
@@ -308,4 +310,49 @@ TEST(HabitsEval, AWeeklyHabitDoneTodayCountsForTheDay) {
     EXPECT_EQ(p["done"], 1);
     EXPECT_EQ(p["total"], 1);
     EXPECT_TRUE(p["left"].empty()) << "left lists daily habits only";
+}
+
+// ── a daily target ──────────────────────────────────────────────────────────
+
+// Water, target 2000 ml: 1500 on the 12th, 2000 on the 13th, 2250 on the 14th, a tick without a value on the 11th.
+TEST(HabitsEval, ADailyTargetCountsADayOnlyWhenTheSumReachesIt) {
+    Habit water = daily();
+    water.target = 2000;
+    const Habits::Checks manual{{d("2026-10-11"), std::nullopt},
+                                {d("2026-10-12"), 1500.0},
+                                {d("2026-10-13"), 2000.0},
+                                {d("2026-10-14"), 2250.0}};
+    const Habits::Values none;
+
+    const auto short_day = Habits::day_state(water, d("2026-10-12"), manual, none);
+    EXPECT_FALSE(short_day.done) << "1500 < 2000";
+    EXPECT_TRUE(short_day.manual) << "the tick is there, only short";
+    EXPECT_DOUBLE_EQ(*short_day.value, 1500);
+    EXPECT_TRUE(Habits::day_state(water, d("2026-10-13"), manual, none).done) << "2000 reaches 2000";
+    EXPECT_TRUE(Habits::day_state(water, d("2026-10-14"), manual, none).done);
+    EXPECT_FALSE(Habits::day_state(water, d("2026-10-11"), manual, none).done) << "no value is no water";
+
+    EXPECT_EQ(Habits::done_days(water, manual, none), days({"2026-10-13", "2026-10-14"}));
+    EXPECT_EQ(Habits::streak(water, Habits::done_days(water, manual, none), d("2026-10-14")), 2)
+        << "the 12th was short: the run starts on the 13th";
+
+    // The same ticks without a target: any tick counts, as before 1.33.
+    EXPECT_EQ(Habits::done_days(daily(), manual, none).size(), 4U);
+    EXPECT_TRUE(Habits::check_counts(daily(), std::nullopt));
+    EXPECT_FALSE(Habits::check_counts(water, 1999.9));
+}
+
+// ── mood ────────────────────────────────────────────────────────────────────
+
+TEST(HabitsMood, TagsComeFromTheFixedSetInItsOrder) {
+    const auto tags = Habits::Mood::tags_of(json::array({"tired", "calm", "tired", "focused"}));
+    ASSERT_TRUE(tags.has_value());
+    EXPECT_EQ(*tags, (std::vector<std::string>{"calm", "focused", "tired"})) << "repeats dropped, the set's order";
+    EXPECT_TRUE(Habits::Mood::tags_of(json::array())->empty());
+    EXPECT_FALSE(Habits::Mood::tags_of(json::array({"calm", "bored"})).has_value()) << "not in the set";
+    EXPECT_FALSE(Habits::Mood::tags_of(json::array({"Calm"})).has_value()) << "lower case only";
+    EXPECT_FALSE(Habits::Mood::tags_of(json::array({1})).has_value());
+    EXPECT_FALSE(Habits::Mood::tags_of(json("calm")).has_value()) << "a list, not a word";
+    EXPECT_TRUE(Habits::Mood::is_tag("sick"));
+    EXPECT_FALSE(Habits::Mood::is_tag(""));
 }

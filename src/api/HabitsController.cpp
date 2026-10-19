@@ -23,8 +23,10 @@
 #include "api/Validation.hpp"
 #include "domain/Role.hpp"
 #include "habits/Habits.hpp"
+#include "habits/Mood.hpp"
 #include "repositories/habits/Days.hpp"
 #include "repositories/habits/HabitRepository.hpp"
+#include "repositories/habits/MoodRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
 #include "security/Auth.hpp"
 #include "utils/ErrorResponse.hpp"
@@ -39,9 +41,12 @@ using Api::Fields::is_calendar_date;
 using Api::Fields::opt_int;
 using Api::Fields::text_length;
 using Repositories::Habits::HabitRepository;
+using Repositories::Habits::MoodRepository;
 
 /// The longest range GET /habits/days answers, in days.
 constexpr int kRangeMax = 62;
+/// The longest range GET /habits/mood answers, in days: a year and a day.
+constexpr int kMoodRangeMax = 366;
 /// How far back a tick may go, in days.
 constexpr int kTickBackMax = 366;
 /// The largest goal: a step count with room to spare.
@@ -92,6 +97,17 @@ std::optional<HabitRepository::Input> habit_input(const json& body, const Habits
         !(body.contains("goal") && !body["goal"].is_null())) {
         errs.add("goal", "missing", "a source from Mi needs a goal");
     }
+    std::optional<double> target;
+    if (body.contains("target") && !body["target"].is_null()) {
+        if (source != "manual") {
+            errs.add("target", "not_allowed", "only a habit ticked by hand takes a daily target");
+        } else if (!body["target"].is_number() || !(body["target"].get<double>() > 0) ||
+                   body["target"].get<double>() > kGoalMax) {
+            errs.add("target", "invalid", "a target is a number above 0, at most 1000000");
+        } else {
+            target = body["target"].get<double>();
+        }
+    }
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return std::nullopt;
@@ -105,7 +121,8 @@ std::optional<HabitRepository::Input> habit_input(const json& body, const Habits
                                   schedule == "weekly" ? per_week : std::nullopt,
                                   goal,
                                   Validation::opt_string(body, "unit").value_or(""),
-                                  source};
+                                  source,
+                                  target};
 }
 
 /// The day of a tick, checked against today in the caller's zone; false (answered) when bad.
@@ -295,6 +312,105 @@ void HabitsController::deleteCheck(const HttpRequestPtr& req,
     }
     with_repo_errors(callback, "habits.uncheck", [&] {
         HabitRepository().remove_check(owner, id, date);
+        no_content(callback);
+    });
+}
+
+void HabitsController::addCheck(const HttpRequestPtr& req,
+                                Callback&& callback,
+                                const std::string& id,
+                                const std::string& date) {
+    API_MODULE_USER_GUARD(Core::habits_enabled(), "habits", req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    if (!body.contains("value") || !body["value"].is_number() || !(body["value"].get<double>() > 0) ||
+        body["value"].get<double>() > kGoalMax) {
+        Validation::Errors errs;
+        errs.add("value", "invalid", "the amount to add: a number above 0, at most 1000000");
+        callback(Validation::response_400(errs));
+        return;
+    }
+    with_repo_errors(callback, "habits.check_add", [&] {
+        const auto tz = zone_of(req, callback);
+        if (!tz || !tick_day(date, *tz, callback)) {
+            return;
+        }
+        callback(
+            Response::ok(json{{"data", HabitRepository().add_to_check(owner, id, date, body["value"].get<double>())}}));
+    });
+}
+
+void HabitsController::listMood(const HttpRequestPtr& req, Callback&& callback) {
+    API_MODULE_USER_GUARD(Core::habits_enabled(), "habits", req, callback, owner);
+    const std::string from = req->getParameter("from");
+    const std::string to = req->getParameter("to");
+    if (!is_calendar_date(from) || !is_calendar_date(to) || to < from) {
+        callback(ErrorResponse::bad_request("invalid_query", "from and to must be calendar days, from first"));
+        return;
+    }
+    if ((::Habits::day_of(to) - ::Habits::day_of(from)).count() >= kMoodRangeMax) {
+        callback(ErrorResponse::bad_request("invalid_query", "at most 366 days at a time"));
+        return;
+    }
+    with_repo_errors(callback, "habits.mood_list", [&] {
+        callback(Response::ok(json{{"data", MoodRepository().list(owner, from, to)}, {"from", from}, {"to", to}}));
+    });
+}
+
+void HabitsController::putMood(const HttpRequestPtr& req, Callback&& callback, const std::string& date) {
+    API_MODULE_USER_GUARD(Core::habits_enabled(), "habits", req, callback, owner);
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    Validation::Errors errs;
+    const auto score = opt_int(body, "score");
+    if (!score || *score < ::Habits::Mood::kScoreMin || *score > ::Habits::Mood::kScoreMax) {
+        errs.add("score", "invalid", "a whole number from 1 to 5");
+    }
+    std::optional<std::vector<std::string>> tags = std::vector<std::string>{};
+    if (body.contains("tags") && !body["tags"].is_null()) {
+        tags = ::Habits::Mood::tags_of(body["tags"]);
+        if (!tags) {
+            std::string known;
+            for (const auto t : ::Habits::Mood::kTags) {
+                known += known.empty() ? "" : ", ";
+                known += t;
+            }
+            errs.add("tags", "invalid", "a list of these tags: " + known);
+        }
+    }
+    text_length(errs, body, "note", 0, ::Habits::Mood::kNoteMax);
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    with_repo_errors(callback, "habits.mood_put", [&] {
+        const auto tz = zone_of(req, callback);
+        if (!tz || !tick_day(date, *tz, callback)) {
+            return;
+        }
+        MoodRepository::Input in;
+        in.score = *score;
+        in.tags = *tags;
+        in.note = Validation::opt_string(body, "note").value_or("");
+        callback(Response::ok(json{{"data", MoodRepository().put(owner, date, in)}}));
+    });
+}
+
+void HabitsController::deleteMood(const HttpRequestPtr& req, Callback&& callback, const std::string& date) {
+    API_MODULE_USER_GUARD(Core::habits_enabled(), "habits", req, callback, owner);
+    if (!is_calendar_date(date)) {
+        callback(ErrorResponse::bad_request("invalid_date", "the date must be a calendar day as YYYY-MM-DD"));
+        return;
+    }
+    with_repo_errors(callback, "habits.mood_delete", [&] {
+        MoodRepository().remove(owner, date);
         no_content(callback);
     });
 }

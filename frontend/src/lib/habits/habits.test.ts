@@ -15,6 +15,14 @@ import {
   subline,
   canGoBack,
   oldestTickDay,
+  amountProblem,
+  hasTarget,
+  moodBody,
+  moodForm,
+  progressLine,
+  quickAmounts,
+  targetLine,
+  toggleTag,
   weekCells,
   weekDates,
   weekLine,
@@ -29,6 +37,7 @@ const habit = (over: Partial<HabitDays>): HabitDays => ({
   goal: null,
   unit: '',
   source: 'manual',
+  target: null,
   position: 1,
   archived_at: null,
   created_at: '2026-10-01T00:00:00Z',
@@ -167,6 +176,7 @@ describe('the habit form', () => {
         goal: '45',
         unit: 'min',
         source: 'manual',
+        target: '',
       }),
     ).toEqual({
       name: 'Swimming',
@@ -175,6 +185,7 @@ describe('the habit form', () => {
       goal: 45,
       unit: 'min',
       source: 'manual',
+      target: null,
     });
   });
 
@@ -188,6 +199,7 @@ describe('the habit form', () => {
       goal: null,
       unit: '',
       source: 'workout',
+      target: null,
     });
   });
 
@@ -210,5 +222,77 @@ describe('how far back a tick reaches', () => {
     expect(canGoBack('2025-10-20', '2026-10-18')).toBe(true);
     // The week before 2025-10-13 ends on 2025-10-12, out of reach.
     expect(canGoBack('2025-10-13', '2026-10-18')).toBe(false);
+  });
+});
+
+describe('a daily target', () => {
+  const water = habit({ name: 'Water', unit: 'ml', target: 2000 });
+
+  it('is sent for a habit by hand only', () => {
+    const f = { ...habitForm(), name: 'Water', unit: 'ml', target: '2000' };
+    expect(habitBody(f).target).toBe(2000);
+    expect(habitBody({ ...f, target: ' ' }).target).toBeNull();
+    expect(habitBody({ ...f, source: 'steps', goal: '8000' }).target).toBeNull();
+    expect(habitForm(water).target).toBe('2000');
+    expect(habitProblem({ ...f, target: '0' })).toBe(
+      'The daily target is a number above zero, at most 1,000,000.',
+    );
+    expect(habitProblem({ ...f, target: 'lots' })).not.toBeNull();
+    expect(habitProblem(f)).toBeNull();
+  });
+
+  it('reads as the sum of the day against the target', () => {
+    expect(hasTarget(water)).toBe(true);
+    expect(hasTarget(habit({}))).toBe(false);
+    expect(hasTarget(habit({ source: 'steps', target: 10 }))).toBe(false);
+    expect(progressLine(water, 750)).toBe('750 of 2,000 ml');
+    expect(progressLine(water, null)).toBe('0 of 2,000 ml');
+    expect(targetLine(water)).toBe('2,000 ml');
+    expect(targetLine(habit({}))).toBeNull();
+    expect(quickAmounts(water)).toEqual([250, 500]);
+    expect(quickAmounts(habit({ unit: 'pages' }))).toEqual([]);
+  });
+
+  it('checks an amount to add', () => {
+    expect(amountProblem('250')).toBeNull();
+    expect(amountProblem('0,5')).toBeNull();
+    expect(amountProblem('')).toBe('An amount above zero.');
+    expect(amountProblem('-1')).toBe('An amount above zero.');
+    expect(amountProblem('2000000')).toBe('At most 1,000,000 at a time.');
+  });
+
+  it('shows a day short of the target as half a cell', () => {
+    const h = habit({
+      target: 2000,
+      days: [day('2026-10-12', false, true, 500), day('2026-10-13', true, true, 2000)],
+    });
+    expect(weekCells(h, '2026-10-12', '2026-10-14').slice(0, 3)).toEqual([
+      'partial',
+      'manual',
+      'open',
+    ]);
+  });
+});
+
+describe('the mood form', () => {
+  it('waits for a score and keeps the tags in the set order', () => {
+    expect(moodBody(moodForm())).toBeNull();
+    const tags = toggleTag(toggleTag(['tired'], 'calm'), 'focused');
+    expect(tags).toEqual(['calm', 'focused', 'tired']);
+    expect(toggleTag(tags, 'focused')).toEqual(['calm', 'tired']);
+    expect(moodBody({ score: 4, tags, note: ' walk ' })).toEqual({
+      score: 4,
+      tags: ['calm', 'focused', 'tired'],
+      note: 'walk',
+    });
+    const m = {
+      date: '2026-10-18',
+      score: 2,
+      tags: ['sick' as const],
+      note: '',
+      created_at: '2026-10-18T09:00:00+00:00',
+      updated_at: '2026-10-18T09:00:00+00:00',
+    };
+    expect(moodForm(m)).toEqual({ score: 2, tags: ['sick'], note: '' });
   });
 });

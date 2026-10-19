@@ -1,12 +1,15 @@
 import { useState } from 'react';
 
 import { useErrorToast } from '@/hooks/useErrorToast';
-import { habitsZone, useHabitDays, useTickHabit } from '@/hooks/useHabits';
+import { habitsZone, useHabitDays, useMood, useTickHabit } from '@/hooks/useHabits';
 import {
   addDays,
   canGoBack,
   dayCount,
+  hasTarget,
   longDay,
+  moodOf,
+  moodWord,
   mondayOf,
   oldestTickDay,
   weekCells,
@@ -14,17 +17,20 @@ import {
   weekLine,
   type Cell,
   type HabitDays,
+  type MoodCheckin,
 } from '@/lib/habits';
 import { localDate } from '@/lib/now';
 import { Num } from '@/shell/kit';
 
 import { HabitsFrame, LoadError, Placeholder } from './frame';
+import { MoodSheet } from './Mood';
 
 const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 const CELL_WORDS: Record<Cell, string> = {
   manual: 'ticked by hand',
   auto: 'ticked from data',
+  partial: 'short of the target',
   open: 'not done',
   future: 'still to come',
 };
@@ -49,7 +55,15 @@ function WeekLine({ h, monday, today }: { h: HabitDays; monday: string; today: s
           aria-label={`${h.name}, ${longDay(dates[i])}: ${CELL_WORDS[cell]}`}
           title={cell === 'auto' ? 'Ticked from data' : undefined}
           disabled={cell === 'future' || cell === 'auto' || dates[i] < oldest || tick.isPending}
-          onClick={() => tick.mutate({ id: h.id, date: dates[i], on: cell !== 'manual' })}
+          onClick={() =>
+            tick.mutate({
+              id: h.id,
+              date: dates[i],
+              on: cell !== 'manual',
+              // A habit with a target is filled to it: a bare tick would not count.
+              value: hasTarget(h) && h.target != null ? h.target : undefined,
+            })
+          }
         />
       ))}
       <span className="h-end">
@@ -69,12 +83,60 @@ function WeekLine({ h, monday, today }: { h: HabitDays; monday: string; today: s
   );
 }
 
+/** The mood of each day of the week; a click on a day up to today checks it in. */
+function MoodLine({
+  monday,
+  today,
+  list,
+}: {
+  monday: string;
+  today: string;
+  list: MoodCheckin[] | undefined;
+}) {
+  const [editing, setEditing] = useState<string | null>(null);
+  const dates = weekDates(monday);
+  const oldest = oldestTickDay(today);
+  const scores = dates.map((d) => moodOf(list, d)?.score ?? null);
+  const known = scores.filter((s): s is number => s != null);
+  const mean = known.length > 0 ? known.reduce((a, b) => a + b, 0) / known.length : null;
+  return (
+    <>
+      <span className="h-n h-mood-n">Mood</span>
+      {dates.map((d, i) => (
+        <button
+          key={d}
+          type="button"
+          className={`h-m${scores[i] != null ? ' h-m-on' : ''}`}
+          aria-label={`Mood, ${longDay(d)}: ${scores[i] != null ? `${scores[i]}, ${moodWord(scores[i] ?? 0)}` : 'not checked in'}`}
+          disabled={d > today || d < oldest}
+          onClick={() => setEditing(d)}
+        >
+          {scores[i] != null ? <Num>{scores[i]}</Num> : null}
+        </button>
+      ))}
+      <span className="h-end">
+        {mean != null ? (
+          <>
+            <Num>{mean.toFixed(1)}</Num> avg
+          </>
+        ) : (
+          <span className="k-muted">none</span>
+        )}
+      </span>
+      {editing && (
+        <MoodSheet date={editing} mood={moodOf(list, editing)} onClose={() => setEditing(null)} />
+      )}
+    </>
+  );
+}
+
 /** One line of seven days per habit; a click on a past day ticks it by hand. */
 export function HabitsWeekPage() {
   const today = localDate(new Date(), habitsZone());
   const thisMonday = mondayOf(today);
   const [monday, setMonday] = useState(thisMonday);
   const q = useHabitDays(monday, addDays(monday, 6));
+  const mood = useMood(monday, addDays(monday, 6));
   const list = q.data?.data ?? [];
   const day = q.data?.today ?? today;
   const current = monday === thisMonday;
@@ -137,10 +199,12 @@ export function HabitsWeekPage() {
             {list.map((h) => (
               <WeekLine key={h.id} h={h} monday={monday} today={day} />
             ))}
+            {!mood.isError && <MoodLine monday={monday} today={day} list={mood.data} />}
           </div>
-          <p className="h-note">
-            Filled: ticked by hand. Green: ticked from Mi or Training. A click on a past day ticks
-            or unticks it by hand.
+          <p className="h-note" data-num-ok>
+            Filled: ticked by hand. Green: ticked from Mi or Training. Half: short of the daily
+            target. A click on a past day ticks or unticks it by hand; a habit with a target is
+            filled to it. Mood shows the score of each day, 1 to 5.
           </p>
         </>
       )}

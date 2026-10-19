@@ -1,8 +1,9 @@
 // Habits: the words of a habit row, its value, the seven cells of a week, the
-// numbers of the day, and the body of the habit form.
+// numbers of the day, the body of the habit form, the daily target, and the
+// words of a mood check-in.
 import { shiftDays } from '@/lib/dates';
 
-import type { Habit, HabitDays, HabitInput } from './types';
+import type { Habit, HabitDays, HabitInput, MoodCheckin, MoodInput, MoodTag } from './types';
 
 export type * from './types';
 
@@ -125,17 +126,19 @@ export const oldestTickDay = (today: string): string => shift(today, -TICK_BACK_
 export const canGoBack = (monday: string, today: string): boolean =>
   shift(monday, -1) >= oldestTickDay(today);
 
-export type Cell = 'manual' | 'auto' | 'open' | 'future';
+export type Cell = 'manual' | 'auto' | 'partial' | 'open' | 'future';
 
 /**
- * The cell of each day of the week: ticked by hand, ticked from data, open, or
- * after today. A day the answer does not carry is open (or future).
+ * The cell of each day of the week: ticked by hand, ticked from data, ticked
+ * but short of the daily target, open, or after today. A day the answer does
+ * not carry is open (or future).
  */
 export function weekCells(h: Pick<HabitDays, 'days'>, monday: string, today: string): Cell[] {
   const byDate = new Map(h.days.map((d) => [d.date, d]));
   return weekDates(monday).map((date) => {
     if (date > today) return 'future';
     const d = byDate.get(date);
+    if (d && !d.done && d.manual) return 'partial';
     if (!d || !d.done) return 'open';
     return d.manual ? 'manual' : 'auto';
   });
@@ -181,6 +184,7 @@ export interface HabitForm {
   goal: string;
   unit: string;
   source: Source;
+  target: string;
 }
 
 export function habitForm(h?: Habit): HabitForm {
@@ -191,10 +195,11 @@ export function habitForm(h?: Habit): HabitForm {
     goal: h?.goal != null ? String(h.goal) : '',
     unit: h?.unit ?? '',
     source: h?.source ?? 'manual',
+    target: h?.target != null ? String(h.target) : '',
   };
 }
 
-/** The body of the habit form (pinned by habits.test.ts); a workout sends no goal. */
+/** The body of the habit form (pinned by habits.test.ts); a workout sends no goal, only a habit by hand a target. */
 export function habitBody(f: HabitForm): HabitInput {
   const goal = f.goal.trim() === '' || f.source === 'workout' ? null : Number(f.goal);
   return {
@@ -204,6 +209,7 @@ export function habitBody(f: HabitForm): HabitInput {
     goal,
     unit: f.source === 'manual' ? f.unit.trim() : '',
     source: f.source,
+    target: f.source === 'manual' && f.target.trim() !== '' ? Number(f.target) : null,
   };
 }
 
@@ -217,5 +223,104 @@ export function habitProblem(f: HabitForm): string | null {
     if (!Number.isFinite(g) || g <= 0) return 'The goal is a number above zero.';
     if (f.source === 'sleep' && g > 24) return 'A sleep goal is in hours, at most 24.';
   }
+  if (f.source === 'manual' && f.target.trim() !== '') {
+    const t = Number(f.target);
+    if (!Number.isFinite(t) || t <= 0 || t > 1_000_000) {
+      return 'The daily target is a number above zero, at most 1,000,000.';
+    }
+  }
   return null;
+}
+
+// ── the daily target ────────────────────────────────────────────────────────
+
+/** Whether a habit fills up over the day (a target by hand) instead of a single tick. */
+export const hasTarget = (h: Pick<Habit, 'source' | 'target'>): boolean =>
+  h.source === 'manual' && h.target != null;
+
+/** The target in words: "2,000 ml"; null without one. */
+export function targetLine(h: Pick<Habit, 'unit' | 'target'>): string | null {
+  if (h.target == null) return null;
+  return h.unit ? `${n1.format(h.target)} ${h.unit}` : n1.format(h.target);
+}
+
+/** "750 of 2,000 ml": the day's sum against the target. */
+export function progressLine(h: Pick<Habit, 'unit' | 'target'>, value: number | null | undefined) {
+  const of = `${n1.format(value ?? 0)} of ${n1.format(h.target ?? 0)}`;
+  return h.unit ? `${of} ${h.unit}` : of;
+}
+
+/** The amounts offered as one tap: a glass and a bottle for ml, else none. */
+export function quickAmounts(h: Pick<Habit, 'unit'>): number[] {
+  const unit = h.unit.trim().toLowerCase();
+  if (unit === 'ml') return [250, 500];
+  if (unit === 'l') return [0.25, 0.5];
+  return [];
+}
+
+/** What is wrong with an amount to add, or null. */
+export function amountProblem(text: string): string | null {
+  const v = Number(text.replace(',', '.'));
+  if (text.trim() === '' || !Number.isFinite(v) || v <= 0) return 'An amount above zero.';
+  if (v > 1_000_000) return 'At most 1,000,000 at a time.';
+  return null;
+}
+
+// ── mood ────────────────────────────────────────────────────────────────────
+
+/** The tags of a check-in in the order the API keeps them (MoodTag in docs/openapi.yaml). */
+export const MOOD_TAGS: MoodTag[] = [
+  'calm',
+  'happy',
+  'energetic',
+  'focused',
+  'grateful',
+  'social',
+  'tired',
+  'stressed',
+  'anxious',
+  'sad',
+  'irritable',
+  'sick',
+];
+
+/** The word of each score, 1 to 5. */
+export const MOOD_WORDS: Record<number, string> = {
+  1: 'Very low',
+  2: 'Low',
+  3: 'Okay',
+  4: 'Good',
+  5: 'Great',
+};
+
+export const moodWord = (score: number): string => MOOD_WORDS[score] ?? '';
+
+/** The tags as one line: "calm, focused". */
+export const tagLine = (tags: readonly string[]): string => tags.join(', ');
+
+/** The check-in of @p date among @p list. */
+export function moodOf(list: MoodCheckin[] | undefined, date: string): MoodCheckin | undefined {
+  return list?.find((m) => m.date === date);
+}
+
+export interface MoodForm {
+  score: number | null;
+  tags: MoodTag[];
+  note: string;
+}
+
+export function moodForm(m?: MoodCheckin): MoodForm {
+  return { score: m?.score ?? null, tags: m ? [...m.tags] : [], note: m?.note ?? '' };
+}
+
+/** Adds or takes off a tag, the set's order kept. */
+export function toggleTag(tags: MoodTag[], tag: MoodTag): MoodTag[] {
+  const on = tags.includes(tag) ? tags.filter((t) => t !== tag) : [...tags, tag];
+  return MOOD_TAGS.filter((t) => on.includes(t));
+}
+
+/** The body of the mood form; null until a score is picked. */
+export function moodBody(f: MoodForm): MoodInput | null {
+  if (f.score == null) return null;
+  return { score: f.score, tags: f.tags, note: f.note.trim() };
 }

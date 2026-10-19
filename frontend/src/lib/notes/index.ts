@@ -1,3 +1,5 @@
+import { formatDay, todayLocal } from '@/lib/dates';
+
 export type * from './types';
 export * from './draft';
 export * from './markdown';
@@ -24,4 +26,21 @@ export function monthOf(iso: string, timeZone?: string): string {
 /** The day a note was written, for its row: "Oct 12"; in the browser's zone, as monthOf. */
 export function dayOf(iso: string, timeZone?: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone });
+}
+
+/**
+ * The day a note's row shows and the month it is grouped in: the day it is
+ * about when set (the list sorts by it), else the day it was written.
+ */
+export function noteDay(
+  n: { date?: string | null; created_at: string },
+  timeZone?: string,
+): { day: string; month: string } {
+  if (n.date) {
+    return {
+      day: formatDay(n.date, { yearUnless: todayLocal(timeZone) }),
+      month: monthOf(`${n.date}T00:00:00Z`, 'UTC'),
+    };
+  }
+  return { day: dayOf(n.created_at, timeZone), month: monthOf(n.created_at, timeZone) };
 }

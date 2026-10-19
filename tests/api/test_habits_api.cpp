@@ -4,8 +4,9 @@
  *        create-edit-archive-delete round, the owner scope on every id route,
  *        manual ticks (a day after today and a day too far back refused), the
  *        days with auto values from seeded Mi Fitness and Training rows on the
- *        local day, a source without data, the streak from ticks, and the
- *        habits part of /api/v1/today.
+ *        local day, a source without data, the streak from ticks, the habits
+ *        part of /api/v1/today, a daily target reached by adding to a day, and
+ *        the mood check-in of a day.
  */
 
 #include <chrono>
@@ -544,4 +545,171 @@ TEST_F(HabitsApiTest, TheTodayDigestCarriesTheHabitsPlate) {
     other->setParameter("date", "2026-10-14");
     today.today(other, [&](const HttpResponsePtr& r) { resp = r; });
     EXPECT_FALSE(body_of(resp)["data"].contains("habits"));
+}
+
+// ── a daily target ──────────────────────────────────────────────────────────
+
+TEST_F(HabitsApiTest, ATargetIsForAHabitTickedByHand) {
+    auto r = call(kAnna,
+                  Post,
+                  json{{"name", "Water"}, {"schedule", "daily"}, {"unit", "ml"}, {"target", 2000}},
+                  [&](auto req, auto cb) { c.create(req, std::move(cb)); });
+    ASSERT_EQ(r->statusCode(), k201Created) << std::string(r->body());
+    TestHelpers::expect_matches_schema(r, "POST", "/api/v1/habits");
+    EXPECT_EQ(body_of(r)["data"]["target"], 2000);
+    const auto plain = created(kAnna, json{{"name", "Meditation"}, {"schedule", "daily"}});
+    EXPECT_TRUE(habit_of(list(kAnna), plain)["target"].is_null()) << "no target: any tick counts";
+    for (const json& bad : {
+             json{{"name", "Steps"}, {"schedule", "daily"}, {"source", "steps"}, {"goal", 8000}, {"target", 10}},
+             json{{"name", "Water"}, {"schedule", "daily"}, {"target", 0}},
+             json{{"name", "Water"}, {"schedule", "daily"}, {"target", "2000"}},
+             json{{"name", "Water"}, {"schedule", "daily"}, {"target", 1000001}},
+         }) {
+        EXPECT_EQ(call(kAnna, Post, bad, [&](auto req, auto cb) { c.create(req, std::move(cb)); })->statusCode(),
+                  k400BadRequest)
+            << bad.dump();
+    }
+    // An edit without the target takes it off (PATCH replaces every field).
+    const auto water = body_of(r)["data"]["id"].get<std::string>();
+    auto edited =
+        call(kAnna, Patch, json{{"name", "Water"}, {"schedule", "daily"}, {"unit", "ml"}}, [&](auto req, auto cb) {
+            c.update(req, std::move(cb), water);
+        });
+    ASSERT_EQ(edited->statusCode(), k200OK);
+    EXPECT_TRUE(body_of(edited)["data"]["target"].is_null());
+}
+
+TEST_F(HabitsApiTest, AddingToADayReachesTheTarget) {
+    auto r = call(kAnna,
+                  Post,
+                  json{{"name", "Water"}, {"schedule", "daily"}, {"unit", "ml"}, {"target", 2000}},
+                  [&](auto req, auto cb) { c.create(req, std::move(cb)); });
+    ASSERT_EQ(r->statusCode(), k201Created) << std::string(r->body());
+    const auto water = body_of(r)["data"]["id"].get<std::string>();
+    const std::string today = utc_day(0);
+    const auto add = [&](const char* who, const std::string& date, const json& body) {
+        auto res = call(
+            who, Post, body, [&](auto req, auto cb) { c.addCheck(req, std::move(cb), water, date); }, {{"tz", "UTC"}});
+        TestHelpers::expect_2xx_matches_schema(res, "POST", "/api/v1/habits/{id}/checks/{date}/add");
+        return res;
+    };
+    auto first = add(kAnna, today, json{{"value", 500}});
+    ASSERT_EQ(first->statusCode(), k200OK) << std::string(first->body());
+    EXPECT_EQ(body_of(first)["data"]["value"], 500);
+    auto day = day_of(habit_of(days(reader(kAnna), today, today, "UTC")["data"], water), today);
+    EXPECT_FALSE(day["done"]) << "500 of 2000";
+    EXPECT_TRUE(day["manual"]);
+    EXPECT_EQ(day["value"], 500);
+
+    auto second = add(kAnna, today, json{{"value", 1500}});
+    ASSERT_EQ(second->statusCode(), k200OK);
+    EXPECT_EQ(body_of(second)["data"]["value"], 2000) << "500 + 1500";
+    const auto h = habit_of(days(reader(kAnna), today, today, "UTC")["data"], water);
+    EXPECT_TRUE(day_of(h, today)["done"]) << "2000 of 2000";
+    EXPECT_EQ(h["streak"], 1);
+
+    // A tick by PUT without a value does not count against a target; a PUT value replaces the sum.
+    const std::string yesterday = utc_day(-1);
+    ASSERT_EQ(tick(kAnna, water, yesterday)->statusCode(), k200OK);
+    EXPECT_FALSE(day_of(habit_of(days(reader(kAnna), yesterday, yesterday, "UTC")["data"], water), yesterday)["done"]);
+    ASSERT_EQ(add(kAnna, yesterday, json{{"value", 250}})->statusCode(), k200OK);
+    EXPECT_EQ(day_of(habit_of(days(reader(kAnna), yesterday, yesterday, "UTC")["data"], water), yesterday)["value"],
+              250)
+        << "a tick without a value counts as 0";
+    ASSERT_EQ(tick(kAnna, water, yesterday, json{{"value", 2100}})->statusCode(), k200OK);
+    EXPECT_TRUE(day_of(habit_of(days(reader(kAnna), yesterday, yesterday, "UTC")["data"], water), yesterday)["done"]);
+
+    for (const json& bad : {json{{"value", 0}}, json{{"value", -5}}, json{{"value", "250"}}, json::object()}) {
+        EXPECT_EQ(add(kAnna, today, bad)->statusCode(), k400BadRequest) << bad.dump();
+    }
+    EXPECT_EQ(add(kAnna, utc_day(1), json{{"value", 250}})->statusCode(), k400BadRequest) << "tomorrow";
+    EXPECT_EQ(add(kBoris, today, json{{"value", 250}})->statusCode(), k404NotFound) << "not Boris's habit";
+}
+
+// ── mood ────────────────────────────────────────────────────────────────────
+
+TEST_F(HabitsApiTest, AMoodCheckInPerDay) {
+    Database::get().execute_write([](auto& txn) {
+        for (const char* id : {kAnna, kBoris}) {
+            txn.exec_params("DELETE FROM mood_checkins WHERE owner_id = $1::uuid", std::string(id));
+        }
+        return true;
+    });
+    const auto put = [&](const char* who, const std::string& date, const json& body) {
+        auto res =
+            call(who, Put, body, [&](auto req, auto cb) { c.putMood(req, std::move(cb), date); }, {{"tz", "UTC"}});
+        TestHelpers::expect_2xx_matches_schema(res, "PUT", "/api/v1/habits/mood/{date}");
+        return res;
+    };
+    const auto moods = [&](const char* who, const std::string& from, const std::string& to) {
+        auto res = call(who,
+                        Get,
+                        json::object(),
+                        [&](auto req, auto cb) { c.listMood(req, std::move(cb)); },
+                        {{"from", from}, {"to", to}});
+        EXPECT_EQ(res->statusCode(), k200OK) << std::string(res->body());
+        TestHelpers::expect_2xx_matches_schema(res, "GET", "/api/v1/habits/mood");
+        return body_of(res)["data"];
+    };
+    const std::string today = utc_day(0);
+    const std::string yesterday = utc_day(-1);
+
+    auto r = put(kAnna, today, json{{"score", 4}, {"tags", json::array({"tired", "calm"})}, {"note", "Long walk"}});
+    ASSERT_EQ(r->statusCode(), k200OK) << std::string(r->body());
+    EXPECT_EQ(body_of(r)["data"]["date"], today);
+    EXPECT_EQ(body_of(r)["data"]["tags"], json::array({"calm", "tired"})) << "in the order of the set";
+    ASSERT_EQ(put(kAnna, yesterday, json{{"score", 2}})->statusCode(), k200OK);
+
+    // A second check-in of the day replaces the first.
+    auto again = put(kAnna, today, json{{"score", 5}});
+    ASSERT_EQ(again->statusCode(), k200OK);
+    EXPECT_EQ(body_of(again)["data"]["score"], 5);
+    EXPECT_TRUE(body_of(again)["data"]["tags"].empty());
+    EXPECT_EQ(body_of(again)["data"]["note"], "");
+
+    auto rows = moods(kAnna, utc_day(-6), today);
+    ASSERT_EQ(rows.size(), 2U);
+    EXPECT_EQ(rows[0]["date"], yesterday) << "oldest first";
+    EXPECT_EQ(rows[1]["score"], 5);
+    EXPECT_TRUE(moods(kBoris, utc_day(-6), today).empty()) << "Anna's mood is hers";
+
+    for (const json& bad : {
+             json{{"score", 0}},
+             json{{"score", 6}},
+             json{{"score", 3.5}},
+             json::object(),
+             json{{"score", 3}, {"tags", json::array({"bored"})}},
+             json{{"score", 3}, {"tags", "calm"}},
+             json{{"score", 3}, {"note", std::string(501, 'x')}},
+         }) {
+        EXPECT_EQ(put(kAnna, today, bad)->statusCode(), k400BadRequest) << bad.dump();
+    }
+    EXPECT_EQ(put(kAnna, utc_day(1), json{{"score", 3}})->statusCode(), k400BadRequest) << "tomorrow";
+    EXPECT_EQ(put(kAnna, "2026-02-30", json{{"score", 3}})->statusCode(), k400BadRequest);
+    EXPECT_EQ(call(kAnna,
+                   Get,
+                   json::object(),
+                   [&](auto req, auto cb) { c.listMood(req, std::move(cb)); },
+                   {{"from", utc_day(-400)}, {"to", today}})
+                  ->statusCode(),
+              k400BadRequest)
+        << "more than 366 days";
+
+    // Boris removing "his" check-in of the day leaves Anna's.
+    const auto remove = [&](const char* who, const std::string& date) {
+        return call(who, Delete, json::object(), [&](auto req, auto cb) { c.deleteMood(req, std::move(cb), date); });
+    };
+    EXPECT_EQ(remove(kBoris, today)->statusCode(), k204NoContent);
+    EXPECT_EQ(moods(kAnna, today, today).size(), 1U);
+    EXPECT_EQ(remove(kAnna, today)->statusCode(), k204NoContent);
+    EXPECT_TRUE(moods(kAnna, today, today).empty());
+}
+
+TEST_F(HabitsOffTest, MoodIsNotThereWhileTheModuleIsOff) {
+    auto r = call(kAnna,
+                  Get,
+                  json::object(),
+                  [&](auto req, auto cb) { c.listMood(req, std::move(cb)); },
+                  {{"from", utc_day(-1)}, {"to", utc_day(0)}});
+    EXPECT_EQ(r->statusCode(), k404NotFound);
 }

@@ -6,7 +6,7 @@ import { useProjects } from '@/hooks/useProjects';
 import { tagsFrom } from '@/lib/notes';
 import { Sheet } from '@/shell/kit';
 
-/** A new note: title, topic, tags and its project or course; it opens in the editor. */
+/** A new note: title, topic, tags, its project or course and the day it is about; it opens in the editor. */
 export function NoteSheet({
   projectId,
   taskId,
@@ -27,6 +27,7 @@ export function NoteSheet({
     topic: '',
     tags: '',
     project: projectId ?? '',
+    date: '',
   });
   const save = useSaveNote(null, (n) => {
     onClose();
@@ -41,6 +42,7 @@ export function NoteSheet({
       topic: f.topic.trim(),
       tags: tagsFrom(f.tags),
       project_id: f.project || null,
+      ...(f.date ? { date: f.date } : {}),
       ...(taskId ? { task_id: taskId } : {}),
     });
   };
@@ -72,17 +74,23 @@ export function NoteSheet({
             <input value={f.tags} onChange={set('tags')} placeholder="otel, tracing" />
           </label>
         </div>
-        <label className="k-field">
-          <span>Project or course</span>
-          <select value={f.project} onChange={set('project')}>
-            <option value="">None</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.kind === 'course' ? `${p.name} (course)` : p.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="k-fields">
+          <label className="k-field">
+            <span>Project or course</span>
+            <select value={f.project} onChange={set('project')}>
+              <option value="">None</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.kind === 'course' ? `${p.name} (course)` : p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="k-field">
+            <span>Day it is about (optional)</span>
+            <input type="date" value={f.date} onChange={set('date')} />
+          </label>
+        </div>
         {save.error && (
           <p role="alert" className="k-error">
             {save.error}
