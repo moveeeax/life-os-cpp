@@ -11,7 +11,7 @@ info:
     `/api/v1/admin/billing`); and the life modules, each behind its own
     switch and answering 404 while off: fitness (Mi Fitness sync), workout,
     food, money, tasks with projects, goals, now (`/api/v1/today`, wallpapers,
-    sounds), travel, habits and notes. Every route except the probes is under
+    sounds), travel, habits, notes and practice. Every route except the probes is under
     `/api/v1`. Authentication is a JWT bearer, an API key (`X-API-Key`) or the
     HttpOnly session cookie the SPA uses; rate limiting and idempotency are
     driven by headers (`Idempotency-Key` on writes). Maintained by one owner,
@@ -600,6 +600,121 @@ components:
         topic: { type: string }
         tag: { type: string }
         count: { type: integer }
+    PracticeAmount:
+      type: object
+      required: [currency, amount]
+      description: A sum in one currency; amounts of two currencies are never added together
+      properties:
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        amount: { type: number }
+    PracticeTotal:
+      type: object
+      required: [currency, income, expense, net, entries]
+      description: 'The totals of one currency: income, expense, income minus expense, and the count of entries'
+      properties:
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        income: { type: number }
+        expense: { type: number }
+        net: { type: number }
+        entries: { type: integer }
+    PracticeClient:
+      type: object
+      required: [id, name, contact, note, open_deals, income, created_at, updated_at]
+      description: A client of the freelance practice
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        contact: { type: string, description: 'An email, a phone or a link, as typed' }
+        note: { type: string }
+        open_deals: { type: integer, description: 'Deals at lead, negotiation or active' }
+        income: { type: array, items: { $ref: '#/components/schemas/PracticeAmount' }, description: All the incomes of the client, per currency }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    PracticeClientInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120, description: Required on create }
+        contact: { type: string, maxLength: 300 }
+        note: { type: string, maxLength: 2000 }
+    PracticeDealStage:
+      type: string
+      enum: [lead, negotiation, active, done, lost]
+    PracticeDeal:
+      type: object
+      required: [id, client_id, client_name, title, stage, value, currency, start_date, end_date, note, open_tasks, received, created_at, updated_at]
+      description: A piece of work for a client; its next steps are tasks with its deal_id
+      properties:
+        id: { type: string, format: uuid }
+        client_id: { type: string, format: uuid }
+        client_name: { type: string }
+        title: { type: string }
+        stage: { $ref: '#/components/schemas/PracticeDealStage' }
+        value: { type: [number, 'null'], description: The agreed value, in currency }
+        currency: { type: [string, 'null'], pattern: '^[A-Z]{3}$' }
+        start_date: { type: [string, 'null'], format: date }
+        end_date: { type: [string, 'null'], format: date }
+        note: { type: string }
+        open_tasks: { type: integer, description: Open tasks linked to the deal }
+        received: { type: array, items: { $ref: '#/components/schemas/PracticeAmount' }, description: The incomes linked to the deal, per currency }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    PracticeDealInput:
+      type: object
+      properties:
+        client_id: { type: string, format: uuid, description: 'A client of the caller; required on create' }
+        title: { type: string, minLength: 1, maxLength: 200, description: Required on create }
+        stage: { $ref: '#/components/schemas/PracticeDealStage' }
+        value: { type: [number, 'null'], exclusiveMinimum: 0, description: 'Given together with currency, both or neither; a whole number of the currency''s smallest unit' }
+        currency: { type: [string, 'null'], pattern: '^[A-Z]{3}$' }
+        start_date: { type: [string, 'null'], format: date }
+        end_date: { type: [string, 'null'], format: date, description: On or after start_date }
+        note: { type: string, maxLength: 2000 }
+    PracticeEntry:
+      type: object
+      required: [id, kind, date, amount, currency, client_id, client_name, deal_id, deal_title, note, created_at, updated_at]
+      description: An income or an expense of the practice, in its own currency
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [income, expense] }
+        date: { type: string, format: date }
+        amount: { type: number, description: Positive; the kind is the sign }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        client_id: { type: [string, 'null'], format: uuid }
+        client_name: { type: [string, 'null'] }
+        deal_id: { type: [string, 'null'], format: uuid }
+        deal_title: { type: [string, 'null'] }
+        note: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    PracticeEntryInput:
+      type: object
+      properties:
+        kind: { type: string, enum: [income, expense], description: Required on create }
+        date: { type: string, format: date, description: Required on create }
+        amount: { type: number, exclusiveMinimum: 0, description: 'Required on create; a whole number of the currency''s smallest unit' }
+        currency: { type: string, pattern: '^[A-Z]{3}$', description: Required on create }
+        client_id: { type: [string, 'null'], format: uuid, description: 'A client of the caller; with a deal, the deal''s client (filled when left out)' }
+        deal_id: { type: [string, 'null'], format: uuid, description: A deal of the caller }
+        note: { type: string, maxLength: 500 }
+    PracticeMonth:
+      type: object
+      required: [month, entries, totals]
+      properties:
+        month: { type: string, pattern: '^\d{4}-\d{2}$' }
+        entries: { type: integer }
+        totals: { type: array, items: { $ref: '#/components/schemas/PracticeTotal' } }
+    PracticeClientTotal:
+      type: object
+      required: [client_id, client_name, currency, income, expense, net, entries]
+      description: The totals of one client in one currency; client_id null for entries without a client
+      properties:
+        client_id: { type: [string, 'null'], format: uuid }
+        client_name: { type: [string, 'null'] }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        income: { type: number }
+        expense: { type: number }
+        net: { type: number }
+        entries: { type: integer }
     Project:
       type: object
       required: [id, kind, name, code, description, link, status, platform, starts_on, ends_on, certificate, position, open, done, next, created_at, updated_at]
@@ -666,6 +781,8 @@ components:
         project_id: { type: [string, 'null'], format: uuid, description: The project or course the task belongs to }
         project_title: { type: [string, 'null'], description: The name of that project or course }
         project_kind: { type: [string, 'null'], enum: [project, course, null] }
+        deal_id: { type: [string, 'null'], format: uuid, description: The deal of the practice this task is a next step of }
+        deal_title: { type: [string, 'null'], description: The title of that deal }
         goal_title: { type: [string, 'null'], description: The title of the goal the task belongs to }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
@@ -686,6 +803,7 @@ components:
         goal_section_id: { type: [string, 'null'], format: uuid, description: A section of that goal; given together with goal_id }
         trip_id: { type: [string, 'null'], format: uuid, description: A trip of the caller (packing) }
         project_id: { type: [string, 'null'], format: uuid, description: A project or course of the caller; null unlinks }
+        deal_id: { type: [string, 'null'], format: uuid, description: A deal of the caller's practice; null unlinks }
         external_id: { type: string, minLength: 1, maxLength: 100 }
     TaskPatch:
       type: object
@@ -703,6 +821,7 @@ components:
         goal_section_id: { type: [string, 'null'], format: uuid, description: A section of that goal; given together with goal_id }
         trip_id: { type: [string, 'null'], format: uuid, description: A trip of the caller (packing) }
         project_id: { type: [string, 'null'], format: uuid, description: A project or course of the caller; null unlinks }
+        deal_id: { type: [string, 'null'], format: uuid, description: A deal of the caller's practice; null unlinks }
     TravelCrossing:
       type: object
       required: [id, date, from_country, to_country, time, place, note]
@@ -3034,7 +3153,7 @@ paths:
                 properties:
                   data:
                     type: object
-                    required: [billing, fitness, food, goals, habits, money, notes, now, tasks, travel, workout]
+                    required: [billing, fitness, food, goals, habits, money, notes, now, practice, tasks, travel, workout]
                     properties:
                       billing: { type: boolean }
                       fitness: { type: boolean }
@@ -3044,6 +3163,7 @@ paths:
                       money: { type: boolean }
                       notes: { type: boolean }
                       now: { type: boolean }
+                      practice: { type: boolean }
                       tasks: { type: boolean }
                       travel: { type: boolean }
                       workout: { type: boolean }
@@ -7500,6 +7620,338 @@ paths:
         '204': { description: Deleted }
         '401': { description: Not authenticated }
         '404': { description: 'Notes module disabled, or not the caller''s note' }
+  /api/v1/practice/clients:
+    get:
+      summary: The caller's clients by name, with open deals and income per currency
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The clients
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/PracticeClient' } }
+        '401': { description: Not authenticated }
+        '404': { description: Practice module disabled }
+    post:
+      summary: Add a client
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PracticeClientInput' }
+      responses:
+        '201':
+          description: The client
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PracticeClient' }
+        '400': { description: Validation failed }
+        '401': { description: Not authenticated }
+        '404': { description: Practice module disabled }
+  /api/v1/practice/clients/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: One client
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The client
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PracticeClient' }
+        '401': { description: Not authenticated }
+        '404': { description: 'Practice module disabled, or not the caller''s client' }
+    patch:
+      summary: Edit a client (the fields given)
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PracticeClientInput' }
+      responses:
+        '200':
+          description: The client
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PracticeClient' }
+        '400': { description: Validation failed }
+        '401': { description: Not authenticated }
+        '404': { description: 'Practice module disabled, or not the caller''s client' }
+    delete:
+      summary: Delete a client; its entries stay, unlinked
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '401': { description: Not authenticated }
+        '404': { description: 'Practice module disabled, or not the caller''s client' }
+        '409': { description: The client still has deals (client_has_deals) }
+  /api/v1/practice/deals:
+    get:
+      summary: The deals, open stages first (lead, negotiation, active, done, lost)
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: stage, in: query, schema: { $ref: '#/components/schemas/PracticeDealStage' } }
+        - { name: client, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: The deals
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/PracticeDeal' } }
+        '400': { description: Bad query }
+        '401': { description: Not authenticated }
+        '404': { description: Practice module disabled }
+    post:
+      summary: Add a deal for a client (a lead unless a stage is given)
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PracticeDealInput' }
+      responses:
+        '201':
+          description: The deal
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PracticeDeal' }
+        '400': { description: Validation failed }
+        '401': { description: Not authenticated }
+        '404': { description: Practice module disabled }
+  /api/v1/practice/deals/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: One deal with its open tasks and what it brought in
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The deal
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PracticeDeal' }
+        '401': { description: Not authenticated }
+        '404': { description: 'Practice module disabled, or not the caller''s deal' }
+    patch:
+      summary: Edit a deal or move it to another stage; a new client takes the deal's entries with it
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PracticeDealInput' }
+      responses:
+        '200':
+          description: The deal
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PracticeDeal' }
+        '400': { description: Validation failed }
+        '401': { description: Not authenticated }
+        '404': { description: 'Practice module disabled, or not the caller''s deal' }
+    delete:
+      summary: Delete a deal; its entries and tasks stay, unlinked
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '401': { description: Not authenticated }
+        '404': { description: 'Practice module disabled, or not the caller''s deal' }
+  /api/v1/practice/entries:
+    get:
+      summary: Incomes and expenses of the practice, the latest day first
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: kind, in: query, schema: { type: string, enum: [income, expense] } }
+        - { name: month, in: query, schema: { type: string, pattern: '^\d{4}-\d{2}$' }, description: 'One month, as YYYY-MM' }
+        - { name: client, in: query, schema: { type: string, format: uuid } }
+        - { name: deal, in: query, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200':
+          description: A page of entries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, total, limit, offset]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/PracticeEntry' } }
+                  total: { type: integer }
+                  limit: { type: integer }
+                  offset: { type: integer }
+        '400': { description: Bad query }
+        '401': { description: Not authenticated }
+        '404': { description: Practice module disabled }
+    post:
+      summary: Add an income or an expense
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PracticeEntryInput' }
+      responses:
+        '201':
+          description: The entry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PracticeEntry' }
+        '400': { description: 'Validation failed, or a client other than the deal''s (not_of_client)' }
+        '401': { description: Not authenticated }
+        '404': { description: Practice module disabled }
+  /api/v1/practice/entries/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: One income or expense
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The entry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PracticeEntry' }
+        '401': { description: Not authenticated }
+        '404': { description: 'Practice module disabled, or not the caller''s entry' }
+    patch:
+      summary: Edit an income or expense (the fields given)
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PracticeEntryInput' }
+      responses:
+        '200':
+          description: The entry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PracticeEntry' }
+        '400': { description: 'Validation failed, or a client other than the deal''s (not_of_client)' }
+        '401': { description: Not authenticated }
+        '404': { description: 'Practice module disabled, or not the caller''s entry' }
+    delete:
+      summary: Delete an income or expense
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '401': { description: Not authenticated }
+        '404': { description: 'Practice module disabled, or not the caller''s entry' }
+  /api/v1/practice/months:
+    get:
+      summary: The months of a year that have entries, with totals per currency
+      description: >-
+        The latest month first. Every total is of one currency: amounts of two currencies are never added
+        together, and nothing is converted.
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: year, in: query, schema: { type: integer, minimum: 1900, maximum: 2100 }, description: 'Defaults to this year (UTC)' }
+      responses:
+        '200':
+          description: The months and the year's totals
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [year, data, totals]
+                properties:
+                  year: { type: integer }
+                  data: { type: array, items: { $ref: '#/components/schemas/PracticeMonth' } }
+                  totals: { type: array, items: { $ref: '#/components/schemas/PracticeTotal' } }
+        '400': { description: Bad query }
+        '401': { description: Not authenticated }
+        '404': { description: Practice module disabled }
+  /api/v1/practice/months/{month}:
+    parameters:
+      - { name: month, in: path, required: true, schema: { type: string, pattern: '^\d{4}-\d{2}$' }, description: YYYY-MM }
+    get:
+      summary: 'One month: totals per currency and per client, and its entries'
+      tags: [practice]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The month
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [month, totals, by_client, entries]
+                    properties:
+                      month: { type: string, pattern: '^\d{4}-\d{2}$' }
+                      totals: { type: array, items: { $ref: '#/components/schemas/PracticeTotal' } }
+                      by_client: { type: array, items: { $ref: '#/components/schemas/PracticeClientTotal' } }
+                      entries: { type: array, items: { $ref: '#/components/schemas/PracticeEntry' } }
+        '400': { description: Not a month (invalid_month) }
+        '401': { description: Not authenticated }
+        '404': { description: Practice module disabled }
   /api/v1/tasks/projects:
     get:
       summary: Projects and courses with their task counts and the next open task
@@ -7608,6 +8060,7 @@ paths:
         - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the day done_since starts in' }
         - { name: trip, in: query, schema: { type: string, format: uuid }, description: The tasks of one trip (packing) }
         - { name: project, in: query, schema: { type: string, format: uuid }, description: The tasks of one project or course }
+        - { name: deal, in: query, schema: { type: string, format: uuid }, description: The tasks of one deal of the practice (its next steps) }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:

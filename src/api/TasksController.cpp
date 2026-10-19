@@ -27,6 +27,7 @@
 #include "repositories/JobRows.hpp"
 #include "repositories/Zones.hpp"
 #include "repositories/goals/GoalRepository.hpp"
+#include "repositories/practice/DealRepository.hpp"
 #include "repositories/tasks/Errors.hpp"
 #include "repositories/tasks/InboxRepository.hpp"
 #include "repositories/tasks/ParseJobRepository.hpp"
@@ -194,6 +195,21 @@ void project_link_fields(Validation::Errors& errs, const json& body, const std::
     }
 }
 
+/// The deal link: a deal of the caller's practice (a next step of it), or null to unlink.
+void deal_link_fields(Validation::Errors& errs, const json& body, const std::string& owner) {
+    if (!body.contains("deal_id") || body["deal_id"].is_null()) {
+        return;
+    }
+    Validation::uuid(errs, body, "deal_id");
+    if (errs.any()) {
+        return;
+    }
+    if (!Core::practice_enabled() ||
+        !Repositories::Practice::DealRepository().client_of(owner, body["deal_id"].get<std::string>())) {
+        errs.add("deal_id", "not_yours", "the deal is not yours");
+    }
+}
+
 Repo::TaskRepository::Input task_input(const json& body) {
     Repo::TaskRepository::Input in;
     in.title = body["title"].get<std::string>();
@@ -210,6 +226,7 @@ Repo::TaskRepository::Input task_input(const json& body) {
     in.goal_section_id = Validation::opt_string(body, "goal_section_id");
     in.trip_id = Validation::opt_string(body, "trip_id");
     in.project_id = Validation::opt_string(body, "project_id");
+    in.deal_id = Validation::opt_string(body, "deal_id");
     return in;
 }
 
@@ -232,6 +249,7 @@ void TasksController::listItems(const HttpRequestPtr& req, Callback&& callback) 
     f.done_since = req->getParameter("done_since");
     f.trip = req->getParameter("trip");
     f.project = req->getParameter("project");
+    f.deal = req->getParameter("deal");
     if (!req->getParameter("tz").empty()) {
         f.tz = req->getParameter("tz");
     }
@@ -242,9 +260,10 @@ void TasksController::listItems(const HttpRequestPtr& req, Callback&& callback) 
     };
     if (bad(f.status, kStatuses) || bad(f.area, kAreas) || (!f.due_to.empty() && !is_calendar_date(f.due_to)) ||
         (!f.done_since.empty() && !is_calendar_date(f.done_since)) || (!f.trip.empty() && !is_valid_uuid(f.trip)) ||
-        (!f.project.empty() && !is_valid_uuid(f.project))) {
+        (!f.project.empty() && !is_valid_uuid(f.project)) || (!f.deal.empty() && !is_valid_uuid(f.deal))) {
         callback(ErrorResponse::bad_request(
-            "invalid_query", "status, area, due_to, done_since, trip and project must be known values, days and ids"));
+            "invalid_query",
+            "status, area, due_to, done_since, trip, project and deal must be known values, days and ids"));
         return;
     }
     with_repo_errors(callback, "tasks.listItems", [&] {
@@ -277,6 +296,9 @@ void TasksController::createItem(const HttpRequestPtr& req, Callback&& callback)
     }
     if (!errs.any()) {
         project_link_fields(errs, body, owner);
+    }
+    if (!errs.any()) {
+        deal_link_fields(errs, body, owner);
     }
     if (errs.any()) {
         callback(Validation::response_400(errs));
@@ -326,6 +348,9 @@ void TasksController::updateItem(const HttpRequestPtr& req, Callback&& callback,
     if (!errs.any()) {
         project_link_fields(errs, body, owner);
     }
+    if (!errs.any()) {
+        deal_link_fields(errs, body, owner);
+    }
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;
@@ -345,6 +370,7 @@ void TasksController::updateItem(const HttpRequestPtr& req, Callback&& callback,
     p.goal_section_id = nullable(body, "goal_section_id");
     p.trip_id = nullable(body, "trip_id");
     p.project_id = nullable(body, "project_id");
+    p.deal_id = nullable(body, "deal_id");
     if (p.goal_id.has_value() && !p.goal_section_id.has_value()) {
         // A new goal (or none) does not keep the old goal's section.
         p.goal_section_id = std::optional<std::string>();
@@ -615,7 +641,8 @@ void TasksController::parseAccept(const HttpRequestPtr& req, Callback&& callback
             continue;
         }
         // A draft becomes an open task; its origin is the phrase, not a source.
-        for (const char* key : {"status", "source_kind", "source_ref", "external_id", "goal_id", "goal_section_id"}) {
+        for (const char* key :
+             {"status", "source_kind", "source_ref", "external_id", "goal_id", "goal_section_id", "deal_id"}) {
             line.erase(std::string(key));
         }
         Validation::Errors local;

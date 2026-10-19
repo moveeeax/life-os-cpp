@@ -567,6 +567,7 @@ export interface paths {
                                 money: boolean;
                                 notes: boolean;
                                 now: boolean;
+                                practice: boolean;
                                 tasks: boolean;
                                 travel: boolean;
                                 workout: boolean;
@@ -10501,6 +10502,892 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/v1/practice/clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's clients by name, with open deals and income per currency */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The clients */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["PracticeClient"][];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Add a client */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PracticeClientInput"];
+                };
+            };
+            responses: {
+                /** @description The client */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["PracticeClient"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/practice/clients/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** One client */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The client */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["PracticeClient"];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled, or not the caller's client */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete a client; its entries stay, unlinked */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled, or not the caller's client */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The client still has deals (client_has_deals) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Edit a client (the fields given) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PracticeClientInput"];
+                };
+            };
+            responses: {
+                /** @description The client */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["PracticeClient"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled, or not the caller's client */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/practice/deals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The deals, open stages first (lead, negotiation, active, done, lost) */
+        get: {
+            parameters: {
+                query?: {
+                    stage?: components["schemas"]["PracticeDealStage"];
+                    client?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The deals */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["PracticeDeal"][];
+                        };
+                    };
+                };
+                /** @description Bad query */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Add a deal for a client (a lead unless a stage is given) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PracticeDealInput"];
+                };
+            };
+            responses: {
+                /** @description The deal */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["PracticeDeal"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/practice/deals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** One deal with its open tasks and what it brought in */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The deal */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["PracticeDeal"];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled, or not the caller's deal */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete a deal; its entries and tasks stay, unlinked */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled, or not the caller's deal */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Edit a deal or move it to another stage; a new client takes the deal's entries with it */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PracticeDealInput"];
+                };
+            };
+            responses: {
+                /** @description The deal */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["PracticeDeal"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled, or not the caller's deal */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/practice/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Incomes and expenses of the practice, the latest day first */
+        get: {
+            parameters: {
+                query?: {
+                    kind?: "income" | "expense";
+                    /** @description One month, as YYYY-MM */
+                    month?: string;
+                    client?: string;
+                    deal?: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A page of entries */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["PracticeEntry"][];
+                            total: number;
+                            limit: number;
+                            offset: number;
+                        };
+                    };
+                };
+                /** @description Bad query */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Add an income or an expense */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PracticeEntryInput"];
+                };
+            };
+            responses: {
+                /** @description The entry */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["PracticeEntry"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or a client other than the deal's (not_of_client) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/practice/entries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** One income or expense */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The entry */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["PracticeEntry"];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled, or not the caller's entry */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete an income or expense */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled, or not the caller's entry */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Edit an income or expense (the fields given) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PracticeEntryInput"];
+                };
+            };
+            responses: {
+                /** @description The entry */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["PracticeEntry"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or a client other than the deal's (not_of_client) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled, or not the caller's entry */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/practice/months": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The months of a year that have entries, with totals per currency
+         * @description The latest month first. Every total is of one currency: amounts of two currencies are never added together, and nothing is converted.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Defaults to this year (UTC) */
+                    year?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The months and the year's totals */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            year: number;
+                            data: components["schemas"]["PracticeMonth"][];
+                            totals: components["schemas"]["PracticeTotal"][];
+                        };
+                    };
+                };
+                /** @description Bad query */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/practice/months/{month}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description YYYY-MM */
+                month: string;
+            };
+            cookie?: never;
+        };
+        /** One month: totals per currency and per client, and its entries */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description YYYY-MM */
+                    month: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The month */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                month: string;
+                                totals: components["schemas"]["PracticeTotal"][];
+                                by_client: components["schemas"]["PracticeClientTotal"][];
+                                entries: components["schemas"]["PracticeEntry"][];
+                            };
+                        };
+                    };
+                };
+                /** @description Not a month (invalid_month) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Practice module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/projects": {
         parameters: {
             query?: never;
@@ -10787,6 +11674,8 @@ export interface paths {
                     trip?: string;
                     /** @description The tasks of one project or course */
                     project?: string;
+                    /** @description The tasks of one deal of the practice (its next steps) */
+                    deal?: string;
                     limit?: number;
                     offset?: number;
                 };
@@ -16899,6 +17788,157 @@ export interface components {
             tag?: string;
             count: number;
         };
+        /** @description A sum in one currency; amounts of two currencies are never added together */
+        PracticeAmount: {
+            currency: string;
+            amount: number;
+        };
+        /** @description The totals of one currency: income, expense, income minus expense, and the count of entries */
+        PracticeTotal: {
+            currency: string;
+            income: number;
+            expense: number;
+            net: number;
+            entries: number;
+        };
+        /** @description A client of the freelance practice */
+        PracticeClient: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description An email, a phone or a link, as typed */
+            contact: string;
+            note: string;
+            /** @description Deals at lead, negotiation or active */
+            open_deals: number;
+            /** @description All the incomes of the client */
+            income: components["schemas"]["PracticeAmount"][];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        PracticeClientInput: {
+            /** @description Required on create */
+            name?: string;
+            contact?: string;
+            note?: string;
+        };
+        /** @enum {string} */
+        PracticeDealStage: "lead" | "negotiation" | "active" | "done" | "lost";
+        /** @description A piece of work for a client; its next steps are tasks with its deal_id */
+        PracticeDeal: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            client_id: string;
+            client_name: string;
+            title: string;
+            stage: components["schemas"]["PracticeDealStage"];
+            /** @description The agreed value */
+            value: number | null;
+            currency: string | null;
+            /** Format: date */
+            start_date: string | null;
+            /** Format: date */
+            end_date: string | null;
+            note: string;
+            /** @description Open tasks linked to the deal */
+            open_tasks: number;
+            /** @description The incomes linked to the deal */
+            received: components["schemas"]["PracticeAmount"][];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        PracticeDealInput: {
+            /**
+             * Format: uuid
+             * @description A client of the caller; required on create
+             */
+            client_id?: string;
+            /** @description Required on create */
+            title?: string;
+            stage?: components["schemas"]["PracticeDealStage"];
+            /** @description Given together with currency, both or neither; a whole number of the currency's smallest unit */
+            value?: number | null;
+            currency?: string | null;
+            /** Format: date */
+            start_date?: string | null;
+            /**
+             * Format: date
+             * @description On or after start_date
+             */
+            end_date?: string | null;
+            note?: string;
+        };
+        /** @description An income or an expense of the practice, in its own currency */
+        PracticeEntry: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "income" | "expense";
+            /** Format: date */
+            date: string;
+            /** @description Positive; the kind is the sign */
+            amount: number;
+            currency: string;
+            /** Format: uuid */
+            client_id: string | null;
+            client_name: string | null;
+            /** Format: uuid */
+            deal_id: string | null;
+            deal_title: string | null;
+            note: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        PracticeEntryInput: {
+            /**
+             * @description Required on create
+             * @enum {string}
+             */
+            kind?: "income" | "expense";
+            /**
+             * Format: date
+             * @description Required on create
+             */
+            date?: string;
+            /** @description Required on create; a whole number of the currency's smallest unit */
+            amount?: number;
+            /** @description Required on create */
+            currency?: string;
+            /**
+             * Format: uuid
+             * @description A client of the caller; with a deal, the deal's client (filled when left out)
+             */
+            client_id?: string | null;
+            /**
+             * Format: uuid
+             * @description A deal of the caller
+             */
+            deal_id?: string | null;
+            note?: string;
+        };
+        PracticeMonth: {
+            month: string;
+            entries: number;
+            totals: components["schemas"]["PracticeTotal"][];
+        };
+        /** @description The totals of one client in one currency; client_id null for entries without a client */
+        PracticeClientTotal: {
+            /** Format: uuid */
+            client_id: string | null;
+            client_name: string | null;
+            currency: string;
+            income: number;
+            expense: number;
+            net: number;
+            entries: number;
+        };
         /** @description A project groups tasks; a course (kind course) is a project of Learning with a platform and dates */
         Project: {
             /** Format: uuid */
@@ -17004,6 +18044,13 @@ export interface components {
             project_title: string | null;
             /** @enum {string|null} */
             project_kind: "project" | "course" | null;
+            /**
+             * Format: uuid
+             * @description The deal of the practice this task is a next step of
+             */
+            deal_id?: string | null;
+            /** @description The title of that deal */
+            deal_title?: string | null;
             /** @description The title of the goal the task belongs to */
             goal_title: string | null;
             /** Format: date-time */
@@ -17044,6 +18091,11 @@ export interface components {
              * @description A project or course of the caller; null unlinks
              */
             project_id?: string | null;
+            /**
+             * Format: uuid
+             * @description A deal of the caller's practice; null unlinks
+             */
+            deal_id?: string | null;
             external_id?: string;
         };
         TaskPatch: {
@@ -17079,6 +18131,11 @@ export interface components {
              * @description A project or course of the caller; null unlinks
              */
             project_id?: string | null;
+            /**
+             * Format: uuid
+             * @description A deal of the caller's practice; null unlinks
+             */
+            deal_id?: string | null;
         };
         TravelCrossing: {
             /** Format: uuid */

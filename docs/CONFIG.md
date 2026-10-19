@@ -306,6 +306,7 @@ outage can never affect the money path.
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
 | `NOTES_ENABLED` | `notes.enabled` | bool | `false` | Master switch for the notes module (`Core::notes_enabled()`): private Markdown notes with the fields of a tarassov.me blog post, linked to a project, course or task. Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
+| `PRACTICE_ENABLED` | `practice.enabled` | bool | `false` | Master switch for the practice module (`Core::practice_enabled()`): the freelance practice's clients, deals with stages, incomes and expenses, and a month view with totals per currency. Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
 
 ## Now module
 

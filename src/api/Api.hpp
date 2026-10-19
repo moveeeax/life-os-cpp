@@ -41,6 +41,7 @@
 #include "api/Middleware.hpp"
 #include "api/MoneyController.hpp"
 #include "api/NotesController.hpp"
+#include "api/PracticeController.hpp"
 #include "api/ProjectsController.hpp"
 #include "api/SoundsController.hpp"
 #include "api/TasksController.hpp"

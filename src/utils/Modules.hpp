@@ -77,5 +77,8 @@ inline bool habits_enabled() {
 inline bool notes_enabled() {
     return module_enabled(Config::Keys::notes_enabled);
 }
+inline bool practice_enabled() {
+    return module_enabled(Config::Keys::practice_enabled);
+}
 
 }  // namespace Core

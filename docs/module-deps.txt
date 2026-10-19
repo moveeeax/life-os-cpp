@@ -236,3 +236,7 @@ api -> habits/now
 api -> repositories/habits
 repositories/notes -> database
 repositories/notes -> repositories
+api -> practice
+api -> repositories/practice
+repositories/practice -> database
+repositories/practice -> repositories

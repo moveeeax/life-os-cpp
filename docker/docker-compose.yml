@@ -80,6 +80,7 @@ services:
       TRAVEL_ENABLED: ${TRAVEL_ENABLED:-false}
       HABITS_ENABLED: ${HABITS_ENABLED:-false}
       NOTES_ENABLED: ${NOTES_ENABLED:-false}
+      PRACTICE_ENABLED: ${PRACTICE_ENABLED:-false}
       REGISTRATION_OPEN: ${REGISTRATION_OPEN:-true}
       NOW_ENABLED: ${NOW_ENABLED:-false}
       # Rate limiting, idempotency and CSRF: the defaults are the values of
@@ -263,6 +264,7 @@ services:
       TRAVEL_ENABLED: ${TRAVEL_ENABLED:-false}
       HABITS_ENABLED: ${HABITS_ENABLED:-false}
       NOTES_ENABLED: ${NOTES_ENABLED:-false}
+      PRACTICE_ENABLED: ${PRACTICE_ENABLED:-false}
       REGISTRATION_OPEN: ${REGISTRATION_OPEN:-true}
       NOW_ENABLED: ${NOW_ENABLED:-false}
       WORKER_ID: ${WORKER_ID:-worker-1}

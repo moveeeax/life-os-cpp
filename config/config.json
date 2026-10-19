@@ -266,6 +266,9 @@
   "notes": {
     "enabled": "${NOTES_ENABLED:-false}"
   },
+  "practice": {
+    "enabled": "${PRACTICE_ENABLED:-false}"
+  },
   "worker": {
     "id": "worker-1",
     "types": ["default"],
