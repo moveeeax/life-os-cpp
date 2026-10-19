@@ -11060,11 +11060,14 @@ export interface paths {
         head?: never;
         /**
          * Change a task
-         * @description Closing (status done) sets completed_at, reopening clears it; a completed_at in the body is ignored. Null clears effort, due and the source.
+         * @description Closing (status done) sets completed_at, reopening clears it; a completed_at in the body is ignored. Null clears effort, due and the source. Closing a task with a repeat rule creates its next occurrence once (next_id points at it); reopening keeps it.
          */
         patch: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description IANA zone of the caller: the day a repeating task is closed on */
+                    tz?: string;
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -16922,6 +16925,18 @@ export interface components {
             ends_on: string | null;
             certificate: string;
             position: number;
+            /**
+             * Format: date
+             * @description Project only: the day it is due
+             */
+            deadline: string | null;
+            /**
+             * @description Project only: p1 is the highest
+             * @enum {string|null}
+             */
+            priority: "p1" | "p2" | "p3" | null;
+            /** @description Done tasks in percent of all its tasks that do not repeat; null when it has none */
+            progress: number | null;
             /** @description Open tasks */
             open: number;
             /** @description Done tasks */
@@ -16966,6 +16981,27 @@ export interface components {
             ends_on?: string | null;
             /** @description Course only: an http(s) address or empty */
             certificate?: string;
+            /**
+             * Format: date
+             * @description Project only; null clears
+             */
+            deadline?: string | null;
+            /**
+             * @description Project only; null clears
+             * @enum {string|null}
+             */
+            priority?: "p1" | "p2" | "p3" | null;
+        };
+        /** @description The repeat rule of a task. Closing the task creates the next occurrence (a copy, open, due on the first day of the rule after the later of its due date and the day it was closed); the agenda shows that one occurrence, never the ones after it. */
+        TaskRepeat: {
+            /** @enum {string} */
+            kind: "daily" | "weekly" | "monthly" | "every_n_days";
+            /** @description weekly: ISO weekdays, 1 is Monday */
+            weekdays?: number[];
+            /** @description monthly: the day of the month; a shorter month uses its last day */
+            day?: number;
+            /** @description every_n_days: the gap in days */
+            every?: number;
         };
         Task: {
             /** Format: uuid */
@@ -17000,6 +17036,12 @@ export interface components {
              * @description The project or course the task belongs to
              */
             project_id: string | null;
+            repeat: components["schemas"]["TaskRepeat"] | null;
+            /**
+             * Format: uuid
+             * @description The occurrence created when this repeating task was closed
+             */
+            next_id: string | null;
             /** @description The name of that project or course */
             project_title: string | null;
             /** @enum {string|null} */
@@ -17044,6 +17086,8 @@ export interface components {
              * @description A project or course of the caller; null unlinks
              */
             project_id?: string | null;
+            /** @description The repeat rule; null stops it */
+            repeat?: components["schemas"]["TaskRepeat"] | null;
             external_id?: string;
         };
         TaskPatch: {
@@ -17079,6 +17123,8 @@ export interface components {
              * @description A project or course of the caller; null unlinks
              */
             project_id?: string | null;
+            /** @description The repeat rule; null stops it */
+            repeat?: components["schemas"]["TaskRepeat"] | null;
         };
         TravelCrossing: {
             /** Format: uuid */

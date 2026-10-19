@@ -1,5 +1,6 @@
 /** The bodies of the task edit form and the typed capture (pinned by bodies.test.ts). */
 import type { Task, TaskPatch } from './index';
+import { sameRepeat, type TaskRepeat } from './repeat';
 
 export interface TaskDraft {
   title: string;
@@ -13,6 +14,8 @@ export interface TaskDraft {
   sectionId: string;
   /** The project or course; left out, the task keeps its own. */
   projectId?: string;
+  /** The repeat rule, null for none; left out, the task keeps its own. */
+  repeat?: TaskRepeat | null;
 }
 
 type TaskFields = Pick<
@@ -26,7 +29,7 @@ type TaskFields = Pick<
   | 'status'
   | 'goal_id'
   | 'goal_section_id'
-> & { project_id?: string | null };
+> & { project_id?: string | null; repeat?: TaskRepeat | null };
 
 /** Only the fields that changed; a section travels with its goal (the API checks the pair). */
 export function taskPatch(task: TaskFields, d: TaskDraft): TaskPatch {
@@ -44,6 +47,9 @@ export function taskPatch(task: TaskFields, d: TaskDraft): TaskPatch {
   }
   if (d.projectId !== undefined && (d.projectId || null) !== (task.project_id ?? null)) {
     patch.project_id = d.projectId || null;
+  }
+  if (d.repeat !== undefined && !sameRepeat(d.repeat, task.repeat)) {
+    patch.repeat = d.repeat;
   }
   return patch;
 }

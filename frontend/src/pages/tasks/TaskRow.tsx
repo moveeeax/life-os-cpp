@@ -4,7 +4,15 @@ import { Link } from 'react-router';
 import { Modal } from '@/components/Modal';
 import { useUpdateTask } from '@/hooks/useTasks';
 import { useNotesEnabled } from '@/hooks/useNotes';
-import { areaOf, dueLabel, EFFORT_LABEL, isDueDate, safeLink, type Task } from '@/lib/tasks';
+import {
+  areaOf,
+  dueLabel,
+  EFFORT_LABEL,
+  isDueDate,
+  repeatLabel,
+  safeLink,
+  type Task,
+} from '@/lib/tasks';
 import { cn } from '@/lib/utils';
 
 import { NoteSheet } from '../notes/NoteSheet';
@@ -37,6 +45,7 @@ export function TaskRow({
   const due = done ? null : dueLabel(task.due, today);
   const area = areaOf(task.area);
   const link = task.source_kind === 'url' ? safeLink(task.source_ref) : null;
+  const repeats = repeatLabel(task.repeat);
   return (
     <li>
       <div className="grid grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-3.5 py-2.5">
@@ -69,6 +78,12 @@ export function TaskRow({
         </button>
         {due ? (
           <span className={cn('text-theme-xs whitespace-nowrap tabular-nums', TONE[due.tone])}>
+            {repeats && !done && (
+              <span className="k-muted" title={`Repeats ${repeats}`} data-repeat-mark>
+                <span aria-hidden="true">↻ </span>
+                <span className="sr-only">repeats, </span>
+              </span>
+            )}
             {due.text}
           </span>
         ) : (
@@ -83,6 +98,7 @@ export function TaskRow({
           <p>
             {area.label}
             {task.effort && ` · ${EFFORT_LABEL[task.effort]}`}
+            {repeats && ` · repeats ${repeats}`}
             {link && (
               <>
                 {' · '}

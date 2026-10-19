@@ -1,0 +1,1 @@
+Projects have a `deadline` and a `priority` (p1..p3), and every project or course row carries `progress`, the share of done tasks in percent over its tasks without a repeat rule. A course keeps its own dates and takes neither field. The Projects tab shows the priority, the progress and the deadline on each row; the project sheet edits them. Migration 049.

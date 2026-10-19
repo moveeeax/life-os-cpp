@@ -2,7 +2,9 @@
  * @file ProjectRepository.hpp
  * @brief The owner's projects — streams of work that group tasks — and the
  *        courses of Learning, which are projects of kind "course". A list row
- *        carries its open and done task counts and the next open task.
+ *        carries its open and done task counts, the progress over its tasks
+ *        that do not repeat, and the next open task. A project has a deadline
+ *        and a priority; a course keeps its own dates instead.
  */
 
 #pragma once
@@ -36,6 +38,8 @@ public:
         std::optional<std::string> starts_on;
         std::optional<std::string> ends_on;
         std::string certificate;
+        std::optional<std::string> deadline;  // project only
+        std::optional<std::string> priority;  // project only: p1 | p2 | p3
     };
 
     /// A partial edit: a field left empty is kept; a date given as null clears.
@@ -49,6 +53,8 @@ public:
         std::optional<std::optional<std::string>> starts_on;
         std::optional<std::optional<std::string>> ends_on;
         std::optional<std::string> certificate;
+        std::optional<std::optional<std::string>> deadline;
+        std::optional<std::optional<std::string>> priority;
     };
 
     /// @throws CodeTaken, Invariant, InvalidDate.
@@ -58,9 +64,10 @@ public:
                 return Database::get().execute_write([&](auto& txn) {
                     auto r = txn.exec_params(
                         "INSERT INTO projects (owner_id, kind, name, code, description, link, status, platform, "
-                        " starts_on, ends_on, certificate, position) "
+                        " starts_on, ends_on, certificate, position, deadline, priority) "
                         "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9::date, $10::date, $11, "
-                        " (SELECT COALESCE(max(position), 0) + 1 FROM projects WHERE owner_id = $1::uuid)) "
+                        " (SELECT COALESCE(max(position), 0) + 1 FROM projects WHERE owner_id = $1::uuid), "
+                        " $12::date, $13) "
                         "RETURNING id::text",
                         owner,
                         in.kind,
@@ -72,7 +79,9 @@ public:
                         in.platform,
                         in.starts_on,
                         in.ends_on,
-                        in.certificate);
+                        in.certificate,
+                        in.deadline,
+                        in.priority);
                     return *find_in(txn, owner, r[0][0].template as<std::string>());
                 });
             },
@@ -102,7 +111,9 @@ public:
                         " status = COALESCE($7, status), platform = COALESCE($8, platform), "
                         " starts_on = CASE WHEN $9::boolean THEN $10::date ELSE starts_on END, "
                         " ends_on = CASE WHEN $11::boolean THEN $12::date ELSE ends_on END, "
-                        " certificate = COALESCE($13, certificate) "
+                        " certificate = COALESCE($13, certificate), "
+                        " deadline = CASE WHEN $14::boolean THEN $15::date ELSE deadline END, "
+                        " priority = CASE WHEN $16::boolean THEN $17 ELSE priority END "
                         "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
                         owner,
                         id,
@@ -116,7 +127,11 @@ public:
                         p.starts_on.has_value() ? *p.starts_on : std::optional<std::string>(),
                         p.ends_on.has_value(),
                         p.ends_on.has_value() ? *p.ends_on : std::optional<std::string>(),
-                        p.certificate);
+                        p.certificate,
+                        p.deadline.has_value(),
+                        p.deadline.has_value() ? *p.deadline : std::optional<std::string>(),
+                        p.priority.has_value(),
+                        p.priority.has_value() ? *p.priority : std::optional<std::string>());
                     if (r.empty()) {
                         throw NotFound("project");
                     }
@@ -153,11 +168,15 @@ public:
 
 private:
     /// The columns of a project, its task counts and the next open task (the earliest due, then the oldest);
-    /// open means not done, so a task in progress counts.
+    /// open means not done, so a task in progress counts. progress is the share of done tasks in percent,
+    /// over the tasks without a repeat rule (each closed occurrence would count again); null when none.
     static constexpr const char* kColumns =
         "p.id, p.kind, p.name, p.code, p.description, p.link, p.status, p.platform, "
         " to_char(p.starts_on, 'YYYY-MM-DD') AS starts_on, to_char(p.ends_on, 'YYYY-MM-DD') AS ends_on, "
-        " p.certificate, p.position, "
+        " p.certificate, p.position, to_char(p.deadline, 'YYYY-MM-DD') AS deadline, p.priority, "
+        " (SELECT CASE WHEN count(*) = 0 THEN NULL "
+        "   ELSE (100 * count(*) FILTER (WHERE t.status = 'done') / count(*))::int END "
+        "   FROM task_items t WHERE t.project_id = p.id AND t.repeat IS NULL) AS progress, "
         " (SELECT count(*) FROM task_items t WHERE t.project_id = p.id AND t.status <> 'done') AS open, "
         " (SELECT count(*) FROM task_items t WHERE t.project_id = p.id AND t.status = 'done') AS done, "
         " (SELECT json_build_object('id', t.id, 'title', t.title, 'due', to_char(t.due, 'YYYY-MM-DD')) "

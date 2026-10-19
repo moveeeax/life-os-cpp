@@ -27,6 +27,8 @@ export function ProjectSheet({
     starts_on: project?.starts_on ?? '',
     ends_on: project?.ends_on ?? '',
     certificate: project?.certificate ?? '',
+    deadline: project?.deadline ?? '',
+    priority: project?.priority ?? '',
   });
   const save = useSaveProject(project?.id ?? null, (p) => {
     onSaved?.(p);
@@ -50,7 +52,10 @@ export function ProjectSheet({
             ends_on: f.ends_on || null,
             certificate: f.certificate.trim(),
           }
-        : {}),
+        : {
+            deadline: f.deadline || null,
+            priority: (f.priority || null) as ProjectInput['priority'],
+          }),
     };
     save.mutate(body);
   };
@@ -73,7 +78,7 @@ export function ProjectSheet({
             <span>Code, for #code in a task</span>
             <input
               maxLength={24}
-              pattern="[a-z0-9-]{1,24}"
+              pattern="[a-z0-9\-]{1,24}"
               placeholder="made from the name"
               value={f.code}
               onChange={set('code')}
@@ -90,6 +95,29 @@ export function ProjectSheet({
             </select>
           </label>
         </div>
+        {!course && (
+          <div className="k-fields">
+            <label className="k-field">
+              <span>Deadline</span>
+              <input
+                type="date"
+                min="1900-01-01"
+                max="2100-12-31"
+                value={f.deadline}
+                onChange={set('deadline')}
+              />
+            </label>
+            <label className="k-field">
+              <span>Priority</span>
+              <select value={f.priority} onChange={set('priority')}>
+                <option value="">None</option>
+                <option value="p1">P1, first</option>
+                <option value="p2">P2</option>
+                <option value="p3">P3, when there is time</option>
+              </select>
+            </label>
+          </div>
+        )}
         {course && (
           <>
             <label className="k-field">

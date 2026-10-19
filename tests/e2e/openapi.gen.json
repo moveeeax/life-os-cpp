@@ -2087,6 +2087,9 @@
      "ends_on",
      "certificate",
      "position",
+     "deadline",
+     "priority",
+     "progress",
      "open",
      "done",
      "next",
@@ -2151,6 +2154,36 @@
      },
      "position": {
       "type": "integer"
+     },
+     "deadline": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date",
+      "description": "Project only: the day it is due"
+     },
+     "priority": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "p1",
+       "p2",
+       "p3",
+       null
+      ],
+      "description": "Project only: p1 is the highest"
+     },
+     "progress": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Done tasks in percent of all its tasks that do not repeat; null when it has none"
      },
      "open": {
       "type": "integer",
@@ -2268,6 +2301,67 @@
       "type": "string",
       "maxLength": 500,
       "description": "Course only: an http(s) address or empty"
+     },
+     "deadline": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date",
+      "description": "Project only; null clears"
+     },
+     "priority": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "p1",
+       "p2",
+       "p3",
+       null
+      ],
+      "description": "Project only; null clears"
+     }
+    }
+   },
+   "TaskRepeat": {
+    "type": "object",
+    "required": [
+     "kind"
+    ],
+    "description": "The repeat rule of a task. Closing the task creates the next occurrence (a copy, open, due on the first day of the rule after the later of its due date and the day it was closed); the agenda shows that one occurrence, never the ones after it.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "daily",
+       "weekly",
+       "monthly",
+       "every_n_days"
+      ]
+     },
+     "weekdays": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 7
+      },
+      "description": "weekly: ISO weekdays, 1 is Monday"
+     },
+     "day": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 31,
+      "description": "monthly: the day of the month; a shorter month uses its last day"
+     },
+     "every": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 365,
+      "description": "every_n_days: the gap in days"
      }
     }
    },
@@ -2290,6 +2384,8 @@
      "goal_section_id",
      "trip_id",
      "project_id",
+     "repeat",
+     "next_id",
      "goal_title",
      "project_title",
      "project_kind",
@@ -2392,6 +2488,24 @@
       ],
       "format": "uuid",
       "description": "The project or course the task belongs to"
+     },
+     "repeat": {
+      "oneOf": [
+       {
+        "$ref": "#/components/schemas/TaskRepeat"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "next_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "The occurrence created when this repeating task was closed"
      },
      "project_title": {
       "type": [
@@ -2519,6 +2633,17 @@
       "format": "uuid",
       "description": "A project or course of the caller; null unlinks"
      },
+     "repeat": {
+      "description": "The repeat rule; null stops it",
+      "oneOf": [
+       {
+        "$ref": "#/components/schemas/TaskRepeat"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "external_id": {
       "type": "string",
       "minLength": 1,
@@ -2612,6 +2737,17 @@
       ],
       "format": "uuid",
       "description": "A project or course of the caller; null unlinks"
+     },
+     "repeat": {
+      "description": "The repeat rule; null stops it",
+      "oneOf": [
+       {
+        "$ref": "#/components/schemas/TaskRepeat"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     }
    },
@@ -22054,13 +22190,24 @@
    },
    "patch": {
     "summary": "Change a task",
-    "description": "Closing (status done) sets completed_at, reopening clears it; a completed_at in the body is ignored. Null clears effort, due and the source.",
+    "description": "Closing (status done) sets completed_at, reopening clears it; a completed_at in the body is ignored. Null clears effort, due and the source. Closing a task with a repeat rule creates its next occurrence once (next_id points at it); reopening keeps it.",
     "tags": [
      "tasks"
     ],
     "security": [
      {
       "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the day a repeating task is closed on"
      }
     ],
     "requestBody": {
@@ -27944,7 +28091,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 412204,
-  "source_fnv1a64": "28b578a404758a2b"
+  "source_bytes": 414576,
+  "source_fnv1a64": "4146f448734a75c5"
  }
 }

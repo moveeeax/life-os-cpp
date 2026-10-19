@@ -1,3 +1,5 @@
+import { daysBetween, formatDay } from '@/lib/dates';
+
 import type { Project, Task } from './types';
 
 export const PROJECT_STATUS: Record<Project['status'], string> = {
@@ -6,6 +8,31 @@ export const PROJECT_STATUS: Record<Project['status'], string> = {
   paused: 'Paused',
   done: 'Done',
 };
+
+export const PRIORITY_LABEL: Record<NonNullable<Project['priority']>, string> = {
+  p1: 'P1',
+  p2: 'P2',
+  p3: 'P3',
+};
+
+/**
+ * A project's deadline for its row: "by 31 Mar", "today", "3 days late";
+ * null when it has none or the project is done.
+ */
+export function deadlineText(
+  p: Pick<Project, 'deadline' | 'status'>,
+  today: string,
+): { text: string; late: boolean } | null {
+  if (!p.deadline || p.status === 'done') return null;
+  const d = daysBetween(today, p.deadline);
+  if (Number.isNaN(d)) return null;
+  if (d < 0) return { text: `${-d} ${d === -1 ? 'day' : 'days'} late`, late: true };
+  if (d === 0) return { text: 'due today', late: false };
+  return {
+    text: `by ${formatDay(p.deadline, { locale: 'en-GB', yearUnless: today })}`,
+    late: false,
+  };
+}
 
 /**
  * The project a phrase names with "#code", and the phrase without that code.

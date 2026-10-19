@@ -4,6 +4,7 @@ import {
   PROJECT_STATUS,
   TASK_PAGE,
   courseProgress,
+  deadlineText,
   loadProjectTasks,
   takeProjectCode,
 } from './projects';
@@ -78,5 +79,27 @@ describe('loadProjectTasks', () => {
     // Newest first across the statuses.
     expect(out[0].created_at >= out[out.length - 1].created_at).toBe(true);
     expect(out[0].status).toBe('done');
+  });
+});
+
+describe('deadlineText', () => {
+  const today = '2026-10-19';
+  it('says how far the deadline is, and nothing once the project is done', () => {
+    expect(deadlineText({ deadline: null, status: 'active' }, today)).toBeNull();
+    expect(deadlineText({ deadline: '2026-10-01', status: 'done' }, today)).toBeNull();
+    expect(deadlineText({ deadline: '2026-10-19', status: 'active' }, today)).toEqual({
+      text: 'due today',
+      late: false,
+    });
+    expect(deadlineText({ deadline: '2026-10-16', status: 'paused' }, today)).toEqual({
+      text: '3 days late',
+      late: true,
+    });
+    expect(deadlineText({ deadline: '2026-12-31', status: 'active' }, today)?.text).toBe(
+      'by 31 Dec',
+    );
+    expect(deadlineText({ deadline: '2027-03-31', status: 'active' }, today)?.text).toBe(
+      'by 31 Mar 2027',
+    );
   });
 });

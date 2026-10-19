@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { captureBody, taskPatch } from './bodies';
+import type { TaskRepeat } from './repeat';
 
 const task = {
   title: 'Pay rent',
@@ -26,6 +27,17 @@ describe('taskPatch', () => {
     goalId: '',
     sectionId: '',
   };
+  it('sends the repeat rule only when it changed, null to stop it', () => {
+    const weekly: TaskRepeat = { kind: 'weekly', weekdays: [1, 4] };
+    expect(taskPatch(task, { ...draft, repeat: { kind: 'daily' } })).toEqual({
+      repeat: { kind: 'daily' },
+    });
+    expect(taskPatch({ ...task, repeat: weekly }, { ...draft, repeat: { ...weekly } })).toEqual({});
+    expect(taskPatch({ ...task, repeat: weekly }, { ...draft, repeat: null })).toEqual({
+      repeat: null,
+    });
+    expect(taskPatch({ ...task, repeat: weekly }, draft)).toEqual({});
+  });
   it('files the task under a project, takes it out with an empty choice', () => {
     expect(taskPatch(task, { ...draft, projectId: 'p1' })).toEqual({ project_id: 'p1' });
     expect(taskPatch({ ...task, project_id: 'p1' }, { ...draft, projectId: '' })).toEqual({
