@@ -363,14 +363,14 @@ TEST_F(NotesApiTest, ANoteLinksADealOfTheCaller) {
         call(kAnna, Patch, json{{"deal_id", theirs}}, [&](auto req, auto cb) { c.updateNote(req, std::move(cb), id); });
     EXPECT_EQ(foreign_edit->statusCode(), k400BadRequest);
 
-    const json by_deal = list(kAnna, {{"deal_id", site}});
+    const json by_deal = list(kAnna, {{"deal", site}});
     const json rows = by_deal["data"];
     ASSERT_EQ(rows.size(), 1U);
     EXPECT_EQ(rows[0]["id"], id);
     EXPECT_EQ(rows[0]["deal_title"], "Landing page") << "the list carries the deal";
     EXPECT_EQ(by_deal["total"], 1);
     auto bad = call(
-        kAnna, Get, json::object(), [&](auto req, auto cb) { c.listNotes(req, std::move(cb)); }, {{"deal_id", "nope"}});
+        kAnna, Get, json::object(), [&](auto req, auto cb) { c.listNotes(req, std::move(cb)); }, {{"deal", "nope"}});
     EXPECT_EQ(bad->statusCode(), k400BadRequest);
 
     auto unlinked = call(

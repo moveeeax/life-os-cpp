@@ -7924,7 +7924,7 @@ paths:
         - { name: project, in: query, schema: { type: string, format: uuid } }
         - { name: from, in: query, schema: { type: string, format: date }, description: 'The first day of the note''s date, inclusive; a note without a date is left out when from or to is given' }
         - { name: to, in: query, schema: { type: string, format: date }, description: 'The last day of the note''s date, inclusive; not before from' }
-        - { name: deal_id, in: query, schema: { type: string, format: uuid }, description: Only the notes about this deal of the practice }
+        - { name: deal, in: query, schema: { type: string, format: uuid }, description: Only the notes about this deal of the practice }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:

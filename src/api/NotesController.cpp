@@ -138,11 +138,11 @@ void NotesController::listNotes(const HttpRequestPtr& req, Callback&& callback) 
     f.project = req->getParameter("project");
     f.from = req->getParameter("from");
     f.to = req->getParameter("to");
-    f.deal = req->getParameter("deal_id");
+    f.deal = req->getParameter("deal");
     f.limit = clamp_int(req->getParameter("limit"), kDefaultLimit, 1, kMaxLimit);
     f.offset = clamp_int(req->getParameter("offset"), 0, 0, 1000000);
     if ((!f.project.empty() && !is_valid_uuid(f.project)) || (!f.deal.empty() && !is_valid_uuid(f.deal))) {
-        callback(ErrorResponse::bad_request("invalid_query", "project and deal_id must be ids"));
+        callback(ErrorResponse::bad_request("invalid_query", "project and deal must be ids"));
         return;
     }
     if ((!f.from.empty() && !is_calendar_date(f.from)) || (!f.to.empty() && !is_calendar_date(f.to)) ||

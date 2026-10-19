@@ -10500,7 +10500,7 @@ export interface paths {
                     /** @description The last day of the note's date, inclusive; not before from */
                     to?: string;
                     /** @description Only the notes about this deal of the practice */
-                    deal_id?: string;
+                    deal?: string;
                     limit?: number;
                     offset?: number;
                 };

@@ -23225,7 +23225,7 @@
       "description": "The last day of the note's date, inclusive; not before from"
      },
      {
-      "name": "deal_id",
+      "name": "deal",
       "in": "query",
       "schema": {
        "type": "string",
@@ -34259,7 +34259,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 507307,
-  "source_fnv1a64": "c7447490c8a2eaa5"
+  "source_bytes": 507304,
+  "source_fnv1a64": "d8f8d6a0eb22dcd7"
  }
 }
