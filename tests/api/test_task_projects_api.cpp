@@ -235,3 +235,47 @@ TEST_F(TaskProjectsApiTest, ADeletedProjectLeavesItsTasks) {
     TestHelpers::expect_matches_schema(left, "GET", "/api/v1/tasks/items/{id}");
     EXPECT_TRUE(body_of(left)["data"]["project_id"].is_null());
 }
+
+TEST_F(TaskProjectsApiTest, AProjectHasADeadlineAndAPriorityACourseKeepsItsDates) {
+    auto made = create(kAnna, json{{"name", "Tax return"}, {"deadline", "2027-03-31"}, {"priority", "p1"}});
+    ASSERT_EQ(made->statusCode(), k201Created) << std::string(made->body());
+    const json p = body_of(made)["data"];
+    EXPECT_EQ(p["deadline"], "2027-03-31");
+    EXPECT_EQ(p["priority"], "p1");
+    EXPECT_TRUE(p["progress"].is_null()) << "no tasks yet";
+    const std::string id = p["id"].get<std::string>();
+    EXPECT_EQ(create(kAnna, json{{"name", "X"}, {"priority", "p4"}})->statusCode(), k400BadRequest);
+    EXPECT_EQ(create(kAnna, json{{"name", "X"}, {"deadline", "2027-02-30"}})->statusCode(), k400BadRequest);
+    EXPECT_EQ(create(kAnna, json{{"name", "X"}, {"kind", "course"}, {"deadline", "2027-03-31"}})->statusCode(),
+              k400BadRequest)
+        << "a course has its own dates";
+    EXPECT_EQ(create(kAnna, json{{"name", "X"}, {"kind", "course"}, {"priority", "p2"}})->statusCode(), k400BadRequest);
+
+    const auto patch = [&](const json& body) {
+        auto r = call(kAnna, Patch, body, [&](auto req, auto cb) { c.updateProject(req, std::move(cb), id); });
+        TestHelpers::expect_2xx_matches_schema(r, "PATCH", "/api/v1/tasks/projects/{id}");
+        return r;
+    };
+    const json kept = body_of(patch(json{{"name", "Tax return 2026"}}))["data"];
+    EXPECT_EQ(kept["deadline"], "2027-03-31") << "a patch without them keeps them";
+    EXPECT_EQ(kept["priority"], "p1");
+    const json cleared = body_of(patch(json{{"deadline", nullptr}, {"priority", "p3"}}))["data"];
+    EXPECT_TRUE(cleared["deadline"].is_null());
+    EXPECT_EQ(cleared["priority"], "p3");
+    EXPECT_EQ(patch(json{{"priority", "high"}})->statusCode(), k400BadRequest);
+}
+
+TEST_F(TaskProjectsApiTest, ProgressIsTheShareOfDoneTasksThatDoNotRepeat) {
+    const auto p = project(kAnna, "Move flat");
+    add_task(kAnna, json{{"project_id", p}, {"title", "Pack"}, {"status", "done"}});
+    add_task(kAnna, json{{"project_id", p}, {"title", "Book the van"}, {"status", "in_progress"}});
+    add_task(kAnna, json{{"project_id", p}, {"title", "Hand the keys"}});
+    add_task(
+        kAnna,
+        json{{"project_id", p}, {"title", "Water the plants"}, {"status", "done"}, {"repeat", {{"kind", "daily"}}}});
+    auto got = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.getProject(req, std::move(cb), p); });
+    TestHelpers::expect_2xx_matches_schema(got, "GET", "/api/v1/tasks/projects/{id}");
+    const json row = body_of(got)["data"];
+    EXPECT_EQ(row["progress"], 33) << "one of three: the repeating task is left out";
+    EXPECT_EQ(row["done"], 2) << "the counts keep every task";
+}

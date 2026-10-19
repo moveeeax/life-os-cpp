@@ -219,6 +219,7 @@ void TodayController::focusDone(const HttpRequestPtr& req, Callback&& callback) 
                 if (closed != done) {
                     TaskRepository::Patch p{};
                     p.status = done ? "done" : "open";
+                    p.today = date;  // a repeating task counts its next occurrence from the focus day
                     // One transaction: a focus ticked without its task (or the
                     // other way round) is a lie the Now screen would show.
                     const json ticked = Repositories::Tasks::detail::translate_sql(

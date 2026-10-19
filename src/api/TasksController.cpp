@@ -37,6 +37,7 @@
 #include "tasks/Fields.hpp"
 #include "tasks/Llm.hpp"
 #include "tasks/ParseAnswer.hpp"
+#include "tasks/Repeat.hpp"
 #include "tasks/jobs/ParseJob.hpp"
 #include "utils/ErrorResponse.hpp"
 #include "utils/Modules.hpp"
@@ -108,6 +109,30 @@ void task_fields(Validation::Errors& errs, const json& body, bool creating) {
     if (creating) {
         text_length(errs, body, "external_id", 1, kExternalIdMax);
     }
+    if (body.contains("repeat") && !body["repeat"].is_null()) {
+        ::Tasks::Repeat::Rule rule;
+        if (const auto why = ::Tasks::Repeat::check(body["repeat"], rule)) {
+            errs.add("repeat", "invalid", *why);
+        }
+    }
+}
+
+/// The stored form of a valid repeat rule (task_fields checked it).
+std::string repeat_text(const json& v) {
+    ::Tasks::Repeat::Rule rule;
+    ::Tasks::Repeat::check(v, rule);
+    return ::Tasks::Repeat::to_json(rule).dump();
+}
+
+/// The repeat of a patch: absent, null (stop), or the rule.
+std::optional<std::optional<std::string>> repeat_patch(const json& body) {
+    if (!body.contains("repeat")) {
+        return std::nullopt;
+    }
+    if (body["repeat"].is_null()) {
+        return std::optional<std::string>();
+    }
+    return std::optional<std::string>(repeat_text(body["repeat"]));
 }
 
 /// The source pair: both or neither, a link is http(s), a ledger row is a uuid of the caller's.
@@ -210,6 +235,9 @@ Repo::TaskRepository::Input task_input(const json& body) {
     in.goal_section_id = Validation::opt_string(body, "goal_section_id");
     in.trip_id = Validation::opt_string(body, "trip_id");
     in.project_id = Validation::opt_string(body, "project_id");
+    if (body.contains("repeat") && !body["repeat"].is_null()) {
+        in.repeat = repeat_text(body["repeat"]);
+    }
     return in;
 }
 
@@ -345,11 +373,19 @@ void TasksController::updateItem(const HttpRequestPtr& req, Callback&& callback,
     p.goal_section_id = nullable(body, "goal_section_id");
     p.trip_id = nullable(body, "trip_id");
     p.project_id = nullable(body, "project_id");
+    p.repeat = repeat_patch(body);
     if (p.goal_id.has_value() && !p.goal_section_id.has_value()) {
         // A new goal (or none) does not keep the old goal's section.
         p.goal_section_id = std::optional<std::string>();
     }
     with_repo_errors(callback, "tasks.updateItem", [&] {
+        // The day a repeating task is closed on, in the caller's zone: the next occurrence counts from it.
+        const std::string tz = req->getParameter("tz");
+        if (!tz.empty() && !Repo::TaskRepository::is_timezone(tz)) {
+            callback(ErrorResponse::bad_request("invalid_query", "tz must be an IANA zone like Asia/Bangkok"));
+            return;
+        }
+        p.today = local_today(req, &Repositories::Zones::today_in, today_utc());
         callback(Response::ok(json{{"data", Repo::TaskRepository().update(owner, id, p)}}));
     });
 }

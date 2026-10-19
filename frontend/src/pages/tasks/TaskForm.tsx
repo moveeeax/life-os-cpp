@@ -4,7 +4,18 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useGoal, useGoals } from '@/hooks/useGoals';
 import { useProjects } from '@/hooks/useProjects';
 import { useDeleteTask, useUpdateTask } from '@/hooks/useTasks';
-import { AREAS, EFFORT_LABEL, localToday, type Area, type Effort, type Task } from '@/lib/tasks';
+import {
+  AREAS,
+  EFFORT_LABEL,
+  localToday,
+  repeatDraft,
+  repeatOf,
+  WEEKDAYS,
+  type Area,
+  type Effort,
+  type RepeatDraft,
+  type Task,
+} from '@/lib/tasks';
 import { taskPatch } from '@/lib/tasks/bodies';
 
 import {
@@ -31,6 +42,8 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
   const [goalId, setGoalId] = useState(task.goal_id ?? '');
   const [sectionId, setSectionId] = useState(task.goal_section_id ?? '');
   const [projectId, setProjectId] = useState(task.project_id ?? '');
+  const [repeat, setRepeat] = useState<RepeatDraft>(repeatDraft(task.repeat, task.due));
+  const rule = repeatOf(repeat);
   const projects = (useProjects().data ?? []).filter(
     (p) => p.status !== 'done' || p.id === task.project_id,
   );
@@ -45,7 +58,7 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
   const [confirm, setConfirm] = useState(false);
   const update = useUpdateTask(task.id, onClose);
   const remove = useDeleteTask(onClose);
-  const ok = title.trim() !== '';
+  const ok = title.trim() !== '' && rule !== undefined;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -61,6 +74,7 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
       goalId,
       sectionId,
       projectId,
+      repeat: rule,
     });
     if (Object.keys(patch).length === 0) {
       onClose();
@@ -221,6 +235,7 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
               </select>
             </div>
           )}
+          <RepeatField draft={repeat} onChange={setRepeat} />
           <div className="sm:col-span-2">
             <label htmlFor="task-note" className={labelClass}>
               Note
@@ -269,5 +284,101 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
         />
       )}
     </>
+  );
+}
+
+const REPEAT_KINDS: { key: RepeatDraft['kind']; label: string }[] = [
+  { key: '', label: 'Does not repeat' },
+  { key: 'daily', label: 'Every day' },
+  { key: 'weekly', label: 'Every week' },
+  { key: 'monthly', label: 'Every month' },
+  { key: 'every_n_days', label: 'Every few days' },
+];
+
+/** The repeat rule: closing the task makes the next one, due on the rule's next day. */
+function RepeatField({
+  draft,
+  onChange,
+}: {
+  draft: RepeatDraft;
+  onChange: (d: RepeatDraft) => void;
+}) {
+  const toggle = (n: number) =>
+    onChange({
+      ...draft,
+      weekdays: draft.weekdays.includes(n)
+        ? draft.weekdays.filter((x) => x !== n)
+        : [...draft.weekdays, n],
+    });
+  return (
+    <div className="grid gap-2 sm:col-span-2 sm:grid-cols-2 sm:gap-4">
+      <div>
+        <label htmlFor="task-repeat" className={labelClass}>
+          Repeats
+        </label>
+        <select
+          id="task-repeat"
+          value={draft.kind}
+          onChange={(e) => onChange({ ...draft, kind: e.target.value as RepeatDraft['kind'] })}
+          className={inputClass}
+        >
+          {REPEAT_KINDS.map((k) => (
+            <option key={k.key} value={k.key}>
+              {k.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {draft.kind === 'weekly' && (
+        <fieldset>
+          <legend className={labelClass}>On</legend>
+          <div className="k-seg k-seg-scroll">
+            {WEEKDAYS.map((w) => (
+              <button
+                key={w.n}
+                type="button"
+                aria-pressed={draft.weekdays.includes(w.n)}
+                onClick={() => toggle(w.n)}
+                className={draft.weekdays.includes(w.n) ? 'k-seg-on' : undefined}
+              >
+                {w.short}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      )}
+      {draft.kind === 'monthly' && (
+        <div>
+          <label htmlFor="task-repeat-day" className={labelClass}>
+            Day of the month
+          </label>
+          <input
+            id="task-repeat-day"
+            type="number"
+            min={1}
+            max={31}
+            value={draft.day}
+            onChange={(e) => onChange({ ...draft, day: e.target.value })}
+            className={inputClass}
+          />
+        </div>
+      )}
+      {draft.kind === 'every_n_days' && (
+        <div>
+          <label htmlFor="task-repeat-every" className={labelClass}>
+            Every this many days
+          </label>
+          <input
+            id="task-repeat-every"
+            type="number"
+            min={1}
+            max={365}
+            value={draft.every}
+            onChange={(e) => onChange({ ...draft, every: e.target.value })}
+            className={inputClass}
+          />
+        </div>
+      )}
+    </div>
   );
 }

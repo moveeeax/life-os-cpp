@@ -1,6 +1,7 @@
 // Tasks on the page: areas with their colour, the effort words, the due label.
 export * from './types';
 export * from './projects';
+export * from './repeat';
 import { daysBetween, formatDay, isDay, todayLocal } from '@/lib/dates';
 
 import type { Area, Effort } from './types';

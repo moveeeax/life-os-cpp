@@ -1,8 +1,9 @@
 /**
  * @file ProjectsController.cpp
  * @brief Projects and courses: validation by kind (a project is active, paused
- *        or done; a course is planned, active or done and has a platform and
- *        dates), a code made from the name when none is given.
+ *        or done and may have a deadline and a priority; a course is planned,
+ *        active or done and has a platform and dates), a code made from the
+ *        name when none is given.
  */
 
 #include "api/ProjectsController.hpp"
@@ -41,6 +42,7 @@ const std::vector<std::string> kKinds = {"project", "course"};
 const std::vector<std::string> kProjectStatuses = {"active", "paused", "done"};
 const std::vector<std::string> kCourseStatuses = {"planned", "active", "done"};
 const std::vector<std::string> kAllStatuses = {"planned", "active", "paused", "done"};
+const std::vector<std::string> kPriorities = {"p1", "p2", "p3"};
 const std::regex kCode("^[a-z0-9-]{1,24}$");
 constexpr std::size_t kCodeMax = 24;
 
@@ -121,7 +123,18 @@ void common_fields(Validation::Errors& errs, const json& body, const std::string
         if (!errs.any() && starts && ends && *ends < *starts) {
             errs.add("ends_on", "invalid", "a course ends on or after its start");
         }
+        for (const char* field : {"deadline", "priority"}) {
+            if (body.contains(field) && !body[field].is_null()) {
+                errs.add(field, "not_allowed", "a course keeps its dates; only a project has it");
+            }
+        }
     } else {
+        if (body.contains("deadline") && !body["deadline"].is_null()) {
+            date_field(errs, body, "deadline");
+        }
+        if (body.contains("priority") && !body["priority"].is_null()) {
+            Validation::one_of(errs, body, "priority", kPriorities);
+        }
         for (const char* field : {"platform", "starts_on", "ends_on", "certificate"}) {
             if (body.contains(field) && !body[field].is_null() &&
                 !(body[field].is_string() && body[field].get<std::string>().empty())) {
@@ -131,7 +144,7 @@ void common_fields(Validation::Errors& errs, const json& body, const std::string
     }
 }
 
-std::optional<std::optional<std::string>> nullable_date(const json& body, const char* field) {
+std::optional<std::optional<std::string>> nullable_text(const json& body, const char* field) {
     if (!body.contains(field)) {
         return std::nullopt;
     }
@@ -188,6 +201,10 @@ void ProjectsController::createProject(const HttpRequestPtr& req, Callback&& cal
         in.starts_on = Validation::opt_string(body, "starts_on");
         in.ends_on = Validation::opt_string(body, "ends_on");
         in.certificate = Validation::opt_string(body, "certificate").value_or("");
+        if (kind == "project") {
+            in.deadline = Validation::opt_string(body, "deadline");
+            in.priority = Validation::opt_string(body, "priority");
+        }
         callback(Response::created(json{{"data", ProjectRepository().create(owner, in)}}));
     });
 }
@@ -240,9 +257,12 @@ void ProjectsController::updateProject(const HttpRequestPtr& req, Callback&& cal
         p.status = Validation::opt_string(body, "status");
         if (kind == "course") {
             p.platform = Validation::opt_string(body, "platform");
-            p.starts_on = nullable_date(body, "starts_on");
-            p.ends_on = nullable_date(body, "ends_on");
+            p.starts_on = nullable_text(body, "starts_on");
+            p.ends_on = nullable_text(body, "ends_on");
             p.certificate = Validation::opt_string(body, "certificate");
+        } else {
+            p.deadline = nullable_text(body, "deadline");
+            p.priority = nullable_text(body, "priority");
         }
         callback(Response::ok(json{{"data", repo.update(owner, id, p)}}));
     });
