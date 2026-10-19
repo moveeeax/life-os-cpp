@@ -4,9 +4,9 @@
  *        create-edit-archive-delete round, the owner scope on every id route,
  *        manual ticks (a day after today and a day too far back refused), the
  *        days with auto values from seeded Mi Fitness and Training rows on the
- *        local day, a source without data, the streak from ticks, the habits
- *        part of /api/v1/today, a daily target reached by adding to a day, and
- *        the mood check-in of a day.
+ *        local day, a source without data, the streak from ticks, a weigh-in
+ *        habit read from the scales' rows, the habits part of /api/v1/today, a daily target reached by adding to a day,
+ * and the mood check-in of a day.
  */
 
 #include <chrono>
@@ -100,6 +100,7 @@ protected:
             const std::string mi = kAnnaMi;
             txn.exec_params("DELETE FROM daily_activity WHERE user_id = $1", mi);
             txn.exec_params("DELETE FROM sleep_sessions WHERE user_id = $1", mi);
+            txn.exec_params("DELETE FROM body_measurements WHERE user_id = $1", mi);
             return true;
         });
     }
@@ -500,6 +501,84 @@ TEST_F(HabitsApiTest, TheDaysCarryAutoValuesFromHealthAndTraining) {
     EXPECT_TRUE(habit_of(blind, steps)["no_data"]);
     EXPECT_FALSE(day_of(habit_of(blind, steps), "2026-09-14")["done"]);
     EXPECT_FALSE(habit_of(blind, workout)["no_data"]);
+}
+
+TEST_F(HabitsApiTest, AWeighInHabitTakesNoGoal) {
+    const auto weight = created(kAnna, json{{"name", "Weigh-in"}, {"schedule", "daily"}, {"source", "weight"}});
+    const json row = habit_of(list(kAnna), weight);
+    EXPECT_EQ(row["source"], "weight");
+    EXPECT_TRUE(row["goal"].is_null());
+
+    // Unlike a workout, whose goal is dropped, a goal on a weigh-in is refused.
+    for (const json& goal : {json(70), json(0), json("70")}) {
+        auto r = call(kAnna,
+                      Post,
+                      json{{"name", "Weigh-in"}, {"schedule", "daily"}, {"source", "weight"}, {"goal", goal}},
+                      [&](auto req, auto cb) { c.create(req, std::move(cb)); });
+        ASSERT_EQ(r->statusCode(), k400BadRequest) << goal.dump();
+        const json errors = body_of(r)["errors"];
+        ASSERT_EQ(errors.size(), 1U) << errors.dump();
+        EXPECT_EQ(errors[0]["field"], "goal");
+        EXPECT_EQ(errors[0]["code"], "not_allowed");
+    }
+    auto edit = call(kAnna,
+                     Patch,
+                     json{{"name", "Weigh-in"}, {"schedule", "daily"}, {"source", "weight"}, {"goal", 70}},
+                     [&](auto req, auto cb) { c.update(req, std::move(cb), weight); });
+    EXPECT_EQ(edit->statusCode(), k400BadRequest) << "on edit as well";
+    auto weekly = call(kAnna,
+                       Patch,
+                       json{{"name", "Weigh-in"}, {"schedule", "weekly"}, {"per_week", 3}, {"source", "weight"}},
+                       [&](auto req, auto cb) { c.update(req, std::move(cb), weight); });
+    ASSERT_EQ(weekly->statusCode(), k200OK) << std::string(weekly->body());
+    EXPECT_EQ(body_of(weekly)["data"]["source"], "weight");
+    EXPECT_EQ(list(kAnna).size(), 1U);
+}
+
+// Anna's Mi account is in region cn (UTC+8); D(n) is the UTC day n days from today.
+//   D-5 01:00Z (09:00 local) 72.4 kg and D-5 03:00Z (11:00 local) 72.1 kg: D-5 is done, 72.1.
+//   D-4 17:00Z is 01:00 on D-3 local, 71.9 kg: D-3 is done, D-4 is not.
+//   D-2 has no weighing and a tick by hand: done, manual, no value.
+// The habit is created after all of them: the days are evaluated on read, nothing is backfilled.
+TEST_F(HabitsApiTest, AWeighInTicksItsLocalDayFromThePast) {
+    sql(std::string("INSERT INTO mi_accounts (owner_id, xiaomi_user_id, pass_token_sealed, nonce, region) VALUES ('") +
+        kAnna + "', '" + kAnnaMi + "', 'x', 'x', 'cn')");
+    const auto weigh = [&](int shift, const char* time, double kg) {
+        sql(std::string("INSERT INTO body_measurements (user_id, timestamp, weight_kg) VALUES ('") + kAnnaMi + "', '" +
+            utc_day(shift) + "T" + time + "Z', " + std::to_string(kg) + ")");
+    };
+    weigh(-5, "01:00:00", 72.4);
+    weigh(-5, "03:00:00", 72.1);
+    weigh(-4, "17:00:00", 71.9);
+    const auto weight = created(kAnna, json{{"name", "Weigh-in"}, {"schedule", "daily"}, {"source", "weight"}});
+    ASSERT_EQ(tick(kAnna, weight, utc_day(-2))->statusCode(), k200OK);
+
+    const json h = habit_of(days(reader(kAnna), utc_day(-6), utc_day(0), "UTC")["data"], weight);
+    EXPECT_FALSE(h["no_data"]);
+    for (int shift = -6; shift <= 0; ++shift) {
+        const bool weighed = shift == -5 || shift == -3;
+        const json day = day_of(h, utc_day(shift));
+        EXPECT_EQ(day["done"], weighed || shift == -2) << "D" << shift;
+        EXPECT_EQ(day["manual"], shift == -2) << "D" << shift;
+        if (!weighed) {
+            EXPECT_TRUE(day["value"].is_null()) << "D" << shift;
+        }
+    }
+    EXPECT_DOUBLE_EQ(day_of(h, utc_day(-5))["value"].get<double>(), 72.1) << "the later weighing of the day";
+    EXPECT_DOUBLE_EQ(day_of(h, utc_day(-3))["value"].get<double>(), 71.9) << "17:00Z is the next day in cn";
+    EXPECT_EQ(h["best"], 2) << "D-3 and D-2";
+    EXPECT_EQ(h["streak"], 0) << "yesterday is open";
+
+    // Without the fitness read permission the scales are not read: the rule of every Mi source.
+    const json blind =
+        habit_of(days(user(kAnna, Domain::Permission::kGeneral), utc_day(-6), utc_day(0), "UTC")["data"], weight);
+    EXPECT_TRUE(blind["no_data"]);
+    EXPECT_FALSE(day_of(blind, utc_day(-5))["done"]);
+    EXPECT_TRUE(day_of(blind, utc_day(-2))["done"]) << "the tick by hand still counts";
+
+    // Without a linked account too.
+    const auto other = created(kBoris, json{{"name", "Weigh-in"}, {"schedule", "daily"}, {"source", "weight"}});
+    EXPECT_TRUE(habit_of(days(reader(kBoris), utc_day(-6), utc_day(0), "UTC")["data"], other)["no_data"]);
 }
 
 TEST_F(HabitsApiTest, ASourceWithoutAnAccountSaysNoData) {

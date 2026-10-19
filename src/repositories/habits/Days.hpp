@@ -1,7 +1,7 @@
 /**
  * @file Days.hpp
  * @brief The habits evaluated over a range of days: the manual ticks, the Mi
- *        Fitness values (sleep, steps, active kcal) and the Training sessions
+ *        Fitness values (sleep, steps, active kcal, weigh-ins) and the Training sessions
  *        read for the range, the auto values computed on read. Shared by
  *        GET /api/v1/habits/days and the habits part of GET /api/v1/today.
  */
@@ -109,10 +109,12 @@ inline std::vector<Evaluated> evaluate(const std::string& owner,
     }
     bool wants_health = false;
     bool wants_workout = false;
+    bool wants_weight = false;
     for (const auto& row : rows) {
         const auto m = model_of(row);
         wants_health = wants_health || ::Habits::from_health(m.source);
         wants_workout = wants_workout || m.source == Source::Workout;
+        wants_weight = wants_weight || m.source == Source::Weight;
     }
     // Each window's values, kept to its own days: the sleep read is padded by a day
     // on each side, and a padding day holds only part of its nights.
@@ -129,6 +131,7 @@ inline std::vector<Evaluated> evaluate(const std::string& owner,
     ::Habits::Values steps;
     ::Habits::Values kcal;
     ::Habits::Values workouts;
+    ::Habits::Values weight;
     bool health_linked = false;
     const auto read_windows = windows(from, to, today, history);
     if (wants_health && access.health) {
@@ -151,6 +154,19 @@ inline std::vector<Evaluated> evaluate(const std::string& owner,
                     health.daily_activity(::Habits::text_of(lo), ::Habits::text_of(hi), kRowsPerWindow, 0).rows;
                 keep(steps, ::Habits::activity_by_day(activity, "steps"), lo, hi);
                 keep(kcal, ::Habits::activity_by_day(activity, "active_kcal"), lo, hi);
+                if (wants_weight) {
+                    // Weigh-ins are filed by their UTC instant; the region day may start hours earlier.
+                    keep(
+                        weight,
+                        ::Habits::weight_by_local_day(
+                            health
+                                .body(
+                                    ::Habits::text_of(lo - days{1}), ::Habits::text_of(hi + days{1}), kRowsPerWindow, 0)
+                                .rows,
+                            offset),
+                        lo,
+                        hi);
+                }
             }
         }
     }
@@ -192,6 +208,9 @@ inline std::vector<Evaluated> evaluate(const std::string& owner,
                 break;
             case Source::Workout:
                 values = &workouts;
+                break;
+            case Source::Weight:
+                values = &weight;
                 break;
             case Source::Manual:
                 break;

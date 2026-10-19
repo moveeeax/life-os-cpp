@@ -4,11 +4,12 @@
  *        hand or by a source meeting its goal, the daily streak with an open
  *        today across a month and a year boundary, the Monday-to-Sunday week
  *        and its streak across New Year, the best streak, sleep and workouts
- *        placed on the local day, the Now plate, a daily target on a habit
+ *        placed on the local day, weigh-ins on the local day, the Now plate, a daily target on a habit
  *        ticked by hand, and the tags of a mood check-in. The worked numbers are
  *        in the comments; 2026-10-14 is a Wednesday, 2026-01-01 a Thursday.
  */
 
+#include <cmath>
 #include <map>
 #include <optional>
 #include <set>
@@ -63,6 +64,8 @@ TEST(HabitsEval, ParsesTheWordsOfTheModel) {
     EXPECT_TRUE(Habits::source_of("steps") == Source::Steps);
     EXPECT_TRUE(Habits::source_of("active_kcal") == Source::ActiveKcal);
     EXPECT_TRUE(Habits::source_of("workout") == Source::Workout);
+    EXPECT_TRUE(Habits::source_of("weight") == Source::Weight);
+    EXPECT_TRUE(Habits::from_health(Source::Weight)) << "the scales are Mi Fitness rows";
     EXPECT_FALSE(Habits::source_of("water").has_value());
 }
 
@@ -279,6 +282,49 @@ TEST(HabitsEval, AWorkoutCountsOnTheLocalDayItFinished) {
     EXPECT_DOUBLE_EQ(by_day.at(d("2026-10-15")), 1);
     EXPECT_EQ(Habits::local_day("2026-10-13T20:30:00Z", 0), d("2026-10-13")) << "in UTC";
     EXPECT_EQ(Habits::local_day("2026-10-14T02:00:00Z", -7 * 3600), d("2026-10-13")) << "west of UTC";
+}
+
+// Region cn (UTC+8). Oct 13 22:30Z is 06:30 on Oct 14 local, Oct 14 03:00Z is 11:00 on
+// Oct 14: the later one (71.8) is the day's. Oct 14 16:30Z is 00:30 on Oct 15 local, with
+// no weight in it. Oct 12 10:00Z (Oct 12 18:00 local) weighs 72.4.
+TEST(HabitsEval, AWeighInLandsOnTheLocalDayAndTheLatestWins) {
+    const json rows = json::array({
+        {{"timestamp", "2026-10-12T10:00:00+00:00"}, {"weight_kg", 72.4}},
+        {{"timestamp", "2026-10-13T22:30:00+00:00"}, {"weight_kg", 72.1}},
+        {{"timestamp", "2026-10-14T03:00:00+00:00"}, {"weight_kg", 71.8}},
+        {{"timestamp", "2026-10-14T16:30:00+00:00"}, {"weight_kg", nullptr}},
+        {{"timestamp", nullptr}, {"weight_kg", 70}},
+    });
+    const auto by_day = Habits::weight_by_local_day(rows, 8 * 3600);
+    ASSERT_EQ(by_day.size(), 3U);
+    EXPECT_DOUBLE_EQ(by_day.at(d("2026-10-12")), 72.4);
+    EXPECT_DOUBLE_EQ(by_day.at(d("2026-10-14")), 71.8) << "the 11:00 weighing, not the 06:30 one";
+    EXPECT_EQ(by_day.count(d("2026-10-13")), 0U) << "22:30Z is already Oct 14 in the region";
+
+    // In UTC the 22:30 weighing stays on Oct 13 and the 16:30 one on Oct 14.
+    const auto utc = Habits::weight_by_local_day(rows, 0);
+    EXPECT_DOUBLE_EQ(utc.at(d("2026-10-13")), 72.1);
+    EXPECT_TRUE(std::isnan(utc.at(d("2026-10-14")))) << "the latest record of the day has no weight";
+
+    // A weigh-in is done whatever it weighs; a day without a number is still done, its value null.
+    const Habit weight = daily(Source::Weight);
+    const Habits::Checks none;
+    const auto weighed = Habits::day_state(weight, d("2026-10-14"), none, by_day);
+    EXPECT_TRUE(weighed.done);
+    EXPECT_FALSE(weighed.manual);
+    ASSERT_TRUE(weighed.value.has_value());
+    EXPECT_DOUBLE_EQ(*weighed.value, 71.8);
+    const auto no_number = Habits::day_state(weight, d("2026-10-15"), none, by_day);
+    EXPECT_TRUE(no_number.done) << "a record without weight_kg still ticks the day";
+    EXPECT_FALSE(no_number.value.has_value());
+    EXPECT_FALSE(Habits::day_state(weight, d("2026-10-13"), none, by_day).done) << "no weighing that day";
+    EXPECT_EQ(Habits::done_days(weight, none, by_day), days({"2026-10-12", "2026-10-14", "2026-10-15"}));
+
+    // A tick by hand on a day without a weighing counts, as for every source.
+    const Habits::Checks ticked{{d("2026-10-13"), std::nullopt}};
+    const auto by_hand = Habits::day_state(weight, d("2026-10-13"), ticked, by_day);
+    EXPECT_TRUE(by_hand.done);
+    EXPECT_TRUE(by_hand.manual);
 }
 
 // ── the Now plate ───────────────────────────────────────────────────────────

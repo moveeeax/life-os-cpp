@@ -244,7 +244,8 @@ Additive-only is a gate, not a review rule: the `openapi-drift` job runs
 against the spec on the merge base with `master` with `oasdiff breaking
 --fail-on WARN`. A removed path or operation, a response property that is no
 longer required, a tightened type or a removed enum value fails the job;
-adding is free. The same job runs `scripts/check-openapi-gen-fresh.sh`, so
+adding is free, a new value of a response enum included (oasdiff rates it a
+warning; `scripts/oasdiff-severity-levels.txt` lowers it to info). The same job runs `scripts/check-openapi-gen-fresh.sh`, so
 `tests/e2e/openapi.gen.json` cannot lag behind the YAML. Response bodies meet
 the schemas in the tests: the e2e suite over the wire and the api bucket
 in-process, both through `OpenApiCheck::expect_matches_schema`

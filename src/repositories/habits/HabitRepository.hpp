@@ -50,7 +50,7 @@ public:
         std::optional<int> per_week;
         std::optional<double> goal;
         std::string unit;
-        std::string source;            // manual | sleep | steps | active_kcal | workout
+        std::string source;            // manual | sleep | steps | active_kcal | workout | weight
         std::optional<double> target;  // manual only: the amount a day must reach
     };
 

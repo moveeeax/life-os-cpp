@@ -1,0 +1,1 @@
+Habits take a new source, a weigh-in: any record of the Mi scales in the local day of the account region ticks the day, and the day shows the weight of its latest record in kg. It takes no goal (one is refused with 400), a tick by hand still counts, and since the days are read from the scales on request, a habit made today shows the past weigh-ins too (migration 055).

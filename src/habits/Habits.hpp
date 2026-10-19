@@ -7,7 +7,8 @@
  *        whose value, the sum of the day, reaches the target) or the habit's
  *        source meets the goal that day: sleep minutes >= goal x 60, steps >=
  *        goal, active kcal >= goal, a workout when a session finished that
- *        local day. A daily habit streaks over consecutive done days ending
+ *        local day, a weigh-in when the Mi scales took a record that local
+ *        day. A daily habit streaks over consecutive done days ending
  *        yesterday, plus today when today is done; a weekly habit (Monday to Sunday) over
  *        consecutive weeks with at least per_week done days, ending last week,
  *        plus this week when met. An open today or week never breaks a streak.
@@ -17,8 +18,10 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdio>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
@@ -52,7 +55,7 @@ inline std::string text_of(Day d) {
 }
 
 enum class Schedule { Daily, Weekly };
-enum class Source { Manual, Sleep, Steps, ActiveKcal, Workout };
+enum class Source { Manual, Sleep, Steps, ActiveKcal, Workout, Weight };
 
 inline std::optional<Schedule> schedule_of(std::string_view s) {
     if (s == "daily") {
@@ -80,12 +83,15 @@ inline std::optional<Source> source_of(std::string_view s) {
     if (s == "workout") {
         return Source::Workout;
     }
+    if (s == "weight") {
+        return Source::Weight;
+    }
     return std::nullopt;
 }
 
 /// Whether the source reads the Mi Fitness tables (as opposed to Training or nothing).
 inline bool from_health(Source s) {
-    return s == Source::Sleep || s == Source::Steps || s == Source::ActiveKcal;
+    return s == Source::Sleep || s == Source::Steps || s == Source::ActiveKcal || s == Source::Weight;
 }
 
 struct Habit {
@@ -98,13 +104,16 @@ struct Habit {
 };
 
 /// Whether a day's source value meets the goal. Sleep values are minutes, the goal hours;
-/// a workout value is the count of sessions and ignores the goal.
+/// a workout value is the count of sessions and ignores the goal; a weigh-in is met by
+/// being there at all, whatever it weighs (kNoNumber included).
 inline bool meets(const Habit& h, double value) {
     switch (h.source) {
         case Source::Manual:
             return false;
         case Source::Workout:
             return value >= 1;
+        case Source::Weight:
+            return true;
         case Source::Sleep:
             return h.goal.has_value() && value >= *h.goal * 60.0;
         case Source::Steps:
@@ -125,6 +134,11 @@ inline bool check_counts(const Habit& h, const std::optional<double>& value) {
 /// Source values: day -> the value of the habit's source that day.
 using Values = std::map<Day, double>;
 
+/// The value of a day that has a record but no number in it: a weigh-in whose
+/// weight_kg is null. The day counts (meets() looks at the record, not the number)
+/// and day_state() reports its value as null.
+inline constexpr double kNoNumber = std::numeric_limits<double>::quiet_NaN();
+
 struct DayState {
     bool done = false;
     bool manual = false;
@@ -135,7 +149,9 @@ inline DayState day_state(const Habit& h, Day day, const Checks& manual, const V
     DayState s;
     const auto a = autos.find(day);
     if (a != autos.end()) {
-        s.value = a->second;
+        if (!std::isnan(a->second)) {
+            s.value = a->second;
+        }
         s.done = meets(h, a->second);
     }
     const auto m = manual.find(day);
@@ -299,6 +315,34 @@ inline Values workouts_by_local_day(const std::vector<Session>& sessions) {
     Values out;
     for (const auto& s : sessions) {
         out[local_day(s.finished_at, s.offset_seconds)] += 1;
+    }
+    return out;
+}
+
+/// A weigh-in by the local day it was taken on (the region zone, @p offset_seconds, as
+/// sleep): the weight_kg of the day's latest record, kNoNumber when that record has
+/// none. @p rows are HealthReadRepository::body rows.
+inline Values weight_by_local_day(const json& rows, long long offset_seconds) {
+    std::map<Day, std::pair<std::string, double>> latest;
+    for (const auto& r : rows) {
+        if (!r.contains("timestamp") || !r["timestamp"].is_string()) {
+            continue;
+        }
+        const std::string at = r["timestamp"].get<std::string>();
+        if (at.size() < 19) {
+            continue;
+        }
+        const Day day = local_day(at, offset_seconds);
+        const auto it = latest.find(day);
+        // Rows come oldest first: a later row of the same instant wins as well.
+        if (it == latest.end() || at >= it->second.first) {
+            const bool weighed = r.contains("weight_kg") && r["weight_kg"].is_number();
+            latest[day] = {at, weighed ? r["weight_kg"].get<double>() : kNoNumber};
+        }
+    }
+    Values out;
+    for (const auto& [day, v] : latest) {
+        out[day] = v.second;
     }
     return out;
 }
