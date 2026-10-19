@@ -3,7 +3,9 @@
  * @brief /api/v1/travel: the module switch, the owner scope on every kind of
  *        id, the two rule templates, counters over seeded crossings, a trip's
  *        spends in one currency (partial without a rate), a deleted trip
- *        leaving its tasks and spends, and tasks taking a trip.
+ *        leaving its tasks and spends, tasks taking a trip, a trip's purpose
+ *        and booked cost, the end date of a stay, and a trip's contacts and
+ *        moments.
  */
 
 #include <string>
@@ -58,6 +60,8 @@ protected:
         Database::get().execute_write([](auto& txn) {
             // DELETE, not TRUNCATE: task_items and money_transactions reference travel_trips.
             for (const char* table : {"travel_trip_items",
+                                      "travel_trip_contacts",
+                                      "travel_trip_moments",
                                       "travel_trips",
                                       "travel_rules",
                                       "travel_crossings",
@@ -449,4 +453,195 @@ TEST_F(TravelApiTest, ATaskTakesOnlyTheCallersTrip) {
     tasks.listItems(req, [&](const HttpResponsePtr& x) { r = x; });
     ASSERT_TRUE(r);
     EXPECT_EQ(body_of(r)["data"].size(), 1U) << "the trip's packing only";
+}
+
+TEST_F(TravelApiTest, ATripHasAPurposeAndABookedCost) {
+    auto made = call(kAnna,
+                     Post,
+                     json{{"name", "Bangkok"},
+                          {"start_date", "2026-11-01"},
+                          {"end_date", "2026-11-20"},
+                          {"purpose", "relocation"},
+                          {"booked_cost", {{"amount", 1250.5}, {"currency", "THB"}}}},
+                     [&](auto req, auto cb) { c.createTrip(req, std::move(cb)); });
+    ASSERT_EQ(made->statusCode(), k201Created) << std::string(made->body());
+    TestHelpers::expect_matches_schema(made, "POST", "/api/v1/travel/trips");
+    const auto trip = body_of(made)["data"];
+    EXPECT_EQ(trip["purpose"], "relocation");
+    EXPECT_EQ(trip["booked_cost"], (json{{"amount", 1250.5}, {"currency", "THB"}})) << "kept in its own currency";
+    const auto id = trip["id"].get<std::string>();
+    const auto patch = [&](const json& body) {
+        return call(kAnna, Patch, body, [&](auto req, auto cb) { c.updateTrip(req, std::move(cb), id); });
+    };
+    auto renamed = patch({{"name", "Bangkok again"}});
+    ASSERT_EQ(renamed->statusCode(), k200OK) << std::string(renamed->body());
+    EXPECT_EQ(body_of(renamed)["data"]["purpose"], "relocation") << "a field not sent stays";
+    EXPECT_EQ(body_of(renamed)["data"]["booked_cost"]["currency"], "THB");
+    auto cleared = patch({{"purpose", nullptr}, {"booked_cost", nullptr}});
+    ASSERT_EQ(cleared->statusCode(), k200OK) << std::string(cleared->body());
+    TestHelpers::expect_matches_schema(cleared, "PATCH", "/api/v1/travel/trips/{id}");
+    EXPECT_TRUE(body_of(cleared)["data"]["purpose"].is_null());
+    EXPECT_TRUE(body_of(cleared)["data"]["booked_cost"].is_null());
+    for (const json& bad : {json{{"purpose", "holiday"}},
+                            json{{"booked_cost", {{"amount", -1}, {"currency", "USD"}}}},
+                            json{{"booked_cost", {{"amount", 10}, {"currency", "usd"}}}},
+                            json{{"booked_cost", {{"amount", 10}}}},
+                            json{{"booked_cost", {{"amount", "10"}, {"currency", "USD"}}}},
+                            json{{"booked_cost", 10}}}) {
+        EXPECT_EQ(patch(bad)->statusCode(), k400BadRequest) << bad.dump();
+    }
+    auto listed = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.listTrips(req, std::move(cb)); });
+    TestHelpers::expect_matches_schema(listed, "GET", "/api/v1/travel/trips");
+    EXPECT_TRUE(body_of(listed)["data"][0].contains("booked_cost"));
+}
+
+TEST_F(TravelApiTest, AStayHasAnEndDate) {
+    const auto trip = created_trip(kAnna)["id"].get<std::string>();
+    const auto add = [&](const json& body) {
+        return call(kAnna, Post, body, [&](auto req, auto cb) { c.addItem(req, std::move(cb), trip); });
+    };
+    auto stay = add({{"kind", "stay"},
+                     {"date", "2026-11-02"},
+                     {"end_date", "2026-11-09"},
+                     {"title", "Lanta Sand"},
+                     {"reference", "HB-55120"}});
+    ASSERT_EQ(stay->statusCode(), k201Created) << std::string(stay->body());
+    TestHelpers::expect_matches_schema(stay, "POST", "/api/v1/travel/trips/{id}/items");
+    EXPECT_EQ(body_of(stay)["data"]["end_date"], "2026-11-09");
+    EXPECT_EQ(body_of(stay)["data"]["reference"], "HB-55120");
+    auto flight = add({{"kind", "flight"}, {"date", "2026-11-02"}, {"title", "ALA to BKK"}});
+    ASSERT_EQ(flight->statusCode(), k201Created);
+    EXPECT_TRUE(body_of(flight)["data"]["end_date"].is_null());
+    EXPECT_EQ(
+        add({{"kind", "flight"}, {"date", "2026-11-02"}, {"end_date", "2026-11-03"}, {"title", "x"}})->statusCode(),
+        k400BadRequest)
+        << "only a stay has an end date";
+    EXPECT_EQ(add({{"kind", "stay"}, {"date", "2026-11-02"}, {"end_date", "2026-11-01"}, {"title", "x"}})->statusCode(),
+              k400BadRequest)
+        << "a stay ends on or after its first day";
+    EXPECT_EQ(add({{"kind", "stay"}, {"date", "2026-11-02"}, {"end_date", "2026-11-31"}, {"title", "x"}})->statusCode(),
+              k400BadRequest);
+    // A replacement without end_date drops it, as every other field of a full replacement.
+    const auto id = body_of(stay)["data"]["id"].get<std::string>();
+    auto replaced = call(
+        kAnna, Patch, json{{"kind", "stay"}, {"date", "2026-11-02"}, {"title", "Lanta Sand"}}, [&](auto req, auto cb) {
+            c.updateItem(req, std::move(cb), trip, id);
+        });
+    ASSERT_EQ(replaced->statusCode(), k200OK) << std::string(replaced->body());
+    EXPECT_TRUE(body_of(replaced)["data"]["end_date"].is_null());
+}
+
+TEST_F(TravelApiTest, ATripKeepsItsContactsAndMoments) {
+    const auto trip = created_trip(kAnna)["id"].get<std::string>();
+    auto contact = call(kAnna,
+                        Post,
+                        json{{"name", "Somchai"},
+                             {"role", "host"},
+                             {"phone", "+66 81 234 5678"},
+                             {"email", "host@example.com"},
+                             {"link", "https://example.com/somchai"}},
+                        [&](auto req, auto cb) { c.addContact(req, std::move(cb), trip); });
+    ASSERT_EQ(contact->statusCode(), k201Created) << std::string(contact->body());
+    TestHelpers::expect_matches_schema(contact, "POST", "/api/v1/travel/trips/{id}/contacts");
+    const auto contact_id = body_of(contact)["data"]["id"].get<std::string>();
+    for (const json& bad : {json{{"name", ""}},
+                            json{{"role", "host"}},
+                            json{{"name", "x"}, {"email", "not an email"}},
+                            json{{"name", "x"}, {"link", "javascript:alert(1)"}}}) {
+        EXPECT_EQ(
+            call(kAnna, Post, bad, [&](auto req, auto cb) { c.addContact(req, std::move(cb), trip); })->statusCode(),
+            k400BadRequest)
+            << bad.dump();
+    }
+    auto moment = call(kAnna,
+                       Post,
+                       json{{"date", "2026-11-03"}, {"text", "Sunset on the pier"}, {"place", "Koh Lanta"}},
+                       [&](auto req, auto cb) { c.addMoment(req, std::move(cb), trip); });
+    ASSERT_EQ(moment->statusCode(), k201Created) << std::string(moment->body());
+    TestHelpers::expect_matches_schema(moment, "POST", "/api/v1/travel/trips/{id}/moments");
+    const auto moment_id = body_of(moment)["data"]["id"].get<std::string>();
+    call(kAnna, Post, json{{"date", "2026-11-02"}, {"text", "Landed"}}, [&](auto req, auto cb) {
+        c.addMoment(req, std::move(cb), trip);
+    });
+    for (const json& bad : {json{{"date", "2026-11-03"}}, json{{"text", "x"}}, json{{"date", "x"}, {"text", "x"}}}) {
+        EXPECT_EQ(
+            call(kAnna, Post, bad, [&](auto req, auto cb) { c.addMoment(req, std::move(cb), trip); })->statusCode(),
+            k400BadRequest)
+            << bad.dump();
+    }
+
+    auto view = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.getTrip(req, std::move(cb), trip); });
+    ASSERT_EQ(view->statusCode(), k200OK);
+    TestHelpers::expect_matches_schema(view, "GET", "/api/v1/travel/trips/{id}");
+    const auto data = body_of(view)["data"];
+    ASSERT_EQ(data["contacts"].size(), 1U);
+    EXPECT_EQ(data["contacts"][0]["role"], "host");
+    ASSERT_EQ(data["moments"].size(), 2U);
+    EXPECT_EQ(data["moments"][0]["text"], "Landed") << "the earliest first";
+
+    auto edited = call(kAnna, Patch, json{{"name", "Somchai"}, {"role", "driver"}}, [&](auto req, auto cb) {
+        c.updateContact(req, std::move(cb), trip, contact_id);
+    });
+    ASSERT_EQ(edited->statusCode(), k200OK) << std::string(edited->body());
+    TestHelpers::expect_matches_schema(edited, "PATCH", "/api/v1/travel/trips/{id}/contacts/{child}");
+    EXPECT_EQ(body_of(edited)["data"]["role"], "driver");
+    EXPECT_EQ(body_of(edited)["data"]["phone"], "") << "a full replacement";
+    auto rewritten =
+        call(kAnna, Patch, json{{"date", "2026-11-04"}, {"text", "Sunset, again"}}, [&](auto req, auto cb) {
+            c.updateMoment(req, std::move(cb), trip, moment_id);
+        });
+    ASSERT_EQ(rewritten->statusCode(), k200OK) << std::string(rewritten->body());
+    TestHelpers::expect_matches_schema(rewritten, "PATCH", "/api/v1/travel/trips/{id}/moments/{child}");
+    EXPECT_EQ(body_of(rewritten)["data"]["date"], "2026-11-04");
+
+    // Another owner sees none of it.
+    EXPECT_EQ(
+        call(kBoris, Post, json{{"name", "x"}}, [&](auto req, auto cb) { c.addContact(req, std::move(cb), trip); })
+            ->statusCode(),
+        k404NotFound);
+    EXPECT_EQ(call(kBoris,
+                   Patch,
+                   json{{"name", "x"}},
+                   [&](auto req, auto cb) { c.updateContact(req, std::move(cb), trip, contact_id); })
+                  ->statusCode(),
+              k404NotFound);
+    EXPECT_EQ(call(kBoris,
+                   Delete,
+                   json::object(),
+                   [&](auto req, auto cb) { c.deleteMoment(req, std::move(cb), trip, moment_id); })
+                  ->statusCode(),
+              k404NotFound);
+    EXPECT_EQ(call(kBoris,
+                   Post,
+                   json{{"date", "2026-11-03"}, {"text", "x"}},
+                   [&](auto req, auto cb) { c.addMoment(req, std::move(cb), trip); })
+                  ->statusCode(),
+              k404NotFound);
+
+    const auto remove_contact = [&] {
+        return call(kAnna,
+                    Delete,
+                    json::object(),
+                    [&](auto req, auto cb) { c.deleteContact(req, std::move(cb), trip, contact_id); })
+            ->statusCode();
+    };
+    EXPECT_EQ(remove_contact(), k204NoContent);
+    EXPECT_EQ(remove_contact(), k404NotFound);
+    EXPECT_EQ(call(kAnna,
+                   Delete,
+                   json::object(),
+                   [&](auto req, auto cb) { c.deleteMoment(req, std::move(cb), trip, moment_id); })
+                  ->statusCode(),
+              k204NoContent);
+
+    // The trip takes the rest with it.
+    call(kAnna, Delete, json::object(), [&](auto req, auto cb) { c.deleteTrip(req, std::move(cb), trip); });
+    const auto left = Database::get().execute_read([&](auto& txn) {
+        auto r = txn.exec_params(
+            "SELECT (SELECT count(*) FROM travel_trip_contacts WHERE owner_id = $1::uuid) + "
+            " (SELECT count(*) FROM travel_trip_moments WHERE owner_id = $1::uuid)",
+            std::string(kAnna));
+        return r[0][0].template as<long>();
+    });
+    EXPECT_EQ(left, 0);
 }
