@@ -661,11 +661,11 @@ components:
       description: A sum in one currency; amounts of two currencies are never added together
       properties:
         currency: { type: string, pattern: '^[A-Z]{3}$' }
-        amount: { type: number }
+        amount: { type: number, description: 'In the currency''s major units, e.g. 1500.50' }
     PracticeTotal:
       type: object
       required: [currency, income, expense, net, entries]
-      description: 'The totals of one currency: income, expense, income minus expense, and the count of entries'
+      description: 'The totals of one currency in its major units (e.g. 1500.50): income, expense, income minus expense, and the count of entries'
       properties:
         currency: { type: string, pattern: '^[A-Z]{3}$' }
         income: { type: number }
@@ -704,7 +704,7 @@ components:
         client_name: { type: string }
         title: { type: string }
         stage: { $ref: '#/components/schemas/PracticeDealStage' }
-        value: { type: [number, 'null'], description: The agreed value, in currency }
+        value: { type: [number, 'null'], description: 'The agreed value, in the currency''s major units, e.g. 1500.50' }
         currency: { type: [string, 'null'], pattern: '^[A-Z]{3}$' }
         start_date: { type: [string, 'null'], format: date }
         end_date: { type: [string, 'null'], format: date }
@@ -719,7 +719,7 @@ components:
         client_id: { type: string, format: uuid, description: 'A client of the caller; required on create' }
         title: { type: string, minLength: 1, maxLength: 200, description: Required on create }
         stage: { $ref: '#/components/schemas/PracticeDealStage' }
-        value: { type: [number, 'null'], exclusiveMinimum: 0, description: 'Given together with currency, both or neither; a whole number of the currency''s smallest unit' }
+        value: { type: [number, 'null'], exclusiveMinimum: 0, description: 'Given together with currency, both or neither; in the currency''s major units, e.g. 1500.50, with no more decimals than the currency has' }
         currency: { type: [string, 'null'], pattern: '^[A-Z]{3}$' }
         start_date: { type: [string, 'null'], format: date }
         end_date: { type: [string, 'null'], format: date, description: On or after start_date }
@@ -732,7 +732,7 @@ components:
         id: { type: string, format: uuid }
         kind: { type: string, enum: [income, expense] }
         date: { type: string, format: date }
-        amount: { type: number, description: Positive; the kind is the sign }
+        amount: { type: number, description: 'Positive, in the currency''s major units, e.g. 1500.50; the kind is the sign' }
         currency: { type: string, pattern: '^[A-Z]{3}$' }
         client_id: { type: [string, 'null'], format: uuid }
         client_name: { type: [string, 'null'] }
@@ -746,7 +746,7 @@ components:
       properties:
         kind: { type: string, enum: [income, expense], description: Required on create }
         date: { type: string, format: date, description: Required on create }
-        amount: { type: number, exclusiveMinimum: 0, description: 'Required on create; a whole number of the currency''s smallest unit' }
+        amount: { type: number, exclusiveMinimum: 0, description: 'Required on create; in the currency''s major units, e.g. 1500.50, with no more decimals than the currency has' }
         currency: { type: string, pattern: '^[A-Z]{3}$', description: Required on create }
         client_id: { type: [string, 'null'], format: uuid, description: 'A client of the caller; with a deal, the deal''s client (filled when left out)' }
         deal_id: { type: [string, 'null'], format: uuid, description: A deal of the caller }
@@ -761,7 +761,7 @@ components:
     PracticeClientTotal:
       type: object
       required: [client_id, client_name, currency, income, expense, net, entries]
-      description: The totals of one client in one currency; client_id null for entries without a client
+      description: The totals of one client in one currency, in its major units (e.g. 1500.50); client_id null for entries without a client
       properties:
         client_id: { type: [string, 'null'], format: uuid }
         client_name: { type: [string, 'null'] }

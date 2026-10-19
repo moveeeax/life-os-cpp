@@ -2,9 +2,9 @@
  * @file PracticeController.cpp
  * @brief The practice module: clients, deals and the incomes and expenses of
  *        the practice. Every link is the caller's own; an amount is positive,
- *        in its own currency and a whole number of that currency's smallest
- *        unit; the months answer totals per currency and never add two
- *        currencies together.
+ *        in its own currency and in its major units (1500.50 RUB), with no
+ *        more decimals than the currency has; the months answer totals per
+ *        currency and never add two currencies together.
  */
 
 #include "api/PracticeController.hpp"

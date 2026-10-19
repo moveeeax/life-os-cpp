@@ -4,7 +4,7 @@
  *        stages, incomes and expenses in their own currencies, the months
  *        with totals per currency (two currencies never added together), the
  *        owner scope, the 404 while the module is off, and a task linked to
- *        a deal as its next step.
+ *        a deal as its next step; every amount in the currency's major units.
  */
 
 #include <string>
@@ -429,6 +429,44 @@ TEST_F(PracticeApiTest, ATaskIsANextStepOfADeal) {
         call(kAnna, Get, json::object(), [&](auto req, auto cb) { tasks.getItem(req, std::move(cb), task_id); });
     ASSERT_EQ(left->statusCode(), k200OK);
     EXPECT_TRUE(body_of(left)["data"]["deal_id"].is_null()) << "the task stays, unlinked";
+}
+
+// Every practice amount is in the currency's major units: 1500.50 RUB goes in and comes back as 1500.5,
+// never as 150050 kopecks.
+TEST_F(PracticeApiTest, AmountsAreInMajorUnits) {
+    const auto acme = client(kAnna);
+    auto d = add_deal(kAnna, json{{"client_id", acme}, {"title", "Audit"}, {"value", 1500.50}, {"currency", "RUB"}});
+    ASSERT_EQ(d->statusCode(), k201Created) << std::string(d->body());
+    EXPECT_DOUBLE_EQ(body_of(d)["data"]["value"].get<double>(), 1500.5);
+    const std::string audit = body_of(d)["data"]["id"].get<std::string>();
+
+    auto e = add_entry(
+        kAnna,
+        json{{"kind", "income"}, {"date", "2026-10-03"}, {"amount", 1500.50}, {"currency", "RUB"}, {"deal_id", audit}});
+    ASSERT_EQ(e->statusCode(), k201Created) << std::string(e->body());
+    EXPECT_DOUBLE_EQ(body_of(e)["data"]["amount"].get<double>(), 1500.5);
+    auto x = add_entry(kAnna, json{{"kind", "expense"}, {"date", "2026-10-04"}, {"amount", 0.25}, {"currency", "RUB"}});
+    ASSERT_EQ(x->statusCode(), k201Created) << std::string(x->body());
+
+    const json received = deal_row(kAnna, audit)["received"];
+    ASSERT_EQ(received.size(), 1U);
+    EXPECT_EQ(received[0]["currency"], "RUB");
+    EXPECT_DOUBLE_EQ(received[0]["amount"].get<double>(), 1500.5) << "PracticeAmount in major units";
+
+    auto one = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.getMonth(req, std::move(cb), "2026-10"); });
+    ASSERT_EQ(one->statusCode(), k200OK) << std::string(one->body());
+    const json totals = body_of(one)["data"]["totals"];
+    const json rub = total_of(totals, "RUB");
+    ASSERT_TRUE(rub.is_object()) << totals.dump();
+    EXPECT_DOUBLE_EQ(rub["income"].get<double>(), 1500.5);
+    EXPECT_DOUBLE_EQ(rub["expense"].get<double>(), 0.25);
+    EXPECT_DOUBLE_EQ(rub["net"].get<double>(), 1500.25);
+
+    EXPECT_EQ(
+        add_entry(kAnna, json{{"kind", "income"}, {"date", "2026-10-05"}, {"amount", 1500.505}, {"currency", "RUB"}})
+            ->statusCode(),
+        k400BadRequest)
+        << "RUB has two decimals";
 }
 
 namespace {
