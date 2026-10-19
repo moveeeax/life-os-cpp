@@ -73,11 +73,14 @@ public:
             [&](auto& txn) -> std::optional<nlohmann::json> { return find_in(txn, owner, code); });
     }
 
-    /// Insert or update by code. @throws Invariant on a bad code or decimals.
+    /// Insert or update by code. @throws Invariant on a bad code or decimals;
+    /// DecimalsInUse when the code exists and the update would shrink its
+    /// decimals under rows kept in it (the same rule as patch()).
     nlohmann::json upsert(const std::string& owner, const std::string& code, const Input& in) {
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
+                    refuse_fewer_decimals_in(txn, owner, code, in.decimals);
                     txn.exec_params(
                         "INSERT INTO money_currencies (owner_id, code, name, role, decimals, minor_unit, archived) "
                         "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7) "
@@ -105,24 +108,8 @@ public:
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
                     if (p.decimals.has_value()) {
-                        auto cur = txn.exec_params(
-                            "SELECT decimals FROM money_currencies WHERE owner_id = $1::uuid AND code = $2 FOR UPDATE",
-                            owner,
-                            code);
-                        if (cur.empty()) {
+                        if (!refuse_fewer_decimals_in(txn, owner, code, *p.decimals)) {
                             throw NotFound("money_currency");
-                        }
-                        if (*p.decimals < cur[0][0].template as<int>()) {
-                            auto used = txn.exec_params(
-                                "SELECT 1 WHERE EXISTS (SELECT 1 FROM money_accounts WHERE owner_id = $1::uuid AND "
-                                "currency = $2) OR EXISTS (SELECT 1 FROM money_categories WHERE owner_id = $1::uuid "
-                                "AND budget_currency = $2) OR EXISTS (SELECT 1 FROM money_transactions WHERE "
-                                "owner_id = $1::uuid AND receipt_currency = $2)",
-                                owner,
-                                code);
-                            if (!used.empty()) {
-                                throw DecimalsInUse();
-                            }
                         }
                     }
                     auto r = txn.exec_params(
@@ -206,6 +193,31 @@ public:
 
 private:
     inline static const std::string kColumns = kColumnsRaw;
+
+    /// Locks the owner's row of @p code and throws DecimalsInUse when
+    /// @p decimals is fewer than it has while an account, a budget or a
+    /// receipt is kept in the currency. False when the owner has no such code.
+    template <typename Txn>
+    static bool refuse_fewer_decimals_in(Txn& txn, const std::string& owner, const std::string& code, int decimals) {
+        auto cur = txn.exec_params(
+            "SELECT decimals FROM money_currencies WHERE owner_id = $1::uuid AND code = $2 FOR UPDATE", owner, code);
+        if (cur.empty()) {
+            return false;
+        }
+        if (decimals < cur[0][0].template as<int>()) {
+            auto used = txn.exec_params(
+                "SELECT 1 WHERE EXISTS (SELECT 1 FROM money_accounts WHERE owner_id = $1::uuid AND "
+                "currency = $2) OR EXISTS (SELECT 1 FROM money_categories WHERE owner_id = $1::uuid "
+                "AND budget_currency = $2) OR EXISTS (SELECT 1 FROM money_transactions WHERE "
+                "owner_id = $1::uuid AND receipt_currency = $2)",
+                owner,
+                code);
+            if (!used.empty()) {
+                throw DecimalsInUse();
+            }
+        }
+        return true;
+    }
 
     template <typename Txn>
     static std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& code) {

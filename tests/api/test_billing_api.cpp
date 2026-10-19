@@ -691,6 +691,32 @@ TEST_F(BillingApiTest, CaptureMapsOrderNotApprovedToConflict) {
     EXPECT_NE(payment->status, "failed");
 }
 
+// A first capture came back PENDING (the payment stays open); a second
+// /capture makes PayPal answer ORDER_ALREADY_CAPTURED, which is a 409 for
+// the client to wait on, not a 500.
+TEST_F(BillingApiTest, ASecondCaptureOfAPendingOrderIsAConflict) {
+    auto user = seed_user("pending-twice-buyer@example.com");
+    fake->next_order_id = "ORDER-PENDING-TWICE-1";
+    do_topup(user, json{{"amount_cents", 1000}});
+    fake->capture_amount_cents = 1000;
+    fake->capture_status = "PENDING";
+    int status = 0;
+    auto first = do_capture(user, "ORDER-PENDING-TWICE-1", &status);
+    EXPECT_EQ(status, k200OK);
+    EXPECT_EQ(first["data"]["pending"], true);
+
+    fake->capture_throw_message =
+        "paypal: capture_order failed with HTTP 422: name=UNPROCESSABLE_ENTITY issue=ORDER_ALREADY_CAPTURED";
+    auto second = do_capture(user, "ORDER-PENDING-TWICE-1", &status);
+    EXPECT_EQ(status, k409Conflict);
+    EXPECT_EQ(second["error"], "capture_pending");
+    EXPECT_EQ(Billing::balance_of(user.subject), 0);
+    auto payment = payments.find_by_order_id("ORDER-PENDING-TWICE-1");
+    ASSERT_TRUE(payment.has_value());
+    EXPECT_NE(payment->status, "captured");
+    EXPECT_NE(payment->status, "failed");
+}
+
 // A PayPal failure that ISN'T a recognized 4xx-shaped issue must surface as
 // a plain 500 with no partial/inconsistent DB state — no ledger row, no
 // payment mutation, and the request is safely retryable.

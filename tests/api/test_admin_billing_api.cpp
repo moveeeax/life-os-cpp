@@ -24,6 +24,8 @@
  * no SMTP anywhere.
  */
 
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -382,6 +384,101 @@ TEST_F(AdminBillingApiTest, UpdatePackageRejectsEmptyPatchAndUnknownId) {
         [&](const HttpResponsePtr& r) { resp = r; },
         "00000000-0000-0000-0000-000000000000");
     EXPECT_EQ(resp->statusCode(), k404NotFound);
+}
+
+// A sort outside int used to be truncated by get<int>() (4294967297 -> 1).
+TEST_F(AdminBillingApiTest, UpdatePackageRefusesASortOutsideInt) {
+    auto admin = seed_admin();
+    auto pkg = seed_package("Existing", 500, 500);
+    for (const auto& body :
+         {json{{"sort", 4294967297LL}}, json{{"sort", "1"}}, json{{"credits", 1'000'000'000'001LL}}}) {
+        HttpResponsePtr resp;
+        controller.updatePackage(
+            TestHelpers::authed_json(admin, body, Patch), [&](const HttpResponsePtr& r) { resp = r; }, pkg.id);
+        ASSERT_NE(resp, nullptr);
+        EXPECT_EQ(resp->statusCode(), k400BadRequest) << body.dump();
+    }
+    auto kept = packages.find(pkg.id);
+    ASSERT_TRUE(kept.has_value());
+    EXPECT_EQ(kept->sort, 0);
+    EXPECT_EQ(kept->credits, 500);
+}
+
+// The audit row of a package update or delete, and of a settings update,
+// holds the values before the write, so a price change can be reconstructed.
+TEST_F(AdminBillingApiTest, AuditRowsKeepTheValuesBefore) {
+    auto admin = seed_admin();
+    auto pkg = seed_package("Starter", 500, 600);
+    HttpResponsePtr resp;
+    controller.updatePackage(
+        TestHelpers::authed_json(admin, json{{"amount_cents", 700}}, Patch),
+        [&](const HttpResponsePtr& r) { resp = r; },
+        pkg.id);
+    ASSERT_EQ(resp->statusCode(), k200OK);
+    controller.updateSettings(
+        TestHelpers::authed_json(
+            admin, json{{"credits_per_unit", 80}, {"min_amount_cents", 100}, {"max_amount_cents", 100000}}, Put),
+        [&](const HttpResponsePtr& r) { resp = r; });
+    ASSERT_EQ(resp->statusCode(), k200OK);
+    controller.deletePackage(
+        TestHelpers::authed(admin, Delete), [&](const HttpResponsePtr& r) { resp = r; }, pkg.id);
+    ASSERT_EQ(resp->statusCode(), k200OK);
+
+    const auto details = [&](const std::string& action, const std::string& target) {
+        return Database::get().execute_read([&](auto& txn) {
+            auto r = txn.exec_params(
+                "SELECT details::text FROM audit_log WHERE action = $1 AND target_id = $2 ORDER BY id DESC LIMIT 1",
+                action,
+                target);
+            EXPECT_EQ(r.size(), 1u);
+            return r.empty() ? json::object() : json::parse(r[0][0].template as<std::string>());
+        });
+    };
+    const json updated = details("billing.package.update", pkg.id);
+    EXPECT_EQ(updated["before"]["amount_cents"], 500);
+    EXPECT_EQ(updated["after"]["amount_cents"], 700);
+    EXPECT_EQ(updated["before"]["credits"], 600);
+    const json deleted = details("billing.package.delete", pkg.id);
+    EXPECT_EQ(deleted["before"]["amount_cents"], 700);
+    EXPECT_EQ(deleted["before"]["title"], "Starter");
+    const json settings_row = details("billing.settings.update", "1");
+    EXPECT_EQ(settings_row["before"]["credits_per_unit"], 100);
+    EXPECT_EQ(settings_row["after"]["credits_per_unit"], 80);
+}
+
+// Bounds that keep the credit math inside int64: package credits and
+// |delta_credits| at most 10^12, credits_per_unit at most 10^9.
+TEST_F(AdminBillingApiTest, CreditsRateAndAdjustDeltaAreBounded) {
+    auto admin = seed_admin();
+    auto target = seed_user("bounded@example.com");
+    HttpResponsePtr resp;
+    controller.createPackage(
+        TestHelpers::authed_json(admin,
+                                 json{{"title", "Huge"}, {"amount_cents", 100}, {"credits", 1'000'000'000'001LL}}),
+        [&](const HttpResponsePtr& r) { resp = r; });
+    EXPECT_EQ(resp->statusCode(), k400BadRequest);
+
+    controller.updateSettings(
+        TestHelpers::authed_json(
+            admin,
+            json{{"credits_per_unit", 1'000'000'000'000LL}, {"min_amount_cents", 100}, {"max_amount_cents", 100000}},
+            Put),
+        [&](const HttpResponsePtr& r) { resp = r; });
+    EXPECT_EQ(resp->statusCode(), k400BadRequest);
+    EXPECT_EQ(settings.get().credits_per_unit, 100);
+
+    for (const json& delta : {json(std::numeric_limits<std::int64_t>::max()),
+                              json(std::numeric_limits<std::int64_t>::min()),
+                              json(std::uint64_t{1} << 63),
+                              json(1'000'000'000'001LL)}) {
+        controller.adjustWallet(
+            TestHelpers::authed_json(admin, json{{"delta_credits", delta}, {"note", "huge"}}),
+            [&](const HttpResponsePtr& r) { resp = r; },
+            target.subject);
+        EXPECT_EQ(resp->statusCode(), k400BadRequest) << delta.dump();
+    }
+    EXPECT_EQ(Billing::balance_of(target.subject), 0);
+    EXPECT_EQ(audit_count("billing.wallet.adjust", target.subject), 0);
 }
 
 // ── settings ────────────────────────────────────────────────────────────────

@@ -186,6 +186,17 @@ void BillingController::capture(const HttpRequestPtr& req, std::function<void(co
                         ErrorResponse::conflict("order_not_approved", "This PayPal order has not been approved yet"));
                     return;
                 }
+                // PayPal's ORDER_ALREADY_CAPTURED (422, Orders v2 error
+                // reference: "only one capture per order is allowed"): an
+                // earlier capture of this order came back PENDING, so the
+                // payment is still open here and the webhook settles it.
+                // A second /capture is the client asking again, not a fault.
+                if (std::string(e.what()).find("ORDER_ALREADY_CAPTURED") != std::string::npos) {
+                    callback(ErrorResponse::conflict(
+                        "capture_pending",
+                        "PayPal already holds a capture of this order; the credits arrive when it completes"));
+                    return;
+                }
                 throw;  // anything else: with_repo_errors' outer catch maps it to 500.
             }
 
@@ -701,7 +712,16 @@ bool BillingController::resolve_topup_plan(const json& body,
         }
         out.amount_cents = body["amount_cents"].get<std::int64_t>();
         // Integer math only — see Billing::refund_capture's identical rule.
-        out.credits_expected = (out.amount_cents * out.rate_snapshot) / 100;
+        // The product is 128-bit: amount_cents comes from the client and is
+        // range-checked only below, so int64 could overflow (UB) first.
+        const auto credits = Billing::mul_div(out.amount_cents, out.rate_snapshot, 100);
+        if (!credits) {
+            callback(ErrorResponse::bad_request(
+                "amount_out_of_range",
+                "amount_cents must be between " + std::to_string(min_cents) + " and " + std::to_string(max_cents)));
+            return false;
+        }
+        out.credits_expected = *credits;
     }
 
     // Guard BEFORE the PayPal order is ever created (topup() calls

@@ -272,7 +272,9 @@ CreditResult refund_capture(const std::string& provider_capture_id,
         // amount_cents) / amount_cents == credits_expected` exactly for a
         // full refund, no matter how credits_expected was priced (package or
         // custom).
-        const std::int64_t refund_credits = (credits_expected * refunded_amount_cents) / amount_cents;
+        // 128-bit product: credits_expected * refunded_amount_cents can pass
+        // 2^63 for a large rate; the quotient is at most credits_expected.
+        const std::int64_t refund_credits = *mul_div(credits_expected, refunded_amount_cents, amount_cents);
 
         // Materialize the row FIRST so the lock below always has something
         // to hold — see credit_capture's comments for the full lost-update
@@ -408,6 +410,8 @@ CreditResult adjust(const std::string& user_id,
                     const std::string& admin_id) {
     if (delta_credits == 0)
         throw ZeroAdjustment{};
+    if (delta_credits > kMaxCredits || delta_credits < -kMaxCredits)
+        throw AdjustmentTooLarge{};
 
     switch (detail::check_user_id(user_id)) {
         case detail::IdCheck::Malformed:
@@ -451,7 +455,9 @@ CreditResult adjust(const std::string& user_id,
                 // caught below as SQLSTATE 23514.
                 auto wb = txn.exec_params("SELECT credits FROM wallet_balances WHERE user_id = $1 FOR UPDATE", user_id);
                 const std::int64_t current_balance = wb[0]["credits"].template as<std::int64_t>();
-                const std::int64_t new_total = current_balance + delta_credits;
+                std::int64_t new_total = 0;
+                if (__builtin_add_overflow(current_balance, delta_credits, &new_total))
+                    throw AdjustmentTooLarge{};
 
                 txn.exec_params(
                     "INSERT INTO wallet_entries (user_id, delta_credits, kind, reference, note, created_by) "

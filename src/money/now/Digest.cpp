@@ -7,6 +7,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "cache/Cache.hpp"
+#include "money/DigestCache.hpp"
 #include "money/Period.hpp"
 #include "now/Today.hpp"
 #include "repositories/money/ReportBuilder.hpp"
@@ -15,7 +17,9 @@
 
 namespace Money {
 
-nlohmann::json digest(const std::string& owner, const std::string& day) {
+namespace {
+
+nlohmann::json compute(const std::string& owner, const std::string& day) {
     using json = nlohmann::json;
     using Period::Kind;
     Repositories::Money::TransactionRepository tx;
@@ -48,6 +52,15 @@ nlohmann::json digest(const std::string& owner, const std::string& day) {
     return json{{"currencies", currencies.is_null() ? json::array() : currencies},
                 {"spends_today", spends},
                 {"net_worth", net_worth}};
+}
+
+}  // namespace
+
+nlohmann::json digest(const std::string& owner, const std::string& day) {
+    // Cached per owner and day under the version tokens of DigestCache.hpp;
+    // the answer is the same JSON either way, and Redis down means computed.
+    return Cache::cached<nlohmann::json>(
+        DigestCache::entry_key(owner, day), DigestCache::kTtlSec, [&] { return compute(owner, day); });
 }
 
 }  // namespace Money

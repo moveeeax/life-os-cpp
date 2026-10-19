@@ -23,6 +23,7 @@
 #include <nlohmann/json.hpp>
 
 #include "jobs/Jobs.hpp"
+#include "money/DigestCache.hpp"
 #include "money/Period.hpp"
 #include "money/RatesSource.hpp"
 #include "net/Http.hpp"
@@ -61,6 +62,8 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         }
     }
     rates.put_day(day.date, keep);
+    // The net worth on /today reads these quotes: the cached digests go stale.
+    Money::DigestCache::touch_rates();
     nlohmann::json out{{"status", "done"}, {"date", day.date}, {"stored", keep.size()}};
     if (!missing.empty()) {
         out["missing"] = missing;
@@ -69,18 +72,11 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     return out;
 }
 
-/// The days in [from, to] that have no rates yet, oldest first.
+/// The days in [from, to] that have no rates yet, or lack a quote in use
+/// that the source publishes (FxRateRepository::missing_days), oldest first.
 inline std::vector<std::string> missing_days(const std::string& from, const std::string& to) {
-    using namespace Money::Period::detail;
     Repositories::Money::FxRateRepository rates;
-    std::vector<std::string> out;
-    for (sys_days d = day_of(from); d <= day_of(to); d += std::chrono::days{1}) {
-        std::string date = text_of(d);
-        if (!rates.has_day(date)) {
-            out.push_back(std::move(date));
-        }
-    }
-    return out;
+    return rates.missing_days(from, to, rates.quotes_needed());
 }
 
 /// Rate jobs still waiting in the queue (a running one is not counted).
