@@ -6970,7 +6970,6 @@ paths:
       parameters:
         - { name: kind, in: query, schema: { type: string, enum: [week, month, quarter, custom], default: month } }
         - { name: date, in: query, schema: { type: string, format: date }, description: 'A day of the period (week, month, quarter); defaults to today in tz, else UTC' }
-        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there' }
         - { name: from, in: query, schema: { type: string, format: date }, description: Custom period start }
         - { name: to, in: query, schema: { type: string, format: date }, description: Custom period end }
         - { name: as_if, in: query, schema: { type: string, pattern: '^[A-Z]{3}$' }, description: Defaults to the settings' view_currency }

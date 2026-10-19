@@ -9242,14 +9242,14 @@ export interface paths {
                     kind?: "week" | "month" | "quarter" | "custom";
                     /** @description A day of the period (week, month, quarter); defaults to today in tz, else UTC */
                     date?: string;
-                    /** @description IANA zone of the caller: the default day is today there; a name that is not a zone answers 400 invalid_query */
-                    tz?: string;
                     /** @description Custom period start */
                     from?: string;
                     /** @description Custom period end */
                     to?: string;
                     /** @description Defaults to the settings' view_currency */
                     as_if?: string;
+                    /** @description IANA zone of the caller: the default day is today there; a name that is not a zone answers 400 invalid_query */
+                    tz?: string;
                 };
                 header?: never;
                 path?: never;

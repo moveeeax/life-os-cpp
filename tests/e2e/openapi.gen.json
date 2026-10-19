@@ -19955,15 +19955,6 @@
       "description": "A day of the period (week, month, quarter); defaults to today in tz, else UTC"
      },
      {
-      "name": "tz",
-      "in": "query",
-      "schema": {
-       "type": "string",
-       "default": "UTC"
-      },
-      "description": "IANA zone of the caller: the default day is today there"
-     },
-     {
       "name": "from",
       "in": "query",
       "schema": {
@@ -27953,7 +27944,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 412350,
-  "source_fnv1a64": "acf6c7b0323c3d8e"
+  "source_bytes": 412204,
+  "source_fnv1a64": "9110a0588ce89ed9"
  }
 }
