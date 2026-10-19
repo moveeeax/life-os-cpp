@@ -2,6 +2,7 @@ import {
   FOOD_PROBE,
   GOALS_PROBE,
   HABITS_PROBE,
+  MEDICAL_PROBE,
   MONEY_PROBE,
   NOTES_PROBE,
   NOW_PROBE,
@@ -46,11 +47,14 @@ export function useGlassNav(): {
       on: useModuleOn('practice', PRACTICE_PROBE, signedIn),
     },
   ];
+  // Body shows without fitness:read while the medical module is on.
+  const medicalOn = useModuleOn('medical', MEDICAL_PROBE, signedIn && !canTrain);
   const off = new Set(probes.filter((p) => p.on === false).map((p) => p.id));
+  const on = new Set(medicalOn === true ? ['medical'] : []);
   // Learning has no module of its own: its courses are projects of Tasks.
   if (off.has('tasks')) off.add('learning');
   return {
-    items: glassNav(user, off),
+    items: glassNav(user, off, on),
     nowOn: probes[0].on,
     settled: probesSettled(probes),
   };

@@ -3,8 +3,9 @@ import { Permission, userCan, type PermissionUser } from '@/lib/auth/permissions
 /**
  * The glass pill nav: the one list of the signed-in app's sections. A
  * section whose backend module is off is left out (Now too); Body and
- * Training need fitness:read. Routes keep their paths (Body is /health,
- * Training is /workout).
+ * Training need fitness:read, but Body also shows without it while the
+ * medical module is on, opening at the medical records. Routes keep their
+ * paths (Body is /health, Training is /workout).
  */
 export interface NavItem {
   key: string;
@@ -12,6 +13,8 @@ export interface NavItem {
   to: string;
   /** Permission bit the section needs; the item is hidden without it. */
   permission?: number;
+  /** A module that shows the item without the permission, linking to `to` instead. */
+  without?: { module: string; to: string };
 }
 
 export const NAV: readonly NavItem[] = [
@@ -25,20 +28,31 @@ export const NAV: readonly NavItem[] = [
   { key: 'travel', label: 'Travel', to: '/travel' },
   { key: 'money', label: 'Money', to: '/money' },
   { key: 'food', label: 'Food', to: '/food' },
-  { key: 'health', label: 'Body', to: '/health', permission: Permission.FitnessRead },
+  {
+    key: 'health',
+    label: 'Body',
+    to: '/health',
+    permission: Permission.FitnessRead,
+    without: { module: 'medical', to: '/health/records' },
+  },
   { key: 'workout', label: 'Training', to: '/workout', permission: Permission.FitnessRead },
 ];
 
-/** The items this user sees; `off` holds the keys of modules switched off. */
+/**
+ * The items this user sees; `off` holds the keys of modules switched off and
+ * `on` the keys of modules known to be on.
+ */
 export function glassNav(
   user: PermissionUser | null | undefined,
   off: ReadonlySet<string> = new Set(),
+  on: ReadonlySet<string> = new Set(),
 ): NavItem[] {
-  return NAV.filter((s) => {
-    if (off.has(s.key)) return false;
-    if (s.key === 'now') return true;
-    if (user == null) return false;
-    return s.permission === undefined || userCan(user, s.permission);
+  return NAV.flatMap((s) => {
+    if (off.has(s.key)) return [];
+    if (s.key === 'now') return [s];
+    if (user == null) return [];
+    if (s.permission === undefined || userCan(user, s.permission)) return [s];
+    return s.without && on.has(s.without.module) ? [{ ...s, to: s.without.to }] : [];
   });
 }
 
