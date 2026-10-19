@@ -418,14 +418,15 @@ public:
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
-                    auto row = detail::one(txn,
-                                           "SELECT v.id::text AS id, v.reason, to_char(v.date, 'YYYY-MM-DD') AS date, "
-                                           " to_char(v.follow_up, 'YYYY-MM-DD') AS follow_up, "
-                                           " v.follow_up_task_id::text AS task_id, p.name AS person "
-                                           " FROM medical_visits v JOIN medical_people p ON p.id = v.person_id "
-                                           " WHERE v.owner_id = $1::uuid AND v.id = $2::uuid FOR UPDATE OF v",
-                                           owner,
-                                           id);
+                    std::optional<nlohmann::json> row =
+                        detail::one(txn,
+                                    "SELECT v.id::text AS id, v.reason, to_char(v.date, 'YYYY-MM-DD') AS date, "
+                                    " to_char(v.follow_up, 'YYYY-MM-DD') AS follow_up, "
+                                    " v.follow_up_task_id::text AS task_id, p.name AS person "
+                                    " FROM medical_visits v JOIN medical_people p ON p.id = v.person_id "
+                                    " WHERE v.owner_id = $1::uuid AND v.id = $2::uuid FOR UPDATE OF v",
+                                    owner,
+                                    id);
                     if (!row) {
                         throw NotFound("visit");
                     }
@@ -715,7 +716,7 @@ public:
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
-                    auto row =
+                    std::optional<nlohmann::json> row =
                         detail::one(txn,
                                     "SELECT m.id::text AS id, m.name, to_char(m.end_date, 'YYYY-MM-DD') AS end_date, "
                                     " m.end_task_id::text AS task_id, p.name AS person "
