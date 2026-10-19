@@ -49,7 +49,7 @@ export function PracticeClientsPage() {
             <Row
               key={c.id}
               title={c.name}
-              sub={c.contact || undefined}
+              sub={c.contact ? <Num>{c.contact}</Num> : undefined}
               right={
                 c.open_deals > 0 ? (
                   <span className="k-muted">

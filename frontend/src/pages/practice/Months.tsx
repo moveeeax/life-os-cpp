@@ -74,13 +74,11 @@ export function PracticeMonthsPage() {
               <Row
                 key={m.month}
                 title={<span data-num-ok>{monthLabel(m.month)}</span>}
-                sub={
-                  <>
-                    <Num>{m.entries}</Num> {m.entries === 1 ? 'entry' : 'entries'}
-                  </>
-                }
-                right={<Num>{netLine(m.totals)}</Num>}
+                sub={<Num>{netLine(m.totals)}</Num>}
               >
+                <span className="k-muted">
+                  <Num>{m.entries}</Num> {m.entries === 1 ? 'entry' : 'entries'}
+                </span>
                 <TotalsFacts totals={m.totals} />
                 <span className="k-actions">
                   <Link to={`/practice/months/${m.month}`} className="k-link">

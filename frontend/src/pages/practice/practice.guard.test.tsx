@@ -40,7 +40,7 @@ const mutation = () => ({ mutate: vi.fn(), isPending: false, error: null });
 const client: PracticeClient = {
   id: 'c1',
   name: 'Acme',
-  contact: 'anna@acme.test',
+  contact: '+7 701 555 0101',
   note: '',
   open_deals: 2,
   income: [
