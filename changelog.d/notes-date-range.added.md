@@ -1,1 +1,0 @@
-`GET /api/v1/notes` takes `from` and `to` (calendar days, inclusive) on the day a note is about; a note without a date is left out once either bound is given, and a bad day or `to` before `from` answers 400 `invalid_query`.

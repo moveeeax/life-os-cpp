@@ -6,6 +6,20 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.33.1] - 2026-10-19
+
+### Added
+- One medical row by id: `GET /api/v1/medical/visits/{id}`, `/records/{id}` and `/medications/{id}` answer the row in the shape of a list element, 404 `not_found` for a missing id or another user's.
+- `GET /api/v1/notes` takes `from` and `to` (calendar days, inclusive) on the day a note is about; a note without a date is left out once either bound is given, and a bad day or `to` before `from` answers 400 `invalid_query`.
+- A note can name the practice deal it is about (migration 054, `notes.deal_id`): create and edit take `deal_id` (a deal of the caller, null unlinks), a note answers `deal_id` and `deal_title`, `GET /api/v1/notes?deal=` filters on it, and deleting the deal leaves the note unlinked.
+
+### Changed
+- Girths measured by hand (`/api/v1/fitness/measurements`) no longer need the fitness:read permission: they are the caller's own rows, like the medical archive, so any user account with the fitness module on can list, add, edit and delete them.
+
+### Fixed
+- Body shows in the nav without the Fitness Reader role while the medical module is on: it opens at the medical records, and the band page without the role keeps the hand measurements under its notice.
+- Practice amounts in the API spec: deal values, entry amounts, totals and per-currency sums are documented in the currency's major units (1500.50 RUB), which is what the API has always taken and answered; the old text said a whole number of the smallest unit. Description change only.
+
 ## [1.33.0] - 2026-10-19
 
 ### Added
