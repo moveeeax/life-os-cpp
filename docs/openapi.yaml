@@ -4164,7 +4164,7 @@ paths:
   /api/v1/fitness/measurements:
     get:
       summary: Girths measured by hand, newest first
-      description: 'The caller''s own rows: they need no linked Mi account.'
+      description: 'The caller''s own rows: they need no linked Mi account and no fitness permission.'
       tags: [fitness]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -4185,7 +4185,7 @@ paths:
                   total: { type: integer }
         '400': { description: Malformed range }
         '401': { description: Not authenticated }
-        '403': { description: 'No fitness:read, or the principal is not a user account (no_user_account)' }
+        '403': { description: 'The principal is not a user account (no_user_account); no fitness permission is needed' }
         '404': { description: Fitness module disabled }
     post:
       summary: Add girths measured by hand
@@ -4208,7 +4208,7 @@ paths:
                   data: { $ref: '#/components/schemas/TapeMeasurement' }
         '400': { description: 'Validation failed: no date, no girth, or a girth out of range' }
         '401': { description: Not authenticated }
-        '403': { description: 'No fitness:read, or the principal is not a user account (no_user_account)' }
+        '403': { description: 'The principal is not a user account (no_user_account); no fitness permission is needed' }
         '404': { description: Fitness module disabled }
   /api/v1/fitness/measurements/{id}:
     parameters:
@@ -4234,7 +4234,7 @@ paths:
                   data: { $ref: '#/components/schemas/TapeMeasurement' }
         '400': { description: 'Validation failed, or the edit clears every girth' }
         '401': { description: Not authenticated }
-        '403': { description: 'No fitness:read, or the principal is not a user account (no_user_account)' }
+        '403': { description: 'The principal is not a user account (no_user_account); no fitness permission is needed' }
         '404': { description: 'Fitness module disabled, or not the caller''s measurement' }
     delete:
       summary: Delete a measurement by hand
@@ -4243,7 +4243,7 @@ paths:
       responses:
         '204': { description: Deleted }
         '401': { description: Not authenticated }
-        '403': { description: 'No fitness:read, or the principal is not a user account (no_user_account)' }
+        '403': { description: 'The principal is not a user account (no_user_account); no fitness permission is needed' }
         '404': { description: 'Fitness module disabled, or not the caller''s measurement' }
   /api/v1/fitness/workouts:
     get:
