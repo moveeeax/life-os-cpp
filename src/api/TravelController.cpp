@@ -27,10 +27,12 @@
 #include "money/Summary.hpp"
 #include "repositories/Zones.hpp"
 #include "repositories/money/SummaryRepository.hpp"
+#include "repositories/travel/ContactRepository.hpp"
 #include "repositories/travel/Counters.hpp"
 #include "repositories/travel/CrossingRepository.hpp"
 #include "repositories/travel/DocumentRepository.hpp"
 #include "repositories/travel/Errors.hpp"
+#include "repositories/travel/MomentRepository.hpp"
 #include "repositories/travel/RuleRepository.hpp"
 #include "repositories/travel/SettingsRepository.hpp"
 #include "repositories/travel/TripRepository.hpp"
@@ -48,7 +50,9 @@ using Api::Fields::is_calendar_date;
 using Api::Fields::opt_int;
 using Api::Fields::text_length;
 using Api::Fields::today_utc;
+using Repositories::Travel::ContactRepository;
 using Repositories::Travel::CrossingRepository;
+using Repositories::Travel::MomentRepository;
 using Repositories::Travel::RuleRepository;
 using Repositories::Travel::SettingsRepository;
 using Repositories::Travel::TripRepository;
@@ -61,6 +65,8 @@ const std::vector<std::string> kWindows = {
 const std::vector<std::string> kThresholds = {"at_most", "over"};
 const std::vector<std::string> kItemKinds = {"flight", "stay", "booking", "note"};
 const std::vector<std::string> kDocumentKinds = {"passport", "visa", "insurance", "other"};
+const std::vector<std::string> kPurposes = {"leisure", "business", "family", "relocation", "other"};
+constexpr double kBookedMax = 1e12;
 
 bool is_country(const std::string& s) {
     return s.size() == 2 && s[0] >= 'A' && s[0] <= 'Z' && s[1] >= 'A' && s[1] <= 'Z';
@@ -129,6 +135,64 @@ std::optional<std::set<std::string>> countries_field(
 
 std::optional<std::string> opt_text(const json& body, const char* field) {
     return Validation::opt_string(body, field);
+}
+
+/// A link field: empty, or a web address (https:// or http://).
+void web_link_field(Validation::Errors& errs, const json& body, const char* field) {
+    if (const auto link = opt_text(body, field);
+        link && !link->empty() && link->rfind("https://", 0) != 0 && link->rfind("http://", 0) != 0) {
+        errs.add(field, "bad_format", "a link starts with https:// or http://");
+    }
+}
+
+/// The purpose and the booked cost of a trip body. The outer optional is "sent at all";
+/// an inner nullopt is an explicit null, which clears the field on a PATCH.
+struct TripExtras {
+    std::optional<std::optional<std::string>> purpose;
+    std::optional<std::optional<TripRepository::Cost>> booked_cost;
+};
+
+TripExtras trip_extras(Validation::Errors& errs, const json& body) {
+    TripExtras out;
+    if (body.contains("purpose")) {
+        if (body["purpose"].is_null()) {
+            out.purpose = std::optional<std::string>{};
+        } else {
+            Validation::one_of(errs, body, "purpose", kPurposes);
+            if (body["purpose"].is_string()) {
+                out.purpose = body["purpose"].get<std::string>();
+            }
+        }
+    }
+    if (!body.contains("booked_cost")) {
+        return out;
+    }
+    const json& cost = body["booked_cost"];
+    if (cost.is_null()) {
+        out.booked_cost = std::optional<TripRepository::Cost>{};
+        return out;
+    }
+    if (!cost.is_object()) {
+        errs.add("booked_cost", "invalid", "an object with amount and currency, or null");
+        return out;
+    }
+    // The amount as money takes it: a number from 0, at most 15 significant digits.
+    const bool amount_ok = cost.contains("amount") && cost["amount"].is_number() && cost["amount"].get<double>() >= 0 &&
+                           cost["amount"].get<double>() <= kBookedMax &&
+                           Api::Fields::significant_digits(cost["amount"].dump()) <= Api::Fields::kAmountDigitsMax;
+    if (!amount_ok) {
+        errs.add("booked_cost.amount", "invalid", "a number from 0 with at most 15 significant digits");
+    }
+    static const std::regex currency_re("^[A-Z]{3,10}$");
+    const bool currency_ok = cost.contains("currency") && cost["currency"].is_string() &&
+                             std::regex_match(cost["currency"].get<std::string>(), currency_re);
+    if (!currency_ok) {
+        errs.add("booked_cost.currency", "invalid", "a currency code, 3 to 10 capital letters");
+    }
+    if (amount_ok && currency_ok) {
+        out.booked_cost = TripRepository::Cost{cost["amount"].get<double>(), cost["currency"].get<std::string>()};
+    }
+    return out;
 }
 
 /// A crossing body, checked; nullopt (answered) when bad.
@@ -214,9 +278,13 @@ std::optional<TripRepository::ItemInput> item_input(const json& body, const Trav
     if (body.contains("no_crossing") && !body["no_crossing"].is_boolean()) {
         errs.add("no_crossing", "invalid", "must be true or false");
     }
-    if (const auto link = opt_text(body, "link");
-        link && !link->empty() && link->rfind("https://", 0) != 0 && link->rfind("http://", 0) != 0) {
-        errs.add("link", "bad_format", "a link starts with https:// or http://");
+    web_link_field(errs, body, "link");
+    date_field(errs, body, "end_date");
+    const auto end_date = opt_text(body, "end_date");
+    if (end_date && opt_text(body, "kind").value_or("") != "stay") {
+        errs.add("end_date", "not_allowed", "only a stay has an end date");
+    } else if (end_date && opt_text(body, "date") && *end_date < *opt_text(body, "date")) {
+        errs.add("end_date", "invalid", "a stay ends on or after its first day");
     }
     if (errs.any()) {
         callback(Validation::response_400(errs));
@@ -229,7 +297,50 @@ std::optional<TripRepository::ItemInput> item_input(const json& body, const Trav
                                      opt_text(body, "reference").value_or(""),
                                      opt_text(body, "link").value_or(""),
                                      opt_text(body, "note").value_or(""),
-                                     body.value("no_crossing", false)};
+                                     body.value("no_crossing", false),
+                                     end_date};
+}
+
+/// A trip contact body, checked; nullopt (answered) when bad.
+std::optional<ContactRepository::Input> contact_input(const json& body, const TravelController::Callback& callback) {
+    Validation::Errors errs;
+    Validation::require_string(errs, body, "name");
+    text_length(errs, body, "name", 1, 120);
+    text_length(errs, body, "role", 0, 80);
+    text_length(errs, body, "phone", 0, 40);
+    text_length(errs, body, "email", 0, 200);
+    text_length(errs, body, "link", 0, 500);
+    text_length(errs, body, "note", 0, 500);
+    if (!opt_text(body, "email").value_or("").empty()) {
+        Validation::email(errs, body, "email");
+    }
+    web_link_field(errs, body, "link");
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return std::nullopt;
+    }
+    return ContactRepository::Input{body["name"].get<std::string>(),
+                                    opt_text(body, "role").value_or(""),
+                                    opt_text(body, "phone").value_or(""),
+                                    opt_text(body, "email").value_or(""),
+                                    opt_text(body, "link").value_or(""),
+                                    opt_text(body, "note").value_or("")};
+}
+
+/// A trip moment body, checked; nullopt (answered) when bad.
+std::optional<MomentRepository::Input> moment_input(const json& body, const TravelController::Callback& callback) {
+    Validation::Errors errs;
+    Validation::require_string(errs, body, "date");
+    Validation::require_string(errs, body, "text");
+    date_field(errs, body, "date");
+    text_length(errs, body, "text", 1, 2000);
+    text_length(errs, body, "place", 0, 120);
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return std::nullopt;
+    }
+    return MomentRepository::Input{
+        body["date"].get<std::string>(), body["text"].get<std::string>(), opt_text(body, "place").value_or("")};
 }
 
 /// A document body, checked; nullopt (answered) when bad.
@@ -326,6 +437,8 @@ json trip_view(TripRepository& repo, const std::string& owner, json row, const s
     if (full) {
         row["items"] = repo.items(owner, id);
         row["spend_rows"] = spends;
+        row["contacts"] = ContactRepository().list(owner, id);
+        row["moments"] = MomentRepository().list(owner, id);
     }
     return row;
 }
@@ -583,6 +696,7 @@ void TravelController::createTrip(const HttpRequestPtr& req, Callback&& callback
     date_field(errs, body, "start_date");
     date_field(errs, body, "end_date");
     const auto countries = countries_field(errs, body, "countries", false, false);
+    const auto extras = trip_extras(errs, body);
     if (!errs.any() && body["end_date"].get<std::string>() < body["start_date"].get<std::string>()) {
         errs.add("end_date", "invalid", "a trip ends on or after its start");
     }
@@ -597,7 +711,9 @@ void TravelController::createTrip(const HttpRequestPtr& req, Callback&& callback
                                       body["start_date"].get<std::string>(),
                                       body["end_date"].get<std::string>(),
                                       countries.value_or(std::set<std::string>{}),
-                                      opt_text(body, "note").value_or("")});
+                                      opt_text(body, "note").value_or(""),
+                                      extras.purpose.value_or(std::nullopt),
+                                      extras.booked_cost.value_or(std::nullopt)});
         callback(Response::created(json{{"data", trip_view(repo, owner, row, *currency, true)}}));
     });
 }
@@ -649,6 +765,7 @@ void TravelController::updateTrip(const HttpRequestPtr& req, Callback&& callback
     date_field(errs, body, "start_date");
     date_field(errs, body, "end_date");
     const auto countries = countries_field(errs, body, "countries", false, false);
+    const auto extras = trip_extras(errs, body);
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;
@@ -659,6 +776,8 @@ void TravelController::updateTrip(const HttpRequestPtr& req, Callback&& callback
     p.end_date = opt_text(body, "end_date");
     p.countries = countries;
     p.note = opt_text(body, "note");
+    p.purpose = extras.purpose;
+    p.booked_cost = extras.booked_cost;
     with_repo_errors(callback, "travel.trips.update", [&] {
         TripRepository repo;
         callback(Response::ok(json{{"data", trip_view(repo, owner, repo.update(owner, id, p), *currency, true)}}));
@@ -788,6 +907,114 @@ void TravelController::linkSpends(const HttpRequestPtr& req, Callback&& callback
             throw Repositories::Travel::NotFound("trip");
         }
         callback(Response::ok(json{{"data", {{"changed", changed}}}}));
+    });
+}
+
+// ── contacts and moments of a trip ──────────────────────────────────────────
+
+void TravelController::addContact(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    const auto in = contact_input(body, callback);
+    if (!in) {
+        return;
+    }
+    with_repo_errors(callback, "travel.contacts.create", [&] {
+        callback(Response::created(json{{"data", ContactRepository().add(owner, id, *in)}}));
+    });
+}
+
+void TravelController::updateContact(const HttpRequestPtr& req,
+                                     Callback&& callback,
+                                     const std::string& id,
+                                     const std::string& child) {
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
+    if (!require_valid_uuid(id, callback) || !require_valid_uuid(child, callback)) {
+        return;
+    }
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    const auto in = contact_input(body, callback);
+    if (!in) {
+        return;
+    }
+    with_repo_errors(callback, "travel.contacts.update", [&] {
+        callback(Response::ok(json{{"data", ContactRepository().replace(owner, id, child, *in)}}));
+    });
+}
+
+void TravelController::deleteContact(const HttpRequestPtr& req,
+                                     Callback&& callback,
+                                     const std::string& id,
+                                     const std::string& child) {
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
+    if (!require_valid_uuid(id, callback) || !require_valid_uuid(child, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "travel.contacts.delete", [&] {
+        ContactRepository().remove(owner, id, child);
+        no_content(callback);
+    });
+}
+
+void TravelController::addMoment(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    const auto in = moment_input(body, callback);
+    if (!in) {
+        return;
+    }
+    with_repo_errors(callback, "travel.moments.create", [&] {
+        callback(Response::created(json{{"data", MomentRepository().add(owner, id, *in)}}));
+    });
+}
+
+void TravelController::updateMoment(const HttpRequestPtr& req,
+                                    Callback&& callback,
+                                    const std::string& id,
+                                    const std::string& child) {
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
+    if (!require_valid_uuid(id, callback) || !require_valid_uuid(child, callback)) {
+        return;
+    }
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    const auto in = moment_input(body, callback);
+    if (!in) {
+        return;
+    }
+    with_repo_errors(callback, "travel.moments.update", [&] {
+        callback(Response::ok(json{{"data", MomentRepository().replace(owner, id, child, *in)}}));
+    });
+}
+
+void TravelController::deleteMoment(const HttpRequestPtr& req,
+                                    Callback&& callback,
+                                    const std::string& id,
+                                    const std::string& child) {
+    API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
+    if (!require_valid_uuid(id, callback) || !require_valid_uuid(child, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "travel.moments.delete", [&] {
+        MomentRepository().remove(owner, id, child);
+        no_content(callback);
     });
 }
 

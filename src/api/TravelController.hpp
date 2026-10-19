@@ -1,7 +1,7 @@
 /**
  * @file TravelController.hpp
  * @brief /api/v1/travel: the owner's border crossings, day counters, trips with
- *        their plan, packing and spends
+ *        their plan, packing, spends, contacts and moments
  *        (docs/superpowers/specs/2026-10-13-travel-design.md).
  */
 
@@ -42,6 +42,12 @@ public:
     ADD_METHOD_TO(TravelController::deleteItem, "/api/v1/travel/trips/{id}/items/{child}", Delete);
     ADD_METHOD_TO(TravelController::candidateSpends, "/api/v1/travel/trips/{id}/candidate-spends", Get);
     ADD_METHOD_TO(TravelController::linkSpends, "/api/v1/travel/trips/{id}/spends", Post);
+    ADD_METHOD_TO(TravelController::addContact, "/api/v1/travel/trips/{id}/contacts", Post);
+    ADD_METHOD_TO(TravelController::updateContact, "/api/v1/travel/trips/{id}/contacts/{child}", Patch);
+    ADD_METHOD_TO(TravelController::deleteContact, "/api/v1/travel/trips/{id}/contacts/{child}", Delete);
+    ADD_METHOD_TO(TravelController::addMoment, "/api/v1/travel/trips/{id}/moments", Post);
+    ADD_METHOD_TO(TravelController::updateMoment, "/api/v1/travel/trips/{id}/moments/{child}", Patch);
+    ADD_METHOD_TO(TravelController::deleteMoment, "/api/v1/travel/trips/{id}/moments/{child}", Delete);
     ADD_METHOD_TO(TravelController::listDocuments, "/api/v1/travel/documents", Get);
     ADD_METHOD_TO(TravelController::createDocument, "/api/v1/travel/documents", Post);
     ADD_METHOD_TO(TravelController::updateDocument, "/api/v1/travel/documents/{id}", Patch);
@@ -73,6 +79,12 @@ public:
     void deleteItem(const HttpRequestPtr& req, Callback&& callback, const std::string& id, const std::string& child);
     void candidateSpends(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void linkSpends(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void addContact(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void updateContact(const HttpRequestPtr& req, Callback&& callback, const std::string& id, const std::string& child);
+    void deleteContact(const HttpRequestPtr& req, Callback&& callback, const std::string& id, const std::string& child);
+    void addMoment(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void updateMoment(const HttpRequestPtr& req, Callback&& callback, const std::string& id, const std::string& child);
+    void deleteMoment(const HttpRequestPtr& req, Callback&& callback, const std::string& id, const std::string& child);
     void listDocuments(const HttpRequestPtr& req, Callback&& callback);
     void createDocument(const HttpRequestPtr& req, Callback&& callback);
     void updateDocument(const HttpRequestPtr& req, Callback&& callback, const std::string& id);

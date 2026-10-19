@@ -306,6 +306,19 @@ notes:
   enabled: false
 
 # ---------------------------------------------------------------
+# practice module — the freelance practice: clients, deals, incomes and
+# expenses, a month view. Env var set: PRACTICE_ENABLED.
+# ---------------------------------------------------------------
+practice:
+  enabled: false
+
+# medical module — the family medical archive; its files live under the
+# private prefix of storage.s3 (docs/RUNBOOK.md, private files). Env var set: MEDICAL_ENABLED.
+# ---------------------------------------------------------------
+medical:
+  enabled: false
+
+# ---------------------------------------------------------------
 # now module — the Now screen's digest, the focus of the day and the
 # wallpaper library. Env var set: NOW_ENABLED.
 # ---------------------------------------------------------------

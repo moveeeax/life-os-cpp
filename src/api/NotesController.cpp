@@ -2,7 +2,8 @@
  * @file NotesController.cpp
  * @brief Notes: a slug made from the title when none is given (kept unique per
  *        owner), tags as a list (no commas: tarassov.me stores them joined), a
- *        project, course or task link of the caller only; private for now.
+ *        project, course or task link of the caller only, an optional day the
+ *        note is about; private for now.
  */
 
 #include "api/NotesController.hpp"
@@ -91,6 +92,7 @@ void note_fields(Validation::Errors& errs, const json& body, const std::string& 
     if (body.contains("status") && body["status"] != "private") {
         errs.add("status", "not_yet", "notes are private for now; publishing to the blog comes later");
     }
+    Api::Fields::date_field(errs, body, "date");
     for (const char* link : {"project_id", "task_id"}) {
         if (body.contains(link) && !body[link].is_null()) {
             Validation::uuid(errs, body, link);
@@ -166,6 +168,7 @@ void NotesController::createNote(const HttpRequestPtr& req, Callback&& callback)
         in.tags = tags.value_or(std::vector<std::string>{});
         in.project_id = Validation::opt_string(body, "project_id");
         in.task_id = Validation::opt_string(body, "task_id");
+        in.date = Validation::opt_string(body, "date");
         callback(Response::created(json{{"data", repo.create(owner, in)}}));
     });
 }
@@ -210,6 +213,7 @@ void NotesController::updateNote(const HttpRequestPtr& req, Callback&& callback,
         p.tags = tags;
         p.project_id = nullable(body, "project_id");
         p.task_id = nullable(body, "task_id");
+        p.date = nullable(body, "date");
         callback(Response::ok(json{{"data", NoteRepository().update(owner, id, p)}}));
     });
 }

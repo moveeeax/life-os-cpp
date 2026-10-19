@@ -58,7 +58,7 @@ worker:
   id: ""
   # The worker pulls only the listed queues: without fitness_sync, sync jobs
   # would pile up in Redis silently. Mail is off, its queues are not subscribed.
-  types: "fitness_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,now_media_sweep"
+  types: "fitness_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,now_media_sweep,files_sweep"
   # One sync per system by construction.
   concurrency: 1
 
@@ -101,6 +101,14 @@ habits:
   enabled: true
 
 notes:
+  enabled: true
+
+practice:
+  enabled: true
+
+# The family medical archive. Its files need the private prefix in the MinIO
+# policy first (docs/RUNBOOK.md, private files); without it uploads answer 503.
+medical:
   enabled: true
 
 # Invite-only: self sign-up is closed, admins invite people (POST /api/v1/admin/invite).

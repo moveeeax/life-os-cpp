@@ -2,7 +2,7 @@
  "openapi": "3.1.0",
  "info": {
   "title": "life-os-cpp API",
-  "description": "The REST API of Life OS, a C++20 service on Drogon with Postgres and\nRedis. Four families of routes: the probes and infrastructure (`/healthz`,\n`/ready`, `/health`, `/metrics`, the background-job queue and its DLQ under\n`/api/v1/jobs`); accounts and administration (`/api/v1/auth`,\n`/api/v1/account`, `/api/v1/admin`, API keys, the audit log); billing\n(PayPal top-ups into a credit wallet, `/api/v1/billing` and\n`/api/v1/admin/billing`); and the life modules, each behind its own\nswitch and answering 404 while off: fitness (Mi Fitness sync), workout,\nfood, money, tasks with projects, goals, now (`/api/v1/today`, wallpapers,\nsounds), travel, habits and notes. Every route except the probes is under\n`/api/v1`. Authentication is a JWT bearer, an API key (`X-API-Key`) or the\nHttpOnly session cookie the SPA uses; rate limiting and idempotency are\ndriven by headers (`Idempotency-Key` on writes). Maintained by one owner,\nsee the repository.\n",
+  "description": "The REST API of Life OS, a C++20 service on Drogon with Postgres and\nRedis. Four families of routes: the probes and infrastructure (`/healthz`,\n`/ready`, `/health`, `/metrics`, the background-job queue and its DLQ under\n`/api/v1/jobs`); accounts and administration (`/api/v1/auth`,\n`/api/v1/account`, `/api/v1/admin`, API keys, the audit log); billing\n(PayPal top-ups into a credit wallet, `/api/v1/billing` and\n`/api/v1/admin/billing`); and the life modules, each behind its own\nswitch and answering 404 while off: fitness (Mi Fitness sync), workout,\nfood, money, tasks with projects, goals, now (`/api/v1/today`, wallpapers,\nsounds), travel, habits, notes and practice. Every route except the probes is under\nsounds), travel, habits, notes and medical (with the private files of its\nrecords and of travel documents under `/api/v1/files`). Every route except the probes is under\n`/api/v1`. Authentication is a JWT bearer, an API key (`X-API-Key`) or the\nHttpOnly session cookie the SPA uses; rate limiting and idempotency are\ndriven by headers (`Idempotency-Key` on writes). Maintained by one owner,\nsee the repository.\n",
   "version": "1.32.0",
   "contact": {
    "name": "life-os-cpp repository",
@@ -789,6 +789,7 @@
      "goal",
      "unit",
      "source",
+     "target",
      "position",
      "archived_at",
      "created_at"
@@ -835,6 +836,13 @@
        "active_kcal",
        "workout"
       ]
+     },
+     "target": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "description": "Manual only: the amount a day must reach (in unit) to count as done; null counts any tick"
      },
      "position": {
       "type": "integer"
@@ -902,6 +910,15 @@
        "workout"
       ],
       "default": "manual"
+     },
+     "target": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "exclusiveMinimum": 0,
+      "maximum": 1000000,
+      "description": "Manual only: a day is done when the value of its tick (the sum of what was added) reaches it"
      }
     }
    },
@@ -998,6 +1015,228 @@
        "number",
        "null"
       ]
+     }
+    }
+   },
+   "MoodTag": {
+    "type": "string",
+    "enum": [
+     "calm",
+     "happy",
+     "energetic",
+     "focused",
+     "grateful",
+     "social",
+     "tired",
+     "stressed",
+     "anxious",
+     "sad",
+     "irritable",
+     "sick"
+    ]
+   },
+   "MoodCheckin": {
+    "type": "object",
+    "required": [
+     "date",
+     "score",
+     "tags",
+     "note",
+     "created_at",
+     "updated_at"
+    ],
+    "description": "The mood of one local day",
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "score": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "1 low to 5 high"
+     },
+     "tags": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/MoodTag"
+      },
+      "description": "In the order of MoodTag"
+     },
+     "note": {
+      "type": "string"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "MoodInput": {
+    "type": "object",
+    "required": [
+     "score"
+    ],
+    "properties": {
+     "score": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+     },
+     "tags": {
+      "type": [
+       "array",
+       "null"
+      ],
+      "items": {
+       "$ref": "#/components/schemas/MoodTag"
+      },
+      "description": "Repeats are dropped"
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 500
+     }
+    }
+   },
+   "TapeMeasurement": {
+    "type": "object",
+    "required": [
+     "id",
+     "date",
+     "waist_cm",
+     "chest_cm",
+     "hips_cm",
+     "neck_cm",
+     "arm_cm",
+     "thigh_cm",
+     "note",
+     "created_at",
+     "updated_at"
+    ],
+    "description": "Girths measured by hand on a day, in cm with one decimal; a girth not measured is null",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "waist_cm": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "chest_cm": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "hips_cm": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "neck_cm": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "arm_cm": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "thigh_cm": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "note": {
+      "type": "string"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "TapeMeasurementInput": {
+    "type": "object",
+    "description": "On create a date and at least one girth are required; on edit every field is optional, a girth sent as null is cleared, but not the last one",
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "waist_cm": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 400
+     },
+     "chest_cm": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 400
+     },
+     "hips_cm": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 400
+     },
+     "neck_cm": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 400
+     },
+     "arm_cm": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 400
+     },
+     "thigh_cm": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 400
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 500
      }
     }
    },
@@ -1902,6 +2141,7 @@
      "status",
      "topic",
      "tags",
+     "date",
      "project_id",
      "task_id",
      "project_title",
@@ -1945,6 +2185,14 @@
       "items": {
        "type": "string"
       }
+     },
+     "date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date",
+      "description": "The day the note is about; the list sorts by it, else by the UTC day the note was made"
      },
      "project_id": {
       "type": [
@@ -2052,6 +2300,14 @@
       ],
       "format": "uuid",
       "description": "A task of the caller"
+     },
+     "date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date",
+      "description": "The day the note is about; null clears it"
      }
     }
    },
@@ -2072,6 +2328,470 @@
      }
     }
    },
+   "PracticeAmount": {
+    "type": "object",
+    "required": [
+     "currency",
+     "amount"
+    ],
+    "description": "A sum in one currency; amounts of two currencies are never added together",
+    "properties": {
+     "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+     },
+     "amount": {
+      "type": "number"
+     }
+    }
+   },
+   "PracticeTotal": {
+    "type": "object",
+    "required": [
+     "currency",
+     "income",
+     "expense",
+     "net",
+     "entries"
+    ],
+    "description": "The totals of one currency: income, expense, income minus expense, and the count of entries",
+    "properties": {
+     "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+     },
+     "income": {
+      "type": "number"
+     },
+     "expense": {
+      "type": "number"
+     },
+     "net": {
+      "type": "number"
+     },
+     "entries": {
+      "type": "integer"
+     }
+    }
+   },
+   "PracticeClient": {
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "contact",
+     "note",
+     "open_deals",
+     "income",
+     "created_at",
+     "updated_at"
+    ],
+    "description": "A client of the freelance practice",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "name": {
+      "type": "string"
+     },
+     "contact": {
+      "type": "string",
+      "description": "An email, a phone or a link, as typed"
+     },
+     "note": {
+      "type": "string"
+     },
+     "open_deals": {
+      "type": "integer",
+      "description": "Deals at lead, negotiation or active"
+     },
+     "income": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/PracticeAmount"
+      },
+      "description": "All the incomes of the client",
+      "per currency": null
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "PracticeClientInput": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "Required on create"
+     },
+     "contact": {
+      "type": "string",
+      "maxLength": 300
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 2000
+     }
+    }
+   },
+   "PracticeDealStage": {
+    "type": "string",
+    "enum": [
+     "lead",
+     "negotiation",
+     "active",
+     "done",
+     "lost"
+    ]
+   },
+   "PracticeDeal": {
+    "type": "object",
+    "required": [
+     "id",
+     "client_id",
+     "client_name",
+     "title",
+     "stage",
+     "value",
+     "currency",
+     "start_date",
+     "end_date",
+     "note",
+     "open_tasks",
+     "received",
+     "created_at",
+     "updated_at"
+    ],
+    "description": "A piece of work for a client; its next steps are tasks with its deal_id",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "client_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "client_name": {
+      "type": "string"
+     },
+     "title": {
+      "type": "string"
+     },
+     "stage": {
+      "$ref": "#/components/schemas/PracticeDealStage"
+     },
+     "value": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "description": "The agreed value",
+      "in currency": null
+     },
+     "currency": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "pattern": "^[A-Z]{3}$"
+     },
+     "start_date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date"
+     },
+     "end_date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date"
+     },
+     "note": {
+      "type": "string"
+     },
+     "open_tasks": {
+      "type": "integer",
+      "description": "Open tasks linked to the deal"
+     },
+     "received": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/PracticeAmount"
+      },
+      "description": "The incomes linked to the deal",
+      "per currency": null
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "PracticeDealInput": {
+    "type": "object",
+    "properties": {
+     "client_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "A client of the caller; required on create"
+     },
+     "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Required on create"
+     },
+     "stage": {
+      "$ref": "#/components/schemas/PracticeDealStage"
+     },
+     "value": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "exclusiveMinimum": 0,
+      "description": "Given together with currency, both or neither; a whole number of the currency's smallest unit"
+     },
+     "currency": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "pattern": "^[A-Z]{3}$"
+     },
+     "start_date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date"
+     },
+     "end_date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date",
+      "description": "On or after start_date"
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 2000
+     }
+    }
+   },
+   "PracticeEntry": {
+    "type": "object",
+    "required": [
+     "id",
+     "kind",
+     "date",
+     "amount",
+     "currency",
+     "client_id",
+     "client_name",
+     "deal_id",
+     "deal_title",
+     "note",
+     "created_at",
+     "updated_at"
+    ],
+    "description": "An income or an expense of the practice, in its own currency",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "income",
+       "expense"
+      ]
+     },
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "amount": {
+      "type": "number",
+      "description": "Positive; the kind is the sign"
+     },
+     "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+     },
+     "client_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid"
+     },
+     "client_name": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "deal_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid"
+     },
+     "deal_title": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "note": {
+      "type": "string"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "PracticeEntryInput": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "income",
+       "expense"
+      ],
+      "description": "Required on create"
+     },
+     "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Required on create"
+     },
+     "amount": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Required on create; a whole number of the currency's smallest unit"
+     },
+     "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "Required on create"
+     },
+     "client_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "A client of the caller; with a deal, the deal's client (filled when left out)"
+     },
+     "deal_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "A deal of the caller"
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 500
+     }
+    }
+   },
+   "PracticeMonth": {
+    "type": "object",
+    "required": [
+     "month",
+     "entries",
+     "totals"
+    ],
+    "properties": {
+     "month": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}$"
+     },
+     "entries": {
+      "type": "integer"
+     },
+     "totals": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/PracticeTotal"
+      }
+     }
+    }
+   },
+   "PracticeClientTotal": {
+    "type": "object",
+    "required": [
+     "client_id",
+     "client_name",
+     "currency",
+     "income",
+     "expense",
+     "net",
+     "entries"
+    ],
+    "description": "The totals of one client in one currency; client_id null for entries without a client",
+    "properties": {
+     "client_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid"
+     },
+     "client_name": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+     },
+     "income": {
+      "type": "number"
+     },
+     "expense": {
+      "type": "number"
+     },
+     "net": {
+      "type": "number"
+     },
+     "entries": {
+      "type": "integer"
+     }
+    }
+   },
    "Project": {
     "type": "object",
     "required": [
@@ -2087,6 +2807,9 @@
      "ends_on",
      "certificate",
      "position",
+     "deadline",
+     "priority",
+     "progress",
      "open",
      "done",
      "next",
@@ -2151,6 +2874,36 @@
      },
      "position": {
       "type": "integer"
+     },
+     "deadline": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date",
+      "description": "Project only: the day it is due"
+     },
+     "priority": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "p1",
+       "p2",
+       "p3",
+       null
+      ],
+      "description": "Project only: p1 is the highest"
+     },
+     "progress": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Done tasks in percent of all its tasks that do not repeat; null when it has none"
      },
      "open": {
       "type": "integer",
@@ -2268,6 +3021,67 @@
       "type": "string",
       "maxLength": 500,
       "description": "Course only: an http(s) address or empty"
+     },
+     "deadline": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date",
+      "description": "Project only; null clears"
+     },
+     "priority": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "p1",
+       "p2",
+       "p3",
+       null
+      ],
+      "description": "Project only; null clears"
+     }
+    }
+   },
+   "TaskRepeat": {
+    "type": "object",
+    "required": [
+     "kind"
+    ],
+    "description": "The repeat rule of a task. Closing the task creates the next occurrence (a copy, open, due on the first day of the rule after the later of its due date and the day it was closed); the agenda shows that one occurrence, never the ones after it.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "daily",
+       "weekly",
+       "monthly",
+       "every_n_days"
+      ]
+     },
+     "weekdays": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 7
+      },
+      "description": "weekly: ISO weekdays, 1 is Monday"
+     },
+     "day": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 31,
+      "description": "monthly: the day of the month; a shorter month uses its last day"
+     },
+     "every": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 365,
+      "description": "every_n_days: the gap in days"
      }
     }
    },
@@ -2290,6 +3104,8 @@
      "goal_section_id",
      "trip_id",
      "project_id",
+     "repeat",
+     "next_id",
      "goal_title",
      "project_title",
      "project_kind",
@@ -2393,6 +3209,24 @@
       "format": "uuid",
       "description": "The project or course the task belongs to"
      },
+     "repeat": {
+      "oneOf": [
+       {
+        "$ref": "#/components/schemas/TaskRepeat"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "next_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "The occurrence created when this repeating task was closed"
+     },
      "project_title": {
       "type": [
        "string",
@@ -2410,6 +3244,21 @@
        "course",
        null
       ]
+     },
+     "deal_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "The deal of the practice this task is a next step of"
+     },
+     "deal_title": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "The title of that deal"
      },
      "goal_title": {
       "type": [
@@ -2519,6 +3368,25 @@
       "format": "uuid",
       "description": "A project or course of the caller; null unlinks"
      },
+     "repeat": {
+      "description": "The repeat rule; null stops it",
+      "oneOf": [
+       {
+        "$ref": "#/components/schemas/TaskRepeat"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "deal_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "A deal of the caller's practice; null unlinks"
+     },
      "external_id": {
       "type": "string",
       "minLength": 1,
@@ -2612,6 +3480,25 @@
       ],
       "format": "uuid",
       "description": "A project or course of the caller; null unlinks"
+     },
+     "repeat": {
+      "description": "The repeat rule; null stops it",
+      "oneOf": [
+       {
+        "$ref": "#/components/schemas/TaskRepeat"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "deal_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "A deal of the caller's practice; null unlinks"
      }
     }
    },
@@ -2910,7 +3797,8 @@
      "reference",
      "link",
      "note",
-     "no_crossing"
+     "no_crossing",
+     "end_date"
     ],
     "properties": {
      "id": {
@@ -2944,7 +3832,8 @@
       "type": "string"
      },
      "reference": {
-      "type": "string"
+      "type": "string",
+      "description": "The booking reference"
      },
      "link": {
       "type": "string"
@@ -2955,6 +3844,14 @@
      "no_crossing": {
       "type": "boolean",
       "description": "A flight that crosses no border of the owner: domestic, or one the owner is not on"
+     },
+     "end_date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date",
+      "description": "A stay only: the check-out day"
      }
     }
    },
@@ -3007,6 +3904,165 @@
       "type": "boolean",
       "default": false,
       "description": "A flight that crosses no border of the owner: domestic, or one the owner is not on"
+     },
+     "end_date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date",
+      "description": "A stay only (400 not_allowed on another kind): the check-out day, on or after date"
+     }
+    }
+   },
+   "TravelBookedCost": {
+    "type": [
+     "object",
+     "null"
+    ],
+    "description": "What the bookings of a trip cost, in the currency they were paid in, never converted; null when not set (on a write, null clears it)",
+    "required": [
+     "amount",
+     "currency"
+    ],
+    "properties": {
+     "amount": {
+      "type": "number",
+      "description": "From 0 to 10^12, at most 15 significant digits"
+     },
+     "currency": {
+      "type": "string",
+      "description": "A currency code, 3 to 10 capital letters"
+     }
+    }
+   },
+   "TravelTripContact": {
+    "type": "object",
+    "required": [
+     "id",
+     "trip_id",
+     "name",
+     "role",
+     "phone",
+     "email",
+     "link",
+     "note"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "trip_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "name": {
+      "type": "string"
+     },
+     "role": {
+      "type": "string"
+     },
+     "phone": {
+      "type": "string"
+     },
+     "email": {
+      "type": "string"
+     },
+     "link": {
+      "type": "string"
+     },
+     "note": {
+      "type": "string"
+     }
+    }
+   },
+   "TravelTripContactInput": {
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+     },
+     "role": {
+      "type": "string",
+      "maxLength": 80,
+      "description": "Free text: host, guide, driver, embassy"
+     },
+     "phone": {
+      "type": "string",
+      "maxLength": 40
+     },
+     "email": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "An email address",
+      "or empty": null
+     },
+     "link": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "A web address (https:// or http://), or empty"
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 500
+     }
+    }
+   },
+   "TravelTripMoment": {
+    "type": "object",
+    "required": [
+     "id",
+     "trip_id",
+     "date",
+     "text",
+     "place"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "trip_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "text": {
+      "type": "string"
+     },
+     "place": {
+      "type": "string"
+     }
+    }
+   },
+   "TravelTripMomentInput": {
+    "type": "object",
+    "required": [
+     "date",
+     "text"
+    ],
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+     },
+     "place": {
+      "type": "string",
+      "maxLength": 120
      }
     }
    },
@@ -3429,6 +4485,637 @@
      }
     }
    },
+   "MedicalPerson": {
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "relation",
+     "note"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "name": {
+      "type": "string"
+     },
+     "relation": {
+      "type": "string"
+     },
+     "note": {
+      "type": "string"
+     }
+    }
+   },
+   "MedicalPersonInput": {
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+     },
+     "relation": {
+      "type": "string",
+      "maxLength": 40,
+      "description": "Free text: me, wife, son, mother"
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 1000
+     }
+    }
+   },
+   "MedicalProvider": {
+    "type": "object",
+    "required": [
+     "id",
+     "kind",
+     "name",
+     "specialty",
+     "clinic",
+     "phone",
+     "email",
+     "address",
+     "note"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "doctor",
+       "clinic"
+      ]
+     },
+     "name": {
+      "type": "string"
+     },
+     "specialty": {
+      "type": "string"
+     },
+     "clinic": {
+      "type": "string",
+      "description": "The clinic a doctor works at"
+     },
+     "phone": {
+      "type": "string"
+     },
+     "email": {
+      "type": "string"
+     },
+     "address": {
+      "type": "string"
+     },
+     "note": {
+      "type": "string"
+     }
+    }
+   },
+   "MedicalProviderInput": {
+    "type": "object",
+    "required": [
+     "kind",
+     "name"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "doctor",
+       "clinic"
+      ]
+     },
+     "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+     },
+     "specialty": {
+      "type": "string",
+      "maxLength": 80
+     },
+     "clinic": {
+      "type": "string",
+      "maxLength": 120
+     },
+     "phone": {
+      "type": "string",
+      "maxLength": 40
+     },
+     "email": {
+      "type": "string",
+      "maxLength": 254,
+      "description": "Empty or an email address"
+     },
+     "address": {
+      "type": "string",
+      "maxLength": 300
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 1000
+     }
+    }
+   },
+   "MedicalVisit": {
+    "type": "object",
+    "required": [
+     "id",
+     "person_id",
+     "person_name",
+     "provider_id",
+     "provider_name",
+     "date",
+     "reason",
+     "outcome",
+     "follow_up",
+     "follow_up_task_id"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "person_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "person_name": {
+      "type": "string"
+     },
+     "provider_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid"
+     },
+     "provider_name": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "reason": {
+      "type": "string"
+     },
+     "outcome": {
+      "type": "string"
+     },
+     "follow_up": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date"
+     },
+     "follow_up_task_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "The task made by POST .../task"
+     }
+    }
+   },
+   "MedicalVisitInput": {
+    "type": "object",
+    "required": [
+     "person_id",
+     "date",
+     "reason"
+    ],
+    "properties": {
+     "person_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "provider_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid"
+     },
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+     },
+     "outcome": {
+      "type": "string",
+      "maxLength": 2000
+     },
+     "follow_up": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date"
+     }
+    }
+   },
+   "MedicalRecord": {
+    "type": "object",
+    "required": [
+     "id",
+     "person_id",
+     "person_name",
+     "visit_id",
+     "date",
+     "kind",
+     "title",
+     "note",
+     "files"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "person_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "person_name": {
+      "type": "string"
+     },
+     "visit_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid"
+     },
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "lab",
+       "imaging",
+       "prescription",
+       "discharge",
+       "vaccination",
+       "certificate",
+       "other"
+      ]
+     },
+     "title": {
+      "type": "string"
+     },
+     "note": {
+      "type": "string"
+     },
+     "files": {
+      "type": "integer",
+      "description": "The number of its ready files"
+     }
+    }
+   },
+   "MedicalRecordInput": {
+    "type": "object",
+    "required": [
+     "person_id",
+     "date",
+     "kind",
+     "title"
+    ],
+    "properties": {
+     "person_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "visit_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid"
+     },
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "lab",
+       "imaging",
+       "prescription",
+       "discharge",
+       "vaccination",
+       "certificate",
+       "other"
+      ]
+     },
+     "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 2000
+     }
+    }
+   },
+   "MedicalMedication": {
+    "type": "object",
+    "required": [
+     "id",
+     "person_id",
+     "person_name",
+     "name",
+     "dose",
+     "schedule",
+     "start_date",
+     "end_date",
+     "end_task_id",
+     "note"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "person_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "person_name": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "dose": {
+      "type": "string"
+     },
+     "schedule": {
+      "type": "string",
+      "description": "Free text as prescribed: twice a day after meals"
+     },
+     "start_date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date"
+     },
+     "end_date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date"
+     },
+     "end_task_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "The task made by POST .../task"
+     },
+     "note": {
+      "type": "string"
+     }
+    }
+   },
+   "MedicalMedicationInput": {
+    "type": "object",
+    "required": [
+     "person_id",
+     "name"
+    ],
+    "properties": {
+     "person_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+     },
+     "dose": {
+      "type": "string",
+      "maxLength": 80
+     },
+     "schedule": {
+      "type": "string",
+      "maxLength": 200
+     },
+     "start_date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date"
+     },
+     "end_date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date",
+      "description": "On or after start_date"
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 1000
+     }
+    }
+   },
+   "MedicalTask": {
+    "type": "object",
+    "required": [
+     "id",
+     "title",
+     "due",
+     "status"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "title": {
+      "type": "string"
+     },
+     "due": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date"
+     },
+     "status": {
+      "type": "string"
+     }
+    }
+   },
+   "PrivateFile": {
+    "type": "object",
+    "required": [
+     "id",
+     "parent_kind",
+     "parent_id",
+     "name",
+     "content_type",
+     "bytes",
+     "status",
+     "created_at"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "parent_kind": {
+      "type": "string",
+      "enum": [
+       "medical_record",
+       "travel_document"
+      ]
+     },
+     "parent_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "name": {
+      "type": "string"
+     },
+     "content_type": {
+      "type": "string"
+     },
+     "bytes": {
+      "type": "integer"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "pending",
+       "ready"
+      ]
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "PrivateFileInput": {
+    "type": "object",
+    "required": [
+     "parent_kind",
+     "parent_id",
+     "name",
+     "content_type",
+     "bytes"
+    ],
+    "properties": {
+     "parent_kind": {
+      "type": "string",
+      "enum": [
+       "medical_record",
+       "travel_document"
+      ]
+     },
+     "parent_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "The file name as shown and downloaded; a path keeps its last segment"
+     },
+     "content_type": {
+      "type": "string",
+      "enum": [
+       "application/pdf",
+       "image/jpeg",
+       "image/png",
+       "image/webp",
+       "image/heic"
+      ]
+     },
+     "bytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 26214400
+     }
+    }
+   },
+   "PrivateFileUpload": {
+    "type": "object",
+    "required": [
+     "url",
+     "headers"
+    ],
+    "properties": {
+     "url": {
+      "type": "string",
+      "description": "Presigned PUT valid 15 minutes"
+     },
+     "headers": {
+      "type": "object",
+      "description": "Send exactly these headers with the PUT; they are signed",
+      "required": [
+       "Content-Type",
+       "Cache-Control"
+      ],
+      "properties": {
+       "Content-Type": {
+        "type": "string"
+       },
+       "Cache-Control": {
+        "type": "string"
+       }
+      }
+     }
+    }
+   },
+   "PrivateFileDownload": {
+    "type": "object",
+    "required": [
+     "url",
+     "expires_in"
+    ],
+    "properties": {
+     "url": {
+      "type": "string",
+      "description": "Presigned GET; do not store it"
+     },
+     "expires_in": {
+      "type": "integer",
+      "description": "Seconds the link stays valid"
+     }
+    }
+   },
    "TravelTrip": {
     "type": "object",
     "required": [
@@ -3438,6 +5125,8 @@
      "end_date",
      "countries",
      "note",
+     "purpose",
+     "booked_cost",
      "packing",
      "spends"
     ],
@@ -3465,6 +5154,23 @@
      },
      "note": {
       "type": "string"
+     },
+     "purpose": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "leisure",
+       "business",
+       "family",
+       "relocation",
+       "other",
+       null
+      ]
+     },
+     "booked_cost": {
+      "$ref": "#/components/schemas/TravelBookedCost"
      },
      "packing": {
       "type": "object",
@@ -3521,6 +5227,20 @@
       "items": {
        "$ref": "#/components/schemas/TravelSpend"
       }
+     },
+     "contacts": {
+      "type": "array",
+      "description": "GET of one trip only, by name",
+      "items": {
+       "$ref": "#/components/schemas/TravelTripContact"
+      }
+     },
+     "moments": {
+      "type": "array",
+      "description": "GET of one trip only, the earliest first",
+      "items": {
+       "$ref": "#/components/schemas/TravelTripMoment"
+      }
      }
     }
    },
@@ -3551,6 +5271,24 @@
      "note": {
       "type": "string",
       "maxLength": 2000
+     },
+     "purpose": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "leisure",
+       "business",
+       "family",
+       "relocation",
+       "other",
+       null
+      ],
+      "description": "null clears it"
+     },
+     "booked_cost": {
+      "$ref": "#/components/schemas/TravelBookedCost"
      }
     }
    },
@@ -10261,9 +11999,11 @@
             "food",
             "goals",
             "habits",
+            "medical",
             "money",
             "notes",
             "now",
+            "practice",
             "tasks",
             "travel",
             "workout"
@@ -10284,6 +12024,9 @@
             "habits": {
              "type": "boolean"
             },
+            "medical": {
+             "type": "boolean"
+            },
             "money": {
              "type": "boolean"
             },
@@ -10291,6 +12034,9 @@
              "type": "boolean"
             },
             "now": {
+             "type": "boolean"
+            },
+            "practice": {
              "type": "boolean"
             },
             "tasks": {
@@ -12174,6 +13920,242 @@
      },
      "503": {
       "description": "Database unavailable"
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/measurements": {
+   "get": {
+    "summary": "Girths measured by hand, newest first",
+    "description": "The caller's own rows: they need no linked Mi account.",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "Open when absent"
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "Open when absent"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The measurements by date, newest first",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data",
+          "total"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/TapeMeasurement"
+           }
+          },
+          "total": {
+           "type": "integer"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Malformed range"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "No fitness:read, or the principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Fitness module disabled"
+     }
+    }
+   },
+   "post": {
+    "summary": "Add girths measured by hand",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TapeMeasurementInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "The measurement",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/TapeMeasurement"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed: no date, no girth, or a girth out of range"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "No fitness:read, or the principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Fitness module disabled"
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/measurements/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "patch": {
+    "summary": "Edit a measurement by hand",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TapeMeasurementInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The measurement",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/TapeMeasurement"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed, or the edit clears every girth"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "No fitness:read, or the principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Fitness module disabled, or not the caller's measurement"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a measurement by hand",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "No fitness:read, or the principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Fitness module disabled, or not the caller's measurement"
      }
     }
    }
@@ -21449,6 +23431,896 @@
     }
    }
   },
+  "/api/v1/practice/clients": {
+   "get": {
+    "summary": "The caller's clients by name, with open deals and income per currency",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The clients",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/PracticeClient"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled"
+     }
+    }
+   },
+   "post": {
+    "summary": "Add a client",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PracticeClientInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "The client",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/PracticeClient"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled"
+     }
+    }
+   }
+  },
+  "/api/v1/practice/clients/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "get": {
+    "summary": "One client",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The client",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/PracticeClient"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled, or not the caller's client"
+     }
+    }
+   },
+   "patch": {
+    "summary": "Edit a client (the fields given)",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PracticeClientInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The client",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/PracticeClient"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled, or not the caller's client"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a client; its entries stay, unlinked",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled, or not the caller's client"
+     },
+     "409": {
+      "description": "The client still has deals (client_has_deals)"
+     }
+    }
+   }
+  },
+  "/api/v1/practice/deals": {
+   "get": {
+    "summary": "The deals, open stages first (lead, negotiation, active, done, lost)",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "stage",
+      "in": "query",
+      "schema": {
+       "$ref": "#/components/schemas/PracticeDealStage"
+      }
+     },
+     {
+      "name": "client",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The deals",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/PracticeDeal"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Bad query"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled"
+     }
+    }
+   },
+   "post": {
+    "summary": "Add a deal for a client (a lead unless a stage is given)",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PracticeDealInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "The deal",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/PracticeDeal"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled"
+     }
+    }
+   }
+  },
+  "/api/v1/practice/deals/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "get": {
+    "summary": "One deal with its open tasks and what it brought in",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The deal",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/PracticeDeal"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled, or not the caller's deal"
+     }
+    }
+   },
+   "patch": {
+    "summary": "Edit a deal or move it to another stage; a new client takes the deal's entries with it",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PracticeDealInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The deal",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/PracticeDeal"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled, or not the caller's deal"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a deal; its entries and tasks stay, unlinked",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled, or not the caller's deal"
+     }
+    }
+   }
+  },
+  "/api/v1/practice/entries": {
+   "get": {
+    "summary": "Incomes and expenses of the practice, the latest day first",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "kind",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "income",
+        "expense"
+       ]
+      }
+     },
+     {
+      "name": "month",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}$"
+      },
+      "description": "One month, as YYYY-MM"
+     },
+     {
+      "name": "client",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     },
+     {
+      "name": "deal",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "A page of entries",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data",
+          "total",
+          "limit",
+          "offset"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/PracticeEntry"
+           }
+          },
+          "total": {
+           "type": "integer"
+          },
+          "limit": {
+           "type": "integer"
+          },
+          "offset": {
+           "type": "integer"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Bad query"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled"
+     }
+    }
+   },
+   "post": {
+    "summary": "Add an income or an expense",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PracticeEntryInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "The entry",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/PracticeEntry"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed, or a client other than the deal's (not_of_client)"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled"
+     }
+    }
+   }
+  },
+  "/api/v1/practice/entries/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "get": {
+    "summary": "One income or expense",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The entry",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/PracticeEntry"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled, or not the caller's entry"
+     }
+    }
+   },
+   "patch": {
+    "summary": "Edit an income or expense (the fields given)",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PracticeEntryInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The entry",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/PracticeEntry"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed, or a client other than the deal's (not_of_client)"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled, or not the caller's entry"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete an income or expense",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled, or not the caller's entry"
+     }
+    }
+   }
+  },
+  "/api/v1/practice/months": {
+   "get": {
+    "summary": "The months of a year that have entries, with totals per currency",
+    "description": "The latest month first. Every total is of one currency: amounts of two currencies are never added together, and nothing is converted.",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "year",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1900,
+       "maximum": 2100
+      },
+      "description": "Defaults to this year (UTC)"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The months and the year's totals",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "year",
+          "data",
+          "totals"
+         ],
+         "properties": {
+          "year": {
+           "type": "integer"
+          },
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/PracticeMonth"
+           }
+          },
+          "totals": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/PracticeTotal"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Bad query"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled"
+     }
+    }
+   }
+  },
+  "/api/v1/practice/months/{month}": {
+   "parameters": [
+    {
+     "name": "month",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}$"
+     },
+     "description": "YYYY-MM"
+    }
+   ],
+   "get": {
+    "summary": "One month: totals per currency and per client, and its entries",
+    "tags": [
+     "practice"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The month",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "month",
+            "totals",
+            "by_client",
+            "entries"
+           ],
+           "properties": {
+            "month": {
+             "type": "string",
+             "pattern": "^\\d{4}-\\d{2}$"
+            },
+            "totals": {
+             "type": "array",
+             "items": {
+              "$ref": "#/components/schemas/PracticeTotal"
+             }
+            },
+            "by_client": {
+             "type": "array",
+             "items": {
+              "$ref": "#/components/schemas/PracticeClientTotal"
+             }
+            },
+            "entries": {
+             "type": "array",
+             "items": {
+              "$ref": "#/components/schemas/PracticeEntry"
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Not a month (invalid_month)"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Practice module disabled"
+     }
+    }
+   }
+  },
   "/api/v1/tasks/projects": {
    "get": {
     "summary": "Projects and courses with their task counts and the next open task",
@@ -21782,6 +24654,15 @@
       "description": "The tasks of one project or course"
      },
      {
+      "name": "deal",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "description": "The tasks of one deal of the practice (its next steps)"
+     },
+     {
       "name": "limit",
       "in": "query",
       "schema": {
@@ -22054,13 +24935,24 @@
    },
    "patch": {
     "summary": "Change a task",
-    "description": "Closing (status done) sets completed_at, reopening clears it; a completed_at in the body is ignored. Null clears effort, due and the source.",
+    "description": "Closing (status done) sets completed_at, reopening clears it; a completed_at in the body is ignored. Null clears effort, due and the source. Closing a task with a repeat rule creates its next occurrence once (next_id points at it); reopening keeps it.",
     "tags": [
      "tasks"
     ],
     "security": [
      {
       "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the day a repeating task is closed on"
      }
     ],
     "requestBody": {
@@ -26540,6 +29432,2379 @@
     }
    }
   },
+  "/api/v1/medical/people": {
+   "get": {
+    "summary": "The people of the family, by name",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/MedicalPerson"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "summary": "Add a person",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MedicalPersonInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Created",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MedicalPerson"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/medical/people/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "patch": {
+    "summary": "Replace a person (every field)",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MedicalPersonInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MedicalPerson"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a person with no visits, records or medications",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "The person still has visits, records or medications (person_in_use)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/medical/providers": {
+   "get": {
+    "summary": "The doctors and clinics, by name",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/MedicalProvider"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "summary": "Add a doctor or a clinic",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MedicalProviderInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Created",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MedicalProvider"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/medical/providers/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "patch": {
+    "summary": "Replace a doctor or a clinic (every field)",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MedicalProviderInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MedicalProvider"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a doctor or a clinic; its visits keep their date and lose the link",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/medical/visits": {
+   "get": {
+    "summary": "The visits, the newest first",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "person",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "description": "Only this person"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/MedicalVisit"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "summary": "Add a visit",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MedicalVisitInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Created",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MedicalVisit"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/medical/visits/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "patch": {
+    "summary": "Replace a visit (every field)",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MedicalVisitInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MedicalVisit"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a visit",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/medical/visits/{id}/task": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "post": {
+    "summary": "The task of the follow-up date",
+    "description": "The task linked to the follow-up date while it exists (200), else a new open task in area health due that day (201). 404 tasks while the tasks module is off.",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The linked task",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "visit",
+            "task",
+            "created"
+           ],
+           "properties": {
+            "visit": {
+             "$ref": "#/components/schemas/MedicalVisit"
+            },
+            "task": {
+             "$ref": "#/components/schemas/MedicalTask"
+            },
+            "created": {
+             "type": "boolean"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "201": {
+      "description": "A new task",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "visit",
+            "task",
+            "created"
+           ],
+           "properties": {
+            "visit": {
+             "$ref": "#/components/schemas/MedicalVisit"
+            },
+            "task": {
+             "$ref": "#/components/schemas/MedicalTask"
+            },
+            "created": {
+             "type": "boolean"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical or tasks module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "The visit has no follow-up date (no_date)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/medical/records": {
+   "get": {
+    "summary": "The records, the newest first, with the count of their files",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "person",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "description": "Only this person"
+     },
+     {
+      "name": "kind",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "lab",
+        "imaging",
+        "prescription",
+        "discharge",
+        "vaccination",
+        "certificate",
+        "other"
+       ]
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/MedicalRecord"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "summary": "Add a record",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MedicalRecordInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Created",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MedicalRecord"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/medical/records/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "patch": {
+    "summary": "Replace a record (every field)",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MedicalRecordInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MedicalRecord"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a record and its files",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/medical/medications": {
+   "get": {
+    "summary": "The medications, the current ones by name, then the finished ones",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "person",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "description": "Only this person"
+     },
+     {
+      "name": "current",
+      "in": "query",
+      "schema": {
+       "type": "boolean"
+      },
+      "description": "true: only those without an end, or ending today or later"
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "IANA zone of the caller's today (UTC by default)"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/MedicalMedication"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "summary": "Add a medication",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MedicalMedicationInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Created",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MedicalMedication"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/medical/medications/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "patch": {
+    "summary": "Replace a medication (every field)",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MedicalMedicationInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MedicalMedication"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a medication",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/medical/medications/{id}/task": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "post": {
+    "summary": "The task of the end date",
+    "description": "The task linked to the end date while it exists (200), else a new open task in area health due that day (201). 404 tasks while the tasks module is off.",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The linked task",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "medication",
+            "task",
+            "created"
+           ],
+           "properties": {
+            "medication": {
+             "$ref": "#/components/schemas/MedicalMedication"
+            },
+            "task": {
+             "$ref": "#/components/schemas/MedicalTask"
+            },
+            "created": {
+             "type": "boolean"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "201": {
+      "description": "A new task",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "medication",
+            "task",
+            "created"
+           ],
+           "properties": {
+            "medication": {
+             "$ref": "#/components/schemas/MedicalMedication"
+            },
+            "task": {
+             "$ref": "#/components/schemas/MedicalTask"
+            },
+            "created": {
+             "type": "boolean"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the medical or tasks module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "The medication has no end date (no_date)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/files": {
+   "get": {
+    "summary": "The ready files of a medical record or a travel document, oldest first",
+    "tags": [
+     "files"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "parent_kind",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "enum": [
+        "medical_record",
+        "travel_document"
+       ]
+      }
+     },
+     {
+      "name": "parent_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/PrivateFile"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found (another owner's file or parent reads the same), or the module of the parent is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "summary": "Start a private upload",
+    "description": "Creates a pending row and answers a presigned PUT valid 15 minutes under the private prefix. The browser sends the bytes with exactly the answered headers, then calls /ready. PDF, JPEG, PNG, WebP or HEIC, up to 25 MB, at most 20 files per parent.",
+    "tags": [
+     "files"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PrivateFileInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "The pending file and its upload",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "file",
+            "upload"
+           ],
+           "properties": {
+            "file": {
+             "$ref": "#/components/schemas/PrivateFile"
+            },
+            "upload": {
+             "$ref": "#/components/schemas/PrivateFileUpload"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found (another owner's file or parent reads the same), or the module of the parent is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "The parent holds the most files it can (too_many_files)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Storage not configured (storage_not_configured)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/files/{id}/ready": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "post": {
+    "summary": "Mark a file ready once it is in the storage at the declared size",
+    "description": "Fails closed: the file turns ready only after an unsigned HEAD at its public URL is refused. If the storage lets anyone read it, the file is deleted and the call answers 503 storage_public.",
+    "tags": [
+     "files"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Ready",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/PrivateFile"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found (another owner's file or parent reads the same), or the module of the parent is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "The object is missing or has another size (upload_incomplete)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Storage not configured, refusing, or readable without a key (storage_not_configured, storage_unavailable, storage_public)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/files/{id}/download": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "get": {
+    "summary": "A presigned GET link to the file, valid two minutes",
+    "description": "Signed for the owner on every call; the answer carries Cache-Control no-store. The link opens the file inline under its name.",
+    "tags": [
+     "files"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The link",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/PrivateFileDownload"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found (another owner's file or parent reads the same), or the module of the parent is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "The upload has not finished (not_ready)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Storage not configured or refusing (storage_not_configured, storage_unavailable)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/files/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "delete": {
+    "summary": "Delete a file",
+    "description": "The row goes first and its object key is kept for the files_sweep job in the same transaction; the object is removed right after, or by the sweep when the storage does not answer.",
+    "tags": [
+     "files"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "400": {
+      "description": "Validation failed",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found (another owner's file or parent reads the same), or the module of the parent is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/travel/trips": {
    "get": {
     "summary": "Trips with packing and spends, the latest first",
@@ -27186,6 +32451,512 @@
    },
    "delete": {
     "summary": "Delete a plan item",
+    "tags": [
+     "travel"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "400": {
+      "description": "Invalid input",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the travel module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/travel/trips/{id}/contacts": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "post": {
+    "summary": "Add a contact to a trip",
+    "tags": [
+     "travel"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TravelTripContactInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/TravelTripContact"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Invalid input",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the travel module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/travel/trips/{id}/contacts/{child}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    },
+    {
+     "name": "child",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "patch": {
+    "summary": "Replace a trip contact (all fields)",
+    "tags": [
+     "travel"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TravelTripContactInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/TravelTripContact"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Invalid input",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the travel module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a trip contact",
+    "tags": [
+     "travel"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "400": {
+      "description": "Invalid input",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the travel module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/travel/trips/{id}/moments": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "post": {
+    "summary": "Add a moment to a trip",
+    "tags": [
+     "travel"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TravelTripMomentInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/TravelTripMoment"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Invalid input",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the travel module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/travel/trips/{id}/moments/{child}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    },
+    {
+     "name": "child",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "patch": {
+    "summary": "Replace a trip moment (all fields)",
+    "tags": [
+     "travel"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TravelTripMomentInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/TravelTripMoment"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Invalid input",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the travel module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a trip moment",
     "tags": [
      "travel"
     ],
@@ -27939,12 +33710,291 @@
      }
     }
    }
+  },
+  "/api/v1/habits/{id}/checks/{date}/add": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    },
+    {
+     "name": "date",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "date"
+     }
+    }
+   ],
+   "post": {
+    "summary": "Add an amount to the day of a habit",
+    "description": "Adds value to the tick of the day (a tick without a value counts as 0) and creates the tick when there is none; with a daily target the day is done once the sum reaches it.",
+    "tags": [
+     "habits"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: a day after today there is refused"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "value"
+        ],
+        "properties": {
+         "value": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1000000
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The tick with the sum of the day",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/HabitCheck"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed: a bad amount, a bad date, a day after today or more than 366 days back"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Habits module disabled, or not the caller's habit"
+     }
+    }
+   }
+  },
+  "/api/v1/habits/mood": {
+   "get": {
+    "summary": "The mood check-ins of a range of days",
+    "tags": [
+     "habits"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "At most 365 days after from"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The check-ins, oldest first; a day without one is absent",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data",
+          "from",
+          "to"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/MoodCheckin"
+           }
+          },
+          "from": {
+           "type": "string",
+           "format": "date"
+          },
+          "to": {
+           "type": "string",
+           "format": "date"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Habits module disabled"
+     }
+    }
+   }
+  },
+  "/api/v1/habits/mood/{date}": {
+   "parameters": [
+    {
+     "name": "date",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "date"
+     }
+    }
+   ],
+   "put": {
+    "summary": "Check in the mood of a day",
+    "description": "One check-in per local day; a second one replaces the first.",
+    "tags": [
+     "habits"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: a day after today there is refused"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MoodInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The check-in",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MoodCheckin"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed: a bad score or tag, a bad date, a day after today or more than 366 days back"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Habits module disabled"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Remove the mood check-in of a day",
+    "tags": [
+     "habits"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Removed, or there was none"
+     },
+     "400": {
+      "description": "Not a calendar day"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Habits module disabled"
+     }
+    }
+   }
   }
  },
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 412204,
-  "source_fnv1a64": "28b578a404758a2b"
+  "source_bytes": 502410,
+  "source_fnv1a64": "804ec09ecb65fbe1"
  }
 }

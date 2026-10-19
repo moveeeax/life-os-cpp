@@ -1,8 +1,9 @@
 /**
  * @file TaskRepository.hpp
  * @brief task_items: the person's tasks. Closing sets completed_at and
- *        reopening clears it in the same UPDATE; the agenda rows come back
- *        with the day read in the caller's zone.
+ *        reopening clears it in the same UPDATE; closing a task with a repeat
+ *        rule creates its next occurrence in the same transaction; the agenda
+ *        rows come back with the day read in the caller's zone.
  */
 
 #pragma once
@@ -20,6 +21,7 @@
 #include "repositories/Zones.hpp"
 #include "repositories/tasks/Errors.hpp"
 #include "tasks/Agenda.hpp"
+#include "tasks/Repeat.hpp"
 
 namespace Repositories::Tasks {
 
@@ -40,6 +42,8 @@ public:
         std::optional<std::string> goal_section_id;
         std::optional<std::string> trip_id;
         std::optional<std::string> project_id;
+        std::optional<std::string> repeat;  // the rule as JSON text (Tasks::Repeat::to_json)
+        std::optional<std::string> deal_id;
     };
 
     struct Patch {
@@ -56,6 +60,10 @@ public:
         std::optional<std::optional<std::string>> goal_section_id;
         std::optional<std::optional<std::string>> trip_id;
         std::optional<std::optional<std::string>> project_id;
+        std::optional<std::optional<std::string>> repeat;  // JSON text; null stops the repeat
+        /// The local day the task is closed on, for the next occurrence; empty: today in UTC.
+        std::optional<std::string> today;
+        std::optional<std::optional<std::string>> deal_id;
     };
 
     struct Filter {
@@ -68,6 +76,7 @@ public:
         int offset = 0;
         std::string trip;        // "" any, or a trip id: that trip's tasks (packing)
         std::string project;     // "" any, or a project (or course) id
+        std::string deal;        // "" any, or a deal id of the practice: its next steps
         std::string tz = "UTC";  // the zone done_since is read in (a zone PostgreSQL knows)
     };
 
@@ -84,9 +93,9 @@ public:
     static std::string create_in(Txn& txn, const std::string& owner, const Input& in) {
         auto r = txn.exec_params(
             "INSERT INTO task_items (owner_id, title, area, effort, due, next_step, note, status, completed_at, "
-            " source_kind, source_ref, external_id, goal_id, goal_section_id, trip_id, project_id) "
+            " source_kind, source_ref, external_id, goal_id, goal_section_id, trip_id, project_id, repeat, deal_id) "
             "VALUES ($1::uuid, $2, $3, $4, $5::date, $6, $7, $8, CASE WHEN $8 = 'done' THEN now() END, $9, $10, $11, "
-            " $12::uuid, $13::uuid, $14::uuid, $15::uuid) "
+            " $12::uuid, $13::uuid, $14::uuid, $15::uuid, $16::jsonb, $17::uuid) "
             "RETURNING id::text",
             owner,
             in.title,
@@ -102,7 +111,9 @@ public:
             in.goal_id,
             in.goal_section_id,
             in.trip_id,
-            in.project_id);
+            in.project_id,
+            in.repeat,
+            in.deal_id);
         return r[0][0].template as<std::string>();
     }
 
@@ -118,10 +129,21 @@ public:
     }
 
     /// update() inside the caller's transaction (the focus of the day closes
-    /// its task in the same one). The SQLSTATE translation is the caller's:
+    /// its task in the same one). A repeating task that goes to done gets its
+    /// next occurrence here, once. The SQLSTATE translation is the caller's:
     /// wrap in detail::translate_sql. @throws NotFound.
     template <typename Txn>
     static nlohmann::json update_in(Txn& txn, const std::string& owner, const std::string& id, const Patch& p) {
+        auto before = txn.exec_params(
+            "SELECT status, recur_next_id IS NOT NULL FROM task_items "
+            "WHERE owner_id = $1::uuid AND id = $2::uuid FOR UPDATE",
+            owner,
+            id);
+        if (before.empty()) {
+            throw NotFound("task");
+        }
+        const bool was_done = before[0][0].template as<std::string>() == "done";
+        const bool has_next = before[0][1].template as<bool>();
         auto r = txn.exec_params(
             "UPDATE task_items SET title = COALESCE($3, title), area = COALESCE($4, area), "
             " effort = CASE WHEN $5::boolean THEN $6 ELSE effort END, "
@@ -135,7 +157,9 @@ public:
             " goal_id = CASE WHEN $16::boolean THEN $17::uuid ELSE goal_id END, "
             " goal_section_id = CASE WHEN $18::boolean THEN $19::uuid ELSE goal_section_id END, "
             " trip_id = CASE WHEN $20::boolean THEN $21::uuid ELSE trip_id END, "
-            " project_id = CASE WHEN $22::boolean THEN $23::uuid ELSE project_id END "
+            " project_id = CASE WHEN $22::boolean THEN $23::uuid ELSE project_id END, "
+            " repeat = CASE WHEN $24::boolean THEN $25::jsonb ELSE repeat END, "
+            " deal_id = CASE WHEN $26::boolean THEN $27::uuid ELSE deal_id END "
             "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
             owner,
             id,
@@ -159,11 +183,56 @@ public:
             p.trip_id.has_value(),
             p.trip_id.has_value() ? *p.trip_id : std::optional<std::string>(),
             p.project_id.has_value(),
-            p.project_id.has_value() ? *p.project_id : std::optional<std::string>());
+            p.project_id.has_value() ? *p.project_id : std::optional<std::string>(),
+            p.repeat.has_value(),
+            p.repeat.has_value() ? *p.repeat : std::optional<std::string>(),
+            p.deal_id.has_value(),
+            p.deal_id.has_value() ? *p.deal_id : std::optional<std::string>());
         if (r.empty()) {
             throw NotFound("task");
         }
-        return *find_in(txn, owner, id);
+        auto row = *find_in(txn, owner, id);
+        if (!was_done && !has_next && row["status"] == "done" && row["repeat"].is_object()) {
+            if (spawn_next_in(txn, owner, id, row, p.today)) {
+                row = *find_in(txn, owner, id);
+            }
+        }
+        return row;
+    }
+
+    /// The next occurrence of the closed task @p row: a copy, open, due on the
+    /// rule's next day, with no external id; the closed one points at it.
+    /// False when the stored rule does not read (left alone, the close stands).
+    template <typename Txn>
+    static bool spawn_next_in(Txn& txn,
+                              const std::string& owner,
+                              const std::string& id,
+                              const nlohmann::json& row,
+                              const std::optional<std::string>& today) {
+        ::Tasks::Repeat::Rule rule;
+        if (::Tasks::Repeat::check(row["repeat"], rule)) {
+            return false;
+        }
+        const std::string done_day =
+            today ? *today
+                  : txn.exec("SELECT to_char((now() AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD')")[0][0]
+                        .template as<std::string>();
+        const std::string due = row["due"].is_string() ? row["due"].get<std::string>() : "";
+        const std::string next = ::Tasks::Repeat::next_due(rule, due, done_day);
+        auto made = txn.exec_params(
+            "INSERT INTO task_items (owner_id, title, area, effort, due, next_step, note, status, source_kind, "
+            " source_ref, goal_id, goal_section_id, trip_id, project_id, repeat, deal_id) "
+            "SELECT owner_id, title, area, effort, $3::date, next_step, note, 'open', source_kind, source_ref, "
+            " goal_id, goal_section_id, trip_id, project_id, repeat, deal_id "
+            "FROM task_items WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id::text",
+            owner,
+            id,
+            next);
+        txn.exec_params("UPDATE task_items SET recur_next_id = $3::uuid WHERE owner_id = $1::uuid AND id = $2::uuid",
+                        owner,
+                        id,
+                        made[0][0].template as<std::string>());
+        return true;
     }
 
     void remove(const std::string& owner, const std::string& id) {
@@ -185,7 +254,8 @@ public:
                 "'\\') "
                 " AND ($5 = '' OR due <= $5::date) AND ($6 = '' OR completed_at >= ($6::date::timestamp AT TIME ZONE "
                 "$11)) AND ($9 = '' OR trip_id = NULLIF($9, '')::uuid) "
-                " AND ($10 = '' OR project_id = NULLIF($10, '')::uuid) ";
+                " AND ($10 = '' OR project_id = NULLIF($10, '')::uuid) "
+                " AND ($12 = '' OR deal_id = NULLIF($12, '')::uuid) ";
             const std::string q = escape_like(f.q);
             auto total =
                 txn.exec_params("SELECT count(*) FROM task_items" + where + " AND $7::int >= 0 AND $8::int >= 0",
@@ -199,7 +269,8 @@ public:
                                 f.offset,
                                 f.trip,
                                 f.project,
-                                f.tz);
+                                f.tz,
+                                f.deal);
             auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
                                          " FROM task_items" + where + " ORDER BY created_at DESC LIMIT $7 OFFSET $8) t",
                                      owner,
@@ -212,7 +283,8 @@ public:
                                      f.offset,
                                      f.trip,
                                      f.project,
-                                     f.tz);
+                                     f.tz,
+                                     f.deal);
             return nlohmann::json{{"data", nlohmann::json::parse(r[0][0].template as<std::string>())},
                                   {"total", total[0][0].template as<long>()}};
         });
@@ -283,6 +355,8 @@ public:
         "id, title, area, effort, to_char(due, 'YYYY-MM-DD') AS due, next_step, note, status, "
         " " SQL_ISO_UTC("completed_at") " AS completed_at, "
         " source_kind, source_ref, external_id, goal_id, goal_section_id, trip_id, project_id, "
+        " repeat, recur_next_id AS next_id, deal_id, "
+        " (SELECT d.title FROM practice_deals d WHERE d.id = task_items.deal_id) AS deal_title, "
         " (SELECT g.title FROM goal_items g WHERE g.id = task_items.goal_id) AS goal_title, "
         " (SELECT p.name FROM projects p WHERE p.id = task_items.project_id) AS project_title, "
         " (SELECT p.kind FROM projects p WHERE p.id = task_items.project_id) AS project_kind, "

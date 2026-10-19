@@ -1,0 +1,17 @@
+/* The files inside an open row of a record or a document. */
+.k-files {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.k-files .k-kv {
+  align-items: baseline;
+  min-width: 0;
+}
+.k-file-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}

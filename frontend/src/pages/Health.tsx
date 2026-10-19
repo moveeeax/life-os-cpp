@@ -41,7 +41,9 @@ import {
 import { needsLink } from '@/lib/mi';
 
 import { ChartCard } from './health/ChartCard';
+import { Measurements } from './health/Measurements';
 import { SyncPanel } from './health/SyncPanel';
+import { useBodyTabs } from './medical/tabs';
 import { Banner, Facts, Group, Num, Row, SectionFrame } from '@/shell/kit';
 import { TimeChart } from './health/LazyTimeChart';
 
@@ -593,10 +595,11 @@ export function HealthPage() {
   const canRead = userCan(user, Permission.FitnessRead);
   // The link status needs fitness:sync; without it the page shows what there is.
   const mi = useMiAccount(canRead && userCan(user, Permission.FitnessSync));
+  const tabs = useBodyTabs();
 
   if (!canRead) {
     return (
-      <SectionFrame eyebrow="Body" headline="No access to Health">
+      <SectionFrame eyebrow="Body" headline="No access to Health" tabs={tabs}>
         <div className="k-banner" role="alert">
           <span>
             <ShieldAlert className="k-inline-icon" aria-hidden="true" /> Your role does not include
@@ -615,8 +618,9 @@ export function HealthPage() {
   // Nothing is linked: there is no data to chart, only the way to get some.
   if (needsLink(mi.data)) {
     return (
-      <SectionFrame eyebrow="Body" headline="Body">
+      <SectionFrame eyebrow="Body" headline="Body" tabs={tabs}>
         <LinkMiNotice purpose="to see your steps, sleep, heart rate and weight here" />
+        <Measurements />
       </SectionFrame>
     );
   }
@@ -626,6 +630,7 @@ export function HealthPage() {
       eyebrow="Body"
       headline={<span data-num-ok>{headline}</span>}
       sub="from the band"
+      tabs={tabs}
       tools={<PeriodPicker />}
     >
       {mi.data?.status === 'reauth_required' && (
@@ -637,6 +642,7 @@ export function HealthPage() {
       <Tiles range={range} />
       <Charts range={range} />
       <Tables range={range} />
+      <Measurements />
       {userCan(user, Permission.FitnessSync) && <SyncPanel />}
     </SectionFrame>
   );

@@ -84,6 +84,7 @@ function Editor({ note }: { note: Note }) {
       summary: d.summary.trim(),
       body: d.body,
       project_id: d.project || null,
+      date: d.date || null,
       ...(d.slug.trim() && d.slug.trim() !== base.slug ? { slug: d.slug.trim() } : {}),
     });
   };
@@ -185,15 +186,21 @@ function Editor({ note }: { note: Note }) {
             />
           </label>
         </div>
-        <label className="k-field">
-          <span>Summary</span>
-          <input
-            maxLength={500}
-            value={d.summary}
-            onChange={set('summary')}
-            placeholder="One or two lines for a list"
-          />
-        </label>
+        <div className="k-fields">
+          <label className="k-field">
+            <span>Summary</span>
+            <input
+              maxLength={500}
+              value={d.summary}
+              onChange={set('summary')}
+              placeholder="One or two lines for a list"
+            />
+          </label>
+          <label className="k-field">
+            <span>Day it is about (optional)</span>
+            <input type="date" value={d.date} onChange={set('date')} />
+          </label>
+        </div>
       </div>
       {save.error && (
         <p role="alert" className="k-error">

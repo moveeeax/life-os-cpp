@@ -80,6 +80,8 @@ services:
       TRAVEL_ENABLED: ${TRAVEL_ENABLED:-false}
       HABITS_ENABLED: ${HABITS_ENABLED:-false}
       NOTES_ENABLED: ${NOTES_ENABLED:-false}
+      PRACTICE_ENABLED: ${PRACTICE_ENABLED:-false}
+      MEDICAL_ENABLED: ${MEDICAL_ENABLED:-false}
       REGISTRATION_OPEN: ${REGISTRATION_OPEN:-true}
       NOW_ENABLED: ${NOW_ENABLED:-false}
       # Rate limiting, idempotency and CSRF: the defaults are the values of
@@ -263,6 +265,8 @@ services:
       TRAVEL_ENABLED: ${TRAVEL_ENABLED:-false}
       HABITS_ENABLED: ${HABITS_ENABLED:-false}
       NOTES_ENABLED: ${NOTES_ENABLED:-false}
+      PRACTICE_ENABLED: ${PRACTICE_ENABLED:-false}
+      MEDICAL_ENABLED: ${MEDICAL_ENABLED:-false}
       REGISTRATION_OPEN: ${REGISTRATION_OPEN:-true}
       NOW_ENABLED: ${NOW_ENABLED:-false}
       WORKER_ID: ${WORKER_ID:-worker-1}
@@ -272,7 +276,7 @@ services:
       # testing — opt them in explicitly when you want them, e.g.:
       #   WORKER_TYPES=account_email,echo,slow,fail
       # (The API job tests drain Redis directly and do NOT rely on this list.)
-      WORKER_TYPES: ${WORKER_TYPES:-account_email,email.send,webhook.deliver,fitness_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,now_media_sweep}
+      WORKER_TYPES: ${WORKER_TYPES:-account_email,email.send,webhook.deliver,fitness_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,now_media_sweep,files_sweep}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
       WORKER_HEALTH_PORT: ${WORKER_HEALTH_PORT:-9091}
       WORKER_BRPOP_TIMEOUT: ${WORKER_BRPOP_TIMEOUT:-5}

@@ -2,7 +2,9 @@
  * @file NoteRepository.hpp
  * @brief The owner's notes: Markdown with the fields of a tarassov.me post
  *        (slug, title, summary, body, topic, tags, status), linked to a project
- *        or course and to the task a note was made from.
+ *        or course and to the task a note was made from, and the day a note is
+ *        about (optional; the list sorts by it when set, else by the day the
+ *        note was made).
  */
 
 #pragma once
@@ -46,6 +48,7 @@ public:
         std::vector<std::string> tags;
         std::optional<std::string> project_id;
         std::optional<std::string> task_id;
+        std::optional<std::string> date;  // YYYY-MM-DD
     };
 
     /// A partial edit; a link given as null clears it.
@@ -58,6 +61,7 @@ public:
         std::optional<std::vector<std::string>> tags;
         std::optional<std::optional<std::string>> project_id;
         std::optional<std::optional<std::string>> task_id;
+        std::optional<std::optional<std::string>> date;
     };
 
     struct Filter {
@@ -75,8 +79,10 @@ public:
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
                     auto r = txn.exec_params(
-                        "INSERT INTO notes (owner_id, slug, title, summary, body, topic, tags, project_id, task_id) "
-                        "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7::text[], $8::uuid, $9::uuid) RETURNING id::text",
+                        "INSERT INTO notes (owner_id, slug, title, summary, body, topic, tags, project_id, task_id, "
+                        "date) "
+                        "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7::text[], $8::uuid, $9::uuid, $10::date) "
+                        "RETURNING id::text",
                         owner,
                         in.slug,
                         in.title,
@@ -85,7 +91,8 @@ public:
                         in.topic,
                         pg_array(in.tags),
                         in.project_id,
-                        in.task_id);
+                        in.task_id,
+                        in.date);
                     return *find_in(txn, owner, r[0][0].template as<std::string>());
                 });
             },
@@ -117,7 +124,8 @@ public:
                         " summary = COALESCE($5, summary), body = COALESCE($6, body), topic = COALESCE($7, topic), "
                         " tags = CASE WHEN $8::boolean THEN $9::text[] ELSE tags END, "
                         " project_id = CASE WHEN $10::boolean THEN $11::uuid ELSE project_id END, "
-                        " task_id = CASE WHEN $12::boolean THEN $13::uuid ELSE task_id END "
+                        " task_id = CASE WHEN $12::boolean THEN $13::uuid ELSE task_id END, "
+                        " date = CASE WHEN $14::boolean THEN $15::date ELSE date END "
                         "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
                         owner,
                         id,
@@ -131,7 +139,9 @@ public:
                         p.project_id.has_value(),
                         p.project_id.has_value() ? *p.project_id : std::optional<std::string>(),
                         p.task_id.has_value(),
-                        p.task_id.has_value() ? *p.task_id : std::optional<std::string>());
+                        p.task_id.has_value() ? *p.task_id : std::optional<std::string>(),
+                        p.date.has_value(),
+                        p.date.has_value() ? *p.date : std::optional<std::string>());
                     if (r.empty()) {
                         throw NotFound();
                     }
@@ -152,7 +162,8 @@ public:
         });
     }
 
-    /// {data: newest first, total}; the body is left out of the list (topics() gives the facets).
+    /// {data: by the day of the note, newest first, total}; the body is left out of the list (topics() gives the
+    /// facets).
     nlohmann::json list(const std::string& owner, const Filter& f) {
         return Database::get().execute_read([&](auto& txn) {
             const std::string where =
@@ -169,16 +180,16 @@ public:
                                          f.project,
                                          f.limit,
                                          f.offset);
-            auto r =
-                txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kListColumns) +
-                                    " FROM notes n" + where + " ORDER BY n.created_at DESC LIMIT $6 OFFSET $7) t",
-                                owner,
-                                q,
-                                f.topic,
-                                f.tag,
-                                f.project,
-                                f.limit,
-                                f.offset);
+            auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " +
+                                         std::string(kListColumns) + " FROM notes n" + where + " ORDER BY " +
+                                         std::string(kDayOrder) + " LIMIT $6 OFFSET $7) t",
+                                     owner,
+                                     q,
+                                     f.topic,
+                                     f.tag,
+                                     f.project,
+                                     f.limit,
+                                     f.offset);
             return nlohmann::json{{"data", nlohmann::json::parse(r[0][0].template as<std::string>())},
                                   {"total", total[0][0].template as<long>()}};
         });
@@ -210,8 +221,11 @@ private:
         " n.project_id, n.task_id, "
         " (SELECT p.name FROM projects p WHERE p.id = n.project_id) AS project_title, "
         " (SELECT p.kind FROM projects p WHERE p.id = n.project_id) AS project_kind, ";
+    /// The day a note sorts by: its date when set, else the UTC day it was made (index notes_owner_day).
+    static constexpr const char* kDayOrder =
+        "COALESCE(n.date, (n.created_at AT TIME ZONE 'UTC')::date) DESC, n.created_at DESC";
     static constexpr const char* kListColumns =
-        "n.id, n.slug, n.title, n.summary, n.status, n.topic, n.tags, "
+        "n.id, n.slug, n.title, n.summary, n.status, n.topic, n.tags, n.date::text AS date, "
         " n.project_id, n.task_id, "
         " (SELECT p.name FROM projects p WHERE p.id = n.project_id) AS project_title, "
         " (SELECT p.kind FROM projects p WHERE p.id = n.project_id) AS project_kind, "
@@ -251,7 +265,7 @@ private:
     static std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& id) {
         auto r =
             txn.exec_params(std::string("SELECT row_to_json(t) FROM (SELECT n.id, n.slug, n.title, n.summary, "
-                                        "n.body, n.status, n.topic, n.tags, ") +
+                                        "n.body, n.status, n.topic, n.tags, n.date::text AS date, ") +
                                 kLinks + kTimes + " FROM notes n WHERE n.owner_id = $1::uuid AND n.id = $2::uuid) t",
                             owner,
                             id);

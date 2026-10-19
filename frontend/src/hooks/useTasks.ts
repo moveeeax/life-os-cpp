@@ -7,6 +7,7 @@ import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import {
   localToday,
+  localZone,
   type Task,
   type TaskAgenda,
   type TaskInput,
@@ -83,7 +84,13 @@ export function useCreateTasks(onSuccess?: () => void) {
 export function useUpdateTask(id: string, onSuccess?: () => void) {
   return useApiMutation(
     async (body: TaskPatch) =>
-      (await api.patchJson<{ data: Task }>(`${BASE}/items/${id}`, { body })).data,
+      // tz: the day a repeating task is closed on, which its next occurrence counts from.
+      (
+        await api.patchJson<{ data: Task }>(`${BASE}/items/${id}`, {
+          body,
+          query: { tz: localZone() },
+        })
+      ).data,
     { invalidate: ALL, onSuccess },
   );
 }

@@ -13,3 +13,5 @@ export const GOALS_PROBE = [qk.goals.enabled(), '/api/v1/goals?status=active'] a
 export const TRAVEL_PROBE = [qk.travel.enabled(), '/api/v1/travel/settings'] as const;
 export const HABITS_PROBE = [qk.habits.enabled(), '/api/v1/habits'] as const;
 export const NOTES_PROBE = [qk.notes.enabled(), '/api/v1/notes?limit=1'] as const;
+export const PRACTICE_PROBE = [qk.practice.enabled(), '/api/v1/practice/clients'] as const;
+export const MEDICAL_PROBE = [qk.medical.enabled(), '/api/v1/medical/people'] as const;

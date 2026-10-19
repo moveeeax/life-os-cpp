@@ -308,6 +308,8 @@ public:
         "food_parse_jobs",
         "day_focus",
         "travel_trip_items",
+        "travel_trip_contacts",
+        "travel_trip_moments",
         "travel_trips",
         "travel_rules",
         "travel_crossings",
@@ -315,10 +317,23 @@ public:
         "travel_documents",
         "now_settings",
         "day_note",
+        "mood_checkins",
+        "tape_measurements",
         "habit_checks",
         "habits",
         "notes",
         "projects",
+        "practice_entries",
+        "practice_deals",
+        "practice_clients",
+        // A deleted private_files row leaves its object key in private_file_purges
+        // (a trigger of migration 051); the files_sweep job removes the objects.
+        "private_files",
+        "medical_medications",
+        "medical_records",
+        "medical_visits",
+        "medical_providers",
+        "medical_people",
     };
 
     /// The foreign keys of the billing tables (migration 007, ON DELETE

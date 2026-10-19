@@ -265,9 +265,11 @@ void AuthController::modules(const HttpRequestPtr& req, std::function<void(const
                              {"food", Core::food_enabled()},
                              {"goals", Core::goals_enabled()},
                              {"habits", Core::habits_enabled()},
+                             {"medical", Core::medical_enabled()},
                              {"money", Core::money_enabled()},
                              {"notes", Core::notes_enabled()},
                              {"now", Core::now_enabled()},
+                             {"practice", Core::practice_enabled()},
                              {"tasks", Core::tasks_enabled()},
                              {"travel", Core::travel_enabled()},
                              {"workout", Core::workout_enabled()}}}}));

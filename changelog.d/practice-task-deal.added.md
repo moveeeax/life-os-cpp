@@ -1,0 +1,1 @@
+A task can name the deal of the practice it is a next step of (`deal_id` on `/api/v1/tasks`, the `deal` filter on the list); a deal answers with its open tasks, and deleting it leaves the tasks unlinked.

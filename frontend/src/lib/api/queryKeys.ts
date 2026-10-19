@@ -23,6 +23,7 @@ export const qk = {
     all: () => ['health'] as const,
     list: (route: string, from: string, to: string) => ['health', route, from, to] as const,
     coverage: () => ['health', 'coverage'] as const,
+    measurements: () => ['health', 'measurements'] as const,
     syncRun: (id: number) => ['health-sync-run', id] as const,
   },
   /** The caller's Mi account link. */
@@ -101,6 +102,7 @@ export const qk = {
     projects: (kind: string) => ['tasks', 'projects', kind] as const,
     project: (id: string) => ['tasks', 'project', id] as const,
     byProject: (id: string) => ['tasks', 'by-project', id] as const,
+    byDeal: (id: string) => ['tasks', 'by-deal', id] as const,
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['tasks-enabled'] as const,
   },
@@ -138,11 +140,40 @@ export const qk = {
     /** Outside ['travel'], so a write in travel does not re-run the probe. */
     enabled: () => ['travel-enabled'] as const,
   },
+  /** Practice section: the freelance practice. */
+  practice: {
+    all: () => ['practice'] as const,
+    clients: () => ['practice', 'clients'] as const,
+    deals: () => ['practice', 'deals'] as const,
+    deal: (id: string) => ['practice', 'deal', id] as const,
+    entries: (filter: string) => ['practice', 'entries', filter] as const,
+    months: (year: number) => ['practice', 'months', year] as const,
+    month: (month: string) => ['practice', 'month', month] as const,
+    /** Outside ['practice'], so a write in practice does not re-run the probe. */
+    enabled: () => ['practice-enabled'] as const,
+  },
+  /** The medical archive (the Records tabs of Body). */
+  medical: {
+    all: () => ['medical'] as const,
+    people: () => ['medical', 'people'] as const,
+    providers: () => ['medical', 'providers'] as const,
+    visits: () => ['medical', 'visits'] as const,
+    records: () => ['medical', 'records'] as const,
+    medications: () => ['medical', 'medications'] as const,
+    /** Outside ['medical'], so a write there does not re-run the probe. */
+    enabled: () => ['medical-enabled'] as const,
+  },
+  /** The private files of one record or document. */
+  files: {
+    all: () => ['files'] as const,
+    of: (kind: string, id: string) => ['files', kind, id] as const,
+  },
   /** Habits section. */
   habits: {
     all: () => ['habits'] as const,
     list: (archived: boolean) => ['habits', 'list', archived] as const,
     days: (from: string, to: string, tz: string) => ['habits', 'days', from, to, tz] as const,
+    mood: (from: string, to: string) => ['habits', 'mood', from, to] as const,
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['habits-enabled'] as const,
   },

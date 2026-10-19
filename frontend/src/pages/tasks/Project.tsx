@@ -5,7 +5,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useDeleteProject, useProject, useProjectTasks } from '@/hooks/useProjects';
 import { useNoteList, useNotesEnabled } from '@/hooks/useNotes';
 import { useCreateTask } from '@/hooks/useTasks';
-import { PROJECT_STATUS, safeLink } from '@/lib/tasks';
+import { deadlineText, PRIORITY_LABEL, PROJECT_STATUS, safeLink } from '@/lib/tasks';
 import { Group, Num, Row } from '@/shell/kit';
 
 import { NoteSheet } from '../notes/NoteSheet';
@@ -40,6 +40,7 @@ export function TasksProjectPage() {
     if (title.trim()) create.mutate({ title: title.trim(), area: 'projects', project_id: id });
   };
   const link = p ? safeLink(p.link) : null;
+  const deadline = p ? deadlineText(p, today) : null;
   return (
     <TasksFrame
       counts={counts}
@@ -47,7 +48,22 @@ export function TasksProjectPage() {
       sub={
         p && (
           <>
-            {PROJECT_STATUS[p.status]} · <Num>{p.open}</Num> open
+            {PROJECT_STATUS[p.status]}
+            {p.priority && <span data-num-ok> · {PRIORITY_LABEL[p.priority]}</span>}
+            {' · '}
+            <Num>{p.open}</Num> open
+            {p.progress !== null && (
+              <>
+                {' · '}
+                <Num>{p.progress}%</Num> done
+              </>
+            )}
+            {deadline && (
+              <span className={deadline.late ? 'k-error-text' : undefined} data-num-ok>
+                {' · '}
+                {deadline.text}
+              </span>
+            )}
             {link && (
               <>
                 {' · '}

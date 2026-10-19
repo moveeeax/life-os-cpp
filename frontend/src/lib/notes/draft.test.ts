@@ -31,7 +31,9 @@ describe('draftOf', () => {
       slug: 'state',
       project: 'p1',
       body: 'one',
+      date: '',
     });
+    expect(draftOf(note({ date: '2026-05-02' })).date).toBe('2026-05-02');
   });
 
   it('a missing body or project is an empty string', () => {

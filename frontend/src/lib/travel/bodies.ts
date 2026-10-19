@@ -1,9 +1,12 @@
 /** The bodies of the travel forms (pinned by bodies.test.ts). */
 import type {
   TravelCrossingInput,
+  TravelPurpose,
   TravelRuleInput,
+  TravelTripContactInput,
   TravelTripInput,
   TravelTripItemInput,
+  TravelTripMomentInput,
 } from './types';
 
 const codes = (text: string) =>
@@ -62,15 +65,23 @@ export interface TripForm {
   end_date: string;
   countries: string;
   note: string;
+  purpose: TravelPurpose | '';
+  booked_amount: string;
+  booked_currency: string;
 }
 
 export function tripBody(f: TripForm): TravelTripInput {
+  const amount = f.booked_amount.trim().replace(',', '.');
+  const currency = f.booked_currency.trim().toUpperCase();
   return {
     name: f.name.trim(),
     start_date: f.start_date,
     end_date: f.end_date,
     countries: codes(f.countries),
     note: f.note.trim(),
+    // An empty field clears it; a half-filled cost goes as it is and the API names the missing half.
+    purpose: f.purpose || null,
+    booked_cost: amount || currency ? { amount: amount ? Number(amount) : NaN, currency } : null,
   };
 }
 
@@ -83,6 +94,7 @@ export interface ItemForm {
   link: string;
   note: string;
   no_crossing: boolean;
+  end_date: string;
 }
 
 export function itemBody(f: ItemForm): TravelTripItemInput {
@@ -96,5 +108,37 @@ export function itemBody(f: ItemForm): TravelTripItemInput {
     note: f.note.trim(),
     // Only a flight asks for a crossing; any other kind keeps the default.
     no_crossing: f.kind === 'flight' && f.no_crossing,
+    // Only a stay has a last day.
+    end_date: f.kind === 'stay' && f.end_date ? f.end_date : null,
   };
+}
+
+export interface ContactForm {
+  name: string;
+  role: string;
+  phone: string;
+  email: string;
+  link: string;
+  note: string;
+}
+
+export function contactBody(f: ContactForm): TravelTripContactInput {
+  return {
+    name: f.name.trim(),
+    role: f.role.trim(),
+    phone: f.phone.trim(),
+    email: f.email.trim(),
+    link: f.link.trim(),
+    note: f.note.trim(),
+  };
+}
+
+export interface MomentForm {
+  date: string;
+  text: string;
+  place: string;
+}
+
+export function momentBody(f: MomentForm): TravelTripMomentInput {
+  return { date: f.date, text: f.text.trim(), place: f.place.trim() };
 }

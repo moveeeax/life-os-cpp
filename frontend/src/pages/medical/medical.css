@@ -1,0 +1,6 @@
+/* The medical archive on the calm sheet. */
+/* A note or an outcome keeps the lines it was written in. */
+.k-pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

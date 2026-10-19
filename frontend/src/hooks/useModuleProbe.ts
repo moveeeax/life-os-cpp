@@ -9,9 +9,11 @@ export type ModuleId =
   | 'food'
   | 'goals'
   | 'habits'
+  | 'medical'
   | 'money'
   | 'notes'
   | 'now'
+  | 'practice'
   | 'tasks'
   | 'travel'
   | 'workout';

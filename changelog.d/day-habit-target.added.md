@@ -1,0 +1,1 @@
+A habit ticked by hand takes an optional daily `target`: a day counts as done only when the value of its tick reaches it, and `POST /api/v1/habits/{id}/checks/{date}/add` adds an amount to the day (water in ml); a habit without a target counts any tick, as before.

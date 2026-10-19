@@ -1,0 +1,1 @@
+Body measurements by hand: waist, chest, hips, neck, arm and thigh in cm with a date and a note (`/api/v1/fitness/measurements`, table `tape_measurements` in migration 050), shown as a Measurements block on Body, also without a linked Mi account.

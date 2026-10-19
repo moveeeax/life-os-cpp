@@ -54,7 +54,7 @@ protected:
             txn.exec(
                 "TRUNCATE TABLE notes, task_parse_jobs, task_notes, task_items, money_settings, money_fx_rates, "
                 "money_merchants, money_transfers, money_transactions, money_categories, money_accounts, "
-                "money_currencies");
+                "money_currencies CASCADE");
             for (const char* id : {kAnna, kBoris}) {
                 txn.exec_params(
                     "INSERT INTO users (id, email, confirmed, role_id) "
@@ -545,4 +545,124 @@ TEST_F(TasksApiTest, SearchTakesPercentLiterallyAndSomedayIsNewestFirst) {
         body_of(call(&Api::TasksController::agenda, user(kAnna), Get, {{"date", "2026-10-07"}}))["data"]["someday"];
     ASSERT_EQ(someday.size(), 2u);
     EXPECT_EQ(someday[0]["title"], "Save 100% of it") << "newest first";
+}
+
+TEST_F(TasksApiTest, ClosingARepeatingTaskCreatesTheNextOccurrenceOnce) {
+    // 2099-01-05 is a Monday: a Monday and Thursday rule goes on to the Thursday.
+    const json t = created(&Api::TasksController::createItem,
+                           kAnna,
+                           json{{"title", "Water the plants"},
+                                {"area", "health"},
+                                {"due", "2099-01-05"},
+                                {"next_step", "Fill the can"},
+                                {"repeat", {{"kind", "weekly"}, {"weekdays", {4, 1}}, {"day", 9}}}});
+    EXPECT_EQ(t["repeat"], (json{{"kind", "weekly"}, {"weekdays", {1, 4}}})) << "kept in its stored form";
+    EXPECT_TRUE(t["next_id"].is_null());
+    const std::string id = t["id"].get<std::string>();
+
+    const auto done = call_id(&Api::TasksController::updateItem, user(kAnna), Patch, id, json{{"status", "done"}});
+    ASSERT_EQ(done->statusCode(), k200OK) << done->body();
+    const json closed = body_of(done)["data"];
+    ASSERT_TRUE(closed["next_id"].is_string());
+    const json next = body_of(
+        call_id(&Api::TasksController::getItem, user(kAnna), Get, closed["next_id"].get<std::string>()))["data"];
+    EXPECT_EQ(next["status"], "open");
+    EXPECT_EQ(next["due"], "2099-01-08");
+    EXPECT_EQ(next["title"], "Water the plants");
+    EXPECT_EQ(next["next_step"], "Fill the can");
+    EXPECT_EQ(next["repeat"], closed["repeat"]);
+    EXPECT_TRUE(next["completed_at"].is_null());
+    EXPECT_EQ(call_id(&Api::TasksController::getItem, user(kBoris), Get, next["id"].get<std::string>())->statusCode(),
+              k404NotFound);
+
+    // The agenda holds the next occurrence only; the closed one is history.
+    const json agenda =
+        body_of(call(&Api::TasksController::agenda, user(kAnna), Get, {{"date", "2099-01-06"}}))["data"];
+    std::vector<std::string> open_ids;
+    for (const char* group : {"late", "soon", "dated", "someday"}) {
+        for (const auto& row : agenda[group]) {
+            open_ids.push_back(row["id"].get<std::string>());
+        }
+    }
+    EXPECT_EQ(open_ids, std::vector<std::string>{next["id"].get<std::string>()});
+
+    // Reopened and closed again, the task does not make a second occurrence.
+    call_id(&Api::TasksController::updateItem, user(kAnna), Patch, id, json{{"status", "open"}});
+    const json again =
+        body_of(call_id(&Api::TasksController::updateItem, user(kAnna), Patch, id, json{{"status", "done"}}))["data"];
+    EXPECT_EQ(again["next_id"], closed["next_id"]);
+    EXPECT_EQ(body_of(call(&Api::TasksController::listItems, user(kAnna), Get, {{"q", "Water the plants"}}))["total"],
+              2);
+}
+
+TEST_F(TasksApiTest, TheRuleIsEditedAndStopped) {
+    const json t = created(&Api::TasksController::createItem,
+                           kAnna,
+                           json{{"title", "Pay the rent"}, {"area", "finance"}, {"due", "2099-01-31"}});
+    EXPECT_TRUE(t["repeat"].is_null());
+    const std::string id = t["id"].get<std::string>();
+    const auto patch = [&](const json& body) {
+        return call_id(&Api::TasksController::updateItem, user(kAnna), Patch, id, body);
+    };
+    for (const json& bad : {json("daily"),
+                            json{{"kind", "hourly"}},
+                            json{{"kind", "weekly"}},
+                            json{{"kind", "monthly"}, {"day", 0}},
+                            json{{"kind", "every_n_days"}, {"every", 400}}}) {
+        EXPECT_EQ(patch(json{{"repeat", bad}})->statusCode(), k400BadRequest) << bad.dump();
+    }
+    const json monthly = body_of(patch(json{{"repeat", {{"kind", "monthly"}, {"day", 31}}}}))["data"];
+    EXPECT_EQ(monthly["repeat"], (json{{"kind", "monthly"}, {"day", 31}}));
+    EXPECT_EQ(body_of(patch(json{{"title", "Pay the rent on time"}}))["data"]["repeat"], monthly["repeat"])
+        << "a patch without repeat keeps the rule";
+    const json stopped = body_of(patch(json{{"repeat", nullptr}}))["data"];
+    EXPECT_TRUE(stopped["repeat"].is_null());
+    const json closed = body_of(patch(json{{"status", "done"}}))["data"];
+    EXPECT_TRUE(closed["next_id"].is_null()) << "a stopped rule makes no next occurrence";
+
+    // A rule set in the same patch that closes the task counts.
+    const json other = created(&Api::TasksController::createItem,
+                               kAnna,
+                               json{{"title", "Rent again"}, {"area", "finance"}, {"due", "2099-01-31"}});
+    const json closed_with_rule =
+        body_of(call_id(&Api::TasksController::updateItem,
+                        user(kAnna),
+                        Patch,
+                        other["id"].get<std::string>(),
+                        json{{"status", "done"}, {"repeat", {{"kind", "monthly"}, {"day", 31}}}}))["data"];
+    ASSERT_TRUE(closed_with_rule["next_id"].is_string());
+    EXPECT_EQ(body_of(call_id(&Api::TasksController::getItem,
+                              user(kAnna),
+                              Get,
+                              closed_with_rule["next_id"].get<std::string>()))["data"]["due"],
+              "2099-02-28")
+        << "the 31st in February is its last day";
+}
+
+TEST_F(TasksApiTest, AnUndatedRepeatingTaskCountsFromTheDayItIsClosedInTheCallersZone) {
+    // Kiritimati is UTC+14 and Pago Pago UTC-11: at any hour one of them is on another date than UTC.
+    const auto [zone, tomorrow] = Database::get().execute_read([](auto& txn) {
+        auto r = txn.exec(
+            "SELECT z, to_char((now() AT TIME ZONE z)::date + 1, 'YYYY-MM-DD') "
+            "FROM unnest(ARRAY['Pacific/Kiritimati', 'Pacific/Pago_Pago']) AS z "
+            "WHERE (now() AT TIME ZONE z)::date <> (now() AT TIME ZONE 'UTC')::date LIMIT 1");
+        return std::make_pair(r[0][0].template as<std::string>(), r[0][1].template as<std::string>());
+    });
+    const json t = created(&Api::TasksController::createItem,
+                           kAnna,
+                           json{{"title", "Stretch"}, {"area", "health"}, {"repeat", {{"kind", "daily"}}}});
+    const auto close = [&](const std::string& tz) {
+        auto req = TestHelpers::authed_json(user(kAnna), json{{"status", "done"}}, Patch);
+        req->setParameter("tz", tz);
+        HttpResponsePtr captured;
+        controller.updateItem(
+            req, [&](const HttpResponsePtr& r) { captured = r; }, t["id"].get<std::string>());
+        return captured;
+    };
+    EXPECT_EQ(close("Mars/Olympus")->statusCode(), k400BadRequest);
+    const auto resp = close(zone);
+    ASSERT_EQ(resp->statusCode(), k200OK) << resp->body();
+    const json next = body_of(call_id(
+        &Api::TasksController::getItem, user(kAnna), Get, body_of(resp)["data"]["next_id"].get<std::string>()))["data"];
+    EXPECT_EQ(next["due"], tomorrow);
 }

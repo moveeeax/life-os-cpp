@@ -1,8 +1,8 @@
 /**
  * @file test_user_repository.cpp
  * @brief UserRepository::remove beyond the owner_id tables: the fitness rows
- *        of the linked Xiaomi account, and which foreign-key violations mean
- *        billing history.
+ *        of the linked Xiaomi account, the object keys of private files, and
+ *        which foreign-key violations mean billing history.
  */
 
 #include <pqxx/pqxx>
@@ -91,6 +91,29 @@ TEST_F(UserRepositoryRemoveTest, TheFitnessRowsOfTheLinkedAccountGoWithTheUser) 
     EXPECT_EQ(count(std::string("SELECT count(*) FROM mi_accounts WHERE owner_id = '") + kLeaver + "'"), 0);
     EXPECT_EQ(count("SELECT count(*) FROM daily_activity WHERE user_id = '4100000002'"), 1) << "another account stays";
     EXPECT_EQ(count("SELECT count(*) FROM sync_runs WHERE xiaomi_user_id = '4100000002'"), 1);
+}
+
+TEST_F(UserRepositoryRemoveTest, TheMedicalArchiveGoesAndItsObjectsWaitForTheSweep) {
+    const std::string key = std::string("life-os/private/") + kLeaver + "/f1/file.pdf";
+    exec("DELETE FROM private_file_purges WHERE object_key = '" + key + "'");
+    exec(std::string(
+             "INSERT INTO medical_people (id, owner_id, name) VALUES ('cccccccc-cccc-4ccc-8ccc-cccccccccc41', '") +
+         kLeaver + "', 'Anna')");
+    exec(std::string("INSERT INTO medical_records (id, owner_id, person_id, date, kind, title) VALUES "
+                     "('dddddddd-dddd-4ddd-8ddd-dddddddddd41', '") +
+         kLeaver + "', 'cccccccc-cccc-4ccc-8ccc-cccccccccc41', '2026-10-01', 'lab', 'Blood')");
+    exec(std::string("INSERT INTO private_files (id, owner_id, parent_kind, parent_id, name, content_type, bytes, "
+                     "object_key) VALUES ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeee41', '") +
+         kLeaver + "', 'medical_record', 'dddddddd-dddd-4ddd-8ddd-dddddddddd41', 'a.pdf', 'application/pdf', 10, '" +
+         key + "')");
+
+    Repositories::UserRepository().remove(kLeaver);
+
+    EXPECT_EQ(count(std::string("SELECT count(*) FROM medical_people WHERE owner_id = '") + kLeaver + "'"), 0);
+    EXPECT_EQ(count(std::string("SELECT count(*) FROM private_files WHERE owner_id = '") + kLeaver + "'"), 0);
+    EXPECT_EQ(count("SELECT count(*) FROM private_file_purges WHERE object_key = '" + key + "'"), 1)
+        << "the object outlives its row only as a purge the files_sweep job removes";
+    exec("DELETE FROM private_file_purges WHERE object_key = '" + key + "'");
 }
 
 TEST_F(UserRepositoryRemoveTest, AUserWithoutALinkIsDeletedAsBefore) {

@@ -7,7 +7,9 @@ import {
   flightsWithoutCrossing,
   documentWarningLine,
   headlineTrip,
+  itemSub,
   splitTrips,
+  telLink,
   whereNow,
 } from './index';
 import type { TravelCounter, TravelCrossing, TravelTrip, TravelTripItem } from './types';
@@ -64,6 +66,7 @@ describe('flightsWithoutCrossing', () => {
     link: '',
     note: '',
     no_crossing: false,
+    end_date: null,
   });
   const crossing = (date: string): TravelCrossing => ({
     id: date,
@@ -165,5 +168,38 @@ describe('headlineTrip', () => {
     const later = splitTrips([trip('lisbon', '2026-06-01', '2026-06-07')], '2026-05-31').coming;
     expect(headlineTrip(later, '2026-05-31')?.id).toBe('lisbon');
     expect(headlineTrip([], today)).toBeUndefined();
+  });
+});
+
+describe('itemSub', () => {
+  const base: TravelTripItem = {
+    id: 'i',
+    trip_id: 't',
+    kind: 'stay',
+    date: '2026-11-02',
+    time: null,
+    title: 'Lanta Sand',
+    reference: '',
+    link: '',
+    note: '',
+    no_crossing: false,
+    end_date: '2026-11-09',
+  };
+  it('a stay says until when and how many nights', () => {
+    expect(itemSub(base, '2026-10-19')).toBe('stay · until Nov 9 · 7 nights');
+    expect(itemSub({ ...base, end_date: '2026-11-03' }, '2026-10-19')).toBe(
+      'stay · until Nov 3 · 1 night',
+    );
+    expect(itemSub({ ...base, end_date: null }, '2026-10-19')).toBe('stay');
+    expect(itemSub({ ...base, kind: 'flight', time: '23:40', end_date: null }, '2026-10-19')).toBe(
+      'flight · 23:40',
+    );
+  });
+});
+
+describe('telLink', () => {
+  it('keeps the digits and a leading plus', () => {
+    expect(telLink('+66 (81) 234-5678')).toBe('tel:+66812345678');
+    expect(telLink('ask at the desk')).toBeNull();
   });
 });

@@ -15,7 +15,7 @@ import { Sheet } from '@/shell/kit';
 
 const SOURCES = Object.keys(SOURCE_LABEL) as Source[];
 
-/** New habit, or edit one: name, how often, what ticks it, the goal. */
+/** New habit, or edit one: name, how often, what ticks it, the goal, a daily target. */
 export function HabitSheet({ habit, onClose }: { habit?: Habit; onClose: () => void }) {
   const [f, setF] = useState<HabitForm>(() => habitForm(habit));
   const [problem, setProblem] = useState<string | null>(null);
@@ -109,8 +109,20 @@ export function HabitSheet({ habit, onClose }: { habit?: Habit; onClose: () => v
             )}
           </div>
         )}
+        {f.source === 'manual' && (
+          <label className="k-field">
+            <span>Daily target (optional){f.unit.trim() ? `, ${f.unit.trim()}` : ''}</span>
+            <input
+              inputMode="decimal"
+              placeholder="2000"
+              value={f.target}
+              onChange={set('target')}
+            />
+          </label>
+        )}
         <p className="k-sub">
           A source from Mi needs a goal; a Training session means any finished session that day.
+          With a daily target, a day counts once what you add that day reaches it (water in ml).
         </p>
         {(problem || save.error) && (
           <p role="alert" className="k-error">

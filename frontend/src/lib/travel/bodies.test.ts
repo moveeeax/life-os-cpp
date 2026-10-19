@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { crossingBody, itemBody, ruleBody, tripBody } from './bodies';
+import { contactBody, crossingBody, itemBody, momentBody, ruleBody, tripBody } from './bodies';
 
 describe('travel bodies', () => {
   it('a crossing trims and drops an empty time', () => {
@@ -65,6 +65,9 @@ describe('travel bodies', () => {
         end_date: '2026-11-20',
         countries: 'th',
         note: '',
+        purpose: '',
+        booked_amount: '',
+        booked_currency: '',
       }),
     ).toEqual({
       name: 'Thailand',
@@ -72,6 +75,8 @@ describe('travel bodies', () => {
       end_date: '2026-11-20',
       countries: ['TH'],
       note: '',
+      purpose: null,
+      booked_cost: null,
     });
     expect(
       itemBody({
@@ -83,6 +88,7 @@ describe('travel bodies', () => {
         link: '',
         note: '',
         no_crossing: true,
+        end_date: '2026-11-03',
       }),
     ).toEqual({
       kind: 'flight',
@@ -93,6 +99,7 @@ describe('travel bodies', () => {
       link: '',
       note: '',
       no_crossing: true,
+      end_date: null,
     });
   });
   it('only a flight keeps the no-crossing mark', () => {
@@ -105,7 +112,53 @@ describe('travel bodies', () => {
       link: '',
       note: '',
       no_crossing: true,
+      end_date: '2026-11-09',
     });
     expect(stay.no_crossing).toBe(false);
+    expect(stay.end_date).toBe('2026-11-09');
+  });
+  it('a trip sends its purpose and its booked cost in its own currency', () => {
+    const base = {
+      name: 'Bangkok',
+      start_date: '2026-11-01',
+      end_date: '2026-11-20',
+      countries: '',
+      note: '',
+    };
+    const body = tripBody({
+      ...base,
+      purpose: 'relocation',
+      booked_amount: ' 1250,50 ',
+      booked_currency: 'thb',
+    });
+    expect(body.purpose).toBe('relocation');
+    expect(body.booked_cost).toEqual({ amount: 1250.5, currency: 'THB' });
+    // A half-filled cost goes as it is, so the API names the missing half instead of saving 0.
+    const half = tripBody({ ...base, purpose: '', booked_amount: '', booked_currency: 'USD' });
+    expect(half.booked_cost?.amount).toBeNaN();
+  });
+  it('a contact and a moment trim their text', () => {
+    expect(
+      contactBody({
+        name: ' Somchai ',
+        role: 'host ',
+        phone: ' +66 81 234 5678',
+        email: '',
+        link: '',
+        note: '',
+      }),
+    ).toEqual({
+      name: 'Somchai',
+      role: 'host',
+      phone: '+66 81 234 5678',
+      email: '',
+      link: '',
+      note: '',
+    });
+    expect(momentBody({ date: '2026-11-03', text: ' Sunset ', place: '' })).toEqual({
+      date: '2026-11-03',
+      text: 'Sunset',
+      place: '',
+    });
   });
 });

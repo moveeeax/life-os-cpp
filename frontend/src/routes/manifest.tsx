@@ -149,11 +149,38 @@ const NotesPage = lazy(() => import('@/pages/notes/List').then((m) => ({ default
 const NoteEditorPage = lazy(() =>
   import('@/pages/notes/Editor').then((m) => ({ default: m.NoteEditorPage })),
 );
+const PracticeDealsPage = lazy(() =>
+  import('@/pages/practice/Deals').then((m) => ({ default: m.PracticeDealsPage })),
+);
+const PracticeMoneyPage = lazy(() =>
+  import('@/pages/practice/Money').then((m) => ({ default: m.PracticeMoneyPage })),
+);
+const PracticeMonthsPage = lazy(() =>
+  import('@/pages/practice/Months').then((m) => ({ default: m.PracticeMonthsPage })),
+);
+const PracticeMonthPage = lazy(() =>
+  import('@/pages/practice/Month').then((m) => ({ default: m.PracticeMonthPage })),
+);
+const PracticeClientsPage = lazy(() =>
+  import('@/pages/practice/Clients').then((m) => ({ default: m.PracticeClientsPage })),
+);
 const TravelRulesPage = lazy(() =>
   import('@/pages/travel/Rules').then((m) => ({ default: m.TravelRulesPage })),
 );
 const TravelDocumentsPage = lazy(() =>
   import('@/pages/travel/Documents').then((m) => ({ default: m.TravelDocumentsPage })),
+);
+const MedicalRecordsPage = lazy(() =>
+  import('@/pages/medical/Records').then((m) => ({ default: m.MedicalRecordsPage })),
+);
+const MedicalVisitsPage = lazy(() =>
+  import('@/pages/medical/Visits').then((m) => ({ default: m.MedicalVisitsPage })),
+);
+const MedicalMedicinesPage = lazy(() =>
+  import('@/pages/medical/Medicines').then((m) => ({ default: m.MedicalMedicinesPage })),
+);
+const MedicalFamilyPage = lazy(() =>
+  import('@/pages/medical/Family').then((m) => ({ default: m.MedicalFamilyPage })),
 );
 const TravelTripPage = lazy(() =>
   import('@/pages/travel/Trip').then((m) => ({ default: m.TravelTripPage })),
@@ -285,6 +312,21 @@ export const routes: RouteEntry[] = [
   // Now: the landing screen of the glass shell (DASHBOARD_HOME).
   { path: '/now', element: <NowPage />, guard: 'confirmed', layout: 'shell' },
   { path: '/health', element: <HealthPage />, guard: 'confirmed', layout: 'shell' },
+  // The medical archive: tabs of Body; the medical module switch is the only gate.
+  {
+    path: '/health/records',
+    element: <MedicalRecordsPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
+  { path: '/health/visits', element: <MedicalVisitsPage />, guard: 'confirmed', layout: 'shell' },
+  {
+    path: '/health/medicines',
+    element: <MedicalMedicinesPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
+  { path: '/health/family', element: <MedicalFamilyPage />, guard: 'confirmed', layout: 'shell' },
   { path: '/workout', element: <WorkoutHomePage />, guard: 'confirmed', layout: 'shell' },
   {
     path: '/workout/session',
@@ -384,6 +426,33 @@ export const routes: RouteEntry[] = [
   // ── Notes — any confirmed user; the module switch is the only gate ───────
   { path: '/notes', element: <NotesPage />, guard: 'confirmed', layout: 'shell' },
   { path: '/notes/:id', element: <NoteEditorPage />, guard: 'confirmed', layout: 'shell' },
+
+  // ── Practice — any confirmed user; the module switch is the only gate ────
+  { path: '/practice', element: <PracticeDealsPage />, guard: 'confirmed', layout: 'shell' },
+  {
+    path: '/practice/money',
+    element: <PracticeMoneyPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
+  {
+    path: '/practice/months',
+    element: <PracticeMonthsPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
+  {
+    path: '/practice/months/:month',
+    element: <PracticeMonthPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
+  {
+    path: '/practice/clients',
+    element: <PracticeClientsPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
 
   // ── Travel — any confirmed user; the module switch is the only gate ──────
   { path: '/travel', element: <TravelTripsPage />, guard: 'confirmed', layout: 'shell' },

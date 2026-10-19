@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 
 import { useProjects } from '@/hooks/useProjects';
-import type { Project } from '@/lib/tasks';
+import { deadlineText, PRIORITY_LABEL, type Project } from '@/lib/tasks';
 import { Group, Num, Row } from '@/shell/kit';
 
 import { useTasksDay } from './counts';
@@ -16,7 +16,8 @@ const DOT: Record<Project['status'], string> = {
   done: 'var(--g-ink-faint)',
 };
 
-function ProjectRow({ p }: { p: Project }) {
+function ProjectRow({ p, today }: { p: Project; today: string }) {
+  const deadline = deadlineText(p, today);
   return (
     <Row
       dot={DOT[p.status]}
@@ -26,14 +27,28 @@ function ProjectRow({ p }: { p: Project }) {
         </Link>
       }
       sub={
-        <span data-num-ok>
-          {p.next ? `next: ${p.next.title}` : p.status === 'paused' ? 'paused' : 'no open task'}
+        <span>
+          {p.priority && <span data-num-ok>{PRIORITY_LABEL[p.priority]} · </span>}
+          {p.progress !== null && (
+            <>
+              <Num>{p.progress}%</Num> done ·{' '}
+            </>
+          )}
+          <span data-num-ok>
+            {p.next ? `next: ${p.next.title}` : p.status === 'paused' ? 'paused' : 'no open task'}
+          </span>
         </span>
       }
       right={
-        <span>
-          <Num>{p.open}</Num> open
-        </span>
+        deadline ? (
+          <span className={deadline.late ? 'k-error-text' : undefined} data-num-ok>
+            {deadline.text}
+          </span>
+        ) : (
+          <span>
+            <Num>{p.open}</Num> open
+          </span>
+        )
       }
     />
   );
@@ -41,7 +56,7 @@ function ProjectRow({ p }: { p: Project }) {
 
 /** The projects of Tasks: active, paused, done; courses live in Learning. */
 export function TasksProjectsPage() {
-  const { counts } = useTasksDay();
+  const { counts, today } = useTasksDay();
   const projects = useProjects('project');
   const [adding, setAdding] = useState(false);
   const [showDone, setShowDone] = useState(false);
@@ -85,14 +100,14 @@ export function TasksProjectsPage() {
           {active.length > 0 && (
             <Group label="Active">
               {active.map((p) => (
-                <ProjectRow key={p.id} p={p} />
+                <ProjectRow key={p.id} p={p} today={today} />
               ))}
             </Group>
           )}
           {paused.length > 0 && (
             <Group label="Paused">
               {paused.map((p) => (
-                <ProjectRow key={p.id} p={p} />
+                <ProjectRow key={p.id} p={p} today={today} />
               ))}
             </Group>
           )}
@@ -105,7 +120,7 @@ export function TasksProjectsPage() {
                 </button>
               }
             >
-              {showDone && done.map((p) => <ProjectRow key={p.id} p={p} />)}
+              {showDone && done.map((p) => <ProjectRow key={p.id} p={p} today={today} />)}
             </Group>
           )}
         </>

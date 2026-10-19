@@ -5,7 +5,14 @@ import { HABITS_PROBE } from '@/hooks/moduleProbes';
 import { useModuleOn } from '@/hooks/useModuleProbe';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
-import type { Habit, HabitCheck, HabitDays, HabitInput } from '@/lib/habits';
+import type {
+  Habit,
+  HabitCheck,
+  HabitDays,
+  HabitInput,
+  MoodCheckin,
+  MoodInput,
+} from '@/lib/habits';
 
 const BASE = '/api/v1/habits';
 
@@ -73,17 +80,65 @@ export function useDeleteHabit(onSuccess?: () => void) {
   });
 }
 
-/** Tick a habit by hand on a day, or take the tick back. */
+/**
+ * Tick a habit by hand on a day, or take the tick back. A habit with a daily
+ * target is ticked with the target as its value, so the day counts.
+ */
 export function useTickHabit(onSuccess?: () => void) {
   return useApiMutation(
-    async ({ id, date, on }: { id: string; date: string; on: boolean }) => {
+    async ({ id, date, on, value }: { id: string; date: string; on: boolean; value?: number }) => {
       const path = `${BASE}/${id}/checks/${date}`;
       if (!on) return api.deleteJson<unknown>(path);
       return (
-        await api.putJson<{ data: HabitCheck }>(path, { query: { tz: habitsZone() }, body: {} })
+        await api.putJson<{ data: HabitCheck }>(path, {
+          query: { tz: habitsZone() },
+          body: value === undefined ? {} : { value },
+        })
       ).data;
     },
     { invalidate: HABIT_WRITES, onSuccess },
+  );
+}
+
+/** Add an amount to the day of a habit (a glass of water); the answer carries the day's sum. */
+export function useAddToHabit(onSuccess?: () => void) {
+  return useApiMutation(
+    async ({ id, date, value }: { id: string; date: string; value: number }) =>
+      (
+        await api.postJson<{ data: HabitCheck }>(`${BASE}/${id}/checks/${date}/add`, {
+          query: { tz: habitsZone() },
+          body: { value },
+        })
+      ).data,
+    { invalidate: HABIT_WRITES, onSuccess },
+  );
+}
+
+/** The mood check-ins dated from..to, oldest first. */
+export function useMood(from: string, to: string, enabled = true) {
+  return useQuery({
+    queryKey: qk.habits.mood(from, to),
+    enabled,
+    queryFn: async ({ signal }) =>
+      (
+        await api.getJson<{ data: MoodCheckin[]; from: string; to: string }>(`${BASE}/mood`, {
+          query: { from, to },
+          signal,
+        })
+      ).data,
+  });
+}
+
+/** Check in the mood of a day (a second check-in replaces the first), or remove it with null. */
+export function useSaveMood(onSuccess?: () => void) {
+  return useApiMutation(
+    async ({ date, body }: { date: string; body: MoodInput | null }) => {
+      const path = `${BASE}/mood/${date}`;
+      if (body === null) return api.deleteJson<unknown>(path);
+      return (await api.putJson<{ data: MoodCheckin }>(path, { query: { tz: habitsZone() }, body }))
+        .data;
+    },
+    { invalidate: [qk.habits.all()], onSuccess },
   );
 }
 

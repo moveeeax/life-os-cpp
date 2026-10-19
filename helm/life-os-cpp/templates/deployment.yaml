@@ -231,6 +231,12 @@ spec:
             # notes module — master switch
             - name: NOTES_ENABLED
               value: {{ .Values.notes.enabled | quote }}
+            # practice module — master switch
+            - name: PRACTICE_ENABLED
+              value: {{ .Values.practice.enabled | quote }}
+            # medical module — master switch (the family medical archive)
+            - name: MEDICAL_ENABLED
+              value: {{ .Values.medical.enabled | quote }}
             # self sign-up: false = invite-only
             - name: REGISTRATION_OPEN
               value: {{ .Values.registration.open | quote }}

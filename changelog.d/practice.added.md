@@ -1,0 +1,1 @@
+Practice module (switch `PRACTICE_ENABLED`, nav section Practice, migration 053): clients, deals with the stages lead, negotiation, active, done and lost, the incomes and expenses of the practice in their own currencies, linked to a client or a deal, and a month view under `/api/v1/practice` whose totals are per currency and never add two currencies together.
