@@ -44,6 +44,19 @@ struct Config {
     // tier re-arms them with a tight per-IP cap.
     int protected_requests = 10;
     int protected_window_sec = 60;
+    // Failure tiers: only failures are counted, and while an identity has
+    // `*_requests` failures inside the trailing window its next attempt is
+    // refused before any work is done.
+    //   auth_fail   — credentials the auth advice rejected (an unknown API
+    //                 key, a forged or broken JWT), per client IP. Checked
+    //                 before the key lookup (a primary-DB transaction) and the
+    //                 signature check.
+    //   login_email — failed logins per email address, whatever the IP, so a
+    //                 spread-out guessing run on one account is throttled too.
+    int auth_fail_requests = 20;
+    int auth_fail_window_sec = 60;
+    int login_email_requests = 5;
+    int login_email_window_sec = 900;
     Scope scope = Scope::IpOrUser;
     bool trust_proxy = false;                   // read X-Forwarded-For
     int trusted_proxy_count = 1;                // # of trusted hops appended to XFF (index from the right)
@@ -52,6 +65,9 @@ struct Config {
     std::unordered_set<std::string> public_paths;
     std::unordered_set<std::string> protected_paths;  // auth surface, limited despite being public
 };
+
+/// Which failure tier a check_failures / record_failure call is about.
+enum class FailureTier { AuthFailure, LoginEmail };
 
 struct Decision {
     bool allowed = true;
@@ -75,7 +91,18 @@ public:
     // versa.
     Decision check_protected(const std::string& identity) const;
 
+    // Failure tiers (see Config::auth_fail_* / login_email_*). check_failures
+    // only reads the count: allowed is false while the identity already has
+    // the tier's budget of failures in the window. record_failure adds one
+    // (the set is trimmed to the budget, so a flood cannot grow it).
+    // Keys "rl:authfail:" and "rl:login:". The whitelist and fail_open apply
+    // as in check(); a failed record is logged and dropped.
+    Decision check_failures(FailureTier tier, const std::string& identity) const;
+    void record_failure(FailureTier tier, const std::string& identity) const;
+
 private:
+    bool whitelisted(const std::string& identity) const;
+
     Decision check_window(const std::string& identity, int requests, int window_sec, const char* key_prefix) const;
 
     Decision fallback_(const std::string& reason, int requests) const;
@@ -116,5 +143,10 @@ std::string identity_for(const drogon::HttpRequestPtr& req, const Config& cfg);
 // expired) cookie's subject to shift the bucket — the brute-force unit is the
 // source IP regardless of the configured scope.
 std::string ip_identity(const drogon::HttpRequestPtr& req, const Config& cfg);
+
+// Identity of the login_email tier: "email:" + sha256 of the trimmed,
+// lower-cased address (the key never carries the address itself, and case or
+// spaces cannot open a second bucket).
+std::string email_identity(const std::string& email);
 
 }  // namespace Security::RateLimit

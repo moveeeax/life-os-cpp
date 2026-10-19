@@ -1,7 +1,7 @@
 // Tasks on the page: areas with their colour, the effort words, the due label.
 export * from './types';
 export * from './projects';
-import { daysBetween, formatDay, todayLocal } from '@/lib/dates';
+import { daysBetween, formatDay, isDay, todayLocal } from '@/lib/dates';
 
 import type { Area, Effort } from './types';
 
@@ -32,6 +32,13 @@ export function dueLabel(
   if (d === 0) return { text: 'today', tone: 'today' };
   if (d === 1) return { text: 'tomorrow', tone: 'plain' };
   return { text: formatDay(due, { locale: 'en-GB' }), tone: 'plain' };
+}
+
+/** A due date the API takes: a real day in 1900..2100 (is_calendar_date). */
+export function isDueDate(v: string): boolean {
+  if (!isDay(v)) return false;
+  const y = Number(v.slice(0, 4));
+  return y >= 1900 && y <= 2100;
 }
 
 /** A source link the page may put in an href: http(s) only, never javascript: or data:. */

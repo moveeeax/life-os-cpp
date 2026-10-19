@@ -1,5 +1,7 @@
 import { Link } from 'react-router';
 
+import { Num } from '@/shell/kit';
+
 import { Capture } from './Capture';
 import { useTasksDay } from './counts';
 import { LoadError, Placeholder, Section, TasksFrame } from './frame';
@@ -39,9 +41,9 @@ export function TasksTodayPage() {
           )}
           {review > 0 && (
             <div className="k-banner">
-              <span data-num-ok>
-                Weekly review: {a.review.no_next_step.length} without a next step,{' '}
-                {a.review.stale.length} untouched for two weeks
+              <span>
+                Weekly review: <Num>{a.review.no_next_step.length}</Num> without a next step,{' '}
+                <Num>{a.review.stale.length}</Num> untouched for two weeks
               </span>
               <Link to="/tasks/later#review">Look</Link>
             </div>

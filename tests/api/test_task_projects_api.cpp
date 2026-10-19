@@ -204,6 +204,23 @@ TEST_F(TaskProjectsApiTest, ATaskTakesOnlyTheCallersProject) {
     EXPECT_TRUE(body_of(cleared)["data"]["project_id"].is_null());
 }
 
+TEST_F(TaskProjectsApiTest, AnotherOwnersProjectIsNotFound) {
+    const auto p = project(kAnna, "Anna's");
+    EXPECT_EQ(call(kBoris, Get, json::object(), [&](auto req, auto cb) { c.getProject(req, std::move(cb), p); })
+                  ->statusCode(),
+              k404NotFound);
+    EXPECT_EQ(
+        call(kBoris, Patch, json{{"name", "Taken"}}, [&](auto req, auto cb) { c.updateProject(req, std::move(cb), p); })
+            ->statusCode(),
+        k404NotFound);
+    EXPECT_EQ(call(kBoris, Delete, json::object(), [&](auto req, auto cb) { c.deleteProject(req, std::move(cb), p); })
+                  ->statusCode(),
+              k404NotFound);
+    auto mine = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.getProject(req, std::move(cb), p); });
+    ASSERT_EQ(mine->statusCode(), k200OK);
+    EXPECT_EQ(body_of(mine)["data"]["name"], "Anna's") << "the patch of another owner changed nothing";
+}
+
 TEST_F(TaskProjectsApiTest, ADeletedProjectLeavesItsTasks) {
     const auto p = project(kAnna, "Short-lived");
     const auto task = body_of(add_task(kAnna, json{{"project_id", p}}))["data"]["id"].get<std::string>();

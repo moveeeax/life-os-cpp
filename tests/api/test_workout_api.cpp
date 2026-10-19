@@ -619,7 +619,22 @@ TEST_F(WorkoutSessionsTest, AStartRacingAnotherIsAConflictNotAServerError) {
     pqxx::work hold(side);
     hold.exec("INSERT INTO workout_sessions (owner_id) VALUES ('" + std::string(kOwner) + "'::uuid)");
     auto racing = std::async(std::launch::async, [&] { return start(owner()); });
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    // Commit only once start() is waiting on the index: a fixed sleep let the
+    // test pass through the plain pre-check instead when start() came late,
+    // leaving the 23505-to-409 branch unexercised.
+    pqxx::connection watch(TestHelpers::pg_conn_string());
+    bool waiting = false;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (!waiting && std::chrono::steady_clock::now() < deadline) {
+        pqxx::nontransaction look(watch);
+        waiting = look.exec(
+                          "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' "
+                          "AND datname = current_database() AND pid <> pg_backend_pid()")[0][0]
+                      .as<long>() > 0;
+        if (!waiting)
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    EXPECT_TRUE(waiting) << "start() never waited on the one-active-session index";
     hold.commit();
     const auto resp = racing.get();
     ASSERT_TRUE(resp);
@@ -860,6 +875,27 @@ TEST_F(WorkoutSessionsTest, ReconciliationGoesFromPendingToNoDataToMatched) {
     EXPECT_EQ(body_of(away)["data"]["hr_samples"], 0);
     EXPECT_TRUE(body_of(away)["data"]["hr_avg"].is_null());
     EXPECT_TRUE(body_of(away)["data"]["band_workout_id"].is_null());
+}
+
+// review-fitness 5: a daily resting value whose timestamp falls inside the
+// session is not a beat of the session: neither the mean nor the chart takes it.
+TEST_F(WorkoutSessionsTest, RestingHeartRateStaysOutOfTheSession) {
+    const std::string id = body_of(start(owner()))["data"]["id"].get<std::string>();
+    ASSERT_EQ(patch_session(
+                  owner(), id, json{{"started_at", "2026-09-01T10:00:00Z"}, {"finished_at", "2026-09-01T11:00:00Z"}})
+                  ->statusCode(),
+              k200OK);
+    sql("INSERT INTO heart_rate_samples (user_id, timestamp, bpm, sample_type) VALUES "
+        "('t', '2026-09-01T10:10:00Z', 120, 'active'), ('t', '2026-09-01T10:30:00Z', 52, 'resting')");
+    ASSERT_EQ(reconcile(syncer(), json{{"from", "2026-09-01"}, {"to", "2026-09-01"}})->statusCode(), k200OK);
+
+    const json s = body_of(get_session(owner(), id))["data"];
+    EXPECT_EQ(s["hr_samples"], 1);
+    EXPECT_EQ(s["hr_avg"], 120);
+    const auto chart = heart_rate(owner(), id);
+    ASSERT_EQ(chart->statusCode(), k200OK);
+    ASSERT_EQ(body_of(chart)["data"]["samples"].size(), 1u);
+    EXPECT_EQ(body_of(chart)["data"]["samples"][0]["bpm"], 120);
 }
 
 TEST_F(WorkoutSessionsTest, ReconcileNeedsFitnessSyncAndAValidRange) {

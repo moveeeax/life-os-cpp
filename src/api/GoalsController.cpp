@@ -46,6 +46,8 @@ using Api::Fields::today_utc;
 using Repositories::Goals::GoalRepository;
 
 constexpr double kValueMax = 1e12;
+/// UTC+14: the zone whose date is the latest on Earth, the bound of a check-in sent without ?tz=.
+constexpr const char* kLatestZone = "Pacific/Kiritimati";
 
 std::vector<std::string> listed(const auto& values) {
     return {values.begin(), values.end()};
@@ -358,6 +360,21 @@ void GoalsController::putCheckin(const HttpRequestPtr& req, Callback&& callback,
     const std::string date =
         Validation::opt_string(body, "date").value_or(local_today(req, &Repositories::Zones::today_in, today_utc()));
     with_repo_errors(callback, "goals.putCheckin", [&] {
+        // compute() reads check-ins up to today only, so a later one would be listed and drawn
+        // while "now" and the pace ignore it. The caller's today comes from ?tz=; without a
+        // zone the bound is today in UTC+14, a date no caller is past yet.
+        const std::string tz = req->getParameter("tz");
+        std::optional<std::string> latest;
+        if (!tz.empty()) {
+            latest = Repositories::Zones::today_in(tz);
+        }
+        if (!latest) {
+            latest = Repositories::Zones::today_in(kLatestZone);
+        }
+        if (latest && date > *latest) {
+            callback(ErrorResponse::bad_request("future_date", "a check-in cannot be dated after today"));
+            return;
+        }
         const json row = GoalRepository().put_checkin(
             owner, id, date, *opt_number(body, "value"), Validation::opt_string(body, "note").value_or(""));
         callback(Response::created(json{{"data", row}}));

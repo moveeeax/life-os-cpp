@@ -1,0 +1,1 @@
+`GET /api/v1/fitness/export` counts the rows before reading them and refuses a request over 200000 rows (all types together) with 400 `export_too_large`, `rows` and `max_rows` in the body. The JSON export splices the rows Postgres built into the envelope as text instead of building a JSON tree of every row; the response format is unchanged.

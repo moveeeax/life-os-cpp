@@ -81,6 +81,10 @@ for example); where it does, the Notes column says so.
 | `RATE_LIMIT_WHITELIST` | `rate_limit.whitelist` | csv | — | IPs / user IDs that bypass |
 | `RATE_LIMIT_PROTECTED_REQUESTS` | `rate_limit.protected_requests` | int | `10` | Stricter budget for the auth-public brute-force surfaces (login/register/refresh, token-bearing account links, public content — `Utils::Strings::kDefaultProtectedPathsCsv`), which the general limiter skips as public paths |
 | `RATE_LIMIT_PROTECTED_WINDOW_SEC` | `rate_limit.protected_window_sec` | int | `60` | Window for the protected-path budget |
+| `RATE_LIMIT_AUTH_FAIL_REQUESTS` | `rate_limit.auth_fail_requests` | int | `20` | Rejected credentials (unknown API key, forged or broken JWT; not an expired or missing token) allowed per client IP per window; past it a request with credentials gets 429 before the key lookup or signature check |
+| `RATE_LIMIT_AUTH_FAIL_WINDOW_SEC` | `rate_limit.auth_fail_window_sec` | int | `60` | Window for the rejected-credentials budget |
+| `RATE_LIMIT_LOGIN_EMAIL_REQUESTS` | `rate_limit.login_email_requests` | int | `5` | Failed logins allowed per email address (any IP) per window; past it the login answers 429, right password included |
+| `RATE_LIMIT_LOGIN_EMAIL_WINDOW_SEC` | `rate_limit.login_email_window_sec` | int | `900` | Window for the per-email login budget |
 | `RATE_LIMIT_PROTECTED_PATHS` | `rate_limit.protected_paths` | csv | `Utils::Strings::kDefaultProtectedPathsCsv` | The protected-budget path set (same matching rules as public paths). FULL override of the built-in default — env or code default only; deliberately NOT in `config/*.json` (a present-but-empty string value would silently empty the set, see `docs/config-sync-allowlist.txt`) |
 
 ## Security headers & CSRF
@@ -184,7 +188,7 @@ For URL components: `REDIS_HOST`, `REDIS_PORT`.
 | `JOBS_MAX_RETRIES` | `jobs.max_retries` | int | `3` | |
 | `JOBS_RETRY_BACKOFF_BASE_MS` | `jobs.retry_backoff_base_ms` | int | `2000` | Delay before a failed job is retried (exponential, capped by the max below). `0` brings back the immediate requeue, which lets a job spend its retries within milliseconds |
 | `JOBS_RETRY_BACKOFF_MAX_MS` | `jobs.retry_backoff_max_ms` | int | `60000` | Cap on the retry backoff |
-| `JOBS_VISIBILITY_TIMEOUT_SEC` | `jobs.visibility_timeout_sec` | int | `0` | Processing lease: a job whose worker dies is re-queued after this many seconds. `0` disables leases (legacy behaviour). Helm: `jobs.visibilityTimeoutSec` on the worker chart; production sets `300` (`deploy/values-worker-prod.yaml`) |
+| `JOBS_VISIBILITY_TIMEOUT_SEC` | `jobs.visibility_timeout_sec` | int | `0` | Processing lease: a job whose worker dies is re-queued after this many seconds. The worker renews the lease of a running job every third of it, so a handler may run longer. `0` disables leases (legacy behaviour). Helm: `jobs.visibilityTimeoutSec` on the worker chart; production sets `300` (`deploy/values-worker-prod.yaml`) |
 | `JOBS_DLQ_METRIC_REFRESH_SEC` | `jobs.dlq_metric_refresh_sec` | int | `10` | Exports `jobs_dlq_depth{type="..."}` plus an aggregate `type="_total"` |
 | `JOBS_QUEUE_METRIC_REFRESH_SEC` | `jobs.queue_metric_refresh_sec` | int | `10` | Same bookkeeping for the waiting queue: `jobs_queue_depth{type="..."}` plus `type="_total"` |
 | `OUTBOX_DRAIN_INTERVAL_SEC` | `outbox.drain_interval_sec` | int | `0` | Transactional outbox (`src/jobs/Outbox.hpp`): how often the API pod relays `outbox` table rows to the job queue. `0` (default) disables draining — the pattern is opt-in; rows written via `Outbox::enqueue` sit in Postgres until a deploy enables this. Needs `jobs.enabled=true`. Helm: `outbox.drainIntervalSec` on the API chart; production sets `5` (`deploy/values-prod.yaml`) |
@@ -344,7 +348,7 @@ outage can never affect the money path.
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
 | `WORKER_ID` | `worker.id` | string | `worker-1` | Names the Redis processing list of this instance. Helm: the pod name (`metadata.name`) unless `worker.id` is set, so replicas never share a list |
-| `WORKER_TYPES` | `worker.types` | csv | all registered handler types | Queues the worker pulls from. Unset (prod leaves it unset) → every type with a registered handler. The nine handlers this binary registers: `account_email`, `email.send`, `webhook.deliver`, `fitness_sync`, `food_parse`, `money_parse`, `money_rates`, `money_advisor`, `tasks_parse`. When you DO set it, a type left out piles up undrained: the compose stack lists all nine, `config.json` ships `default` (no handler of that name; the startup guard warns). |
+| `WORKER_TYPES` | `worker.types` | csv | all registered handler types | Queues the worker pulls from. Unset (prod leaves it unset) → every type with a registered handler. The ten handlers this binary registers: `account_email`, `email.send`, `webhook.deliver`, `fitness_sync`, `food_parse`, `money_parse`, `money_rates`, `money_advisor`, `tasks_parse`, `now_media_sweep`. When you DO set it, a type left out piles up undrained: the compose stack lists all ten, `config.json` ships `default` (no handler of that name; the startup guard warns). |
 | `WORKER_STRICT_TYPES` | `worker.strict_types` | bool | `false` | A `WORKER_TYPES` entry without a registered handler logs a warning; `true` upgrades it to a refusal to start |
 | `WORKER_CONCURRENCY` | `worker.concurrency` | int | `2` | |
 | `WORKER_HEALTH_PORT` | `worker.health_port` | int | `9091` | |

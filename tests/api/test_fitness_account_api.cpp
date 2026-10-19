@@ -130,10 +130,9 @@ protected:
     }
 
     HttpResponsePtr step(const Security::Auth::AuthPrincipal& p, const std::string& link_id) {
-        HttpResponsePtr captured;
-        controller.accountLinkStep(
-            TestHelpers::authed(p, Get), [&](const HttpResponsePtr& r) { captured = r; }, link_id);
-        return captured;
+        TestHelpers::AwaitedResponse awaited;
+        controller.accountLinkStep(TestHelpers::authed(p, Get), awaited.callback(), link_id);
+        return awaited.get();
     }
 
     HttpResponsePtr unlink(const Security::Auth::AuthPrincipal& p, const json& body = json::object()) {
@@ -151,9 +150,9 @@ protected:
     }
 
     HttpResponsePtr detect(const Security::Auth::AuthPrincipal& p) {
-        HttpResponsePtr captured;
-        controller.accountDetectRegion(TestHelpers::authed(p, Post), [&](const HttpResponsePtr& r) { captured = r; });
-        return captured;
+        TestHelpers::AwaitedResponse awaited;
+        controller.accountDetectRegion(TestHelpers::authed(p, Post), awaited.callback());
+        return awaited.get();
     }
 
     /// Start an attempt and return its id.

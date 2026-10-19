@@ -61,3 +61,40 @@ triple tasks.llm.max_tokens TASKS_LLM_MAX_TOKENS
 # Core and falls back to postgresql://localhost:5432/app. docs/CONFIG.md
 # documents both in the DATABASE_PRIMARY_URL row.
 defaults-differ database.primary DATABASE_PRIMARY_URL
+
+# compose-absent: envs the helm deployments set that docker/docker-compose.yml
+# deliberately leaves to config/config.json (or worker.json), because they are
+# Kubernetes plumbing or prod tuning with no meaning for `make up`.
+# DATABASE_PASSWORD: the chart splits the password out of the URL into a
+# Secret; compose carries it inside DATABASE_PRIMARY_URL.
+compose-absent app DATABASE_PASSWORD
+compose-absent worker DATABASE_PASSWORD
+# DB_MIGRATIONS_ENABLED / RUN_MIGRATIONS_ONLY: the chart runs migrations in a
+# migrate init container and turns them off in the main one; compose lets the
+# app run them at start, the config json's default.
+compose-absent app DB_MIGRATIONS_ENABLED
+compose-absent worker DB_MIGRATIONS_ENABLED
+compose-absent app RUN_MIGRATIONS_ONLY
+# SHUTDOWN_PRE_STOP_DELAY_SEC: the delay that lets a pod leave the Service
+# endpoints before it stops; compose has no endpoints.
+compose-absent app SHUTDOWN_PRE_STOP_DELAY_SEC
+# DB_POOL_SIZE, CACHE_POOL_SIZE: prod tuning from chart values; the config
+# json's values fit a laptop.
+compose-absent app DB_POOL_SIZE
+compose-absent worker DB_POOL_SIZE
+compose-absent app CACHE_POOL_SIZE
+compose-absent worker CACHE_POOL_SIZE
+# DB_STATEMENT_TIMEOUT_MS, METRICS_ADDRESS: set only on the one-shot init
+# containers (no statement timeout for the migrate step, no metrics exposer
+# on a process that exits); the long-running containers use the json's values.
+compose-absent app DB_STATEMENT_TIMEOUT_MS
+compose-absent app METRICS_ADDRESS
+compose-absent worker METRICS_ADDRESS
+# APP_ENV, LOG_FORMAT, LOG_NAME: the chart sets production, its log format
+# and a per-chart log name; compose keeps the config json's dev values
+# (development, text logs).
+compose-absent app APP_ENV
+compose-absent app LOG_FORMAT
+compose-absent worker LOG_FORMAT
+compose-absent app LOG_NAME
+compose-absent worker LOG_NAME

@@ -434,6 +434,18 @@ describe('travel on Now', () => {
     expect(c.map((x) => x.title)).toContain('Thailand');
     expect(c.find((x) => x.title === 'Thailand')?.words).toBe('in 19 days');
   });
+  it('a running trip leads the countdowns as "now"', () => {
+    const t: Today = {
+      ...base,
+      travel: {
+        next_trip: { id: 't1', name: 'Thailand', start_date: '2026-10-10', days_to: -3 },
+        near: [],
+      },
+    };
+    const c = countdowns(t, '2026-10-13');
+    expect(c[0]).toMatchObject({ title: 'Thailand', days: 0, words: 'now' });
+    expect(text(chips(t, 10, '2026-10-13')[1].main)).toBe('Thailand now');
+  });
   it('a near threshold sets the dot and leads the small line', () => {
     const t: Today = {
       ...base,

@@ -115,6 +115,18 @@ struct MetricsTopUser {
     std::int64_t revenue_cents{0};
 };
 
+/// A refund PayPal paid out that took no credits back (outcome skipped_*):
+/// the buyer kept the credits, or the payment never credited any.
+struct MetricsSkippedRefund {
+    std::string provider_refund_id;
+    std::string payment_id;
+    std::string user_id;
+    std::string email;
+    std::int64_t amount_cents{0};
+    std::string outcome;
+    std::string created_at;
+};
+
 struct BillingMetrics {
     std::int64_t revenue_cents{0};
     std::int64_t payments_count{0};
@@ -126,6 +138,11 @@ struct BillingMetrics {
 
     std::int64_t refunds_cents{0};
     std::int64_t refunds_count{0};
+    // Refund rows that moved no credits (outcome skipped_*), in-window, and
+    // the newest of them (at most kSkippedRefundsShown) for the admin page.
+    std::int64_t refunds_skipped_cents{0};
+    std::int64_t refunds_skipped_count{0};
+    std::vector<MetricsSkippedRefund> refunds_skipped;
 
     std::int64_t outstanding_credits{0};
     std::int64_t outstanding_value_cents{0};
@@ -137,6 +154,8 @@ struct BillingMetrics {
 
 class BillingMetricsRepository {
 public:
+    static constexpr int kSkippedRefundsShown = 20;
+
     /**
      * @brief Run every aggregate block in one read transaction.
      * @param w calendar/window shape for @p w.period (MetricsWindow::for_period).
@@ -183,6 +202,43 @@ public:
                 w.rolling_interval);
             m.refunds_cents = refunds[0]["total"].template as<std::int64_t>();
             m.refunds_count = refunds[0]["cnt"].template as<std::int64_t>();
+
+            // ── refunds that took no credits back (skipped_*) ──────────────────
+            // The money left through PayPal while the wallet kept its credits
+            // (skipped_insufficient: spent before a chargeback). Counted and
+            // listed apart, so the loss shows on the admin page instead of
+            // living only in the logs.
+            auto skipped = txn.exec_params(
+                "SELECT COALESCE(SUM(amount_cents), 0) AS total, COUNT(*) AS cnt "
+                "FROM billing_refunds "
+                "WHERE outcome <> 'applied' AND created_at >= now() - $1::interval",
+                w.rolling_interval);
+            m.refunds_skipped_cents = skipped[0]["total"].template as<std::int64_t>();
+            m.refunds_skipped_count = skipped[0]["cnt"].template as<std::int64_t>();
+            auto skipped_rows = txn.exec_params(
+                "SELECT r.provider_refund_id, r.payment_id::text AS payment_id, p.user_id::text AS user_id, "
+                "       COALESCE(u.email, '') AS email, r.amount_cents, r.outcome, "
+                "       to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at "
+                "FROM billing_refunds r "
+                "JOIN payments p ON p.id = r.payment_id "
+                "LEFT JOIN users u ON u.id = p.user_id "
+                "WHERE r.outcome <> 'applied' AND r.created_at >= now() - $1::interval "
+                "ORDER BY r.created_at DESC, r.provider_refund_id "
+                "LIMIT $2",
+                w.rolling_interval,
+                kSkippedRefundsShown);
+            m.refunds_skipped.reserve(skipped_rows.size());
+            for (const auto& row : skipped_rows) {
+                MetricsSkippedRefund sr;
+                sr.provider_refund_id = row["provider_refund_id"].template as<std::string>();
+                sr.payment_id = row["payment_id"].template as<std::string>();
+                sr.user_id = row["user_id"].template as<std::string>();
+                sr.email = row["email"].template as<std::string>();
+                sr.amount_cents = row["amount_cents"].template as<std::int64_t>();
+                sr.outcome = row["outcome"].template as<std::string>();
+                sr.created_at = row["created_at"].template as<std::string>();
+                m.refunds_skipped.push_back(std::move(sr));
+            }
 
             // ── outstanding liability: all-time, not windowed ──────────────────
             auto outstanding = txn.exec("SELECT COALESCE(SUM(credits), 0) AS total FROM wallet_balances");

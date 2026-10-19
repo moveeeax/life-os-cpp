@@ -1,7 +1,7 @@
 // Goals on the page: the kind labels, the pace word of a row, values with
 // their unit and the shelf of a count goal.
 export * from './types';
-import type { Goal, GoalKind } from './types';
+import type { Goal, GoalCheckin, GoalKind } from './types';
 
 export const KIND_LABEL: Record<GoalKind, string> = {
   number: 'number',
@@ -15,6 +15,22 @@ export function formatValue(v: number, unit: string): string {
   const text =
     Math.abs(v) >= 10_000 ? Math.round(v).toLocaleString('en-US') : String(Math.round(v * 10) / 10);
   return unit ? `${text} ${unit}` : text;
+}
+
+/**
+ * The weekly pace fact of a number goal: "reached" once progress hits 1 (the
+ * server clamps it, so past the target too), a sign only on a non-zero value.
+ */
+export function weeklyPace(
+  progress: number | null | undefined,
+  perWeek: number | null | undefined,
+  unit: string,
+): { value: string; label: string } {
+  if ((progress ?? 0) >= 1) return { value: 'reached', label: 'the target' };
+  const v = perWeek ?? 0;
+  const shown = formatValue(Math.abs(v), unit);
+  const zero = Math.round(Math.abs(v) * 10) === 0;
+  return { value: zero ? shown : `${v > 0 ? '+' : '−'}${shown}`, label: 'a week to make it' };
 }
 
 export type Tone = 'ok' | 'behind' | 'stale' | 'fail';
@@ -42,7 +58,9 @@ export function paceWord(goal: Pick<Goal, 'kind' | 'unit' | 'progress'>): {
   if (goal.kind === 'count') {
     if (p.reached) return { text: 'reached', tone: 'ok' };
     if (p.pace === 'on_track') return { text: 'on track', tone: 'ok' };
-    return { text: `behind ${Math.ceil((p.expected ?? 0) - (p.done ?? 0))}`, tone: 'behind' };
+    // The server calls it behind when done < floor(expected) (Progress.hpp).
+    const behind = Math.max(1, Math.floor((p.expected ?? 0) + 1e-9) - (p.done ?? 0));
+    return { text: `behind ${behind}`, tone: 'behind' };
   }
   return p.pace === 'on_track'
     ? { text: 'on track', tone: 'ok' }
@@ -54,4 +72,23 @@ export function shelf(target: number, done: number): ('done' | 'next' | 'empty')
   return Array.from({ length: target }, (_, i) =>
     i < done ? 'done' : i === done ? 'next' : 'empty',
   );
+}
+
+/**
+ * The points of a number goal's chart, oldest first. The line starts at the
+ * start date; a check-in dated on that day is the value there, as the server's
+ * progress takes it as current (Progress.hpp), not start_value.
+ * @p checkins come newest first, as the API lists them.
+ */
+export function chartPoints(
+  startDate: string,
+  startValue: number | null | undefined,
+  checkins: Pick<GoalCheckin, 'date' | 'value'>[],
+): [string, number][] {
+  const asc = checkins.slice().reverse();
+  const onStart = asc.filter((c) => c.date === startDate).pop();
+  return [
+    [startDate, onStart ? onStart.value : (startValue ?? 0)],
+    ...asc.filter((c) => c.date !== startDate).map((c): [string, number] => [c.date, c.value]),
+  ];
 }

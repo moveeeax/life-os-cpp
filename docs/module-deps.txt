@@ -78,6 +78,7 @@ core -> fitness/jobs
 core -> food/jobs
 core -> jobs
 core -> money/jobs
+core -> now/jobs
 core -> observability
 core -> root
 core -> security
@@ -104,6 +105,7 @@ food/jobs -> utils
 food/now -> repositories/food
 llm -> net
 llm -> utils
+money -> cache
 money -> llm
 money -> net
 money -> utils
@@ -113,6 +115,7 @@ money/jobs -> money
 money/jobs -> net
 money/jobs -> repositories/money
 money/jobs -> utils
+money/now -> cache
 money/now -> money
 money/now -> now
 money/now -> repositories/money
@@ -145,6 +148,10 @@ jobs -> webhooks
 now -> net
 now -> tasks
 now -> utils
+now/jobs -> jobs
+now/jobs -> repositories/now
+now/jobs -> storage
+now/jobs -> utils
 observability -> utils
 repositories -> database
 repositories -> domain

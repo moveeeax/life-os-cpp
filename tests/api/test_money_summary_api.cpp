@@ -29,6 +29,9 @@ using namespace drogon;
 namespace {
 
 constexpr const char* kOwner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaab9";
+// Another owner with money of his own in every test: a summary that dropped
+// its owner filter would add his accounts to every total below.
+constexpr const char* kBoris = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb9";
 constexpr const char* kDay = "2026-10-13";
 
 Security::Auth::AuthPrincipal owner() {
@@ -84,11 +87,28 @@ protected:
         });
         Database::get().execute_write([](auto& txn) {
             const std::string o = kOwner;
-            txn.exec_params("DELETE FROM money_transfers WHERE owner_id = $1::uuid", o);
-            txn.exec_params("DELETE FROM money_transactions WHERE owner_id = $1::uuid", o);
-            txn.exec_params("DELETE FROM money_accounts WHERE owner_id = $1::uuid", o);
-            txn.exec_params("DELETE FROM money_categories WHERE owner_id = $1::uuid", o);
-            txn.exec_params("DELETE FROM money_currencies WHERE owner_id = $1::uuid", o);
+            for (const std::string& who : {std::string(kOwner), std::string(kBoris)}) {
+                txn.exec_params("DELETE FROM money_transfers WHERE owner_id = $1::uuid", who);
+                txn.exec_params("DELETE FROM money_transactions WHERE owner_id = $1::uuid", who);
+                txn.exec_params("DELETE FROM money_accounts WHERE owner_id = $1::uuid", who);
+                txn.exec_params("DELETE FROM money_categories WHERE owner_id = $1::uuid", who);
+                txn.exec_params("DELETE FROM money_currencies WHERE owner_id = $1::uuid", who);
+            }
+            const std::string b = kBoris;
+            txn.exec_params("INSERT INTO money_currencies (owner_id, code) VALUES ($1::uuid, 'KZT'), ($1::uuid, 'USD')",
+                            b);
+            txn.exec_params(
+                "INSERT INTO money_accounts (id, owner_id, name, currency, opening_balance) VALUES "
+                "('c0000000-0000-4000-8000-0000000000b1', $1::uuid, 'Boris Kaspi', 'KZT', 9000000), "
+                "('c0000000-0000-4000-8000-0000000000b2', $1::uuid, 'Boris Wise', 'USD', 7777)",
+                b);
+            txn.exec_params(
+                "WITH c AS (INSERT INTO money_categories (owner_id, name, kind) VALUES ($1::uuid, 'Pay', 'income') "
+                " RETURNING id) "
+                "INSERT INTO money_transactions (owner_id, type, date, account_id, category_id, amount, name) "
+                "SELECT $1::uuid, 'income', '2026-10-05', 'c0000000-0000-4000-8000-0000000000b2', c.id, 1000, "
+                "'Boris pay' FROM c",
+                b);
             txn.exec("DELETE FROM money_fx_rates WHERE quote IN ('KZT', 'EUR', 'THB')");
             txn.exec_params(
                 "INSERT INTO money_currencies (owner_id, code) VALUES ($1::uuid, 'KZT'), ($1::uuid, 'USD'), "
@@ -268,4 +288,58 @@ TEST_F(MoneySummaryApiTest, BadQueries) {
     EXPECT_EQ(r->statusCode(), k422UnprocessableEntity);
     EXPECT_EQ(body_of(r)["error"], "no_rate");
     EXPECT_EQ(summary({})->statusCode(), k200OK) << "USD, 90 days, today by default";
+}
+
+// Pending rows (the inbox) are not money yet: neither the balances nor the
+// summary count them until they are confirmed.
+TEST_F(MoneySummaryApiTest, APendingRowMovesNothingUntilConfirmed) {
+    const auto total = [&] { return ok({{"currency", "USD"}, {"days", "30"}, {"date", kDay}})["total"].get<double>(); };
+    const auto kaspi_balance = [&] {
+        auto req = TestHelpers::authed_json(owner(), json::object(), Get);
+        HttpResponsePtr captured;
+        c.balances(req, [&](const HttpResponsePtr& r) { captured = r; });
+        EXPECT_TRUE(captured);
+        // Bound to a local: a range-for over `temporary["data"]` reads freed memory.
+        const json groups = body_of(captured)["data"];
+        for (const auto& group : groups) {
+            if (group["currency"] == "KZT") {
+                return group["total"].get<double>();
+            }
+        }
+        return -1.0;
+    };
+    const double total_before = total();
+    const double kaspi_before = kaspi_balance();
+    EXPECT_NEAR(kaspi_before, 100000.0, 1e-6);
+
+    const std::string food = Database::get().execute_write([](auto& txn) {
+        return txn
+            .exec_params(
+                "INSERT INTO money_categories (owner_id, name, kind) VALUES ($1::uuid, 'Food', 'expense') "
+                "RETURNING id::text",
+                std::string(kOwner))[0][0]
+            .template as<std::string>();
+    });
+    HttpResponsePtr created;
+    c.createTransaction(TestHelpers::authed_json(owner(),
+                                                 json{{"date", "2026-10-12"},
+                                                      {"category_id", food},
+                                                      {"account_id", "c0000000-0000-4000-8000-000000000001"},
+                                                      {"amount", 4900},
+                                                      {"name", "Dinner"},
+                                                      {"status", "pending"}}),
+                        [&](const HttpResponsePtr& r) { created = r; });
+    ASSERT_TRUE(created);
+    ASSERT_EQ(created->statusCode(), k201Created) << std::string(created->body());
+    const std::string id = body_of(created)["data"]["id"].get<std::string>();
+    EXPECT_NEAR(kaspi_balance(), kaspi_before, 1e-6) << "a pending row is not in the balance";
+    EXPECT_NEAR(total(), total_before, 1e-6) << "nor in the summary";
+
+    HttpResponsePtr confirmed;
+    c.confirmTransaction(
+        TestHelpers::authed_json(owner(), json::object(), Post), [&](const HttpResponsePtr& r) { confirmed = r; }, id);
+    ASSERT_TRUE(confirmed);
+    ASSERT_EQ(confirmed->statusCode(), k200OK) << std::string(confirmed->body());
+    EXPECT_NEAR(kaspi_balance(), kaspi_before - 4900.0, 1e-6) << "confirmed: the expense counts";
+    EXPECT_NEAR(total(), total_before - 4900.0 / 490.0, 1e-6);
 }

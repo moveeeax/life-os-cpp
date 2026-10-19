@@ -274,6 +274,9 @@ void WallpapersController::deleteWallpaper(const HttpRequestPtr& req, Callback&&
         if (!row) {
             throw Repositories::Now::WallpaperNotFound();
         }
+        // The row leaves the players first: if the store or the final DELETE fails, a pending
+        // row stays behind for the media sweep, never a ready row pointing at a gone object.
+        repo.mark_pending(id);
         try {
             store->remove((*row)["object_key"].get<std::string>());
             if ((*row)["poster_key"].is_string()) {

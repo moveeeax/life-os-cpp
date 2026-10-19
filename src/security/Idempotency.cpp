@@ -186,6 +186,14 @@ drogon::HttpResponsePtr pre_handle(const drogon::HttpRequestPtr& req) {
         return {};
     if (!is_mutating(req->method()))
         return {};
+    // The auth-public surface (login, register, refresh, reset and token
+    // links) is never replayed. Its caller has no principal, so the entry
+    // would be scoped to anon:<client ip>: a login's 200 (the user object)
+    // would sit in Redis for ttl_sec and come back to anyone behind the same
+    // address who repeats the key. A retry gets the route's own answer
+    // instead (409 for a taken email, 401 for a spent refresh token).
+    if (Security::Auth::is_initialized() && Security::Auth::get().path_is_public(req->path()))
+        return {};
 
     const auto& key = req->getHeader("Idempotency-Key");
     if (key.empty())

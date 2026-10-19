@@ -7,7 +7,9 @@
  *        with the same numbers.
  *
  *        A source outage throws (the queue retries); a dated day the source
- *        never published finishes with `no_snapshot`, nothing to retry.
+ *        never published finishes with `no_snapshot`, nothing to retry; a
+ *        date that is neither finishes with `invalid_date` before any request
+ *        (POST /jobs takes the payload from an admin as is).
  */
 
 #pragma once
@@ -23,6 +25,7 @@
 #include <nlohmann/json.hpp>
 
 #include "jobs/Jobs.hpp"
+#include "money/DigestCache.hpp"
 #include "money/Period.hpp"
 #include "money/RatesSource.hpp"
 #include "net/Http.hpp"
@@ -34,7 +37,15 @@ namespace Jobs::MoneyRates {
 inline constexpr const char* kJobType = "money_rates";
 
 inline nlohmann::json process_job(const nlohmann::json& payload) {
-    const std::string date = payload.value("date", std::string("latest"));
+    // find() on a non-object payload answers end(): the default applies.
+    const auto date_it = payload.find("date");
+    const bool has_date = date_it != payload.end() && !date_it->is_null();
+    const std::string date = !has_date              ? std::string("latest")
+                             : date_it->is_string() ? date_it->get<std::string>()
+                                                    : "";
+    if (!Money::RatesSource::valid_date_arg(date)) {
+        return {{"status", "invalid_date"}};
+    }
     if (!Core::money_enabled()) {
         return {{"status", "skipped"}, {"reason", "money_disabled"}, {"date", date}};
     }
@@ -61,6 +72,8 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         }
     }
     rates.put_day(day.date, keep);
+    // The net worth on /today reads these quotes: the cached digests go stale.
+    Money::DigestCache::touch_rates();
     nlohmann::json out{{"status", "done"}, {"date", day.date}, {"stored", keep.size()}};
     if (!missing.empty()) {
         out["missing"] = missing;
@@ -69,18 +82,11 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     return out;
 }
 
-/// The days in [from, to] that have no rates yet, oldest first.
+/// The days in [from, to] that have no rates yet, or lack a quote in use
+/// that the source publishes (FxRateRepository::missing_days), oldest first.
 inline std::vector<std::string> missing_days(const std::string& from, const std::string& to) {
-    using namespace Money::Period::detail;
     Repositories::Money::FxRateRepository rates;
-    std::vector<std::string> out;
-    for (sys_days d = day_of(from); d <= day_of(to); d += std::chrono::days{1}) {
-        std::string date = text_of(d);
-        if (!rates.has_day(date)) {
-            out.push_back(std::move(date));
-        }
-    }
-    return out;
+    return rates.missing_days(from, to, rates.quotes_needed());
 }
 
 /// Rate jobs still waiting in the queue (a running one is not counted).

@@ -36,6 +36,15 @@
 #      literal defaults, the knob behaves differently per caller — the
 #      drift worker.id once had (worker_main.cpp). Both sites are named.
 #      Non-literal defaults (a variable, a constant) are not compared.
+#   7. Compose: docker/docker-compose.yml, services `app` and `worker` (their
+#      environment maps with the x-*-env anchors merged in). Every env they
+#      set is an env the code reads, and every env the matching helm
+#      deployment sets (life-os-cpp for app, life-os-cpp-worker for worker)
+#      is set in compose too, so `make up` runs with the knobs prod has. An
+#      env that is deployment plumbing only (the migrate init container, the
+#      preStop delay, the split DB password) gets a `compose-absent` entry in
+#      the allowlist. The deploy/values-*.yaml overlays set chart values, not
+#      env names; the helm render gate (check-helm-render.sh) covers them.
 #
 # Reads the code can't declare in one regex-visible triple live in
 # docs/config-sync-allowlist.txt with a comment each — never a silent skip.
@@ -46,7 +55,7 @@ set -euo pipefail
 
 REPO="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
-for p in src config/config.json config/config.sample.json docs/CONFIG.md docs/config-sync-allowlist.txt; do
+for p in src config/config.json config/config.sample.json docs/CONFIG.md docs/config-sync-allowlist.txt docker/docker-compose.yml; do
     [ -e "$REPO/$p" ] || {
         echo "check-config-sync: $REPO/$p not found — nothing to check against" >&2
         exit 2
@@ -194,9 +203,12 @@ if len(extracted) < 70:
 #   absent-json <json.path>        — key deliberately NOT in the config jsons
 #   defaults-differ <json.path> <ENV_NAME> — two sites read it with two
 #                                    documented, deliberately different defaults
+#   compose-absent <app|worker> <ENV_NAME> — the helm deployment sets it, the
+#                                    compose service deliberately does not
 allow_triples = set()
 absent_json = set()
 defaults_differ = set()
+compose_absent = set()
 allow_path = repo / "docs" / "config-sync-allowlist.txt"
 for lineno, raw in enumerate(allow_path.read_text(encoding="utf-8").splitlines(), 1):
     line = raw.split("#", 1)[0].strip()
@@ -209,10 +221,12 @@ for lineno, raw in enumerate(allow_path.read_text(encoding="utf-8").splitlines()
         absent_json.add(parts[1])
     elif parts[0] == "defaults-differ" and len(parts) == 3:
         defaults_differ.add((parts[1], parts[2]))
+    elif parts[0] == "compose-absent" and len(parts) == 3 and parts[1] in ("app", "worker"):
+        compose_absent.add((parts[1], parts[2]))
     else:
         print(f"✗ {allow_path.name}:{lineno}: malformed line: {raw.strip()!r} "
-              f"(expected 'triple <json.path> <ENV>', 'absent-json <json.path>' "
-              f"or 'defaults-differ <json.path> <ENV>')")
+              f"(expected 'triple <json.path> <ENV>', 'absent-json <json.path>', "
+              f"'defaults-differ <json.path> <ENV>' or 'compose-absent <app|worker> <ENV>')")
         sys.exit(2)
 
 failures = []
@@ -316,6 +330,107 @@ for chart in ("life-os-cpp", "life-os-cpp-worker"):
             failures.append(f"helm/{chart}/templates/deployment.yaml sets env '{env}' "
                             f"but nothing in src/ reads it — stale or misspelled env line")
 
+# --- 7. compose services match the code and the helm deployments -----------
+# A line parser, not a YAML library (stdlib only): the compose file keeps its
+# env blocks in map form (`KEY: value`, needed for the `<<:` merges), the
+# shared fragments are top-level `x-...: &name` maps, and a service's
+# environment is the `environment:` map under `  <service>:`.
+compose_path = repo / "docker" / "docker-compose.yml"
+compose_lines = compose_path.read_text(encoding="utf-8").splitlines()
+ANCHOR_RE = re.compile(r"^x-[\w-]+:\s*&([\w-]+)\s*$")
+MAP_ENV_RE = re.compile(r"^\s+([A-Z][A-Z0-9_]*)\s*:")
+LIST_ENV_RE = re.compile(r"^\s+-\s*([A-Z][A-Z0-9_]*)=")
+MERGE_RE = re.compile(r"^\s+<<:\s*(.*)$")
+
+
+def indent_of(line):
+    return len(line) - len(line.lstrip(" "))
+
+
+def meaningful(line):
+    stripped = line.strip()
+    return stripped and not stripped.startswith("#")
+
+
+anchors = {}
+for i, line in enumerate(compose_lines):
+    m = ANCHOR_RE.match(line)
+    if not m:
+        continue
+    names = set()
+    for body in compose_lines[i + 1:]:
+        if meaningful(body) and indent_of(body) == 0:
+            break
+        em = MAP_ENV_RE.match(body)
+        if em and meaningful(body):
+            names.add(em.group(1))
+    anchors[m.group(1)] = names
+
+
+def compose_service_env(service):
+    try:
+        top = compose_lines.index("services:")
+    except ValueError:
+        return None
+    header = f"  {service}:"
+    start = next((i for i in range(top + 1, len(compose_lines))
+                  if compose_lines[i].rstrip() == header), None)
+    if start is None:
+        return None
+    names = set()
+    in_env = False
+    env_indent = 0
+    for body in compose_lines[start + 1:]:
+        if not meaningful(body):
+            continue
+        ind = indent_of(body)
+        if ind <= 2:
+            break  # next service or next top-level key
+        if body.strip() == "environment:":
+            in_env, env_indent = True, ind
+            continue
+        if in_env and ind <= env_indent:
+            in_env = False
+        if not in_env:
+            continue
+        mm = MERGE_RE.match(body)
+        if mm:
+            for ref in re.findall(r"\*([\w-]+)", mm.group(1)):
+                if ref not in anchors:
+                    failures.append(f"docker/docker-compose.yml: service '{service}' merges "
+                                    f"*{ref}, which is not an x-* anchor the gate can read")
+                names |= anchors.get(ref, set())
+            continue
+        em = MAP_ENV_RE.match(body) or LIST_ENV_RE.match(body)
+        if em:
+            names.add(em.group(1))
+    return names
+
+
+for service, chart in (("app", "life-os-cpp"), ("worker", "life-os-cpp-worker")):
+    compose_env = compose_service_env(service)
+    if compose_env is None:
+        failures.append(f"docker/docker-compose.yml has no '{service}' service under services:")
+        continue
+    for env in sorted(compose_env - known_envs):
+        failures.append(f"docker/docker-compose.yml service '{service}' sets env '{env}' "
+                        f"but nothing in src/ reads it — stale or misspelled env line")
+    dep = repo / "helm" / chart / "templates" / "deployment.yaml"
+    if not dep.is_file():
+        continue
+    helm_env = set(HELM_ENV_RE.findall(dep.read_text(encoding="utf-8")))
+    exempt = {e for s_, e in compose_absent if s_ == service}
+    for env in sorted(helm_env - compose_env - exempt):
+        failures.append(f"helm/{chart}/templates/deployment.yaml sets env '{env}' but "
+                        f"docker/docker-compose.yml service '{service}' does not — add it "
+                        f"there (default = the config json's value) or a 'compose-absent "
+                        f"{service} {env}' allowlist entry with the reason")
+    for env in sorted(exempt):
+        if env in compose_env or env not in helm_env:
+            failures.append(f"stale allowlist entry: 'compose-absent {service} {env}' but "
+                            f"compose sets it or the helm deployment no longer does — remove "
+                            f"it from docs/config-sync-allowlist.txt")
+
 # --- verdict -----------------------------------------------------------------
 if failures:
     print(f"✗ config-key drift ({len(failures)} finding(s)):")
@@ -333,5 +448,5 @@ if failures:
 print(f"✓ config keys in sync: {len(extracted)} extracted read triples "
       f"({len(registry)} in the registry, +{len(allow_triples)} allowlisted), "
       f"{len(known_envs)} env names covered by config.json, config.sample.json, "
-      f"docs/CONFIG.md and the helm env lists; one default per knob")
+      f"docs/CONFIG.md, the helm env lists and the compose app and worker services; one default per knob")
 PY

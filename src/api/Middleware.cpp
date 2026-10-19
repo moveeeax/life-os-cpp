@@ -39,6 +39,7 @@
 #include "security/Csrf.hpp"
 #include "security/Idempotency.hpp"
 #include "security/RateLimit.hpp"
+#include "security/SessionStore.hpp"
 #include "utils/Config.hpp"
 #include "utils/Crypto.hpp"
 #include "utils/ErrorResponse.hpp"
@@ -330,6 +331,26 @@ void register_request_id() {
     });
 }
 
+namespace {
+
+/// The limiter when rate limiting is on, else nullptr. Read per request: the
+/// auth advice is registered before the limiter's own advice.
+const Security::RateLimit::Limiter* enabled_limiter() {
+    if (!Security::RateLimit::is_initialized())
+        return nullptr;
+    const auto& limiter = Security::RateLimit::get();
+    return limiter.config().enabled ? &limiter : nullptr;
+}
+
+/// A JWT error the auth-failure tier does not count: an expired token was
+/// validly signed (the signature is checked first), the routine end of a
+/// session that the SPA answers with a refresh.
+bool counts_as_auth_failure(const std::string& jwt_error) {
+    return jwt_error != "token_expired";
+}
+
+}  // namespace
+
 void register_auth() {
     if (!Security::Auth::is_initialized())
         return;
@@ -356,6 +377,31 @@ void register_auth() {
             return short_circuit(req, resp);
         };
 
+        // Auth-failure tier. The general limiter runs after this advice (it
+        // buckets signed-in callers per user, so it needs the principal), which
+        // left rejected credentials unlimited: every bogus API key cost a
+        // primary-DB transaction, every forged JWT an HMAC. Rejections are
+        // counted per client IP here, and past the budget a request carrying
+        // credentials is refused before the lookup or the signature check.
+        const auto* limiter = enabled_limiter();
+        std::string fail_identity;
+        auto over_failure_budget = [&]() -> drogon::HttpResponsePtr {
+            if (!limiter)
+                return {};
+            fail_identity = Security::RateLimit::ip_identity(req, limiter->config());
+            const auto d = limiter->check_failures(Security::RateLimit::FailureTier::AuthFailure, fail_identity);
+            if (d.allowed)
+                return {};
+            auto resp = ErrorResponse::too_many_requests(d.retry_after_sec);
+            resp->addHeader("Retry-After", std::to_string(d.retry_after_sec));
+            return short_circuit(req, resp);
+        };
+        auto rejected = [&](const std::string& code) {
+            if (limiter && !fail_identity.empty())
+                limiter->record_failure(Security::RateLimit::FailureTier::AuthFailure, fail_identity);
+            return unauthorized(code);
+        };
+
         if (cfg.mode == Security::Auth::AuthMode::Bearer) {
             // Bearer mode is the legacy header-only path — kept verbatim.
             const auto& header = req->getHeader("Authorization");
@@ -372,9 +418,11 @@ void register_auth() {
             // session-only, whatever the key.
             if (!Security::ApiKeys::path_allows_key(req->path()))
                 return unauthorized("key_not_allowed");
+            if (auto refused = over_failure_budget())
+                return refused;
             auto key_principal = Security::ApiKeys::authenticate(req);
             if (!key_principal)
-                return unauthorized("invalid_api_key");
+                return rejected("invalid_api_key");
             // A read key answers the safe methods only; decided here, before
             // any handler, so no write of any module needs its own check.
             if (key_principal->key_read_only && !Security::ApiKeys::read_key_allows(req->method(), req->path()))
@@ -389,6 +437,8 @@ void register_auth() {
         std::string token = Security::Auth::extract_access_token(req, cfg.cookies);
         if (token.empty())
             return unauthorized("missing_token");
+        if (auto refused = over_failure_budget())
+            return refused;
 
         std::string err;
         std::optional<Security::Auth::AuthPrincipal> principal;
@@ -398,10 +448,16 @@ void register_auth() {
             // The token is unauthenticated input; a shape the parser did not
             // anticipate is a 401, never an exception out of the advice.
             spdlog::warn("auth: token verification threw ({}): {}", req->path(), e.what());
-            return unauthorized("malformed_token");
+            return rejected("malformed_token");
         }
         if (!principal)
-            return unauthorized(err);
+            return counts_as_auth_failure(err) ? rejected(err) : unauthorized(err);
+        // Access JWTs are stateless; a password reset or change, a role change
+        // or a deleted account stamps a per-user "valid since" in Redis, and a
+        // token issued before it is refused here (Sessions::access_revoked;
+        // fail-open when Redis is down, see there).
+        if (Security::Sessions::access_revoked(cfg.cookies, principal->subject, principal->raw_claims))
+            return unauthorized("session_revoked");
         req->attributes()->insert(Security::Auth::kPrincipalAttr, *principal);
         return {};
     });

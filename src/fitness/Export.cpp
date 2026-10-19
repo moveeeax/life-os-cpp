@@ -6,6 +6,7 @@
 #include "fitness/Export.hpp"
 
 #include <cstdint>
+#include <string_view>
 
 #include <nlohmann/json.hpp>
 
@@ -104,6 +105,34 @@ json envelope(
                 {"generated_at", Xiaomi::detail::iso_with_offset(static_cast<std::int64_t>(now_epoch), 0)},
                 {"filters", {{"dataset", type.empty() ? json() : json(type)}, {"start_date", from}, {"end_date", to}}},
                 {"records", records}};
+}
+
+std::string envelope_text(const std::vector<std::pair<std::string, std::string>>& records_by_type,
+                          const std::string& type,
+                          const std::string& from,
+                          const std::string& to,
+                          long long now_epoch) {
+    // The envelope with an empty records object, then the rows in its place.
+    // The other values are dates, a dataset name and a timestamp, none of which
+    // can contain the marker text, so the first match is the records value.
+    std::string out = envelope(json::object(), type, from, to, now_epoch).dump();
+    static constexpr std::string_view kMarker = "\"records\":{}";
+    const auto at = out.find(kMarker);
+    if (at == std::string::npos) {
+        return out;
+    }
+    std::string records = "{";
+    for (const auto& [name, rows] : records_by_type) {
+        if (records.size() > 1) {
+            records += ',';
+        }
+        records += json(name).dump();
+        records += ':';
+        records += rows;
+    }
+    records += '}';
+    out.replace(at + kMarker.size() - 2, 2, records);
+    return out;
 }
 
 }  // namespace Fitness::Export

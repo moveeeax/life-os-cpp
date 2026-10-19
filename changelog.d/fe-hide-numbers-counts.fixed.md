@@ -1,0 +1,1 @@
+Hide numbers blurs the weekly review counts on Tasks Today, the active and closed counts on Goals (like the same counts on Projects and Habits) and the last four digits of a card on Money Accounts. A guard test now renders Accounts, Summary and Health with the mask on and fails on any digit outside `.num`, `.num-chart` or `data-num-ok`.

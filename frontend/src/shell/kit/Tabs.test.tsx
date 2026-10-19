@@ -52,4 +52,23 @@ describe('Tabs More menu with the keyboard', () => {
     expect(screen.queryByRole('menu')).toBeNull();
     expect(document.activeElement).toBe(button);
   });
+
+  it('closes when the focus moves outside, and points aria-controls at the open menu only', () => {
+    render(
+      <MemoryRouter initialEntries={['/money/ledger']}>
+        <Tabs items={items} max={5} label="Money" />
+        <button type="button">Elsewhere</button>
+      </MemoryRouter>,
+    );
+    const button = screen.getByRole('button', { name: /More/ });
+    expect(button.getAttribute('aria-controls')).toBeNull();
+    fireEvent.keyDown(button, { key: 'ArrowDown' });
+    const menu = screen.getByRole('menu');
+    expect(button.getAttribute('aria-controls')).toBe(menu.id);
+    const first = screen.getAllByRole('menuitem')[0];
+    const elsewhere = screen.getByRole('button', { name: 'Elsewhere' });
+    fireEvent.blur(first, { relatedTarget: elsewhere });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(button.getAttribute('aria-controls')).toBeNull();
+  });
 });

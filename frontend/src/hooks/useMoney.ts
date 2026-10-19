@@ -1,4 +1,10 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+  type QueryClient,
+} from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { useBatchMutation } from '@/hooks/useBatchMutation';
@@ -38,9 +44,74 @@ import type {
 // path templates); the response types come from the same OpenAPI schemas.
 const BASE = '/api/v1/money';
 
-/** Every write invalidates the whole section (balances, totals, reports) and Now's digest. */
+/**
+ * A write to the setup (accounts, categories, currencies, merchants, settings)
+ * invalidates the whole section and Now's digest: names and scales show up
+ * everywhere.
+ */
 export const MONEY_WRITES = [qk.money.all(), qk.now.all()] as const;
 const ALL = MONEY_WRITES;
+
+const part = (name: string) => ['money', name] as const;
+
+/**
+ * A ledger row write (create, edit, delete, confirm, accept) touches the rows,
+ * the inbox, the balances (accounts carry theirs), the reports, the summary,
+ * the merchant memory and Now; not transfers, currencies or categories.
+ */
+export const ROW_WRITES = [
+  part('transactions'),
+  part('transaction'),
+  part('nearby'),
+  part('inbox'),
+  part('balances'),
+  part('accounts'),
+  part('report'),
+  part('summary'),
+  part('merchants'),
+  part('merchant-memory'),
+  qk.now.all(),
+] as const;
+
+/** A transfer moves balances and the summary; the rows and the reports do not count it. */
+export const TRANSFER_WRITES = [
+  part('transfers'),
+  part('balances'),
+  part('accounts'),
+  part('summary'),
+  qk.now.all(),
+] as const;
+
+/**
+ * Cut the paged lists under @p prefix back to their first page, so the
+ * invalidation that follows a write refetches one page, not every page that
+ * "Show more" loaded.
+ */
+export function firstPageOnly(qc: QueryClient, prefix: readonly unknown[]) {
+  qc.setQueriesData<InfiniteData<unknown, unknown>>({ queryKey: prefix }, (d) =>
+    d && d.pages.length > 1
+      ? { pages: d.pages.slice(0, 1), pageParams: d.pageParams.slice(0, 1) }
+      : d,
+  );
+}
+
+/** useApiMutation that first drops the loaded pages of the paged lists it refreshes. */
+function useMoneyWrite<TData, TVariables>(
+  fn: (vars: TVariables) => Promise<TData>,
+  invalidate: readonly (readonly unknown[])[],
+  onSuccess?: (data: TData, vars: TVariables) => void,
+) {
+  const qc = useQueryClient();
+  return useApiMutation(
+    async (vars: TVariables) => {
+      const out = await fn(vars);
+      firstPageOnly(qc, part('transactions'));
+      firstPageOnly(qc, part('transfers'));
+      return out;
+    },
+    { invalidate, onSuccess },
+  );
+}
 
 export const PARSE_POLL_MS = 2000;
 /** The provider call is capped at MONEY_LLM_TIMEOUT_SECONDS; a job unfinished after this is stuck. */
@@ -221,63 +292,71 @@ export function useMoneySettings() {
   });
 }
 
-/** [query key, url] of the probe that says whether the module is on. */
-export const MONEY_PROBE = [qk.money.enabled(), `${BASE}/settings`] as const;
-
 // ── writes ─────────────────────────────────────────────────────────────────
 
 export function useCreateTransaction(onSuccess?: (row: Transaction) => void) {
-  return useApiMutation(
+  return useMoneyWrite(
     async (body: TransactionInput) =>
       (await api.postJson<{ data: Transaction }>(`${BASE}/transactions`, { body })).data,
-    { invalidate: ALL, onSuccess },
+    ROW_WRITES,
+    onSuccess,
   );
 }
 
 export function useUpdateTransaction(id: string, onSuccess?: () => void) {
-  return useApiMutation(
+  return useMoneyWrite(
     async (body: TransactionPatch) =>
       (await api.patchJson<{ data: Transaction }>(`${BASE}/transactions/${id}`, { body })).data,
-    { invalidate: ALL, onSuccess },
+    ROW_WRITES,
+    onSuccess,
   );
 }
 
 export function useDeleteTransaction(onSuccess?: () => void) {
-  return useApiMutation((id: string) => api.deleteJson<unknown>(`${BASE}/transactions/${id}`), {
-    invalidate: ALL,
+  return useMoneyWrite(
+    (id: string) => api.deleteJson<unknown>(`${BASE}/transactions/${id}`),
+    ROW_WRITES,
     onSuccess,
-  });
+  );
 }
 
 /** Posts inbox rows one after another; one call, one error, one refetch. */
 export function useConfirmTransactions() {
+  const qc = useQueryClient();
   return useBatchMutation(
-    (id: string) => api.postJson<{ data: Transaction }>(`${BASE}/transactions/${id}/confirm`),
-    { invalidate: ALL },
+    async (id: string) => {
+      const out = await api.postJson<{ data: Transaction }>(`${BASE}/transactions/${id}/confirm`);
+      firstPageOnly(qc, part('transactions'));
+      return out;
+    },
+    { invalidate: ROW_WRITES },
   );
 }
 
 export function useCreateTransfer(onSuccess?: () => void) {
-  return useApiMutation(
+  return useMoneyWrite(
     async (body: TransferInput) =>
       (await api.postJson<{ data: Transfer }>(`${BASE}/transfers`, { body })).data,
-    { invalidate: ALL, onSuccess },
+    TRANSFER_WRITES,
+    onSuccess,
   );
 }
 
 export function useUpdateTransfer(id: string, onSuccess?: () => void) {
-  return useApiMutation(
+  return useMoneyWrite(
     async (body: TransferPatch) =>
       (await api.patchJson<{ data: Transfer }>(`${BASE}/transfers/${id}`, { body })).data,
-    { invalidate: ALL, onSuccess },
+    TRANSFER_WRITES,
+    onSuccess,
   );
 }
 
 export function useDeleteTransfer(onSuccess?: () => void) {
-  return useApiMutation((id: string) => api.deleteJson<unknown>(`${BASE}/transfers/${id}`), {
-    invalidate: ALL,
+  return useMoneyWrite(
+    (id: string) => api.deleteJson<unknown>(`${BASE}/transfers/${id}`),
+    TRANSFER_WRITES,
     onSuccess,
-  });
+  );
 }
 
 /** A new code goes through POST (upsert); an existing one through PATCH. */
@@ -377,14 +456,15 @@ export function useMoneyParse() {
 }
 
 export function useAcceptParse(jobId: string | undefined, onSuccess?: () => void) {
-  return useApiMutation(
+  return useMoneyWrite(
     async (lines: AcceptLine[]) =>
       (
         await api.postJson<{ data: Transaction[] }>(`${BASE}/parse/${jobId}/accept`, {
           body: { lines },
         })
       ).data,
-    { invalidate: ALL, onSuccess },
+    ROW_WRITES,
+    onSuccess,
   );
 }
 

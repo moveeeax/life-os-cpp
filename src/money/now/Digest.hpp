@@ -14,7 +14,8 @@
 namespace Money {
 
 /// {currencies, spends_today, net_worth} of @p owner on @p day; null when all
-/// three are empty.
+/// three are empty. Cached in Redis (money/DigestCache.hpp): a money write
+/// of the owner or a new day of rates makes the next call compute afresh.
 nlohmann::json digest(const std::string& owner, const std::string& day);
 
 }  // namespace Money

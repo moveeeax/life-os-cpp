@@ -143,7 +143,8 @@ export function Corners({
       openerRefs.current[id] = el;
     },
     'aria-expanded': open === id,
-    'aria-controls': `corner-${id}`,
+    // Only an open panel is in the DOM for the reference to point at.
+    'aria-controls': open === id ? `corner-${id}` : undefined,
     onClick: () => toggle(id),
   });
   const title: Record<PanelId, string> = {

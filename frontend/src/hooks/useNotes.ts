@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
-import { useModuleProbe } from '@/hooks/useModuleProbe';
+import { NOTES_PROBE } from '@/hooks/moduleProbes';
+import { useModuleOn } from '@/hooks/useModuleProbe';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import type { Note, NoteFacet, NoteInput } from '@/lib/notes';
@@ -25,12 +26,9 @@ export interface NoteList {
   tags: NoteFacet[];
 }
 
-/** [query key, url] of the probe that says whether the module is on. */
-export const NOTES_PROBE = [qk.notes.enabled(), `${BASE}?limit=1`] as const;
-
 /** Whether the notes module answers at all (404 while it is off). */
 export function useNotesEnabled(signedIn: boolean): boolean {
-  return useModuleProbe(...NOTES_PROBE, signedIn) ?? true;
+  return useModuleOn('notes', NOTES_PROBE, signedIn) ?? true;
 }
 
 export function useNoteList(filter: NoteFilter, enabled = true) {

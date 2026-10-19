@@ -132,6 +132,38 @@ TEST_F(MoneyRatesJobTest, MissingSnapshotFinishesAndOutagesThrow) {
     EXPECT_THROW(Jobs::MoneyRates::process_job(json{{"date", "latest"}}), std::runtime_error) << "a transport failure";
 }
 
+// A currency added after rates exist: the daily job stores it from the day
+// it is kept, and the backfill then asks again for the past days without it.
+// A kept quote the source never published (SGD here) does not make every day
+// missing.
+TEST_F(MoneyRatesJobTest, BackfillAsksAgainForDaysWithoutANewCurrency) {
+    rates.put_day("2026-10-01", {{"KZT", 450}});
+    rates.put_day("2026-10-02", {{"KZT", 451}});
+    Repositories::Money::CurrencyRepository::Input gel;
+    gel.name = "Georgian lari";
+    gel.decimals = 2;
+    gel.minor_unit = "tetri";
+    Repositories::Money::CurrencyRepository().upsert(kAnna, "GEL", gel);
+    EXPECT_TRUE(Jobs::MoneyRates::missing_days("2026-10-01", "2026-10-02").empty())
+        << "GEL has no quote stored anywhere yet";
+    rates.put_day("2026-10-03", {{"KZT", 452}, {"GEL", 2.7}});
+    EXPECT_EQ(Jobs::MoneyRates::missing_days("2026-10-01", "2026-10-04"),
+              (std::vector<std::string>{"2026-10-01", "2026-10-02", "2026-10-04"}));
+    rates.put_day("2026-10-01", {{"GEL", 2.69}});
+    EXPECT_EQ(Jobs::MoneyRates::missing_days("2026-10-01", "2026-10-03"), (std::vector<std::string>{"2026-10-02"}));
+}
+
+TEST_F(MoneyRatesJobTest, AnInvalidDateFinishesWithoutARequest) {
+    for (const json& payload : {json{{"date", "../../other@1/x"}}, json{{"date", 20261004}}, json{{"date", ""}}}) {
+        EXPECT_EQ(Jobs::MoneyRates::process_job(payload)["status"], "invalid_date") << payload.dump();
+    }
+    EXPECT_TRUE(source.urls.empty()) << "nothing may be fetched for a refused date";
+    // No date, or null, is still "latest".
+    source.replies.push_back({200, fixture()});
+    EXPECT_EQ(Jobs::MoneyRates::process_job(json::object())["status"], "done");
+    EXPECT_EQ(source.urls.back(), Money::RatesSource::url_for("latest"));
+}
+
 TEST_F(MoneyRatesJobTest, BackfillEnqueuesOnlyTheMissingDays) {
     rates.put_day("2026-10-02", {{"KZT", 450}});
     const auto days = Jobs::MoneyRates::missing_days("2026-10-01", "2026-10-03");

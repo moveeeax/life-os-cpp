@@ -6,6 +6,7 @@ import {
   countryName,
   flightsWithoutCrossing,
   documentWarningLine,
+  headlineTrip,
   splitTrips,
   whereNow,
 } from './index';
@@ -148,5 +149,21 @@ describe('documentWarningLine', () => {
         '2026-10-14',
       ),
     ).toMatch(/^Maksim's visa ends on .*Nov.*10, before the trip does$/);
+  });
+});
+
+describe('headlineTrip', () => {
+  const trip = (id: string, start: string, end: string) =>
+    ({ id, start_date: start, end_date: end }) as TravelTrip;
+  it('takes the running trip over the next one ahead', () => {
+    const today = '2026-05-10';
+    const { coming } = splitTrips(
+      [trip('lisbon', '2026-06-01', '2026-06-07'), trip('bali', '2026-05-02', '2026-05-30')],
+      today,
+    );
+    expect(headlineTrip(coming, today)?.id).toBe('bali');
+    const later = splitTrips([trip('lisbon', '2026-06-01', '2026-06-07')], '2026-05-31').coming;
+    expect(headlineTrip(later, '2026-05-31')?.id).toBe('lisbon');
+    expect(headlineTrip([], today)).toBeUndefined();
   });
 });

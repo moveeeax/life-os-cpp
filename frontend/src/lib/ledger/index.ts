@@ -2,18 +2,34 @@
 // parse draft, small rules. Amounts of different currencies are never added.
 import { formatAmount, parseAmount } from '@/lib/amounts';
 import { shiftDays } from '@/lib/dates';
+import { jobErrorText } from '@/lib/parseJob';
 
 import type {
+  Category,
   Currency,
   Merchant,
   ParseJob,
   ParseLine,
+  Report,
   Transaction,
   TransactionInput,
 } from './types';
 
 export * from './types';
 export { formatDay, isDay, todayLocal } from '@/lib/dates';
+
+/**
+ * A category's spend in a report, in its budget's currency: the block of that
+ * currency, not the first one. 0 without a budget currency or a report.
+ */
+export function spentIn(
+  report: Pick<Report, 'blocks'> | undefined,
+  category: Pick<Category, 'id' | 'budget_currency'>,
+): number {
+  if (!report || !category.budget_currency) return 0;
+  const block = report.blocks.find((b) => b.currency === category.budget_currency);
+  return block?.categories.find((c) => c.category_id === category.id)?.spent ?? 0;
+}
 
 /** The account the add form picked last, kept in the browser. */
 export const LAST_ACCOUNT_KEY = 'money:last-account';
@@ -328,30 +344,38 @@ export function linesToAccept(lines: DraftLine[]): AcceptLine[] {
     }));
 }
 
-export function parseErrorText(error: string | null | undefined): string {
-  if (!error) return 'The parse failed.';
-  const colon = error.indexOf(':');
-  const code = colon === -1 ? error : error.slice(0, colon);
-  const detail = colon === -1 ? '' : error.slice(colon + 1).trim();
-  if (code === 'invalid_answer')
-    return `The model did not answer with a usable list${detail ? `: ${detail}` : '.'}`;
-  if (code === 'not_configured') return 'Parsing is not configured on the server.';
-  if (code === 'money_disabled') return 'The money module is switched off on the server.';
-  if (code === 'provider_refused') return 'The language model provider refused the request.';
-  if (code === 'provider_unavailable')
-    return 'The language model provider did not answer. Try again later.';
-  if (code === 'parse_timeout') return 'The parse is taking too long. Try again in a minute.';
-  const status = /^provider_error_(\d+)$/.exec(code);
-  if (status)
-    return `The provider answered with an error (${status[1]})${detail ? `: ${detail}` : '.'}`;
-  return detail || code;
-}
+/** A readable sentence for a parse or advisor job's `error` ("<code>: <detail>"). */
+export const parseErrorText = (error: string | null | undefined): string =>
+  jobErrorText(error, {
+    notConfigured: 'Parsing is not configured on the server.',
+    disabledCode: 'money_disabled',
+    disabled: 'The money module is switched off on the server.',
+  });
 
 // ── small rules ────────────────────────────────────────────────────────────
 
 /** A transfer names the received amount only when the currencies differ. */
 export const transferNeedsReceived = (from?: string, to?: string): boolean =>
   !!from && !!to && from !== to;
+
+/**
+ * An exchange rate the way it reads: @p rate is @p from per one @p to; below 1
+ * it is turned over (KZT per USD, not 0.0019 USD per KZT), and the number keeps
+ * six significant digits, so a BTC pair does not print as 0.0000.
+ */
+export function rateLine(
+  rate: number,
+  from: string,
+  to: string,
+): { value: string; unit: string } | null {
+  if (!Number.isFinite(rate) || rate <= 0) return null;
+  const flip = rate < 1;
+  const v = flip ? 1 / rate : rate;
+  return {
+    value: v.toLocaleString('en-US', { maximumSignificantDigits: 6 }),
+    unit: flip ? `${to} per ${from}` : `${from} per ${to}`,
+  };
+}
 
 /** The size a photo is drawn at so its long side is at most `max`. */
 export function targetSize(

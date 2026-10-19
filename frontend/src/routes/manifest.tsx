@@ -5,21 +5,49 @@ import { Shield, ScrollText } from 'lucide-react';
 import { Permission } from '@/lib/auth/permissions';
 
 import { LoginRedirect, RootPage } from '@/pages/Root';
-import { AboutPage } from '@/pages/About';
-import { RegisterPage } from '@/pages/Register';
-import { CheckEmailPage } from '@/pages/CheckEmail';
-import { ConfirmEmailPage } from '@/pages/ConfirmEmail';
-import { ConfirmChangeEmailPage } from '@/pages/ConfirmChangeEmail';
-import { UnconfirmedPage } from '@/pages/Unconfirmed';
-import { ProfilePage } from '@/pages/Profile';
-import { ChangePasswordPage } from '@/pages/ChangePassword';
-import { ChangeEmailPage } from '@/pages/ChangeEmail';
-import { RequestResetPage } from '@/pages/RequestReset';
-import { ResetPasswordPage } from '@/pages/ResetPassword';
-import { JoinFromInvitePage } from '@/pages/JoinFromInvite';
-import { BillingPage } from '@/pages/Billing';
-import { BillingReturnPage } from '@/pages/BillingReturn';
-import { BillingCancelPage } from '@/pages/BillingCancel';
+
+// The account, sign-up and billing pages are code-split too: they carry zod
+// and react-hook-form, which a signed-in visit to a section never needs.
+// Layout wraps their Outlet in a <Suspense> boundary.
+const AboutPage = lazy(() => import('@/pages/About').then((m) => ({ default: m.AboutPage })));
+const RegisterPage = lazy(() =>
+  import('@/pages/Register').then((m) => ({ default: m.RegisterPage })),
+);
+const CheckEmailPage = lazy(() =>
+  import('@/pages/CheckEmail').then((m) => ({ default: m.CheckEmailPage })),
+);
+const ConfirmEmailPage = lazy(() =>
+  import('@/pages/ConfirmEmail').then((m) => ({ default: m.ConfirmEmailPage })),
+);
+const ConfirmChangeEmailPage = lazy(() =>
+  import('@/pages/ConfirmChangeEmail').then((m) => ({ default: m.ConfirmChangeEmailPage })),
+);
+const UnconfirmedPage = lazy(() =>
+  import('@/pages/Unconfirmed').then((m) => ({ default: m.UnconfirmedPage })),
+);
+const ProfilePage = lazy(() => import('@/pages/Profile').then((m) => ({ default: m.ProfilePage })));
+const ChangePasswordPage = lazy(() =>
+  import('@/pages/ChangePassword').then((m) => ({ default: m.ChangePasswordPage })),
+);
+const ChangeEmailPage = lazy(() =>
+  import('@/pages/ChangeEmail').then((m) => ({ default: m.ChangeEmailPage })),
+);
+const RequestResetPage = lazy(() =>
+  import('@/pages/RequestReset').then((m) => ({ default: m.RequestResetPage })),
+);
+const ResetPasswordPage = lazy(() =>
+  import('@/pages/ResetPassword').then((m) => ({ default: m.ResetPasswordPage })),
+);
+const JoinFromInvitePage = lazy(() =>
+  import('@/pages/JoinFromInvite').then((m) => ({ default: m.JoinFromInvitePage })),
+);
+const BillingPage = lazy(() => import('@/pages/Billing').then((m) => ({ default: m.BillingPage })));
+const BillingReturnPage = lazy(() =>
+  import('@/pages/BillingReturn').then((m) => ({ default: m.BillingReturnPage })),
+);
+const BillingCancelPage = lazy(() =>
+  import('@/pages/BillingCancel').then((m) => ({ default: m.BillingCancelPage })),
+);
 
 // Admin pages are code-split: a logged-out visitor on /login should not pull
 // the whole admin bundle. React.lazy needs a module with a `default` export,

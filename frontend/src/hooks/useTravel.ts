@@ -220,9 +220,6 @@ export function usePacking(tripId: string) {
   });
 }
 
-/** [query key, url] of the probe that says whether the module is on. */
-export const TRAVEL_PROBE = [qk.travel.enabled(), `${BASE}/settings`] as const;
-
 export function useDocuments() {
   return useQuery({
     queryKey: qk.travel.documents(),

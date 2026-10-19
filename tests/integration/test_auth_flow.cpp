@@ -222,6 +222,40 @@ TEST_F(AuthFlowTest, meReturnsUserForValidPrincipal) {
     EXPECT_EQ(body["user"]["email"].get<std::string>(), "eve@example.com");
 }
 
+class AuthModulesTest : public AuthFlowTest {
+protected:
+    std::string config_file_name() const override { return "auth_modules_test_config.json"; }
+    void config_overrides(json& cfg) override {
+        AuthFlowTest::config_overrides(cfg);
+        cfg["money"]["enabled"] = true;
+        cfg["travel"]["enabled"] = false;
+    }
+};
+
+TEST_F(AuthModulesTest, modulesAnswersTheSwitchesTheRoutesObey) {
+    auto req = HttpRequest::newHttpRequest();
+    req->setMethod(Get);
+    Security::Auth::AuthPrincipal principal;
+    principal.subject = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01";
+    req->attributes()->insert(Security::Auth::kPrincipalAttr, principal);
+    HttpResponsePtr resp;
+    controller.modules(req, [&](const HttpResponsePtr& r) { resp = r; });
+    ASSERT_NE(resp, nullptr);
+    ASSERT_EQ(resp->statusCode(), k200OK) << std::string(resp->body());
+    TestHelpers::expect_matches_schema(resp, "GET", "/api/v1/modules");
+    const auto data = json::parse(std::string(resp->body()))["data"];
+    EXPECT_EQ(data["money"], true);
+    EXPECT_EQ(data["travel"], false);
+    EXPECT_EQ(data.size(), 11U) << "one flag per module";
+
+    auto anonymous = HttpRequest::newHttpRequest();
+    anonymous->setMethod(Get);
+    HttpResponsePtr refused;
+    controller.modules(anonymous, [&](const HttpResponsePtr& r) { refused = r; });
+    ASSERT_NE(refused, nullptr);
+    EXPECT_EQ(refused->statusCode(), k401Unauthorized);
+}
+
 TEST_F(AuthFlowTest, meRefuses401WhenNoPrincipal) {
     auto req = HttpRequest::newHttpRequest();
     req->setMethod(Get);

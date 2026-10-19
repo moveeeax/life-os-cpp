@@ -22,8 +22,8 @@ on:
 # architecture builds natively on its own hosted runner (ubuntu-latest and
 # ubuntu-24.04-arm), never under QEMU: an emulated C++ build takes hours (see
 # docs/CI-PROFILES.md). Uses the repo's existing multi-stage Dockerfile — runtime is the default final stage,
-# worker-runtime is the worker image. Both get tagged with the git tag and
-# :latest.
+# worker-runtime is the worker image. Both get tagged with the git tag and,
+# for a release tag without a '-' (not a pre-release), :latest.
 #
 # Registry: GHCR `ghcr.io/moveeeax/life-os-cpp{,-worker,-frontend}`, which is
 # what docker/docker-compose.yml and the helm values pull. Login uses the
@@ -228,6 +228,12 @@ jobs:
           # GET /health) — without it the image reports the baked CMake
           # fallback, which went three releases stale before anyone noticed.
           build-args: APP_VERSION=${{ steps.ver.outputs.version }}
+          # runtime-base installs the runtime packages with apt-get. Replayed
+          # from the gha cache while ubuntu:24.04 keeps its tag's digest, that
+          # layer keeps the package versions of its first build, misses every
+          # security fix since, and Trivy fails the release. Rebuild it on
+          # every release; the builder stages stay cached.
+          no-cache-filters: runtime-base
           outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ matrix.cache }}
           cache-to: type=gha,scope=${{ matrix.cache }},mode=max
@@ -243,6 +249,7 @@ jobs:
           target: worker-runtime
           platforms: linux/${{ matrix.arch }}
           build-args: APP_VERSION=${{ steps.ver.outputs.version }}
+          no-cache-filters: runtime-base
           outputs: type=image,name=${{ env.IMAGE_NAME }}-worker,push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ matrix.cache }}
           cache-to: type=gha,scope=${{ matrix.cache }},mode=max
@@ -256,6 +263,9 @@ jobs:
           context: .
           file: frontend/Dockerfile
           platforms: linux/${{ matrix.arch }}
+          # The runtime stage runs `apk upgrade`, which must run again on every
+          # release for the same reason as runtime-base.
+          no-cache-filters: runtime
           outputs: type=image,name=${{ env.IMAGE_NAME }}-frontend,push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ matrix.cache }}
           cache-to: type=gha,scope=${{ matrix.cache }},mode=max
@@ -463,8 +473,10 @@ jobs:
     needs: [scan, supply-chain, ci-green]
     env:
       # :latest moves only on a pushed tag; a manual rebuild of an older tag
-      # must not drag :latest back to it.
-      LATEST: ${{ github.event_name == 'push' && '1' || '' }}
+      # must not drag :latest back to it, and a pre-release tag (one with a
+      # '-', such as v1.32.0-rc1) must not move it either: compose pulls
+      # :latest.
+      LATEST: ${{ github.event_name == 'push' && !contains(github.ref_name, '-') && '1' || '' }}
     permissions:
       contents: read
       packages: write  # promote staging digests to release tags in GHCR

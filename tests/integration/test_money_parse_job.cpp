@@ -5,7 +5,9 @@
  *        and cleared, the provider rules shared with the food parse.
  */
 
+#include <atomic>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -18,6 +20,7 @@
 #include "jobs/Dispatcher.hpp"
 #include "money/jobs/ParseJob.hpp"
 #include "net/Http.hpp"
+#include "repositories/JobRows.hpp"
 #include "repositories/money/AccountRepository.hpp"
 #include "repositories/money/CategoryRepository.hpp"
 #include "repositories/money/CurrencyRepository.hpp"
@@ -280,6 +283,38 @@ TEST_F(MoneyParseJobTest, ARunningRowIsRetriedAndALateResultChangesNothing) {
     const json row = *jobs.get(kAnna, id);
     EXPECT_EQ(row["status"], "done");
     EXPECT_EQ(row["result"].size(), 1u);
+}
+
+// The cap holds inside the create transaction: creates at once all pass a
+// count taken before them, and the lock plus the count after the insert
+// still leaves exactly kOpenMax rows. Boris's rows are his own slots.
+TEST_F(MoneyParseJobTest, TheOpenJobCapHoldsUnderConcurrentCreates) {
+    const auto create = [&](const char* who) {
+        return jobs.create_text(who, "coffee 1500", "2026-10-07", [&](auto& txn, const std::string&) {
+            Repositories::JobRows::hold_slot(txn, Repositories::Money::ParseJobRepository::kTable, who);
+        });
+    };
+    std::atomic<int> created{0};
+    std::atomic<int> refused{0};
+    std::vector<std::thread> threads;
+    for (int i = 0; i < 6; ++i) {
+        threads.emplace_back([&] {
+            try {
+                create(kAnna);
+                ++created;
+            } catch (const Repositories::JobRows::SlotsTaken&) {
+                ++refused;
+            }
+        });
+    }
+    for (auto& t : threads) {
+        t.join();
+    }
+    EXPECT_EQ(created.load(), Repositories::JobRows::kOpenMax);
+    EXPECT_EQ(refused.load(), 6 - Repositories::JobRows::kOpenMax);
+    EXPECT_EQ(jobs.open_count(kAnna), Repositories::JobRows::kOpenMax) << "a refused insert rolled back";
+    EXPECT_THROW(create(kAnna), Repositories::JobRows::SlotsTaken);
+    EXPECT_NO_THROW(create(kBoris));
 }
 
 TEST(MoneyParseHandler, IsRegisteredAmongBuiltins) {

@@ -1,0 +1,1 @@
+A sync run signs in to Xiaomi at most once: a login that fails on the network or the protocol closes the remaining types with the same error class, as an auth failure already did, instead of one more sign-in per type.

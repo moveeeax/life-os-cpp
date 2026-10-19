@@ -16,10 +16,10 @@ import {
   budgetState,
   formatMoney,
   merchantsByCategory,
+  spentIn,
   todayLocal,
   type Category,
   type Merchant,
-  type Report,
 } from '@/lib/ledger';
 import { decimalsOf } from '@/lib/ledger';
 import { parseAmount } from '@/lib/amounts';
@@ -324,13 +324,6 @@ function CategoryForm({
       )}
     </>
   );
-}
-
-/** This month's spend of a category in its budget's currency. */
-function spentIn(report: Report | undefined, category: Category): number {
-  if (!report || !category.budget_currency) return 0;
-  const block = report.blocks.find((b) => b.currency === category.budget_currency);
-  return block?.categories.find((c) => c.category_id === category.id)?.spent ?? 0;
 }
 
 const TONE = { ok: 'ok', near: 'warn', over: 'late' } as const;

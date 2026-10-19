@@ -22,6 +22,22 @@ backend:
   port: 8080
 
 # ---------------------------------------------------------------
+# Which peers may tell nginx the client address (X-Real-IP, set by the
+# ingress controller). nginx forwards the result to the API as X-Real-IP, and
+# the API's rate limiter and login audit read it (rate_limit.trust_proxy).
+# Default: the private ranges, which hold every pod address the ingress can
+# have in any CNI (k3s pods are 10.42.0.0/16 by default); a client on the
+# internet never connects from one. Narrow it to the ingress pods' range if
+# other in-cluster workloads must not be able to set the header. Empty →
+# nobody is trusted and the API sees the ingress pod as every client.
+# ---------------------------------------------------------------
+realIp:
+  trustedProxies:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+
+# ---------------------------------------------------------------
 # "Open trace" deep link shown on admin Jobs. Runtime-injected (served as
 # /trace-ui.js), so one image works in every environment. MUST contain the
 # {traceId} placeholder. Empty → the button is hidden entirely.
@@ -64,7 +80,8 @@ resources:
     cpu: 200m
     memory: 128Mi
 
-# Pod Disruption Budget
+# Pod Disruption Budget; rendered only when replicaCount > 1 (minAvailable 1
+# on a single replica would block every node drain)
 pdb:
   enabled: false
   minAvailable: 1

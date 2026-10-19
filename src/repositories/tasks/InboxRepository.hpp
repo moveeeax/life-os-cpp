@@ -33,14 +33,16 @@ public:
             &detail::translate);
     }
 
-    /// The owner's notes of one status, newest first.
-    nlohmann::json list(const std::string& owner, const std::string& status) {
+    /// One page of the owner's notes of one status, newest first.
+    nlohmann::json list(const std::string& owner, const std::string& status, int limit, int offset) {
         return Database::get().execute_read([&](auto& txn) {
             auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
                                          " FROM task_notes WHERE owner_id = $1::uuid AND status = $2 "
-                                         " ORDER BY created_at DESC) t",
+                                         " ORDER BY created_at DESC, id LIMIT $3 OFFSET $4) t",
                                      owner,
-                                     status);
+                                     status,
+                                     limit,
+                                     offset);
             return nlohmann::json::parse(r[0][0].template as<std::string>());
         });
     }

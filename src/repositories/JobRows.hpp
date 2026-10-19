@@ -20,6 +20,7 @@
 #pragma once
 
 #include <optional>
+#include <stdexcept>
 #include <string>
 
 #include "database/Database.hpp"
@@ -102,6 +103,31 @@ inline long open_count(const char* table, const std::string& owner) {
                                  kStaleRunning);
         return r[0][0].template as<long>();
     });
+}
+
+/// Thrown by hold_slot: the owner already has kOpenMax open jobs in the table.
+struct SlotsTaken : std::runtime_error {
+    SlotsTaken() : std::runtime_error("too_many_parses") {}
+};
+
+/// The open-job cap inside the creating transaction, called right after the
+/// new row's insert: a transaction-scoped advisory lock per owner and table
+/// serializes concurrent creates, and the count (READ COMMITTED: a fresh
+/// snapshot after the lock) sees every committed row plus this one. More than
+/// kOpenMax throws SlotsTaken, and the insert rolls back with it. The count
+/// before the create (open_count) stays as the cheap refusal; this closes the
+/// race between that count and the insert.
+template <typename Txn>
+void hold_slot(Txn& txn, const char* table, const std::string& owner) {
+    txn.exec_params("SELECT pg_advisory_xact_lock(hashtext($1))", std::string(table) + ":" + owner);
+    auto r = txn.exec_params(std::string("SELECT count(*) FROM ") + table +
+                                 " WHERE owner_id = $1::uuid AND status IN ('queued', 'running') AND "
+                                 " COALESCE(started_at, created_at) >= now() - $2::interval",
+                             owner,
+                             kStaleRunning);
+    if (r[0][0].template as<long>() > kOpenMax) {
+        throw SlotsTaken();
+    }
 }
 
 /// Appended to a finish, with the attempt start() returned as parameter $n:

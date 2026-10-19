@@ -17,6 +17,10 @@ backend:
 
 ingress:
   enabled: true
+  # The cluster's IngressClass "nginx" is served by Traefik (controller
+  # traefik.io/ingress-controller, next to the default class "traefik"), not
+  # by ingress-nginx. So the hops in front of the API are Traefik, then this
+  # chart's nginx: the two proxies values-prod.yaml counts.
   className: nginx
   certManager:
     clusterIssuer: letsencrypt-prod

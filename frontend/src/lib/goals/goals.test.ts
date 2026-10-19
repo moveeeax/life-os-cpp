@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatValue, paceWord, shelf } from './index';
+import { chartPoints, formatValue, paceWord, shelf, weeklyPace } from './index';
 import type { Goal } from './types';
 
 const base = {
@@ -78,7 +78,25 @@ describe('paceWord', () => {
           } as Goal['progress'],
         }),
       ).text,
-    ).toBe('behind 3');
+    ).toBe('behind 2');
+    // The server's pace floors expected: 3.2 expected with 2 done is one behind.
+    expect(
+      paceWord(
+        goal({
+          kind: 'count',
+          progress: {
+            kind: 'count',
+            elapsed: 0.32,
+            days_left: 60,
+            progress: 0.2,
+            pace: 'behind',
+            done: 2,
+            expected: 3.2,
+            reached: false,
+          } as Goal['progress'],
+        }),
+      ).text,
+    ).toBe('behind 1');
     expect(
       paceWord(
         goal({
@@ -154,5 +172,32 @@ describe('shelf', () => {
     expect(shelf(4, 2)).toEqual(['done', 'done', 'next', 'empty']);
     expect(shelf(3, 3)).toEqual(['done', 'done', 'done']);
     expect(shelf(2, 5)).toEqual(['done', 'done']);
+  });
+});
+
+describe('weeklyPace', () => {
+  it('says reached at and past the target, and signs only a non-zero pace', () => {
+    expect(weeklyPace(1, 0, 'kg')).toEqual({ value: 'reached', label: 'the target' });
+    expect(weeklyPace(1, -0.4, 'kg').value).toBe('reached');
+    expect(weeklyPace(0.5, -0.4, 'kg')).toEqual({ value: '−0.4 kg', label: 'a week to make it' });
+    expect(weeklyPace(0.5, 0.3, 'kg').value).toBe('+0.3 kg');
+    expect(weeklyPace(0.99, 0.01, 'kg').value).toBe('0 kg');
+  });
+});
+
+describe('chartPoints', () => {
+  it('starts the line at a check-in dated on the start date', () => {
+    const newestFirst = [
+      { date: '2026-03-01', value: 80 },
+      { date: '2026-01-01', value: 84 },
+    ];
+    expect(chartPoints('2026-01-01', 85, newestFirst)).toEqual([
+      ['2026-01-01', 84],
+      ['2026-03-01', 80],
+    ]);
+    expect(chartPoints('2026-01-01', 85, newestFirst.slice(0, 1))).toEqual([
+      ['2026-01-01', 85],
+      ['2026-03-01', 80],
+    ]);
   });
 });

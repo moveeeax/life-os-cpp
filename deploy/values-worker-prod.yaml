@@ -58,7 +58,7 @@ worker:
   id: ""
   # The worker pulls only the listed queues: without fitness_sync, sync jobs
   # would pile up in Redis silently. Mail is off, its queues are not subscribed.
-  types: "fitness_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse"
+  types: "fitness_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,now_media_sweep"
   # One sync per system by construction.
   concurrency: 1
 
@@ -67,10 +67,10 @@ jobs:
   # A failed job waits 2 s, 4 s, ... before its retry: with an immediate
   # requeue a parse whose row was still held spent its retries in milliseconds.
   retryBackoffBaseMs: 2000
-  # A job whose pod was killed goes back to the queue after 300 s. Longer
-  # than the longest handler (fitness sync: MI_FITNESS_SYNC_TYPE_TIMEOUT per
-  # type, 180 s; the LLM parses: MONEY_LLM_TIMEOUT_SECONDS 90 s), so a live
-  # job is not reaped. Raise it together with those timeouts.
+  # A job whose pod was killed goes back to the queue after 300 s. The worker
+  # renews the lease of a running job every 100 s (a third of it), so a
+  # handler may run longer than this (a fitness sync runs up to
+  # MI_FITNESS_SYNC_TYPE_TIMEOUT, 1800 s, per data type) without being reaped.
   visibilityTimeoutSec: 300
 
 fitness:
@@ -109,6 +109,21 @@ registration:
 
 now:
   enabled: true
+
+# The same bucket and keys as the API (deploy/values-prod.yaml): the
+# now_media_sweep job deletes the objects of wallpaper and sound rows left pending.
+storage:
+  s3:
+    endpoint: "https://s3.tarassov.me"
+    region: "us-east-1"
+    bucket: "life-os"
+    prefix: "life-os/"
+    publicBaseUrl: "https://s3.tarassov.me/life-os"
+    pathStyle: true
+    credentialsSecret:
+      name: life-os-s3
+      accessKeyIdKey: access-key-id
+      secretAccessKeyKey: secret-access-key
 
 mail:
   enabled: false

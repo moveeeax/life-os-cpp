@@ -45,6 +45,7 @@ public:
     ADD_METHOD_TO(AuthController::logout, "/api/v1/auth/logout", Post);
     ADD_METHOD_TO(AuthController::refresh, "/api/v1/auth/refresh", Post);
     ADD_METHOD_TO(AuthController::me, "/api/v1/auth/me", Get);
+    ADD_METHOD_TO(AuthController::modules, "/api/v1/modules", Get);
     METHOD_LIST_END
 
     // ---------------------------------------------------------------------
@@ -106,24 +107,36 @@ public:
     // ---------------------------------------------------------------------
     void me(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
 
-private:
+    // ---------------------------------------------------------------------
+    // GET /api/v1/modules
+    //
+    // The module switches the routes obey, in one answer:
+    // {"data": {"now": bool, "money": bool, ...}}. A module that is off
+    // answers 404 on its routes; the app reads this once instead of asking
+    // one data route per module. Needs a signed-in principal (401 without).
+    // ---------------------------------------------------------------------
+    void modules(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
+
     struct Session {
         std::string access;
         std::string refresh;
     };
 
-    static std::string make_jti();
-
-    /// auth.registration_open / REGISTRATION_OPEN, read per request (default true).
-    static bool registration_open();
-
     /**
      * @brief Mint access + refresh JWTs, write refresh JTI to Redis.
      *        Returns nullopt if Redis write fails — refresh would be
      *        unverifiable, so we'd rather refuse the login than mint a
-     *        permanently-invalid session.
+     *        permanently-invalid session. Public for AccountController's
+     *        password change, which re-issues the caller's own session after
+     *        revoking all of them.
      */
-    std::optional<Session> mint_session(const Domain::User& user);
+    static std::optional<Session> mint_session(const Domain::User& user);
+
+private:
+    static std::string make_jti();
+
+    /// auth.registration_open / REGISTRATION_OPEN, read per request (default true).
+    static bool registration_open();
 
     /// True when the refresh token carries an integer `exp` that has not
     /// passed (with the configured leeway). A token without `exp` is refused.

@@ -85,3 +85,28 @@ TEST(MoneyRatesSource, SkipsWhatIsNotACurrencyQuote) {
     EXPECT_EQ(day.per_usd.size(), 1u);
     EXPECT_DOUBLE_EQ(day.per_usd.at("THB"), 33.5);
 }
+
+TEST(MoneyRatesSource, OnlyLatestOrACalendarDateReachesTheUrl) {
+    using Money::RatesSource::valid_date_arg;
+    EXPECT_TRUE(valid_date_arg("latest"));
+    EXPECT_TRUE(valid_date_arg("2026-10-04"));
+    EXPECT_TRUE(valid_date_arg("2024-02-29"));
+    for (const char* bad : {"",
+                            "LATEST",
+                            "2026-1-04",
+                            "2026-13-01",
+                            "2026-00-10",
+                            "2026-10-00",
+                            "2026-10-32",
+                            "2026/10/04",
+                            "2026-10-04/../../evil@1",
+                            "../x",
+                            "latest/../../other-package@1",
+                            "2026-10-0a"}) {
+        EXPECT_FALSE(valid_date_arg(bad)) << bad;
+    }
+
+    ScriptedTransport t;
+    EXPECT_THROW(Money::RatesSource::fetch(t, "../../evil@1/x"), std::invalid_argument);
+    EXPECT_TRUE(t.urls.empty()) << "a refused date must not reach the transport";
+}

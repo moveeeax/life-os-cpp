@@ -9,6 +9,7 @@
 #include <cctype>
 #include <chrono>
 #include <cstdio>
+#include <functional>
 #include <optional>
 #include <regex>
 #include <stdexcept>
@@ -64,6 +65,25 @@ constexpr double kKcalMax = 10000;
 constexpr double kGramsMax = 10000;
 constexpr double kMacroMax = 1000;
 constexpr long kOffCacheSeconds = 3600;
+/// Set for a minute after Open Food Facts failed: each call could hold a server thread for its 10 s
+/// timeout, so the next ones answer 503 at once. Outside the "food:off:<query>" space of the search cache.
+constexpr const char* kOffDownKey = "food:off-down";
+constexpr long kOffDownSeconds = 60;
+
+/// True (answered 503) while Open Food Facts is marked down.
+bool off_down(const std::function<void(const drogon::HttpResponsePtr&)>& callback) {
+    if (Cache::is_initialized() && Cache::get().exists(kOffDownKey)) {
+        callback(ErrorResponse::service_unavailable("upstream_unavailable", "Open Food Facts is not available now"));
+        return true;
+    }
+    return false;
+}
+
+void mark_off_down() {
+    if (Cache::is_initialized()) {
+        Cache::get().set(kOffDownKey, "1", kOffDownSeconds);
+    }
+}
 
 const std::vector<std::string> kMeals = {"breakfast", "lunch", "dinner", "snack"};
 const std::vector<std::string> kPer = {"100g", "100ml"};
@@ -434,6 +454,9 @@ void FoodController::offSearch(const HttpRequestPtr& req, Callback&& callback) {
             }
         }
     }
+    if (off_down(callback)) {
+        return;
+    }
     try {
         json data = json::array();
         for (const auto& p : Food::Off::search(Food::Http::transport(), q)) {
@@ -445,6 +468,7 @@ void FoodController::offSearch(const HttpRequestPtr& req, Callback&& callback) {
         callback(Response::ok(json{{"data", data}, {"count", data.size()}, {"cached", false}}));
     } catch (const Food::Off::Unavailable& e) {
         spdlog::warn("open food facts search unavailable: {}", e.what());
+        mark_off_down();
         callback(ErrorResponse::service_unavailable("upstream_unavailable", "Open Food Facts is not available now"));
     }
 }
@@ -461,11 +485,15 @@ void FoodController::itemFromOff(const HttpRequestPtr& req, Callback&& callback)
         callback(ErrorResponse::bad_request("invalid_code", "code must be 1..20 digits"));
         return;
     }
+    if (off_down(callback)) {
+        return;
+    }
     std::optional<Food::Off::Product> product;
     try {
         product = Food::Off::product(Food::Http::transport(), code);
     } catch (const Food::Off::Unavailable& e) {
         spdlog::warn("open food facts product unavailable: {}", e.what());
+        mark_off_down();
         callback(ErrorResponse::service_unavailable("upstream_unavailable", "Open Food Facts is not available now"));
         return;
     }
@@ -672,15 +700,24 @@ void FoodController::parseStart(const HttpRequestPtr& req, Callback&& callback) 
                                           json{{"retry_after_sec", 30}}}));
             return;
         }
-        const json job = repo.create(owner,
-                                     body["text"].get<std::string>(),
-                                     body["meal"].get<std::string>(),
-                                     body["date"].get<std::string>(),
-                                     [&](auto& txn, const std::string& job_id) {
-                                         via_outbox = Jobs::Outbox::enqueue_if_drained(
-                                             txn, Jobs::FoodParse::kJobType, payload(job_id));
-                                     });
+        const json job = repo.create(
+            owner,
+            body["text"].get<std::string>(),
+            body["meal"].get<std::string>(),
+            body["date"].get<std::string>(),
+            [&](auto& txn, const std::string& job_id) {
+                // The cap again, under the lock: two creates at once
+                // cannot both pass the count above.
+                Repositories::JobRows::hold_slot(txn, Repositories::ParseJobRepository::kTable, owner);
+                via_outbox = Jobs::Outbox::enqueue_if_drained(txn, Jobs::FoodParse::kJobType, payload(job_id));
+            });
         id = job["id"].get<std::string>();
+    } catch (const Repositories::JobRows::SlotsTaken&) {
+        callback(ErrorResponse::make({drogon::k429TooManyRequests,
+                                      "too_many_parses",
+                                      "wait for your running parses to finish",
+                                      json{{"retry_after_sec", 30}}}));
+        return;
     } catch (const std::exception& e) {
         spdlog::warn("food parse create failed: {}", e.what());
         callback(ErrorResponse::service_unavailable("storage_unavailable"));

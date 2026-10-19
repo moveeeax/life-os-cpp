@@ -460,6 +460,8 @@ TEST_F(BillingMetricsApiTest, ZeroPaymentsInWindowGuardsDivisionByZero) {
     EXPECT_DOUBLE_EQ(data["conversion"]["rate"].get<double>(), 0.0);
     EXPECT_EQ(data["refunds_cents"], 0);
     EXPECT_EQ(data["refunds_count"], 0);
+    EXPECT_EQ(data["refunds_skipped_count"], 0);
+    EXPECT_TRUE(data["refunds_skipped"].empty());
     EXPECT_EQ(data["outstanding_credits"], 0);
     EXPECT_EQ(data["outstanding_value_cents"], 0);
     EXPECT_TRUE(data["top_packages"].empty());
@@ -513,6 +515,40 @@ TEST_F(BillingMetricsApiTest, RefundsExcludeSkippedOutcomesButIncludeApplied) {
     // figure, proving the filter discriminates rather than summing everything.
     EXPECT_EQ(data["refunds_cents"], 1000);
     EXPECT_EQ(data["refunds_count"], 1);
+    // The skipped one is counted and listed apart.
+    EXPECT_EQ(data["refunds_skipped_cents"], 1);
+    EXPECT_EQ(data["refunds_skipped_count"], 1);
+    ASSERT_EQ(data["refunds_skipped"].size(), 1u);
+    EXPECT_EQ(data["refunds_skipped"][0]["provider_refund_id"], "REFUND-SKIPPED-ZERO");
+    EXPECT_EQ(data["refunds_skipped"][0]["outcome"], "skipped_zero_credits");
+    EXPECT_EQ(data["refunds_skipped"][0]["email"], "alice-refunds@example.com");
+    EXPECT_EQ(data["refunds_skipped"][0]["amount_cents"], 1);
+}
+
+// Buy credits, spend them, then a chargeback: the refund cannot take the
+// credits back (skipped_insufficient). The metrics must show that loss.
+TEST_F(BillingMetricsApiTest, AChargebackAfterTheCreditsWereSpentShowsAsSkipped) {
+    auto admin = seed_admin();
+    auto bob = seed_user("bob-chargeback@example.com");
+    seed_captured(bob.subject, "ORDER-CHARGEBACK", 2000, "1 days");
+    // The credits are gone (spent) before the chargeback arrives.
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE wallet_balances SET credits = 0 WHERE user_id = $1::uuid", bob.subject);
+        return 0;
+    });
+    seed_refund("ORDER-CHARGEBACK", "REFUND-CHARGEBACK", 2000, "1 days");
+    ASSERT_EQ(refund_outcome("REFUND-CHARGEBACK"), "skipped_insufficient");
+
+    int status = 0;
+    auto body = call_metrics(admin, "week", &status);
+    ASSERT_EQ(status, k200OK);
+    const auto& data = body["data"];
+    EXPECT_EQ(data["refunds_cents"], 0) << "no credits moved";
+    EXPECT_EQ(data["refunds_skipped_cents"], 2000);
+    EXPECT_EQ(data["refunds_skipped_count"], 1);
+    ASSERT_EQ(data["refunds_skipped"].size(), 1u);
+    EXPECT_EQ(data["refunds_skipped"][0]["outcome"], "skipped_insufficient");
+    EXPECT_EQ(data["refunds_skipped"][0]["user_id"], bob.subject);
 }
 
 // Regression guard for the `status IN ('captured', 'refunded')` filter in

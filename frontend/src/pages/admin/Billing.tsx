@@ -29,6 +29,7 @@ import type {
 import { formatDateTime } from '@/lib/dates';
 import { dollarsToCents, formatCents } from '@/lib/money';
 import { AdjustDialog } from '@/pages/admin/billing/AdjustDialog';
+import { SkippedRefundsTab } from '@/pages/admin/billing/SkippedRefunds';
 import { Num } from '@/shell/kit/Num';
 
 const PER_PAGE = 20;
@@ -70,7 +71,7 @@ function PaymentStatusBadge({ status }: { status: Payment['status'] }) {
 }
 
 export function AdminBillingPage() {
-  const [tab, setTab] = useState<'packages' | 'payments' | 'settings'>('packages');
+  const [tab, setTab] = useState<'packages' | 'payments' | 'refunds' | 'settings'>('packages');
   const [adjusting, setAdjusting] = useState(false);
 
   return (
@@ -93,7 +94,7 @@ export function AdminBillingPage() {
       </div>
 
       <div className="flex gap-2 border-b" role="tablist" aria-label="Billing">
-        {(['packages', 'payments', 'settings'] as const).map((t) => (
+        {(['packages', 'payments', 'refunds', 'settings'] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -115,6 +116,7 @@ export function AdminBillingPage() {
           note at the top of this file for how to add one. */}
       {tab === 'packages' && <PackagesTab />}
       {tab === 'payments' && <PaymentsTab />}
+      {tab === 'refunds' && <SkippedRefundsTab />}
       {tab === 'settings' && <SettingsTab />}
 
       {adjusting && <AdjustDialog onClose={() => setAdjusting(false)} />}

@@ -12,6 +12,7 @@ tree.
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Pre-commit setup, dev workflow, commit-message convention, release flow |
 | [`../SECURITY.md`](../SECURITY.md) | Disclosure policy + production-hardening checklist |
 | [`../CHANGELOG.md`](../CHANGELOG.md) | Versioned change log (semver; authored via `changelog.d/` fragments — parallel-safe, see [`../changelog.d/README.md`](../changelog.d/README.md) — or directly under `## [Unreleased]`) |
+| [`WRITING-STYLE.md`](WRITING-STYLE.md) | Rules for every text in the repo and for the owner: facts with sources, the stop-lists, rhythm and typography (pulled into `../CLAUDE.md`) |
 
 ## Guides & deep-dives
 
@@ -73,6 +74,13 @@ tree.
 | [`../helm/life-os-cpp-worker/`](../helm/life-os-cpp-worker/) | Worker Helm chart |
 | [`../helm/cpp-frontend/`](../helm/cpp-frontend/) | Frontend (nginx SPA) Helm chart |
 | [`../helm/cpp-env/`](../helm/cpp-env/) | Umbrella chart — full environment (api + worker + frontend), rendered by `make helm-validate` |
+
+## Tools (`tools/`)
+
+| File | What's there |
+|---|---|
+| [`../tools/fitness/gen_crypto_vectors.py`](../tools/fitness/gen_crypto_vectors.py) | One-off snapshot of the upstream Mi Fitness crypto as fixed input/output pairs, run against the Python bridge; the C++ port's crypto tests compare against them |
+| [`../tools/newtab-extension/`](../tools/newtab-extension/) | Chrome extension (Manifest V3) that opens `/now` of Life OS in every new tab; install steps in its README |
 
 ## Scripts (`scripts/`)
 

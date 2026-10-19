@@ -36,7 +36,9 @@ components:
     # API keys (cpk_..., in X-API-Key or as the Bearer token) authenticate
     # like BearerAuth on data routes, with the owner's permissions minus the
     # admin bit. /api/v1/account/* (including the api-keys routes) and
-    # /api/v1/admin/* answer 401 key_not_allowed to a key.
+    # /api/v1/admin/* answer 401 key_not_allowed to a key. A key with
+    # scope `read` is answered 403 key_read_only on any method other than
+    # GET, HEAD and OPTIONS.
     # Browser-SPA session: the access JWT travels in an HttpOnly
     # __Host- cookie set by POST /api/v1/auth/login (auth.cookies.* in
     # config/config.json). Same-origin only — the SPA never reads it
@@ -297,7 +299,7 @@ components:
         travel:
           type: object
           required: [next_trip, near]
-          description: The next trip and the day counters near their threshold (within 14 days)
+          description: The running trip (or else the next one) and the day counters near their threshold (within 14 days)
           properties:
             next_trip:
               oneOf:
@@ -307,7 +309,7 @@ components:
                     id: { type: string, format: uuid }
                     name: { type: string }
                     start_date: { type: string, format: date }
-                    days_to: { type: integer }
+                    days_to: { type: integer, description: "Days until the start; zero or negative while the trip runs" }
                 - { type: 'null' }
             near:
               type: array
@@ -1027,7 +1029,7 @@ components:
               code: { type: string }
               message: { type: string }
 
-    # Mirrors Jobs::Job::to_json() in src/jobs/Jobs.hpp.
+    # Mirrors Jobs::Job::to_json() in src/jobs/Job.hpp.
     Job:
       type: object
       required: [id, type, status, created_at]
@@ -1042,10 +1044,44 @@ components:
         error:       { type: string }
         worker_id:   { type: string }
         trace_id:    { type: string, description: W3C trace id of the submitting request — deep-link into Jaeger }
+        traceparent: { type: string, description: W3C traceparent of the submitting request; the worker continues that trace (empty when there was none) }
         retry_count: { type: integer }
         max_retries: { type: integer }
         created_at:  { type: integer, format: int64, description: Epoch seconds }
         updated_at:  { type: integer, format: int64, description: Epoch seconds }
+
+    # Mirrors Domain::to_json(ApiKey) in src/domain/ApiKey.hpp. key_hash
+    # never leaves the database.
+    ApiKey:
+      type: object
+      required: [id, name, prefix, scope, last_used_at, revoked_at, created_at]
+      properties:
+        id:           { type: string, format: uuid }
+        name:         { type: string }
+        prefix:       { type: string, description: The first characters of the key, to tell keys apart }
+        scope:        { type: string, enum: [full, read] }
+        last_used_at: { type: ['string', 'null'] }
+        revoked_at:   { type: ['string', 'null'] }
+        created_at:   { type: string }
+
+    ApiKeyListResponse:
+      type: object
+      required: [data, total]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ApiKey' }
+        total: { type: integer }
+
+    # POST /api/v1/account/api-keys answers the key object itself (no data
+    # envelope) plus the one-time plaintext `key`.
+    ApiKeyCreated:
+      allOf:
+        - { $ref: '#/components/schemas/ApiKey' }
+        - type: object
+          required: [key]
+          properties:
+            key: { type: string, description: The plaintext key (cpk_...); shown only in this response }
 
     # Mirrors Domain::to_json(Role) in src/domain/Role.hpp.
     Role:
@@ -1433,6 +1469,9 @@ components:
             - conversion
             - refunds_cents
             - refunds_count
+            - refunds_skipped_cents
+            - refunds_skipped_count
+            - refunds_skipped
             - outstanding_credits
             - outstanding_value_cents
             - series
@@ -1452,6 +1491,22 @@ components:
                 rate:     { type: number, format: double, description: "captured / created as a float ratio; 0 if created is 0" }
             refunds_cents:            { type: integer, format: int64, description: "Sum of billing_refunds.amount_cents in-window, outcome='applied' only" }
             refunds_count:            { type: integer, format: int64, description: "Count of billing_refunds rows in-window, outcome='applied' only" }
+            refunds_skipped_cents:    { type: integer, format: int64, description: "Sum of billing_refunds.amount_cents in-window that took no credits back (outcome skipped_*): money that left through PayPal while the wallet kept its credits" }
+            refunds_skipped_count:    { type: integer, format: int64, description: "Count of those skipped_* refund rows in-window" }
+            refunds_skipped:
+              type: array
+              description: "The newest skipped_* refund rows in-window (at most 20), newest first"
+              items:
+                type: object
+                required: [provider_refund_id, payment_id, user_id, email, amount_cents, outcome, created_at]
+                properties:
+                  provider_refund_id: { type: string }
+                  payment_id:         { type: string, format: uuid }
+                  user_id:            { type: string, format: uuid }
+                  email:              { type: string }
+                  amount_cents:       { type: integer, format: int64 }
+                  outcome:            { type: string, enum: [skipped_insufficient, skipped_zero_credits, skipped_not_credited] }
+                  created_at:         { type: string, format: date-time }
             outstanding_credits:      { type: integer, format: int64, description: "SUM(wallet_balances.credits) — all-time liability, NOT windowed" }
             outstanding_value_cents:  { type: integer, format: int64, description: "outstanding_credits * 100 / credits_per_unit (integer math, current billing_settings rate)" }
             series:
@@ -1498,6 +1553,7 @@ components:
           type: array
           items:
             type: object
+            required: [date, steps, distance_m, active_kcal, total_kcal, timezone]
             properties:
               date: { type: string, format: date }
               steps: { type: integer }
@@ -1515,6 +1571,7 @@ components:
           type: array
           items:
             type: object
+            required: [sleep_id, start_at, end_at, duration_minutes, time_asleep_minutes, time_awake_minutes, sleep_score, sleep_score_source, is_nap, timezone, stages]
             properties:
               sleep_id: { type: string }
               start_at: { type: string }
@@ -1526,7 +1583,14 @@ components:
               sleep_score_source: { type: string, nullable: true }
               is_nap: { type: boolean }
               timezone: { type: string }
-              stages: { type: array, items: { type: object } }
+              stages:
+                type: array
+                items:
+                  type: object
+                  required: [stage, minutes]
+                  properties:
+                    stage: { type: string, description: 'deep, light, rem or awake' }
+                    minutes: { type: integer }
     HeartRateListResponse:
       type: object
       required: [data, count, total]
@@ -1537,6 +1601,7 @@ components:
           type: array
           items:
             type: object
+            required: [timestamp, bpm, sample_type]
             properties:
               timestamp: { type: string }
               bpm: { type: integer }
@@ -1551,6 +1616,7 @@ components:
           type: array
           items:
             type: object
+            required: [timestamp, stress_score, level]
             properties:
               timestamp: { type: string }
               stress_score: { type: integer }
@@ -1565,6 +1631,7 @@ components:
           type: array
           items:
             type: object
+            required: [timestamp, spo2_pct]
             properties:
               timestamp: { type: string }
               spo2_pct: { type: integer }
@@ -1578,6 +1645,7 @@ components:
           type: array
           items:
             type: object
+            required: [timestamp, weight_kg, bmi, body_fat_pct, muscle_mass_kg, water_pct, bone_mass_kg, visceral_fat_score, basal_metabolism_kcal, metabolic_age]
             properties:
               timestamp: { type: string }
               weight_kg: { type: number }
@@ -1599,6 +1667,7 @@ components:
           type: array
           items:
             type: object
+            required: [workout_id, activity_type, start_at, end_at, duration_minutes, distance_m, calories_kcal, avg_heart_rate_bpm, max_heart_rate_bpm, avg_pace_sec_per_km, max_pace_sec_per_km, total_steps]
             properties:
               workout_id: { type: string }
               activity_type: { type: string }
@@ -1622,6 +1691,7 @@ components:
           type: array
           items:
             type: object
+            required: [date, steps, distance_m, active_kcal, sleep_duration_minutes, sleep_score, resting_bpm]
             properties:
               date: { type: string, format: date }
               steps: { type: integer }
@@ -1640,6 +1710,7 @@ components:
           type: array
           items:
             type: object
+            required: [event_id, start_at, end_at, duration_seconds]
             properties:
               event_id: { type: string }
               start_at: { type: string }
@@ -1653,6 +1724,7 @@ components:
           type: object
           additionalProperties:
             type: object
+            required: [first_date, last_date, records, last_sync_at]
             properties:
               first_date: { type: string, format: date, nullable: true }
               last_date: { type: string, format: date, nullable: true }
@@ -2824,6 +2896,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: The default role is missing from the database (misconfigured)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /api/v1/auth/registration:
     get:
       summary: Whether self sign-up is open
@@ -2871,8 +2948,18 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: "Too many attempts: the per-IP budget of the auth surface, or too many failed logins for this email address (rate_limit.login_email_*; the right password is refused too until the window frees a slot). Retry-After says when."
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '415':
           description: Body content type is not application/json (content-type middleware — applies to every JSON API endpoint)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: The session could not be minted (session_unavailable)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -2905,6 +2992,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: The new session could not be minted (session_unavailable)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /api/v1/auth/me:
     get:
       summary: Get the authenticated user
@@ -2917,6 +3009,49 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/MeResponse' }
         '401': { description: Not authenticated }
+        '404':
+          description: The token's user no longer exists (user)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/modules:
+    get:
+      summary: The module switches
+      description: >-
+        Whether each module is switched on. A module that is off answers 404 on its routes; the app reads
+        this once to build its navigation instead of asking one data route per module.
+      tags: [auth]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: One flag per module
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [billing, fitness, food, goals, habits, money, notes, now, tasks, travel, workout]
+                    properties:
+                      billing: { type: boolean }
+                      fitness: { type: boolean }
+                      food: { type: boolean }
+                      goals: { type: boolean }
+                      habits: { type: boolean }
+                      money: { type: boolean }
+                      notes: { type: boolean }
+                      now: { type: boolean }
+                      tasks: { type: boolean }
+                      travel: { type: boolean }
+                      workout: { type: boolean }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   # ── Account self-service ───────────────────────────────────────────────────
   /api/v1/account/confirm-resend:
@@ -3048,7 +3183,7 @@ paths:
                 old_password: { type: string }
                 new_password: { type: string, minLength: 8, maxLength: 128 }
       responses:
-        '200': { description: Password updated }
+        '200': { description: "Password updated. Every session of the account ends, access tokens included; the caller gets a fresh session in Set-Cookie." }
         '401': { description: Wrong current password or not authenticated }
 
   /api/v1/account/api-keys:
@@ -3057,7 +3192,11 @@ paths:
       tags: [account]
       security: [{ BearerAuth: [] }]
       responses:
-        '200': { description: "Array of API key metadata under data[]" }
+        '200':
+          description: "Array of API key metadata under data[]"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiKeyListResponse' }
         '401': { description: Not authenticated }
     post:
       summary: Create an API key — the secret is returned ONCE in this response
@@ -3075,7 +3214,11 @@ paths:
                 name: { type: string }
                 scope: { type: string, enum: [full, read], default: full }
       responses:
-        '201': { description: "Key created; `key` field holds the one-time secret, `scope` its scope" }
+        '201':
+          description: "Key created; `key` field holds the one-time secret, `scope` its scope"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiKeyCreated' }
         '400': { description: Validation failed (an unknown scope) }
         '401': { description: Not authenticated }
 
@@ -3436,7 +3579,7 @@ paths:
                       run_id: { type: integer }
                       status: { type: string }
         '400':
-          description: Malformed range, unknown or duplicate data type
+          description: Malformed range, a range wider than 366 days (range_too_wide), unknown or duplicate data type
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -3681,7 +3824,7 @@ paths:
             text/csv:
               schema: { type: string }
           description: schema_version 1.0 envelope (json) or a flat table of one type (csv)
-        '400': { description: "Malformed range, a range wider than 366 days, unknown type, or csv without a type" }
+        '400': { description: "Malformed range, a range wider than 366 days, unknown type, csv without a type, or more rows than one export carries (export_too_large, 200000 rows over all types; the body adds rows and max_rows)" }
         '401': { description: Not authenticated }
         '503': { description: Database unavailable }
   /api/v1/fitness/account:
@@ -3853,7 +3996,8 @@ paths:
       description: |
         Polls Xiaomi once (about 3 seconds). On the confirmation the new token is
         verified with a login, the account's region is detected and the link is
-        stored; a first sync is enqueued.
+        stored; a first sync is enqueued. When every slot for Xiaomi requests is
+        taken, the step answers pending without asking Xiaomi.
       tags: [fitness]
       security: [{ BearerAuth: [] }]
       responses:
@@ -3917,7 +4061,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '503':
-          description: not_configured, upstream_auth (link again) or upstream_protocol
+          description: not_configured, upstream_auth (link again), upstream_protocol, or busy (every slot for Xiaomi requests is taken; retry after the Retry-After seconds)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -3962,7 +4106,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '503':
-          description: Not configured, upstream refused authentication, protocol mismatch, or upstream_unavailable (any other failure)
+          description: Not configured, upstream refused authentication, protocol mismatch, upstream_unavailable (any other failure), or busy (every slot for Xiaomi requests is taken; retry after the Retry-After seconds)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -4071,7 +4215,7 @@ paths:
         '400': { description: order_id missing or not a string }
         '401': { description: Not authenticated }
         '404': { description: "Billing module disabled, or no such order for this caller" }
-        '409': { description: "This payment is failed/refunded and cannot be captured (payment_not_capturable), or PayPal reports the order hasn't been approved yet (order_not_approved)" }
+        '409': { description: "This payment is failed/refunded and cannot be captured (payment_not_capturable), or PayPal reports the order hasn't been approved yet (order_not_approved), or an earlier capture of the order is still pending at PayPal (capture_pending)" }
   /api/v1/billing/paypal/webhook:
     post:
       summary: PayPal webhook — capture/refund notifications
@@ -5769,6 +5913,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: The code exists and fewer decimals are asked while an account, a budget or a receipt keeps it (decimals_in_use); nothing changed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /api/v1/money/currencies/{code}:
     parameters:
@@ -6820,10 +6969,11 @@ paths:
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: kind, in: query, schema: { type: string, enum: [week, month, quarter, custom], default: month } }
-        - { name: date, in: query, schema: { type: string, format: date }, description: 'A day of the period (week, month, quarter); defaults to today' }
+        - { name: date, in: query, schema: { type: string, format: date }, description: 'A day of the period (week, month, quarter); defaults to today in tz, else UTC' }
         - { name: from, in: query, schema: { type: string, format: date }, description: Custom period start }
         - { name: to, in: query, schema: { type: string, format: date }, description: Custom period end }
         - { name: as_if, in: query, schema: { type: string, pattern: '^[A-Z]{3}$' }, description: Defaults to the settings' view_currency }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there; a name that is not a zone answers 400 invalid_query' }
       responses:
         '200':
           description: The report
@@ -6885,11 +7035,13 @@ paths:
       summary: Send a bank mail, an SMS or a list of purchases to the LLM parse job
       tags: [money]
       security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: hint_date defaults to today there; a name that is not a zone answers 400 invalid_query' }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 8000 }, hint_date: { type: string, format: date, description: The date of a line without one; defaults to today (UTC) } } }
+            schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 8000 }, hint_date: { type: string, format: date, description: The date of a line without one; defaults to today in tz (UTC without it) } } }
       responses:
         '202':
           description: Queued
@@ -6931,11 +7083,13 @@ paths:
       summary: Send a receipt photo (a jpeg, png or webp data URL, at most 4 MB decoded) to the LLM parse job
       tags: [money]
       security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: hint_date defaults to today there; a name that is not a zone answers 400 invalid_query' }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [image], properties: { image: { type: string, description: 'data:image/jpeg;base64,...' }, hint_date: { type: string, format: date } } }
+            schema: { type: object, required: [image], properties: { image: { type: string, description: 'data:image/jpeg;base64,...' }, hint_date: { type: string, format: date, description: The date of a line without one; defaults to today in tz, else UTC } } }
       responses:
         '202':
           description: Queued
@@ -7662,6 +7816,8 @@ paths:
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: status, in: query, schema: { type: string, enum: [inbox, archived], default: inbox } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 500 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
         '200':
           description: Notes, newest first
@@ -7793,11 +7949,13 @@ paths:
       summary: Queue one phrase for the tasks_parse job
       tags: [tasks]
       security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there' }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 2000 }, hint_date: { type: string, format: date }, note_id: { type: string, format: uuid } } }
+            schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 2000 }, hint_date: { type: string, format: date, description: The reference day of the parse; defaults to today in tz, else UTC }, note_id: { type: string, format: uuid } } }
       responses:
         '202':
           description: Queued
@@ -7886,7 +8044,7 @@ paths:
           description: The tasks
           content:
             application/json:
-              schema: { type: object, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/Task' } } } }
+              schema: { type: object, required: [data, count], properties: { data: { type: array, items: { $ref: '#/components/schemas/Task' } }, count: { type: integer } } }
         '400':
           description: Validation failed
           content:
@@ -8842,9 +9000,12 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required: [data, total, limit, offset]
                 properties:
                   data: { type: array, items: { $ref: '#/components/schemas/TravelCrossing' } }
+                  total: { type: integer }
+                  limit: { type: integer }
+                  offset: { type: integer }
         '400':
           description: Invalid input
           content:
@@ -9312,6 +9473,8 @@ paths:
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: currency, in: query, schema: { type: string, default: USD } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 500 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
         '200':
           description: OK

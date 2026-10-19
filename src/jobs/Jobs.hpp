@@ -39,9 +39,13 @@ namespace Jobs {
  *   - submit / pick / complete / fail / cancel / get_status / list_paged /
  *     list_dlq / requeue_from_dlq THROW on Redis errors or missing state —
  *     controllers map them to 5xx.
+ *   - promote_due_jobs / reap_expired_leases / trim_indexes / renew_lease
+ *     throw when their first read fails; the worker's maintenance pass and
+ *     its lease heartbeat log that (jobs/Worker.hpp). A failure on one id
+ *     inside promote or reap is logged and left for the next pass.
  *   - dlq_depth / dlq_depth_by_type / health_check / set_trace_id and the
- *     index ZADDs inside submit are best-effort: they swallow Redis errors
- *     (observability must not take the queue down with it).
+ *     index ZADDs inside submit are best-effort: they log and swallow Redis
+ *     errors (observability must not take the queue down with it).
  */
 /// Runs a job gets before the queue dead-letters it (the initialize() default).
 inline constexpr int kDefaultMaxRetries = 3;
@@ -89,6 +93,21 @@ public:
      *        once during init from config.
      */
     void set_visibility_timeout(int64_t sec) { visibility_timeout_ms_ = sec <= 0 ? 0 : sec * 1000; }
+
+    /// The lease length in ms (0 = leases off). The worker renews a running
+    /// job's lease every third of it (Jobs::LeaseHeartbeat).
+    int64_t visibility_timeout_ms() const { return visibility_timeout_ms_; }
+
+    /**
+     * @brief Push the lease of a running job one visibility timeout ahead.
+     * @details One Lua script: the lease moves only while the blob still says
+     *          `processing` by @p worker_id and the lease entry still exists.
+     *          A job the reaper took back (lease gone) or another worker picked
+     *          (worker_id changed) is left alone, so a slow handler can never
+     *          keep a job another worker now owns. No-op with leases off.
+     * @return true when the lease was moved. Throws on Redis errors.
+     */
+    bool renew_lease(const std::string& id, const std::string& worker_id);
 
     /**
      * @brief Dedicated standalone Redis client for blocking BRPOP. The Cache
@@ -214,9 +233,15 @@ public:
      *        delayed set back onto its live queue. Runs whether or not retry
      *        backoff is on (a deferred job waits there too); an empty set
      *        costs one ZRANGEBYSCORE. Call periodically from the worker loop.
-     * @return number of jobs promoted.
+     *        Each id leaves the delayed set and lands on its queue in one Lua
+     *        script, so a Redis error between the two cannot strand it.
+     * @param now_ms the clock to compare due times with (-1 = the wall
+     *        clock); tests pass an explicit time instead of sleeping.
+     * @return number of jobs promoted. Throws when the delayed set cannot be
+     *         read (the worker's maintenance pass logs it); a failure on one
+     *         id is logged and leaves that id for the next pass.
      */
-    long promote_due_jobs();
+    long promote_due_jobs(int64_t now_ms = -1);
 
     /**
      * @brief Reclaim jobs whose visibility lease has expired — a worker picked
@@ -225,9 +250,27 @@ public:
      *        (bumps retry, requeues or DLQs), so a permanently-wedged job is not
      *        reaped forever. Cheap no-op when the lease is disabled. Call
      *        periodically from the worker loop.
-     * @return number of leases reclaimed.
+     *        The gate is one Lua script that removes the lease only while
+     *        its score is still past @p now_ms, so a lease the worker renewed
+     *        a moment ago is not reaped. When fail() then throws, the lease is
+     *        put back as already expired and the next pass tries again.
+     * @param now_ms the clock (-1 = the wall clock).
+     * @return number of leases reclaimed. Throws when the lease set cannot be
+     *         read.
      */
-    long reap_expired_leases();
+    long reap_expired_leases(int64_t now_ms = -1);
+
+    /**
+     * @brief Drop jobs:index and every jobs:index:<type> entry created more
+     *        than result_ttl ago. submit() adds to these sets and only
+     *        list_paged healed them, page by page, so without this they grew
+     *        with every job ever submitted. The blob of such a job has expired
+     *        (completed or cancelled) or still sits in the DLQ, which keeps its
+     *        own listing. Called from the worker's maintenance pass.
+     * @param now_sec the clock in seconds (-1 = the wall clock).
+     * @return entries removed. Throws on Redis errors.
+     */
+    long trim_indexes(int64_t now_sec = -1);
 
     /**
      * @brief Get job status by ID

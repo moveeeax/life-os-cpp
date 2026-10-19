@@ -31,6 +31,7 @@
 #include "core/JobHandlers.hpp"
 #include "jobs/Dispatcher.hpp"
 #include "jobs/Jobs.hpp"
+#include "jobs/Worker.hpp"
 #include "observability/Observability.hpp"
 #include "observability/Trace.hpp"
 #include "observability/TraceOtel.hpp"
@@ -96,6 +97,7 @@ std::optional<opentelemetry::trace::SpanContext> parent_ctx_from_traceparent(con
  */
 void worker_loop(const std::string& worker_id, const std::vector<std::string>& types, long brpop_timeout) {
     spdlog::info("Worker thread started: id={} types={}", worker_id, Utils::Strings::join(types, ","));
+    Jobs::Maintenance maintenance;
 
     while (!shutdown_requested.load()) {
         try {
@@ -104,10 +106,9 @@ void worker_loop(const std::string& worker_id, const std::vector<std::string>& t
             // The reaper is a no-op unless enabled via config; both are idempotent across
             // worker threads (ZREM-gated), so running them on every thread/cycle
             // is safe — worst case is a wasted ZRANGEBYSCORE on an empty set.
-            try {
-                Jobs::get().promote_due_jobs();
-                Jobs::get().reap_expired_leases();
-            } catch (...) {}
+            // The listing indexes are trimmed once per ten minutes per thread.
+            // Failures are logged at warn, at most once a minute per thread.
+            maintenance.run(Jobs::get());
 
             auto job = Jobs::get().pick(types, brpop_timeout, worker_id);
             if (!job)
@@ -166,59 +167,26 @@ void worker_loop(const std::string& worker_id, const std::vector<std::string>& t
                 }
             };
 
-            // complete() stays outside the handler's try: a Redis error while
-            // recording a success must not fail() the job and run it again
-            // (a second email, a second webhook delivery).
-            std::optional<json> result;
-            try {
-                result = process_job(*job);
-            } catch (const Jobs::DeferJob& e) {
-                // Not a failure: the job waits (e.g. its row is held by another
-                // delivery) and comes back without spending an attempt.
-                spdlog::info("Job deferred: id={} for {}ms: {}", job->id, e.delay_ms, e.what());
-                span->SetAttribute("job.deferred_ms", static_cast<int64_t>(e.delay_ms));
-                span->End();
-                Jobs::get().defer(job->id, e.delay_ms, e.what());
-                record_done("deferred");
-            } catch (const Jobs::PermanentJobError& e) {
-                // No retries — straight to DLQ so a permanent mismatch can't
-                // spin the worker through its full retry budget.
-                spdlog::error("Job permanently failed (no retry): id={} error={}", job->id, e.what());
-                span->SetStatus(opentelemetry::trace::StatusCode::kError, e.what());
-                span->SetAttribute("error.message", std::string(e.what()));
-                span->End();
-                Jobs::get().dead_letter(job->id, e.what());
-                record_done("permanent_failure");
-            } catch (const std::exception& e) {
-                spdlog::error("Job failed: id={} error={}", job->id, e.what());
-                span->SetStatus(opentelemetry::trace::StatusCode::kError, e.what());
-                span->SetAttribute("error.message", std::string(e.what()));
-                span->End();
-                Jobs::get().fail(job->id, e.what());
-                record_done("failure");
-            } catch (...) {
-                // A handler throwing a non-std type must not std::terminate the
-                // worker thread (Dispatcher invites arbitrary handlers).
-                spdlog::error("Job failed with a non-std exception: id={}", job->id);
-                span->SetStatus(opentelemetry::trace::StatusCode::kError, "non-std exception");
-                span->End();
-                Jobs::get().fail(job->id, "non-std exception in handler");
-                record_done("failure");
+            // The outcome mapping (defer / dead_letter / fail / complete, the
+            // last outside the handler's try) and the lease heartbeat live in
+            // Jobs::run_one (jobs/Worker.hpp), where the tests drive them.
+            const Jobs::RunResult run = Jobs::run_one(Jobs::get(), *job, process_job);
+            switch (run.outcome) {
+                case Jobs::Outcome::success:
+                    span->SetStatus(opentelemetry::trace::StatusCode::kOk);
+                    spdlog::info("Job completed: id={}", job->id);
+                    break;
+                case Jobs::Outcome::deferred:
+                    span->SetAttribute("job.deferred_ms", static_cast<int64_t>(run.defer_ms));
+                    break;
+                case Jobs::Outcome::permanent_failure:
+                case Jobs::Outcome::failure:
+                    span->SetStatus(opentelemetry::trace::StatusCode::kError, run.error);
+                    span->SetAttribute("error.message", run.error);
+                    break;
             }
-            if (result) {
-                try {
-                    Jobs::get().complete(job->id, *result);
-                } catch (const std::exception& e) {
-                    // The work is done; the blob still says processing. The
-                    // lease reaper may hand it out again after the visibility
-                    // timeout, the at-least-once contract, but never at once.
-                    spdlog::error("Job succeeded but complete() failed: id={} error={}", job->id, e.what());
-                }
-                span->SetStatus(opentelemetry::trace::StatusCode::kOk);
-                span->End();
-                record_done("success");
-                spdlog::info("Job completed: id={}", job->id);
-            }
+            span->End();
+            record_done(Jobs::outcome_label(run.outcome));
         } catch (const std::exception& e) {
             if (shutdown_requested.load())
                 break;

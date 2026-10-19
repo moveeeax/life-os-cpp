@@ -89,7 +89,12 @@ auth:
 # keeps the client address (proxy protocol from the balancer) and sets
 # X-Real-Ip; the frontend nginx of the cpp-frontend chart passes that header
 # through. The failed-login audit shows the client address, so the login is
-# limited per client; signed-in requests are limited per user.
+# limited per client; signed-in requests are limited per user. The API takes
+# X-Real-Ip first; trustedProxyCount applies only when that header is absent
+# and the client is read from X-Forwarded-For (Traefik writes the client,
+# nginx appends Traefik's address, so the client is 2 from the right). The
+# frontend ingress's className "nginx" names a Traefik IngressClass in this
+# cluster (values-frontend-prod.yaml), so there is no third proxy.
 rateLimit:
   enabled: true
   trustProxy: true
@@ -97,6 +102,11 @@ rateLimit:
   # Redis down → refuse rather than let the login go unthrottled; sessions live
   # in Redis too, so without it signing in fails either way.
   failOpen: false
+  # Rejected credentials per client IP, and failed logins per email address.
+  authFailRequests: 20
+  authFailWindowSec: 60
+  loginEmailRequests: 5
+  loginEmailWindowSec: 900
 
 # Retried mutating requests with an Idempotency-Key are answered once.
 idempotency:

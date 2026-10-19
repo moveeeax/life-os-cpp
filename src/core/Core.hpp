@@ -139,6 +139,8 @@ private:
     static void register_money_rates_schedule_(Config::AppConfig& cfg);
     // The weekly money review: an hourly tick that queues each user's week at MONEY_ADVISOR_HOUR_UTC.
     static void register_money_advisor_schedule_(Config::AppConfig& cfg);
+    // The hourly sweep of wallpaper and sound rows left pending (now_media_sweep, run in the worker).
+    static void register_now_media_sweep_schedule_();
 
     // Registers db_pool_active_connections + db_pool_size gauges, labeled by
     // pool (primary/replica). Saturation = active / size → 1.0 means acquire()
