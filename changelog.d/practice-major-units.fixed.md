@@ -1,0 +1,1 @@
+Practice amounts in the API spec: deal values, entry amounts, totals and per-currency sums are documented in the currency's major units (1500.50 RUB), which is what the API has always taken and answered; the old text said a whole number of the smallest unit. Description change only.

@@ -1,9 +1,8 @@
 /**
  * @file test_measurements_api.cpp
- * @brief /api/v1/fitness/measurements: the module switch and fitness:read,
- *        the checks of a measurement, add-list-edit-delete with the newest
- *        date first, a range, the owner scope on every id route, and an edit
- *        that would clear every girth refused.
+ * @brief /api/v1/fitness/measurements: the module switch, no fitness
+ *        permission needed (the rows are the caller's own), the checks of a measurement, add-list-edit-delete with the
+ * newest date first, a range, the owner scope on every id route, and an edit that would clear every girth refused.
  */
 
 #include <cstdint>
@@ -127,12 +126,29 @@ TEST_F(MeasurementsOffTest, TheRoutesAreNotThereWhileFitnessIsOff) {
     EXPECT_EQ(r->statusCode(), k404NotFound);
 }
 
-TEST_F(MeasurementsApiTest, FitnessReadIsNeeded) {
-    auto r = call(user(kAnna, Domain::Permission::kGeneral),
-                  Post,
-                  json{{"date", "2026-10-18"}, {"waist_cm", 82}},
-                  [&](auto req, auto cb) { c.create(req, std::move(cb)); });
-    EXPECT_EQ(r->statusCode(), k403Forbidden);
+TEST_F(MeasurementsApiTest, NoFitnessPermissionIsNeeded) {
+    // A role without any fitness bit still keeps its own girths, as the medical archive.
+    const auto plain = user(kAnna, Domain::Permission::kGeneral);
+    auto made = call(plain, Post, json{{"date", "2026-10-18"}, {"waist_cm", 82}}, [&](auto req, auto cb) {
+        c.create(req, std::move(cb));
+    });
+    ASSERT_EQ(made->statusCode(), k201Created) << std::string(made->body());
+    TestHelpers::expect_matches_schema(made, "POST", "/api/v1/fitness/measurements");
+    const std::string id = body_of(made)["data"]["id"].get<std::string>();
+
+    auto listed = call(plain, Get, json::object(), [&](auto req, auto cb) { c.list(req, std::move(cb)); });
+    ASSERT_EQ(listed->statusCode(), k200OK) << std::string(listed->body());
+    TestHelpers::expect_matches_schema(listed, "GET", "/api/v1/fitness/measurements");
+    const json rows = body_of(listed)["data"];
+    ASSERT_EQ(rows.size(), 1U);
+    EXPECT_EQ(rows[0]["id"], id);
+    EXPECT_EQ(rows[0]["waist_cm"], 82);
+
+    auto edited =
+        call(plain, Patch, json{{"waist_cm", 81}}, [&](auto req, auto cb) { c.update(req, std::move(cb), id); });
+    EXPECT_EQ(edited->statusCode(), k200OK) << std::string(edited->body());
+    auto gone = call(plain, Delete, json::object(), [&](auto req, auto cb) { c.remove(req, std::move(cb), id); });
+    EXPECT_EQ(gone->statusCode(), k204NoContent);
 }
 
 TEST_F(MeasurementsApiTest, AMeasurementIsChecked) {

@@ -2146,6 +2146,8 @@
      "task_id",
      "project_title",
      "project_kind",
+     "deal_id",
+     "deal_title",
      "published_at",
      "created_at",
      "updated_at"
@@ -2224,6 +2226,21 @@
        "course",
        null
       ]
+     },
+     "deal_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "The deal of the practice the note is about"
+     },
+     "deal_title": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "The title of that deal"
      },
      "published_at": {
       "type": [
@@ -2308,6 +2325,14 @@
       ],
       "format": "date",
       "description": "The day the note is about; null clears it"
+     },
+     "deal_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid",
+      "description": "A deal of the caller's practice (400 not_yours otherwise, or while practice is off); null unlinks"
      }
     }
    },
@@ -2341,7 +2366,8 @@
       "pattern": "^[A-Z]{3}$"
      },
      "amount": {
-      "type": "number"
+      "type": "number",
+      "description": "In the currency's major units, e.g. 1500.50"
      }
     }
    },
@@ -2354,7 +2380,7 @@
      "net",
      "entries"
     ],
-    "description": "The totals of one currency: income, expense, income minus expense, and the count of entries",
+    "description": "The totals of one currency in its major units (e.g. 1500.50): income, expense, income minus expense, and the count of entries",
     "properties": {
      "currency": {
       "type": "string",
@@ -2495,8 +2521,7 @@
        "number",
        "null"
       ],
-      "description": "The agreed value",
-      "in currency": null
+      "description": "The agreed value, in the currency's major units, e.g. 1500.50"
      },
      "currency": {
       "type": [
@@ -2567,7 +2592,7 @@
        "null"
       ],
       "exclusiveMinimum": 0,
-      "description": "Given together with currency, both or neither; a whole number of the currency's smallest unit"
+      "description": "Given together with currency, both or neither; in the currency's major units, e.g. 1500.50, with no more decimals than the currency has"
      },
      "currency": {
       "type": [
@@ -2632,7 +2657,7 @@
      },
      "amount": {
       "type": "number",
-      "description": "Positive; the kind is the sign"
+      "description": "Positive, in the currency's major units, e.g. 1500.50; the kind is the sign"
      },
      "currency": {
       "type": "string",
@@ -2696,7 +2721,7 @@
      "amount": {
       "type": "number",
       "exclusiveMinimum": 0,
-      "description": "Required on create; a whole number of the currency's smallest unit"
+      "description": "Required on create; in the currency's major units, e.g. 1500.50, with no more decimals than the currency has"
      },
      "currency": {
       "type": "string",
@@ -2759,7 +2784,7 @@
      "net",
      "entries"
     ],
-    "description": "The totals of one client in one currency; client_id null for entries without a client",
+    "description": "The totals of one client in one currency, in its major units (e.g. 1500.50); client_id null for entries without a client",
     "properties": {
      "client_id": {
       "type": [
@@ -13927,7 +13952,7 @@
   "/api/v1/fitness/measurements": {
    "get": {
     "summary": "Girths measured by hand, newest first",
-    "description": "The caller's own rows: they need no linked Mi account.",
+    "description": "The caller's own rows: they need no linked Mi account and no fitness permission.",
     "tags": [
      "fitness"
     ],
@@ -14008,7 +14033,7 @@
       "description": "Not authenticated"
      },
      "403": {
-      "description": "No fitness:read, or the principal is not a user account (no_user_account)"
+      "description": "The principal is not a user account (no_user_account); no fitness permission is needed"
      },
      "404": {
       "description": "Fitness module disabled"
@@ -14061,7 +14086,7 @@
       "description": "Not authenticated"
      },
      "403": {
-      "description": "No fitness:read, or the principal is not a user account (no_user_account)"
+      "description": "The principal is not a user account (no_user_account); no fitness permission is needed"
      },
      "404": {
       "description": "Fitness module disabled"
@@ -14127,7 +14152,7 @@
       "description": "Not authenticated"
      },
      "403": {
-      "description": "No fitness:read, or the principal is not a user account (no_user_account)"
+      "description": "The principal is not a user account (no_user_account); no fitness permission is needed"
      },
      "404": {
       "description": "Fitness module disabled, or not the caller's measurement"
@@ -14152,7 +14177,7 @@
       "description": "Not authenticated"
      },
      "403": {
-      "description": "No fitness:read, or the principal is not a user account (no_user_account)"
+      "description": "The principal is not a user account (no_user_account); no fitness permission is needed"
      },
      "404": {
       "description": "Fitness module disabled, or not the caller's measurement"
@@ -23182,6 +23207,33 @@
       }
      },
      {
+      "name": "from",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "The first day of the note's date, inclusive; a note without a date is left out when from or to is given"
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "The last day of the note's date, inclusive; not before from"
+     },
+     {
+      "name": "deal",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "description": "Only the notes about this deal of the practice"
+     },
+     {
       "name": "limit",
       "in": "query",
       "schema": {
@@ -23242,7 +23294,7 @@
       }
      },
      "400": {
-      "description": "Bad query"
+      "description": "Bad query (invalid_query): project or deal_id not an id, from or to not a calendar day, or to before from"
      },
      "401": {
       "description": "Not authenticated"
@@ -30216,6 +30268,77 @@
      }
     }
    ],
+   "get": {
+    "summary": "One visit, in the shape of an element of the list",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MedicalVisit"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "The id is not a uuid",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not the caller's visit (not_found), or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
    "patch": {
     "summary": "Replace a visit (every field)",
     "tags": [
@@ -30695,6 +30818,77 @@
      }
     }
    ],
+   "get": {
+    "summary": "One record, in the shape of an element of the list",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MedicalRecord"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "The id is not a uuid",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not the caller's record (not_found), or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
    "patch": {
     "summary": "Replace a record (every field)",
     "tags": [
@@ -31029,6 +31223,77 @@
      }
     }
    ],
+   "get": {
+    "summary": "One medication, in the shape of an element of the list",
+    "tags": [
+     "medical"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MedicalMedication"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "The id is not a uuid",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not the caller's medication (not_found), or the medical module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
    "patch": {
     "summary": "Replace a medication (every field)",
     "tags": [
@@ -33994,7 +34259,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 502410,
-  "source_fnv1a64": "3f42b0a3abb19e68"
+  "source_bytes": 507304,
+  "source_fnv1a64": "d8f8d6a0eb22dcd7"
  }
 }

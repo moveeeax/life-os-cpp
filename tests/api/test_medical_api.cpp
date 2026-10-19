@@ -3,7 +3,8 @@
  * @brief /api/v1/medical: the module switch, the owner scope on every id and
  *        every reference, a person kept while something is on file, the
  *        record and medication filters, and the tasks of a follow-up date and
- *        of a medication end (created once, then the same one).
+ *        of a medication end (created once, then the same one), and one
+ *        visit, record or medication read by its id.
  */
 
 #include <string>
@@ -408,4 +409,76 @@ TEST_F(MedicalNoTasksTest, TheTaskRouteIs404WhileTasksIsOff) {
     auto r = call(kAnna, Post, json::object(), [&](auto req, auto cb) { c.visitTask(req, std::move(cb), id); });
     ASSERT_EQ(r->statusCode(), k404NotFound);
     EXPECT_EQ(body_of(r)["message"], "tasks not found");
+}
+
+TEST_F(MedicalApiTest, OneRowReadsLikeAnElementOfItsList) {
+    const json anna = person(kAnna, "Anna");
+    const json v = visit(kAnna, json{{"person_id", anna["id"]}, {"date", "2026-09-01"}, {"reason", "Thyroid"}});
+    const json r = record(kAnna,
+                          json{{"person_id", anna["id"]},
+                               {"visit_id", v["id"]},
+                               {"date", "2026-09-01"},
+                               {"kind", "lab"},
+                               {"title", "TSH"}});
+    const json m = medication(kAnna, json{{"person_id", anna["id"]}, {"name", "Vitamin D"}, {"dose", "1000 IU"}});
+    const std::string vid = v["id"].get<std::string>();
+    const std::string rid = r["id"].get<std::string>();
+    const std::string mid = m["id"].get<std::string>();
+
+    struct Kind {
+        const char* name;
+        const char* spec_path;
+        std::string id;
+        Fn get;
+        Fn list;
+    };
+    const std::vector<Kind> kinds = {
+        {"visit",
+         "/api/v1/medical/visits/{id}",
+         vid,
+         [&](auto req, auto cb) { c.getVisit(req, std::move(cb), vid); },
+         [&](auto req, auto cb) { c.listVisits(req, std::move(cb)); }},
+        {"record",
+         "/api/v1/medical/records/{id}",
+         rid,
+         [&](auto req, auto cb) { c.getRecord(req, std::move(cb), rid); },
+         [&](auto req, auto cb) { c.listRecords(req, std::move(cb)); }},
+        {"medication",
+         "/api/v1/medical/medications/{id}",
+         mid,
+         [&](auto req, auto cb) { c.getMedication(req, std::move(cb), mid); },
+         [&](auto req, auto cb) { c.listMedications(req, std::move(cb)); }},
+    };
+    for (const auto& k : kinds) {
+        auto own = call(kAnna, Get, json::object(), k.get, k.spec_path);
+        ASSERT_EQ(own->statusCode(), k200OK) << k.name << ": " << std::string(own->body());
+        const json row = body_of(own)["data"];
+        auto listed = call(kAnna, Get, json::object(), k.list);
+        ASSERT_EQ(listed->statusCode(), k200OK) << k.name;
+        const json rows = body_of(listed)["data"];
+        ASSERT_EQ(rows.size(), 1U) << k.name;
+        EXPECT_EQ(row, rows[0]) << k.name << ": the same fields as the list";
+        EXPECT_EQ(row["id"], k.id) << k.name;
+
+        auto foreign = call(kBoris, Get, json::object(), k.get);
+        ASSERT_EQ(foreign->statusCode(), k404NotFound) << k.name << ": another owner's row";
+        EXPECT_EQ(body_of(foreign)["error"], "not_found") << k.name;
+    }
+    EXPECT_EQ(v["reason"], "Thyroid");
+    EXPECT_EQ(r["title"], "TSH");
+    EXPECT_EQ(m["dose"], "1000 IU");
+
+    const std::string random = "0d0d0d0d-1111-4222-8333-444455556666";
+    const std::vector<Fn> missing_gets = {
+        [&](auto req, auto cb) { c.getVisit(req, std::move(cb), random); },
+        [&](auto req, auto cb) { c.getRecord(req, std::move(cb), random); },
+        [&](auto req, auto cb) { c.getMedication(req, std::move(cb), random); },
+    };
+    for (const Fn& get : missing_gets) {
+        auto missing = call(kAnna, Get, json::object(), get);
+        ASSERT_EQ(missing->statusCode(), k404NotFound) << std::string(missing->body());
+        EXPECT_EQ(body_of(missing)["error"], "not_found");
+    }
+    auto bad = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.getVisit(req, std::move(cb), "nope"); });
+    EXPECT_EQ(bad->statusCode(), k400BadRequest);
 }

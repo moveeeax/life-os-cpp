@@ -2,7 +2,9 @@
  * @file MeasurementsController.cpp
  * @brief Bodies for src/api/MeasurementsController.hpp: the checks of a
  *        measurement (a calendar day, girths from 0 to 400 cm, at least one of
- *        them, a short note) and the owner scope on every id route.
+ *        them, a short note) and the owner scope on every id route. No
+ *        permission bit: the rows are the caller's own, like the medical
+ *        archive.
  */
 
 #include "api/MeasurementsController.hpp"
@@ -21,7 +23,6 @@
 #include "api/HandlerSupport.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
-#include "domain/Role.hpp"
 #include "repositories/fitness/TapeRepository.hpp"
 #include "utils/ErrorResponse.hpp"
 #include "utils/Modules.hpp"
@@ -63,8 +64,7 @@ std::optional<double> girth_of(const json& body, std::string_view name) {
 }  // namespace
 
 void MeasurementsController::list(const HttpRequestPtr& req, Callback&& callback) {
-    API_MODULE_PERMISSION_USER_GUARD(
-        Core::fitness_enabled(), "fitness", req, callback, Domain::Permission::kFitnessRead, owner);
+    API_MODULE_USER_GUARD(Core::fitness_enabled(), "fitness", req, callback, owner);
     TapeRepository::Filter f;
     f.from = req->getParameter("from");
     f.to = req->getParameter("to");
@@ -79,8 +79,7 @@ void MeasurementsController::list(const HttpRequestPtr& req, Callback&& callback
 }
 
 void MeasurementsController::create(const HttpRequestPtr& req, Callback&& callback) {
-    API_MODULE_PERMISSION_USER_GUARD(
-        Core::fitness_enabled(), "fitness", req, callback, Domain::Permission::kFitnessRead, owner);
+    API_MODULE_USER_GUARD(Core::fitness_enabled(), "fitness", req, callback, owner);
     json body;
     if (!parse_object(req, body, callback)) {
         return;
@@ -111,8 +110,7 @@ void MeasurementsController::create(const HttpRequestPtr& req, Callback&& callba
 }
 
 void MeasurementsController::update(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    API_MODULE_PERMISSION_USER_GUARD(
-        Core::fitness_enabled(), "fitness", req, callback, Domain::Permission::kFitnessRead, owner);
+    API_MODULE_USER_GUARD(Core::fitness_enabled(), "fitness", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }
@@ -146,8 +144,7 @@ void MeasurementsController::update(const HttpRequestPtr& req, Callback&& callba
 }
 
 void MeasurementsController::remove(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    API_MODULE_PERMISSION_USER_GUARD(
-        Core::fitness_enabled(), "fitness", req, callback, Domain::Permission::kFitnessRead, owner);
+    API_MODULE_USER_GUARD(Core::fitness_enabled(), "fitness", req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
         return;
     }

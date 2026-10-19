@@ -344,6 +344,11 @@ public:
         });
     }
 
+    /// One row in the shape of an element of list(); nullopt for a missing or foreign id.
+    std::optional<nlohmann::json> get(const std::string& owner, const std::string& id) {
+        return Database::get().execute_read([&](auto& txn) { return find_in(txn, owner, id); });
+    }
+
     /// @throws UnknownReference.
     nlohmann::json create(const std::string& owner, const Input& in) {
         return detail::translate_sql(
@@ -513,6 +518,7 @@ public:
         });
     }
 
+    /// One row in the shape of an element of list(); nullopt for a missing or foreign id.
     std::optional<nlohmann::json> get(const std::string& owner, const std::string& id) {
         return Database::get().execute_read([&](auto& txn) { return find_in(txn, owner, id); });
     }
@@ -638,6 +644,11 @@ public:
                                 today,
                                 current_only);
         });
+    }
+
+    /// One row in the shape of an element of list(); nullopt for a missing or foreign id.
+    std::optional<nlohmann::json> get(const std::string& owner, const std::string& id) {
+        return Database::get().execute_read([&](auto& txn) { return find_in(txn, owner, id); });
     }
 
     /// @throws UnknownReference.

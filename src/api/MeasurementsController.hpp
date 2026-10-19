@@ -4,9 +4,10 @@
  *        hips, neck, arm, thigh, in cm) for the Body section.
  *
  * The routes sit under the fitness module because Body is its section: the
- * module switch (404 `fitness`), then fitness:read (403), then a user account,
- * as every per-user Body route. The rows are the caller's own (owner_id), not
- * the Mi account's, so they work without a linked band.
+ * module switch (404 `fitness`), then a user account (403 no_user_account).
+ * No permission bit: the rows are the caller's own (owner_id), entered by
+ * hand like the medical archive, not data of the Mi account, so they need
+ * neither fitness:read nor a linked band.
  *
  * Declarations only; the bodies live in MeasurementsController.cpp. The route
  * macros stay here for scripts/check-routes-registered.sh.

@@ -313,6 +313,20 @@ void MedicalController::createVisit(const HttpRequestPtr& req, Callback&& callba
     });
 }
 
+void MedicalController::getVisit(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MEDICAL_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "medical.visits.get", [&] {
+        const auto row = VisitRepository().get(owner, id);
+        if (!row) {
+            throw Repositories::Medical::NotFound("visit");
+        }
+        callback(Response::ok(json{{"data", *row}}));
+    });
+}
+
 void MedicalController::updateVisit(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     MEDICAL_GUARD(req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
@@ -379,6 +393,20 @@ void MedicalController::createRecord(const HttpRequestPtr& req, Callback&& callb
     });
 }
 
+void MedicalController::getRecord(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MEDICAL_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "medical.records.get", [&] {
+        const auto row = RecordRepository().get(owner, id);
+        if (!row) {
+            throw Repositories::Medical::NotFound("record");
+        }
+        callback(Response::ok(json{{"data", *row}}));
+    });
+}
+
 void MedicalController::updateRecord(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     MEDICAL_GUARD(req, callback, owner);
     if (!require_valid_uuid(id, callback)) {
@@ -431,6 +459,20 @@ void MedicalController::createMedication(const HttpRequestPtr& req, Callback&& c
     }
     with_repo_errors(callback, "medical.medications.create", [&] {
         callback(Response::created(json{{"data", MedicationRepository().create(owner, *in)}}));
+    });
+}
+
+void MedicalController::getMedication(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    MEDICAL_GUARD(req, callback, owner);
+    if (!require_valid_uuid(id, callback)) {
+        return;
+    }
+    with_repo_errors(callback, "medical.medications.get", [&] {
+        const auto row = MedicationRepository().get(owner, id);
+        if (!row) {
+            throw Repositories::Medical::NotFound("medication");
+        }
+        callback(Response::ok(json{{"data", *row}}));
     });
 }
 
