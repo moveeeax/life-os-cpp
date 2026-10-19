@@ -9,6 +9,8 @@ export interface Draft {
   slug: string;
   project: string;
   body: string;
+  /** The day the note is about, YYYY-MM-DD, or ''. */
+  date: string;
 }
 
 const KEYS: readonly (keyof Draft)[] = [
@@ -19,6 +21,7 @@ const KEYS: readonly (keyof Draft)[] = [
   'slug',
   'project',
   'body',
+  'date',
 ];
 
 export const draftOf = (n: Note): Draft => ({
@@ -29,6 +32,7 @@ export const draftOf = (n: Note): Draft => ({
   slug: n.slug,
   project: n.project_id ?? '',
   body: n.body ?? '',
+  date: n.date ?? '',
 });
 
 export const isDirty = (d: Draft, base: Draft): boolean => KEYS.some((k) => d[k] !== base[k]);

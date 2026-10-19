@@ -128,3 +128,68 @@
   font-size: 12px;
   color: var(--g-ink-faint);
 }
+
+/* A habit with a daily target: the ring adds an amount; a day short of it shows half. */
+.h-add[aria-pressed='false']::after {
+  content: '+';
+  display: block;
+  color: var(--g-ink-soft);
+  font-size: 15px;
+  line-height: 19px;
+  text-align: center;
+}
+.h-c.h-c-partial {
+  background: linear-gradient(90deg, var(--g-ink) 50%, transparent 50%);
+  border-color: var(--g-ink);
+}
+.h-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Mood: the five scores, the tags, and the line in the week. */
+.h-score button {
+  min-width: 40px;
+}
+.h-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.h-tag[aria-pressed='true'] {
+  background: var(--g-ink);
+  border-color: var(--g-ink);
+  color: #0b1020;
+}
+.h-mood-btn {
+  flex: none;
+  align-self: center;
+}
+.h-mood-n {
+  color: var(--g-ink-soft);
+}
+.h-m {
+  width: 22px;
+  height: 22px;
+  justify-self: center;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px dashed var(--g-ink-ghost);
+  background: none;
+  color: var(--g-ink);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.h-m.h-m-on {
+  border: 1px solid var(--g-ink-faint);
+}
+.h-m:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.h-m:focus-visible {
+  outline: 2px solid var(--g-brand);
+  outline-offset: 2px;
+}

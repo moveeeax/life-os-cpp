@@ -41,6 +41,7 @@ import {
 import { needsLink } from '@/lib/mi';
 
 import { ChartCard } from './health/ChartCard';
+import { Measurements } from './health/Measurements';
 import { SyncPanel } from './health/SyncPanel';
 import { Banner, Facts, Group, Num, Row, SectionFrame } from '@/shell/kit';
 import { TimeChart } from './health/LazyTimeChart';
@@ -617,6 +618,7 @@ export function HealthPage() {
     return (
       <SectionFrame eyebrow="Body" headline="Body">
         <LinkMiNotice purpose="to see your steps, sleep, heart rate and weight here" />
+        <Measurements />
       </SectionFrame>
     );
   }
@@ -637,6 +639,7 @@ export function HealthPage() {
       <Tiles range={range} />
       <Charts range={range} />
       <Tables range={range} />
+      <Measurements />
       {userCan(user, Permission.FitnessSync) && <SyncPanel />}
     </SectionFrame>
   );

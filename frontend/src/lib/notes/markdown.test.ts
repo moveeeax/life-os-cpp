@@ -82,7 +82,7 @@ describe('parseNote', () => {
   });
 });
 
-import { dayOf, monthOf, tagsFrom } from './index';
+import { dayOf, monthOf, noteDay, tagsFrom } from './index';
 
 describe('tagsFrom', () => {
   it('splits, trims and drops repeats', () => {
@@ -106,5 +106,17 @@ describe('dayOf', () => {
   it('reads the instant in the given zone, not in UTC', () => {
     expect(dayOf('2026-10-31T23:30:00Z', 'Asia/Almaty')).toBe('Nov 1');
     expect(dayOf('2026-10-31T23:30:00Z', 'UTC')).toBe('Oct 31');
+  });
+});
+
+describe('noteDay', () => {
+  it('takes the day a note is about when set, else the day it was written', () => {
+    const made = '2026-10-31T23:30:00Z';
+    expect(noteDay({ date: '2026-05-02', created_at: made }, 'Asia/Almaty').month).toBe('May 2026');
+    expect(noteDay({ date: null, created_at: made }, 'Asia/Almaty')).toEqual({
+      day: 'Nov 1',
+      month: 'November 2026',
+    });
+    expect(noteDay({ date: '2001-05-02', created_at: made }).day).toBe('May 2, 2001');
   });
 });

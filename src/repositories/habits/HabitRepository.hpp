@@ -50,7 +50,8 @@ public:
         std::optional<int> per_week;
         std::optional<double> goal;
         std::string unit;
-        std::string source;  // manual | sleep | steps | active_kcal | workout
+        std::string source;            // manual | sleep | steps | active_kcal | workout
+        std::optional<double> target;  // manual only: the amount a day must reach
     };
 
     nlohmann::json create(const std::string& owner, const Input& in) {
@@ -58,8 +59,8 @@ public:
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
                     auto r = txn.exec_params(
-                        "INSERT INTO habits (owner_id, name, schedule, per_week, goal, unit, source, position) "
-                        "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, "
+                        "INSERT INTO habits (owner_id, name, schedule, per_week, goal, unit, source, target, position) "
+                        "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, "
                         " (SELECT COALESCE(max(position), 0) + 1 FROM habits WHERE owner_id = $1::uuid)) "
                         "RETURNING id::text",
                         owner,
@@ -68,7 +69,8 @@ public:
                         in.per_week,
                         in.goal,
                         in.unit,
-                        in.source);
+                        in.source,
+                        in.target);
                     return *find_in(txn, owner, r[0][0].template as<std::string>());
                 });
             },
@@ -81,8 +83,8 @@ public:
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
                     auto r = txn.exec_params(
-                        "UPDATE habits SET name = $3, schedule = $4, per_week = $5, goal = $6, unit = $7, source = $8 "
-                        "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
+                        "UPDATE habits SET name = $3, schedule = $4, per_week = $5, goal = $6, unit = $7, source = $8, "
+                        " target = $9 WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
                         owner,
                         id,
                         in.name,
@@ -90,7 +92,8 @@ public:
                         in.per_week,
                         in.goal,
                         in.unit,
-                        in.source);
+                        in.source,
+                        in.target);
                     if (r.empty()) {
                         throw NotFound();
                     }
@@ -156,6 +159,29 @@ public:
                 habit,
                 date,
                 value);
+            if (r.empty()) {
+                throw NotFound();
+            }
+            return nlohmann::json::parse(r[0][0].template as<std::string>());
+        });
+    }
+
+    /// Adds @p amount to the tick of @p date (a tick without a value counts as 0), creating
+    /// the tick when there is none; the answer carries the day's sum. @throws NotFound.
+    nlohmann::json add_to_check(const std::string& owner,
+                                const std::string& habit,
+                                const std::string& date,
+                                double amount) {
+        return Database::get().execute_write([&](auto& txn) {
+            auto r = txn.exec_params(
+                "INSERT INTO habit_checks (owner_id, habit_id, date, value) "
+                "SELECT owner_id, id, $3::date, $4 FROM habits WHERE owner_id = $1::uuid AND id = $2::uuid "
+                "ON CONFLICT (habit_id, date) DO UPDATE SET value = COALESCE(habit_checks.value, 0) + EXCLUDED.value "
+                "RETURNING json_build_object('habit_id', habit_id, 'date', date::text, 'value', value)::text",
+                owner,
+                habit,
+                date,
+                amount);
             if (r.empty()) {
                 throw NotFound();
             }
@@ -232,8 +258,8 @@ public:
 
 private:
     static constexpr const char* kColumns =
-        "id, name, schedule, per_week, goal::double precision AS goal, unit, source, position, archived_at, "
-        "created_at";
+        "id, name, schedule, per_week, goal::double precision AS goal, unit, source, "
+        "target::double precision AS target, position, archived_at, created_at";
 
     template <typename Txn>
     std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& id) {

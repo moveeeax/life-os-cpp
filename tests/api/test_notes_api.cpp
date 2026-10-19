@@ -4,7 +4,8 @@
  *        made from the title and kept unique, tags checked, search and the
  *        topic, tag and project filters with the facets, a project or task link
  *        of the caller only, private for now, owner scope, a deleted project
- *        leaving its notes unlinked.
+ *        leaving its notes unlinked, and the day a note is about ordering the
+ *        list.
  */
 
 #include <chrono>
@@ -244,4 +245,39 @@ TEST_F(NotesApiTest, UpdatedAtMovesByTheTriggerAlone) {
         kAnna, Patch, json{{"body", "More words"}}, [&](auto req, auto cb) { c.updateNote(req, std::move(cb), id); });
     ASSERT_EQ(edited->statusCode(), k200OK) << std::string(edited->body());
     EXPECT_GT(updated_at_of(sql, id), before) << "notes_touch_updated_at";
+}
+
+// A note about a day sorts by that day; one without a date by the day it was made (today here).
+TEST_F(NotesApiTest, ADateOrdersTheList) {
+    auto r = add(kAnna, json{{"title", "Trip to Almaty"}, {"date", "2026-05-02"}});
+    ASSERT_EQ(r->statusCode(), k201Created) << std::string(r->body());
+    EXPECT_EQ(body_of(r)["data"]["date"], "2026-05-02");
+    const auto may = body_of(r)["data"]["id"].get<std::string>();
+    const auto undated = body_of(add(kAnna, json{{"title", "Made today"}}))["data"];
+    EXPECT_TRUE(undated["date"].is_null());
+    const auto future = body_of(add(kAnna, json{{"title", "Plan for 2099"}, {"date", "2099-01-01"}}))["data"];
+    const auto march = body_of(add(kAnna, json{{"title", "Spring"}, {"date", "2026-03-10"}}))["data"];
+
+    auto rows = list(kAnna)["data"];
+    ASSERT_EQ(rows.size(), 4U);
+    EXPECT_EQ(rows[0]["id"], future["id"]) << "the latest day first";
+    EXPECT_EQ(rows[1]["id"], undated["id"]) << "an undated note sits at the day it was made";
+    EXPECT_EQ(rows[2]["id"], may);
+    EXPECT_EQ(rows[3]["id"], march["id"]);
+    EXPECT_EQ(rows[2]["date"], "2026-05-02") << "the list carries the date";
+
+    EXPECT_EQ(add(kAnna, json{{"title", "x"}, {"date", "2026-02-30"}})->statusCode(), k400BadRequest);
+    EXPECT_EQ(add(kAnna, json{{"title", "x"}, {"date", "May 2"}})->statusCode(), k400BadRequest);
+
+    // An edit moves the date or clears it with null; leaving it out keeps it.
+    const auto patch = [&](const json& body) {
+        return call(kAnna, Patch, body, [&](auto req, auto cb) { c.updateNote(req, std::move(cb), may); });
+    };
+    auto moved = patch(json{{"date", "2026-01-15"}});
+    ASSERT_EQ(moved->statusCode(), k200OK) << std::string(moved->body());
+    TestHelpers::expect_matches_schema(moved, "PATCH", "/api/v1/notes/{id}");
+    EXPECT_EQ(body_of(moved)["data"]["date"], "2026-01-15");
+    EXPECT_EQ(body_of(patch(json{{"title", "Trip"}}))["data"]["date"], "2026-01-15");
+    EXPECT_EQ(list(kAnna)["data"][3]["id"], may) << "now the oldest";
+    EXPECT_TRUE(body_of(patch(json{{"date", nullptr}}))["data"]["date"].is_null());
 }

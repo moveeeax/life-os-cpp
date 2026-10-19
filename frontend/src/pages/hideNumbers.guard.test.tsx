@@ -212,6 +212,27 @@ vi.mock('@/hooks/useHealth', async () => {
   };
 });
 
+vi.mock('@/hooks/useMeasurements', () => ({
+  useMeasurements: () =>
+    ok([
+      {
+        id: 'm1',
+        date: '2026-10-15',
+        waist_cm: 82.5,
+        chest_cm: null,
+        hips_cm: 97,
+        neck_cm: null,
+        arm_cm: null,
+        thigh_cm: null,
+        note: '',
+        created_at: '2026-10-15T06:00:00+00:00',
+        updated_at: '2026-10-15T06:00:00+00:00',
+      },
+    ]),
+  useSaveMeasurement: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  useDeleteMeasurement: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+}));
+
 vi.mock('@/hooks/useMe', () => ({
   useMe: () =>
     ok({

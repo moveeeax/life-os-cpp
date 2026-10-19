@@ -6,3 +6,6 @@ export type HabitInput = S['HabitInput'];
 export type HabitDay = S['HabitDay'];
 export type HabitDays = S['HabitDays'];
 export type HabitCheck = S['HabitCheck'];
+export type MoodTag = S['MoodTag'];
+export type MoodCheckin = S['MoodCheckin'];
+export type MoodInput = S['MoodInput'];

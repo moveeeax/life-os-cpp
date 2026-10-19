@@ -317,6 +317,8 @@ public:
         "travel_documents",
         "now_settings",
         "day_note",
+        "mood_checkins",
+        "tape_measurements",
         "habit_checks",
         "habits",
         "notes",

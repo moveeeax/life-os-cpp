@@ -23,6 +23,7 @@ export const qk = {
     all: () => ['health'] as const,
     list: (route: string, from: string, to: string) => ['health', route, from, to] as const,
     coverage: () => ['health', 'coverage'] as const,
+    measurements: () => ['health', 'measurements'] as const,
     syncRun: (id: number) => ['health-sync-run', id] as const,
   },
   /** The caller's Mi account link. */
@@ -143,6 +144,7 @@ export const qk = {
     all: () => ['habits'] as const,
     list: (archived: boolean) => ['habits', 'list', archived] as const,
     days: (from: string, to: string, tz: string) => ['habits', 'days', from, to, tz] as const,
+    mood: (from: string, to: string) => ['habits', 'mood', from, to] as const,
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['habits-enabled'] as const,
   },

@@ -2469,6 +2469,252 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fitness/measurements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Girths measured by hand, newest first
+         * @description The caller's own rows: they need no linked Mi account.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Open when absent */
+                    from?: string;
+                    /** @description Open when absent */
+                    to?: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The measurements by date, newest first */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["TapeMeasurement"][];
+                            total: number;
+                        };
+                    };
+                };
+                /** @description Malformed range */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Fitness module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Add girths measured by hand */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["TapeMeasurementInput"];
+                };
+            };
+            responses: {
+                /** @description The measurement */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["TapeMeasurement"];
+                        };
+                    };
+                };
+                /** @description Validation failed: no date, no girth, or a girth out of range */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Fitness module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fitness/measurements/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a measurement by hand */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Fitness module disabled, or not the caller's measurement */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Edit a measurement by hand */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["TapeMeasurementInput"];
+                };
+            };
+            responses: {
+                /** @description The measurement */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["TapeMeasurement"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or the edit clears every girth */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No fitness:read, or the principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Fitness module disabled, or not the caller's measurement */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
     "/api/v1/fitness/workouts": {
         parameters: {
             query?: never;
@@ -16789,6 +17035,285 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/habits/{id}/checks/{date}/add": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                date: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add an amount to the day of a habit
+         * @description Adds value to the tick of the day (a tick without a value counts as 0) and creates the tick when there is none; with a daily target the day is done once the sum reaches it.
+         */
+        post: {
+            parameters: {
+                query?: {
+                    /** @description IANA zone of the caller: a day after today there is refused */
+                    tz?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                    date: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        value: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description The tick with the sum of the day */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["HabitCheck"];
+                        };
+                    };
+                };
+                /** @description Validation failed: a bad amount, a bad date, a day after today or more than 366 days back */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Habits module disabled, or not the caller's habit */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/habits/mood": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The mood check-ins of a range of days */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    /** @description At most 365 days after from */
+                    to: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The check-ins, oldest first; a day without one is absent */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoodCheckin"][];
+                            /** Format: date */
+                            from: string;
+                            /** Format: date */
+                            to: string;
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Habits module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/habits/mood/{date}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                date: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Check in the mood of a day
+         * @description One check-in per local day; a second one replaces the first.
+         */
+        put: {
+            parameters: {
+                query?: {
+                    /** @description IANA zone of the caller: a day after today there is refused */
+                    tz?: string;
+                };
+                header?: never;
+                path: {
+                    date: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MoodInput"];
+                };
+            };
+            responses: {
+                /** @description The check-in */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoodCheckin"];
+                        };
+                    };
+                };
+                /** @description Validation failed: a bad score or tag, a bad date, a day after today or more than 366 days back */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Habits module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /** Remove the mood check-in of a day */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    date: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Removed, or there was none */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not a calendar day */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Habits module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -17009,6 +17534,8 @@ export interface components {
             unit: string;
             /** @enum {string} */
             source: "manual" | "sleep" | "steps" | "active_kcal" | "workout";
+            /** @description Manual only: the amount a day must reach (in unit) to count as done; null counts any tick */
+            target: number | null;
             position: number;
             /** Format: date-time */
             archived_at: string | null;
@@ -17029,6 +17556,8 @@ export interface components {
              * @enum {string}
              */
             source: "manual" | "sleep" | "steps" | "active_kcal" | "workout";
+            /** @description Manual only: a day is done when the value of its tick (the sum of what was added) reaches it */
+            target?: number | null;
         };
         HabitDay: {
             /** Format: date */
@@ -17055,6 +17584,58 @@ export interface components {
             /** Format: date */
             date: string;
             value: number | null;
+        };
+        /** @enum {string} */
+        MoodTag: "calm" | "happy" | "energetic" | "focused" | "grateful" | "social" | "tired" | "stressed" | "anxious" | "sad" | "irritable" | "sick";
+        /** @description The mood of one local day */
+        MoodCheckin: {
+            /** Format: date */
+            date: string;
+            /** @description 1 low to 5 high */
+            score: number;
+            /** @description In the order of MoodTag */
+            tags: components["schemas"]["MoodTag"][];
+            note: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        MoodInput: {
+            score: number;
+            /** @description Repeats are dropped */
+            tags?: components["schemas"]["MoodTag"][] | null;
+            note?: string;
+        };
+        /** @description Girths measured by hand on a day, in cm with one decimal; a girth not measured is null */
+        TapeMeasurement: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            date: string;
+            waist_cm: number | null;
+            chest_cm: number | null;
+            hips_cm: number | null;
+            neck_cm: number | null;
+            arm_cm: number | null;
+            thigh_cm: number | null;
+            note: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** @description On create a date and at least one girth are required; on edit every field is optional, a girth sent as null is cleared, but not the last one */
+        TapeMeasurementInput: {
+            /** Format: date */
+            date?: string;
+            waist_cm?: number | null;
+            chest_cm?: number | null;
+            hips_cm?: number | null;
+            neck_cm?: number | null;
+            arm_cm?: number | null;
+            thigh_cm?: number | null;
+            note?: string;
         };
         /** @description A section key is absent when its module is off, the caller has nothing there, or it failed (then it is in errors) */
         Today: {
@@ -17304,6 +17885,11 @@ export interface components {
             status: "private" | "published";
             topic: string;
             tags: string[];
+            /**
+             * Format: date
+             * @description The day the note is about; the list sorts by it, else by the UTC day the note was made
+             */
+            date: string | null;
             /** Format: uuid */
             project_id: string | null;
             /** Format: uuid */
@@ -17339,6 +17925,11 @@ export interface components {
              * @description A task of the caller
              */
             task_id?: string | null;
+            /**
+             * Format: date
+             * @description The day the note is about; null clears it
+             */
+            date?: string | null;
         };
         NoteFacet: {
             topic?: string;

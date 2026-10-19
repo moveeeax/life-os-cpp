@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 
 import { useNoteList } from '@/hooks/useNotes';
-import { dayOf, monthOf, type Note } from '@/lib/notes';
+import { noteDay, type Note } from '@/lib/notes';
 import { Group, Num, Row } from '@/shell/kit';
 
 import { LoadError, NotesFrame, Placeholder } from './frame';
 import { NoteSheet } from './NoteSheet';
 
 function NoteRow({ n }: { n: Note }) {
-  const date = dayOf(n.created_at);
+  const date = noteDay(n).day;
   return (
     <Row
       dot={
@@ -41,7 +41,7 @@ function NoteRow({ n }: { n: Note }) {
   );
 }
 
-/** The notes, newest first: search, topic chips, grouped by month. */
+/** The notes by their day, newest first (the day a note is about when set): search, topic chips, grouped by month. */
 export function NotesPage() {
   const [q, setQ] = useState('');
   const [topic, setTopic] = useState('');
@@ -50,7 +50,7 @@ export function NotesPage() {
   const data = notes.data;
   const months = new Map<string, Note[]>();
   for (const n of data?.data ?? []) {
-    const m = monthOf(n.created_at);
+    const m = noteDay(n).month;
     months.set(m, [...(months.get(m) ?? []), n]);
   }
   return (

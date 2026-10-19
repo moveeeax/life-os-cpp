@@ -81,6 +81,9 @@ inline ::Habits::Habit model_of(const nlohmann::json& row) {
     h.per_week = row.at("per_week").is_number() ? row.at("per_week").get<int>() : 0;
     h.goal = row.at("goal").is_number() ? std::optional<double>(row.at("goal").get<double>()) : std::nullopt;
     h.source = ::Habits::source_of(row.at("source").get<std::string>()).value_or(::Habits::Source::Manual);
+    h.target = row.contains("target") && row.at("target").is_number()
+                   ? std::optional<double>(row.at("target").get<double>())
+                   : std::nullopt;
     return h;
 }
 

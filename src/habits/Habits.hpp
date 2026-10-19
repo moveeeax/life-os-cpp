@@ -3,11 +3,12 @@
  * @brief The habit evaluation (docs/superpowers/specs/2026-10-14-habits-design.md).
  *        Pure: no database, no clock; "today" is always passed in.
  *
- *        A day is done when it has a manual check or the habit's source meets
- *        the goal that day: sleep minutes >= goal x 60, steps >= goal, active
- *        kcal >= goal, a workout when a session finished that local day. A
- *        daily habit streaks over consecutive done days ending yesterday, plus
- *        today when today is done; a weekly habit (Monday to Sunday) over
+ *        A day is done when it has a manual check (with a daily target, one
+ *        whose value, the sum of the day, reaches the target) or the habit's
+ *        source meets the goal that day: sleep minutes >= goal x 60, steps >=
+ *        goal, active kcal >= goal, a workout when a session finished that
+ *        local day. A daily habit streaks over consecutive done days ending
+ *        yesterday, plus today when today is done; a weekly habit (Monday to Sunday) over
  *        consecutive weeks with at least per_week done days, ending last week,
  *        plus this week when met. An open today or week never breaks a streak.
  */
@@ -92,6 +93,8 @@ struct Habit {
     int per_week = 0;  // weekly only, 1..7
     std::optional<double> goal;
     Source source = Source::Manual;
+    /// A hand-ticked habit's daily target: a check counts only when its value reaches it.
+    std::optional<double> target;
 };
 
 /// Whether a day's source value meets the goal. Sleep values are minutes, the goal hours;
@@ -113,6 +116,12 @@ inline bool meets(const Habit& h, double value) {
 
 /// Manual checks: day -> the optional value of the check.
 using Checks = std::map<Day, std::optional<double>>;
+
+/// Whether a manual check counts: always without a target, else when its value
+/// (the sum of the day) reaches the target.
+inline bool check_counts(const Habit& h, const std::optional<double>& value) {
+    return !h.target || (value && *value >= *h.target);
+}
 /// Source values: day -> the value of the habit's source that day.
 using Values = std::map<Day, double>;
 
@@ -132,7 +141,7 @@ inline DayState day_state(const Habit& h, Day day, const Checks& manual, const V
     const auto m = manual.find(day);
     if (m != manual.end()) {
         s.manual = true;
-        s.done = true;
+        s.done = s.done || check_counts(h, m->second);
         if (m->second) {
             s.value = m->second;
         }
@@ -143,7 +152,9 @@ inline DayState day_state(const Habit& h, Day day, const Checks& manual, const V
 inline std::set<Day> done_days(const Habit& h, const Checks& manual, const Values& autos) {
     std::set<Day> out;
     for (const auto& [day, value] : manual) {
-        out.insert(day);
+        if (check_counts(h, value)) {
+            out.insert(day);
+        }
     }
     for (const auto& [day, value] : autos) {
         if (meets(h, value)) {

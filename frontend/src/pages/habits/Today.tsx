@@ -17,10 +17,13 @@ import {
   dayOf,
   formatValue,
   goalLine,
+  hasTarget,
   lastDays,
   longDay,
+  progressLine,
   scheduleWords,
   subline,
+  targetLine,
   type Habit,
   type HabitDays,
 } from '@/lib/habits';
@@ -29,7 +32,9 @@ import { ArrangeSheet } from '@/shell/ArrangeSheet';
 import { useGlassNav } from '@/shell/useGlassNav';
 import { Banner, Group, Num, Row } from '@/shell/kit';
 
+import { AddSheet } from './AddSheet';
 import { HabitSheet } from './HabitSheet';
+import { MoodToday } from './Mood';
 import { HabitsFrame, LoadError, Numbered, Placeholder, Tick } from './frame';
 
 /** The value on the right of a row: the source's value today, or the week's count. */
@@ -44,6 +49,7 @@ function RightOf({ h, today }: { h: HabitDays; today: string }) {
     );
   }
   const d = dayOf(h, today);
+  if (hasTarget(h)) return <Num>{progressLine(h, d?.value)}</Num>;
   if (h.source === 'manual' || d?.value == null) return null;
   return (
     <span>
@@ -114,14 +120,39 @@ function HabitRow({
   onArchive: () => void;
 }) {
   const goal = goalLine(h);
+  const [adding, setAdding] = useState(false);
+  const d = dayOf(h, today);
+  const target = hasTarget(h);
   return (
     <Row
       title={<span data-num-ok>{h.name}</span>}
       sub={<Numbered text={subline(h)} />}
       right={<RightOf h={h} today={today} />}
-      action={<Tick habit={h} date={today} day={dayOf(h, today)} />}
+      action={
+        target ? (
+          <>
+            <button
+              type="button"
+              className="h-tick h-add"
+              aria-pressed={d?.done ?? false}
+              aria-label={`Add to ${h.name}`}
+              onClick={() => setAdding(true)}
+            />
+            {adding && (
+              <AddSheet habit={h} date={today} value={d?.value} onClose={() => setAdding(false)} />
+            )}
+          </>
+        ) : (
+          <Tick habit={h} date={today} day={d} />
+        )
+      }
     >
       <Streak h={h} />
+      {target && (
+        <span>
+          A day counts at <Num>{targetLine(h)}</Num>
+        </span>
+      )}
       {goal && (
         <span>
           Goal <Num>{goal}</Num>
@@ -251,6 +282,7 @@ export function HabitsTodayPage() {
       }
     >
       <ShowOnNow />
+      <MoodToday today={day} />
       {q.isPending ? (
         <Placeholder />
       ) : q.isError ? (

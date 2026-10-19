@@ -789,6 +789,7 @@
      "goal",
      "unit",
      "source",
+     "target",
      "position",
      "archived_at",
      "created_at"
@@ -835,6 +836,13 @@
        "active_kcal",
        "workout"
       ]
+     },
+     "target": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "description": "Manual only: the amount a day must reach (in unit) to count as done; null counts any tick"
      },
      "position": {
       "type": "integer"
@@ -902,6 +910,15 @@
        "workout"
       ],
       "default": "manual"
+     },
+     "target": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "exclusiveMinimum": 0,
+      "maximum": 1000000,
+      "description": "Manual only: a day is done when the value of its tick (the sum of what was added) reaches it"
      }
     }
    },
@@ -998,6 +1015,228 @@
        "number",
        "null"
       ]
+     }
+    }
+   },
+   "MoodTag": {
+    "type": "string",
+    "enum": [
+     "calm",
+     "happy",
+     "energetic",
+     "focused",
+     "grateful",
+     "social",
+     "tired",
+     "stressed",
+     "anxious",
+     "sad",
+     "irritable",
+     "sick"
+    ]
+   },
+   "MoodCheckin": {
+    "type": "object",
+    "required": [
+     "date",
+     "score",
+     "tags",
+     "note",
+     "created_at",
+     "updated_at"
+    ],
+    "description": "The mood of one local day",
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "score": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "1 low to 5 high"
+     },
+     "tags": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/MoodTag"
+      },
+      "description": "In the order of MoodTag"
+     },
+     "note": {
+      "type": "string"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "MoodInput": {
+    "type": "object",
+    "required": [
+     "score"
+    ],
+    "properties": {
+     "score": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+     },
+     "tags": {
+      "type": [
+       "array",
+       "null"
+      ],
+      "items": {
+       "$ref": "#/components/schemas/MoodTag"
+      },
+      "description": "Repeats are dropped"
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 500
+     }
+    }
+   },
+   "TapeMeasurement": {
+    "type": "object",
+    "required": [
+     "id",
+     "date",
+     "waist_cm",
+     "chest_cm",
+     "hips_cm",
+     "neck_cm",
+     "arm_cm",
+     "thigh_cm",
+     "note",
+     "created_at",
+     "updated_at"
+    ],
+    "description": "Girths measured by hand on a day, in cm with one decimal; a girth not measured is null",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "waist_cm": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "chest_cm": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "hips_cm": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "neck_cm": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "arm_cm": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "thigh_cm": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "note": {
+      "type": "string"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "TapeMeasurementInput": {
+    "type": "object",
+    "description": "On create a date and at least one girth are required; on edit every field is optional, a girth sent as null is cleared, but not the last one",
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "waist_cm": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 400
+     },
+     "chest_cm": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 400
+     },
+     "hips_cm": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 400
+     },
+     "neck_cm": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 400
+     },
+     "arm_cm": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 400
+     },
+     "thigh_cm": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 400
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 500
      }
     }
    },
@@ -1902,6 +2141,7 @@
      "status",
      "topic",
      "tags",
+     "date",
      "project_id",
      "task_id",
      "project_title",
@@ -1945,6 +2185,14 @@
       "items": {
        "type": "string"
       }
+     },
+     "date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date",
+      "description": "The day the note is about; the list sorts by it, else by the UTC day the note was made"
      },
      "project_id": {
       "type": [
@@ -2052,6 +2300,14 @@
       ],
       "format": "uuid",
       "description": "A task of the caller"
+     },
+     "date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date",
+      "description": "The day the note is about; null clears it"
      }
     }
    },
@@ -12394,6 +12650,242 @@
      },
      "503": {
       "description": "Database unavailable"
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/measurements": {
+   "get": {
+    "summary": "Girths measured by hand, newest first",
+    "description": "The caller's own rows: they need no linked Mi account.",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "Open when absent"
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "Open when absent"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The measurements by date, newest first",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data",
+          "total"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/TapeMeasurement"
+           }
+          },
+          "total": {
+           "type": "integer"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Malformed range"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "No fitness:read, or the principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Fitness module disabled"
+     }
+    }
+   },
+   "post": {
+    "summary": "Add girths measured by hand",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TapeMeasurementInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "The measurement",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/TapeMeasurement"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed: no date, no girth, or a girth out of range"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "No fitness:read, or the principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Fitness module disabled"
+     }
+    }
+   }
+  },
+  "/api/v1/fitness/measurements/{id}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "patch": {
+    "summary": "Edit a measurement by hand",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TapeMeasurementInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The measurement",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/TapeMeasurement"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed, or the edit clears every girth"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "No fitness:read, or the principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Fitness module disabled, or not the caller's measurement"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a measurement by hand",
+    "tags": [
+     "fitness"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "No fitness:read, or the principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Fitness module disabled, or not the caller's measurement"
      }
     }
    }
@@ -28665,12 +29157,291 @@
      }
     }
    }
+  },
+  "/api/v1/habits/{id}/checks/{date}/add": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    },
+    {
+     "name": "date",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "date"
+     }
+    }
+   ],
+   "post": {
+    "summary": "Add an amount to the day of a habit",
+    "description": "Adds value to the tick of the day (a tick without a value counts as 0) and creates the tick when there is none; with a daily target the day is done once the sum reaches it.",
+    "tags": [
+     "habits"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: a day after today there is refused"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "value"
+        ],
+        "properties": {
+         "value": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1000000
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The tick with the sum of the day",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/HabitCheck"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed: a bad amount, a bad date, a day after today or more than 366 days back"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Habits module disabled, or not the caller's habit"
+     }
+    }
+   }
+  },
+  "/api/v1/habits/mood": {
+   "get": {
+    "summary": "The mood check-ins of a range of days",
+    "tags": [
+     "habits"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "At most 365 days after from"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The check-ins, oldest first; a day without one is absent",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data",
+          "from",
+          "to"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/MoodCheckin"
+           }
+          },
+          "from": {
+           "type": "string",
+           "format": "date"
+          },
+          "to": {
+           "type": "string",
+           "format": "date"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Habits module disabled"
+     }
+    }
+   }
+  },
+  "/api/v1/habits/mood/{date}": {
+   "parameters": [
+    {
+     "name": "date",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "date"
+     }
+    }
+   ],
+   "put": {
+    "summary": "Check in the mood of a day",
+    "description": "One check-in per local day; a second one replaces the first.",
+    "tags": [
+     "habits"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: a day after today there is refused"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MoodInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The check-in",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/MoodCheckin"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation failed: a bad score or tag, a bad date, a day after today or more than 366 days back"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Habits module disabled"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Remove the mood check-in of a day",
+    "tags": [
+     "habits"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Removed, or there was none"
+     },
+     "400": {
+      "description": "Not a calendar day"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Habits module disabled"
+     }
+    }
+   }
   }
  },
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 422874,
-  "source_fnv1a64": "3490199b9fb3573b"
+  "source_bytes": 434123,
+  "source_fnv1a64": "0685b82f6df41fd1"
  }
 }
