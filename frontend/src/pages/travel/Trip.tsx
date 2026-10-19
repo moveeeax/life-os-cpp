@@ -5,7 +5,9 @@ import { useCreateTask, useCreateTasks, useUpdateTask } from '@/hooks/useTasks';
 import {
   useCandidateSpends,
   useCrossings,
+  useDeleteContact,
   useDeleteItem,
+  useDeleteMoment,
   useDeleteTrip,
   useLinkSpends,
   usePacking,
@@ -21,18 +23,31 @@ import {
   daysBetween,
   documentWarningLine,
   flightsWithoutCrossing,
+  itemSub,
+  PURPOSE,
   type TravelTrip,
+  type TravelTripContact,
   type TravelTripItem,
+  type TravelTripMoment,
   shortDay,
+  telLink,
   todayLocal,
 } from '@/lib/travel';
 import { Banner, Facts, Group, Num, Row, Sheet } from '@/shell/kit';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 import { LoadError, Placeholder, TravelFrame } from './frame';
-import { CrossingSheet, ItemSheet, TripSheet } from './Sheets';
+import { ContactSheet, CrossingSheet, ItemSheet, MomentSheet, TripSheet } from './Sheets';
 
-type Tab = 'plan' | 'packing' | 'spends';
+type Tab = 'plan' | 'packing' | 'spends' | 'contacts' | 'moments';
+
+const TAB_LABEL: Record<Tab, string> = {
+  plan: 'Plan',
+  packing: 'Packing',
+  spends: 'Spends',
+  contacts: 'Contacts',
+  moments: 'Moments',
+};
 
 function weekday(iso: string) {
   return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', {
@@ -100,7 +115,7 @@ function Plan({ trip, today }: { trip: TravelTrip; today: string }) {
                     : 'var(--g-ink-faint)'
               }
               title={i.title}
-              sub={[i.kind, i.time].filter(Boolean).join(' · ')}
+              sub={itemSub(i, today)}
             >
               {i.reference && (
                 <span>
@@ -296,6 +311,7 @@ function Spends({ trip }: { trip: TravelTrip }) {
   useErrorToast(link.error);
   const rows = trip.spend_rows ?? [];
   const total = trip.spends.total;
+  const booked = trip.booked_cost;
   return (
     <>
       <div className="k-tools">
@@ -304,6 +320,20 @@ function Spends({ trip }: { trip: TravelTrip }) {
           Link spends of these dates
         </button>
       </div>
+      {booked && (
+        <Facts
+          items={[
+            {
+              label: 'Bookings, as paid',
+              value: (
+                <Num>
+                  {formatTotal(booked.amount)} {booked.currency}
+                </Num>
+              ),
+            },
+          ]}
+        />
+      )}
       {rows.length === 0 ? (
         <p className="k-empty">No spends linked yet.</p>
       ) : (
@@ -423,7 +453,119 @@ function PickSpends({
   );
 }
 
-/** One trip: its plan by day, packing and spends. */
+function Contacts({ trip }: { trip: TravelTrip }) {
+  const remove = useDeleteContact(trip.id);
+  useErrorToast(remove.error);
+  const [editing, setEditing] = useState<TravelTripContact | 'new' | null>(null);
+  const list = trip.contacts ?? [];
+  return (
+    <>
+      <div className="k-tools">
+        <span className="k-grow" />
+        <button type="button" className="k-btn k-solid" onClick={() => setEditing('new')}>
+          Add a contact
+        </button>
+      </div>
+      {list.length === 0 ? (
+        <p className="k-empty">No one here yet: a host, a guide, a driver, an embassy.</p>
+      ) : (
+        <Group label="Contacts">
+          {list.map((p) => (
+            <Row key={p.id} title={p.name} sub={p.role || undefined}>
+              {p.phone && (
+                <span>
+                  <PhoneLink phone={p.phone} />
+                </span>
+              )}
+              {p.email && (
+                <a className="k-link" href={`mailto:${p.email}`}>
+                  {p.email}
+                </a>
+              )}
+              <ItemLink link={p.link} />
+              {p.note && <span>{p.note}</span>}
+              <span className="k-actions">
+                <button type="button" className="k-link" onClick={() => setEditing(p)}>
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="k-link k-error-text"
+                  onClick={() => remove.mutate(p.id)}
+                >
+                  Delete
+                </button>
+              </span>
+            </Row>
+          ))}
+        </Group>
+      )}
+      {editing && (
+        <ContactSheet
+          tripId={trip.id}
+          contact={editing === 'new' ? undefined : editing}
+          onClose={() => setEditing(null)}
+        />
+      )}
+    </>
+  );
+}
+
+function Moments({ trip, today }: { trip: TravelTrip; today: string }) {
+  const remove = useDeleteMoment(trip.id);
+  useErrorToast(remove.error);
+  const [editing, setEditing] = useState<TravelTripMoment | 'new' | null>(null);
+  const list = trip.moments ?? [];
+  // A new moment is of today while the trip runs, else of its first day.
+  const day = today >= trip.start_date && today <= trip.end_date ? today : trip.start_date;
+  return (
+    <>
+      <div className="k-tools">
+        <span className="k-grow" />
+        <button type="button" className="k-btn k-solid" onClick={() => setEditing('new')}>
+          Add a moment
+        </button>
+      </div>
+      {list.length === 0 ? (
+        <p className="k-empty">Nothing written down yet: what happened, and where.</p>
+      ) : (
+        <Group label="Moments">
+          {list.map((m) => (
+            <Row
+              key={m.id}
+              title={m.text}
+              sub={[shortDay(m.date, today), m.place].filter(Boolean).join(' · ')}
+            >
+              <span style={{ whiteSpace: 'pre-wrap' }}>{m.text}</span>
+              <span className="k-actions">
+                <button type="button" className="k-link" onClick={() => setEditing(m)}>
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="k-link k-error-text"
+                  onClick={() => remove.mutate(m.id)}
+                >
+                  Delete
+                </button>
+              </span>
+            </Row>
+          ))}
+        </Group>
+      )}
+      {editing && (
+        <MomentSheet
+          tripId={trip.id}
+          moment={editing === 'new' ? undefined : editing}
+          date={day}
+          onClose={() => setEditing(null)}
+        />
+      )}
+    </>
+  );
+}
+
+/** One trip: its plan by day, packing, spends, contacts and moments. */
 export function TravelTripPage() {
   const { id = '' } = useParams();
   const today = todayLocal();
@@ -446,6 +588,7 @@ export function TravelTripPage() {
             {shortDay(t.start_date, today)} – {shortDay(t.end_date, today)}
             {t.start_date > today && <span data-num-ok> · {countdownWords(days)}</span>}
             {t.countries.length > 0 && ` · ${t.countries.map(countryName).join(', ')}`}
+            {t.purpose && ` · ${PURPOSE[t.purpose]}`}
           </>
         ) : undefined
       }
@@ -453,7 +596,7 @@ export function TravelTripPage() {
         t ? (
           <>
             <div className="k-seg" role="tablist" aria-label="Trip">
-              {(['plan', 'packing', 'spends'] as const).map((k) => (
+              {(Object.keys(TAB_LABEL) as Tab[]).map((k) => (
                 <button
                   key={k}
                   type="button"
@@ -462,7 +605,7 @@ export function TravelTripPage() {
                   className={tab === k ? 'k-seg-on' : undefined}
                   onClick={() => setTab(k)}
                 >
-                  {k === 'plan' ? 'Plan' : k === 'packing' ? 'Packing' : 'Spends'}
+                  {TAB_LABEL[k]}
                 </button>
               ))}
             </div>
@@ -489,14 +632,18 @@ export function TravelTripPage() {
         <Plan trip={trip.data} today={today} />
       ) : tab === 'packing' ? (
         <Packing trip={trip.data} />
-      ) : (
+      ) : tab === 'spends' ? (
         <Spends trip={trip.data} />
+      ) : tab === 'contacts' ? (
+        <Contacts trip={trip.data} />
+      ) : (
+        <Moments trip={trip.data} today={today} />
       )}
       {editing && t && <TripSheet trip={t} onClose={() => setEditing(false)} />}
       {confirm && t && (
         <ConfirmDialog
           title="Delete the trip?"
-          description="Its plan goes; its packing tasks and linked spends stay, unlinked."
+          description="Its plan, contacts and moments go; its packing tasks and linked spends stay, unlinked."
           confirmLabel="Delete"
           destructive
           busy={remove.isPending}
@@ -516,4 +663,16 @@ function ItemLink({ link }: { link: string }) {
       {link}
     </a>
   ) : null;
+}
+
+/** A phone number, dialable when it has digits; personal, so hidden with the numbers. */
+function PhoneLink({ phone }: { phone: string }) {
+  const href = telLink(phone);
+  return href ? (
+    <a className="k-link num" href={href}>
+      {phone}
+    </a>
+  ) : (
+    <span className="num">{phone}</span>
+  );
 }

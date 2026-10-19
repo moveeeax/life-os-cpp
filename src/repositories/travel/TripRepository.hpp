@@ -1,8 +1,9 @@
 /**
  * @file TripRepository.hpp
- * @brief travel_trips and travel_trip_items: the owner's trips with their plan
- *        by day, plus the links other modules keep to a trip — packing tasks
- *        (task_items.trip_id) and spends (money_transactions.trip_id).
+ * @brief travel_trips and travel_trip_items: the owner's trips (with a purpose
+ *        and what the bookings cost) and their plan by day, plus the links
+ *        other modules keep to a trip — packing tasks (task_items.trip_id) and
+ *        spends (money_transactions.trip_id).
  */
 
 #pragma once
@@ -21,12 +22,20 @@ namespace Repositories::Travel {
 
 class TripRepository {
 public:
+    /// What the bookings cost, in the currency they were paid in.
+    struct Cost {
+        double amount = 0;
+        std::string currency;
+    };
+
     struct Input {
         std::string name;
         std::string start_date;
         std::string end_date;
         std::set<std::string> countries;
         std::string note;
+        std::optional<std::string> purpose = std::nullopt;  // leisure | business | family | relocation | other
+        std::optional<Cost> booked_cost = std::nullopt;
     };
 
     struct Patch {
@@ -35,6 +44,9 @@ public:
         std::optional<std::string> end_date;
         std::optional<std::set<std::string>> countries;
         std::optional<std::string> note;
+        // The outer optional is "sent at all"; an inner nullopt clears the field.
+        std::optional<std::optional<std::string>> purpose;
+        std::optional<std::optional<Cost>> booked_cost;
     };
 
     struct ItemInput {
@@ -45,22 +57,34 @@ public:
         std::string reference;
         std::string link;
         std::string note;
-        bool no_crossing = false;  // a domestic flight, or one the owner is not on
+        bool no_crossing = false;                            // a domestic flight, or one the owner is not on
+        std::optional<std::string> end_date = std::nullopt;  // a stay only: the check-out day
     };
 
     nlohmann::json create(const std::string& owner, const Input& in) {
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
+                    std::optional<double> amount;
+                    std::optional<std::string> currency;
+                    if (in.booked_cost) {
+                        amount = in.booked_cost->amount;
+                        currency = in.booked_cost->currency;
+                    }
                     auto r = txn.exec_params(
-                        "INSERT INTO travel_trips (owner_id, name, start_date, end_date, countries, note) "
-                        "VALUES ($1::uuid, $2, $3::date, $4::date, $5::text[], $6) RETURNING id::text",
+                        "INSERT INTO travel_trips (owner_id, name, start_date, end_date, countries, note, purpose, "
+                        " booked_amount, booked_currency) "
+                        "VALUES ($1::uuid, $2, $3::date, $4::date, $5::text[], $6, $7, $8::numeric, $9) "
+                        "RETURNING id::text",
                         owner,
                         in.name,
                         in.start_date,
                         in.end_date,
                         detail::pg_array(in.countries),
-                        in.note);
+                        in.note,
+                        in.purpose,
+                        amount,
+                        currency);
                     return *find_in(txn, owner, r[0][0].template as<std::string>());
                 });
             },
@@ -109,10 +133,23 @@ public:
                     if (p.countries) {
                         countries = detail::pg_array(*p.countries);
                     }
+                    std::optional<std::string> purpose;
+                    if (p.purpose) {
+                        purpose = *p.purpose;
+                    }
+                    std::optional<double> amount;
+                    std::optional<std::string> currency;
+                    if (p.booked_cost && *p.booked_cost) {
+                        amount = (*p.booked_cost)->amount;
+                        currency = (*p.booked_cost)->currency;
+                    }
                     auto r = txn.exec_params(
                         "UPDATE travel_trips SET name = COALESCE($3, name), "
                         " start_date = COALESCE($4::date, start_date), end_date = COALESCE($5::date, end_date), "
-                        " countries = COALESCE($6::text[], countries), note = COALESCE($7, note) "
+                        " countries = COALESCE($6::text[], countries), note = COALESCE($7, note), "
+                        " purpose = CASE WHEN $8 THEN $9 ELSE purpose END, "
+                        " booked_amount = CASE WHEN $10 THEN $11::numeric ELSE booked_amount END, "
+                        " booked_currency = CASE WHEN $10 THEN $12 ELSE booked_currency END "
                         "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
                         owner,
                         id,
@@ -120,7 +157,12 @@ public:
                         p.start_date,
                         p.end_date,
                         countries,
-                        p.note);
+                        p.note,
+                        p.purpose.has_value(),
+                        purpose,
+                        p.booked_cost.has_value(),
+                        amount,
+                        currency);
                     if (r.empty()) {
                         throw NotFound("trip");
                     }
@@ -163,7 +205,8 @@ public:
                 return Database::get().execute_write([&](auto& txn) {
                     auto r = txn.exec_params(
                         "INSERT INTO travel_trip_items (owner_id, trip_id, kind, date, time, title, reference, link, "
-                        " note, no_crossing) SELECT $1::uuid, id, $3, $4::date, $5::time, $6, $7, $8, $9, $10 "
+                        " note, no_crossing, end_date) "
+                        "SELECT $1::uuid, id, $3, $4::date, $5::time, $6, $7, $8, $9, $10, $11::date "
                         "FROM travel_trips WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id::text",
                         owner,
                         trip,
@@ -174,7 +217,8 @@ public:
                         in.reference,
                         in.link,
                         in.note,
-                        in.no_crossing);
+                        in.no_crossing,
+                        in.end_date);
                     if (r.empty()) {
                         throw NotFound("trip");
                     }
@@ -194,7 +238,7 @@ public:
                 return Database::get().execute_write([&](auto& txn) {
                     auto r = txn.exec_params(
                         "UPDATE travel_trip_items SET kind = $4, date = $5::date, time = $6::time, title = $7, "
-                        " reference = $8, link = $9, note = $10, no_crossing = $11 "
+                        " reference = $8, link = $9, note = $10, no_crossing = $11, end_date = $12::date "
                         "WHERE owner_id = $1::uuid AND trip_id = $2::uuid AND id = $3::uuid RETURNING id",
                         owner,
                         trip,
@@ -206,7 +250,8 @@ public:
                         in.reference,
                         in.link,
                         in.note,
-                        in.no_crossing);
+                        in.no_crossing,
+                        in.end_date);
                     if (r.empty()) {
                         throw NotFound("trip_item");
                     }
@@ -295,10 +340,11 @@ public:
 private:
     static constexpr const char* kColumns =
         "id, name, to_char(start_date, 'YYYY-MM-DD') AS start_date, to_char(end_date, 'YYYY-MM-DD') AS end_date, "
-        "countries, note";
+        "countries, note, purpose, CASE WHEN booked_amount IS NULL THEN NULL ELSE "
+        "json_build_object('amount', booked_amount::float8, 'currency', booked_currency) END AS booked_cost";
     static constexpr const char* kItemColumns =
         "id, trip_id, kind, to_char(date, 'YYYY-MM-DD') AS date, to_char(time, 'HH24:MI') AS time, title, reference, "
-        "link, note, no_crossing";
+        "link, note, no_crossing, to_char(end_date, 'YYYY-MM-DD') AS end_date";
 
     nlohmann::json spend_rows(const std::string& owner, const std::string& trip, const std::string& where) {
         return Database::get().execute_read([&](auto& txn) {

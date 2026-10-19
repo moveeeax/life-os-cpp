@@ -2910,7 +2910,8 @@
      "reference",
      "link",
      "note",
-     "no_crossing"
+     "no_crossing",
+     "end_date"
     ],
     "properties": {
      "id": {
@@ -2944,7 +2945,8 @@
       "type": "string"
      },
      "reference": {
-      "type": "string"
+      "type": "string",
+      "description": "The booking reference"
      },
      "link": {
       "type": "string"
@@ -2955,6 +2957,14 @@
      "no_crossing": {
       "type": "boolean",
       "description": "A flight that crosses no border of the owner: domestic, or one the owner is not on"
+     },
+     "end_date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date",
+      "description": "A stay only: the check-out day"
      }
     }
    },
@@ -3007,6 +3017,165 @@
       "type": "boolean",
       "default": false,
       "description": "A flight that crosses no border of the owner: domestic, or one the owner is not on"
+     },
+     "end_date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date",
+      "description": "A stay only (400 not_allowed on another kind): the check-out day, on or after date"
+     }
+    }
+   },
+   "TravelBookedCost": {
+    "type": [
+     "object",
+     "null"
+    ],
+    "description": "What the bookings of a trip cost, in the currency they were paid in, never converted; null when not set (on a write, null clears it)",
+    "required": [
+     "amount",
+     "currency"
+    ],
+    "properties": {
+     "amount": {
+      "type": "number",
+      "description": "From 0 to 10^12, at most 15 significant digits"
+     },
+     "currency": {
+      "type": "string",
+      "description": "A currency code, 3 to 10 capital letters"
+     }
+    }
+   },
+   "TravelTripContact": {
+    "type": "object",
+    "required": [
+     "id",
+     "trip_id",
+     "name",
+     "role",
+     "phone",
+     "email",
+     "link",
+     "note"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "trip_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "name": {
+      "type": "string"
+     },
+     "role": {
+      "type": "string"
+     },
+     "phone": {
+      "type": "string"
+     },
+     "email": {
+      "type": "string"
+     },
+     "link": {
+      "type": "string"
+     },
+     "note": {
+      "type": "string"
+     }
+    }
+   },
+   "TravelTripContactInput": {
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+     },
+     "role": {
+      "type": "string",
+      "maxLength": 80,
+      "description": "Free text: host, guide, driver, embassy"
+     },
+     "phone": {
+      "type": "string",
+      "maxLength": 40
+     },
+     "email": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "An email address",
+      "or empty": null
+     },
+     "link": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "A web address (https:// or http://), or empty"
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 500
+     }
+    }
+   },
+   "TravelTripMoment": {
+    "type": "object",
+    "required": [
+     "id",
+     "trip_id",
+     "date",
+     "text",
+     "place"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "trip_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "text": {
+      "type": "string"
+     },
+     "place": {
+      "type": "string"
+     }
+    }
+   },
+   "TravelTripMomentInput": {
+    "type": "object",
+    "required": [
+     "date",
+     "text"
+    ],
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+     },
+     "place": {
+      "type": "string",
+      "maxLength": 120
      }
     }
    },
@@ -3438,6 +3607,8 @@
      "end_date",
      "countries",
      "note",
+     "purpose",
+     "booked_cost",
      "packing",
      "spends"
     ],
@@ -3465,6 +3636,23 @@
      },
      "note": {
       "type": "string"
+     },
+     "purpose": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "leisure",
+       "business",
+       "family",
+       "relocation",
+       "other",
+       null
+      ]
+     },
+     "booked_cost": {
+      "$ref": "#/components/schemas/TravelBookedCost"
      },
      "packing": {
       "type": "object",
@@ -3521,6 +3709,20 @@
       "items": {
        "$ref": "#/components/schemas/TravelSpend"
       }
+     },
+     "contacts": {
+      "type": "array",
+      "description": "GET of one trip only, by name",
+      "items": {
+       "$ref": "#/components/schemas/TravelTripContact"
+      }
+     },
+     "moments": {
+      "type": "array",
+      "description": "GET of one trip only, the earliest first",
+      "items": {
+       "$ref": "#/components/schemas/TravelTripMoment"
+      }
      }
     }
    },
@@ -3551,6 +3753,24 @@
      "note": {
       "type": "string",
       "maxLength": 2000
+     },
+     "purpose": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "leisure",
+       "business",
+       "family",
+       "relocation",
+       "other",
+       null
+      ],
+      "description": "null clears it"
+     },
+     "booked_cost": {
+      "$ref": "#/components/schemas/TravelBookedCost"
      }
     }
    },
@@ -27241,6 +27461,512 @@
     }
    }
   },
+  "/api/v1/travel/trips/{id}/contacts": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "post": {
+    "summary": "Add a contact to a trip",
+    "tags": [
+     "travel"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TravelTripContactInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/TravelTripContact"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Invalid input",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the travel module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/travel/trips/{id}/contacts/{child}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    },
+    {
+     "name": "child",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "patch": {
+    "summary": "Replace a trip contact (all fields)",
+    "tags": [
+     "travel"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TravelTripContactInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/TravelTripContact"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Invalid input",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the travel module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a trip contact",
+    "tags": [
+     "travel"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "400": {
+      "description": "Invalid input",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the travel module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/travel/trips/{id}/moments": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "post": {
+    "summary": "Add a moment to a trip",
+    "tags": [
+     "travel"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TravelTripMomentInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/TravelTripMoment"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Invalid input",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the travel module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/travel/trips/{id}/moments/{child}": {
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    },
+    {
+     "name": "child",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   ],
+   "patch": {
+    "summary": "Replace a trip moment (all fields)",
+    "tags": [
+     "travel"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TravelTripMomentInput"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/TravelTripMoment"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Invalid input",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the travel module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete a trip moment",
+    "tags": [
+     "travel"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "400": {
+      "description": "Invalid input",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not found, or the travel module is off",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/travel/trips/{id}/candidate-spends": {
    "parameters": [
     {
@@ -27944,7 +28670,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 412204,
-  "source_fnv1a64": "28b578a404758a2b"
+  "source_bytes": 422874,
+  "source_fnv1a64": "3490199b9fb3573b"
  }
 }

@@ -1,19 +1,36 @@
 import { useState, type FormEvent } from 'react';
 
 import {
+  useSaveContact,
   useSaveCrossing,
   useSaveDocument,
   useSaveItem,
+  useSaveMoment,
   useSaveRule,
   useSaveTrip,
 } from '@/hooks/useTravel';
-import { crossingBody, itemBody, ruleBody, tripBody, type ItemForm } from '@/lib/travel/bodies';
-import type {
-  TravelCrossing,
-  TravelDocument,
-  TravelRule,
-  TravelTrip,
-  TravelTripItem,
+import {
+  contactBody,
+  crossingBody,
+  itemBody,
+  momentBody,
+  ruleBody,
+  tripBody,
+  type ContactForm,
+  type ItemForm,
+  type MomentForm,
+  type TripForm,
+} from '@/lib/travel/bodies';
+import {
+  PURPOSE,
+  type TravelCrossing,
+  type TravelDocument,
+  type TravelPurpose,
+  type TravelRule,
+  type TravelTrip,
+  type TravelTripContact,
+  type TravelTripItem,
+  type TravelTripMoment,
 } from '@/lib/travel';
 import { Sheet } from '@/shell/kit';
 
@@ -121,16 +138,19 @@ export function TripSheet({
   trip?: TravelTrip;
   onClose: (created?: TravelTrip) => void;
 }) {
-  const [f, setF] = useState({
+  const [f, setF] = useState<TripForm>({
     name: trip?.name ?? '',
     start_date: trip?.start_date ?? '',
     end_date: trip?.end_date ?? '',
     countries: (trip?.countries ?? []).join(', '),
     note: trip?.note ?? '',
+    purpose: trip?.purpose ?? '',
+    booked_amount: trip?.booked_cost ? String(trip.booked_cost.amount) : '',
+    booked_currency: trip?.booked_cost?.currency ?? '',
   });
   const save = useSaveTrip(trip?.id ?? null, (t) => onClose(t));
-  const set = (k: keyof typeof f) => (e: { target: { value: string } }) =>
-    setF({ ...f, [k]: e.target.value });
+  const set = (k: keyof TripForm) => (e: { target: { value: string } }) =>
+    setF({ ...f, [k]: e.target.value } as TripForm);
   return (
     <Sheet title={trip ? 'Edit the trip' : 'New trip'} onClose={() => onClose()} width={460}>
       <form
@@ -160,10 +180,43 @@ export function TripSheet({
             <input type="date" required value={f.end_date} onChange={set('end_date')} />
           </label>
         </div>
-        <label className="k-field">
-          <span>Countries (codes)</span>
-          <input placeholder="TH, LA" value={f.countries} onChange={set('countries')} />
-        </label>
+        <div className="k-fields">
+          <label className="k-field">
+            <span>Countries (codes)</span>
+            <input placeholder="TH, LA" value={f.countries} onChange={set('countries')} />
+          </label>
+          <label className="k-field">
+            <span>Purpose</span>
+            <select value={f.purpose} onChange={set('purpose')}>
+              <option value="">Not set</option>
+              {(Object.keys(PURPOSE) as TravelPurpose[]).map((k) => (
+                <option key={k} value={k}>
+                  {PURPOSE[k]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="k-fields">
+          <label className="k-field">
+            <span>Bookings cost</span>
+            <input
+              inputMode="decimal"
+              placeholder="1250"
+              value={f.booked_amount}
+              onChange={set('booked_amount')}
+            />
+          </label>
+          <label className="k-field">
+            <span>Currency</span>
+            <input
+              maxLength={10}
+              placeholder="USD"
+              value={f.booked_currency}
+              onChange={set('booked_currency')}
+            />
+          </label>
+        </div>
         <label className="k-field">
           <span>Note</span>
           <textarea
@@ -205,6 +258,7 @@ export function ItemSheet({
     link: item?.link ?? '',
     note: item?.note ?? '',
     no_crossing: item?.no_crossing ?? false,
+    end_date: item?.end_date ?? '',
   });
   const save = useSaveItem(tripId, item?.id ?? null, onClose);
   const set = (k: keyof ItemForm) => (e: { target: { value: string } }) =>
@@ -247,6 +301,12 @@ export function ItemSheet({
             <input type="time" value={f.time} onChange={set('time')} />
           </label>
         </div>
+        {f.kind === 'stay' && (
+          <label className="k-field">
+            <span>Until (the check-out day)</span>
+            <input type="date" min={f.date} value={f.end_date} onChange={set('end_date')} />
+          </label>
+        )}
         <label className="k-field">
           <span>Booking reference</span>
           <input maxLength={80} value={f.reference} onChange={set('reference')} />
@@ -271,6 +331,127 @@ export function ItemSheet({
         )}
         <ErrorLine error={save.error} />
         <Actions busy={save.isPending} label={item ? 'Save' : 'Add'} onCancel={onClose} />
+      </form>
+    </Sheet>
+  );
+}
+
+/** Add or edit a person to reach on a trip. */
+export function ContactSheet({
+  tripId,
+  contact,
+  onClose,
+}: {
+  tripId: string;
+  contact?: TravelTripContact;
+  onClose: () => void;
+}) {
+  const [f, setF] = useState<ContactForm>({
+    name: contact?.name ?? '',
+    role: contact?.role ?? '',
+    phone: contact?.phone ?? '',
+    email: contact?.email ?? '',
+    link: contact?.link ?? '',
+    note: contact?.note ?? '',
+  });
+  const save = useSaveContact(tripId, contact?.id ?? null, onClose);
+  const set = (k: keyof ContactForm) => (e: { target: { value: string } }) =>
+    setF({ ...f, [k]: e.target.value });
+  return (
+    <Sheet title={contact ? 'Edit the contact' : 'Add a contact'} onClose={onClose} width={460}>
+      <form
+        className="k-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate(contactBody(f));
+        }}
+      >
+        <div className="k-fields">
+          <label className="k-field">
+            <span>Name</span>
+            <input required maxLength={120} value={f.name} onChange={set('name')} />
+          </label>
+          <label className="k-field">
+            <span>Role</span>
+            <input maxLength={80} placeholder="host, guide" value={f.role} onChange={set('role')} />
+          </label>
+        </div>
+        <div className="k-fields">
+          <label className="k-field">
+            <span>Phone</span>
+            <input type="tel" maxLength={40} value={f.phone} onChange={set('phone')} />
+          </label>
+          <label className="k-field">
+            <span>Email</span>
+            <input type="email" maxLength={200} value={f.email} onChange={set('email')} />
+          </label>
+        </div>
+        <label className="k-field">
+          <span>Link</span>
+          <input type="url" maxLength={500} value={f.link} onChange={set('link')} />
+        </label>
+        <label className="k-field">
+          <span>Note</span>
+          <input maxLength={500} value={f.note} onChange={set('note')} />
+        </label>
+        <ErrorLine error={save.error} />
+        <Actions busy={save.isPending} label={contact ? 'Save' : 'Add'} onCancel={onClose} />
+      </form>
+    </Sheet>
+  );
+}
+
+/** Add or edit a moment of a trip. */
+export function MomentSheet({
+  tripId,
+  moment,
+  date,
+  onClose,
+}: {
+  tripId: string;
+  moment?: TravelTripMoment;
+  date: string;
+  onClose: () => void;
+}) {
+  const [f, setF] = useState<MomentForm>({
+    date: moment?.date ?? date,
+    text: moment?.text ?? '',
+    place: moment?.place ?? '',
+  });
+  const save = useSaveMoment(tripId, moment?.id ?? null, onClose);
+  const set = (k: keyof MomentForm) => (e: { target: { value: string } }) =>
+    setF({ ...f, [k]: e.target.value });
+  return (
+    <Sheet title={moment ? 'Edit the moment' : 'Add a moment'} onClose={onClose} width={460}>
+      <form
+        className="k-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate(momentBody(f));
+        }}
+      >
+        <div className="k-fields">
+          <label className="k-field">
+            <span>Date</span>
+            <input type="date" required value={f.date} onChange={set('date')} />
+          </label>
+          <label className="k-field">
+            <span>Place</span>
+            <input maxLength={120} value={f.place} onChange={set('place')} />
+          </label>
+        </div>
+        <label className="k-field">
+          <span>What happened</span>
+          <textarea
+            className="k-input k-textarea"
+            required
+            maxLength={2000}
+            value={f.text}
+            onChange={set('text')}
+          />
+        </label>
+        <ErrorLine error={save.error} />
+        <Actions busy={save.isPending} label={moment ? 'Save' : 'Add'} onCancel={onClose} />
       </form>
     </Sheet>
   );

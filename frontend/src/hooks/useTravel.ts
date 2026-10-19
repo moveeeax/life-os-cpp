@@ -14,9 +14,13 @@ import type {
   TravelRuleInput,
   TravelSpend,
   TravelTrip,
+  TravelTripContact,
+  TravelTripContactInput,
   TravelTripInput,
   TravelTripItem,
   TravelTripItemInput,
+  TravelTripMoment,
+  TravelTripMomentInput,
 } from '@/lib/travel';
 import { todayLocal } from '@/lib/travel';
 
@@ -178,6 +182,58 @@ export function useDeleteItem(tripId: string, onSuccess?: () => void) {
       invalidate: TRAVEL_WRITES,
       onSuccess,
     },
+  );
+}
+
+export function useSaveContact(tripId: string, id: string | null, onSuccess?: () => void) {
+  return useApiMutation(
+    async (body: TravelTripContactInput) =>
+      id
+        ? (
+            await api.patchJson<{ data: TravelTripContact }>(
+              `${BASE}/trips/${tripId}/contacts/${id}`,
+              { body },
+            )
+          ).data
+        : (
+            await api.postJson<{ data: TravelTripContact }>(`${BASE}/trips/${tripId}/contacts`, {
+              body,
+            })
+          ).data,
+    { invalidate: TRAVEL_WRITES, onSuccess },
+  );
+}
+
+export function useDeleteContact(tripId: string, onSuccess?: () => void) {
+  return useApiMutation(
+    (id: string) => api.deleteJson<unknown>(`${BASE}/trips/${tripId}/contacts/${id}`),
+    { invalidate: TRAVEL_WRITES, onSuccess },
+  );
+}
+
+export function useSaveMoment(tripId: string, id: string | null, onSuccess?: () => void) {
+  return useApiMutation(
+    async (body: TravelTripMomentInput) =>
+      id
+        ? (
+            await api.patchJson<{ data: TravelTripMoment }>(
+              `${BASE}/trips/${tripId}/moments/${id}`,
+              { body },
+            )
+          ).data
+        : (
+            await api.postJson<{ data: TravelTripMoment }>(`${BASE}/trips/${tripId}/moments`, {
+              body,
+            })
+          ).data,
+    { invalidate: TRAVEL_WRITES, onSuccess },
+  );
+}
+
+export function useDeleteMoment(tripId: string, onSuccess?: () => void) {
+  return useApiMutation(
+    (id: string) => api.deleteJson<unknown>(`${BASE}/trips/${tripId}/moments/${id}`),
+    { invalidate: TRAVEL_WRITES, onSuccess },
   );
 }
 

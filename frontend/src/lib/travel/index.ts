@@ -1,10 +1,11 @@
-import { formatDay } from '@/lib/dates';
+import { daysBetween, formatDay } from '@/lib/dates';
 
 import type {
   TravelCounter,
   TravelCrossing,
   TravelDocument,
   TravelDocumentWarning,
+  TravelPurpose,
   TravelTrip,
   TravelTripItem,
 } from './types';
@@ -100,6 +101,32 @@ export const DOCUMENT_KIND: Record<TravelDocument['kind'], string> = {
   insurance: 'Insurance',
   other: 'Document',
 };
+
+export const PURPOSE: Record<TravelPurpose, string> = {
+  leisure: 'Leisure',
+  business: 'Business',
+  family: 'Family visit',
+  relocation: 'Relocation',
+  other: 'Other',
+};
+
+/** The sub line of a plan item: "stay · until Nov 9 · 7 nights", "flight · 23:40". */
+export function itemSub(i: TravelTripItem, today: string): string {
+  const parts: string[] = [i.kind];
+  if (i.time) parts.push(i.time);
+  if (i.kind === 'stay' && i.end_date) {
+    const nights = daysBetween(i.date, i.end_date);
+    parts.push(`until ${shortDay(i.end_date, today)}`);
+    if (nights > 0) parts.push(nights === 1 ? '1 night' : `${nights} nights`);
+  }
+  return parts.join(' · ');
+}
+
+/** A phone number as a tel: link (digits and a leading +), or null when nothing dialable is left. */
+export function telLink(phone: string): string | null {
+  const digits = phone.replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '');
+  return /\d{3,}/.test(digits) ? `tel:${digits}` : null;
+}
 
 /** Six months, the window the passport rule asks for: such a document deserves a look. */
 export const DOCUMENT_SOON_DAYS = 180;

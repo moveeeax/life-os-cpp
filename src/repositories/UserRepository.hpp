@@ -308,6 +308,8 @@ public:
         "food_parse_jobs",
         "day_focus",
         "travel_trip_items",
+        "travel_trip_contacts",
+        "travel_trip_moments",
         "travel_trips",
         "travel_rules",
         "travel_crossings",
