@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792401803520,
+  "lastUpdate": 1792401806142,
   "repoUrl": "https://github.com/moveeeax/life-os-cpp",
   "entries": {
     "Throughput": [
@@ -211,6 +211,63 @@ window.BENCHMARK_DATA = {
           {
             "name": "idle RSS",
             "value": 4.2,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Michael Tarassov",
+            "username": "moveeeax",
+            "email": "michael@tarassov.me"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "f323f3fa8aa065d7dd686cf1b74c303de403a9da",
+          "message": "chore(release): 1.33.0 — recurring tasks, mood and measurements, medical archive, travel details, practice (#152)",
+          "timestamp": "2026-10-19T09:22:11Z",
+          "url": "https://github.com/moveeeax/life-os-cpp/commit/f323f3fa8aa065d7dd686cf1b74c303de403a9da"
+        },
+        "date": 1792401805434,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "healthz p50",
+            "value": 4.68,
+            "unit": "ms"
+          },
+          {
+            "name": "healthz p99",
+            "value": 16.72,
+            "unit": "ms"
+          },
+          {
+            "name": "jobs p50",
+            "value": 25.2,
+            "unit": "ms"
+          },
+          {
+            "name": "jobs p99",
+            "value": 52.69,
+            "unit": "ms"
+          },
+          {
+            "name": "runtime image size",
+            "value": 114.2,
+            "unit": "MB"
+          },
+          {
+            "name": "cold start to /ready",
+            "value": 882,
+            "unit": "ms"
+          },
+          {
+            "name": "idle RSS",
+            "value": 4.9,
             "unit": "MB"
           }
         ]
