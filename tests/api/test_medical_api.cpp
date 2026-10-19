@@ -281,8 +281,9 @@ TEST_F(MedicalApiTest, VisitsAndRecordsListNewestFirstAndFilter) {
     auto gone = call(kAnna, Delete, json::object(), [&](auto req, auto cb) { c.deleteVisit(req, std::move(cb), vid); });
     EXPECT_EQ(gone->statusCode(), k204NoContent);
     auto after = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.listRecords(req, std::move(cb)); });
-    ASSERT_EQ(body_of(after)["data"].size(), 2u);
-    for (const auto& r : body_of(after)["data"]) {
+    const json records = body_of(after)["data"];  // a named copy: the loop must not walk a temporary
+    ASSERT_EQ(records.size(), 2u);
+    for (const auto& r : records) {
         EXPECT_TRUE(r["visit_id"].is_null());
     }
 }
