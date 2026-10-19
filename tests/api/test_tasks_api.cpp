@@ -54,7 +54,7 @@ protected:
             txn.exec(
                 "TRUNCATE TABLE notes, task_parse_jobs, task_notes, task_items, money_settings, money_fx_rates, "
                 "money_merchants, money_transfers, money_transactions, money_categories, money_accounts, "
-                "money_currencies");
+                "money_currencies CASCADE");
             for (const char* id : {kAnna, kBoris}) {
                 txn.exec_params(
                     "INSERT INTO users (id, email, confirmed, role_id) "
