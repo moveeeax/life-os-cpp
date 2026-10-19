@@ -115,7 +115,7 @@ function Plan({ trip, today }: { trip: TravelTrip; today: string }) {
                     : 'var(--g-ink-faint)'
               }
               title={i.title}
-              sub={itemSub(i, today)}
+              sub={<span data-num-ok>{itemSub(i, today)}</span>}
             >
               {i.reference && (
                 <span>
