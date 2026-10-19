@@ -184,7 +184,7 @@ const workouts: Workout[] = [
     workout_id: 'w2',
     activity_type: 'strength',
     start_at: '2026-10-15T16:00:00Z',
-    end_at: null,
+    end_at: '2026-10-15T16:55:00Z',
     duration_minutes: 55,
     distance_m: null,
     calories_kcal: 310,
