@@ -17,6 +17,7 @@ describe('glassNav', () => {
       ['Habits', '/habits'],
       ['Learning', '/learning'],
       ['Notes', '/notes'],
+      ['Practice', '/practice'],
       ['Travel', '/travel'],
       ['Money', '/money'],
       ['Food', '/food'],
@@ -33,6 +34,7 @@ describe('glassNav', () => {
       'Habits',
       'Learning',
       'Notes',
+      'Practice',
       'Travel',
       'Money',
       'Food',
@@ -51,10 +53,16 @@ describe('glassNav', () => {
       'Habits',
       'Learning',
       'Notes',
+      'Practice',
       'Travel',
       'Money',
       'Food',
     ]);
+  });
+
+  it('leaves Practice out when its module is off', () => {
+    const list = glassNav(user(Permission.General), new Set(['practice']));
+    expect(list.map((s) => s.label)).not.toContain('Practice');
   });
 
   it('leaves Habits out when its module is off', () => {
@@ -70,6 +78,7 @@ describe('glassNav', () => {
       'Habits',
       'Learning',
       'Notes',
+      'Practice',
       'Travel',
       'Money',
       'Food',

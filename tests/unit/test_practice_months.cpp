@@ -37,7 +37,7 @@ TEST(PracticeMonths, AnythingElseIsNoMonth) {
 }
 
 TEST(PracticeMonths, AYearAndItsRange) {
-    EXPECT_EQ(Practice::Months::year_of("2026"), 2026);
+    EXPECT_EQ(Practice::Months::year_of("2026").value_or(0), 2026);
     EXPECT_FALSE(Practice::Months::year_of("26").has_value());
     EXPECT_FALSE(Practice::Months::year_of("1899").has_value());
     EXPECT_FALSE(Practice::Months::year_of("20x6").has_value());

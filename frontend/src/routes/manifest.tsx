@@ -149,6 +149,21 @@ const NotesPage = lazy(() => import('@/pages/notes/List').then((m) => ({ default
 const NoteEditorPage = lazy(() =>
   import('@/pages/notes/Editor').then((m) => ({ default: m.NoteEditorPage })),
 );
+const PracticeDealsPage = lazy(() =>
+  import('@/pages/practice/Deals').then((m) => ({ default: m.PracticeDealsPage })),
+);
+const PracticeMoneyPage = lazy(() =>
+  import('@/pages/practice/Money').then((m) => ({ default: m.PracticeMoneyPage })),
+);
+const PracticeMonthsPage = lazy(() =>
+  import('@/pages/practice/Months').then((m) => ({ default: m.PracticeMonthsPage })),
+);
+const PracticeMonthPage = lazy(() =>
+  import('@/pages/practice/Month').then((m) => ({ default: m.PracticeMonthPage })),
+);
+const PracticeClientsPage = lazy(() =>
+  import('@/pages/practice/Clients').then((m) => ({ default: m.PracticeClientsPage })),
+);
 const TravelRulesPage = lazy(() =>
   import('@/pages/travel/Rules').then((m) => ({ default: m.TravelRulesPage })),
 );
@@ -384,6 +399,33 @@ export const routes: RouteEntry[] = [
   // ── Notes — any confirmed user; the module switch is the only gate ───────
   { path: '/notes', element: <NotesPage />, guard: 'confirmed', layout: 'shell' },
   { path: '/notes/:id', element: <NoteEditorPage />, guard: 'confirmed', layout: 'shell' },
+
+  // ── Practice — any confirmed user; the module switch is the only gate ────
+  { path: '/practice', element: <PracticeDealsPage />, guard: 'confirmed', layout: 'shell' },
+  {
+    path: '/practice/money',
+    element: <PracticeMoneyPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
+  {
+    path: '/practice/months',
+    element: <PracticeMonthsPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
+  {
+    path: '/practice/months/:month',
+    element: <PracticeMonthPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
+  {
+    path: '/practice/clients',
+    element: <PracticeClientsPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
 
   // ── Travel — any confirmed user; the module switch is the only gate ──────
   { path: '/travel', element: <TravelTripsPage />, guard: 'confirmed', layout: 'shell' },

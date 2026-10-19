@@ -8,7 +8,6 @@
 #pragma once
 
 #include <array>
-#include <cstdio>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -52,9 +51,12 @@ inline std::optional<int> digits(std::string_view s) {
 }
 
 inline std::string day_one(int year, int month) {
-    char buf[16];
-    std::snprintf(buf, sizeof buf, "%04d-%02d-01", year, month);
-    return buf;
+    // year is 1900..2101 and month 1..12 here: four and two digits.
+    std::string out = std::to_string(year) + "-";
+    if (month < 10) {
+        out += '0';
+    }
+    return out + std::to_string(month) + "-01";
 }
 
 }  // namespace detail

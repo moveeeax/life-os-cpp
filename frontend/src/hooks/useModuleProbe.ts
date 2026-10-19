@@ -12,6 +12,7 @@ export type ModuleId =
   | 'money'
   | 'notes'
   | 'now'
+  | 'practice'
   | 'tasks'
   | 'travel'
   | 'workout';

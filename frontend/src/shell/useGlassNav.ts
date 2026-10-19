@@ -5,6 +5,7 @@ import {
   MONEY_PROBE,
   NOTES_PROBE,
   NOW_PROBE,
+  PRACTICE_PROBE,
   TASKS_PROBE,
   TRAVEL_PROBE,
   WORKOUT_PROBE,
@@ -39,6 +40,11 @@ export function useGlassNav(): {
     { id: 'travel', enabled: signedIn, on: useModuleOn('travel', TRAVEL_PROBE, signedIn) },
     { id: 'habits', enabled: signedIn, on: useModuleOn('habits', HABITS_PROBE, signedIn) },
     { id: 'notes', enabled: signedIn, on: useModuleOn('notes', NOTES_PROBE, signedIn) },
+    {
+      id: 'practice',
+      enabled: signedIn,
+      on: useModuleOn('practice', PRACTICE_PROBE, signedIn),
+    },
   ];
   const off = new Set(probes.filter((p) => p.on === false).map((p) => p.id));
   // Learning has no module of its own: its courses are projects of Tasks.
