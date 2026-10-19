@@ -4,8 +4,9 @@
  *        made from the title and kept unique, tags checked, search and the
  *        topic, tag and project filters with the facets, a project or task link
  *        of the caller only, private for now, owner scope, a deleted project
- *        leaving its notes unlinked, and the day a note is about ordering the
- *        list.
+ *        leaving its notes unlinked, the day a note is about ordering the
+ *        list and bounding it with from and to, and a deal of the practice
+ *        linked, filtered on and unlinked when the deal goes.
  */
 
 #include <chrono>
@@ -21,6 +22,7 @@
 #include <nlohmann/json.hpp>
 
 #include "api/NotesController.hpp"
+#include "api/PracticeController.hpp"
 #include "api/ProjectsController.hpp"
 #include "api/TasksController.hpp"
 #include "database/Database.hpp"
@@ -49,11 +51,13 @@ protected:
     Api::NotesController c;
     Api::ProjectsController projects;
     Api::TasksController tasks;
+    Api::PracticeController practice;
 
     std::string config_file_name() const override { return "notes_api_test_config.json"; }
     void config_overrides(nlohmann::json& cfg) override {
         cfg["notes"]["enabled"] = true;
         cfg["tasks"]["enabled"] = true;
+        cfg["practice"]["enabled"] = true;
     }
 
     void SetUp() override {
@@ -66,6 +70,9 @@ protected:
                 txn.exec_params("DELETE FROM notes WHERE owner_id = $1::uuid", o);
                 txn.exec_params("DELETE FROM task_items WHERE owner_id = $1::uuid", o);
                 txn.exec_params("DELETE FROM projects WHERE owner_id = $1::uuid", o);
+                txn.exec_params("DELETE FROM practice_entries WHERE owner_id = $1::uuid", o);
+                txn.exec_params("DELETE FROM practice_deals WHERE owner_id = $1::uuid", o);
+                txn.exec_params("DELETE FROM practice_clients WHERE owner_id = $1::uuid", o);
                 txn.exec_params(
                     "INSERT INTO users (id, email, confirmed, role_id) "
                     "VALUES ($1::uuid, $2, TRUE, (SELECT id FROM roles ORDER BY id LIMIT 1)) "
@@ -280,4 +287,108 @@ TEST_F(NotesApiTest, ADateOrdersTheList) {
     EXPECT_EQ(body_of(patch(json{{"title", "Trip"}}))["data"]["date"], "2026-01-15");
     EXPECT_EQ(list(kAnna)["data"][3]["id"], may) << "now the oldest";
     EXPECT_TRUE(body_of(patch(json{{"date", nullptr}}))["data"]["date"].is_null());
+}
+
+// from and to bound the day a note is about, both inclusive; an undated note is out once a bound is given.
+TEST_F(NotesApiTest, FromAndToFilterOnTheDate) {
+    const auto id_of = [&](const json& body) {
+        auto r = add(kAnna, body);
+        EXPECT_EQ(r->statusCode(), k201Created) << std::string(r->body());
+        return body_of(r)["data"]["id"].get<std::string>();
+    };
+    const auto march = id_of(json{{"title", "Spring"}, {"date", "2026-03-10"}});
+    const auto may = id_of(json{{"title", "Almaty"}, {"date", "2026-05-02"}});
+    const auto june = id_of(json{{"title", "Summer"}, {"date", "2026-06-30"}});
+    id_of(json{{"title", "Undated"}});
+    add(kBoris, json{{"title", "Theirs"}, {"date", "2026-05-02"}});
+
+    const auto ids = [&](const std::vector<std::pair<std::string, std::string>>& params) {
+        const json page = list(kAnna, params);
+        const json rows = page["data"];
+        std::vector<std::string> out;
+        for (const auto& row : rows) {
+            out.push_back(row["id"].get<std::string>());
+        }
+        EXPECT_EQ(page["total"], static_cast<long>(out.size())) << "the total counts the same notes";
+        return out;
+    };
+    EXPECT_EQ(ids({{"from", "2026-03-10"}, {"to", "2026-05-02"}}), (std::vector<std::string>{may, march}))
+        << "both bounds inclusive, newest first";
+    EXPECT_EQ(ids({{"from", "2026-05-03"}}), (std::vector<std::string>{june}));
+    EXPECT_EQ(ids({{"to", "2026-03-10"}}), (std::vector<std::string>{march}));
+    EXPECT_EQ(ids({{"from", "2026-05-02"}, {"to", "2026-05-02"}}), (std::vector<std::string>{may})) << "one day";
+    EXPECT_EQ(ids({}).size(), 4U) << "no bound: the undated note is there";
+
+    for (const std::vector<std::pair<std::string, std::string>>& bad : {
+             std::vector<std::pair<std::string, std::string>>{{"from", "2026-02-30"}},
+             std::vector<std::pair<std::string, std::string>>{{"to", "May 2"}},
+             std::vector<std::pair<std::string, std::string>>{{"from", "2026-06-01"}, {"to", "2026-05-01"}},
+         }) {
+        auto r = call(
+            kAnna, Get, json::object(), [&](auto req, auto cb) { c.listNotes(req, std::move(cb)); }, bad);
+        ASSERT_EQ(r->statusCode(), k400BadRequest) << bad[0].first << "=" << bad[0].second;
+        EXPECT_EQ(body_of(r)["error"], "invalid_query");
+    }
+}
+
+// A note can be about a deal of the caller's practice; deleting the deal leaves the note, unlinked.
+TEST_F(NotesApiTest, ANoteLinksADealOfTheCaller) {
+    const auto deal_of = [&](const char* who, const char* title) {
+        auto cl = call(
+            who, Post, json{{"name", "Acme"}}, [&](auto req, auto cb) { practice.createClient(req, std::move(cb)); });
+        EXPECT_EQ(cl->statusCode(), k201Created) << std::string(cl->body());
+        auto d =
+            call(who, Post, json{{"client_id", body_of(cl)["data"]["id"]}, {"title", title}}, [&](auto req, auto cb) {
+                practice.createDeal(req, std::move(cb));
+            });
+        EXPECT_EQ(d->statusCode(), k201Created) << std::string(d->body());
+        return body_of(d)["data"]["id"].get<std::string>();
+    };
+    const auto site = deal_of(kAnna, "Landing page");
+    const auto theirs = deal_of(kBoris, "Their deal");
+
+    auto made = add(kAnna, json{{"title", "Call with Acme"}, {"deal_id", site}});
+    ASSERT_EQ(made->statusCode(), k201Created) << std::string(made->body());
+    EXPECT_EQ(body_of(made)["data"]["deal_id"], site);
+    EXPECT_EQ(body_of(made)["data"]["deal_title"], "Landing page");
+    const auto id = body_of(made)["data"]["id"].get<std::string>();
+    const auto plain = body_of(add(kAnna, json{{"title", "Unrelated"}}))["data"];
+    EXPECT_TRUE(plain["deal_id"].is_null());
+    EXPECT_TRUE(plain["deal_title"].is_null());
+
+    auto foreign = add(kAnna, json{{"title", "x"}, {"deal_id", theirs}});
+    ASSERT_EQ(foreign->statusCode(), k400BadRequest) << "a deal of someone else";
+    EXPECT_EQ(add(kAnna, json{{"title", "x"}, {"deal_id", "not-a-uuid"}})->statusCode(), k400BadRequest);
+    auto foreign_edit =
+        call(kAnna, Patch, json{{"deal_id", theirs}}, [&](auto req, auto cb) { c.updateNote(req, std::move(cb), id); });
+    EXPECT_EQ(foreign_edit->statusCode(), k400BadRequest);
+
+    const json by_deal = list(kAnna, {{"deal_id", site}});
+    const json rows = by_deal["data"];
+    ASSERT_EQ(rows.size(), 1U);
+    EXPECT_EQ(rows[0]["id"], id);
+    EXPECT_EQ(rows[0]["deal_title"], "Landing page") << "the list carries the deal";
+    EXPECT_EQ(by_deal["total"], 1);
+    auto bad = call(
+        kAnna, Get, json::object(), [&](auto req, auto cb) { c.listNotes(req, std::move(cb)); }, {{"deal_id", "nope"}});
+    EXPECT_EQ(bad->statusCode(), k400BadRequest);
+
+    auto unlinked = call(
+        kAnna, Patch, json{{"deal_id", nullptr}}, [&](auto req, auto cb) { c.updateNote(req, std::move(cb), id); });
+    ASSERT_EQ(unlinked->statusCode(), k200OK) << std::string(unlinked->body());
+    TestHelpers::expect_matches_schema(unlinked, "PATCH", "/api/v1/notes/{id}");
+    EXPECT_TRUE(body_of(unlinked)["data"]["deal_id"].is_null());
+    auto relinked =
+        call(kAnna, Patch, json{{"deal_id", site}}, [&](auto req, auto cb) { c.updateNote(req, std::move(cb), id); });
+    ASSERT_EQ(relinked->statusCode(), k200OK) << std::string(relinked->body());
+    EXPECT_EQ(body_of(relinked)["data"]["deal_id"], site);
+
+    auto gone =
+        call(kAnna, Delete, json::object(), [&](auto req, auto cb) { practice.deleteDeal(req, std::move(cb), site); });
+    ASSERT_EQ(gone->statusCode(), k204NoContent) << std::string(gone->body());
+    auto left = call(kAnna, Get, json::object(), [&](auto req, auto cb) { c.getNote(req, std::move(cb), id); });
+    ASSERT_EQ(left->statusCode(), k200OK);
+    TestHelpers::expect_matches_schema(left, "GET", "/api/v1/notes/{id}");
+    EXPECT_TRUE(body_of(left)["data"]["deal_id"].is_null()) << "the note stays, unlinked";
+    EXPECT_TRUE(body_of(left)["data"]["deal_title"].is_null());
 }

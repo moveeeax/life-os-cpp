@@ -2,9 +2,9 @@
  * @file NoteRepository.hpp
  * @brief The owner's notes: Markdown with the fields of a tarassov.me post
  *        (slug, title, summary, body, topic, tags, status), linked to a project
- *        or course and to the task a note was made from, and the day a note is
- *        about (optional; the list sorts by it when set, else by the day the
- *        note was made).
+ *        or course, to the task a note was made from and to a deal of the
+ *        practice, and the day a note is about (optional; the list sorts by it
+ *        when set, else by the day the note was made, and filters on it).
  */
 
 #pragma once
@@ -49,6 +49,7 @@ public:
         std::optional<std::string> project_id;
         std::optional<std::string> task_id;
         std::optional<std::string> date;  // YYYY-MM-DD
+        std::optional<std::string> deal_id;
     };
 
     /// A partial edit; a link given as null clears it.
@@ -62,6 +63,7 @@ public:
         std::optional<std::optional<std::string>> project_id;
         std::optional<std::optional<std::string>> task_id;
         std::optional<std::optional<std::string>> date;
+        std::optional<std::optional<std::string>> deal_id;
     };
 
     struct Filter {
@@ -69,6 +71,9 @@ public:
         std::string topic;    // "" any
         std::string tag;      // "" any
         std::string project;  // "" any, or a project id
+        std::string from;     // "" open, or the first day (YYYY-MM-DD) of the note's date
+        std::string to;       // "" open, or the last day; with either bound a note without a date is left out
+        std::string deal;     // "" any, or a deal id
         int limit = 50;
         int offset = 0;
     };
@@ -80,8 +85,8 @@ public:
                 return Database::get().execute_write([&](auto& txn) {
                     auto r = txn.exec_params(
                         "INSERT INTO notes (owner_id, slug, title, summary, body, topic, tags, project_id, task_id, "
-                        "date) "
-                        "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7::text[], $8::uuid, $9::uuid, $10::date) "
+                        "date, deal_id) "
+                        "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7::text[], $8::uuid, $9::uuid, $10::date, $11::uuid) "
                         "RETURNING id::text",
                         owner,
                         in.slug,
@@ -92,7 +97,8 @@ public:
                         pg_array(in.tags),
                         in.project_id,
                         in.task_id,
-                        in.date);
+                        in.date,
+                        in.deal_id);
                     return *find_in(txn, owner, r[0][0].template as<std::string>());
                 });
             },
@@ -125,7 +131,8 @@ public:
                         " tags = CASE WHEN $8::boolean THEN $9::text[] ELSE tags END, "
                         " project_id = CASE WHEN $10::boolean THEN $11::uuid ELSE project_id END, "
                         " task_id = CASE WHEN $12::boolean THEN $13::uuid ELSE task_id END, "
-                        " date = CASE WHEN $14::boolean THEN $15::date ELSE date END "
+                        " date = CASE WHEN $14::boolean THEN $15::date ELSE date END, "
+                        " deal_id = CASE WHEN $16::boolean THEN $17::uuid ELSE deal_id END "
                         "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
                         owner,
                         id,
@@ -141,7 +148,9 @@ public:
                         p.task_id.has_value(),
                         p.task_id.has_value() ? *p.task_id : std::optional<std::string>(),
                         p.date.has_value(),
-                        p.date.has_value() ? *p.date : std::optional<std::string>());
+                        p.date.has_value() ? *p.date : std::optional<std::string>(),
+                        p.deal_id.has_value(),
+                        p.deal_id.has_value() ? *p.deal_id : std::optional<std::string>());
                     if (r.empty()) {
                         throw NotFound();
                     }
@@ -170,7 +179,9 @@ public:
                 " WHERE n.owner_id = $1::uuid AND ($2 = '' OR n.title ILIKE '%' || $2 || '%' ESCAPE '\\' "
                 " OR n.summary ILIKE '%' || $2 || '%' ESCAPE '\\' OR n.body ILIKE '%' || $2 || '%' ESCAPE '\\') "
                 " AND ($3 = '' OR n.topic = $3) AND ($4 = '' OR $4 = ANY(n.tags)) "
-                " AND ($5 = '' OR n.project_id = NULLIF($5, '')::uuid) ";
+                " AND ($5 = '' OR n.project_id = NULLIF($5, '')::uuid) "
+                " AND ($8 = '' OR n.date >= NULLIF($8, '')::date) AND ($9 = '' OR n.date <= NULLIF($9, '')::date) "
+                " AND ($10 = '' OR n.deal_id = NULLIF($10, '')::uuid) ";
             const std::string q = Repositories::escape_like(f.q);
             auto total = txn.exec_params("SELECT count(*) FROM notes n" + where + " AND $6::int >= 0 AND $7::int >= 0",
                                          owner,
@@ -179,7 +190,10 @@ public:
                                          f.tag,
                                          f.project,
                                          f.limit,
-                                         f.offset);
+                                         f.offset,
+                                         f.from,
+                                         f.to,
+                                         f.deal);
             auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " +
                                          std::string(kListColumns) + " FROM notes n" + where + " ORDER BY " +
                                          std::string(kDayOrder) + " LIMIT $6 OFFSET $7) t",
@@ -189,7 +203,10 @@ public:
                                      f.tag,
                                      f.project,
                                      f.limit,
-                                     f.offset);
+                                     f.offset,
+                                     f.from,
+                                     f.to,
+                                     f.deal);
             return nlohmann::json{{"data", nlohmann::json::parse(r[0][0].template as<std::string>())},
                                   {"total", total[0][0].template as<long>()}};
         });
@@ -216,11 +233,12 @@ private:
         " " SQL_ISO_UTC("n.published_at") " AS published_at, "
         " " SQL_ISO_UTC("n.created_at") " AS created_at, "
         " " SQL_ISO_UTC("n.updated_at") " AS updated_at";
-    /// The project or course of a note, by name and kind, as tasks carry theirs.
+    /// The project or course of a note, by name and kind, and its deal by title, as tasks carry theirs.
     static constexpr const char* kLinks =
         " n.project_id, n.task_id, "
         " (SELECT p.name FROM projects p WHERE p.id = n.project_id) AS project_title, "
-        " (SELECT p.kind FROM projects p WHERE p.id = n.project_id) AS project_kind, ";
+        " (SELECT p.kind FROM projects p WHERE p.id = n.project_id) AS project_kind, "
+        " n.deal_id, (SELECT d.title FROM practice_deals d WHERE d.id = n.deal_id) AS deal_title, ";
     /// The day a note sorts by: its date when set, else the UTC day it was made (index notes_owner_day).
     static constexpr const char* kDayOrder =
         "COALESCE(n.date, (n.created_at AT TIME ZONE 'UTC')::date) DESC, n.created_at DESC";
@@ -229,6 +247,7 @@ private:
         " n.project_id, n.task_id, "
         " (SELECT p.name FROM projects p WHERE p.id = n.project_id) AS project_title, "
         " (SELECT p.kind FROM projects p WHERE p.id = n.project_id) AS project_kind, "
+        " n.deal_id, (SELECT d.title FROM practice_deals d WHERE d.id = n.deal_id) AS deal_title, "
         " " SQL_ISO_UTC("n.published_at") " AS published_at, "
         " " SQL_ISO_UTC("n.created_at") " AS created_at, "
         " " SQL_ISO_UTC("n.updated_at") " AS updated_at";

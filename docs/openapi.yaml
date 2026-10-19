@@ -616,7 +616,7 @@ components:
       enum: ['5min', '30min', deep, null]
     Note:
       type: object
-      required: [id, slug, title, summary, status, topic, tags, date, project_id, task_id, project_title, project_kind, published_at, created_at, updated_at]
+      required: [id, slug, title, summary, status, topic, tags, date, project_id, task_id, project_title, project_kind, deal_id, deal_title, published_at, created_at, updated_at]
       description: 'A private Markdown note with the fields of a tarassov.me blog post (slug, title, summary, body, status, topic, tags, published_at); the list leaves the body out'
       properties:
         id: { type: string, format: uuid }
@@ -632,6 +632,8 @@ components:
         task_id: { type: [string, 'null'], format: uuid }
         project_title: { type: [string, 'null'] }
         project_kind: { type: [string, 'null'], enum: [project, course, null] }
+        deal_id: { type: [string, 'null'], format: uuid, description: The deal of the practice the note is about }
+        deal_title: { type: [string, 'null'], description: The title of that deal }
         published_at: { type: [string, 'null'], format: date-time }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
@@ -648,6 +650,7 @@ components:
         project_id: { type: [string, 'null'], format: uuid, description: A project or course of the caller }
         task_id: { type: [string, 'null'], format: uuid, description: A task of the caller }
         date: { type: [string, 'null'], format: date, description: The day the note is about; null clears it }
+        deal_id: { type: [string, 'null'], format: uuid, description: 'A deal of the caller''s practice (400 not_yours otherwise, or while practice is off); null unlinks' }
     NoteFacet:
       type: object
       required: [count]
@@ -7919,6 +7922,9 @@ paths:
         - { name: topic, in: query, schema: { type: string } }
         - { name: tag, in: query, schema: { type: string } }
         - { name: project, in: query, schema: { type: string, format: uuid } }
+        - { name: from, in: query, schema: { type: string, format: date }, description: 'The first day of the note''s date, inclusive; a note without a date is left out when from or to is given' }
+        - { name: to, in: query, schema: { type: string, format: date }, description: 'The last day of the note''s date, inclusive; not before from' }
+        - { name: deal_id, in: query, schema: { type: string, format: uuid }, description: Only the notes about this deal of the practice }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
@@ -7934,7 +7940,7 @@ paths:
                   total: { type: integer }
                   topics: { type: array, items: { $ref: '#/components/schemas/NoteFacet' } }
                   tags: { type: array, items: { $ref: '#/components/schemas/NoteFacet' } }
-        '400': { description: Bad query }
+        '400': { description: 'Bad query (invalid_query): project or deal_id not an id, from or to not a calendar day, or to before from' }
         '401': { description: Not authenticated }
         '404': { description: Notes module disabled }
     post:
@@ -10670,12 +10676,6 @@ paths:
   /api/v1/medical/visits/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-    patch:
-      summary: Replace a visit (every field)
-      tags: [medical]
-      security: [{ BearerAuth: [] }]
-      requestBody:
-        required: true
     get:
       summary: One visit, in the shape of an element of the list
       tags: [medical]
@@ -10710,6 +10710,12 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+    patch:
+      summary: Replace a visit (every field)
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/MedicalVisitInput' }
@@ -10915,12 +10921,6 @@ paths:
   /api/v1/medical/records/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-    patch:
-      summary: Replace a record (every field)
-      tags: [medical]
-      security: [{ BearerAuth: [] }]
-      requestBody:
-        required: true
     get:
       summary: One record, in the shape of an element of the list
       tags: [medical]
@@ -10955,6 +10955,12 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+    patch:
+      summary: Replace a record (every field)
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/MedicalRecordInput' }
@@ -11095,12 +11101,6 @@ paths:
   /api/v1/medical/medications/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-    patch:
-      summary: Replace a medication (every field)
-      tags: [medical]
-      security: [{ BearerAuth: [] }]
-      requestBody:
-        required: true
     get:
       summary: One medication, in the shape of an element of the list
       tags: [medical]
@@ -11135,6 +11135,12 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+    patch:
+      summary: Replace a medication (every field)
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/MedicalMedicationInput' }

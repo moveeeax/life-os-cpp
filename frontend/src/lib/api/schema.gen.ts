@@ -2480,7 +2480,7 @@ export interface paths {
         };
         /**
          * Girths measured by hand, newest first
-         * @description The caller's own rows: they need no linked Mi account.
+         * @description The caller's own rows: they need no linked Mi account and no fitness permission.
          */
         get: {
             parameters: {
@@ -2524,7 +2524,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description No fitness:read, or the principal is not a user account (no_user_account) */
+                /** @description The principal is not a user account (no_user_account); no fitness permission is needed */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -2580,7 +2580,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description No fitness:read, or the principal is not a user account (no_user_account) */
+                /** @description The principal is not a user account (no_user_account); no fitness permission is needed */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -2640,7 +2640,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description No fitness:read, or the principal is not a user account (no_user_account) */
+                /** @description The principal is not a user account (no_user_account); no fitness permission is needed */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -2699,7 +2699,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description No fitness:read, or the principal is not a user account (no_user_account) */
+                /** @description The principal is not a user account (no_user_account); no fitness permission is needed */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -10495,6 +10495,12 @@ export interface paths {
                     topic?: string;
                     tag?: string;
                     project?: string;
+                    /** @description The first day of the note's date, inclusive; a note without a date is left out when from or to is given */
+                    from?: string;
+                    /** @description The last day of the note's date, inclusive; not before from */
+                    to?: string;
+                    /** @description Only the notes about this deal of the practice */
+                    deal_id?: string;
                     limit?: number;
                     offset?: number;
                 };
@@ -10518,7 +10524,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Bad query */
+                /** @description Bad query (invalid_query): project or deal_id not an id, from or to not a calendar day, or to before from */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -16922,7 +16928,67 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /** One visit, in the shape of an element of the list */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MedicalVisit"];
+                        };
+                    };
+                };
+                /** @description The id is not a uuid */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not the caller's visit (not_found), or the medical module is off */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
         put?: never;
         post?: never;
         /** Delete a visit */
@@ -17309,7 +17375,67 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /** One record, in the shape of an element of the list */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MedicalRecord"];
+                        };
+                    };
+                };
+                /** @description The id is not a uuid */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not the caller's record (not_found), or the medical module is off */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
         put?: never;
         post?: never;
         /** Delete a record and its files */
@@ -17590,7 +17716,67 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /** One medication, in the shape of an element of the list */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MedicalMedication"];
+                        };
+                    };
+                };
+                /** @description The id is not a uuid */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not the caller's medication (not_found), or the medical module is off */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
         put?: never;
         post?: never;
         /** Delete a medication */
@@ -20821,6 +21007,13 @@ export interface components {
             project_title: string | null;
             /** @enum {string|null} */
             project_kind: "project" | "course" | null;
+            /**
+             * Format: uuid
+             * @description The deal of the practice the note is about
+             */
+            deal_id: string | null;
+            /** @description The title of that deal */
+            deal_title: string | null;
             /** Format: date-time */
             published_at: string | null;
             /** Format: date-time */
@@ -20854,6 +21047,11 @@ export interface components {
              * @description The day the note is about; null clears it
              */
             date?: string | null;
+            /**
+             * Format: uuid
+             * @description A deal of the caller's practice (400 not_yours otherwise, or while practice is off); null unlinks
+             */
+            deal_id?: string | null;
         };
         NoteFacet: {
             topic?: string;
@@ -20863,9 +21061,10 @@ export interface components {
         /** @description A sum in one currency; amounts of two currencies are never added together */
         PracticeAmount: {
             currency: string;
+            /** @description In the currency's major units, e.g. 1500.50 */
             amount: number;
         };
-        /** @description The totals of one currency: income, expense, income minus expense, and the count of entries */
+        /** @description The totals of one currency in its major units (e.g. 1500.50): income, expense, income minus expense, and the count of entries */
         PracticeTotal: {
             currency: string;
             income: number;
@@ -20907,7 +21106,7 @@ export interface components {
             client_name: string;
             title: string;
             stage: components["schemas"]["PracticeDealStage"];
-            /** @description The agreed value */
+            /** @description The agreed value, in the currency's major units, e.g. 1500.50 */
             value: number | null;
             currency: string | null;
             /** Format: date */
@@ -20933,7 +21132,7 @@ export interface components {
             /** @description Required on create */
             title?: string;
             stage?: components["schemas"]["PracticeDealStage"];
-            /** @description Given together with currency, both or neither; a whole number of the currency's smallest unit */
+            /** @description Given together with currency, both or neither; in the currency's major units, e.g. 1500.50, with no more decimals than the currency has */
             value?: number | null;
             currency?: string | null;
             /** Format: date */
@@ -20953,7 +21152,7 @@ export interface components {
             kind: "income" | "expense";
             /** Format: date */
             date: string;
-            /** @description Positive; the kind is the sign */
+            /** @description Positive, in the currency's major units, e.g. 1500.50; the kind is the sign */
             amount: number;
             currency: string;
             /** Format: uuid */
@@ -20979,7 +21178,7 @@ export interface components {
              * @description Required on create
              */
             date?: string;
-            /** @description Required on create; a whole number of the currency's smallest unit */
+            /** @description Required on create; in the currency's major units, e.g. 1500.50, with no more decimals than the currency has */
             amount?: number;
             /** @description Required on create */
             currency?: string;
@@ -21000,7 +21199,7 @@ export interface components {
             entries: number;
             totals: components["schemas"]["PracticeTotal"][];
         };
-        /** @description The totals of one client in one currency; client_id null for entries without a client */
+        /** @description The totals of one client in one currency, in its major units (e.g. 1500.50); client_id null for entries without a client */
         PracticeClientTotal: {
             /** Format: uuid */
             client_id: string | null;

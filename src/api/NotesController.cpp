@@ -2,8 +2,9 @@
  * @file NotesController.cpp
  * @brief Notes: a slug made from the title when none is given (kept unique per
  *        owner), tags as a list (no commas: tarassov.me stores them joined), a
- *        project, course or task link of the caller only, an optional day the
- *        note is about; private for now.
+ *        project, course, task or practice deal link of the caller only, an
+ *        optional day the note is about (the list filters on it with from and
+ *        to); private for now.
  */
 
 #include "api/NotesController.hpp"
@@ -25,6 +26,7 @@
 #include "api/Validation.hpp"
 #include "notes/Slug.hpp"
 #include "repositories/notes/NoteRepository.hpp"
+#include "repositories/practice/DealRepository.hpp"
 #include "repositories/tasks/ProjectRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
 #include "utils/ErrorResponse.hpp"
@@ -36,6 +38,7 @@ namespace Api {
 namespace {
 
 using json = nlohmann::json;
+using Api::Fields::is_calendar_date;
 using Api::Fields::text_length;
 using Repositories::Notes::NoteRepository;
 
@@ -93,7 +96,7 @@ void note_fields(Validation::Errors& errs, const json& body, const std::string& 
         errs.add("status", "not_yet", "notes are private for now; publishing to the blog comes later");
     }
     Api::Fields::date_field(errs, body, "date");
-    for (const char* link : {"project_id", "task_id"}) {
+    for (const char* link : {"project_id", "task_id", "deal_id"}) {
         if (body.contains(link) && !body[link].is_null()) {
             Validation::uuid(errs, body, link);
         }
@@ -108,6 +111,12 @@ void note_fields(Validation::Errors& errs, const json& body, const std::string& 
     if (body.contains("task_id") && !body["task_id"].is_null() &&
         !Repositories::Tasks::TaskRepository().get(owner, body["task_id"].get<std::string>())) {
         errs.add("task_id", "not_yours", "the task is not yours");
+    }
+    // A deal of the caller's practice, as a task's deal link (TasksController).
+    if (body.contains("deal_id") && !body["deal_id"].is_null() &&
+        (!Core::practice_enabled() ||
+         !Repositories::Practice::DealRepository().client_of(owner, body["deal_id"].get<std::string>()))) {
+        errs.add("deal_id", "not_yours", "the deal is not yours");
     }
 }
 
@@ -127,10 +136,18 @@ void NotesController::listNotes(const HttpRequestPtr& req, Callback&& callback) 
     f.topic = req->getParameter("topic");
     f.tag = req->getParameter("tag");
     f.project = req->getParameter("project");
+    f.from = req->getParameter("from");
+    f.to = req->getParameter("to");
+    f.deal = req->getParameter("deal_id");
     f.limit = clamp_int(req->getParameter("limit"), kDefaultLimit, 1, kMaxLimit);
     f.offset = clamp_int(req->getParameter("offset"), 0, 0, 1000000);
-    if (!f.project.empty() && !is_valid_uuid(f.project)) {
-        callback(ErrorResponse::bad_request("invalid_query", "project must be an id"));
+    if ((!f.project.empty() && !is_valid_uuid(f.project)) || (!f.deal.empty() && !is_valid_uuid(f.deal))) {
+        callback(ErrorResponse::bad_request("invalid_query", "project and deal_id must be ids"));
+        return;
+    }
+    if ((!f.from.empty() && !is_calendar_date(f.from)) || (!f.to.empty() && !is_calendar_date(f.to)) ||
+        (!f.from.empty() && !f.to.empty() && f.to < f.from)) {
+        callback(ErrorResponse::bad_request("invalid_query", "from and to must be calendar days, from first"));
         return;
     }
     with_repo_errors(callback, "notes.list", [&] {
@@ -169,6 +186,7 @@ void NotesController::createNote(const HttpRequestPtr& req, Callback&& callback)
         in.project_id = Validation::opt_string(body, "project_id");
         in.task_id = Validation::opt_string(body, "task_id");
         in.date = Validation::opt_string(body, "date");
+        in.deal_id = Validation::opt_string(body, "deal_id");
         callback(Response::created(json{{"data", repo.create(owner, in)}}));
     });
 }
@@ -214,6 +232,7 @@ void NotesController::updateNote(const HttpRequestPtr& req, Callback&& callback,
         p.project_id = nullable(body, "project_id");
         p.task_id = nullable(body, "task_id");
         p.date = nullable(body, "date");
+        p.deal_id = nullable(body, "deal_id");
         callback(Response::ok(json{{"data", NoteRepository().update(owner, id, p)}}));
     });
 }

@@ -1,0 +1,1 @@
+A note can name the practice deal it is about (migration 054, `notes.deal_id`): create and edit take `deal_id` (a deal of the caller, null unlinks), a note answers `deal_id` and `deal_title`, `GET /api/v1/notes?deal_id=` filters on it, and deleting the deal leaves the note unlinked.
