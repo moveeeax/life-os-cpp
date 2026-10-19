@@ -284,25 +284,32 @@ TEST(HabitsEval, AWorkoutCountsOnTheLocalDayItFinished) {
     EXPECT_EQ(Habits::local_day("2026-10-14T02:00:00Z", -7 * 3600), d("2026-10-13")) << "west of UTC";
 }
 
-// Region cn (UTC+8). Oct 13 22:30Z is 06:30 on Oct 14 local, Oct 14 03:00Z is 11:00 on
-// Oct 14: the later one (71.8) is the day's. Oct 14 16:30Z is 00:30 on Oct 15 local, with
-// no weight in it. Oct 12 10:00Z (Oct 12 18:00 local) weighs 72.4.
+// Asia/Almaty is UTC+5 (offset 18000 s, as the SQL gives it). Oct 13 22:00Z is 03:00 on
+// Oct 14 local, Oct 14 03:00Z is 08:00 on Oct 14: the later one (71.8) is the day's.
+// Oct 12 21:00Z is 02:00 on Oct 13 local, 72.4 kg. Oct 14 19:30Z is 00:30 on Oct 15
+// local, with no weight in it.
 TEST(HabitsEval, AWeighInLandsOnTheLocalDayAndTheLatestWins) {
-    const json rows = json::array({
-        {{"timestamp", "2026-10-12T10:00:00+00:00"}, {"weight_kg", 72.4}},
-        {{"timestamp", "2026-10-13T22:30:00+00:00"}, {"weight_kg", 72.1}},
-        {{"timestamp", "2026-10-14T03:00:00+00:00"}, {"weight_kg", 71.8}},
-        {{"timestamp", "2026-10-14T16:30:00+00:00"}, {"weight_kg", nullptr}},
-        {{"timestamp", nullptr}, {"weight_kg", 70}},
-    });
-    const auto by_day = Habits::weight_by_local_day(rows, 8 * 3600);
+    constexpr long long kAlmaty = 5 * 3600;
+    const std::vector<Habits::WeighIn> almaty{
+        {"2026-10-12T21:00:00Z", kAlmaty, 72.4},
+        {"2026-10-13T22:00:00Z", kAlmaty, 72.1},
+        {"2026-10-14T03:00:00Z", kAlmaty, 71.8},
+        {"2026-10-14T19:30:00Z", kAlmaty, std::nullopt},
+        {"bad", kAlmaty, 70},
+    };
+    const auto by_day = Habits::weight_by_local_day(almaty);
     ASSERT_EQ(by_day.size(), 3U);
-    EXPECT_DOUBLE_EQ(by_day.at(d("2026-10-12")), 72.4);
-    EXPECT_DOUBLE_EQ(by_day.at(d("2026-10-14")), 71.8) << "the 11:00 weighing, not the 06:30 one";
-    EXPECT_EQ(by_day.count(d("2026-10-13")), 0U) << "22:30Z is already Oct 14 in the region";
+    EXPECT_DOUBLE_EQ(by_day.at(d("2026-10-13")), 72.4) << "02:00 local is Oct 13, not Oct 12";
+    EXPECT_DOUBLE_EQ(by_day.at(d("2026-10-14")), 71.8) << "the 08:00 weighing, not the 03:00 one";
+    EXPECT_EQ(by_day.count(d("2026-10-12")), 0U);
 
-    // In UTC the 22:30 weighing stays on Oct 13 and the 16:30 one on Oct 14.
-    const auto utc = Habits::weight_by_local_day(rows, 0);
+    // In UTC the 22:00 weighing stays on Oct 13 and the 19:30 one on Oct 14.
+    std::vector<Habits::WeighIn> utc_rows = almaty;
+    for (auto& w : utc_rows) {
+        w.offset_seconds = 0;
+    }
+    const auto utc = Habits::weight_by_local_day(utc_rows);
+    EXPECT_DOUBLE_EQ(utc.at(d("2026-10-12")), 72.4);
     EXPECT_DOUBLE_EQ(utc.at(d("2026-10-13")), 72.1);
     EXPECT_TRUE(std::isnan(utc.at(d("2026-10-14")))) << "the latest record of the day has no weight";
 
@@ -317,12 +324,12 @@ TEST(HabitsEval, AWeighInLandsOnTheLocalDayAndTheLatestWins) {
     const auto no_number = Habits::day_state(weight, d("2026-10-15"), none, by_day);
     EXPECT_TRUE(no_number.done) << "a record without weight_kg still ticks the day";
     EXPECT_FALSE(no_number.value.has_value());
-    EXPECT_FALSE(Habits::day_state(weight, d("2026-10-13"), none, by_day).done) << "no weighing that day";
-    EXPECT_EQ(Habits::done_days(weight, none, by_day), days({"2026-10-12", "2026-10-14", "2026-10-15"}));
+    EXPECT_FALSE(Habits::day_state(weight, d("2026-10-12"), none, by_day).done) << "no weighing that day";
+    EXPECT_EQ(Habits::done_days(weight, none, by_day), days({"2026-10-13", "2026-10-14", "2026-10-15"}));
 
     // A tick by hand on a day without a weighing counts, as for every source.
-    const Habits::Checks ticked{{d("2026-10-13"), std::nullopt}};
-    const auto by_hand = Habits::day_state(weight, d("2026-10-13"), ticked, by_day);
+    const Habits::Checks ticked{{d("2026-10-12"), std::nullopt}};
+    const auto by_hand = Habits::day_state(weight, d("2026-10-12"), ticked, by_day);
     EXPECT_TRUE(by_hand.done);
     EXPECT_TRUE(by_hand.manual);
 }

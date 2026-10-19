@@ -913,7 +913,7 @@
        "weight"
       ],
       "default": "manual",
-      "description": "weight: a day is done when the Mi scales took a record in the local day of the account region (as sleep), whatever it weighs; it takes no goal"
+      "description": "weight: a day is done when the Mi scales took a record in that local day by tz of the read (as a Training session), whatever it weighs; it takes no goal"
      },
      "target": {
       "type": [
@@ -33643,7 +33643,7 @@
        "type": "string",
        "default": "UTC"
       },
-      "description": "IANA zone of the caller: today and the local day of a Training session"
+      "description": "IANA zone of the caller: today and the local day of a Training session and of a weigh-in"
      }
     ],
     "responses": {
@@ -34263,7 +34263,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 507755,
-  "source_fnv1a64": "8b249c3d779e0f1b"
+  "source_bytes": 507783,
+  "source_fnv1a64": "9b71a0490616e9ba"
  }
 }

@@ -19774,7 +19774,7 @@ export interface paths {
                     from: string;
                     /** @description At most 61 days after from */
                     to: string;
-                    /** @description IANA zone of the caller: today and the local day of a Training session */
+                    /** @description IANA zone of the caller: today and the local day of a Training session and of a weigh-in */
                     tz?: string;
                 };
                 header?: never;
@@ -20665,7 +20665,7 @@ export interface components {
             goal?: number | null;
             unit?: string;
             /**
-             * @description weight: a day is done when the Mi scales took a record in the local day of the account region (as sleep), whatever it weighs; it takes no goal
+             * @description weight: a day is done when the Mi scales took a record in that local day by tz of the read (as a Training session), whatever it weighs; it takes no goal
              * @default manual
              * @enum {string}
              */

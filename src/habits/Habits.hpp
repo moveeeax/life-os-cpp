@@ -319,25 +319,28 @@ inline Values workouts_by_local_day(const std::vector<Session>& sessions) {
     return out;
 }
 
-/// A weigh-in by the local day it was taken on (the region zone, @p offset_seconds, as
-/// sleep): the weight_kg of the day's latest record, kNoNumber when that record has
-/// none. @p rows are HealthReadRepository::body rows.
-inline Values weight_by_local_day(const json& rows, long long offset_seconds) {
+/// A weigh-in of the Mi scales: its UTC instant, the caller's zone offset at that
+/// instant, and its weight (nullopt when the record has none).
+struct WeighIn {
+    std::string taken_at;  // "YYYY-MM-DDTHH:MM:SSZ"
+    long long offset_seconds = 0;
+    std::optional<double> weight_kg;
+};
+
+/// Weigh-ins by the local day they were taken on, in the caller's zone (as workout
+/// sessions): the weight_kg of the day's latest record, kNoNumber when that record has
+/// none.
+inline Values weight_by_local_day(const std::vector<WeighIn>& weigh_ins) {
     std::map<Day, std::pair<std::string, double>> latest;
-    for (const auto& r : rows) {
-        if (!r.contains("timestamp") || !r["timestamp"].is_string()) {
+    for (const auto& w : weigh_ins) {
+        if (w.taken_at.size() < 19) {
             continue;
         }
-        const std::string at = r["timestamp"].get<std::string>();
-        if (at.size() < 19) {
-            continue;
-        }
-        const Day day = local_day(at, offset_seconds);
+        const Day day = local_day(w.taken_at, w.offset_seconds);
         const auto it = latest.find(day);
-        // Rows come oldest first: a later row of the same instant wins as well.
-        if (it == latest.end() || at >= it->second.first) {
-            const bool weighed = r.contains("weight_kg") && r["weight_kg"].is_number();
-            latest[day] = {at, weighed ? r["weight_kg"].get<double>() : kNoNumber};
+        // Weigh-ins come oldest first: a later one of the same instant wins as well.
+        if (it == latest.end() || w.taken_at >= it->second.first) {
+            latest[day] = {w.taken_at, w.weight_kg.value_or(kNoNumber)};
         }
     }
     Values out;

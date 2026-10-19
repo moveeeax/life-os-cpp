@@ -267,7 +267,7 @@ components:
         per_week: { type: [integer, 'null'], minimum: 1, maximum: 7, description: Required for weekly; not allowed for daily }
         goal: { type: [number, 'null'], exclusiveMinimum: 0, description: 'Required for sleep (hours, at most 24), steps and active_kcal; dropped for workout; refused for weight (400 on goal)' }
         unit: { type: string, maxLength: 16 }
-        source: { type: string, enum: [manual, sleep, steps, active_kcal, workout, weight], default: manual, description: 'weight: a day is done when the Mi scales took a record in the local day of the account region (as sleep), whatever it weighs; it takes no goal' }
+        source: { type: string, enum: [manual, sleep, steps, active_kcal, workout, weight], default: manual, description: 'weight: a day is done when the Mi scales took a record in that local day by tz of the read (as a Training session), whatever it weighs; it takes no goal' }
         target: { type: [number, 'null'], exclusiveMinimum: 0, maximum: 1000000, description: 'Manual only: a day is done when the value of its tick (the sum of what was added) reaches it' }
     HabitDay:
       type: object
@@ -12150,7 +12150,7 @@ paths:
       parameters:
         - { name: from, in: query, required: true, schema: { type: string, format: date } }
         - { name: to, in: query, required: true, schema: { type: string, format: date }, description: At most 61 days after from }
-        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: today and the local day of a Training session' }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: today and the local day of a Training session and of a weigh-in' }
       responses:
         '200':
           description: The habits with their days

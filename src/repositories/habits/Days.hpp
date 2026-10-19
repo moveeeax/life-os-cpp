@@ -155,17 +155,12 @@ inline std::vector<Evaluated> evaluate(const std::string& owner,
                 keep(steps, ::Habits::activity_by_day(activity, "steps"), lo, hi);
                 keep(kcal, ::Habits::activity_by_day(activity, "active_kcal"), lo, hi);
                 if (wants_weight) {
-                    // Weigh-ins are filed by their UTC instant; the region day may start hours earlier.
-                    keep(
-                        weight,
-                        ::Habits::weight_by_local_day(
-                            health
-                                .body(
-                                    ::Habits::text_of(lo - days{1}), ::Habits::text_of(hi + days{1}), kRowsPerWindow, 0)
-                                .rows,
-                            offset),
-                        lo,
-                        hi);
+                    // Weigh-ins land on the caller's local day (tz), as Training sessions do.
+                    keep(weight,
+                         ::Habits::weight_by_local_day(
+                             repo.weigh_ins(xiaomi, ::Habits::text_of(lo), ::Habits::text_of(hi), tz)),
+                         lo,
+                         hi);
                 }
             }
         }

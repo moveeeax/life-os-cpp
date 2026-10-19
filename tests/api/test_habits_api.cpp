@@ -535,25 +535,28 @@ TEST_F(HabitsApiTest, AWeighInHabitTakesNoGoal) {
     EXPECT_EQ(list(kAnna).size(), 1U);
 }
 
-// Anna's Mi account is in region cn (UTC+8); D(n) is the UTC day n days from today.
-//   D-5 01:00Z (09:00 local) 72.4 kg and D-5 03:00Z (11:00 local) 72.1 kg: D-5 is done, 72.1.
-//   D-4 17:00Z is 01:00 on D-3 local, 71.9 kg: D-3 is done, D-4 is not.
+// The caller is in Asia/Almaty (UTC+5); Anna's Mi account is in region sg, whose day is UTC,
+// so the region would put a weigh-in before 05:00 local on the day before. D(n) is the UTC
+// day n days from today.
+//   D-6 22:00Z is 03:00 on D-5 local, 72.4 kg; D-5 04:00Z is 09:00 on D-5, 72.1 kg:
+//   D-5 is done with 72.1, D-6 is not.
+//   D-4 20:00Z is 01:00 on D-3 local, 71.9 kg: D-3 is done, D-4 is not.
 //   D-2 has no weighing and a tick by hand: done, manual, no value.
 // The habit is created after all of them: the days are evaluated on read, nothing is backfilled.
 TEST_F(HabitsApiTest, AWeighInTicksItsLocalDayFromThePast) {
     sql(std::string("INSERT INTO mi_accounts (owner_id, xiaomi_user_id, pass_token_sealed, nonce, region) VALUES ('") +
-        kAnna + "', '" + kAnnaMi + "', 'x', 'x', 'cn')");
+        kAnna + "', '" + kAnnaMi + "', 'x', 'x', 'sg')");
     const auto weigh = [&](int shift, const char* time, double kg) {
         sql(std::string("INSERT INTO body_measurements (user_id, timestamp, weight_kg) VALUES ('") + kAnnaMi + "', '" +
             utc_day(shift) + "T" + time + "Z', " + std::to_string(kg) + ")");
     };
-    weigh(-5, "01:00:00", 72.4);
-    weigh(-5, "03:00:00", 72.1);
-    weigh(-4, "17:00:00", 71.9);
+    weigh(-6, "22:00:00", 72.4);
+    weigh(-5, "04:00:00", 72.1);
+    weigh(-4, "20:00:00", 71.9);
     const auto weight = created(kAnna, json{{"name", "Weigh-in"}, {"schedule", "daily"}, {"source", "weight"}});
     ASSERT_EQ(tick(kAnna, weight, utc_day(-2))->statusCode(), k200OK);
 
-    const json h = habit_of(days(reader(kAnna), utc_day(-6), utc_day(0), "UTC")["data"], weight);
+    const json h = habit_of(days(reader(kAnna), utc_day(-6), utc_day(0), "Asia/Almaty")["data"], weight);
     EXPECT_FALSE(h["no_data"]);
     for (int shift = -6; shift <= 0; ++shift) {
         const bool weighed = shift == -5 || shift == -3;
@@ -565,13 +568,22 @@ TEST_F(HabitsApiTest, AWeighInTicksItsLocalDayFromThePast) {
         }
     }
     EXPECT_DOUBLE_EQ(day_of(h, utc_day(-5))["value"].get<double>(), 72.1) << "the later weighing of the day";
-    EXPECT_DOUBLE_EQ(day_of(h, utc_day(-3))["value"].get<double>(), 71.9) << "17:00Z is the next day in cn";
+    EXPECT_DOUBLE_EQ(day_of(h, utc_day(-3))["value"].get<double>(), 71.9) << "20:00Z is the next day in Almaty";
     EXPECT_EQ(h["best"], 2) << "D-3 and D-2";
     EXPECT_EQ(h["streak"], 0) << "yesterday is open";
 
+    // In UTC every weighing stays on its UTC day: D-6, D-5 and D-4, then the tick on D-2.
+    const json utc = habit_of(days(reader(kAnna), utc_day(-6), utc_day(0), "UTC")["data"], weight);
+    EXPECT_TRUE(day_of(utc, utc_day(-6))["done"]);
+    EXPECT_DOUBLE_EQ(day_of(utc, utc_day(-6))["value"].get<double>(), 72.4);
+    EXPECT_DOUBLE_EQ(day_of(utc, utc_day(-5))["value"].get<double>(), 72.1);
+    EXPECT_TRUE(day_of(utc, utc_day(-4))["done"]);
+    EXPECT_FALSE(day_of(utc, utc_day(-3))["done"]);
+    EXPECT_EQ(utc["best"], 3) << "D-6 to D-4";
+
     // Without the fitness read permission the scales are not read: the rule of every Mi source.
-    const json blind =
-        habit_of(days(user(kAnna, Domain::Permission::kGeneral), utc_day(-6), utc_day(0), "UTC")["data"], weight);
+    const json blind = habit_of(
+        days(user(kAnna, Domain::Permission::kGeneral), utc_day(-6), utc_day(0), "Asia/Almaty")["data"], weight);
     EXPECT_TRUE(blind["no_data"]);
     EXPECT_FALSE(day_of(blind, utc_day(-5))["done"]);
     EXPECT_TRUE(day_of(blind, utc_day(-2))["done"]) << "the tick by hand still counts";
