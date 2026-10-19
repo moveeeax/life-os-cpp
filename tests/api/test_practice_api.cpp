@@ -407,7 +407,7 @@ TEST_F(PracticeApiTest, ATaskIsANextStepOfADeal) {
     };
     auto t = add_task(kAnna, json{{"title", "Send the estimate"}, {"area", "projects"}, {"deal_id", site}});
     ASSERT_EQ(t->statusCode(), k201Created) << std::string(t->body());
-    TestHelpers::expect_matches_schema(t, "POST", "/api/v1/tasks");
+    TestHelpers::expect_matches_schema(t, "POST", "/api/v1/tasks/items");
     EXPECT_EQ(body_of(t)["data"]["deal_id"], site);
     EXPECT_EQ(body_of(t)["data"]["deal_title"], "Landing page");
     EXPECT_EQ(add_task(kAnna, json{{"title", "x"}, {"area", "projects"}, {"deal_id", theirs}})->statusCode(),
