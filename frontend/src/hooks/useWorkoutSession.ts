@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   useInfiniteQuery,
   useQuery,
@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
+import { browserStore as browserStorage } from '@/lib/browserStore';
 import { ApiClientError, api, apiErrorMessage } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import {
@@ -39,17 +40,8 @@ const BASE = '/api/v1/workout';
 /** A store that keeps nothing: the queue then lives in memory for this page. */
 const NO_STORE: SetStore = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 
-/**
- * The browser's storage, or NO_STORE when it is blocked or absent (a locked
- * down browser throws on the access itself; a render must not).
- */
-function browserStore(): SetStore {
-  try {
-    return globalThis.localStorage ?? NO_STORE;
-  } catch {
-    return NO_STORE;
-  }
-}
+/** The browser's storage, or NO_STORE when it is blocked or absent. */
+const browserStore = (): SetStore => browserStorage() ?? NO_STORE;
 
 /**
  * Puts a session the server just returned into the cache: under its own key
@@ -257,6 +249,15 @@ export function useRemoveSessionExercise(sessionId: string, onDone?: () => void)
 
 // ── sets: the unsent queue ──────────────────────────────────────────────────
 
+/** DELETE one set; already gone (404) is as good as deleted. */
+async function deleteSet(id: string) {
+  try {
+    await api.deleteJson<unknown>(`${BASE}/sets/${id}`);
+  } catch (e) {
+    if (!(e instanceof ApiClientError && e.status === 404)) throw e;
+  }
+}
+
 /**
  * Sets are written through a queue kept in localStorage. A set shows up at
  * once and is sent in the background; a failed send is retried with backoff
@@ -271,6 +272,10 @@ export function useSetQueue(sessionId: string) {
   );
   const queueRef = useRef(queue);
   const sending = useRef(false);
+  // The id whose PUT is out now, and the ids deleted while their PUT was out:
+  // that PUT may still land, so the set gets a DELETE once it settles.
+  const inFlight = useRef<string | null>(null);
+  const deletedInFlight = useRef(new Set<string>());
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const alive = useRef(true);
 
@@ -285,11 +290,21 @@ export function useSetQueue(sessionId: string) {
     const next = queueRef.current.find((q) => !q.rejected);
     if (!next) return;
     sending.current = true;
+    inFlight.current = next.id;
     let retryIn: number | null = null;
     try {
       const saved = (
         await api.putJson<{ data: WorkoutSet }>(`${BASE}/sets/${next.id}`, { body: next.body })
       ).data;
+      if (deletedInFlight.current.has(next.id)) {
+        // Deleted while this PUT was out: the set is on the server now, take it off.
+        await deleteSet(next.id).catch(() => undefined);
+        deletedInFlight.current.delete(next.id);
+        patchCachedSession(qc, next.sessionId, (s) => withoutSet(s, next.id));
+        void qc.invalidateQueries({ queryKey: qk.workout.sessions() });
+        retryIn = 0;
+        return;
+      }
       // A refetch that started before the write would bring the session back
       // without this set, after the queue has already let go of it.
       await Promise.all([
@@ -304,7 +319,11 @@ export function useSetQueue(sessionId: string) {
       retryIn = 0;
     } catch (e) {
       const status = e instanceof ApiClientError ? e.status : 0;
-      if (isPermanentFailure(status)) {
+      if (deletedInFlight.current.delete(next.id)) {
+        // A lost answer may still mean a stored set; a refused one means none.
+        if (!isPermanentFailure(status)) await deleteSet(next.id).catch(() => undefined);
+        retryIn = 0;
+      } else if (isPermanentFailure(status)) {
         update((q) => markFailed(q, next.id, apiErrorMessage(e, 'The server refused this set.')));
         retryIn = 0;
       } else {
@@ -313,11 +332,13 @@ export function useSetQueue(sessionId: string) {
       }
     } finally {
       sending.current = false;
+      inFlight.current = null;
+      if (alive.current) {
+        clearTimeout(timer.current);
+        if (retryIn === 0) void pump();
+        else if (retryIn !== null) timer.current = setTimeout(() => void pump(), retryIn);
+      }
     }
-    if (!alive.current) return;
-    clearTimeout(timer.current);
-    if (retryIn === 0) void pump();
-    else timer.current = setTimeout(() => void pump(), retryIn);
   }, [qc, update]);
 
   useEffect(() => {
@@ -345,17 +366,19 @@ export function useSetQueue(sessionId: string) {
     [pump, sessionId, update],
   );
 
-  /** Delete a set: an unsent one just leaves the queue. */
+  /**
+   * Delete a set: an unsent one just leaves the queue; one whose PUT is out
+   * gets its DELETE when that PUT settles.
+   */
   const remove = useCallback(
     async (id: string, onServer: boolean) => {
       update((q) => dropFromQueue(q, id));
-      if (!onServer) return;
-      try {
-        await api.deleteJson<unknown>(`${BASE}/sets/${id}`);
-      } catch (e) {
-        // Already gone is as good as deleted.
-        if (!(e instanceof ApiClientError && e.status === 404)) throw e;
+      if (inFlight.current === id) {
+        deletedInFlight.current.add(id);
+        return;
       }
+      if (!onServer) return;
+      await deleteSet(id);
       patchCachedSession(qc, sessionId, (s) => withoutSet(s, id));
       void qc.invalidateQueries({ queryKey: qk.workout.sessions() });
     },
@@ -398,26 +421,55 @@ function beep() {
   }
 }
 
+// The rest end lives outside React: the page starts it from a tap, and only
+// RestBar, which ticks, subscribes. The page itself does not re-render 4 times
+// a second during rest.
+const restListeners = new Set<() => void>();
+let restEnd: number | null | undefined; // undefined until read from storage
+
+function getRestEnd(): number | null {
+  if (restEnd === undefined) restEnd = readRestEnd(browserStore(), Date.now());
+  return restEnd;
+}
+
+function setRestEnd(value: number | null) {
+  writeRestEnd(browserStore(), value);
+  restEnd = value;
+  restListeners.forEach((f) => f());
+}
+
+function subscribeRest(f: () => void) {
+  restListeners.add(f);
+  return () => {
+    restListeners.delete(f);
+  };
+}
+
+/** Start the rest countdown (0 stops it). Called from a tap, so a sound may follow. */
+export function startRest(seconds: number) {
+  armSound();
+  setRestEnd(seconds > 0 ? Date.now() + seconds * 1000 : null);
+}
+
+/** Stop the rest countdown (finish, discard). */
+export function stopRest() {
+  setRestEnd(null);
+}
+
 /**
- * Rest timer of the session page. The end time is stored, so a reload keeps
- * the countdown. When it ends the page beeps and `justEnded` is true for a
- * moment (the visual flash).
+ * The rest countdown, for the component that shows it. The end time is
+ * stored, so a reload keeps the countdown. When it ends the page beeps and
+ * `justEnded` is true for a moment (the visual flash).
  */
 export function useRestTimer() {
-  const [endsAt, setEndsAt] = useState<number | null>(() =>
-    readRestEnd(browserStore(), Date.now()),
-  );
+  const endsAt = useSyncExternalStore(subscribeRest, getRestEnd);
   const [now, setNow] = useState(() => Date.now());
   const [justEnded, setJustEnded] = useState(false);
 
-  const set = useCallback((value: number | null) => {
-    writeRestEnd(browserStore(), value);
-    setNow(Date.now());
-    setEndsAt(value);
-  }, []);
-
   useEffect(() => {
     if (endsAt === null) return;
+    setJustEnded(false);
+    setNow(Date.now());
     const tick = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(tick);
   }, [endsAt]);
@@ -426,11 +478,11 @@ export function useRestTimer() {
 
   useEffect(() => {
     if (endsAt === null || remaining > 0) return;
-    set(null);
+    setRestEnd(null);
     beep();
     navigator.vibrate?.([200, 100, 200]);
     setJustEnded(true);
-  }, [endsAt, remaining, set]);
+  }, [endsAt, remaining]);
 
   useEffect(() => {
     if (!justEnded) return;
@@ -442,15 +494,10 @@ export function useRestTimer() {
     running: endsAt !== null && remaining > 0,
     remaining,
     justEnded,
-    start: (seconds: number) => {
-      armSound();
-      setJustEnded(false);
-      set(seconds > 0 ? Date.now() + seconds * 1000 : null);
-    },
     add: (seconds: number) => {
-      if (endsAt !== null) set(endsAt + seconds * 1000);
+      if (endsAt !== null) setRestEnd(endsAt + seconds * 1000);
     },
-    stop: () => set(null),
+    stop: () => setRestEnd(null),
   };
 }
 

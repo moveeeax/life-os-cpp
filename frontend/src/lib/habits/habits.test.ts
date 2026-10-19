@@ -13,6 +13,8 @@ import {
   scheduleWords,
   splitNumbers,
   subline,
+  canGoBack,
+  oldestTickDay,
   weekCells,
   weekDates,
   weekLine,
@@ -198,5 +200,15 @@ describe('the habit form', () => {
     );
     expect(habitProblem({ ...habitForm(), name: '' })).toBe('Give the habit a name.');
     expect(habitProblem({ ...habitForm(), name: 'Sleep', source: 'sleep', goal: '8' })).toBeNull();
+  });
+});
+
+describe('how far back a tick reaches', () => {
+  it('stops at today minus 366 days', () => {
+    expect(oldestTickDay('2026-10-18')).toBe('2025-10-17');
+    // The week of 2025-10-20 has the week of 2025-10-13 before it, whose Sunday is reachable.
+    expect(canGoBack('2025-10-20', '2026-10-18')).toBe(true);
+    // The week before 2025-10-13 ends on 2025-10-12, out of reach.
+    expect(canGoBack('2025-10-13', '2026-10-18')).toBe(false);
   });
 });

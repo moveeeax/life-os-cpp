@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { Outlet } from 'react-router';
 
 import { Nav } from './Nav';
@@ -19,7 +20,12 @@ export function Layout() {
       </a>
       <Nav />
       <main id="main-content" className="flex-1">
-        <Outlet />
+        {/* The account and public pages are lazy (routes/manifest.tsx). */}
+        <Suspense
+          fallback={<div className="container mx-auto py-8 text-muted-foreground">Loading…</div>}
+        >
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   );

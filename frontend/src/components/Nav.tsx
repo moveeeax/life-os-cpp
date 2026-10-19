@@ -171,7 +171,7 @@ export function Nav() {
             className="md:hidden"
             aria-label="Toggle navigation menu"
             aria-expanded={menuOpen}
-            aria-controls="mobile-nav"
+            aria-controls={menuOpen ? 'mobile-nav' : undefined}
             onClick={() => setMenuOpen((o) => !o)}
           >
             {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}

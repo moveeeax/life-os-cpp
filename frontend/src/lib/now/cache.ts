@@ -1,5 +1,6 @@
 // The last answers of Now kept in the browser, so a new tab paints at once.
 // Every access is guarded: storage can be blocked, full or absent.
+import { browserStore } from '@/lib/browserStore';
 import { todayLocal } from '@/lib/dates';
 
 export interface KeyValueStore {
@@ -12,14 +13,6 @@ export interface ListableStore extends KeyValueStore {
   readonly length: number;
   key(index: number): string | null;
   removeItem(key: string): void;
-}
-
-function browserStore(): ListableStore | undefined {
-  try {
-    return globalThis.localStorage ?? undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 /** One entry per user and local date: yesterday's digest never shows as today's. */

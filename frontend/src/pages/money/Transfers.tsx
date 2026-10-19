@@ -8,6 +8,7 @@ import {
   formatDay,
   formatMoney,
   isDay,
+  rateLine,
   type Account,
   type Currency,
   type Transfer,
@@ -165,6 +166,17 @@ function TransferEditor({ transfer, onClose }: { transfer: Transfer; onClose: ()
 }
 
 /** The period's transfers and exchanges, each open for editing. */
+/** "Rate 520 KZT per USD": the cost rate turned over below 1, six significant digits. */
+function RateText({ rate, from, to }: { rate: number; from: string; to: string }) {
+  const line = rateLine(rate, from, to);
+  if (!line) return null;
+  return (
+    <span>
+      Rate <Num>{line.value}</Num> {line.unit}
+    </span>
+  );
+}
+
 export function TransfersList({
   from,
   to,
@@ -202,9 +214,7 @@ export function TransfersList({
           right={<Num>{money(t.amount_sent, t.from_currency)}</Num>}
         >
           {t.cost_rate !== null && (
-            <span>
-              Rate <Num>{t.cost_rate.toFixed(4)}</Num> {t.from_currency} per {t.to_currency}
-            </span>
+            <RateText rate={t.cost_rate} from={t.from_currency} to={t.to_currency} />
           )}
           {t.fee !== null && t.fee > 0 && (
             <span>

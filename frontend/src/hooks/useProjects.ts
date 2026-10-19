@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
-import type { Project, ProjectInput, Task } from '@/lib/tasks';
+import { loadProjectTasks, type Project, type ProjectInput, type Task } from '@/lib/tasks';
 
 const BASE = '/api/v1/tasks/projects';
 
@@ -32,17 +32,17 @@ export function useProject(id: string) {
   });
 }
 
-/** The tasks of one project or course, open and done. */
+/** The tasks of one project or course: every open one, the newest done ones. */
 export function useProjectTasks(id: string) {
   return useQuery({
     queryKey: qk.tasks.byProject(id),
-    queryFn: async ({ signal }) =>
-      (
-        await api.getJson<{ data: Task[] }>('/api/v1/tasks/items', {
-          query: { project: id, limit: 200 },
+    queryFn: ({ signal }) =>
+      loadProjectTasks((status, limit, offset) =>
+        api.getJson<{ data: Task[]; total: number }>('/api/v1/tasks/items', {
+          query: { project: id, status, limit, offset },
           signal,
-        })
-      ).data,
+        }),
+      ),
   });
 }
 

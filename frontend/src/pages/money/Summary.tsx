@@ -63,6 +63,7 @@ function Segmented<T extends string | number>({
           aria-pressed={o === value}
           onClick={() => onChange(o)}
           className={o === value ? 'k-seg-on' : undefined}
+          data-num-ok
         >
           {text(o)}
         </button>
@@ -146,6 +147,7 @@ function Trend({
             y={box.height - 8}
             textAnchor={k === 0 ? 'start' : k === 2 ? 'end' : 'middle'}
             fontSize="11"
+            data-num-ok
             fill="currentColor"
             fillOpacity="0.56"
           >
@@ -305,7 +307,7 @@ export function MoneySummaryPage() {
               . The total leaves it out.
             </p>
           )}
-          <p className="k-sub">
+          <p className="k-sub" data-num-ok>
             Converted at the rates of {rateDay(d.rate_date, d.date)}, daily quotes against the US
             dollar. Each day of the line: that day's balances at that day's rates.
             {d.change.partial &&

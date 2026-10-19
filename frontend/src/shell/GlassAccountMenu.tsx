@@ -76,7 +76,7 @@ export function GlassAccountMenu() {
         className="g-pill"
         aria-label={`Account: ${name}`}
         aria-expanded={open}
-        aria-controls="glass-account-menu"
+        aria-controls={open ? 'glass-account-menu' : undefined}
         onClick={() => setOpen((v) => !v)}
       >
         {name.slice(0, 1).toUpperCase()}

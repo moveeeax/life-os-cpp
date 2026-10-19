@@ -1,4 +1,4 @@
-import type { Project } from './types';
+import type { Project, Task } from './types';
 
 export const PROJECT_STATUS: Record<Project['status'], string> = {
   planned: 'Planned',
@@ -37,4 +37,40 @@ export function courseProgress(p: {
 }): { done: number; total: number; share: number } | null {
   const total = p.open + p.done;
   return total === 0 ? null : { done: p.done, total, share: p.done / total };
+}
+
+/** One page of a project's tasks in one status, as GET /tasks/items answers. */
+export type TaskPageFetch = (
+  status: Task['status'],
+  limit: number,
+  offset: number,
+) => Promise<{ data: Task[]; total: number }>;
+
+/** The API's largest page (kMaxLimit). */
+export const TASK_PAGE = 200;
+const MAX_PAGES = 25;
+
+/**
+ * Every open and in-progress task of a project, paged through, plus the newest
+ * page of done ones, newest first. One mixed call of 200 dropped the oldest
+ * open tasks once a project passed 200 tasks, while the header still counted them.
+ */
+export async function loadProjectTasks(fetchPage: TaskPageFetch): Promise<Task[]> {
+  const all = async (status: Task['status']) => {
+    const out: Task[] = [];
+    for (let i = 0; i < MAX_PAGES; i++) {
+      const page = await fetchPage(status, TASK_PAGE, out.length);
+      out.push(...page.data);
+      if (page.data.length < TASK_PAGE || out.length >= page.total) break;
+    }
+    return out;
+  };
+  const [open, going, done] = await Promise.all([
+    all('open'),
+    all('in_progress'),
+    fetchPage('done', TASK_PAGE, 0).then((p) => p.data),
+  ]);
+  return [...open, ...going, ...done].sort((a, b) =>
+    a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0,
+  );
 }

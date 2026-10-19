@@ -268,13 +268,21 @@ function AccountRow({
   onEdit: (a: Account) => void;
 }) {
   const a = item.account;
-  const facts = [a.bank, a.kind, a.last4 && `•${a.last4}`].filter(Boolean).join(' · ');
+  const names = [a.bank, a.kind].filter(Boolean).join(' · ');
+  const facts = names || a.last4;
   return (
     <Row
       title={a.name}
       sub={
         <>
-          {facts}
+          {/* Bank and kind are names; the card's last four is blurred like an amount. */}
+          {names && <span data-num-ok>{names}</span>}
+          {a.last4 && (
+            <>
+              {names && ' · '}
+              <Num>•{a.last4}</Num>
+            </>
+          )}
           {a.currency !== 'USD' && item.value !== null && (
             <>
               {facts && ' · '}≈ <Num>{usd(item.value)}</Num>
@@ -284,7 +292,9 @@ function AccountRow({
       }
       right={<Num>{formatMoney(a.balance, a.currency, decimalsOf(currencies, a.currency))}</Num>}
     >
-      <span>{a.last_activity ? `Last activity ${a.last_activity}` : 'No activity yet'}</span>
+      <span data-num-ok>
+        {a.last_activity ? `Last activity ${a.last_activity}` : 'No activity yet'}
+      </span>
       <span className="k-actions">
         <Link to={`/money?account=${a.id}`} className="k-link">
           Rows

@@ -35,7 +35,7 @@ import { cn } from '@/lib/utils';
 
 import { HealthBadge, Stat } from './bits';
 import { ExerciseLog } from './ExerciseLog';
-import { HeartRateChart } from './HeartRateChart';
+import { HeartRateChart } from './LazyHeartRateChart';
 import { LoadError, WorkoutFrame } from './frame';
 import {
   cardClass,

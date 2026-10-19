@@ -4,9 +4,11 @@ import { useErrorToast } from '@/hooks/useErrorToast';
 import { habitsZone, useHabitDays, useTickHabit } from '@/hooks/useHabits';
 import {
   addDays,
+  canGoBack,
   dayCount,
   longDay,
   mondayOf,
+  oldestTickDay,
   weekCells,
   weekDates,
   weekLine,
@@ -32,6 +34,8 @@ function WeekLine({ h, monday, today }: { h: HabitDays; monday: string; today: s
   useErrorToast(tick.error);
   const cells = weekCells(h, monday, today);
   const dates = weekDates(monday);
+  // The API refuses a tick more than 366 days back.
+  const oldest = oldestTickDay(today);
   return (
     <>
       <span className="h-n" data-num-ok>
@@ -44,7 +48,7 @@ function WeekLine({ h, monday, today }: { h: HabitDays; monday: string; today: s
           className={`h-c h-c-${cell}`}
           aria-label={`${h.name}, ${longDay(dates[i])}: ${CELL_WORDS[cell]}`}
           title={cell === 'auto' ? 'Ticked from data' : undefined}
-          disabled={cell === 'future' || cell === 'auto' || tick.isPending}
+          disabled={cell === 'future' || cell === 'auto' || dates[i] < oldest || tick.isPending}
           onClick={() => tick.mutate({ id: h.id, date: dates[i], on: cell !== 'manual' })}
         />
       ))}
@@ -97,6 +101,7 @@ export function HabitsWeekPage() {
             type="button"
             className="k-btn"
             aria-label="The week before"
+            disabled={!canGoBack(monday, day)}
             onClick={() => setMonday(addDays(monday, -7))}
           >
             ←

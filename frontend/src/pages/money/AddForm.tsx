@@ -22,6 +22,7 @@ import {
   scaleImage,
   isDay,
   nearbyDuplicate,
+  rateLine,
   todayLocal,
   transferNeedsReceived,
   type Account,
@@ -637,6 +638,10 @@ function TransferTab({ onDone, accounts }: { onDone: () => void; accounts: Accou
   const needsReceived = transferNeedsReceived(fromCur, toCur);
   const s = num(sent);
   const r = num(received);
+  const rate =
+    needsReceived && s !== null && r !== null && r > 0
+      ? rateLine(s / r, fromCur ?? '', toCur ?? '')
+      : null;
   const f = num(fee);
   const ok =
     !!from &&
@@ -753,10 +758,9 @@ function TransferTab({ onDone, accounts }: { onDone: () => void; accounts: Accou
           />
         </div>
       </div>
-      {needsReceived && s !== null && r !== null && r > 0 && (
+      {rate && (
         <p className="text-theme-xs text-gray-500 tabular-nums">
-          Rate of this exchange: <span className="num">{(s / r).toFixed(4)}</span> {fromCur} per{' '}
-          {toCur}
+          Rate of this exchange: <span className="num">{rate.value}</span> {rate.unit}
         </p>
       )}
       {create.error && (

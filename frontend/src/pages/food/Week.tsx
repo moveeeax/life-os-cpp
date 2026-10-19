@@ -15,7 +15,7 @@ import {
   type FoodWeek,
 } from '@/lib/food';
 
-import { TimeChart } from '../health/TimeChart';
+import { TimeChart } from '../health/LazyTimeChart';
 import { Facts, Group, Num, Row } from '@/shell/kit';
 import { FoodFrame, LoadError, Placeholder } from './frame';
 
