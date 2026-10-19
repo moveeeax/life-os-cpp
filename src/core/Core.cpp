@@ -48,6 +48,12 @@
 
 namespace Core {
 
+namespace {
+// The one startup run of the scheduled ticks (fitness sync, money rates,
+// money advisor): late enough for the event loop and the pools to be up.
+constexpr std::chrono::milliseconds kScheduleFirstRun{std::chrono::seconds(30)};
+}  // namespace
+
 void check_password_value(const std::string& password) {
     static const std::unordered_set<std::string> kWeak = {
         "", "postgres", "password", "changeme", "admin", "root", "123456"};
@@ -585,7 +591,9 @@ void Application::init_jobs_(Config::AppConfig& cfg) {
 void Application::register_fitness_sync_schedule_(Config::AppConfig& cfg) {
     // The scheduled sync lives in the API pod: Tasks is only up in server
     // mode, the sync itself runs in the worker via the queue. Drogon's
-    // runEvery fires first after one interval, not at startup.
+    // runEvery fires first after one interval, so the tick also runs once
+    // shortly after startup: API deploys come more often than every few
+    // hours, and without it the schedule would never fire.
     if (!Tasks::is_initialized() || !Database::is_initialized() || !Jobs::is_initialized())
         return;
     if (!fitness_enabled())
@@ -595,16 +603,20 @@ void Application::register_fitness_sync_schedule_(Config::AppConfig& cfg) {
         return;  // opt-in: no schedule without the knob
     const int window = cfg.get<int>("fitness.xiaomi.sync_window_days", "MI_FITNESS_SYNC_WINDOW_DAYS", 2);
     spdlog::info("fitness sync schedule enabled: every {}h, window {} day(s)", hours, window);
-    Tasks::schedule_recurring("fitness_sync_schedule", std::chrono::hours(hours), [window] {
-        if (!Database::is_initialized() || !Jobs::is_initialized())
-            return;
-        try {
-            Jobs::FitnessSync::enqueue_recent_for_all(window, static_cast<long long>(::time(nullptr)));
-        } catch (const std::exception& e) {
-            // Database or queue is down: the tick is skipped, the next one retries.
-            spdlog::warn("fitness sync schedule tick failed: {}", e.what());
-        }
-    });
+    Tasks::schedule_recurring(
+        "fitness_sync_schedule",
+        std::chrono::hours(hours),
+        [window] {
+            if (!Database::is_initialized() || !Jobs::is_initialized())
+                return;
+            try {
+                Jobs::FitnessSync::enqueue_recent_for_all(window, static_cast<long long>(::time(nullptr)));
+            } catch (const std::exception& e) {
+                // Database or queue is down: the tick is skipped, the next one retries.
+                spdlog::warn("fitness sync schedule tick failed: {}", e.what());
+            }
+        },
+        kScheduleFirstRun);
 }
 
 void Application::register_money_rates_schedule_(Config::AppConfig& cfg) {
@@ -619,21 +631,29 @@ void Application::register_money_rates_schedule_(Config::AppConfig& cfg) {
     if (hours <= 0)
         return;
     spdlog::info("money rates schedule enabled: every {}h", hours);
-    Tasks::schedule_recurring("money_rates_schedule", std::chrono::hours(hours), [] {
-        if (!Database::is_initialized() || !Jobs::is_initialized())
-            return;
-        try {
-            Jobs::get().submit(Jobs::MoneyRates::kJobType, nlohmann::json{{"date", "latest"}});
-        } catch (const std::exception& e) {
-            spdlog::warn("money rates schedule tick failed: {}", e.what());
-        }
-    });
+    // Also once shortly after startup, see the fitness schedule above.
+    Tasks::schedule_recurring(
+        "money_rates_schedule",
+        std::chrono::hours(hours),
+        [] {
+            if (!Database::is_initialized() || !Jobs::is_initialized())
+                return;
+            try {
+                Jobs::get().submit(Jobs::MoneyRates::kJobType, nlohmann::json{{"date", "latest"}});
+            } catch (const std::exception& e) {
+                spdlog::warn("money rates schedule tick failed: {}", e.what());
+            }
+        },
+        kScheduleFirstRun);
 }
 
 void Application::register_money_advisor_schedule_(Config::AppConfig& cfg) {
-    // An hourly tick in the API pod; at the configured hour it queues the week
-    // that just ended for every user whose advisor runs today. The unique key
-    // of money_advisor_reports makes a repeated tick (or a second pod) a no-op.
+    // An hourly tick in the API pod, plus one shortly after startup; from the
+    // configured hour on it queues the week that just ended for every user
+    // whose advisor runs today. The unique key of money_advisor_reports makes
+    // a repeated tick (or a second pod) a no-op, so the ticks after the target
+    // hour only catch a week that a restart around that hour would have
+    // skipped (the old check fired in the target hour alone).
     if (!Tasks::is_initialized() || !Database::is_initialized() || !Jobs::is_initialized())
         return;
     if (!money_enabled())
@@ -642,21 +662,25 @@ void Application::register_money_advisor_schedule_(Config::AppConfig& cfg) {
     if (hour < 0 || hour > 23)
         return;
     spdlog::info("money advisor schedule enabled: weekly at {:02d}:00 UTC on each user's weekday", hour);
-    Tasks::schedule_recurring("money_advisor_schedule", std::chrono::hours(1), [hour] {
-        if (!Database::is_initialized() || !Jobs::is_initialized())
-            return;
-        const auto now = std::chrono::system_clock::now();
-        const auto day = std::chrono::floor<std::chrono::days>(now);
-        const auto h = std::chrono::duration_cast<std::chrono::hours>(now - day).count();
-        if (h != hour)
-            return;
-        const unsigned weekday = std::chrono::weekday(day).iso_encoding();  // 1 = Monday
-        try {
-            Jobs::MoneyAdvisor::enqueue_weekly(static_cast<int>(weekday), Money::Period::detail::text_of(day));
-        } catch (const std::exception& e) {
-            spdlog::warn("money advisor schedule tick failed: {}", e.what());
-        }
-    });
+    Tasks::schedule_recurring(
+        "money_advisor_schedule",
+        std::chrono::hours(1),
+        [hour] {
+            if (!Database::is_initialized() || !Jobs::is_initialized())
+                return;
+            const auto now = std::chrono::system_clock::now();
+            const auto day = std::chrono::floor<std::chrono::days>(now);
+            const auto h = std::chrono::duration_cast<std::chrono::hours>(now - day).count();
+            if (!Jobs::MoneyAdvisor::tick_due(static_cast<int>(h), hour))
+                return;
+            const unsigned weekday = std::chrono::weekday(day).iso_encoding();  // 1 = Monday
+            try {
+                Jobs::MoneyAdvisor::enqueue_weekly(static_cast<int>(weekday), Money::Period::detail::text_of(day));
+            } catch (const std::exception& e) {
+                spdlog::warn("money advisor schedule tick failed: {}", e.what());
+            }
+        },
+        kScheduleFirstRun);
 }
 
 void Application::register_now_media_sweep_schedule_() {

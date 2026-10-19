@@ -218,6 +218,17 @@ inline bool submit_review(const std::string& report_id, const std::string& owner
 }
 
 /**
+ * Whether the hourly advisor tick queues anything at @p hour_now (0-23, UTC)
+ * for the configured @p target_hour: at the target hour and every hour after
+ * it on the same day. enqueue_weekly is a no-op for a week whose row exists,
+ * so the later ticks only catch a week a restart around the target hour
+ * would have skipped.
+ */
+inline bool tick_due(int hour_now, int target_hour) {
+    return hour_now >= target_hour;
+}
+
+/**
  * Queue the week that just ended for every owner whose advisor runs on this
  * weekday (1 = Monday). The unique key makes a second call a no-op.
  * @returns how many reviews were queued.

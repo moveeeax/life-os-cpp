@@ -5,6 +5,21 @@
  *        longer exposes them to including TUs. Every contract and its
  *        rationale is documented on the declarations in the header; the
  *        comments here explain the Redis mechanics in place.
+ *
+ * Delivery contract: at least once. A job runs to the end at least once
+ * unless it is cancelled or dead-lettered, and it may run more than once:
+ * a worker that dies after the handler and before complete() lands, a lease
+ * reaped while its pod was cut off from Redis, or startup recovery of an id
+ * that also reached its next list. Handlers must tolerate a second run (the
+ * DB rows they write are fenced by attempt and unique keys, see JobRows).
+ * What the queue rules out is loss: every move of an id between two Redis
+ * keys is either one command (BRPOPLPUSH) or one Lua script (promote,
+ * recover), or writes the destination before it clears the source (fail,
+ * defer, dead_letter), so a crash or a Redis error leaves the id on at least
+ * one list that a later pass, the reaper or startup recovery reads again.
+ * While a handler runs, the worker renews its lease (renew_lease, driven by
+ * Jobs::LeaseHeartbeat), so the visibility timeout bounds how long a dead
+ * worker holds a job, not how long a live handler may take.
  */
 
 #include "jobs/Jobs.hpp"
@@ -27,6 +42,42 @@
 #include "utils/Time.hpp"
 
 namespace Jobs {
+
+namespace {
+
+// ZREM the id from the delayed set and LPUSH it onto its queue in one step:
+// the old ZREM-then-LPUSH lost the id when the LPUSH failed. Only the caller
+// whose ZREM removed the id pushes it, so concurrent promoters never push it
+// twice. KEYS[1] delayed set, KEYS[2] queue; ARGV[1] id.
+constexpr const char* kPromoteScript =
+    "if redis.call('ZREM', KEYS[1], ARGV[1]) == 1 then "
+    "redis.call('LPUSH', KEYS[2], ARGV[1]) return 1 end return 0";
+
+// Move one id from a processing list back to its queue in one step.
+// KEYS[1] processing list, KEYS[2] queue; ARGV[1] id.
+constexpr const char* kRecoverScript =
+    "if redis.call('LREM', KEYS[1], 0, ARGV[1]) > 0 then "
+    "redis.call('LPUSH', KEYS[2], ARGV[1]) return 1 end return 0";
+
+// Remove a lease only while it is still expired, so a lease renewed after
+// the reaper's range read survives. KEYS[1] leases; ARGV[1] id, ARGV[2] now.
+constexpr const char* kReapGateScript =
+    "local s = redis.call('ZSCORE', KEYS[1], ARGV[1]) "
+    "if s and tonumber(s) <= tonumber(ARGV[2]) then "
+    "redis.call('ZREM', KEYS[1], ARGV[1]) return 1 end return 0";
+
+// Renew a lease while the job is still this worker's: the blob says
+// processing by ARGV[1] and the lease entry exists. KEYS[1] job blob,
+// KEYS[2] leases; ARGV[1] worker id, ARGV[2] job id, ARGV[3] new deadline.
+constexpr const char* kRenewLeaseScript =
+    "local b = redis.call('GET', KEYS[1]) "
+    "if not b then return 0 end "
+    "local ok, j = pcall(cjson.decode, b) "
+    "if not ok or j['status'] ~= 'processing' or j['worker_id'] ~= ARGV[1] then return 0 end "
+    "if not redis.call('ZSCORE', KEYS[2], ARGV[2]) then return 0 end "
+    "redis.call('ZADD', KEYS[2], ARGV[3], ARGV[2]) return 1";
+
+}  // namespace
 
 void JobQueue::initialize(long result_ttl, int max_retries) {
     if (initialized_) {
@@ -156,7 +207,9 @@ std::optional<Job> JobQueue::pick(const std::vector<std::string>& types,
         // Clean up — ghost id shouldn't linger in processing list.
         try {
             redis.lrem(proc_list, 0, job_id);
-        } catch (...) {}
+        } catch (const std::exception& e) {
+            spdlog::warn("Job {}: could not drop the ghost id from {}: {}", job_id, proc_list, e.what());
+        }
         return std::nullopt;
     }
 
@@ -169,7 +222,9 @@ std::optional<Job> JobQueue::pick(const std::vector<std::string>& types,
         spdlog::info("Job {} popped from queue but already {} — skipped", job_id, job.status);
         try {
             redis.lrem(proc_list, 0, job_id);
-        } catch (...) {}
+        } catch (const std::exception& e) {
+            spdlog::warn("Job {}: could not drop the spent id from {}: {}", job_id, proc_list, e.what());
+        }
         return std::nullopt;
     }
     job.status = "processing";
@@ -187,7 +242,9 @@ std::optional<Job> JobQueue::pick(const std::vector<std::string>& types,
         try {
             redis.zadd(
                 leases_key(), job.id, static_cast<double>(Utils::Time::now_epoch_millis() + visibility_timeout_ms_));
-        } catch (...) {}
+        } catch (const std::exception& e) {
+            spdlog::warn("Job {}: could not record its lease: {}", job.id, e.what());
+        }
     }
 
     spdlog::debug("Job picked: id={} type={} worker={}", job.id, job.type, worker_id);
@@ -357,7 +414,8 @@ long JobQueue::dlq_depth() {
         return 0;
     try {
         return static_cast<long>(Cache::get().get_client().scard(kDlqAllKey));
-    } catch (...) {
+    } catch (const std::exception& e) {
+        spdlog::warn("dlq_depth: {}", e.what());
         return 0;
     }
 }
@@ -377,27 +435,35 @@ long JobQueue::recover_processing(const std::string& worker_id) {
     auto& redis = Cache::get().get_client();
     const std::string proc = processing_key(worker_id);
     long recovered = 0;
-    // Snapshot the list, push each id back onto its type queue, then drop
-    // the processing list. Not atomic across commands, but run during
-    // startup only — the worker hasn't picked anything yet, so nothing
-    // else writes here.
+    // Snapshot the list and move each id back onto its type queue with one
+    // script per id (LREM + LPUSH), during startup only: the worker has not
+    // picked anything yet, so nothing else writes here. An id whose move
+    // fails stays on the list for the next start; the old final DEL of the
+    // whole list dropped it instead.
     std::vector<std::string> ids;
     try {
         redis.lrange(proc, 0, -1, std::back_inserter(ids));
-    } catch (...) {
+    } catch (const std::exception& e) {
+        spdlog::warn("Jobs: could not read {} for recovery: {}", proc, e.what());
         return 0;
     }
     for (const auto& id : ids) {
         try {
-            auto loaded = load_job_(redis, id);
-            if (!loaded)
-                continue;
-            Job job = std::move(*loaded);
+            std::optional<Job> loaded;
+            try {
+                loaded = load_job_(redis, id);
+            } catch (const json::exception& e) {
+                spdlog::warn("Jobs: dropping {} from {}: unreadable blob: {}", id, proc, e.what());
+            }
             // A crash between complete()'s blob write and its lrem leaves a
             // finished job here; running it again would send a second email
-            // or webhook. The same for a cancelled or dead-lettered one.
-            if (is_terminal_status_(job.status))
+            // or webhook. The same for a cancelled or dead-lettered one. A
+            // missing or unreadable blob has nothing left to run.
+            if (!loaded || is_terminal_status_(loaded->status)) {
+                redis.lrem(proc, 0, id);
                 continue;
+            }
+            Job job = std::move(*loaded);
             // Put it back on the live queue so another worker (or this one
             // after restart) picks it up again. Don't touch retry_count —
             // the job didn't fail, we just missed its completion.
@@ -405,78 +471,130 @@ long JobQueue::recover_processing(const std::string& worker_id) {
             job.worker_id.clear();
             job.updated_at = now_epoch();
             save_job_(redis, job);
-            redis.lpush(queue_key(job.type), id);
-            ++recovered;
-        } catch (...) {}
+            if (redis.eval<long long>(kRecoverScript, {proc, queue_key(job.type)}, {id}) > 0)
+                ++recovered;
+        } catch (const std::exception& e) {
+            spdlog::warn("Jobs: could not recover {} from {} (left for the next start): {}", id, proc, e.what());
+        }
     }
-    try {
-        redis.del(proc);
-    } catch (...) {}
     if (recovered > 0) {
         spdlog::warn("Jobs: recovered {} orphaned jobs from {}", recovered, proc);
     }
     return recovered;
 }
 
-long JobQueue::promote_due_jobs() {
+long JobQueue::promote_due_jobs(int64_t now_ms) {
     // Not gated on retry backoff: defer() parks jobs in the same set.
     if (!initialized_)
         return 0;
     auto& redis = Cache::get().get_client();
-    const auto now_ms = Utils::Time::now_epoch_millis();
+    if (now_ms < 0)
+        now_ms = Utils::Time::now_epoch_millis();
     std::vector<std::string> ids;
-    try {
-        redis.zrangebyscore(
-            delayed_key(),
-            sw::redis::BoundedInterval<double>(0.0, static_cast<double>(now_ms), sw::redis::BoundType::CLOSED),
-            std::back_inserter(ids));
-    } catch (...) {
-        return 0;
-    }
+    // A read error propagates: the worker's maintenance pass logs it.
+    redis.zrangebyscore(
+        delayed_key(),
+        sw::redis::BoundedInterval<double>(0.0, static_cast<double>(now_ms), sw::redis::BoundType::CLOSED),
+        std::back_inserter(ids));
     long moved = 0;
     for (const auto& id : ids) {
         try {
-            // ZREM-gate: only the caller that actually removes the id pushes
-            // it, so concurrent workers never double-promote the same job.
-            if (redis.zrem(delayed_key(), id) == 0)
+            std::optional<Job> job;
+            try {
+                job = load_job_(redis, id);
+            } catch (const json::exception& e) {
+                spdlog::warn("Job {}: unreadable blob, dropped from the delayed set: {}", id, e.what());
+            }
+            if (!job || is_terminal_status_(job->status)) {
+                // Blob expired, unreadable, or cancelled while it waited: the
+                // entry is spent.
+                redis.zrem(delayed_key(), id);
                 continue;
-            auto job = load_job_(redis, id);
-            if (!job)
-                continue;  // blob expired — drop the orphaned delayed entry
-            if (is_terminal_status_(job->status))
-                continue;  // cancelled while it waited — the entry is spent
-            redis.lpush(queue_key(job->type), id);
-            ++moved;
-        } catch (...) {}
+            }
+            // ZREM and LPUSH in one script: only the caller whose ZREM removed
+            // the id pushes it, and no error can land between the two.
+            if (redis.eval<long long>(kPromoteScript, {delayed_key(), queue_key(job->type)}, {id}) > 0)
+                ++moved;
+        } catch (const std::exception& e) {
+            // The id stays in the delayed set; the next pass tries again.
+            spdlog::warn("Job {}: promotion failed, retried next pass: {}", id, e.what());
+        }
     }
     return moved;
 }
 
-long JobQueue::reap_expired_leases() {
+long JobQueue::reap_expired_leases(int64_t now_ms) {
     if (!initialized_ || visibility_timeout_ms_ <= 0)
         return 0;
     auto& redis = Cache::get().get_client();
-    const auto now_ms = Utils::Time::now_epoch_millis();
+    if (now_ms < 0)
+        now_ms = Utils::Time::now_epoch_millis();
+    const std::string now_text = std::to_string(now_ms);
     std::vector<std::string> ids;
-    try {
-        redis.zrangebyscore(
-            leases_key(),
-            sw::redis::BoundedInterval<double>(0.0, static_cast<double>(now_ms), sw::redis::BoundType::CLOSED),
-            std::back_inserter(ids));
-    } catch (...) {
-        return 0;
-    }
+    // A read error propagates: the worker's maintenance pass logs it.
+    redis.zrangebyscore(
+        leases_key(),
+        sw::redis::BoundedInterval<double>(0.0, static_cast<double>(now_ms), sw::redis::BoundType::CLOSED),
+        std::back_inserter(ids));
     long reaped = 0;
     for (const auto& id : ids) {
+        bool gated = false;
         try {
-            // ZREM-gate so exactly one reaper handles each expired lease.
-            if (redis.zrem(leases_key(), id) == 0)
+            // Exactly one reaper wins each expired lease, and a lease renewed
+            // since the range read is not taken (the script checks the score).
+            gated = redis.eval<long long>(kReapGateScript, {leases_key()}, {id, now_text}) > 0;
+            if (!gated)
                 continue;
             fail(id, "visibility timeout exceeded");
             ++reaped;
-        } catch (...) {}
+        } catch (const std::exception& e) {
+            spdlog::warn("Job {}: reaping its expired lease failed: {}", id, e.what());
+            if (!gated)
+                continue;
+            // The lease is gone but fail() did not finish: put it back as
+            // expired so the next pass runs fail() again, instead of leaving
+            // the job to startup recovery alone.
+            try {
+                redis.zadd(leases_key(), id, static_cast<double>(now_ms));
+            } catch (const std::exception& inner) {
+                spdlog::error("Job {}: could not restore its expired lease: {}", id, inner.what());
+            }
+        }
     }
     return reaped;
+}
+
+bool JobQueue::renew_lease(const std::string& id, const std::string& worker_id) {
+    check_initialized();
+    if (visibility_timeout_ms_ <= 0 || worker_id.empty())
+        return false;
+    auto& redis = Cache::get().get_client();
+    const auto deadline = Utils::Time::now_epoch_millis() + visibility_timeout_ms_;
+    return redis.eval<long long>(
+               kRenewLeaseScript, {job_key(id), leases_key()}, {worker_id, id, std::to_string(deadline)}) > 0;
+}
+
+long JobQueue::trim_indexes(int64_t now_sec) {
+    check_initialized();
+    auto& redis = Cache::get().get_client();
+    if (now_sec < 0)
+        now_sec = now_epoch();
+    // Scores are created_at in seconds; an entry is older than result_ttl
+    // when its score is below now - result_ttl.
+    const sw::redis::RightBoundedInterval<double> older(static_cast<double>(now_sec - result_ttl_),
+                                                        sw::redis::BoundType::OPEN);
+    long removed = static_cast<long>(redis.zremrangebyscore(index_key(), older));
+    const std::string pattern = index_key_for("*");
+    long long cursor = 0;
+    do {
+        std::vector<std::string> keys;
+        cursor = redis.scan(cursor, pattern, 100, std::back_inserter(keys));
+        for (const auto& key : keys)
+            removed += static_cast<long>(redis.zremrangebyscore(key, older));
+    } while (cursor != 0);
+    if (removed > 0)
+        spdlog::debug("Jobs: trimmed {} index entries older than {}s", removed, result_ttl_);
+    return removed;
 }
 
 std::optional<Job> JobQueue::get_status(const std::string& id) {
@@ -564,7 +682,9 @@ JobQueue::JobPage JobQueue::list_paged(const std::string& type, int limit, int o
                 redis.zrem(key, id);
                 if (!type.empty())
                     redis.zrem(index_key(), id);
-            } catch (...) {}
+            } catch (const std::exception& e) {
+                spdlog::warn("Jobs: could not heal index entry {}: {}", id, e.what());
+            }
         }
     }
     page.total = static_cast<long>(redis.zcard(key));
@@ -586,7 +706,9 @@ void JobQueue::set_trace_id(const std::string& id, const std::string& trace_id) 
         job->trace_id = trace_id;
         job->updated_at = now_epoch();
         save_job_(redis, *job);
-    } catch (...) {}
+    } catch (const std::exception& e) {
+        spdlog::debug("Job {}: set_trace_id failed: {}", id, e.what());
+    }
 }
 
 bool JobQueue::health_check() {
@@ -689,7 +811,11 @@ void JobQueue::release_from_worker_(sw::redis::Redis& redis, const Job& job) {
     if (!job.worker_id.empty()) {
         try {
             redis.lrem(processing_key(job.worker_id), 0, job.id);
-        } catch (...) {}
+        } catch (const std::exception& e) {
+            // Left on the list, the id is skipped by startup recovery when the
+            // blob is terminal, or run again (at least once) when it is not.
+            spdlog::warn("Job {}: could not leave {}: {}", job.id, processing_key(job.worker_id), e.what());
+        }
     }
     clear_lease_(redis, job.id);
 }

@@ -1,0 +1,1 @@
+The worker's outcome mapping (defer, dead-letter, fail, complete outside the handler's try) moved from `worker_main.cpp` into `Jobs::run_one` (`src/jobs/Worker.hpp`), with an integration test per branch against Redis; the job queue tests check due times with an explicit clock instead of sleeps, and the workout start race test commits only once `start()` waits on the index.
