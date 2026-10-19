@@ -10676,6 +10676,40 @@ paths:
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
+    get:
+      summary: One visit, in the shape of an element of the list
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/MedicalVisit' }
+        '400':
+          description: The id is not a uuid
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: 'Not the caller''s visit (not_found), or the medical module is off'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         content:
           application/json:
             schema: { $ref: '#/components/schemas/MedicalVisitInput' }
@@ -10887,6 +10921,40 @@ paths:
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
+    get:
+      summary: One record, in the shape of an element of the list
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/MedicalRecord' }
+        '400':
+          description: The id is not a uuid
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: 'Not the caller''s record (not_found), or the medical module is off'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         content:
           application/json:
             schema: { $ref: '#/components/schemas/MedicalRecordInput' }
@@ -11033,6 +11101,40 @@ paths:
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
+    get:
+      summary: One medication, in the shape of an element of the list
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/MedicalMedication' }
+        '400':
+          description: The id is not a uuid
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: 'Not the caller''s medication (not_found), or the medical module is off'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         content:
           application/json:
             schema: { $ref: '#/components/schemas/MedicalMedicationInput' }
