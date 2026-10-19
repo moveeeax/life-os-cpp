@@ -147,6 +147,7 @@ to the six without mail and webhooks.
 | `money_advisor` | `POST /api/v1/money/advisor/run`, and the `money_advisor_schedule` timer at `MONEY_ADVISOR_HOUR_UTC` on each user's weekday | `{report_id, owner_id, max_attempts}` | As `money_parse`, row in `money_advisor_reports`. A period without posted rows gets a one-line review and no provider call. A submit the queue refuses marks the row `queue_unavailable` |
 | `tasks_parse` | `POST /api/v1/tasks/parse` | `{job_id, owner_id, max_attempts}` | As `money_parse`, row in `task_parse_jobs`; falls back to the money provider when `TASKS_LLM_*` is not set |
 | `now_media_sweep` | The `now_media_sweep_schedule` timer in the API pod, hourly while `NOW_ENABLED` is on | `{}` | Deletes wallpaper and sound rows still `pending` an hour after their create (an upload the browser never finished, or a delete whose store call failed), objects first. A row the store would not clear stays for the next tick. Skipped without `S3_*` on the worker |
+| `files_sweep` | The `files_sweep_schedule` timer in the API pod, hourly while `MEDICAL_ENABLED` or `TRAVEL_ENABLED` is on | `{}` | Deletes `private_files` rows still `pending` an hour after their create, then removes the object of every `private_file_purges` entry older than an hour (a file, record, document or account deleted) and forgets the entry. An object the store would not remove keeps its entry for the next tick. Skipped without `S3_*` on the worker. See [Private files](#private-files) |
 
 The four LLM rows are written through the transactional outbox when
 `OUTBOX_DRAIN_INTERVAL_SEC` is above zero (production: 5 s on the API
@@ -160,6 +161,80 @@ The three demo types `echo`, `slow` and `fail` are registered for tests
 and `POST /api/v1/jobs`; they carry no data.
 
 ---
+
+## Private files {#private-files}
+
+The scans of medical records and travel documents live in the same bucket as
+the wallpapers, under `<S3_PREFIX>private/<owner id>/<file id>/file.<ext>`
+(in prod: bucket `life-os`, keys `life-os/private/...`). They are never read
+through `S3_PUBLIC_BASE_URL`: the browser PUTs a file through a presigned URL
+valid 15 minutes, and every read is a presigned GET valid 120 seconds that
+the API signs for the owner of the row on each request
+(`GET /api/v1/files/{id}/download`). Another user gets 404 for the row and
+for the link.
+
+The MinIO user `life-os` has put, get and delete on `life-os/wallpapers/*`
+and `life-os/sounds/*` only (docs/wallpapers.md, "Prod"). Before the first
+upload the owner extends that policy to the private prefix, and leaves the
+anonymous rules as they are:
+
+1. Look at the policy as it is now:
+   `mc admin policy info <alias> life-os-rw`.
+2. Add `arn:aws:s3:::life-os/life-os/private/*` to the resources of the
+   statement with `s3:PutObject`, `s3:GetObject` and `s3:DeleteObject`. With
+   the rights docs/wallpapers.md describes, the whole policy then reads:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+         "Resource": [
+           "arn:aws:s3:::life-os/life-os/wallpapers/*",
+           "arn:aws:s3:::life-os/life-os/sounds/*",
+           "arn:aws:s3:::life-os/life-os/private/*"
+         ]
+       },
+       {
+         "Effect": "Allow",
+         "Action": ["s3:ListBucket"],
+         "Resource": ["arn:aws:s3:::life-os"]
+       }
+     ]
+   }
+   ```
+
+   If step 1 shows more than this, keep the rest and add only the one
+   resource line.
+3. Load it under the same name: `mc admin policy create <alias> life-os-rw life-os-rw.json`
+   (older `mc` releases call the command `mc admin policy add`), then run
+   step 1 again and check the new line is there.
+4. Do NOT add an anonymous rule for the private prefix. `mc anonymous list <alias>/life-os`
+   must show `life-os/wallpapers/*` and `life-os/sounds/*` and nothing else,
+   in particular no rule on the whole bucket.
+5. Check from outside: `curl -sI https://s3.tarassov.me/life-os/life-os/private/probe`
+   answers 403 (no anonymous read). A 404 means anonymous reads are allowed
+   there and the bucket rules need fixing before anyone uploads.
+
+The app checks the same thing on every upload: `POST /api/v1/files/{id}/ready`
+sends an unsigned HEAD to the object's public URL, and if it answers 2xx the
+file is deleted and the call answers 503 `storage_public`. The other answers
+when storage is not ready:
+
+| Answer | Cause | Fix |
+|---|---|---|
+| 503 `storage_not_configured` | `S3_*` incomplete on the API | The `storage.s3` values (docs/wallpapers.md) |
+| 503 `storage_unavailable` | The store refused or did not answer the HEAD (a policy without the private prefix answers 403) | Steps 1 to 3 above; the API log line `files.ready: the store refused` carries the HTTP status |
+| Upload fails in the browser, "the storage refused the file" | MinIO refused the presigned PUT (403 without the private prefix) | Steps 1 to 3 above |
+| 503 `storage_public` | The private prefix is readable without a key | Step 4 above; the file was deleted, upload it again after the fix |
+
+Rows, records, visits and medications work without storage; only the files
+answer 503. Deleting a file, a record, a document or an account removes the
+rows at once and leaves the object keys in `private_file_purges`; the API
+removes the object of a deleted file right away, and the hourly `files_sweep`
+job removes whatever is left (see the job table above).
 
 ## Backups {#backup}
 

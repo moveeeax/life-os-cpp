@@ -162,6 +162,11 @@ habits:
 notes:
   enabled: true
 
+# The family medical archive. Its files need the private prefix in the MinIO
+# policy first (docs/RUNBOOK.md, private files); without it uploads answer 503.
+medical:
+  enabled: true
+
 # Invite-only: self sign-up is closed, admins invite people (POST /api/v1/admin/invite).
 registration:
   open: false
@@ -172,6 +177,9 @@ now:
 # The wallpaper library: bucket life-os on the cluster's MinIO (s3.tarassov.me),
 # user life-os with put/get/delete on life-os/wallpapers/* only, anonymous read
 # on that prefix. Keys in the Secret life-os-s3 (namespace life-os).
+# The private files of the medical archive and travel documents go to
+# life-os/private/*: the user needs put/get/delete there too, and that prefix
+# gets NO anonymous read (docs/RUNBOOK.md, "Private files").
 storage:
   s3:
     endpoint: "https://s3.tarassov.me"

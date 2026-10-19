@@ -319,6 +319,14 @@ public:
         "habits",
         "notes",
         "projects",
+        // A deleted private_files row leaves its object key in private_file_purges
+        // (a trigger of migration 051); the files_sweep job removes the objects.
+        "private_files",
+        "medical_medications",
+        "medical_records",
+        "medical_visits",
+        "medical_providers",
+        "medical_people",
     };
 
     /// The foreign keys of the billing tables (migration 007, ON DELETE

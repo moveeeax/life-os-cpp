@@ -306,6 +306,7 @@ outage can never affect the money path.
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
 | `NOTES_ENABLED` | `notes.enabled` | bool | `false` | Master switch for the notes module (`Core::notes_enabled()`): private Markdown notes with the fields of a tarassov.me blog post, linked to a project, course or task. Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
+| `MEDICAL_ENABLED` | `medical.enabled` | bool | `false` | Master switch for the medical module (`Core::medical_enabled()`): the family medical archive (people, doctors and clinics, visits, records, medications) under `/api/v1/medical`, and the files of its records under `/api/v1/files`. Routes stay registered, handlers 404 while off. The files need `S3_*` and a key with rights on `<prefix>private/*` (docs/RUNBOOK.md, private files); without them the file routes answer 503 and the rest works. |
 
 ## Now module
 
@@ -348,7 +349,7 @@ outage can never affect the money path.
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
 | `WORKER_ID` | `worker.id` | string | `worker-1` | Names the Redis processing list of this instance. Helm: the pod name (`metadata.name`) unless `worker.id` is set, so replicas never share a list |
-| `WORKER_TYPES` | `worker.types` | csv | all registered handler types | Queues the worker pulls from. Unset (prod leaves it unset) → every type with a registered handler. The ten handlers this binary registers: `account_email`, `email.send`, `webhook.deliver`, `fitness_sync`, `food_parse`, `money_parse`, `money_rates`, `money_advisor`, `tasks_parse`, `now_media_sweep`. When you DO set it, a type left out piles up undrained: the compose stack lists all ten, `config.json` ships `default` (no handler of that name; the startup guard warns). |
+| `WORKER_TYPES` | `worker.types` | csv | all registered handler types | Queues the worker pulls from. Unset (prod leaves it unset) → every type with a registered handler. The eleven handlers this binary registers: `account_email`, `email.send`, `webhook.deliver`, `fitness_sync`, `food_parse`, `money_parse`, `money_rates`, `money_advisor`, `tasks_parse`, `now_media_sweep`, `files_sweep`. When you DO set it, a type left out piles up undrained: the compose stack lists all eleven, `config.json` ships `default` (no handler of that name; the startup guard warns). |
 | `WORKER_STRICT_TYPES` | `worker.strict_types` | bool | `false` | A `WORKER_TYPES` entry without a registered handler logs a warning; `true` upgrades it to a refusal to start |
 | `WORKER_CONCURRENCY` | `worker.concurrency` | int | `2` | |
 | `WORKER_HEALTH_PORT` | `worker.health_port` | int | `9091` | |

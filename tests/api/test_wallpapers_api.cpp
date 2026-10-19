@@ -76,6 +76,17 @@ public:
     std::string key_for(const std::string& folder, const std::string& id, const std::string& name) const override {
         return "life-os/" + folder + "/" + id + "/" + name;
     }
+    // The private-file side of the store; this suite does not use it.
+    std::string private_key(const std::string& owner, const std::string& id, const std::string& name) const override {
+        return "life-os/private/" + owner + "/" + id + "/" + name;
+    }
+    std::string private_upload_url(const std::string& key, const std::string&, long long) const override {
+        return "https://fake/" + key;
+    }
+    std::string download_url(const std::string& key, long, const std::string&) const override {
+        return "https://fake/" + key;
+    }
+    bool publicly_readable(const std::string&) const override { return false; }
 };
 
 std::string key_of(const std::string& url) {

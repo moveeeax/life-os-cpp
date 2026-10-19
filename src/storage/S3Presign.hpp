@@ -34,6 +34,7 @@ struct Presign {
     long expires_seconds = 900;
     std::string amz_date;                                      // "20130524T000000Z"
     std::vector<std::pair<std::string, std::string>> headers;  // signed besides host; lower-case names
+    std::vector<std::pair<std::string, std::string>> query;    // extra signed query, e.g. response-content-disposition
 };
 
 /// Percent-encoding of SigV4: unreserved characters stay, everything else is %XX upper-case.

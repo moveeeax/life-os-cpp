@@ -11,7 +11,8 @@ info:
     `/api/v1/admin/billing`); and the life modules, each behind its own
     switch and answering 404 while off: fitness (Mi Fitness sync), workout,
     food, money, tasks with projects, goals, now (`/api/v1/today`, wallpapers,
-    sounds), travel, habits and notes. Every route except the probes is under
+    sounds), travel, habits, notes and medical (with the private files of its
+    records and of travel documents under `/api/v1/files`). Every route except the probes is under
     `/api/v1`. Authentication is a JWT bearer, an API key (`X-API-Key`) or the
     HttpOnly session cookie the SPA uses; rate limiting and idempotency are
     driven by headers (`Idempotency-Key` on writes). Maintained by one owner,
@@ -903,6 +904,165 @@ components:
         kind: { type: string }
         valid_until: { type: string, format: date }
         reason: { type: string, enum: [passport_6_months, expires_during_trip], description: 'A passport valid less than six months past the end, or a visa or insurance ending before it' }
+    MedicalPerson:
+      type: object
+      required: [id, name, relation, note]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        relation: { type: string }
+        note: { type: string }
+    MedicalPersonInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        relation: { type: string, maxLength: 40, description: 'Free text: me, wife, son, mother' }
+        note: { type: string, maxLength: 1000 }
+    MedicalProvider:
+      type: object
+      required: [id, kind, name, specialty, clinic, phone, email, address, note]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [doctor, clinic] }
+        name: { type: string }
+        specialty: { type: string }
+        clinic: { type: string, description: The clinic a doctor works at }
+        phone: { type: string }
+        email: { type: string }
+        address: { type: string }
+        note: { type: string }
+    MedicalProviderInput:
+      type: object
+      required: [kind, name]
+      properties:
+        kind: { type: string, enum: [doctor, clinic] }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        specialty: { type: string, maxLength: 80 }
+        clinic: { type: string, maxLength: 120 }
+        phone: { type: string, maxLength: 40 }
+        email: { type: string, maxLength: 254, description: Empty or an email address }
+        address: { type: string, maxLength: 300 }
+        note: { type: string, maxLength: 1000 }
+    MedicalVisit:
+      type: object
+      required: [id, person_id, person_name, provider_id, provider_name, date, reason, outcome, follow_up, follow_up_task_id]
+      properties:
+        id: { type: string, format: uuid }
+        person_id: { type: string, format: uuid }
+        person_name: { type: string }
+        provider_id: { type: [string, 'null'], format: uuid }
+        provider_name: { type: [string, 'null'] }
+        date: { type: string, format: date }
+        reason: { type: string }
+        outcome: { type: string }
+        follow_up: { type: [string, 'null'], format: date }
+        follow_up_task_id: { type: [string, 'null'], format: uuid, description: The task made by POST .../task }
+    MedicalVisitInput:
+      type: object
+      required: [person_id, date, reason]
+      properties:
+        person_id: { type: string, format: uuid }
+        provider_id: { type: [string, 'null'], format: uuid }
+        date: { type: string, format: date }
+        reason: { type: string, minLength: 1, maxLength: 200 }
+        outcome: { type: string, maxLength: 2000 }
+        follow_up: { type: [string, 'null'], format: date }
+    MedicalRecord:
+      type: object
+      required: [id, person_id, person_name, visit_id, date, kind, title, note, files]
+      properties:
+        id: { type: string, format: uuid }
+        person_id: { type: string, format: uuid }
+        person_name: { type: string }
+        visit_id: { type: [string, 'null'], format: uuid }
+        date: { type: string, format: date }
+        kind: { type: string, enum: [lab, imaging, prescription, discharge, vaccination, certificate, other] }
+        title: { type: string }
+        note: { type: string }
+        files: { type: integer, description: The number of its ready files }
+    MedicalRecordInput:
+      type: object
+      required: [person_id, date, kind, title]
+      properties:
+        person_id: { type: string, format: uuid }
+        visit_id: { type: [string, 'null'], format: uuid }
+        date: { type: string, format: date }
+        kind: { type: string, enum: [lab, imaging, prescription, discharge, vaccination, certificate, other] }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        note: { type: string, maxLength: 2000 }
+    MedicalMedication:
+      type: object
+      required: [id, person_id, person_name, name, dose, schedule, start_date, end_date, end_task_id, note]
+      properties:
+        id: { type: string, format: uuid }
+        person_id: { type: string, format: uuid }
+        person_name: { type: string }
+        name: { type: string }
+        dose: { type: string }
+        schedule: { type: string, description: 'Free text as prescribed: twice a day after meals' }
+        start_date: { type: [string, 'null'], format: date }
+        end_date: { type: [string, 'null'], format: date }
+        end_task_id: { type: [string, 'null'], format: uuid, description: The task made by POST .../task }
+        note: { type: string }
+    MedicalMedicationInput:
+      type: object
+      required: [person_id, name]
+      properties:
+        person_id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        dose: { type: string, maxLength: 80 }
+        schedule: { type: string, maxLength: 200 }
+        start_date: { type: [string, 'null'], format: date }
+        end_date: { type: [string, 'null'], format: date, description: On or after start_date }
+        note: { type: string, maxLength: 1000 }
+    MedicalTask:
+      type: object
+      required: [id, title, due, status]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        due: { type: [string, 'null'], format: date }
+        status: { type: string }
+    PrivateFile:
+      type: object
+      required: [id, parent_kind, parent_id, name, content_type, bytes, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        parent_kind: { type: string, enum: [medical_record, travel_document] }
+        parent_id: { type: string, format: uuid }
+        name: { type: string }
+        content_type: { type: string }
+        bytes: { type: integer }
+        status: { type: string, enum: [pending, ready] }
+        created_at: { type: string, format: date-time }
+    PrivateFileInput:
+      type: object
+      required: [parent_kind, parent_id, name, content_type, bytes]
+      properties:
+        parent_kind: { type: string, enum: [medical_record, travel_document] }
+        parent_id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 200, description: 'The file name as shown and downloaded; a path keeps its last segment' }
+        content_type: { type: string, enum: [application/pdf, image/jpeg, image/png, image/webp, image/heic] }
+        bytes: { type: integer, minimum: 1, maximum: 26214400 }
+    PrivateFileUpload:
+      type: object
+      required: [url, headers]
+      properties:
+        url: { type: string, description: Presigned PUT valid 15 minutes }
+        headers:
+          type: object
+          description: Send exactly these headers with the PUT; they are signed
+          required: [Content-Type, Cache-Control]
+          properties:
+            Content-Type: { type: string }
+            Cache-Control: { type: string }
+    PrivateFileDownload:
+      type: object
+      required: [url, expires_in]
+      properties:
+        url: { type: string, description: Presigned GET; do not store it }
+        expires_in: { type: integer, description: Seconds the link stays valid }
     TravelTrip:
       type: object
       required: [id, name, start_date, end_date, countries, note, packing, spends]
@@ -3034,13 +3194,14 @@ paths:
                 properties:
                   data:
                     type: object
-                    required: [billing, fitness, food, goals, habits, money, notes, now, tasks, travel, workout]
+                    required: [billing, fitness, food, goals, habits, medical, money, notes, now, tasks, travel, workout]
                     properties:
                       billing: { type: boolean }
                       fitness: { type: boolean }
                       food: { type: boolean }
                       goals: { type: boolean }
                       habits: { type: boolean }
+                      medical: { type: boolean }
                       money: { type: boolean }
                       notes: { type: boolean }
                       now: { type: boolean }
@@ -9466,6 +9627,1080 @@ paths:
         '204': { description: Deleted }
         '401': { description: Not authenticated }
         '404': { description: 'Travel module disabled, or not the caller''s document' }
+  /api/v1/medical/people:
+    get:
+      summary: The people of the family, by name
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/MedicalPerson' } }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Add a person
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MedicalPersonInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/MedicalPerson' }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/medical/people/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Replace a person (every field)
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MedicalPersonInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/MedicalPerson' }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a person with no visits, records or medications
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: The person still has visits, records or medications (person_in_use)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/medical/providers:
+    get:
+      summary: The doctors and clinics, by name
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/MedicalProvider' } }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Add a doctor or a clinic
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MedicalProviderInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/MedicalProvider' }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/medical/providers/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Replace a doctor or a clinic (every field)
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MedicalProviderInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/MedicalProvider' }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a doctor or a clinic; its visits keep their date and lose the link
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/medical/visits:
+    get:
+      summary: The visits, the newest first
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: person, in: query, schema: { type: string, format: uuid }, description: Only this person }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/MedicalVisit' } }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Add a visit
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MedicalVisitInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/MedicalVisit' }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/medical/visits/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Replace a visit (every field)
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MedicalVisitInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/MedicalVisit' }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a visit
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/medical/visits/{id}/task:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: The task of the follow-up date
+      description: >-
+        The task linked to the follow-up date while it exists (200), else a new open task in area health due that
+        day (201). 404 tasks while the tasks module is off.
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The linked task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [visit, task, created]
+                    properties:
+                      visit: { $ref: '#/components/schemas/MedicalVisit' }
+                      task: { $ref: '#/components/schemas/MedicalTask' }
+                      created: { type: boolean }
+        '201':
+          description: A new task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [visit, task, created]
+                    properties:
+                      visit: { $ref: '#/components/schemas/MedicalVisit' }
+                      task: { $ref: '#/components/schemas/MedicalTask' }
+                      created: { type: boolean }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical or tasks module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: The visit has no follow-up date (no_date)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/medical/records:
+    get:
+      summary: The records, the newest first, with the count of their files
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: person, in: query, schema: { type: string, format: uuid }, description: Only this person }
+        - { name: kind, in: query, schema: { type: string, enum: [lab, imaging, prescription, discharge, vaccination, certificate, other] } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/MedicalRecord' } }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Add a record
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MedicalRecordInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/MedicalRecord' }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/medical/records/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Replace a record (every field)
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MedicalRecordInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/MedicalRecord' }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a record and its files
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/medical/medications:
+    get:
+      summary: The medications, the current ones by name, then the finished ones
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: person, in: query, schema: { type: string, format: uuid }, description: Only this person }
+        - { name: current, in: query, schema: { type: boolean }, description: 'true: only those without an end, or ending today or later' }
+        - { name: tz, in: query, schema: { type: string }, description: 'IANA zone of the caller''s today (UTC by default)' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/MedicalMedication' } }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Add a medication
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MedicalMedicationInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/MedicalMedication' }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/medical/medications/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Replace a medication (every field)
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MedicalMedicationInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/MedicalMedication' }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Delete a medication
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/medical/medications/{id}/task:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: The task of the end date
+      description: >-
+        The task linked to the end date while it exists (200), else a new open task in area health due that
+        day (201). 404 tasks while the tasks module is off.
+      tags: [medical]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The linked task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [medication, task, created]
+                    properties:
+                      medication: { $ref: '#/components/schemas/MedicalMedication' }
+                      task: { $ref: '#/components/schemas/MedicalTask' }
+                      created: { type: boolean }
+        '201':
+          description: A new task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [medication, task, created]
+                    properties:
+                      medication: { $ref: '#/components/schemas/MedicalMedication' }
+                      task: { $ref: '#/components/schemas/MedicalTask' }
+                      created: { type: boolean }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found, or the medical or tasks module is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: The medication has no end date (no_date)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/files:
+    get:
+      summary: The ready files of a medical record or a travel document, oldest first
+      tags: [files]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: parent_kind, in: query, required: true, schema: { type: string, enum: [medical_record, travel_document] } }
+        - { name: parent_id, in: query, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/PrivateFile' } }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found (another owner's file or parent reads the same), or the module of the parent is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Start a private upload
+      description: >-
+        Creates a pending row and answers a presigned PUT valid 15 minutes under the private prefix. The
+        browser sends the bytes with exactly the answered headers, then calls /ready. PDF, JPEG, PNG, WebP or
+        HEIC, up to 25 MB, at most 20 files per parent.
+      tags: [files]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrivateFileInput' }
+      responses:
+        '201':
+          description: The pending file and its upload
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [file, upload]
+                    properties:
+                      file: { $ref: '#/components/schemas/PrivateFile' }
+                      upload: { $ref: '#/components/schemas/PrivateFileUpload' }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found (another owner's file or parent reads the same), or the module of the parent is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: The parent holds the most files it can (too_many_files)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: Storage not configured (storage_not_configured)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/files/{id}/ready:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Mark a file ready once it is in the storage at the declared size
+      description: >-
+        Fails closed: the file turns ready only after an unsigned HEAD at its public URL is refused. If the
+        storage lets anyone read it, the file is deleted and the call answers 503 storage_public.
+      tags: [files]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PrivateFile' }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found (another owner's file or parent reads the same), or the module of the parent is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: The object is missing or has another size (upload_incomplete)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: Storage not configured, refusing, or readable without a key (storage_not_configured, storage_unavailable, storage_public)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/files/{id}/download:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: A presigned GET link to the file, valid two minutes
+      description: >-
+        Signed for the owner on every call; the answer carries Cache-Control no-store. The link opens the file
+        inline under its name.
+      tags: [files]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The link
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PrivateFileDownload' }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found (another owner's file or parent reads the same), or the module of the parent is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: The upload has not finished (not_ready)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: Storage not configured or refusing (storage_not_configured, storage_unavailable)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/files/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      summary: Delete a file
+      description: >-
+        The row goes first and its object key is kept for the files_sweep job in the same transaction; the
+        object is removed right after, or by the sweep when the storage does not answer.
+      tags: [files]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found (another owner's file or parent reads the same), or the module of the parent is off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /api/v1/travel/trips:
     get:
       summary: Trips with packing and spends, the latest first
