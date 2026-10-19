@@ -1,0 +1,1 @@
+The daily activity sync fetches a day of margin on both sides of the requested range, so a device in a zone ahead of or behind its cloud region no longer gets the edge day stored from a fragment of its minutes.

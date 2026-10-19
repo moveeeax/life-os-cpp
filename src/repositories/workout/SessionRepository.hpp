@@ -367,7 +367,9 @@ public:
                     iso("h.timestamp") +
                     ", 'bpm', h.bpm) ORDER BY h.timestamp) FROM heart_rate_samples h "
                     "  WHERE h.user_id = acc.id AND h.timestamp >= s.started_at "
-                    "   AND h.timestamp <= COALESCE(s.finished_at, now())), "
+                    "   AND h.timestamp <= COALESCE(s.finished_at, now()) "
+                    // A resting value is a daily figure, not a beat of the session.
+                    "   AND h.sample_type <> 'resting'), "
                     "  '[]'::json), "
                     " 'latest_sample_at', (SELECT " +
                     iso("MAX(timestamp)") +
@@ -495,6 +497,8 @@ private:
         " SELECT c.id, COUNT(h.bpm) AS n, ROUND(AVG(h.bpm))::int AS avg_bpm, MAX(h.bpm) AS max_bpm "
         " FROM cand c LEFT JOIN heart_rate_samples h "
         "  ON h.user_id = c.acct AND h.timestamp >= c.started_at AND h.timestamp <= c.finished_at "
+        // A daily resting value inside the window is not a beat of the session.
+        "  AND h.sample_type <> 'resting' "
         " GROUP BY c.id), "
         "band AS ("
         " SELECT DISTINCT ON (c.id) c.id, w.workout_id, w.calories_kcal, w.avg_heart_rate_bpm, "

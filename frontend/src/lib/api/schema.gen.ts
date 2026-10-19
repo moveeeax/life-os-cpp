@@ -1994,7 +1994,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Malformed range, unknown or duplicate data type */
+                /** @description Malformed range, a range wider than 366 days (range_too_wide), unknown or duplicate data type */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -2728,7 +2728,7 @@ export interface paths {
                         "text/csv": string;
                     };
                 };
-                /** @description Malformed range, a range wider than 366 days, unknown type, or csv without a type */
+                /** @description Malformed range, a range wider than 366 days, unknown type, csv without a type, or more rows than one export carries (export_too_large, 200000 rows over all types; the body adds rows and max_rows) */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3066,7 +3066,8 @@ export interface paths {
          * One step of waiting for the QR confirmation
          * @description Polls Xiaomi once (about 3 seconds). On the confirmation the new token is
          *     verified with a login, the account's region is detected and the link is
-         *     stored; a first sync is enqueued.
+         *     stored; a first sync is enqueued. When every slot for Xiaomi requests is
+         *     taken, the step answers pending without asking Xiaomi.
          */
         get: {
             parameters: {
@@ -3196,7 +3197,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description not_configured, upstream_auth (link again) or upstream_protocol */
+                /** @description not_configured, upstream_auth (link again), upstream_protocol, or busy (every slot for Xiaomi requests is taken; retry after the Retry-After seconds) */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -3275,7 +3276,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description Not configured, upstream refused authentication, protocol mismatch, or upstream_unavailable (any other failure) */
+                /** @description Not configured, upstream refused authentication, protocol mismatch, upstream_unavailable (any other failure), or busy (every slot for Xiaomi requests is taken; retry after the Retry-After seconds) */
                 503: {
                     headers: {
                         [name: string]: unknown;

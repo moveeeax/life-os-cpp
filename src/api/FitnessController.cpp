@@ -10,8 +10,12 @@
 #include <cstdio>
 #include <ctime>
 #include <exception>
+#include <functional>
+#include <memory>
 #include <optional>
 #include <stdexcept>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include <drogon/drogon.h>
@@ -35,6 +39,7 @@
 #include "jobs/Jobs.hpp"
 #include "repositories/fitness/MiAccountRepository.hpp"
 #include "repositories/fitness/SyncRunRepository.hpp"
+#include "utils/BlockingPool.hpp"
 #include "utils/Config.hpp"
 #include "utils/ErrorResponse.hpp"
 #include "utils/Modules.hpp"
@@ -44,6 +49,8 @@ namespace Api {
 using json = nlohmann::json;
 
 namespace {
+
+using Callback = std::function<void(const HttpResponsePtr&)>;
 
 constexpr long kSampleDefaultLimit = 1000;
 constexpr long kSampleMaxLimit = 10000;
@@ -95,6 +102,14 @@ json account_status_body(const std::string& owner) {
     out["account"] = Xiaomi::mask_account_id(out.value("xiaomi_user_id", std::string()));
     out.erase("xiaomi_user_id");
     return out;
+}
+
+/// The pool refused the task: every thread waits on Xiaomi and the queue is
+/// full. Nothing was asked of Xiaomi, the client retries in a few seconds.
+HttpResponsePtr busy_response() {
+    auto resp = ErrorResponse::service_unavailable("busy", "Xiaomi requests are queued up, retry in a few seconds");
+    resp->addHeader("Retry-After", "5");
+    return resp;
 }
 
 }  // namespace
@@ -201,51 +216,60 @@ void FitnessController::probe(const HttpRequestPtr& req, std::function<void(cons
         return;
     }
 
-    Repositories::MiAccountRepository accounts(token_key);
-    // The link as it was loaded; a re-link meanwhile is not undone by this login.
-    std::string fence;
-    try {
-        const auto loaded = accounts.load_fenced(owner);
-        if (!loaded.has_value()) {
-            callback(ErrorResponse::conflict("not_linked", "no Mi account is linked"));
-            return;
-        }
-        fence = loaded->rotated_at;
-
-        Xiaomi::CloudClient client(Xiaomi::Service::transport(),
-                                   loaded->credentials,
-                                   [&accounts, &owner, &fence](const Xiaomi::Credentials& rotated) {
-                                       accounts.store_rotated(owner, rotated, fence);
-                                   });
-        client.login();
-        accounts.mark_ok(owner);
-        const auto items = client.fetch_key(key, from, to, std::nullopt);
-
-        callback(Response::ok(json{{"data",
-                                    {{"account", Xiaomi::mask_account_id(client.credentials().user_id)},
-                                     {"region", client.credentials().region},
-                                     {"key", key},
-                                     {"records", items.size()}}}}));
-    } catch (const Xiaomi::MiFitnessAuthError& e) {
-        // Only a fresh token fixes this, so the code is distinct from other
-        // failures. MiFitness*Error messages contain no values by construction.
-        spdlog::warn("fitness probe auth failure: {}", e.what());
+    // Login and fetch wait on Xiaomi (up to the transport timeout per request):
+    // that part runs on the blocking pool, not on this IO thread.
+    auto respond = std::make_shared<Callback>(std::move(callback));
+    const bool queued = Utils::BlockingPool::shared().try_submit([respond, owner, key, from, to, token_key] {
+        const Callback& reply = *respond;
+        Repositories::MiAccountRepository accounts(token_key);
+        // The link as it was loaded; a re-link meanwhile is not undone by this login.
+        std::string fence;
         try {
-            // An empty fence: the stored token could not be read at all, whatever link is there now.
-            accounts.mark_reauth_required(
-                owner, "upstream_auth", fence.empty() ? accounts.rotated_at(owner).value_or("") : fence);
-        } catch (const std::exception& mark_error) {
-            spdlog::warn("fitness probe: failed to record the link status: {}", mark_error.what());
+            const auto loaded = accounts.load_fenced(owner);
+            if (!loaded.has_value()) {
+                reply(ErrorResponse::conflict("not_linked", "no Mi account is linked"));
+                return;
+            }
+            fence = loaded->rotated_at;
+
+            Xiaomi::CloudClient client(Xiaomi::Service::transport(),
+                                       loaded->credentials,
+                                       [&accounts, &owner, &fence](const Xiaomi::Credentials& rotated) {
+                                           accounts.store_rotated(owner, rotated, fence);
+                                       });
+            client.login();
+            accounts.mark_ok(owner);
+            const auto items = client.fetch_key(key, from, to, std::nullopt);
+
+            reply(Response::ok(json{{"data",
+                                     {{"account", Xiaomi::mask_account_id(client.credentials().user_id)},
+                                      {"region", client.credentials().region},
+                                      {"key", key},
+                                      {"records", items.size()}}}}));
+        } catch (const Xiaomi::MiFitnessAuthError& e) {
+            // Only a fresh token fixes this, so the code is distinct from other
+            // failures. MiFitness*Error messages contain no values by construction.
+            spdlog::warn("fitness probe auth failure: {}", e.what());
+            try {
+                // An empty fence: the stored token could not be read at all, whatever link is there now.
+                accounts.mark_reauth_required(
+                    owner, "upstream_auth", fence.empty() ? accounts.rotated_at(owner).value_or("") : fence);
+            } catch (const std::exception& mark_error) {
+                spdlog::warn("fitness probe: failed to record the link status: {}", mark_error.what());
+            }
+            reply(ErrorResponse::service_unavailable("upstream_auth", "Xiaomi refused the stored credentials"));
+        } catch (const Xiaomi::MiFitnessProtocolError& e) {
+            spdlog::warn("fitness probe protocol failure: {}", e.what());
+            reply(ErrorResponse::service_unavailable("upstream_protocol",
+                                                     "Xiaomi response did not match the expected format"));
+        } catch (const std::exception& e) {
+            // The database or the transport failed some other way: still an answer, not a dropped request.
+            spdlog::warn("fitness probe failed: {}", e.what());
+            reply(ErrorResponse::service_unavailable("upstream_unavailable", "the probe could not reach its data now"));
         }
-        callback(ErrorResponse::service_unavailable("upstream_auth", "Xiaomi refused the stored credentials"));
-    } catch (const Xiaomi::MiFitnessProtocolError& e) {
-        spdlog::warn("fitness probe protocol failure: {}", e.what());
-        callback(ErrorResponse::service_unavailable("upstream_protocol",
-                                                    "Xiaomi response did not match the expected format"));
-    } catch (const std::exception& e) {
-        // The database or the transport failed some other way: still an answer, not a dropped request.
-        spdlog::warn("fitness probe failed: {}", e.what());
-        callback(ErrorResponse::service_unavailable("upstream_unavailable", "the probe could not reach its data now"));
+    });
+    if (!queued) {
+        (*respond)(busy_response());
     }
 }
 
@@ -291,34 +315,44 @@ void FitnessController::accountLinkStep(const HttpRequestPtr& req,
                                         const std::string& link_id) {
     API_MODULE_PERMISSION_USER_GUARD(
         Core::fitness_enabled(), "fitness", req, callback, Domain::Permission::kFitnessSync, owner);
-    try {
-        const auto step = Fitness::Link::step(owner, link_id);
-        json data{{"state", "pending"}};
-        if (step.state == Fitness::Link::State::Linked) {
-            data["state"] = "linked";
-            // First data for the new link. A failure to enqueue is not a
-            // failure to link: the schedule or the user starts a sync later.
-            try {
-                const int window =
-                    Config::get().get<int>("fitness.xiaomi.sync_window_days", "MI_FITNESS_SYNC_WINDOW_DAYS", 2);
-                Repositories::MiAccountRepository accounts("");
-                Jobs::FitnessSync::enqueue_recent(
-                    {owner, accounts.xiaomi_id_of(owner).value_or(""), accounts.region_of(owner).value_or("cn")},
-                    window,
-                    static_cast<long long>(::time(nullptr)));
-            } catch (const std::exception& e) {
-                spdlog::warn("mi link: first sync was not enqueued: {}", e.what());
+    // A step long-polls Xiaomi for a few seconds and, on the confirmation,
+    // logs in and probes up to six regions: it runs on the blocking pool.
+    auto respond = std::make_shared<Callback>(std::move(callback));
+    const bool queued = Utils::BlockingPool::shared().try_submit([respond, owner, link_id] {
+        const Callback& reply = *respond;
+        try {
+            const auto step = Fitness::Link::step(owner, link_id);
+            json data{{"state", "pending"}};
+            if (step.state == Fitness::Link::State::Linked) {
+                data["state"] = "linked";
+                // First data for the new link. A failure to enqueue is not a
+                // failure to link: the schedule or the user starts a sync later.
+                try {
+                    const int window =
+                        Config::get().get<int>("fitness.xiaomi.sync_window_days", "MI_FITNESS_SYNC_WINDOW_DAYS", 2);
+                    Repositories::MiAccountRepository accounts("");
+                    Jobs::FitnessSync::enqueue_recent(
+                        {owner, accounts.xiaomi_id_of(owner).value_or(""), accounts.region_of(owner).value_or("cn")},
+                        window,
+                        static_cast<long long>(::time(nullptr)));
+                } catch (const std::exception& e) {
+                    spdlog::warn("mi link: first sync was not enqueued: {}", e.what());
+                }
+            } else if (step.state == Fitness::Link::State::Failed) {
+                data["state"] = "failed";
+                data["error"] = step.error_code;
             }
-        } else if (step.state == Fitness::Link::State::Failed) {
-            data["state"] = "failed";
-            data["error"] = step.error_code;
+            reply(Response::ok(json{{"data", data}}));
+        } catch (const Fitness::Link::LinkNotFound&) {
+            reply(ErrorResponse::not_found("link_attempt"));
+        } catch (const std::exception& e) {
+            spdlog::error("fitness.accountLinkStep failed: {}", e.what());
+            reply(ErrorResponse::internal_error());
         }
-        callback(Response::ok(json{{"data", data}}));
-    } catch (const Fitness::Link::LinkNotFound&) {
-        callback(ErrorResponse::not_found("link_attempt"));
-    } catch (const std::exception& e) {
-        spdlog::error("fitness.accountLinkStep failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
+    });
+    if (!queued) {
+        // Nothing was asked of Xiaomi: the attempt is untouched, the page polls again.
+        (*respond)(Response::ok(json{{"data", {{"state", "pending"}}}}));
     }
 }
 
@@ -386,48 +420,57 @@ void FitnessController::accountDetectRegion(const HttpRequestPtr& req,
         callback(ErrorResponse::service_unavailable("not_configured", "MI_FITNESS_TOKEN_KEY is not set"));
         return;
     }
-    Repositories::MiAccountRepository accounts(token_key);
-    // The link as it was loaded; a re-link meanwhile is not undone by this login.
-    std::string fence;
-    try {
-        const auto loaded = accounts.load_fenced(owner);
-        if (!loaded.has_value()) {
-            callback(ErrorResponse::not_found("mi_account"));
-            return;
-        }
-        fence = loaded->rotated_at;
-        const Xiaomi::Credentials& credentials = loaded->credentials;
-        // Detection logs in, and a login must not run next to a sync of the account.
-        if (Repositories::SyncRunRepository().any_running(credentials.user_id)) {
-            callback(ErrorResponse::conflict("sync_in_progress", "a sync run is in progress, retry later"));
-            return;
-        }
-        Xiaomi::CloudClient client(
-            Xiaomi::Service::transport(), credentials, [&accounts, &owner, &fence](const Xiaomi::Credentials& rotated) {
-                accounts.store_rotated(owner, rotated, fence);
-            });
-        client.login();
-        accounts.mark_ok(owner);
-        const auto region = Xiaomi::detect_region(client, Fitness::Link::detail::today_utc());
-        accounts.set_region(owner, region.value_or(credentials.region), region.has_value());
-        callback(Response::ok(json{{"data", account_status_body(owner)}}));
-    } catch (const Xiaomi::MiFitnessAuthError& e) {
-        spdlog::warn("fitness region detection auth failure: {}", e.what());
+    // Login plus up to six region probes wait on Xiaomi: the blocking pool runs them.
+    auto respond = std::make_shared<Callback>(std::move(callback));
+    const bool queued = Utils::BlockingPool::shared().try_submit([respond, owner, token_key] {
+        const Callback& reply = *respond;
+        Repositories::MiAccountRepository accounts(token_key);
+        // The link as it was loaded; a re-link meanwhile is not undone by this login.
+        std::string fence;
         try {
-            // An empty fence: the stored token could not be read at all, whatever link is there now.
-            accounts.mark_reauth_required(
-                owner, "upstream_auth", fence.empty() ? accounts.rotated_at(owner).value_or("") : fence);
-        } catch (const std::exception& mark_error) {
-            spdlog::warn("fitness region detection: failed to record the link status: {}", mark_error.what());
+            const auto loaded = accounts.load_fenced(owner);
+            if (!loaded.has_value()) {
+                reply(ErrorResponse::not_found("mi_account"));
+                return;
+            }
+            fence = loaded->rotated_at;
+            const Xiaomi::Credentials& credentials = loaded->credentials;
+            // Detection logs in, and a login must not run next to a sync of the account.
+            if (Repositories::SyncRunRepository().any_running(credentials.user_id)) {
+                reply(ErrorResponse::conflict("sync_in_progress", "a sync run is in progress, retry later"));
+                return;
+            }
+            Xiaomi::CloudClient client(Xiaomi::Service::transport(),
+                                       credentials,
+                                       [&accounts, &owner, &fence](const Xiaomi::Credentials& rotated) {
+                                           accounts.store_rotated(owner, rotated, fence);
+                                       });
+            client.login();
+            accounts.mark_ok(owner);
+            const auto region = Xiaomi::detect_region(client, Fitness::Link::detail::today_utc());
+            accounts.set_region(owner, region.value_or(credentials.region), region.has_value());
+            reply(Response::ok(json{{"data", account_status_body(owner)}}));
+        } catch (const Xiaomi::MiFitnessAuthError& e) {
+            spdlog::warn("fitness region detection auth failure: {}", e.what());
+            try {
+                // An empty fence: the stored token could not be read at all, whatever link is there now.
+                accounts.mark_reauth_required(
+                    owner, "upstream_auth", fence.empty() ? accounts.rotated_at(owner).value_or("") : fence);
+            } catch (const std::exception& mark_error) {
+                spdlog::warn("fitness region detection: failed to record the link status: {}", mark_error.what());
+            }
+            reply(ErrorResponse::service_unavailable("upstream_auth", "Xiaomi refused the stored credentials"));
+        } catch (const Xiaomi::MiFitnessProtocolError& e) {
+            spdlog::warn("fitness region detection protocol failure: {}", e.what());
+            reply(ErrorResponse::service_unavailable("upstream_protocol",
+                                                     "Xiaomi response did not match the expected format"));
+        } catch (const std::exception& e) {
+            spdlog::error("fitness.accountDetectRegion failed: {}", e.what());
+            reply(ErrorResponse::internal_error());
         }
-        callback(ErrorResponse::service_unavailable("upstream_auth", "Xiaomi refused the stored credentials"));
-    } catch (const Xiaomi::MiFitnessProtocolError& e) {
-        spdlog::warn("fitness region detection protocol failure: {}", e.what());
-        callback(ErrorResponse::service_unavailable("upstream_protocol",
-                                                    "Xiaomi response did not match the expected format"));
-    } catch (const std::exception& e) {
-        spdlog::error("fitness.accountDetectRegion failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
+    });
+    if (!queued) {
+        (*respond)(busy_response());
     }
 }
 
@@ -448,7 +491,13 @@ void FitnessController::syncEnqueue(const HttpRequestPtr& req, std::function<voi
     const std::string from = body["from"].get<std::string>();
     const std::string to = body["to"].get<std::string>();
     try {
-        Xiaomi::range_to_timestamps(from, to, "cn");
+        // One run holds the account's sync slot until it ends: a range of
+        // decades would keep probe, unlink and the schedule out for hours.
+        const auto range = Xiaomi::range_to_timestamps(from, to, "cn");
+        if (range.second - range.first > 366LL * 86400) {
+            callback(ErrorResponse::bad_request("range_too_wide", "a sync covers at most 366 days per request"));
+            return;
+        }
     } catch (const Xiaomi::MiFitnessProtocolError&) {
         callback(ErrorResponse::bad_request("invalid_range",
                                             "from and to must be YYYY-MM-DD and from must not be after to"));
@@ -670,19 +719,39 @@ void FitnessController::exportData(const HttpRequestPtr& req, std::function<void
     }
     try {
         Repositories::HealthReadRepository repo(account);
+        // The datasets of this request in key order (the order the JSON
+        // object had when it was built as a tree).
+        std::vector<std::string> wanted = type.empty() ? kTypes : std::vector<std::string>{type};
+        std::sort(wanted.begin(), wanted.end());
+        // Memory ceiling: the rows are counted before any is read, and a
+        // request over the limit is refused instead of being built in the pod.
+        long row_count = 0;
+        for (const auto& t : wanted) {
+            row_count += repo.export_count(t, q.from, q.to);
+        }
+        if (row_count > Fitness::Export::kMaxRows) {
+            callback(ErrorResponse::bad_request(
+                "export_too_large",
+                "the export holds more rows than one request carries: narrow the range or export one type",
+                json{{"rows", row_count}, {"max_rows", Fitness::Export::kMaxRows}}));
+            return;
+        }
         if (format == "json") {
-            json records = json::object();
-            if (type.empty()) {
-                for (const auto& t : kTypes) {
-                    records[t] = repo.export_rows(t, q.from, q.to);
-                }
-            } else {
-                records[type] = repo.export_rows(type, q.from, q.to);
+            // Postgres builds each dataset's JSON text; it goes into the
+            // response as it is, without a JSON tree of every row.
+            std::vector<std::pair<std::string, std::string>> records;
+            records.reserve(wanted.size());
+            for (const auto& t : wanted) {
+                records.emplace_back(t, repo.export_json(t, q.from, q.to));
             }
             const auto now =
                 std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
                     .count();
-            callback(Response::ok(Fitness::Export::envelope(records, type, q.from, q.to, now)));
+            auto resp = HttpResponse::newHttpResponse();
+            resp->setStatusCode(k200OK);
+            resp->setContentTypeCode(CT_APPLICATION_JSON);
+            resp->setBody(Fitness::Export::envelope_text(records, type, q.from, q.to, now));
+            callback(resp);
             return;
         }
         const auto rows = repo.export_rows(type, q.from, q.to);

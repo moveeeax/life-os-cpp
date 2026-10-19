@@ -1,0 +1,1 @@
+A fitness sync whose stored Xiaomi token cannot be unsealed (the token key rotated or wrong on the worker, a corrupt row) finishes its run as failed with `token_unreadable` and marks the link as needing a new link, instead of retrying into the dead-letter queue with the run left queued.

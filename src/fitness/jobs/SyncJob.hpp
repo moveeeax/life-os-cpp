@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cstdio>
 #include <exception>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -21,7 +22,9 @@
 #include <nlohmann/json.hpp>
 
 #include "fitness/sync/SyncService.hpp"
+#include "fitness/xiaomi/Errors.hpp"
 #include "fitness/xiaomi/Service.hpp"
+#include "jobs/Job.hpp"
 #include "jobs/Jobs.hpp"
 #include "repositories/fitness/MiAccountRepository.hpp"
 #include "repositories/fitness/SyncRunRepository.hpp"
@@ -104,6 +107,28 @@ inline int enqueue_recent_for_all(int window_days, long long now_epoch) {
     return enqueued;
 }
 
+/**
+ * @brief Dead-letter hook: the queue gave the job up. Its run is closed as
+ *        failed if it is still queued, or running with a quiet heartbeat, so
+ *        the page polling it stops waiting and the account's slot is free.
+ */
+inline void on_dead_letter(const nlohmann::json& payload, const std::string& error) {
+    if (!payload.contains("run_id") || !payload["run_id"].is_number_integer()) {
+        return;
+    }
+    const long run_id = payload["run_id"].get<long>();
+    // The queue's error text is not stored: it may carry details of the failure.
+    (void)error;
+    const bool closed = Repositories::SyncRunRepository().fail_abandoned(
+        run_id,
+        nlohmann::json{{"error", "dead_lettered"}, {"detail", "the sync job failed and will not be retried"}},
+        Sync::SyncService::stale_after_seconds(),
+        Sync::SyncService::quiet_after_seconds());
+    if (closed) {
+        spdlog::warn("fitness sync {}: the job was dead-lettered, the run is closed as failed", run_id);
+    }
+}
+
 inline nlohmann::json process_job(const nlohmann::json& payload) {
     const long run_id = payload.at("run_id").get<long>();
     const std::string from = payload.at("from").get<std::string>();
@@ -137,7 +162,26 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     }
     const std::string owner_id = payload["owner_id"].get<std::string>();
     Repositories::MiAccountRepository accounts(token_key);
-    const auto loaded = accounts.load_fenced(owner_id);
+    std::optional<Repositories::MiAccountRepository::Fenced> loaded;
+    try {
+        loaded = accounts.load_fenced(owner_id);
+    } catch (const Xiaomi::MiFitnessAuthError& e) {
+        // The stored token cannot be read: MI_FITNESS_TOKEN_KEY was rotated or
+        // is wrong on this worker, or the row is corrupt. Retrying cannot help
+        // and only a new link fixes it, the same as a probe concludes. Any
+        // other error (the database) propagates and the queue retries.
+        spdlog::warn("fitness sync {}: the stored token is unreadable: {}", run_id, e.what());
+        runs.finish(
+            run_id,
+            "failed",
+            nlohmann::json{{"error", "token_unreadable"}, {"detail", "the stored Xiaomi token cannot be read"}});
+        try {
+            accounts.mark_reauth_required(owner_id, "token_unreadable", accounts.rotated_at(owner_id).value_or(""));
+        } catch (const std::exception& mark_error) {
+            spdlog::warn("fitness sync {}: failed to record the link status: {}", run_id, mark_error.what());
+        }
+        return {{"run_id", run_id}, {"status", "failed"}};
+    }
     if (!loaded.has_value()) {
         runs.finish(run_id, "failed", nlohmann::json{{"error", "not_linked"}, {"detail", "no Mi account is linked"}});
         return {{"run_id", run_id}, {"status", "failed"}};
@@ -151,6 +195,12 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
                                   accounts.store_rotated(owner_id, rotated, fence);
                               });
     const auto result = service.run(run_id, from, to, data_types);
+    if (service.start_outcome() == Sync::SyncService::Start::HeldElsewhere) {
+        // The run's own row still beats under another delivery of this job (a
+        // lease reaped while the first worker is alive). This one waits without
+        // spending an attempt and takes the run over if that heartbeat stops.
+        throw Jobs::DeferJob("fitness_sync: the run is held by another delivery", service.retry_in_ms());
+    }
 
     // The link status follows what Xiaomi said to the stored token. A run that
     // never reached Xiaomi says nothing about it.

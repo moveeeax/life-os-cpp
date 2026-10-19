@@ -862,6 +862,27 @@ TEST_F(WorkoutSessionsTest, ReconciliationGoesFromPendingToNoDataToMatched) {
     EXPECT_TRUE(body_of(away)["data"]["band_workout_id"].is_null());
 }
 
+// review-fitness 5: a daily resting value whose timestamp falls inside the
+// session is not a beat of the session: neither the mean nor the chart takes it.
+TEST_F(WorkoutSessionsTest, RestingHeartRateStaysOutOfTheSession) {
+    const std::string id = body_of(start(owner()))["data"]["id"].get<std::string>();
+    ASSERT_EQ(patch_session(
+                  owner(), id, json{{"started_at", "2026-09-01T10:00:00Z"}, {"finished_at", "2026-09-01T11:00:00Z"}})
+                  ->statusCode(),
+              k200OK);
+    sql("INSERT INTO heart_rate_samples (user_id, timestamp, bpm, sample_type) VALUES "
+        "('t', '2026-09-01T10:10:00Z', 120, 'active'), ('t', '2026-09-01T10:30:00Z', 52, 'resting')");
+    ASSERT_EQ(reconcile(syncer(), json{{"from", "2026-09-01"}, {"to", "2026-09-01"}})->statusCode(), k200OK);
+
+    const json s = body_of(get_session(owner(), id))["data"];
+    EXPECT_EQ(s["hr_samples"], 1);
+    EXPECT_EQ(s["hr_avg"], 120);
+    const auto chart = heart_rate(owner(), id);
+    ASSERT_EQ(chart->statusCode(), k200OK);
+    ASSERT_EQ(body_of(chart)["data"]["samples"].size(), 1u);
+    EXPECT_EQ(body_of(chart)["data"]["samples"][0]["bpm"], 120);
+}
+
 TEST_F(WorkoutSessionsTest, ReconcileNeedsFitnessSyncAndAValidRange) {
     const json window = {{"from", "2026-09-01"}, {"to", "2026-09-02"}};
     EXPECT_EQ(reconcile(owner(), window)->statusCode(), k403Forbidden);

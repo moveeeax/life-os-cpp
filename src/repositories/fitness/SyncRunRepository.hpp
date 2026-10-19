@@ -24,6 +24,14 @@ inline constexpr long long kSyncAdvisoryLockKey = 0x4d69466974;
 
 class SyncRunRepository {
 public:
+    /// SQL condition on a `running` row: its worker is gone. A row with a
+    /// heartbeat is quiet once the heartbeat is older than $2 seconds; a row
+    /// without one (started by a binary before migration 047) keeps the old
+    /// rule, older than $1 seconds since its start.
+    static constexpr const char* kQuietSql =
+        "((heartbeat_at IS NULL AND started_at < now() - make_interval(secs => $1::double precision)) "
+        " OR heartbeat_at < now() - make_interval(secs => $2::double precision))";
+
     /// A queued run of one Xiaomi account.
     long create(const std::string& xiaomi_user_id,
                 const std::string& from,
@@ -63,6 +71,24 @@ public:
                 status,
                 result.dump());
             return true;
+        });
+    }
+
+    /// Close as failed a run whose job the queue gave up on (dead-lettered):
+    /// a queued run, or a running one whose worker has gone quiet. A run that
+    /// still beats belongs to a live delivery, which closes it itself; a closed
+    /// run stays as it is. True when the run was closed here.
+    bool fail_abandoned(long id, const nlohmann::json& result, long stale_seconds, long quiet_seconds) {
+        return Database::get().execute_write([&](auto& txn) {
+            auto r = txn.exec_params(
+                std::string("UPDATE sync_runs SET status = 'failed', result = $4::jsonb, finished_at = now() "
+                            "WHERE id = $3 AND (status = 'queued' OR (status = 'running' AND ") +
+                    kQuietSql + ")) RETURNING id",
+                stale_seconds,
+                quiet_seconds,
+                id,
+                result.dump());
+            return !r.empty();
         });
     }
 

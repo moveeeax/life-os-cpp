@@ -11566,7 +11566,7 @@
       }
      },
      "400": {
-      "description": "Malformed range, unknown or duplicate data type",
+      "description": "Malformed range, a range wider than 366 days (range_too_wide), unknown or duplicate data type",
       "content": {
        "application/json": {
         "schema": {
@@ -12434,7 +12434,7 @@
       "description": "schema_version 1.0 envelope (json) or a flat table of one type (csv)"
      },
      "400": {
-      "description": "Malformed range, a range wider than 366 days, unknown type, or csv without a type"
+      "description": "Malformed range, a range wider than 366 days, unknown type, csv without a type, or more rows than one export carries (export_too_large, 200000 rows over all types; the body adds rows and max_rows)"
      },
      "401": {
       "description": "Not authenticated"
@@ -12784,7 +12784,7 @@
    ],
    "get": {
     "summary": "One step of waiting for the QR confirmation",
-    "description": "Polls Xiaomi once (about 3 seconds). On the confirmation the new token is\nverified with a login, the account's region is detected and the link is\nstored; a first sync is enqueued.\n",
+    "description": "Polls Xiaomi once (about 3 seconds). On the confirmation the new token is\nverified with a login, the account's region is detected and the link is\nstored; a first sync is enqueued. When every slot for Xiaomi requests is\ntaken, the step answers pending without asking Xiaomi.\n",
     "tags": [
      "fitness"
     ],
@@ -12909,7 +12909,7 @@
       }
      },
      "503": {
-      "description": "not_configured, upstream_auth (link again) or upstream_protocol",
+      "description": "not_configured, upstream_auth (link again), upstream_protocol, or busy (every slot for Xiaomi requests is taken; retry after the Retry-After seconds)",
       "content": {
        "application/json": {
         "schema": {
@@ -13029,7 +13029,7 @@
       }
      },
      "503": {
-      "description": "Not configured, upstream refused authentication, protocol mismatch, or upstream_unavailable (any other failure)",
+      "description": "Not configured, upstream refused authentication, protocol mismatch, upstream_unavailable (any other failure), or busy (every slot for Xiaomi requests is taken; retry after the Retry-After seconds)",
       "content": {
        "application/json": {
         "schema": {
@@ -27864,7 +27864,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 409413,
-  "source_fnv1a64": "592afff75a0f74a7"
+  "source_bytes": 409847,
+  "source_fnv1a64": "11095de0d9b2f864"
  }
 }

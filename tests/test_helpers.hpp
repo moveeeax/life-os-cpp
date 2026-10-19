@@ -1,11 +1,17 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iterator>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <thread>
 
 #include <drogon/HttpRequest.h>
 #include <drogon/HttpResponse.h>
@@ -459,6 +465,48 @@ inline Security::Auth::AuthPrincipal user(const std::string& id) {
     p.raw_claims = nlohmann::json{{"sub", id}, {"permissions", Domain::Permission::kGeneral}};
     return p;
 }
+
+/**
+ * @brief The one response a handler gives, also when it gives it from another
+ *        thread: the fitness routes hand their Xiaomi calls to
+ *        Utils::BlockingPool and answer from there. The state is shared, so a
+ *        callback that arrives after a timed-out wait touches nothing dead.
+ */
+class AwaitedResponse {
+public:
+    std::function<void(const drogon::HttpResponsePtr&)> callback() {
+        return [state = state_](const drogon::HttpResponsePtr& r) {
+            std::lock_guard<std::mutex> lock(state->mutex);
+            state->resp = r;
+            state->thread = std::this_thread::get_id();
+            state->done = true;
+            state->ready.notify_all();
+        };
+    }
+
+    /// The response, or nullptr when none arrived within @p limit.
+    drogon::HttpResponsePtr get(std::chrono::seconds limit = std::chrono::seconds(30)) {
+        std::unique_lock<std::mutex> lock(state_->mutex);
+        state_->ready.wait_for(lock, limit, [this] { return state_->done; });
+        return state_->resp;
+    }
+
+    /// The thread that called the callback (valid after get()).
+    std::thread::id thread() const {
+        std::lock_guard<std::mutex> lock(state_->mutex);
+        return state_->thread;
+    }
+
+private:
+    struct State {
+        std::mutex mutex;
+        std::condition_variable ready;
+        drogon::HttpResponsePtr resp;
+        std::thread::id thread;
+        bool done = false;
+    };
+    std::shared_ptr<State> state_ = std::make_shared<State>();
+};
 
 /// The JSON body of a handler's response.
 inline nlohmann::json body_of(const drogon::HttpResponsePtr& resp) {

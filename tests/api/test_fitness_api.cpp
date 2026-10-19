@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <string>
+#include <thread>
 #include <utility>
 
 #include <drogon/HttpRequest.h>
@@ -17,6 +18,7 @@
 #include "api/FitnessController.hpp"
 #include "database/Database.hpp"
 #include "domain/Role.hpp"
+#include "fitness/Export.hpp"
 #include "fitness/FakeHttpTransport.hpp"
 #include "fitness/xiaomi/Service.hpp"
 #include "jobs/Jobs.hpp"
@@ -126,9 +128,9 @@ protected:
         request->setParameter("key", key);
         request->setParameter("from", from);
         request->setParameter("to", to);
-        HttpResponsePtr captured;
-        controller.probe(request, [&](const HttpResponsePtr& r) { captured = r; });
-        return captured;
+        TestHelpers::AwaitedResponse awaited;
+        controller.probe(request, awaited.callback());
+        return awaited.get();
     }
 };
 
@@ -154,6 +156,26 @@ TEST_F(XiaomiProbeTest, ReturnsMaskedAccountAndCount) {
     EXPECT_EQ(data.value("records", -1), 2);
     // The full account identifier never leaves the service.
     EXPECT_EQ(std::string(resp->body()).find("1234567890"), std::string::npos);
+}
+
+// review-perf 1: the login and the fetch wait on Xiaomi off the IO thread.
+// The route returns at once and the answer comes from a pool thread.
+TEST_F(XiaomiProbeTest, AnswersFromThePoolNotFromTheCallingThread) {
+    seed_credentials();
+    transport.reply_login();
+    transport.reply_encrypted(R"({"code":0,"result":{"data_list":[],"has_more":false}})");
+
+    auto request = TestHelpers::authed(operator_(), Get);
+    request->setParameter("key", "steps");
+    request->setParameter("from", "2026-09-22");
+    request->setParameter("to", "2026-09-22");
+    TestHelpers::AwaitedResponse awaited;
+    controller.probe(request, awaited.callback());
+    const auto resp = awaited.get();
+
+    ASSERT_NE(resp, nullptr);
+    EXPECT_EQ(resp->statusCode(), k200OK) << resp->body();
+    EXPECT_NE(awaited.thread(), std::this_thread::get_id());
 }
 
 TEST_F(XiaomiProbeTest, RejectsUnknownKey) {
@@ -344,6 +366,23 @@ TEST_F(SyncApiTest, StatusOfAnotherAccountsRunIs404) {
         return true;
     });
     EXPECT_EQ(get_status(std::to_string(unattributed))->statusCode(), k404NotFound);
+}
+
+// review-fitness 6: one run holds the account's sync slot until it ends, so
+// its width is capped like the export's.
+TEST_F(SyncApiTest, EnqueueRejectsARangeWiderThanAYear) {
+    const auto resp = post_sync({{"from", "2000-01-01"}, {"to", "2026-09-23"}});
+    ASSERT_NE(resp, nullptr);
+    EXPECT_EQ(resp->statusCode(), k400BadRequest);
+    EXPECT_EQ(json::parse(std::string(resp->body()))["error"], "range_too_wide");
+    Repositories::SyncRunRepository runs;
+    EXPECT_FALSE(runs.any_running("1234567890"));
+    // A full year is still one request.
+    EXPECT_EQ(post_sync({{"from", "2025-09-23"}, {"to", "2026-09-23"}})->statusCode(), k202Accepted);
+    // Its job is taken off the queue: a suite that runs later counts the jobs it finds there.
+    auto job = Jobs::get().pick({"fitness_sync"}, 1);
+    ASSERT_TRUE(job.has_value());
+    Jobs::get().complete(job->id, json::object());
 }
 
 TEST_F(SyncApiTest, EnqueueRejectsMalformedRange) {
@@ -693,6 +732,75 @@ TEST_F(DataApiTest, ExportRejectsARangeWiderThanAYear) {
     EXPECT_EQ(body_of(resp)["error"], "range_too_wide");
 }
 
+// review-perf 2: an export is sized before any row is read. Over the limit it
+// is a 400 with the counts; the same rows of one type over a narrower range
+// still export, and the JSON body is the envelope with the rows spliced in.
+TEST_F(DataApiTest, ExportOverTheRowLimitIsRefusedBeforeReading) {
+    Database::get().execute_write([](auto& txn) {
+        txn.exec_params(
+            "INSERT INTO heart_rate_samples (user_id, timestamp, bpm, sample_type) "
+            "SELECT '42', '2026-09-01T00:00:00Z'::timestamptz + make_interval(secs => g), 60, 'passive' "
+            "FROM generate_series(0, $1::int) g",
+            static_cast<int>(Fitness::Export::kMaxRows));
+        return true;
+    });
+
+    auto req = ranged("2026-09-01", "2026-09-05");
+    req->setParameter("format", "json");
+    HttpResponsePtr resp;
+    controller.exportData(req, [&](const HttpResponsePtr& r) { resp = r; });
+    ASSERT_NE(resp, nullptr);
+    ASSERT_EQ(resp->statusCode(), k400BadRequest) << resp->body();
+    const auto body = body_of(resp);
+    EXPECT_EQ(body["error"], "export_too_large");
+    EXPECT_EQ(body["rows"], Fitness::Export::kMaxRows + 1);
+    EXPECT_EQ(body["max_rows"], Fitness::Export::kMaxRows);
+
+    // CSV goes through the same check.
+    auto csv = ranged("2026-09-01", "2026-09-05");
+    csv->setParameter("format", "csv");
+    csv->setParameter("type", "heart_rate");
+    HttpResponsePtr csv_resp;
+    controller.exportData(csv, [&](const HttpResponsePtr& r) { csv_resp = r; });
+    ASSERT_NE(csv_resp, nullptr);
+    EXPECT_EQ(csv_resp->statusCode(), k400BadRequest);
+
+    // One day holds 86400 rows: under the limit, exported whole.
+    auto day = ranged("2026-09-01", "2026-09-01");
+    day->setParameter("format", "json");
+    day->setParameter("type", "heart_rate");
+    HttpResponsePtr ok;
+    controller.exportData(day, [&](const HttpResponsePtr& r) { ok = r; });
+    ASSERT_NE(ok, nullptr);
+    ASSERT_EQ(ok->statusCode(), k200OK);
+    const auto envelope = body_of(ok);
+    EXPECT_EQ(envelope["schema_version"], "1.0");
+    EXPECT_EQ(envelope["filters"]["dataset"], "heart_rate");
+    ASSERT_EQ(envelope["records"].size(), 1u);
+    EXPECT_EQ(envelope["records"]["heart_rate"].size(), 86400u);
+}
+
+// The JSON export keeps the shape it had as a tree: every dataset present,
+// empty ones as [], keys in the same order.
+TEST_F(DataApiTest, ExportJsonListsEveryDatasetEvenWhenEmpty) {
+    seed_activity("2026-09-21", 5000);
+    auto req = ranged("2026-09-21", "2026-09-21");
+    HttpResponsePtr resp;
+    controller.exportData(req, [&](const HttpResponsePtr& r) { resp = r; });
+    ASSERT_NE(resp, nullptr);
+    ASSERT_EQ(resp->statusCode(), k200OK) << resp->body();
+    const auto body = body_of(resp);
+    EXPECT_TRUE(body["filters"]["dataset"].is_null());
+    ASSERT_EQ(body["records"].size(), Fitness::Export::types().size());
+    for (const auto& type : Fitness::Export::types()) {
+        ASSERT_TRUE(body["records"].contains(type)) << type;
+        EXPECT_TRUE(body["records"][type].is_array()) << type;
+    }
+    EXPECT_EQ(body["records"]["daily_activity"].size(), 1u);
+    EXPECT_TRUE(body["records"]["sleep"].empty());
+    EXPECT_EQ(body["records"]["daily_activity"][0]["steps"], 5000);
+}
+
 // ── permissions and module switch ────────────────────────────────────────────
 
 namespace {
@@ -719,9 +827,9 @@ protected:
         req->setParameter("key", "heart_rate");
         req->setParameter("from", "2026-09-01");
         req->setParameter("to", "2026-09-02");
-        HttpResponsePtr captured;
-        controller.probe(req, [&](const HttpResponsePtr& r) { captured = r; });
-        return captured;
+        TestHelpers::AwaitedResponse awaited;
+        controller.probe(req, awaited.callback());
+        return awaited.get();
     }
 };
 
