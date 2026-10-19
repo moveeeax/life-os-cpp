@@ -1,1 +1,0 @@
-The money rate, convert, period report, summary, parse and advisor endpoints answer 400 `invalid_query` on a `tz` that is not an IANA zone, as `/today` and the agenda do, instead of falling back to UTC.

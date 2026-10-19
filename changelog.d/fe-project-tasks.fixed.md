@@ -1,1 +1,0 @@
-Projects and courses list every open and in-progress task: they are fetched by status and paged through, with the newest 200 done ones. One mixed call of 200 dropped the oldest open tasks of a large project while the header still counted them.

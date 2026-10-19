@@ -1,1 +1,0 @@
-Refunds that took no credits back (a chargeback after the credits were spent, a refund too small for a credit, a payment never credited) are counted in the billing metrics (`refunds_skipped_cents`, `refunds_skipped_count`) and listed (`refunds_skipped`), and the admin Billing page has a Refunds tab with them.

@@ -1,1 +1,0 @@
-Worker job `now_media_sweep`, queued hourly by the API while Now is on: deletes wallpaper and sound rows still pending an hour after their create, objects first. The worker chart now carries the `S3_*` settings (`storage.s3`), and the job type joins the worker's type lists.

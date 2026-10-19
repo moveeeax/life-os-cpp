@@ -1,1 +1,0 @@
-The frontend nginx no longer forwards a client-supplied `X-Real-IP`. It takes the header only from `realIp.trustedProxies` (the private ranges by default, where the ingress pods live) through the real_ip module and sends `$remote_addr` to the API, so a caller that reaches the frontend pod directly cannot pick the IP the API rate-limits and audits.

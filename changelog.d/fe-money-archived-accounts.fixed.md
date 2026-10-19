@@ -1,1 +1,0 @@
-Money: the ledger names rows, inbox lines and transfers of archived accounts, and its Account filter lists them marked "(archived)", so the Rows link of an archived account on the Accounts page opens a filtered ledger that says so.

@@ -1,1 +1,0 @@
-Release images rebuild the runtime base layers (`runtime-base` of the app and worker, `runtime` of the frontend) on every release instead of replaying them from the build cache, so package security fixes reach the image and the Trivy gate; a pre-release tag (one with a `-`) no longer moves `:latest`.

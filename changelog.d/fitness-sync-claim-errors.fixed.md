@@ -1,1 +1,0 @@
-Claiming a sync run treats only the unique violation as "another run is in progress"; any other database error is logged and propagates, so the queue retries the job instead of marking the run skipped.
