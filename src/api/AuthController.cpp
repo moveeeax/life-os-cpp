@@ -27,6 +27,7 @@
 #include "utils/Config.hpp"
 #include "utils/Crypto.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Modules.hpp"
 #include "utils/Time.hpp"
 
 namespace Api {
@@ -229,6 +230,26 @@ void AuthController::me(const HttpRequestPtr& req, std::function<void(const Http
         return;
     }
     callback(Response::ok({{"user", *user}}));
+}
+
+void AuthController::modules(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
+    if (!Security::Auth::principal_of(req)) {
+        callback(ErrorResponse::unauthorized("missing_principal"));
+        return;
+    }
+    // The same switches API_REQUIRE_MODULE reads, so an answer here matches a 404 there.
+    callback(Response::ok({{"data",
+                            {{"billing", Core::billing_enabled()},
+                             {"fitness", Core::fitness_enabled()},
+                             {"food", Core::food_enabled()},
+                             {"goals", Core::goals_enabled()},
+                             {"habits", Core::habits_enabled()},
+                             {"money", Core::money_enabled()},
+                             {"notes", Core::notes_enabled()},
+                             {"now", Core::now_enabled()},
+                             {"tasks", Core::tasks_enabled()},
+                             {"travel", Core::travel_enabled()},
+                             {"workout", Core::workout_enabled()}}}}));
 }
 
 bool AuthController::registration_open() {

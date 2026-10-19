@@ -346,6 +346,27 @@ TEST_F(HabitsApiTest, TicksByHandAndTheStreak) {
     EXPECT_EQ(tick(kAnna, a, utc_day(-1), json{{"value", -1}})->statusCode(), k400BadRequest);
 }
 
+TEST_F(HabitsApiTest, TheTicksAreReadForTheAskedDaysOnly) {
+    const auto a = created(kAnna, json{{"name", "Meditation"}, {"schedule", "daily"}});
+    ASSERT_EQ(tick(kAnna, a, utc_day(-1))->statusCode(), k200OK);
+    // A tick from before the history year, as an old account would hold.
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("INSERT INTO habit_checks (owner_id, habit_id, date) VALUES ($1::uuid, $2::uuid, $3::date)",
+                        kAnna,
+                        a,
+                        utc_day(-500));
+        return true;
+    });
+    const auto week = Repositories::Habits::HabitRepository().checks(kAnna, utc_day(-6), utc_day(0));
+    ASSERT_EQ(week.count(a), 1U);
+    EXPECT_EQ(week.at(a).size(), 1U) << "the tick of 500 days back is not read for this week";
+    EXPECT_EQ(Repositories::Habits::HabitRepository().checks(kAnna, utc_day(-600), utc_day(0)).at(a).size(), 2U);
+    EXPECT_TRUE(Repositories::Habits::HabitRepository().checks(kBoris, utc_day(-600), utc_day(0)).empty());
+    const auto d = habit_of(days(reader(kAnna), utc_day(-6), utc_day(0), "UTC")["data"], a);
+    EXPECT_EQ(d["streak"], 1);
+    EXPECT_EQ(d["best"], 1);
+}
+
 TEST_F(HabitsApiTest, AnOldRangeDoesNotCutTheStreakOffAtTheRowCap) {
     // 2100 days of steps up to yesterday. A range ~5.7 years back used to be read
     // as one window up to today: its first 2000 rows (oldest first) ended 90 days

@@ -80,6 +80,40 @@ public:
         });
     }
 
+    /// Takes the row out of the players before its object goes: a delete that fails half way
+    /// leaves a pending row for the sweep, never a ready row whose object is gone.
+    /// @throws SoundNotFound.
+    void mark_pending(const std::string& id) {
+        Database::get().execute_write([&](auto& txn) {
+            auto r = txn.exec_params("UPDATE sounds SET status = 'pending' WHERE id = $1::uuid RETURNING id", id);
+            if (r.empty()) {
+                throw SoundNotFound();
+            }
+            return true;
+        });
+    }
+
+    /// Pending rows created more than @p older_than_seconds ago, oldest first, at most @p limit.
+    nlohmann::json stale_pending(int older_than_seconds, int limit) {
+        return Database::get().execute_read([&](auto& txn) {
+            auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
+                                         " FROM sounds WHERE status = 'pending' "
+                                         " AND created_at < now() - make_interval(secs => $1::float8) "
+                                         " ORDER BY created_at, id LIMIT $2) t",
+                                     older_than_seconds,
+                                     limit);
+            return nlohmann::json::parse(r[0][0].template as<std::string>());
+        });
+    }
+
+    /// Deletes the row while it is still pending; false when it is gone or became ready.
+    bool remove_pending(const std::string& id) {
+        return Database::get().execute_write([&](auto& txn) {
+            return !txn.exec_params("DELETE FROM sounds WHERE id = $1::uuid AND status = 'pending' RETURNING id", id)
+                        .empty();
+        });
+    }
+
     /// Every row, pending ones included, newest first.
     nlohmann::json list_all() {
         return Database::get().execute_read([&](auto& txn) {

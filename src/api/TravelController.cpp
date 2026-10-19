@@ -551,10 +551,13 @@ void TravelController::listTrips(const HttpRequestPtr& req, Callback&& callback)
     if (!currency) {
         return;
     }
+    // Each trip is summed on its own (trip_view), so the page is bounded; the default covers every
+    // trip the Travel page lists today.
+    const auto page = parse_page_params(req, 500, 500);
     with_repo_errors(callback, "travel.trips", [&] {
         TripRepository repo;
         json rows = json::array();
-        for (const auto& row : repo.list(owner)) {
+        for (const auto& row : repo.list(owner, page.limit, page.offset)) {
             rows.push_back(trip_view(repo, owner, row, *currency, false));
         }
         callback(Response::ok(json{{"data", rows}}));

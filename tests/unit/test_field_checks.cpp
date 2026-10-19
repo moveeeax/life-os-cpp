@@ -1,7 +1,7 @@
 /**
  * @file test_field_checks.cpp
- * @brief The money amount check in src/api/FieldChecks.hpp: significant
- *        digits of a JSON number and the 15-digit cap.
+ * @brief The checks in src/api/FieldChecks.hpp: significant
+ *        digits of a JSON number, the 15-digit cap, opt_int not narrowing.
  */
 
 #include <gtest/gtest.h>
@@ -45,4 +45,16 @@ TEST(FieldChecksAmount, MoreThanFifteenDigitsIsRefused) {
     EXPECT_EQ(check(nullptr), "") << "null is unset";
     EXPECT_EQ(check(2e12), "out_of_range") << "one error, not two";
     EXPECT_EQ(check("12"), "not_number");
+}
+
+TEST(FieldChecksInt, AnIntegerPastTheIntRangeIsNotNarrowed) {
+    using Api::Fields::opt_int;
+    EXPECT_EQ(opt_int(json{{"d", 30}}, "d"), 30);
+    EXPECT_EQ(opt_int(json{{"d", -5}}, "d"), -5);
+    EXPECT_FALSE(opt_int(json{{"d", 4294967297LL}}, "d").has_value()) << "2^32+1 would narrow to 1";
+    EXPECT_FALSE(opt_int(json{{"d", 18446744073709551615ULL}}, "d").has_value());
+    EXPECT_FALSE(opt_int(json{{"d", -2147483649LL}}, "d").has_value());
+    EXPECT_EQ(opt_int(json{{"d", 2147483647}}, "d"), 2147483647);
+    EXPECT_FALSE(opt_int(json{{"d", 1.5}}, "d").has_value());
+    EXPECT_FALSE(opt_int(json::object(), "d").has_value());
 }

@@ -45,6 +45,7 @@ public:
     ADD_METHOD_TO(AuthController::logout, "/api/v1/auth/logout", Post);
     ADD_METHOD_TO(AuthController::refresh, "/api/v1/auth/refresh", Post);
     ADD_METHOD_TO(AuthController::me, "/api/v1/auth/me", Get);
+    ADD_METHOD_TO(AuthController::modules, "/api/v1/modules", Get);
     METHOD_LIST_END
 
     // ---------------------------------------------------------------------
@@ -105,6 +106,16 @@ public:
     // expired; 404 if the user row vanished mid-session.
     // ---------------------------------------------------------------------
     void me(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
+
+    // ---------------------------------------------------------------------
+    // GET /api/v1/modules
+    //
+    // The module switches the routes obey, in one answer:
+    // {"data": {"now": bool, "money": bool, ...}}. A module that is off
+    // answers 404 on its routes; the app reads this once instead of asking
+    // one data route per module. Needs a signed-in principal (401 without).
+    // ---------------------------------------------------------------------
+    void modules(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback);
 
 private:
     struct Session {

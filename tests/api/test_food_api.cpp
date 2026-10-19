@@ -103,6 +103,7 @@ protected:
         // The search cache would answer for a query of an earlier test.
         if (Cache::is_initialized()) {
             Cache::get().del("food:off:nutella");
+            Cache::get().del("food:off-down");
         }
     }
 
@@ -535,6 +536,17 @@ TEST_F(FoodApiTest, SearchProxiesAndCachesOpenFoodFacts) {
     const auto down = call(&Api::FoodController::offSearch, user(kAnna), Get, {{"q", "something else"}});
     EXPECT_EQ(down->statusCode(), k503ServiceUnavailable);
     EXPECT_EQ(body_of(down)["error"], "upstream_unavailable");
+
+    // Marked down: the next calls answer at once without a request that could hang 10 s.
+    off.fail = false;
+    const auto asked = off.urls.size();
+    EXPECT_EQ(call(&Api::FoodController::offSearch, user(kAnna), Get, {{"q", "bread"}})->statusCode(),
+              k503ServiceUnavailable);
+    EXPECT_EQ(call_json(&Api::FoodController::itemFromOff, user(kAnna), json{{"code", "3017624010701"}})->statusCode(),
+              k503ServiceUnavailable);
+    EXPECT_EQ(off.urls.size(), asked) << "nothing reached the service while it is marked down";
+    const auto from_cache = call(&Api::FoodController::offSearch, user(kAnna), Get, {{"q", "Nutella"}});
+    EXPECT_EQ(from_cache->statusCode(), k200OK) << "a cached answer is still served";
 }
 
 TEST_F(FoodApiTest, FromOffCopiesAProductOnce) {

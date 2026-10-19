@@ -201,6 +201,9 @@ void SoundsController::deleteSound(const HttpRequestPtr& req, Callback&& callbac
         if (!row) {
             throw Repositories::Now::SoundNotFound();
         }
+        // The row leaves the players first: if the store or the final DELETE fails, a pending
+        // row stays behind for the media sweep, never a ready row pointing at a gone object.
+        repo.mark_pending(id);
         try {
             store->remove((*row)["object_key"].get<std::string>());
         } catch (const std::exception& e) {

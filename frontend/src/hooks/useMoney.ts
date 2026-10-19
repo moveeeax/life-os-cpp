@@ -221,9 +221,6 @@ export function useMoneySettings() {
   });
 }
 
-/** [query key, url] of the probe that says whether the module is on. */
-export const MONEY_PROBE = [qk.money.enabled(), `${BASE}/settings`] as const;
-
 // ── writes ─────────────────────────────────────────────────────────────────
 
 export function useCreateTransaction(onSuccess?: (row: Transaction) => void) {

@@ -107,8 +107,8 @@ TEST_F(TasksRepositoryTest, ANoteBelongsToItsOwner) {
     Repositories::Tasks::InboxRepository notes;
     const json n = notes.create(kAnna, "Coworking day passes");
     EXPECT_EQ(n["status"], "inbox");
-    EXPECT_EQ(notes.list(kAnna, "inbox").size(), 1u);
-    EXPECT_EQ(notes.list(kBoris, "inbox").size(), 0u);
+    EXPECT_EQ(notes.list(kAnna, "inbox", 50, 0).size(), 1u);
+    EXPECT_EQ(notes.list(kBoris, "inbox", 50, 0).size(), 0u);
     EXPECT_THROW(notes.update(kBoris, n["id"], std::nullopt, std::string("archived")), Repositories::Tasks::NotFound);
     EXPECT_EQ(notes.update(kAnna, n["id"], std::nullopt, std::string("archived"))["status"], "archived");
 }

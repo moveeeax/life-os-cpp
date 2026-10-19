@@ -7,6 +7,7 @@
  */
 
 #include <map>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -57,7 +58,13 @@ public:
         const auto it = objects.find(key);
         return it == objects.end() ? Storage::ObjectInfo{false, 0} : Storage::ObjectInfo{true, it->second};
     }
-    void remove(const std::string& key) const override { removed.push_back(key); }
+    bool fail_remove = false;
+    void remove(const std::string& key) const override {
+        if (fail_remove) {
+            throw std::runtime_error("s3: DELETE answered HTTP 503");
+        }
+        removed.push_back(key);
+    }
     std::string public_url(const std::string& key) const override { return "https://cdn.test/" + key; }
     std::string key_for(const std::string& folder, const std::string& id, const std::string& name) const override {
         return "life-os/" + folder + "/" + id + "/" + name;
@@ -233,4 +240,18 @@ TEST_F(SoundsApiTest, DeleteRemovesTheFileAndTheRow) {
     EXPECT_EQ(call_id(&Api::SoundsController::deleteSound, admin(), Delete, id)->statusCode(), k204NoContent);
     EXPECT_EQ(store.removed.size(), 1u);
     EXPECT_EQ(call_id(&Api::SoundsController::deleteSound, admin(), Delete, id)->statusCode(), k404NotFound);
+}
+
+TEST_F(SoundsApiTest, ADeleteWithTheStoreDownTakesTheSoundOutOfThePlayers) {
+    const json d = create(rain());
+    const std::string id = d["id"];
+    store.objects[key_of(d["upload"]["url"])] = 8 * kMb;
+    ASSERT_EQ(call_id(&Api::SoundsController::markReady, admin(), Post, id)->statusCode(), k200OK);
+    ASSERT_EQ(listed().size(), 1u);
+    store.fail_remove = true;
+    EXPECT_EQ(call_id(&Api::SoundsController::deleteSound, admin(), Delete, id)->statusCode(), k503ServiceUnavailable);
+    EXPECT_TRUE(listed().empty()) << "the row is pending, no player gets a URL to a half-deleted file";
+    store.fail_remove = false;
+    EXPECT_EQ(call_id(&Api::SoundsController::deleteSound, admin(), Delete, id)->statusCode(), k204NoContent)
+        << "a retry finishes the delete";
 }

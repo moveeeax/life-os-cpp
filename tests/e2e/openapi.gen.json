@@ -1015,7 +1015,7 @@
        "next_trip",
        "near"
       ],
-      "description": "The next trip and the day counters near their threshold (within 14 days)",
+      "description": "The running trip (or else the next one) and the day counters near their threshold (within 14 days)",
       "properties": {
        "next_trip": {
         "oneOf": [
@@ -1040,7 +1040,8 @@
             "format": "date"
            },
            "days_to": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Days until the start; zero or negative while the trip runs"
            }
           }
          },
@@ -10147,6 +10148,98 @@
      },
      "404": {
       "description": "The token's user no longer exists (user)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/modules": {
+   "get": {
+    "summary": "The module switches",
+    "description": "Whether each module is switched on. A module that is off answers 404 on its routes; the app reads this once to build its navigation instead of asking one data route per module.",
+    "tags": [
+     "auth"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "One flag per module",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "billing",
+            "fitness",
+            "food",
+            "goals",
+            "habits",
+            "money",
+            "notes",
+            "now",
+            "tasks",
+            "travel",
+            "workout"
+           ],
+           "properties": {
+            "billing": {
+             "type": "boolean"
+            },
+            "fitness": {
+             "type": "boolean"
+            },
+            "food": {
+             "type": "boolean"
+            },
+            "goals": {
+             "type": "boolean"
+            },
+            "habits": {
+             "type": "boolean"
+            },
+            "money": {
+             "type": "boolean"
+            },
+            "notes": {
+             "type": "boolean"
+            },
+            "now": {
+             "type": "boolean"
+            },
+            "tasks": {
+             "type": "boolean"
+            },
+            "travel": {
+             "type": "boolean"
+            },
+            "workout": {
+             "type": "boolean"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
       "content": {
        "application/json": {
         "schema": {
@@ -22134,6 +22227,25 @@
        ],
        "default": "inbox"
       }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 500,
+       "default": 500
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
      }
     ],
     "responses": {
@@ -26367,6 +26479,25 @@
        "type": "string",
        "default": "USD"
       }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 500,
+       "default": 500
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
      }
     ],
     "responses": {
@@ -27733,7 +27864,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 407465,
-  "source_fnv1a64": "6ee7467c6cb93665"
+  "source_bytes": 409413,
+  "source_fnv1a64": "592afff75a0f74a7"
  }
 }

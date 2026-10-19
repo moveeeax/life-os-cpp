@@ -189,7 +189,16 @@ TEST_F(TravelRepositoriesTest, TripsAndItemsAreTheOwnersAlone) {
     p.end_date = "2026-10-01";
     EXPECT_THROW(trips.update(kAnna, t, p), Invariant) << "end before start";
     EXPECT_EQ(trips.next(kAnna, "2026-10-13").value()["id"], t);
-    EXPECT_FALSE(trips.next(kAnna, "2026-11-02").has_value());
+    EXPECT_FALSE(trips.next(kAnna, "2026-11-21").has_value()) << "the day after the trip";
+}
+
+TEST_F(TravelRepositoriesTest, TheNextTripIsTheRunningOneUntilItEnds) {
+    const auto running = trip(kAnna);  // 2026-11-01 .. 2026-11-20
+    const auto later = trips.create(kAnna, {"Laos", "2026-11-25", "2026-11-30", {"LA"}, ""})["id"].get<std::string>();
+    EXPECT_EQ(trips.next(kAnna, "2026-11-05").value()["id"], running) << "a running trip, not the following one";
+    EXPECT_EQ(trips.next(kAnna, "2026-11-20").value()["id"], running) << "its last day";
+    EXPECT_EQ(trips.next(kAnna, "2026-11-21").value()["id"], later);
+    EXPECT_FALSE(trips.next(kBoris, "2026-11-05").has_value());
 }
 
 namespace {

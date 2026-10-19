@@ -40,7 +40,7 @@ export function GoalsPanel({ today, date }: { today: Today; date: string }) {
                 month: 'short',
                 timeZone: 'UTC',
               })}{' '}
-              · {f.words}
+              · {f.figure === null ? c.words : f.words}
             </span>
           </div>
         );

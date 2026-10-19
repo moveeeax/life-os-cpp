@@ -367,6 +367,24 @@ TEST_F(TasksApiTest, NotesAreTheInbox) {
     EXPECT_EQ(body_of(call(&Api::TasksController::listNotes, user(kAnna), Get))["data"].size(), 0u);
 }
 
+TEST_F(TasksApiTest, TheInboxComesInPages) {
+    for (const char* text : {"one", "two", "three"}) {
+        created(&Api::TasksController::createNote, kAnna, json{{"text", text}});
+    }
+    const auto page = [&](const char* limit, const char* offset) {
+        return body_of(
+            call(&Api::TasksController::listNotes, user(kAnna), Get, {{"limit", limit}, {"offset", offset}}));
+    };
+    const json all = body_of(call(&Api::TasksController::listNotes, user(kAnna), Get));
+    ASSERT_EQ(all["data"].size(), 3u) << "the default page holds them all";
+    const json first = page("2", "0");
+    ASSERT_EQ(first["data"].size(), 2u);
+    EXPECT_EQ(first["count"], 2);
+    const json rest = page("2", "2");
+    ASSERT_EQ(rest["data"].size(), 1u);
+    EXPECT_EQ(rest["data"][0]["id"], all["data"][2]["id"]) << "newest first, the oldest on the second page";
+}
+
 TEST_F(TasksOffTest, EveryRouteIs404WhileTheModuleIsOff) {
     EXPECT_EQ(call(&Api::TasksController::status, user(kAnna), Get)->statusCode(), k404NotFound);
     EXPECT_EQ(call(&Api::TasksController::agenda, user(kAnna), Get)->statusCode(), k404NotFound);

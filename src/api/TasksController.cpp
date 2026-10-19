@@ -56,6 +56,9 @@ constexpr std::size_t kSourceRefMax = 2000;
 constexpr std::size_t kExternalIdMax = 100;
 const std::vector<std::string> kStatuses = {"open", "in_progress", "done"};
 const std::vector<std::string> kNoteStatuses = {"inbox", "archived"};
+/// One page of the inbox or the archive (limit, offset).
+constexpr int kNotesPageDefault = 500;
+constexpr int kNotesPageMax = 500;
 const std::vector<std::string> kSourceKinds = {"url", "money_transaction"};
 
 std::vector<std::string> listed(const auto& values) {
@@ -399,8 +402,10 @@ void TasksController::listNotes(const HttpRequestPtr& req, Callback&& callback) 
         callback(ErrorResponse::bad_request("invalid_query", "status must be inbox or archived"));
         return;
     }
+    // The archive only grows; the default page is wide enough for the whole inbox the app shows.
+    const auto page = parse_page_params(req, kNotesPageDefault, kNotesPageMax);
     with_repo_errors(callback, "tasks.listNotes", [&] {
-        const json rows = Repo::InboxRepository().list(owner, status);
+        const json rows = Repo::InboxRepository().list(owner, status, page.limit, page.offset);
         callback(Response::ok(json{{"data", rows}, {"count", rows.size()}}));
     });
 }

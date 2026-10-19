@@ -6,7 +6,9 @@
  *        while storage is not configured. The bucket is a fake ObjectStore.
  */
 
+#include <algorithm>
 #include <map>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -20,6 +22,7 @@
 #include "api/WallpapersController.hpp"
 #include "database/Database.hpp"
 #include "domain/Role.hpp"
+#include "now/jobs/MediaSweep.hpp"
 #include "storage/ObjectStore.hpp"
 #include "test_helpers.hpp"
 
@@ -62,7 +65,13 @@ public:
         const auto it = objects.find(key);
         return it == objects.end() ? Storage::ObjectInfo{false, 0} : Storage::ObjectInfo{true, it->second};
     }
-    void remove(const std::string& key) const override { removed.push_back(key); }
+    bool fail_remove = false;
+    void remove(const std::string& key) const override {
+        if (fail_remove) {
+            throw std::runtime_error("s3: DELETE answered HTTP 503");
+        }
+        removed.push_back(key);
+    }
     std::string public_url(const std::string& key) const override { return "https://cdn.test/" + key; }
     std::string key_for(const std::string& folder, const std::string& id, const std::string& name) const override {
         return "life-os/" + folder + "/" + id + "/" + name;
@@ -347,4 +356,74 @@ TEST_F(WallpapersApiTest, DeleteRemovesBothObjectsAndTheRow) {
     EXPECT_EQ(store.removed.size(), 2u);
     EXPECT_EQ(call_id(&Api::WallpapersController::deleteWallpaper, admin(), Delete, id)->statusCode(), k404NotFound);
     EXPECT_EQ(ready(id)->statusCode(), k404NotFound);
+}
+
+namespace {
+
+/// Moves a row's created_at back, as if its upload began @p seconds ago.
+void age(const std::string& id, int seconds) {
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params(
+            "UPDATE wallpapers SET created_at = now() - make_interval(secs => $2::float8) "
+            "WHERE id = $1::uuid",
+            id,
+            seconds);
+        return true;
+    });
+}
+
+std::vector<std::string> wallpaper_ids() {
+    return Database::get().execute_read([](auto& txn) {
+        std::vector<std::string> out;
+        for (const auto& row : txn.exec("SELECT id::text FROM wallpapers ORDER BY id")) {
+            out.push_back(row[0].template as<std::string>());
+        }
+        return out;
+    });
+}
+
+}  // namespace
+
+TEST_F(WallpapersApiTest, ADeleteWithTheStoreDownLeavesAPendingRowForTheSweep) {
+    const json d = create(image("phone"));
+    const std::string id = d["id"];
+    store.objects[key_of(d["upload"]["url"])] = 2 * kMb;
+    ASSERT_EQ(ready(id)->statusCode(), k200OK);
+    ASSERT_EQ(listed("phone").size(), 1u);
+    store.fail_remove = true;
+    EXPECT_EQ(call_id(&Api::WallpapersController::deleteWallpaper, admin(), Delete, id)->statusCode(),
+              k503ServiceUnavailable);
+    EXPECT_TRUE(listed("phone").empty()) << "pending, so Backdrop never picks a URL to a half-deleted object";
+    store.fail_remove = false;
+    age(id, 2 * 3600);
+    const json swept = Jobs::NowMediaSweep::process_job(json::object());
+    EXPECT_EQ(swept["status"], "done");
+    EXPECT_EQ(swept["wallpapers"], 1);
+    EXPECT_TRUE(wallpaper_ids().empty());
+    EXPECT_EQ(store.removed, std::vector<std::string>{key_of(d["upload"]["url"])});
+}
+
+TEST_F(WallpapersApiTest, TheSweepTakesOnlyStalePendingRowsWithTheirObjects) {
+    const json stale = create(video());
+    const json fresh = create(video());
+    const json done = create(image("phone"));
+    store.objects[key_of(done["upload"]["url"])] = 2 * kMb;
+    ASSERT_EQ(ready(done["id"])->statusCode(), k200OK);
+    age(stale["id"], 3601);
+    age(done["id"], 2 * 3600);
+
+    store.fail_remove = true;
+    json swept = Jobs::NowMediaSweep::process_job(json::object());
+    EXPECT_EQ(swept["wallpapers"], 0);
+    EXPECT_EQ(swept["failed"], 1);
+    EXPECT_EQ(wallpaper_ids().size(), 3u) << "the store kept the objects, so the row stays for the next tick";
+
+    store.fail_remove = false;
+    swept = Jobs::NowMediaSweep::process_job(json::object());
+    EXPECT_EQ(swept["wallpapers"], 1);
+    std::vector<std::string> left = {fresh["id"].get<std::string>(), done["id"].get<std::string>()};
+    std::sort(left.begin(), left.end());
+    EXPECT_EQ(wallpaper_ids(), left) << "a fresh upload and a ready row stay";
+    EXPECT_EQ(store.removed,
+              (std::vector<std::string>{key_of(stale["upload"]["url"]), key_of(stale["poster_upload"]["url"])}));
 }

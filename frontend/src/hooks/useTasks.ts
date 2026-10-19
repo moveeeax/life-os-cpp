@@ -34,9 +34,6 @@ export const TASKS_PARSE_DEADLINE_MS = 3 * 60 * 1000;
 
 // ── reads ──────────────────────────────────────────────────────────────────
 
-/** [query key, url] of the probe that says whether the module is on. */
-export const TASKS_PROBE = [qk.tasks.enabled(), `${BASE}/status`] as const;
-
 export function useTasksStatus() {
   return useQuery({
     queryKey: qk.tasks.status(),
