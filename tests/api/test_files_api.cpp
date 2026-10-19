@@ -353,18 +353,18 @@ TEST_F(FilesApiTest, TheDownloadIsAShortLinkForTheOwnerOnly) {
     EXPECT_EQ(store.signed_downloads[0].second,
               "inline; filename=\"blood test.pdf\"; filename*=UTF-8''blood%20test.pdf");
 
-    for (auto* fn : {+[](Api::FilesController& c,
+    for (auto* fn : {+[](Api::FilesController& fc,
                          const HttpRequestPtr& req,
                          Api::FilesController::Callback&& cb,
-                         const std::string& id) { c.downloadFile(req, std::move(cb), id); },
-                     +[](Api::FilesController& c,
+                         const std::string& fid) { fc.downloadFile(req, std::move(cb), fid); },
+                     +[](Api::FilesController& fc,
                          const HttpRequestPtr& req,
                          Api::FilesController::Callback&& cb,
-                         const std::string& id) { c.markReady(req, std::move(cb), id); },
-                     +[](Api::FilesController& c,
+                         const std::string& fid) { fc.markReady(req, std::move(cb), fid); },
+                     +[](Api::FilesController& fc,
                          const HttpRequestPtr& req,
                          Api::FilesController::Callback&& cb,
-                         const std::string& id) { c.deleteFile(req, std::move(cb), id); }}) {
+                         const std::string& fid) { fc.deleteFile(req, std::move(cb), fid); }}) {
         auto theirs = call(kBoris, Get, json::object(), [&](auto req, auto cb) { fn(c, req, std::move(cb), id); });
         EXPECT_EQ(theirs->statusCode(), k404NotFound) << std::string(theirs->body());
     }
