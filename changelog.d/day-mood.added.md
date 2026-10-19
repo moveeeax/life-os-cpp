@@ -1,1 +1,0 @@
-Mood check-ins: one per local day with a score from 1 to 5, tags from a fixed set of twelve and a short note (`GET /api/v1/habits/mood`, `PUT` and `DELETE /api/v1/habits/mood/{date}`, table `mood_checkins` in migration 050); a mood row on the Habits page and a mood line in the week view.
