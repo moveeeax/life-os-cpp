@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792486846088,
+  "lastUpdate": 1792486848011,
   "repoUrl": "https://github.com/moveeeax/life-os-cpp",
   "entries": {
     "Throughput": [
@@ -300,6 +300,63 @@ window.BENCHMARK_DATA = {
           {
             "name": "idle RSS",
             "value": 4.9,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Michael Tarassov",
+            "username": "moveeeax",
+            "email": "michael@tarassov.me"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "8443e66b98d0dec41fe73d0f4b477f5eb5f9b07a",
+          "message": "chore(release): 1.34.0 — metric sources for goals and habits, goal edit (#163)",
+          "timestamp": "2026-10-20T07:17:30Z",
+          "url": "https://github.com/moveeeax/life-os-cpp/commit/8443e66b98d0dec41fe73d0f4b477f5eb5f9b07a"
+        },
+        "date": 1792486847718,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "healthz p50",
+            "value": 4.8,
+            "unit": "ms"
+          },
+          {
+            "name": "healthz p99",
+            "value": 18.2,
+            "unit": "ms"
+          },
+          {
+            "name": "jobs p50",
+            "value": 23.64,
+            "unit": "ms"
+          },
+          {
+            "name": "jobs p99",
+            "value": 48.96,
+            "unit": "ms"
+          },
+          {
+            "name": "runtime image size",
+            "value": 114.5,
+            "unit": "MB"
+          },
+          {
+            "name": "cold start to /ready",
+            "value": 899,
+            "unit": "ms"
+          },
+          {
+            "name": "idle RSS",
+            "value": 5.1,
             "unit": "MB"
           }
         ]
