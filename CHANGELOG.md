@@ -6,6 +6,18 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.34.0] - 2026-10-20
+
+### Added
+- A number goal can follow a series of the metrics catalog: `source` (a catalog id such as `fitness:weight`, null for check-ins alone) is set on create and by PATCH, and the goal's points are the days of the series from its start merged with its check-ins, a check-in winning on its date, so "Weight 75 kg" moves with the scales and on Now too. The goal answer carries `source` and `source_why` (module_off, no_permission, not_linked or not_yours when the series cannot be read; the check-ins alone drive the progress then), and the detail lists `points` with `from: source | checkin`. A source naming another user's category or habit, or a currency without an account of the caller, is refused with 400 `not_yours`. Migration 057 adds `goal_items.source`.
+- `GET /api/v1/metrics` lists the catalog of daily series expanded for the caller (each currency of their accounts and practice entries, each expense category, each habit ticked by hand) with whether each is available and why not, and `GET /api/v1/metrics/series?source=&from=&to=&tz=` answers one series by local day, at most 400 days at a time.
+- A catalog of daily series in `src/metrics/Catalog.hpp`: 57 entries from Fitness, Food, Habits, Tape, Training, Tasks, Money and Practice under ids like `fitness:steps` or `money:expense:KZT:<category>`, with the five legacy habit sources mapped to their catalog ids.
+- The site picks a series of the metrics catalog for goals and habits: one select grouped by section (Fitness, Food, Habits, Tape, Training, Tasks, Money, Practice), an entry the account cannot read greyed out with the reason ("not linked", "section off"). The habit form takes any series with At least or At most and a goal in the series unit, optional for a weigh-in, a session or a mood ("any record counts"). Every goal has an Edit action that sends only the changed fields; a number goal can follow a series or go back to manual check-ins, shows "from Weight, last 19 Oct" with the check-in form folded behind "Add by hand", draws the source days as dots and the check-ins as rings, and says calmly why a source gives nothing. The goals requests send the browser's time zone, and the "today" label on a goal chart no longer covers the start date.
+- A reader for one catalog series over a range of days (`src/repositories/metrics/Series.hpp`): timestamptz rows land on their local day in the request zone, date rows on their date, and a series the caller cannot read says why (module_off, no_permission, not_linked, not_yours) instead of answering with rows.
+
+### Changed
+- A habit can be ticked by any series of the metrics catalog (`food:kcal`, `fitness:weight`, `tasks:done`, `habits:<id>`...) compared to its goal at least or at most (the new `direction` field); a presence series such as a weigh-in or a session needs no goal, a sum or an average does (400 `missing` on goal), and a weight habit may now have one. Migration 056 stores the five old sources under their catalog ids (`sleep` becomes `fitness:sleep`, `workout` becomes `workout:sessions`); the old names are still taken on input and the answers carry the catalog ids. Each distinct source is read once per window, a night lands on its local end day in the request zone instead of the Mi account's region, and a sleep value is in hours now.
+
 ## [1.33.2] - 2026-10-20
 
 ### Added

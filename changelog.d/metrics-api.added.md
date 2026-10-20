@@ -1,1 +1,0 @@
-`GET /api/v1/metrics` lists the catalog of daily series expanded for the caller (each currency of their accounts and practice entries, each expense category, each habit ticked by hand) with whether each is available and why not, and `GET /api/v1/metrics/series?source=&from=&to=&tz=` answers one series by local day, at most 400 days at a time.
