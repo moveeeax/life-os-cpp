@@ -10,33 +10,26 @@ export type * from './types';
 /** "manual" or a catalog id of GET /api/v1/metrics ("fitness:steps", "food:kcal"). */
 export type Source = Habit['source'];
 
-/** What ticks a habit, as the form offers it (the catalog ids the API answers with). */
-export const SOURCE_LABEL: Record<Source, string> = {
-  manual: 'By hand',
-  'fitness:sleep': 'Sleep from Mi',
-  'fitness:steps': 'Steps from Mi',
-  'fitness:active_kcal': 'Active kcal from Mi',
-  'workout:sessions': 'Training session',
-  'fitness:weight': 'Weigh-in on the Mi scales',
+/**
+ * What the form knows of a source from the catalog: its unit, and whether a day
+ * with any value counts by itself (a weigh-in, a session), so a goal is optional.
+ */
+export interface SourceInfo {
+  unit: string;
+  presence: boolean;
+}
+
+// The section a source's ticks come from, as the row's subline names it.
+const FROM: Record<string, string> = {
+  fitness: 'Mi',
+  food: 'Food',
+  habits: 'Habits',
+  tape: 'Tape',
+  workout: 'Training',
+  tasks: 'Tasks',
+  money: 'Money',
+  practice: 'Practice',
 };
-
-/** The unit a source's goal is in. */
-export const GOAL_UNIT: Record<Source, string> = {
-  manual: '',
-  'fitness:sleep': 'h',
-  'fitness:steps': 'steps',
-  'fitness:active_kcal': 'kcal',
-  'workout:sessions': '',
-  'fitness:weight': '',
-};
-
-/** Whether a source ticks the day by being there at all (a session, a weigh-in): it takes no goal. */
-export const takesNoGoal = (s: Source): boolean =>
-  s === 'workout:sessions' || s === 'fitness:weight';
-
-/** Whether a source needs a goal to tick anything (a sum or an average). */
-export const needsGoal = (s: Source): boolean =>
-  s === 'fitness:sleep' || s === 'fitness:steps' || s === 'fitness:active_kcal';
 
 const n0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const n1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
@@ -56,7 +49,7 @@ export function subline(
 ) {
   const when = scheduleWords(h);
   if (h.source === 'manual') return when;
-  const from = h.source.startsWith('workout:') ? 'Training' : 'Mi';
+  const from = FROM[h.source.split(':')[0]] ?? 'its source';
   return h.no_data ? `no data from ${from} · ${when}` : `from ${from} · ${when}`;
 }
 
@@ -89,14 +82,20 @@ export function formatValue(h: Pick<Habit, 'source' | 'unit'>, value: number): s
   }
 }
 
-/** The goal in words: "8 h", "8,000 steps", "45 min"; none for a workout or a weigh-in. */
+/** The goal in words: "8 h", "8,000 steps", "45 min", "80 kg"; none without a goal. */
 export function goalLine(h: Pick<Habit, 'source' | 'goal' | 'unit'>): string | null {
-  if (h.goal == null || takesNoGoal(h.source)) return null;
+  if (h.goal == null) return null;
   if (h.source === 'fitness:sleep') return `${n1.format(h.goal)} h`;
   if (h.source === 'fitness:steps') return `${n0.format(h.goal)} steps`;
   if (h.source === 'fitness:active_kcal') return `${n0.format(h.goal)} kcal`;
+  if (h.source === 'fitness:weight') return `${n1.format(h.goal)} kg`;
+  if (h.source === 'workout:sessions') return formatValue(h, h.goal);
   return h.unit ? `${n1.format(h.goal)} ${h.unit}` : n1.format(h.goal);
 }
+
+/** "Goal at most 2,200 kcal" reads the direction; at least is the plain "Goal 8,000 steps". */
+export const directionWord = (h: Pick<Habit, 'direction'>): string =>
+  h.direction === 'at_most' ? 'at most ' : '';
 
 const shift = shiftDays;
 
@@ -199,7 +198,7 @@ export interface HabitForm {
   unit: string;
   source: Source;
   target: string;
-  /** Kept as the habit has it: the form offers no choice yet. */
+  /** How a source's day compares to the goal; a habit by hand is always at least. */
   direction: Habit['direction'];
 }
 
@@ -217,32 +216,40 @@ export function habitForm(h?: Habit): HabitForm {
 }
 
 /**
- * The body of the habit form (pinned by habits.test.ts); a workout or a weigh-in sends no goal
- * (the API refuses one on a weigh-in), only a habit by hand a target.
+ * The body of the habit form (pinned by habits.test.ts): the source as its catalog id, with
+ * its direction and the catalog's unit; an empty goal is sent as none (a presence source
+ * counts any record of the day); only a habit by hand takes a target.
  */
-export function habitBody(f: HabitForm): HabitInput {
-  const goal = f.goal.trim() === '' || takesNoGoal(f.source) ? null : Number(f.goal);
+export function habitBody(f: HabitForm, info?: SourceInfo): HabitInput {
+  const manual = f.source === 'manual';
   return {
     name: f.name.trim(),
     schedule: f.schedule,
     per_week: f.schedule === 'weekly' ? Number(f.per_week) : null,
-    goal,
-    unit: f.source === 'manual' ? f.unit.trim() : '',
+    goal: f.goal.trim() === '' ? null : Number(f.goal.replace(',', '.')),
+    unit: manual ? f.unit.trim() : (info?.unit ?? f.unit),
     source: f.source,
-    target: f.source === 'manual' && f.target.trim() !== '' ? Number(f.target) : null,
+    target: manual && f.target.trim() !== '' ? Number(f.target) : null,
     // Only a habit with a source compares at most.
-    direction: f.source === 'manual' ? 'at_least' : f.direction,
+    direction: manual ? 'at_least' : f.direction,
   };
 }
 
-/** What is wrong with the form before it is sent, or null. */
-export function habitProblem(f: HabitForm): string | null {
+/**
+ * What is wrong with the form before it is sent, or null. A source that is not presence (a
+ * sum or an average) needs a goal; without the catalog loaded the API is left to say so.
+ */
+export function habitProblem(f: HabitForm, info?: SourceInfo): string | null {
   if (f.name.trim() === '') return 'Give the habit a name.';
-  if (needsGoal(f.source) && f.goal.trim() === '') return 'A source from Mi needs a goal.';
-  if (f.goal.trim() !== '' && !takesNoGoal(f.source)) {
-    const g = Number(f.goal);
+  if (f.source !== 'manual' && info && !info.presence && f.goal.trim() === '') {
+    return 'This source needs a goal to compare the day with.';
+  }
+  if (f.goal.trim() !== '') {
+    const g = Number(f.goal.replace(',', '.'));
     if (!Number.isFinite(g) || g <= 0) return 'The goal is a number above zero.';
-    if (f.source === 'fitness:sleep' && g > 24) return 'A sleep goal is in hours, at most 24.';
+    if ((f.source === 'fitness:sleep' || info?.unit === 'h') && g > 24) {
+      return 'A goal in hours is at most 24.';
+    }
   }
   if (f.source === 'manual' && f.target.trim() !== '') {
     const t = Number(f.target);

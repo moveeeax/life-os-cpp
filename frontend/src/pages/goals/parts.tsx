@@ -4,10 +4,19 @@ import { useErrorToast } from '@/hooks/useErrorToast';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 import { useAddMilestone, useAddSection, usePutCheckin, useSaveGoal } from '@/hooks/useGoals';
+import { useMetrics } from '@/hooks/useMetrics';
 import { useCreateTask, useUpdateTask } from '@/hooks/useTasks';
 import { parseAmount } from '@/lib/amounts';
 import { daysBetween, formatDay } from '@/lib/dates';
-import { chartPoints, formatValue, shelf, type GoalDetail } from '@/lib/goals';
+import {
+  axisLabels,
+  formatValue,
+  goalChart,
+  lastSourceDate,
+  shelf,
+  type GoalDetail,
+} from '@/lib/goals';
+import { entryOf, WHY_NOTE } from '@/lib/metrics';
 import { dueLabel, type Task } from '@/lib/tasks';
 import { cn } from '@/lib/utils';
 import { Meter, Num } from '@/shell/kit';
@@ -24,15 +33,18 @@ const STATUS: Record<Task['status'], string> = {
   open: 'not started',
 };
 
-/** Check-ins against the even-pace line, drawn to scale. */
+/**
+ * The goal's points against the even-pace line, drawn to scale: the days of its
+ * source as small dots, check-ins as hollow rings.
+ */
 function NumberChart({ goal, today }: { goal: GoalDetail; today: string }) {
   const W = 640;
   const H = 200;
   const P = { l: 46, r: 12, t: 12, b: 26 };
-  const points = chartPoints(goal.start_date, goal.start_value, goal.checkins);
+  const points = goalChart(goal);
   const from = goal.start_value ?? 0;
   const to = goal.target_value ?? 0;
-  const values = points.map((p) => p[1]).concat([from, to]);
+  const values = points.map((p) => p.value).concat([from, to]);
   const lo = Math.min(...values);
   const hi = Math.max(...values);
   const pad = (hi - lo) * 0.08 || 1;
@@ -43,12 +55,22 @@ function NumberChart({ goal, today }: { goal: GoalDetail; today: string }) {
   const last = points[points.length - 1];
   const tick = (v: number) =>
     Math.abs(v) >= 10_000 ? `${Math.round(v / 1000)}k` : String(Math.round(v * 10) / 10);
+  const todayIn = day(today) >= t0 && day(today) <= t1;
+  const labels = axisLabels({
+    start: { x: P.l, text: shortDate(goal.start_date) },
+    end: { x: W - P.r, text: shortDate(goal.due) },
+    today: todayIn ? X(today) : null,
+  });
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
       className="h-auto w-full"
       role="img"
-      aria-label="Check-ins against the even pace"
+      aria-label={
+        goal.source
+          ? 'The source and check-ins against the even pace'
+          : 'Check-ins against the even pace'
+      }
     >
       {[from, (from + to) / 2, to].map((v) => (
         <g key={v}>
@@ -78,38 +100,58 @@ function NumberChart({ goal, today }: { goal: GoalDetail; today: string }) {
         strokeDasharray="4 4"
         className="stroke-gray-400"
       />
-      {day(today) >= t0 && day(today) <= t1 && (
-        <>
-          <line
-            x1={X(today)}
-            x2={X(today)}
-            y1={P.t}
-            y2={H - P.b}
-            className="stroke-gray-200 dark:stroke-white/10"
-          />
-          <text x={X(today)} y={H - 8} textAnchor="middle" fontSize="11" className="fill-gray-400">
-            today
-          </text>
-        </>
+      {todayIn && (
+        <line
+          x1={X(today)}
+          x2={X(today)}
+          y1={P.t}
+          y2={H - P.b}
+          className="stroke-gray-200 dark:stroke-white/10"
+        />
       )}
-      <text x={P.l} y={H - 8} fontSize="11" className="fill-gray-400">
-        {shortDate(goal.start_date)}
-      </text>
-      <text x={W - P.r} y={H - 8} textAnchor="end" fontSize="11" className="fill-gray-400">
-        {shortDate(goal.due)}
-      </text>
+      {labels.map((l) => (
+        <text
+          key={l.text === 'today' ? 'today' : l.anchor}
+          x={l.x}
+          y={H - 8}
+          textAnchor={l.anchor}
+          fontSize="11"
+          className="fill-gray-400"
+        >
+          {l.text}
+        </text>
+      ))}
       <polyline
-        points={points.map(([d, v]) => `${X(d)},${Y(v)}`).join(' ')}
+        points={points.map((p) => `${X(p.date)},${Y(p.value)}`).join(' ')}
         fill="none"
         strokeWidth="2"
         className="stroke-brand-500"
       />
-      {points.map(([d, v]) => (
-        <circle key={d} cx={X(d)} cy={Y(v)} r="3" className="fill-brand-500" />
-      ))}
+      {points.map((p) =>
+        p.from === 'checkin' ? (
+          <circle
+            key={p.date}
+            cx={X(p.date)}
+            cy={Y(p.value)}
+            r="3.5"
+            strokeWidth="1.5"
+            data-from="checkin"
+            className="fill-white stroke-brand-500 dark:fill-gray-900"
+          />
+        ) : (
+          <circle
+            key={p.date}
+            cx={X(p.date)}
+            cy={Y(p.value)}
+            r={p.from === 'source' ? 2 : 3}
+            data-from={p.from}
+            className="fill-brand-500"
+          />
+        ),
+      )}
       <circle
-        cx={X(last[0])}
-        cy={Y(last[1])}
+        cx={X(last.date)}
+        cy={Y(last.value)}
         r="5"
         strokeWidth="2"
         className="fill-white stroke-brand-500 dark:fill-gray-900"
@@ -118,9 +160,32 @@ function NumberChart({ goal, today }: { goal: GoalDetail; today: string }) {
   );
 }
 
+/** Where a sourced goal's numbers come from: "from Weight, last 19 Oct", or why there are none. */
+function SourceLine({ goal }: { goal: GoalDetail }) {
+  const metrics = useMetrics(goal.source !== null);
+  if (!goal.source) return null;
+  const label = entryOf(metrics.data, goal.source)?.label ?? goal.source;
+  if (goal.source_why) return <p className="k-sub">{WHY_NOTE[goal.source_why]}</p>;
+  const last = lastSourceDate(goal.points ?? []);
+  return (
+    <p className="k-sub">
+      from {label}
+      {last ? (
+        <>
+          , last <span data-num-ok>{shortDate(last)}</span>
+        </>
+      ) : (
+        ', no days yet'
+      )}
+    </p>
+  );
+}
+
 export function NumberPart({ goal, today }: { goal: GoalDetail; today: string }) {
   const [value, setValue] = useState('');
   const [date, setDate] = useState(today);
+  // A sourced goal keeps the check-in form folded: its numbers come by themselves.
+  const [byHand, setByHand] = useState(goal.source === null);
   const put = usePutCheckin(goal.id, () => setValue(''));
   // A check-in may be negative, like the goal's own start and target.
   const v = parseAmount(value, { signed: true });
@@ -130,31 +195,40 @@ export function NumberPart({ goal, today }: { goal: GoalDetail; today: string })
   };
   return (
     <div className="grid gap-3">
+      <SourceLine goal={goal} />
       <NumberChart goal={goal} today={today} />
-      <form onSubmit={submit} className="k-inline-form">
-        <input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          inputMode="decimal"
-          placeholder={goal.unit || 'value'}
-          aria-label="Value"
-          className={compactInput}
-        />
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          aria-label="Date"
-          className={compactInput}
-        />
-        <button
-          type="submit"
-          disabled={put.isPending}
-          className="h-9 rounded-lg bg-brand-500 px-4 text-theme-sm font-medium text-white disabled:opacity-50"
-        >
-          Check in
-        </button>
-      </form>
+      {byHand ? (
+        <form onSubmit={submit} className="k-inline-form">
+          <input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            inputMode="decimal"
+            placeholder={goal.unit || 'value'}
+            aria-label="Value"
+            className={compactInput}
+          />
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            aria-label="Date"
+            className={compactInput}
+          />
+          <button
+            type="submit"
+            disabled={put.isPending}
+            className="h-9 rounded-lg bg-brand-500 px-4 text-theme-sm font-medium text-white disabled:opacity-50"
+          >
+            Check in
+          </button>
+        </form>
+      ) : (
+        <div>
+          <button type="button" onClick={() => setByHand(true)} className={ghost}>
+            Add by hand
+          </button>
+        </div>
+      )}
       {put.error && (
         <p role="alert" className="text-theme-sm k-error-text">
           {put.error}

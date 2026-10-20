@@ -177,10 +177,15 @@ export const qk = {
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['habits-enabled'] as const,
   },
+  /** The catalog of daily series a goal or a habit can follow. */
+  metrics: {
+    all: () => ['metrics'] as const,
+  },
   goals: {
     all: () => ['goals'] as const,
-    list: (status: string, date: string) => ['goals', 'list', status, date] as const,
-    detail: (id: string, date: string) => ['goals', 'detail', id, date] as const,
+    list: (status: string, date: string, tz: string) =>
+      ['goals', 'list', status, date, tz] as const,
+    detail: (id: string, date: string, tz: string) => ['goals', 'detail', id, date, tz] as const,
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['goals-enabled'] as const,
   },
