@@ -343,7 +343,17 @@ TEST_F(HabitsApiTest, HabitSourceCannotBeItself) {
     EXPECT_EQ(code_of(post("habits:" + steps)), "not_manual");
     EXPECT_EQ(code_of(post("habits:" + boris)), "not_yours");
     EXPECT_EQ(code_of(post("habits:00000000-0000-4000-8000-000000000000")), "not_yours");
-    EXPECT_EQ(code_of(post("money:expense:KZT")), "not_yours") << "no KZT account of Anna's";
+    // A sum needs a goal; with one, the currency is asked.
+    EXPECT_EQ(code_of(call(kAnna,
+                           Post,
+                           json{{"name", "Spend less"},
+                                {"schedule", "daily"},
+                                {"source", "money:expense:KZT"},
+                                {"goal", 5000},
+                                {"direction", "at_most"}},
+                           [&](auto req, auto cb) { c.create(req, std::move(cb)); })),
+              "not_yours")
+        << "no KZT account of Anna's";
 
     // Its own manual habit is taken, with no goal: a presence source.
     const auto echo = created(kAnna, json{{"name", "Echo"}, {"schedule", "daily"}, {"source", "habits:" + reading}});
