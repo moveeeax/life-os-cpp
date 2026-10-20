@@ -15,6 +15,7 @@ import {
   addDays,
   dayCount,
   dayOf,
+  directionWord,
   formatValue,
   goalLine,
   hasTarget,
@@ -155,7 +156,8 @@ function HabitRow({
       )}
       {goal && (
         <span>
-          Goal <Num>{goal}</Num>
+          Goal {directionWord(h)}
+          <Num>{goal}</Num>
           {h.source === 'fitness:sleep' ? ' of sleep' : ''}, <Numbered text={scheduleWords(h)} />
         </span>
       )}

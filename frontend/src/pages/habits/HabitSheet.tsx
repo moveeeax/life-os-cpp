@@ -1,40 +1,41 @@
 import { useState } from 'react';
 
+import { MetricPicker } from '@/components/MetricPicker';
 import { useSaveHabit } from '@/hooks/useHabits';
+import { useMetrics } from '@/hooks/useMetrics';
 import {
-  GOAL_UNIT,
-  SOURCE_LABEL,
   habitBody,
   habitForm,
   habitProblem,
-  needsGoal,
-  takesNoGoal,
   type Habit,
   type HabitForm,
-  type Source,
+  type SourceInfo,
 } from '@/lib/habits';
+import { entryOf } from '@/lib/metrics';
 import { Sheet } from '@/shell/kit';
-
-const SOURCES = Object.keys(SOURCE_LABEL) as Source[];
 
 /** New habit, or edit one: name, how often, what ticks it, the goal, a daily target. */
 export function HabitSheet({ habit, onClose }: { habit?: Habit; onClose: () => void }) {
   const [f, setF] = useState<HabitForm>(() => habitForm(habit));
   const [problem, setProblem] = useState<string | null>(null);
   const save = useSaveHabit(habit?.id ?? null, onClose);
+  const metrics = useMetrics();
   const set = (k: keyof HabitForm) => (e: { target: { value: string } }) =>
     setF({ ...f, [k]: e.target.value });
-  const goalNeeded = needsGoal(f.source);
-  const unit = GOAL_UNIT[f.source] ?? '';
+  const manual = f.source === 'manual';
+  const entry = manual ? undefined : entryOf(metrics.data, f.source);
+  const info: SourceInfo | undefined = entry && { unit: entry.unit, presence: entry.presence };
+  const unit = manual ? '' : (entry?.unit ?? '');
+  const goalOptional = manual || (info?.presence ?? false);
   return (
     <Sheet title={habit ? 'Edit the habit' : 'New habit'} onClose={onClose} width={460}>
       <form
         className="k-form"
         onSubmit={(e) => {
           e.preventDefault();
-          const wrong = habitProblem(f);
+          const wrong = habitProblem(f, info);
           setProblem(wrong);
-          if (!wrong) save.mutate(habitBody(f));
+          if (!wrong) save.mutate(habitBody(f, info));
         }}
       >
         <label className="k-field">
@@ -78,42 +79,67 @@ export function HabitSheet({ habit, onClose }: { habit?: Habit; onClose: () => v
             )}
           </div>
         </div>
-        <label className="k-field">
-          <span>Ticked by</span>
-          <select value={f.source} onChange={set('source')}>
-            {SOURCES.map((s) => (
-              <option key={s} value={s}>
-                {SOURCE_LABEL[s]}
-              </option>
-            ))}
-          </select>
-        </label>
-        {!takesNoGoal(f.source) && (
-          <div className="k-fields">
-            <label className="k-field">
-              <span>
-                {goalNeeded ? 'Goal' : 'Goal (optional)'}
-                {unit ? `, ${unit}` : ''}
-              </span>
-              <input
-                inputMode="decimal"
-                required={goalNeeded}
-                placeholder={
-                  f.source === 'fitness:sleep' ? '8' : f.source === 'fitness:steps' ? '8000' : ''
-                }
-                value={f.goal}
-                onChange={set('goal')}
-              />
-            </label>
-            {f.source === 'manual' && (
-              <label className="k-field">
-                <span>Unit</span>
-                <input maxLength={16} placeholder="min" value={f.unit} onChange={set('unit')} />
-              </label>
-            )}
+        <div className="k-field">
+          <label htmlFor="habit-source">Ticked by</label>
+          <MetricPicker
+            id="habit-source"
+            value={manual ? null : f.source}
+            onChange={(s) => setF({ ...f, source: s ?? 'manual' })}
+            manual="By hand"
+            exclude={habit ? [`habits:${habit.id}`] : undefined}
+          />
+        </div>
+        {!manual && (
+          <div className="k-field">
+            <span id="habit-direction">The day counts at</span>
+            <div className="h-often">
+              <div className="k-seg" role="radiogroup" aria-labelledby="habit-direction">
+                {(['at_least', 'at_most'] as const).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    role="radio"
+                    aria-checked={f.direction === d}
+                    className={f.direction === d ? 'k-seg-on' : undefined}
+                    onClick={() => setF({ ...f, direction: d })}
+                  >
+                    {d === 'at_least' ? 'At least' : 'At most'}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
-        {f.source === 'manual' && (
+        <div className="k-fields">
+          <label className="k-field">
+            <span>
+              {goalOptional ? 'Goal (optional)' : 'Goal'}
+              {unit ? `, ${unit}` : ''}
+            </span>
+            <input
+              inputMode="decimal"
+              required={!goalOptional}
+              placeholder={
+                !manual && info?.presence
+                  ? 'any record counts'
+                  : f.source === 'fitness:sleep'
+                    ? '8'
+                    : f.source === 'fitness:steps'
+                      ? '8000'
+                      : ''
+              }
+              value={f.goal}
+              onChange={set('goal')}
+            />
+          </label>
+          {manual && (
+            <label className="k-field">
+              <span>Unit</span>
+              <input maxLength={16} placeholder="min" value={f.unit} onChange={set('unit')} />
+            </label>
+          )}
+        </div>
+        {manual && (
           <label className="k-field">
             <span>Daily target (optional){f.unit.trim() ? `, ${f.unit.trim()}` : ''}</span>
             <input
@@ -125,9 +151,9 @@ export function HabitSheet({ habit, onClose }: { habit?: Habit; onClose: () => v
           </label>
         )}
         <p className="k-sub">
-          A source from Mi needs a goal; a Training session means any finished session that day, a
-          weigh-in any record of the Mi scales that day. With a daily target, a day counts once what
-          you add that day reaches it (water in ml).
+          {manual
+            ? 'With a daily target, a day counts once what you add that day reaches it (water in ml).'
+            : 'A tick by hand still counts on its day.'}
         </p>
         {(problem || save.error) && (
           <p role="alert" className="k-error">
