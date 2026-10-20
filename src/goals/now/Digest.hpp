@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 #include <nlohmann/json_fwd.hpp>
@@ -15,6 +16,11 @@ namespace Goals {
 
 /// The active goals of @p owner with their progress on @p day, behind first
 /// (the shape of Now::Today::goals_block); passed and failed goals are left out.
-nlohmann::json digest(const std::string& owner, const std::string& day);
+/// A goal with a source reads its days in @p tz (an IANA zone the caller checked)
+/// with the caller's @p permissions (Domain::Permission bits).
+nlohmann::json digest(const std::string& owner,
+                      const std::string& day,
+                      const std::string& tz,
+                      std::uint32_t permissions);
 
 }  // namespace Goals

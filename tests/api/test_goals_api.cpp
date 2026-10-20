@@ -6,6 +6,7 @@
  *        the module switch.
  */
 
+#include <cstdint>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -30,6 +31,7 @@ namespace {
 
 constexpr const char* kAnna = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaab5";
 constexpr const char* kBoris = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbc5";
+constexpr const char* kBorisHabit = "57575757-0000-4000-8000-0000000000b1";
 
 using TestHelpers::user;
 
@@ -44,6 +46,7 @@ protected:
     void config_overrides(nlohmann::json& cfg) override {
         cfg["goals"]["enabled"] = true;
         cfg["tasks"]["enabled"] = true;
+        cfg["fitness"]["enabled"] = true;  // the tape and Mi sources
     }
 
     void SetUp() override {
@@ -59,7 +62,17 @@ protected:
                     "ON CONFLICT DO NOTHING",
                     std::string(id),
                     std::string(id) + "@example.test");
+                for (const char* table : {"tape_measurements", "mi_accounts"}) {
+                    txn.exec_params(std::string("DELETE FROM ") + table + " WHERE owner_id = $1::uuid",
+                                    std::string(id));
+                }
             }
+            txn.exec_params("DELETE FROM habits WHERE id = $1::uuid", std::string(kBorisHabit));
+            txn.exec_params(
+                "INSERT INTO habits (id, owner_id, name, schedule, source) VALUES ($1::uuid, $2::uuid, 'Water', "
+                "'daily', 'manual')",
+                std::string(kBorisHabit),
+                std::string(kBoris));
             return true;
         });
     }
@@ -203,6 +216,45 @@ protected:
     json detail(const std::string& id) {
         return body_of(call_id(
             goals, &Api::GoalsController::getGoal, kAnna, Get, id, json::object(), {{"date", "2026-10-08"}}))["data"];
+    }
+
+    /// The goal as a caller holding @p permissions sees it on 2026-10-08.
+    json detail_as(std::uint32_t permissions, const std::string& id) {
+        Security::Auth::AuthPrincipal p;
+        p.subject = kAnna;
+        p.raw_claims = json{{"sub", kAnna}, {"permissions", permissions}};
+        auto req = TestHelpers::authed_json(p, json::object(), Get);
+        req->setParameter("date", "2026-10-08");
+        HttpResponsePtr captured;
+        goals.getGoal(
+            req, [&](const HttpResponsePtr& r) { captured = r; }, id);
+        EXPECT_TRUE(captured);
+        TestHelpers::expect_2xx_matches_schema(captured, Get, "/api/v1/goals/{id}");
+        return body_of(captured)["data"];
+    }
+
+    /// A waist goal of Anna's from 1 September, with @p extra fields.
+    json waist_goal(const json& extra = json::object()) {
+        json body{{"title", "Waist 85 cm"},
+                  {"area", "health"},
+                  {"kind", "number"},
+                  {"start_date", "2026-09-01"},
+                  {"due", "2027-03-31"},
+                  {"start_value", 95},
+                  {"target_value", 85},
+                  {"unit", "cm"}};
+        body.update(extra);
+        return goal(body);
+    }
+
+    static void tape(const char* date, double waist) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params("INSERT INTO tape_measurements (owner_id, date, waist_cm) VALUES ($1::uuid, $2::date, $3)",
+                            std::string(kAnna),
+                            std::string(date),
+                            waist);
+            return true;
+        });
     }
 };
 
@@ -443,6 +495,134 @@ TEST_F(GoalsApiTest, DeletingAGoalLeavesItsTasks) {
     EXPECT_TRUE(after["goal_id"].is_null());
     EXPECT_EQ(call_two(&Api::GoalsController::deleteCheckin, kAnna, Delete, g["id"], g["id"])->statusCode(),
               k404NotFound);
+}
+
+TEST_F(GoalsApiTest, SourcePointsFeedCurrent) {
+    tape("2026-10-01", 92);
+    tape("2026-10-05", 91.5);
+    tape("2026-10-10", 90);  // after the date asked for
+    const json g = waist_goal({{"source", "tape:waist"}});
+    EXPECT_EQ(g["source"], "tape:waist");
+    EXPECT_TRUE(g["source_why"].is_null());
+    EXPECT_DOUBLE_EQ(g["progress"]["current"].get<double>(), 91.5);
+    const json d = detail(g["id"]);
+    EXPECT_DOUBLE_EQ(d["progress"]["current"].get<double>(), 91.5);
+    EXPECT_EQ(d["progress"]["current_date"], "2026-10-05");
+    ASSERT_EQ(d["points"].size(), 2u) << "the days up to the date asked for";
+    EXPECT_EQ(d["points"][0]["date"], "2026-10-01");
+    EXPECT_EQ(d["points"][0]["from"], "source");
+    EXPECT_TRUE(d["checkins"].empty());
+    const json list =
+        body_of(call(goals, &Api::GoalsController::listGoals, kAnna, Get, json::object(), {{"date", "2026-10-08"}}));
+    ASSERT_EQ(list["data"].size(), 1u);
+    EXPECT_DOUBLE_EQ(list["data"][0]["progress"]["current"].get<double>(), 91.5);
+    EXPECT_EQ(list["data"][0]["source"], "tape:waist");
+}
+
+TEST_F(GoalsApiTest, CheckinWinsOnItsDate) {
+    tape("2026-10-01", 92);
+    tape("2026-10-05", 91.5);
+    const json g = waist_goal({{"source", "tape:waist"}});
+    const std::string id = g["id"];
+    ASSERT_EQ(
+        call_id(
+            goals, &Api::GoalsController::putCheckin, kAnna, Post, id, json{{"date", "2026-10-05"}, {"value", 91.0}})
+            ->statusCode(),
+        k201Created);
+    const json d = detail(id);
+    EXPECT_DOUBLE_EQ(d["progress"]["current"].get<double>(), 91.0) << "the check-in, not the tape";
+    ASSERT_EQ(d["points"].size(), 2u);
+    EXPECT_EQ(d["points"][0]["from"], "source");
+    EXPECT_EQ(d["points"][1]["date"], "2026-10-05");
+    EXPECT_EQ(d["points"][1]["from"], "checkin");
+    EXPECT_DOUBLE_EQ(d["points"][1]["value"].get<double>(), 91.0);
+}
+
+TEST_F(GoalsApiTest, SourceOnlyForNumberGoals) {
+    const auto create = [&](const json& body) {
+        return call(goals, &Api::GoalsController::createGoal, kAnna, Post, body, {{"date", "2026-10-08"}});
+    };
+    EXPECT_EQ(create(json{{"title", "Run a marathon"},
+                          {"area", "health"},
+                          {"kind", "binary"},
+                          {"due", "2027-01-01"},
+                          {"source", "fitness:steps"}})
+                  ->statusCode(),
+              k400BadRequest);
+    EXPECT_EQ(create(json{{"title", "Ten books"},
+                          {"area", "growth"},
+                          {"kind", "count"},
+                          {"due", "2027-01-01"},
+                          {"target_count", 10},
+                          {"source", "tasks:done"}})
+                  ->statusCode(),
+              k400BadRequest);
+    const json binary = goal({{"title", "Pass AWS"}, {"area", "growth"}, {"kind", "binary"}, {"due", "2027-01-01"}});
+    EXPECT_EQ(
+        call_id(
+            goals, &Api::GoalsController::updateGoal, kAnna, Patch, binary["id"], json{{"source", "fitness:weight"}})
+            ->statusCode(),
+        k400BadRequest);
+    EXPECT_TRUE(binary["source"].is_null());
+
+    const auto refused = [&](const char* source) {
+        const auto r = create(json{{"title", "x"},
+                                   {"area", "health"},
+                                   {"kind", "number"},
+                                   {"due", "2027-01-01"},
+                                   {"start_value", 1},
+                                   {"target_value", 2},
+                                   {"source", source}});
+        EXPECT_EQ(r->statusCode(), k400BadRequest) << source;
+        const json errors = body_of(r)["errors"];
+        return errors.empty() ? std::string() : errors[0]["code"].get<std::string>();
+    };
+    EXPECT_EQ(refused("fitness:nope"), "invalid");
+    EXPECT_EQ(refused("money:expense:kzt"), "invalid");
+    EXPECT_EQ(refused("money:expense:ZZZ"), "not_yours") << "no money account in ZZZ";
+    EXPECT_EQ(refused((std::string("habits:") + kBorisHabit).c_str()), "not_yours") << "Boris's habit";
+}
+
+TEST_F(GoalsApiTest, PatchSetsAndClearsSource) {
+    const json g = waist_goal();
+    EXPECT_TRUE(g["source"].is_null());
+    const std::string id = g["id"];
+    const auto patch = [&](const json& body) {
+        const auto r = call_id(goals, &Api::GoalsController::updateGoal, kAnna, Patch, id, body);
+        EXPECT_EQ(r->statusCode(), k200OK) << r->body();
+        return body_of(r)["data"];
+    };
+    EXPECT_EQ(patch(json{{"source", "weight"}})["source"], "fitness:weight") << "a legacy name, stored canonical";
+    EXPECT_EQ(patch(json{{"title", "Waist 84 cm"}})["source"], "fitness:weight") << "kept when not given";
+    EXPECT_EQ(patch(json{{"source", "tape:waist"}})["source"], "tape:waist");
+    EXPECT_TRUE(patch(json{{"source", nullptr}})["source"].is_null());
+    EXPECT_TRUE(detail(id)["source"].is_null());
+}
+
+TEST_F(GoalsApiTest, UnavailableSourceKeepsCheckins) {
+    const json g = goal({{"title", "Weight 75 kg"},
+                         {"area", "health"},
+                         {"kind", "number"},
+                         {"start_date", "2026-09-01"},
+                         {"due", "2027-03-31"},
+                         {"start_value", 93},
+                         {"target_value", 75},
+                         {"unit", "kg"},
+                         {"source", "fitness:weight"}});
+    const std::string id = g["id"];
+    ASSERT_EQ(
+        call_id(
+            goals, &Api::GoalsController::putCheckin, kAnna, Post, id, json{{"date", "2026-10-06"}, {"value", 91.4}})
+            ->statusCode(),
+        k201Created);
+    const json linked = detail_as(Domain::Permission::kGeneral | Domain::Permission::kFitnessRead, id);
+    EXPECT_EQ(linked["source_why"], "not_linked") << "no Mi account";
+    EXPECT_DOUBLE_EQ(linked["progress"]["current"].get<double>(), 91.4);
+    ASSERT_EQ(linked["points"].size(), 1u);
+    EXPECT_EQ(linked["points"][0]["from"], "checkin");
+    const json plain = detail_as(Domain::Permission::kGeneral, id);
+    EXPECT_EQ(plain["source_why"], "no_permission");
+    EXPECT_DOUBLE_EQ(plain["progress"]["current"].get<double>(), 91.4);
 }
 
 TEST_F(GoalsOffTest, EveryRouteIs404WhileTheModuleIsOff) {

@@ -164,6 +164,8 @@
      "target_value",
      "target_count",
      "result",
+     "source",
+     "source_why",
      "created_at",
      "updated_at",
      "progress"
@@ -240,6 +242,27 @@
        null
       ]
      },
+     "source": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "A number goal only: the id of the metrics catalog series it follows (GET /api/v1/metrics), null when fed by check-ins alone"
+     },
+     "source_why": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "module_off",
+       "no_permission",
+       "not_linked",
+       "not_yours",
+       null
+      ],
+      "description": "Why the source cannot be read for the caller; null when it can or there is none. An unreadable source leaves the check-ins alone driving the progress."
+     },
      "created_at": {
       "type": "string",
       "format": "date-time"
@@ -262,6 +285,7 @@
       "type": "object",
       "required": [
        "checkins",
+       "points",
        "sections",
        "tasks",
        "milestones"
@@ -272,6 +296,13 @@
         "items": {
          "$ref": "#/components/schemas/GoalCheckin"
         }
+       },
+       "points": {
+        "type": "array",
+        "items": {
+         "$ref": "#/components/schemas/GoalPoint"
+        },
+        "description": "A number goal: the days of its source from start_date to the date asked for, merged with its check-ins (a check-in wins on its date), oldest first; empty for the other kinds"
        },
        "sections": {
         "type": "array",
@@ -360,6 +391,13 @@
       "type": "integer",
       "minimum": 1,
       "maximum": 10000
+     },
+     "source": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "A number goal only: an id of the metrics catalog (GET /api/v1/metrics); stored canonical; 400 not_yours when it names a currency, category or habit not the caller's"
      }
     }
    },
@@ -411,6 +449,13 @@
        "pass",
        "fail"
       ]
+     },
+     "source": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "A number goal only: an id of the metrics catalog, or null to go back to check-ins alone"
      }
     }
    },
@@ -436,6 +481,30 @@
      },
      "note": {
       "type": "string"
+     }
+    }
+   },
+   "GoalPoint": {
+    "type": "object",
+    "required": [
+     "date",
+     "value",
+     "from"
+    ],
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "value": {
+      "type": "number"
+     },
+     "from": {
+      "type": "string",
+      "enum": [
+       "source",
+       "checkin"
+      ]
      }
     }
    },
@@ -26086,6 +26155,15 @@
        "format": "date"
       },
       "description": "The person's local day the progress is computed at; defaults to today in UTC"
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the default day is today there, and the days of a goal source are counted there"
      }
     ],
     "responses": {
@@ -26176,6 +26254,15 @@
        "format": "date"
       },
       "description": "The person's local day the progress is computed at; defaults to today in UTC"
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the default day is today there, and the days of a goal source are counted there"
      }
     ],
     "requestBody": {
@@ -26281,6 +26368,15 @@
        "format": "date"
       },
       "description": "The person's local day the progress is computed at; defaults to today in UTC"
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the default day is today there, and the days of a goal source are counted there"
      }
     ],
     "responses": {
@@ -26364,6 +26460,15 @@
        "format": "date"
       },
       "description": "The person's local day the progress is computed at; defaults to today in UTC"
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the default day is today there, and the days of a goal source are counted there"
      }
     ],
     "requestBody": {
@@ -34508,7 +34613,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 513557,
-  "source_fnv1a64": "bed30fb3631540c8"
+  "source_bytes": 515718,
+  "source_fnv1a64": "84c8a905e990daf4"
  }
 }

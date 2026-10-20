@@ -1,3 +1,8 @@
+#include <limits>
+#include <map>
+#include <string>
+#include <vector>
+
 #include <gtest/gtest.h>
 
 #include "goals/Fields.hpp"
@@ -7,6 +12,8 @@ using Goals::Progress::Checkin;
 using Goals::Progress::compute;
 using Goals::Progress::Counts;
 using Goals::Progress::Goal;
+using Goals::Progress::merge;
+using Goals::Progress::values_of;
 
 namespace {
 
@@ -105,4 +112,32 @@ TEST(GoalsProgress, BinaryByTheDaysLeftAndTheResult) {
 TEST(GoalsFields, KnowsTheFourKinds) {
     EXPECT_TRUE(Goals::Fields::is_kind("binary"));
     EXPECT_FALSE(Goals::Fields::is_kind("habit"));
+}
+
+TEST(GoalsProgress, SourcePointsFeedCurrent) {
+    // A weight goal on the scales: the latest day of the source on or before the date is current.
+    const Goal g = number_goal(93.0, 75.0, "2026-09-01", "2027-03-31");
+    const std::map<std::string, double> scales{{"2026-09-10", 92.0}, {"2026-10-05", 90.8}, {"2026-10-09", 90.1}};
+    const auto points = merge(scales, {});
+    ASSERT_EQ(points.size(), 3u);
+    EXPECT_TRUE(points[0].from_source);
+    const auto p = compute(g, "2026-10-08", values_of(points), Counts{0, 0});
+    EXPECT_DOUBLE_EQ(p["current"].get<double>(), 90.8) << "a day after the date does not count";
+    EXPECT_EQ(p["current_date"], "2026-10-05");
+    EXPECT_FALSE(p["stale"].get<bool>());
+}
+
+TEST(GoalsProgress, CheckinWinsOnItsDate) {
+    const std::map<std::string, double> scales{
+        {"2026-10-01", 91.0}, {"2026-10-02", 90.9}, {"2026-10-03", std::numeric_limits<double>::quiet_NaN()}};
+    const std::vector<Checkin> by_hand{{"2026-10-02", 90.0}, {"2026-10-04", 89.5}};
+    const auto points = merge(scales, by_hand);
+    ASSERT_EQ(points.size(), 3u) << "a day of the source without a number is no point";
+    EXPECT_EQ(points[0].date, "2026-10-01");
+    EXPECT_TRUE(points[0].from_source);
+    EXPECT_EQ(points[1].date, "2026-10-02");
+    EXPECT_DOUBLE_EQ(points[1].value, 90.0) << "the check-in, not the scales";
+    EXPECT_FALSE(points[1].from_source);
+    EXPECT_EQ(points[2].date, "2026-10-04");
+    EXPECT_FALSE(points[2].from_source);
 }

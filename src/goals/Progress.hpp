@@ -2,7 +2,8 @@
  * @file Progress.hpp
  * @brief A goal's progress and pace at one date, per kind
  *        (docs/superpowers/specs/2026-10-08-goals-section-design.md §4).
- *        Pure: the caller hands the goal, its check-ins and its task counts.
+ *        Pure: the caller hands the goal, its points (check-ins, and the days
+ *        of its source merged in by merge()) and its task counts.
  */
 
 #pragma once
@@ -10,6 +11,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <map>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -35,6 +37,13 @@ struct Goal {
 struct Checkin {
     std::string date;
     double value = 0;
+};
+
+/// One point of a number goal: a check-in, or a day of the goal's source.
+struct Point {
+    std::string date;
+    double value = 0;
+    bool from_source = false;
 };
 
 /// The goal's tasks: how many are done of how many.
@@ -64,7 +73,40 @@ inline double clamp01(double x) {
 }  // namespace detail
 
 /**
- * @param checkins The number goal's check-ins, oldest first (others ignore them).
+ * The points of a number goal, oldest first: the days of its source (date ->
+ * value; a day without a number, NaN, is no point) and its check-ins. A
+ * check-in wins on its date.
+ */
+inline std::vector<Point> merge(const std::map<std::string, double>& source, const std::vector<Checkin>& checkins) {
+    std::map<std::string, Point> by_date;
+    for (const auto& [date, value] : source) {
+        if (!std::isnan(value)) {
+            by_date[date] = Point{date, value, true};
+        }
+    }
+    for (const auto& c : checkins) {
+        by_date[c.date] = Point{c.date, c.value, false};
+    }
+    std::vector<Point> out;
+    out.reserve(by_date.size());
+    for (const auto& [date, point] : by_date) {
+        out.push_back(point);
+    }
+    return out;
+}
+
+/// The values of @p points as compute() takes them.
+inline std::vector<Checkin> values_of(const std::vector<Point>& points) {
+    std::vector<Checkin> out;
+    out.reserve(points.size());
+    for (const auto& p : points) {
+        out.push_back(Checkin{p.date, p.value});
+    }
+    return out;
+}
+
+/**
+ * @param checkins The number goal's points, oldest first (others ignore them).
  * @param tasks    The goal's tasks (steps and count use them).
  */
 inline nlohmann::json compute(const Goal& g,

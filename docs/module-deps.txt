@@ -218,6 +218,9 @@ repositories/goals -> database
 repositories/goals -> goals
 repositories/goals -> repositories
 repositories/goals -> repositories/tasks
+repositories/goals -> habits
+repositories/goals -> metrics
+repositories/goals -> repositories/metrics
 api -> goals
 api -> goals/now
 api -> repositories/goals

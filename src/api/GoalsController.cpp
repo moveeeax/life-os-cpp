@@ -2,12 +2,16 @@
  * @file GoalsController.cpp
  * @brief The /api/v1/goals handlers: validation per kind, the owner scope,
  *        and each goal answered with its progress at the caller's date
- *        (docs/superpowers/specs/2026-10-08-goals-section-design.md).
+ *        (docs/superpowers/specs/2026-10-08-goals-section-design.md). A number
+ *        goal may follow a series of the metrics catalog (`source`); its days
+ *        join the check-ins as points
+ *        (docs/superpowers/specs/2026-10-20-metric-sources-design.md §3).
  */
 
 #include "api/GoalsController.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <string>
@@ -22,11 +26,16 @@
 #include "api/HandlerSupport.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
+#include "domain/Role.hpp"
 #include "goals/Fields.hpp"
 #include "goals/Progress.hpp"
+#include "metrics/Catalog.hpp"
 #include "repositories/Zones.hpp"
 #include "repositories/goals/Errors.hpp"
 #include "repositories/goals/GoalRepository.hpp"
+#include "repositories/goals/Sources.hpp"
+#include "repositories/metrics/Series.hpp"
+#include "security/Auth.hpp"
 #include "tasks/Fields.hpp"
 #include "utils/ErrorResponse.hpp"
 #include "utils/Modules.hpp"
@@ -44,6 +53,7 @@ using Api::Fields::opt_number;
 using Api::Fields::text_length;
 using Api::Fields::today_utc;
 using Repositories::Goals::GoalRepository;
+using Repositories::Goals::Sources;
 
 constexpr double kValueMax = 1e12;
 /// UTC+14: the zone whose date is the latest on Earth, the bound of a check-in sent without ?tz=.
@@ -68,27 +78,85 @@ std::optional<std::string> at_date(const HttpRequestPtr& req, const GoalsControl
     return date;
 }
 
-/// The goal row with its progress block.
+/// The caller's permission bits, the fitness read bit set when the caller passes
+/// that check (an admin, or no auth enforced), as /api/v1/metrics counts them.
+std::uint32_t permissions_of(const HttpRequestPtr& req) {
+    std::uint32_t p = Security::Auth::current_permissions(req);
+    if (Security::Auth::require_permission(req, Domain::Permission::kFitnessRead) == nullptr) {
+        p |= Domain::Permission::kFitnessRead;
+    }
+    return p;
+}
+
+/// The sources of the request: their days counted in ?tz= (UTC when absent or not a zone).
+Sources sources_of(const HttpRequestPtr& req, const std::string& owner) {
+    const std::string tz = req->getParameter("tz");
+    return Sources(owner, !tz.empty() && Repositories::Zones::is_zone(tz) ? tz : "UTC", permissions_of(req));
+}
+
+/// The goal row with its progress block and source_why; @p with_points adds the
+/// points of a number goal (`points`, empty for the other kinds).
 json with_progress(GoalRepository& repo,
+                   Sources& sources,
                    const std::string& owner,
                    json row,
                    const std::string& date,
                    const std::map<std::string, ::Goals::Progress::Counts>& counts,
-                   const std::map<std::string, std::vector<::Goals::Progress::Checkin>>* all_points = nullptr) {
+                   const std::map<std::string, std::vector<::Goals::Progress::Checkin>>* all_points = nullptr,
+                   bool with_points = false) {
     const std::string id = row["id"].get<std::string>();
     const auto goal = GoalRepository::progress_goal(row);
     const auto it = counts.find(id);
     const ::Goals::Progress::Counts tasks = it == counts.end() ? ::Goals::Progress::Counts{0, 0} : it->second;
-    std::vector<::Goals::Progress::Checkin> points;
+    Sources::Read read;
     if (goal.kind == "number") {
+        std::vector<::Goals::Progress::Checkin> checkins;
         if (all_points == nullptr) {
-            points = repo.checkin_points(owner, id);
+            checkins = repo.checkin_points(owner, id);
         } else if (const auto found = all_points->find(id); found != all_points->end()) {
-            points = found->second;
+            checkins = found->second;
         }
+        read = sources.points(row, date, checkins);
     }
-    row["progress"] = ::Goals::Progress::compute(goal, date, points, tasks);
+    row["progress"] = ::Goals::Progress::compute(goal, date, ::Goals::Progress::values_of(read.points), tasks);
+    row["source_why"] = read.why;
+    if (with_points) {
+        row["points"] = Sources::points_json(read.points);
+    }
     return row;
+}
+
+/// The source of a body: absent, null (no source) or a catalog id. A bad id is a
+/// field error; the canonical id is returned for a good one.
+std::optional<std::string> source_field(Validation::Errors& errs, const json& body) {
+    const auto it = body.find("source");
+    if (it == body.end() || it->is_null()) {
+        return std::nullopt;
+    }
+    const auto ref = it->is_string() ? ::Metrics::parse(it->get<std::string>()) : std::nullopt;
+    if (!ref) {
+        errs.add("source", "invalid", "source is an id of the metrics catalog (GET /api/v1/metrics)");
+        return std::nullopt;
+    }
+    return ::Metrics::canonical(*ref);
+}
+
+/// Whether the source names only what is the owner's (a currency of their accounts,
+/// their category, their habit ticked by hand); answers 400 not_yours when not.
+bool source_is_yours(const std::string& owner,
+                     const std::optional<std::string>& source,
+                     const GoalsController::Callback& callback) {
+    if (!source) {
+        return true;
+    }
+    const auto ref = ::Metrics::parse(*source);
+    if (ref && Repositories::Metrics::detail::owns(owner, *ref)) {
+        return true;
+    }
+    Validation::Errors errs;
+    errs.add("source", "not_yours", "the source names a currency, category or habit that is not the caller's");
+    callback(Validation::response_400(errs));
+    return false;
 }
 
 /// A field that only one kind takes: present on another kind is an error.
@@ -129,6 +197,7 @@ void goal_fields(Validation::Errors& errs, const json& body, const std::string& 
     only_for(errs, body, "target_value", kind, "number");
     only_for(errs, body, "target_count", kind, "count");
     only_for(errs, body, "result", kind, "binary");
+    only_for(errs, body, "source", kind, "number");
 }
 
 }  // namespace
@@ -148,11 +217,13 @@ void GoalsController::listGoals(const HttpRequestPtr& req, Callback&& callback) 
     }
     with_repo_errors(callback, "goals.list", [&] {
         GoalRepository repo;
+        Sources sources = sources_of(req, owner);
         const auto counts = repo.task_counts(owner);
         const auto points = repo.checkin_points_all(owner);
+        const json list = repo.list(owner, status);
         json rows = json::array();
-        for (const auto& row : repo.list(owner, status)) {
-            rows.push_back(with_progress(repo, owner, row, *date, counts, &points));
+        for (const auto& row : list) {
+            rows.push_back(with_progress(repo, sources, owner, row, *date, counts, &points));
         }
         callback(Response::ok(json{{"data", rows}, {"count", rows.size()}}));
     });
@@ -175,6 +246,7 @@ void GoalsController::createGoal(const HttpRequestPtr& req, Callback&& callback)
     date_field(errs, body, "start_date");
     const std::string kind = Validation::opt_string(body, "kind").value_or("");
     goal_fields(errs, body, kind);
+    const auto source = source_field(errs, body);
     if (body.contains("status") || body.contains("result")) {
         errs.add("status", "not_allowed", "a new goal is active and has no result");
     }
@@ -206,14 +278,19 @@ void GoalsController::createGoal(const HttpRequestPtr& req, Callback&& callback)
     in.start_value = opt_number(body, "start_value");
     in.target_value = opt_number(body, "target_value");
     in.target_count = opt_int(body, "target_count");
+    in.source = source;
     const auto date = at_date(req, callback);
     if (!date) {
         return;
     }
     with_repo_errors(callback, "goals.create", [&] {
+        if (!source_is_yours(owner, in.source, callback)) {
+            return;
+        }
         GoalRepository repo;
+        Sources sources = sources_of(req, owner);
         const json row = repo.create(owner, in);
-        callback(Response::created(json{{"data", with_progress(repo, owner, row, *date, {})}}));
+        callback(Response::created(json{{"data", with_progress(repo, sources, owner, row, *date, {})}}));
     });
 }
 
@@ -233,7 +310,8 @@ void GoalsController::getGoal(const HttpRequestPtr& req, Callback&& callback, co
             callback(ErrorResponse::not_found("goal"));
             return;
         }
-        json goal = with_progress(repo, owner, *row, *date, repo.task_counts(owner));
+        Sources sources = sources_of(req, owner);
+        json goal = with_progress(repo, sources, owner, *row, *date, repo.task_counts(owner), nullptr, true);
         goal["checkins"] = repo.checkins(owner, id);
         goal["milestones"] = repo.milestones(owner, id);
         // Sections with their tasks; the tasks without a section apart.
@@ -288,6 +366,7 @@ void GoalsController::updateGoal(const HttpRequestPtr& req, Callback&& callback,
             errs.add("start_date", "immutable", "the start of a goal does not change");
         }
         goal_fields(errs, body, kind);
+        const auto source = source_field(errs, body);
         // A binary goal is done exactly when it has a result (spec §3.2): no closing without
         // one, no reopening with one.
         if (kind == "binary" && body.contains("status") && body["status"].is_string()) {
@@ -308,6 +387,9 @@ void GoalsController::updateGoal(const HttpRequestPtr& req, Callback&& callback,
             callback(Validation::response_400(errs));
             return;
         }
+        if (!source_is_yours(owner, source, callback)) {
+            return;
+        }
         GoalRepository::Patch p;
         p.title = Validation::opt_string(body, "title");
         p.area = Validation::opt_string(body, "area");
@@ -319,8 +401,12 @@ void GoalsController::updateGoal(const HttpRequestPtr& req, Callback&& callback,
         p.target_value = opt_number(body, "target_value");
         p.target_count = opt_int(body, "target_count");
         p.result = Validation::opt_string(body, "result");
+        p.set_source = body.contains("source");
+        p.source = source;
         const json row = repo.update(owner, id, p);
-        callback(Response::ok(json{{"data", with_progress(repo, owner, row, *date, repo.task_counts(owner))}}));
+        Sources sources = sources_of(req, owner);
+        callback(
+            Response::ok(json{{"data", with_progress(repo, sources, owner, row, *date, repo.task_counts(owner))}}));
     });
 }
 
