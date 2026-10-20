@@ -225,12 +225,14 @@ api -> repositories/travel
 api -> travel
 api -> travel/now
 habits -> utils
+habits -> metrics
 habits/now -> habits
 habits/now -> repositories/habits
 repositories/habits -> database
 repositories/habits -> habits
 repositories/habits -> repositories
-repositories/habits -> repositories/fitness
+repositories/habits -> metrics
+repositories/habits -> repositories/metrics
 api -> habits
 api -> habits/now
 api -> repositories/habits

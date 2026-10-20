@@ -19766,7 +19766,7 @@ export interface paths {
         };
         /**
          * Each active habit over a range of days with its streak
-         * @description A day is done by a manual tick or by its source meeting the goal; the auto values come from Mi Fitness and Training on read. The streak and the best count from today in tz over the stored ticks and the last 365 days of data.
+         * @description A day is done by a manual tick or by its source meeting the goal; the auto values come from the source series of the metrics catalog on read, each distinct source read once. The streak and the best count from today in tz over the stored ticks and the last 365 days of data.
          */
         get: {
             parameters: {
@@ -19774,7 +19774,7 @@ export interface paths {
                     from: string;
                     /** @description At most 61 days after from */
                     to: string;
-                    /** @description IANA zone of the caller: today and the local day of a Training session and of a weigh-in */
+                    /** @description IANA zone of the caller: today and the local day of every timestamped series (a night by its end, a session, a weigh-in) */
                     tz?: string;
                 };
                 header?: never;
@@ -20782,14 +20782,16 @@ export interface components {
             /** @enum {string} */
             schedule: "daily" | "weekly";
             per_week: number | null;
-            /** @description Hours for sleep, steps for steps, kcal for active_kcal; shown only for manual; null for workout and weight */
+            /** @description In the unit of the source series (GET /api/v1/metrics: hours for fitness:sleep, the currency for money); shown only for manual. Null on a presence source: any value of the day counts */
             goal: number | null;
             unit: string;
+            /** @description What ticks the day besides a manual tick: manual, or a catalog id of GET /api/v1/metrics (fitness:steps, food:kcal, workout:sessions, money:expense:KZT, habits:<habit uuid>...), compared to the goal by direction. The names of 1.33 come back as their catalog ids */
+            source: string;
             /**
-             * @description What ticks the day besides a manual tick: sleep, steps and active_kcal from Mi Fitness against the goal, workout a finished Training session, weight any weigh-in on the Mi scales that day
+             * @description How the source value of a day compares to the goal
              * @enum {string}
              */
-            source: "manual" | "sleep" | "steps" | "active_kcal" | "workout" | "weight";
+            direction: "at_least" | "at_most";
             /** @description Manual only: the amount a day must reach (in unit) to count as done; null counts any tick */
             target: number | null;
             position: number;
@@ -20804,15 +20806,20 @@ export interface components {
             schedule: "daily" | "weekly";
             /** @description Required for weekly; not allowed for daily */
             per_week?: number | null;
-            /** @description Required for sleep (hours, at most 24), steps and active_kcal; dropped for workout; refused for weight (400 on goal) */
+            /** @description In the unit of the source series. Required (400 missing on goal) for a source that is not presence (sums and averages: fitness:steps, food:kcal, fitness:sleep in hours at most 24...); optional for a presence source (a weigh-in, a session, a mood): without it any value of the day counts. Dropped for the old name workout */
             goal?: number | null;
             unit?: string;
             /**
-             * @description weight: a day is done when the Mi scales took a record in that local day by tz of the read (as a Training session), whatever it weighs; it takes no goal
+             * @description manual or a catalog id of GET /api/v1/metrics; the names of 1.33 (sleep, steps, active_kcal, workout, weight) are taken and stored as fitness:sleep, fitness:steps, fitness:active_kcal, workout:sessions, fitness:weight. 400 on source: invalid (names nothing), not_yours (a currency, a category or a habit that is not the caller's), self (the habit itself), not_manual (a habit with a source of its own). A series the caller cannot read now is taken and shows no_data
              * @default manual
+             */
+            source: string;
+            /**
+             * @description at_most only with a source (400 not_allowed on direction for manual)
+             * @default at_least
              * @enum {string}
              */
-            source: "manual" | "sleep" | "steps" | "active_kcal" | "workout" | "weight";
+            direction: "at_least" | "at_most";
             /** @description Manual only: a day is done when the value of its tick (the sum of what was added) reaches it */
             target?: number | null;
         };
@@ -20822,7 +20829,7 @@ export interface components {
             done: boolean;
             /** @description Ticked by hand */
             manual: boolean;
-            /** @description The value of the tick, else the source value of the day (sleep minutes, steps, kcal, sessions, kg of the latest weigh-in) */
+            /** @description The value of the tick, else the source value of the day in the unit of its series (sleep hours, steps, kcal, sessions, kg of the latest weigh-in) */
             value: number | null;
         };
         HabitDays: components["schemas"]["Habit"] & {
@@ -20832,7 +20839,7 @@ export interface components {
             best: number;
             /** @description Weekly only: done days in the week of to */
             week_done: number | null;
-            /** @description The source has no data for the caller (no Mi account, fitness or Training off) */
+            /** @description The caller cannot read the source series (its module off, no fitness read permission, no Mi account, a habit or a currency no longer theirs) */
             no_data: boolean;
         };
         HabitCheck: {

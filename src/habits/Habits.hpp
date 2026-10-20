@@ -1,14 +1,15 @@
 /**
  * @file Habits.hpp
- * @brief The habit evaluation (docs/superpowers/specs/2026-10-14-habits-design.md).
+ * @brief The habit evaluation (docs/superpowers/specs/2026-10-14-habits-design.md,
+ *        sources from docs/superpowers/specs/2026-10-20-metric-sources-design.md).
  *        Pure: no database, no clock; "today" is always passed in.
  *
  *        A day is done when it has a manual check (with a daily target, one
  *        whose value, the sum of the day, reaches the target) or the habit's
- *        source meets the goal that day: sleep minutes >= goal x 60, steps >=
- *        goal, active kcal >= goal, a workout when a session finished that
- *        local day, a weigh-in when the Mi scales took a record that local
- *        day. A daily habit streaks over consecutive done days ending
+ *        source, a series of the metrics catalog (metrics/Catalog.hpp), meets
+ *        it that day: the value at least or at most the goal, or, for a
+ *        presence entry without a goal (a weigh-in, a session, a mood), any
+ *        value at all. A daily habit streaks over consecutive done days ending
  *        yesterday, plus today when today is done; a weekly habit (Monday to Sunday) over
  *        consecutive weeks with at least per_week done days, ending last week,
  *        plus this week when met. An open today or week never breaks a streak.
@@ -31,6 +32,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "metrics/Catalog.hpp"
 #include "utils/Date.hpp"
 
 namespace Habits {
@@ -55,7 +57,8 @@ inline std::string text_of(Day d) {
 }
 
 enum class Schedule { Daily, Weekly };
-enum class Source { Manual, Sleep, Steps, ActiveKcal, Workout, Weight };
+/// How a source's value of the day compares to the goal.
+enum class Direction { AtLeast, AtMost };
 
 inline std::optional<Schedule> schedule_of(std::string_view s) {
     if (s == "daily") {
@@ -67,60 +70,72 @@ inline std::optional<Schedule> schedule_of(std::string_view s) {
     return std::nullopt;
 }
 
-inline std::optional<Source> source_of(std::string_view s) {
-    if (s == "manual") {
-        return Source::Manual;
+inline std::optional<Direction> direction_of(std::string_view s) {
+    if (s == "at_least") {
+        return Direction::AtLeast;
     }
-    if (s == "sleep") {
-        return Source::Sleep;
-    }
-    if (s == "steps") {
-        return Source::Steps;
-    }
-    if (s == "active_kcal") {
-        return Source::ActiveKcal;
-    }
-    if (s == "workout") {
-        return Source::Workout;
-    }
-    if (s == "weight") {
-        return Source::Weight;
+    if (s == "at_most") {
+        return Direction::AtMost;
     }
     return std::nullopt;
 }
 
-/// Whether the source reads the Mi Fitness tables (as opposed to Training or nothing).
-inline bool from_health(Source s) {
-    return s == Source::Sleep || s == Source::Steps || s == Source::ActiveKcal || s == Source::Weight;
+/// The catalog series a stored or sent source names: nullopt for "manual" and for a
+/// value that names nothing. Metrics::parse maps the five sources of 1.33 (sleep,
+/// steps, active_kcal, workout, weight) to their catalog ids.
+inline std::optional<Metrics::Ref> source_of(std::string_view s) {
+    if (s == "manual") {
+        return std::nullopt;
+    }
+    return Metrics::parse(s);
 }
 
 struct Habit {
     Schedule schedule = Schedule::Daily;
     int per_week = 0;  // weekly only, 1..7
     std::optional<double> goal;
-    Source source = Source::Manual;
+    /// The catalog series that ticks the day besides a manual tick; nullopt for a habit ticked by hand.
+    std::optional<Metrics::Ref> source;
+    Direction direction = Direction::AtLeast;
     /// A hand-ticked habit's daily target: a check counts only when its value reaches it.
     std::optional<double> target;
 };
 
-/// Whether a day's source value meets the goal. Sleep values are minutes, the goal hours;
-/// a workout value is the count of sessions and ignores the goal; a weigh-in is met by
-/// being there at all, whatever it weighs (kNoNumber included).
+/// The value of a day that has a record but no number in it: a weigh-in whose
+/// weight_kg is null, a tick by hand without a value. Without a goal a presence
+/// source counts the day (meets() looks at the record, not the number); against a
+/// goal it does not. day_state() reports its value as null.
+inline constexpr double kNoNumber = std::numeric_limits<double>::quiet_NaN();
+
+/**
+ * Whether a day's source value meets the habit. With a goal the value compares to
+ * it by the direction, in the catalog's unit (sleep in hours). Without a goal a
+ * presence entry of the catalog is met by being there at all; any other entry is
+ * never met (the API refuses such a habit).
+ */
 inline bool meets(const Habit& h, double value) {
-    switch (h.source) {
-        case Source::Manual:
-            return false;
-        case Source::Workout:
-            return value >= 1;
-        case Source::Weight:
-            return true;
-        case Source::Sleep:
-            return h.goal.has_value() && value >= *h.goal * 60.0;
-        case Source::Steps:
-        case Source::ActiveKcal:
-            return h.goal.has_value() && value >= *h.goal;
+    if (!h.source || h.source->def == nullptr) {
+        return false;
     }
-    return false;
+    if (!h.goal) {
+        return h.source->def->presence;
+    }
+    if (std::isnan(value)) {
+        return false;
+    }
+    return h.direction == Direction::AtMost ? value <= *h.goal : value >= *h.goal;
+}
+
+/// The catalog ids @p habits read, each once, sorted: habits sharing a source
+/// have it read once per window.
+inline std::vector<std::string> distinct_sources(const std::vector<Habit>& habits) {
+    std::set<std::string> ids;
+    for (const auto& h : habits) {
+        if (h.source && h.source->def != nullptr) {
+            ids.insert(Metrics::canonical(*h.source));
+        }
+    }
+    return {ids.begin(), ids.end()};
 }
 
 /// Manual checks: day -> the optional value of the check.
@@ -133,11 +148,6 @@ inline bool check_counts(const Habit& h, const std::optional<double>& value) {
 }
 /// Source values: day -> the value of the habit's source that day.
 using Values = std::map<Day, double>;
-
-/// The value of a day that has a record but no number in it: a weigh-in whose
-/// weight_kg is null. The day counts (meets() looks at the record, not the number)
-/// and day_state() reports its value as null.
-inline constexpr double kNoNumber = std::numeric_limits<double>::quiet_NaN();
 
 struct DayState {
     bool done = false;
@@ -251,103 +261,6 @@ inline int best(const Habit& h, const std::set<Day>& done) {
         return detail::longest_run(done, std::chrono::days{1});
     }
     return detail::longest_run(detail::met_weeks(done, h.per_week), std::chrono::days{7});
-}
-
-// ── sources on the local day ────────────────────────────────────────────────
-
-/// The local day of a UTC instant "YYYY-MM-DDTHH:MM:SS..." shifted by @p offset_seconds.
-inline Day local_day(std::string_view utc, long long offset_seconds) {
-    using namespace std::chrono;
-    const auto num = [&](std::size_t at) { return (utc[at] - '0') * 10 + (utc[at + 1] - '0'); };
-    const sys_seconds at =
-        Day{Utils::Date::parse_ymd(utc.substr(0, 10))} + hours{num(11)} + minutes{num(14)} + seconds{num(17)};
-    return floor<days>(at + seconds{offset_seconds});
-}
-
-/// Asleep minutes by the local day the night ends on (the region zone, @p offset_seconds),
-/// as /today picks it: naps left out, the latest ending night of the day kept.
-/// @p rows are HealthReadRepository::sleep rows.
-inline Values sleep_by_local_day(const json& rows, long long offset_seconds) {
-    std::map<Day, std::pair<std::string, double>> latest;
-    for (const auto& r : rows) {
-        const bool nap = r.contains("is_nap") && r["is_nap"].is_boolean() && r["is_nap"].get<bool>();
-        if (nap || !r.contains("end_at") || !r["end_at"].is_string() || !r.contains("time_asleep_minutes") ||
-            !r["time_asleep_minutes"].is_number()) {
-            continue;
-        }
-        const std::string end = r["end_at"].get<std::string>();
-        if (end.size() < 19) {
-            continue;
-        }
-        const Day day = local_day(end, offset_seconds);
-        const auto it = latest.find(day);
-        if (it == latest.end() || end > it->second.first) {
-            latest[day] = {end, r["time_asleep_minutes"].get<double>()};
-        }
-    }
-    Values out;
-    for (const auto& [day, v] : latest) {
-        out[day] = v.second;
-    }
-    return out;
-}
-
-/// A daily activity field (steps, active_kcal) by its date; @p rows are
-/// HealthReadRepository::daily_activity rows.
-inline Values activity_by_day(const json& rows, const char* field) {
-    Values out;
-    for (const auto& r : rows) {
-        if (r.contains("date") && r["date"].is_string() && r.contains(field) && r[field].is_number()) {
-            out[day_of(r["date"].get<std::string>())] = r[field].get<double>();
-        }
-    }
-    return out;
-}
-
-/// A finished Training session: its UTC end and the zone's offset at that instant.
-struct Session {
-    std::string finished_at;  // "YYYY-MM-DDTHH:MM:SSZ"
-    long long offset_seconds = 0;
-};
-
-/// Sessions by the local day they finished on.
-inline Values workouts_by_local_day(const std::vector<Session>& sessions) {
-    Values out;
-    for (const auto& s : sessions) {
-        out[local_day(s.finished_at, s.offset_seconds)] += 1;
-    }
-    return out;
-}
-
-/// A weigh-in of the Mi scales: its UTC instant, the caller's zone offset at that
-/// instant, and its weight (nullopt when the record has none).
-struct WeighIn {
-    std::string taken_at;  // "YYYY-MM-DDTHH:MM:SSZ"
-    long long offset_seconds = 0;
-    std::optional<double> weight_kg;
-};
-
-/// Weigh-ins by the local day they were taken on, in the caller's zone (as workout
-/// sessions): the weight_kg of the day's latest record, kNoNumber when that record has
-/// none.
-inline Values weight_by_local_day(const std::vector<WeighIn>& weigh_ins) {
-    std::map<Day, std::pair<std::string, double>> latest;
-    for (const auto& w : weigh_ins) {
-        if (w.taken_at.size() < 19) {
-            continue;
-        }
-        const Day day = local_day(w.taken_at, w.offset_seconds);
-        const auto it = latest.find(day);
-        // Weigh-ins come oldest first: a later one of the same instant wins as well.
-        if (it == latest.end() || w.taken_at >= it->second.first) {
-            latest[day] = {w.taken_at, w.weight_kg.value_or(kNoNumber)};
-        }
-    }
-    Values out;
-    for (const auto& [day, v] : latest) {
-        out[day] = v.second;
-    }
-    return out;
 }
 
 // ── the Now plate ───────────────────────────────────────────────────────────

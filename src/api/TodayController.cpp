@@ -36,6 +36,7 @@
 #include "now/Weather.hpp"
 #include "repositories/Zones.hpp"
 #include "repositories/goals/GoalRepository.hpp"
+#include "repositories/metrics/Series.hpp"
 #include "repositories/now/FocusRepository.hpp"
 #include "repositories/now/NoteRepository.hpp"
 #include "repositories/now/SettingsRepository.hpp"
@@ -118,7 +119,10 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
              Core::habits_enabled(),
              [&] {
                  return ::Habits::digest(
-                     owner, date, tz, Core::fitness_enabled() && fitness_read, Core::workout_enabled());
+                     owner,
+                     date,
+                     tz,
+                     Repositories::Metrics::access_of(owner, fitness_read ? Domain::Permission::kFitnessRead : 0U));
              }},
         };
         const auto focus = FocusRepository().get(owner, date);

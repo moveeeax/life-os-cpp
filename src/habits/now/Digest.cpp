@@ -14,10 +14,11 @@
 
 namespace Habits {
 
-nlohmann::json digest(
-    const std::string& owner, const std::string& day, const std::string& tz, bool health_read, bool workout_read) {
+nlohmann::json digest(const std::string& owner,
+                      const std::string& day,
+                      const std::string& tz,
+                      const Repositories::Metrics::Access& access) {
     const auto today = day_of(day);
-    const Repositories::Habits::Access access{health_read, workout_read};
     const auto evaluated =
         Repositories::Habits::evaluate(owner, monday_of(today), today, today, tz, access, /*history=*/false);
     if (evaluated.empty()) {

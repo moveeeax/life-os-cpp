@@ -7,30 +7,36 @@ import type { Habit, HabitDays, HabitInput, MoodCheckin, MoodInput, MoodTag } fr
 
 export type * from './types';
 
+/** "manual" or a catalog id of GET /api/v1/metrics ("fitness:steps", "food:kcal"). */
 export type Source = Habit['source'];
 
-/** What ticks a habit, as the form offers it. */
+/** What ticks a habit, as the form offers it (the catalog ids the API answers with). */
 export const SOURCE_LABEL: Record<Source, string> = {
   manual: 'By hand',
-  sleep: 'Sleep from Mi',
-  steps: 'Steps from Mi',
-  active_kcal: 'Active kcal from Mi',
-  workout: 'Training session',
-  weight: 'Weigh-in on the Mi scales',
+  'fitness:sleep': 'Sleep from Mi',
+  'fitness:steps': 'Steps from Mi',
+  'fitness:active_kcal': 'Active kcal from Mi',
+  'workout:sessions': 'Training session',
+  'fitness:weight': 'Weigh-in on the Mi scales',
 };
 
 /** The unit a source's goal is in. */
 export const GOAL_UNIT: Record<Source, string> = {
   manual: '',
-  sleep: 'h',
-  steps: 'steps',
-  active_kcal: 'kcal',
-  workout: '',
-  weight: '',
+  'fitness:sleep': 'h',
+  'fitness:steps': 'steps',
+  'fitness:active_kcal': 'kcal',
+  'workout:sessions': '',
+  'fitness:weight': '',
 };
 
 /** Whether a source ticks the day by being there at all (a session, a weigh-in): it takes no goal. */
-export const takesNoGoal = (s: Source): boolean => s === 'workout' || s === 'weight';
+export const takesNoGoal = (s: Source): boolean =>
+  s === 'workout:sessions' || s === 'fitness:weight';
+
+/** Whether a source needs a goal to tick anything (a sum or an average). */
+export const needsGoal = (s: Source): boolean =>
+  s === 'fitness:sleep' || s === 'fitness:steps' || s === 'fitness:active_kcal';
 
 const n0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const n1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
@@ -50,7 +56,7 @@ export function subline(
 ) {
   const when = scheduleWords(h);
   if (h.source === 'manual') return when;
-  const from = h.source === 'workout' ? 'Training' : 'Mi';
+  const from = h.source.startsWith('workout:') ? 'Training' : 'Mi';
   return h.no_data ? `no data from ${from} · ${when}` : `from ${from} · ${when}`;
 }
 
@@ -65,17 +71,18 @@ export function splitNumbers(text: string): { text: string; num: boolean }[] {
 /** A day's value in the habit's own terms: "7 h 42 m", "9,312", "512 kcal", "2 sessions", "71.8 kg", "45 min". */
 export function formatValue(h: Pick<Habit, 'source' | 'unit'>, value: number): string {
   switch (h.source) {
-    case 'sleep': {
-      const m = Math.round(value);
+    case 'fitness:sleep': {
+      // The API gives sleep in hours.
+      const m = Math.round(value * 60);
       return m < 60 ? `${m} m` : `${Math.floor(m / 60)} h ${m % 60} m`;
     }
-    case 'steps':
+    case 'fitness:steps':
       return n0.format(value);
-    case 'active_kcal':
+    case 'fitness:active_kcal':
       return `${n0.format(value)} kcal`;
-    case 'workout':
+    case 'workout:sessions':
       return value === 1 ? '1 session' : `${n0.format(value)} sessions`;
-    case 'weight':
+    case 'fitness:weight':
       return `${n1.format(value)} kg`;
     default:
       return h.unit ? `${n1.format(value)} ${h.unit}` : n1.format(value);
@@ -85,9 +92,9 @@ export function formatValue(h: Pick<Habit, 'source' | 'unit'>, value: number): s
 /** The goal in words: "8 h", "8,000 steps", "45 min"; none for a workout or a weigh-in. */
 export function goalLine(h: Pick<Habit, 'source' | 'goal' | 'unit'>): string | null {
   if (h.goal == null || takesNoGoal(h.source)) return null;
-  if (h.source === 'sleep') return `${n1.format(h.goal)} h`;
-  if (h.source === 'steps') return `${n0.format(h.goal)} steps`;
-  if (h.source === 'active_kcal') return `${n0.format(h.goal)} kcal`;
+  if (h.source === 'fitness:sleep') return `${n1.format(h.goal)} h`;
+  if (h.source === 'fitness:steps') return `${n0.format(h.goal)} steps`;
+  if (h.source === 'fitness:active_kcal') return `${n0.format(h.goal)} kcal`;
   return h.unit ? `${n1.format(h.goal)} ${h.unit}` : n1.format(h.goal);
 }
 
@@ -192,6 +199,8 @@ export interface HabitForm {
   unit: string;
   source: Source;
   target: string;
+  /** Kept as the habit has it: the form offers no choice yet. */
+  direction: Habit['direction'];
 }
 
 export function habitForm(h?: Habit): HabitForm {
@@ -203,6 +212,7 @@ export function habitForm(h?: Habit): HabitForm {
     unit: h?.unit ?? '',
     source: h?.source ?? 'manual',
     target: h?.target != null ? String(h.target) : '',
+    direction: h?.direction ?? 'at_least',
   };
 }
 
@@ -220,18 +230,19 @@ export function habitBody(f: HabitForm): HabitInput {
     unit: f.source === 'manual' ? f.unit.trim() : '',
     source: f.source,
     target: f.source === 'manual' && f.target.trim() !== '' ? Number(f.target) : null,
+    // Only a habit with a source compares at most.
+    direction: f.source === 'manual' ? 'at_least' : f.direction,
   };
 }
 
 /** What is wrong with the form before it is sent, or null. */
 export function habitProblem(f: HabitForm): string | null {
   if (f.name.trim() === '') return 'Give the habit a name.';
-  const needsGoal = f.source === 'sleep' || f.source === 'steps' || f.source === 'active_kcal';
-  if (needsGoal && f.goal.trim() === '') return 'A source from Mi needs a goal.';
+  if (needsGoal(f.source) && f.goal.trim() === '') return 'A source from Mi needs a goal.';
   if (f.goal.trim() !== '' && !takesNoGoal(f.source)) {
     const g = Number(f.goal);
     if (!Number.isFinite(g) || g <= 0) return 'The goal is a number above zero.';
-    if (f.source === 'sleep' && g > 24) return 'A sleep goal is in hours, at most 24.';
+    if (f.source === 'fitness:sleep' && g > 24) return 'A sleep goal is in hours, at most 24.';
   }
   if (f.source === 'manual' && f.target.trim() !== '') {
     const t = Number(f.target);

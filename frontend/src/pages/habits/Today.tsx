@@ -156,7 +156,7 @@ function HabitRow({
       {goal && (
         <span>
           Goal <Num>{goal}</Num>
-          {h.source === 'sleep' ? ' of sleep' : ''}, <Numbered text={scheduleWords(h)} />
+          {h.source === 'fitness:sleep' ? ' of sleep' : ''}, <Numbered text={scheduleWords(h)} />
         </span>
       )}
       <Strip h={h} today={today} />

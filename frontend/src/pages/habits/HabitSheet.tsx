@@ -7,6 +7,7 @@ import {
   habitBody,
   habitForm,
   habitProblem,
+  needsGoal,
   takesNoGoal,
   type Habit,
   type HabitForm,
@@ -23,8 +24,8 @@ export function HabitSheet({ habit, onClose }: { habit?: Habit; onClose: () => v
   const save = useSaveHabit(habit?.id ?? null, onClose);
   const set = (k: keyof HabitForm) => (e: { target: { value: string } }) =>
     setF({ ...f, [k]: e.target.value });
-  const needsGoal = f.source === 'sleep' || f.source === 'steps' || f.source === 'active_kcal';
-  const unit = GOAL_UNIT[f.source];
+  const goalNeeded = needsGoal(f.source);
+  const unit = GOAL_UNIT[f.source] ?? '';
   return (
     <Sheet title={habit ? 'Edit the habit' : 'New habit'} onClose={onClose} width={460}>
       <form
@@ -91,13 +92,15 @@ export function HabitSheet({ habit, onClose }: { habit?: Habit; onClose: () => v
           <div className="k-fields">
             <label className="k-field">
               <span>
-                {needsGoal ? 'Goal' : 'Goal (optional)'}
+                {goalNeeded ? 'Goal' : 'Goal (optional)'}
                 {unit ? `, ${unit}` : ''}
               </span>
               <input
                 inputMode="decimal"
-                required={needsGoal}
-                placeholder={f.source === 'sleep' ? '8' : f.source === 'steps' ? '8000' : ''}
+                required={goalNeeded}
+                placeholder={
+                  f.source === 'fitness:sleep' ? '8' : f.source === 'fitness:steps' ? '8000' : ''
+                }
                 value={f.goal}
                 onChange={set('goal')}
               />

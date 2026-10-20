@@ -1,15 +1,18 @@
 /**
  * @file Days.hpp
- * @brief The habits evaluated over a range of days: the manual ticks, the Mi
- *        Fitness values (sleep, steps, active kcal, weigh-ins) and the Training sessions
- *        read for the range, the auto values computed on read. Shared by
- *        GET /api/v1/habits/days and the habits part of GET /api/v1/today.
+ * @brief The habits evaluated over a range of days: the manual ticks and the
+ *        series of the metrics catalog the habits read (repositories/metrics/
+ *        Series.hpp, each distinct source once per window), the auto values
+ *        computed on read. Shared by GET /api/v1/habits/days and the habits
+ *        part of GET /api/v1/today.
  */
 
 #pragma once
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
+#include <map>
 #include <optional>
 #include <string>
 #include <utility>
@@ -18,18 +21,11 @@
 #include <nlohmann/json.hpp>
 
 #include "habits/Habits.hpp"
-#include "repositories/fitness/HealthReadRepository.hpp"
-#include "repositories/fitness/MiAccountRepository.hpp"
+#include "metrics/Catalog.hpp"
 #include "repositories/habits/HabitRepository.hpp"
+#include "repositories/metrics/Series.hpp"
 
 namespace Repositories::Habits {
-
-/// What the caller may read: the Mi Fitness tables (the fitness module on and the
-/// fitness read permission) and the Training sessions (the workout module on).
-struct Access {
-    bool health = false;
-    bool workout = false;
-};
 
 /// How far back the auto values reach for the streaks.
 inline constexpr int kHistoryDays = 365;
@@ -44,10 +40,6 @@ struct Evaluated {
     bool no_data = false;
 };
 
-/// Rows one read of a health table takes: a window is at most a year and a range
-/// long (kWindowsMaxDays), a night a day with room for naps.
-inline constexpr long kRowsPerWindow = 2000;
-
 /// The longest window windows() returns: the history year plus a 62-day range.
 inline constexpr int kWindowsMaxDays = kHistoryDays + 1 + 62;
 
@@ -56,7 +48,7 @@ inline constexpr int kWindowsMaxDays = kHistoryDays + 1 + 62;
  * days the streak needs (the last kHistoryDays up to @p today with @p history,
  * else @p today alone). Overlapping or adjacent windows become one. A range far
  * from today is read on its own instead of as one window stretching to today,
- * whose rows would pass the cap of a read and cut the newest days.
+ * which would read years of rows nobody shows.
  */
 inline std::vector<std::pair<::Habits::Day, ::Habits::Day>> windows(::Habits::Day from,
                                                                     ::Habits::Day to,
@@ -80,7 +72,11 @@ inline ::Habits::Habit model_of(const nlohmann::json& row) {
     h.schedule = ::Habits::schedule_of(row.at("schedule").get<std::string>()).value_or(::Habits::Schedule::Daily);
     h.per_week = row.at("per_week").is_number() ? row.at("per_week").get<int>() : 0;
     h.goal = row.at("goal").is_number() ? std::optional<double>(row.at("goal").get<double>()) : std::nullopt;
-    h.source = ::Habits::source_of(row.at("source").get<std::string>()).value_or(::Habits::Source::Manual);
+    h.source = ::Habits::source_of(row.at("source").get<std::string>());
+    h.direction =
+        row.contains("direction") && row.at("direction").is_string()
+            ? ::Habits::direction_of(row.at("direction").get<std::string>()).value_or(::Habits::Direction::AtLeast)
+            : ::Habits::Direction::AtLeast;
     h.target = row.contains("target") && row.at("target").is_number()
                    ? std::optional<double>(row.at("target").get<double>())
                    : std::nullopt;
@@ -91,15 +87,17 @@ inline ::Habits::Habit model_of(const nlohmann::json& row) {
  * The owner's active habits over [@p from, @p to] on @p today (the caller's local
  * day in @p tz). With @p history the sources are read for the last 365 days too, so
  * the streak and the best are whole; without it only the range is read (the plate).
+ * A source the caller cannot read (@p access: the module off, no fitness read
+ * permission, no Mi account, a habit or a category that is not theirs) gives no
+ * values and no_data; the ticks by hand still count.
  */
 inline std::vector<Evaluated> evaluate(const std::string& owner,
                                        ::Habits::Day from,
                                        ::Habits::Day to,
                                        ::Habits::Day today,
                                        const std::string& tz,
-                                       const Access& access,
+                                       const Repositories::Metrics::Access& access,
                                        bool history) {
-    using ::Habits::Source;
     using std::chrono::days;
     HabitRepository repo;
     const auto rows = repo.list(owner, false);
@@ -107,73 +105,34 @@ inline std::vector<Evaluated> evaluate(const std::string& owner,
     if (rows.empty()) {
         return out;
     }
-    bool wants_health = false;
-    bool wants_workout = false;
-    bool wants_weight = false;
+    std::vector<::Habits::Habit> models;
+    models.reserve(rows.size());
     for (const auto& row : rows) {
-        const auto m = model_of(row);
-        wants_health = wants_health || ::Habits::from_health(m.source);
-        wants_workout = wants_workout || m.source == Source::Workout;
-        wants_weight = wants_weight || m.source == Source::Weight;
+        models.push_back(model_of(row));
     }
-    // Each window's values, kept to its own days: the sleep read is padded by a day
-    // on each side, and a padding day holds only part of its nights.
-    const auto keep =
-        [](::Habits::Values& into, const ::Habits::Values& from_window, ::Habits::Day lo, ::Habits::Day hi) {
-            for (const auto& [day, value] : from_window) {
-                if (day >= lo && day <= hi) {
-                    into.emplace(day, value);
-                }
-            }
-        };
 
-    ::Habits::Values sleep;
-    ::Habits::Values steps;
-    ::Habits::Values kcal;
-    ::Habits::Values workouts;
-    ::Habits::Values weight;
-    bool health_linked = false;
+    // Each distinct source once per window, its values kept to the window's own days.
     const auto read_windows = windows(from, to, today, history);
-    if (wants_health && access.health) {
-        const std::string xiaomi = MiAccountRepository("").xiaomi_id_of(owner).value_or("");
-        health_linked = !xiaomi.empty();
-        if (health_linked) {
-            HealthReadRepository health(xiaomi);
-            const long long offset = region_offset_seconds(owner);
-            for (const auto& [lo, hi] : read_windows) {
-                // Sleep rows are filed by the UTC day of their end; the region day may start hours earlier.
-                keep(sleep,
-                     ::Habits::sleep_by_local_day(
-                         health
-                             .sleep(::Habits::text_of(lo - days{1}), ::Habits::text_of(hi + days{1}), kRowsPerWindow, 0)
-                             .rows,
-                         offset),
-                     lo,
-                     hi);
-                const auto activity =
-                    health.daily_activity(::Habits::text_of(lo), ::Habits::text_of(hi), kRowsPerWindow, 0).rows;
-                keep(steps, ::Habits::activity_by_day(activity, "steps"), lo, hi);
-                keep(kcal, ::Habits::activity_by_day(activity, "active_kcal"), lo, hi);
-                if (wants_weight) {
-                    // Weigh-ins land on the caller's local day (tz), as Training sessions do.
-                    keep(weight,
-                         ::Habits::weight_by_local_day(
-                             repo.weigh_ins(xiaomi, ::Habits::text_of(lo), ::Habits::text_of(hi), tz)),
-                         lo,
-                         hi);
+    std::map<std::string, Repositories::Metrics::Series> series;
+    for (const auto& id : ::Habits::distinct_sources(models)) {
+        const auto ref = ::Metrics::parse(id);
+        Repositories::Metrics::Series s;
+        for (const auto& [lo, hi] : read_windows) {
+            const auto window = Repositories::Metrics::read(owner, *ref, lo, hi, tz, access);
+            s.why = window.why;
+            if (window.why != Repositories::Metrics::Why::Ok) {
+                s.values.clear();
+                break;
+            }
+            for (const auto& [day, value] : window.values) {
+                if (day >= lo && day <= hi) {
+                    s.values.emplace(day, value);
                 }
             }
         }
+        series.emplace(id, std::move(s));
     }
-    if (wants_workout && access.workout) {
-        for (const auto& [lo, hi] : read_windows) {
-            keep(
-                workouts,
-                ::Habits::workouts_by_local_day(repo.sessions(owner, ::Habits::text_of(lo), ::Habits::text_of(hi), tz)),
-                lo,
-                hi);
-        }
-    }
+
     // The ticks are read for the same span as the sources, not for all time: /today asks every
     // load for this week only, and the streak and the best reach back kHistoryDays at most.
     ::Habits::Day first = read_windows.front().first;
@@ -186,32 +145,17 @@ inline std::vector<Evaluated> evaluate(const std::string& owner,
     static const ::Habits::Checks kNoChecks;
     static const ::Habits::Values kNoValues;
 
-    for (const auto& row : rows) {
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        const auto& row = rows[i];
         Evaluated e;
         e.habit = row;
-        e.model = model_of(row);
+        e.model = models[i];
         const ::Habits::Values* values = &kNoValues;
-        switch (e.model.source) {
-            case Source::Sleep:
-                values = &sleep;
-                break;
-            case Source::Steps:
-                values = &steps;
-                break;
-            case Source::ActiveKcal:
-                values = &kcal;
-                break;
-            case Source::Workout:
-                values = &workouts;
-                break;
-            case Source::Weight:
-                values = &weight;
-                break;
-            case Source::Manual:
-                break;
+        if (e.model.source && e.model.source->def != nullptr) {
+            const auto& s = series.at(::Metrics::canonical(*e.model.source));
+            values = &s.values;
+            e.no_data = s.why != Repositories::Metrics::Why::Ok;
         }
-        e.no_data = (::Habits::from_health(e.model.source) && !health_linked) ||
-                    (e.model.source == Source::Workout && !access.workout);
         const auto c = checks.find(row.at("id").get<std::string>());
         const ::Habits::Checks& manual = c == checks.end() ? kNoChecks : c->second;
         for (auto d = from; d <= to; d += days{1}) {

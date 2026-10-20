@@ -1,12 +1,14 @@
 /**
  * @file test_habits_eval.cpp
  * @brief The pure habit evaluation (src/habits/Habits.hpp): a day done by
- *        hand or by a source meeting its goal, the daily streak with an open
- *        today across a month and a year boundary, the Monday-to-Sunday week
- *        and its streak across New Year, the best streak, sleep and workouts
- *        placed on the local day, weigh-ins on the local day, the Now plate, a daily target on a habit
- *        ticked by hand, and the tags of a mood check-in. The worked numbers are
- *        in the comments; 2026-10-14 is a Wednesday, 2026-01-01 a Thursday.
+ *        hand or by a catalog source meeting its goal at least or at most, a
+ *        presence source without a goal, the sources a set of habits reads
+ *        once each, the daily streak with an open today across a month and a
+ *        year boundary, the Monday-to-Sunday week and its streak across New
+ *        Year, the best streak, a weigh-in with and without a goal, the Now
+ *        plate, a daily target on a habit ticked by hand, and the tags of a
+ *        mood check-in. The worked numbers are in the comments; 2026-10-14 is
+ *        a Wednesday, 2026-01-01 a Thursday.
  */
 
 #include <cmath>
@@ -14,6 +16,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -22,11 +25,12 @@
 
 #include "habits/Habits.hpp"
 #include "habits/Mood.hpp"
+#include "metrics/Catalog.hpp"
 
 using Habits::Day;
+using Habits::Direction;
 using Habits::Habit;
 using Habits::Schedule;
-using Habits::Source;
 using json = nlohmann::json;
 
 namespace {
@@ -43,12 +47,25 @@ std::set<Day> days(std::initializer_list<const char*> list) {
     return out;
 }
 
-Habit daily(Source source = Source::Manual, std::optional<double> goal = std::nullopt) {
-    return Habit{Schedule::Daily, 0, goal, source, std::nullopt};
+/// A daily habit on the catalog id @p source (nullptr: ticked by hand).
+Habit daily(const char* source = nullptr,
+            std::optional<double> goal = std::nullopt,
+            Direction direction = Direction::AtLeast) {
+    Habit h;
+    h.goal = goal;
+    if (source != nullptr) {
+        h.source = Metrics::parse(source);
+        EXPECT_TRUE(h.source.has_value()) << source;
+    }
+    h.direction = direction;
+    return h;
 }
 
-Habit weekly(int per_week, Source source = Source::Manual) {
-    return Habit{Schedule::Weekly, per_week, std::nullopt, source, std::nullopt};
+Habit weekly(int per_week) {
+    Habit h;
+    h.schedule = Schedule::Weekly;
+    h.per_week = per_week;
+    return h;
 }
 
 }  // namespace
@@ -59,34 +76,126 @@ TEST(HabitsEval, ParsesTheWordsOfTheModel) {
     EXPECT_TRUE(Habits::schedule_of("daily") == Schedule::Daily);
     EXPECT_TRUE(Habits::schedule_of("weekly") == Schedule::Weekly);
     EXPECT_FALSE(Habits::schedule_of("monthly").has_value());
-    EXPECT_TRUE(Habits::source_of("manual") == Source::Manual);
-    EXPECT_TRUE(Habits::source_of("sleep") == Source::Sleep);
-    EXPECT_TRUE(Habits::source_of("steps") == Source::Steps);
-    EXPECT_TRUE(Habits::source_of("active_kcal") == Source::ActiveKcal);
-    EXPECT_TRUE(Habits::source_of("workout") == Source::Workout);
-    EXPECT_TRUE(Habits::source_of("weight") == Source::Weight);
-    EXPECT_TRUE(Habits::from_health(Source::Weight)) << "the scales are Mi Fitness rows";
-    EXPECT_FALSE(Habits::source_of("water").has_value());
+    EXPECT_TRUE(Habits::direction_of("at_least") == Direction::AtLeast);
+    EXPECT_TRUE(Habits::direction_of("at_most") == Direction::AtMost);
+    EXPECT_FALSE(Habits::direction_of("exactly").has_value());
+    EXPECT_FALSE(Habits::source_of("manual").has_value()) << "ticked by hand: no series";
+    EXPECT_FALSE(Habits::source_of("water").has_value()) << "names nothing";
+    ASSERT_TRUE(Habits::source_of("food:kcal").has_value());
+    EXPECT_EQ(Metrics::canonical(*Habits::source_of("food:kcal")), "food:kcal");
 }
 
-// Sleep goal 8 h = 480 min; steps 8000; active kcal 500; a workout is any session.
+// The five sources of 1.33 read as their catalog ids, stored rows and API input alike.
+TEST(HabitsEval, LegacySourceNamesAreAccepted) {
+    const std::vector<std::pair<const char*, const char*>> legacy{{"sleep", "fitness:sleep"},
+                                                                  {"steps", "fitness:steps"},
+                                                                  {"active_kcal", "fitness:active_kcal"},
+                                                                  {"workout", "workout:sessions"},
+                                                                  {"weight", "fitness:weight"}};
+    for (const auto& [old, now] : legacy) {
+        const auto ref = Habits::source_of(old);
+        ASSERT_TRUE(ref.has_value()) << old;
+        EXPECT_EQ(Metrics::canonical(*ref), now) << old;
+    }
+}
+
+// Sleep goal 8 h (the catalog gives hours); steps 8000; active kcal 500; sessions
+// counted, presence: any session without a goal, at least the goal with one.
 TEST(HabitsEval, EachSourceAgainstItsGoal) {
-    EXPECT_TRUE(Habits::meets(daily(Source::Sleep, 8), 480));
-    EXPECT_FALSE(Habits::meets(daily(Source::Sleep, 8), 479)) << "7 h 59 m is short of 8 h";
-    EXPECT_TRUE(Habits::meets(daily(Source::Sleep, 7.5), 450)) << "7.5 h = 450 min";
-    EXPECT_TRUE(Habits::meets(daily(Source::Steps, 8000), 8000));
-    EXPECT_FALSE(Habits::meets(daily(Source::Steps, 8000), 7999));
-    EXPECT_TRUE(Habits::meets(daily(Source::ActiveKcal, 500), 512.5));
-    EXPECT_FALSE(Habits::meets(daily(Source::ActiveKcal, 500), 499.9));
-    EXPECT_TRUE(Habits::meets(daily(Source::Workout), 1)) << "one finished session";
-    EXPECT_TRUE(Habits::meets(daily(Source::Workout, 3), 1)) << "a workout ignores the goal";
-    EXPECT_FALSE(Habits::meets(daily(Source::Workout), 0));
-    EXPECT_FALSE(Habits::meets(daily(Source::Manual, 45), 1000)) << "a manual habit is never done by data";
-    EXPECT_FALSE(Habits::meets(daily(Source::Steps), 100000)) << "a source without a goal is never met";
+    EXPECT_TRUE(Habits::meets(daily("fitness:sleep", 8), 8.0));
+    EXPECT_FALSE(Habits::meets(daily("fitness:sleep", 8), 7.98)) << "7 h 59 m is short of 8 h";
+    EXPECT_TRUE(Habits::meets(daily("fitness:sleep", 7.5), 7.5));
+    EXPECT_TRUE(Habits::meets(daily("fitness:steps", 8000), 8000));
+    EXPECT_FALSE(Habits::meets(daily("fitness:steps", 8000), 7999));
+    EXPECT_TRUE(Habits::meets(daily("fitness:active_kcal", 500), 512.5));
+    EXPECT_FALSE(Habits::meets(daily("fitness:active_kcal", 500), 499.9));
+    EXPECT_TRUE(Habits::meets(daily("workout:sessions"), 1)) << "one finished session";
+    EXPECT_FALSE(Habits::meets(daily("workout:sessions", 2), 1)) << "two a day asked, one done";
+    EXPECT_TRUE(Habits::meets(daily("workout:sessions", 2), 2));
+    EXPECT_FALSE(Habits::meets(daily(nullptr, 45), 1000)) << "a manual habit is never done by data";
+    EXPECT_FALSE(Habits::meets(daily("fitness:steps"), 100000)) << "a sum without a goal is never met";
+}
+
+// food:kcal at most 2200: 2100 and 2200 done, 2300 not.
+TEST(HabitsEval, AtMostDirection) {
+    const Habit kcal = daily("food:kcal", 2200, Direction::AtMost);
+    EXPECT_TRUE(Habits::meets(kcal, 2100));
+    EXPECT_TRUE(Habits::meets(kcal, 2200)) << "the goal itself is within";
+    EXPECT_FALSE(Habits::meets(kcal, 2300));
+    const Habits::Values eaten{{d("2026-10-12"), 2100}, {d("2026-10-13"), 2300}};
+    EXPECT_EQ(Habits::done_days(kcal, {}, eaten), days({"2026-10-12"}))
+        << "a day without entries is not done: nothing was logged";
+    EXPECT_FALSE(Habits::day_state(kcal, d("2026-10-14"), {}, eaten).done);
+}
+
+// Weight at most 80 kg: 79.6 done, 80.4 not, a record without a number not. The same
+// series without a goal ticks every weighed day, the record without a number too.
+TEST(HabitsEval, WeightWithGoalAtMost) {
+    const Habit at_most = daily("fitness:weight", 80, Direction::AtMost);
+    const Habits::Values scales{{d("2026-10-12"), 79.6}, {d("2026-10-13"), 80.4}, {d("2026-10-14"), Habits::kNoNumber}};
+    EXPECT_EQ(Habits::done_days(at_most, {}, scales), days({"2026-10-12"}));
+    const auto no_number = Habits::day_state(at_most, d("2026-10-14"), {}, scales);
+    EXPECT_FALSE(no_number.done) << "no weight to compare";
+    EXPECT_FALSE(no_number.value.has_value());
+
+    const Habit any = daily("fitness:weight");
+    EXPECT_EQ(Habits::done_days(any, {}, scales), days({"2026-10-12", "2026-10-13", "2026-10-14"}));
+    const auto weighed = Habits::day_state(any, d("2026-10-13"), {}, scales);
+    EXPECT_TRUE(weighed.done);
+    EXPECT_FALSE(weighed.manual);
+    EXPECT_DOUBLE_EQ(*weighed.value, 80.4);
+    EXPECT_FALSE(Habits::day_state(any, d("2026-10-11"), {}, scales).done) << "no weighing that day";
+}
+
+// Presence entries count by being there: a mood, tape, a task done, a habit ticked by hand.
+TEST(HabitsEval, PresenceWithoutGoal) {
+    for (const char* id : {"habits:mood",
+                           "tape:waist",
+                           "tasks:done",
+                           "fitness:resting_hr",
+                           "fitness:band_workouts",
+                           "habits:3f2b8c4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f"}) {
+        const Habit h = daily(id);
+        EXPECT_TRUE(Habits::meets(h, 1)) << id;
+        EXPECT_TRUE(Habits::meets(h, Habits::kNoNumber)) << id << ": a tick without a value is still a tick";
+    }
+    for (const char* id : {"food:kcal", "fitness:sleep", "money:expense:KZT", "fitness:hr_avg"}) {
+        EXPECT_FALSE(Habits::meets(daily(id), 1)) << id << " needs a goal";
+    }
+}
+
+// A day short of the goal is still done by a tick by hand, at least and at most alike.
+TEST(HabitsEval, ManualTickWinsOverData) {
+    const Habit kcal = daily("food:kcal", 2200, Direction::AtMost);
+    const Habits::Checks ticked{{d("2026-10-13"), std::nullopt}};
+    const Habits::Values eaten{{d("2026-10-13"), 2600}};
+    const auto s = Habits::day_state(kcal, d("2026-10-13"), ticked, eaten);
+    EXPECT_TRUE(s.done) << "2600 is over 2200, the tick wins";
+    EXPECT_TRUE(s.manual);
+    EXPECT_DOUBLE_EQ(*s.value, 2600) << "no value on the tick: the source's value shows";
+    EXPECT_EQ(Habits::done_days(kcal, ticked, eaten), days({"2026-10-13"}));
+}
+
+// Five habits, three on fitness:steps (one under its 1.33 name), one on food:kcal, one by
+// hand: two reads.
+TEST(HabitsEval, OneReadPerSharedSource) {
+    std::vector<Habit> habits{daily("fitness:steps", 8000),
+                              daily("food:kcal", 2200, Direction::AtMost),
+                              daily("steps", 10000),
+                              daily(nullptr),
+                              daily("fitness:steps", 12000)};
+    EXPECT_EQ(Habits::distinct_sources(habits), (std::vector<std::string>{"fitness:steps", "food:kcal"}));
+    EXPECT_TRUE(Habits::distinct_sources({daily(nullptr)}).empty());
+    // A habit and a category are kept apart by their parameters.
+    habits.push_back(daily("habits:3f2b8c4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f"));
+    habits.push_back(daily("habits:3F2B8C4E-1A2B-4C3D-8E9F-0A1B2C3D4E5F"));
+    habits.push_back(daily("money:expense:KZT", 5000, Direction::AtMost));
+    habits.push_back(daily("money:expense:USD", 50, Direction::AtMost));
+    EXPECT_EQ(Habits::distinct_sources(habits).size(), 5U) << "the habit id in any case is one source";
 }
 
 TEST(HabitsEval, ADayIsDoneByHandOrByItsSource) {
-    const Habit steps = daily(Source::Steps, 8000);
+    const Habit steps = daily("fitness:steps", 8000);
     const std::map<Day, std::optional<double>> manual{{d("2026-10-12"), std::nullopt}, {d("2026-10-13"), 20.0}};
     const std::map<Day, double> autos{{d("2026-10-12"), 3000}, {d("2026-10-14"), 9312}, {d("2026-10-11"), 7000}};
 
@@ -230,108 +339,6 @@ TEST(HabitsEval, TheBestWeeklyRun) {
     // Weeks: Aug 31, Sep 7, Sep 14, Sep 21 (24 and 27), Sep 28, Oct 5 — six in a row.
     EXPECT_EQ(Habits::best(weekly(1), done), 6);
     EXPECT_EQ(Habits::best(weekly(2), done), 1) << "only the week of Sep 21 has two days";
-}
-
-// ── sources on the local day ────────────────────────────────────────────────
-
-// The region zone is UTC+8 (cn). A night ending 2026-10-13T23:30Z ends at 07:30 on
-// Oct 14 local; a nap that day is left out; a second night ending later the same
-// local day (Oct 14 01:00Z = 09:00 local) is the one picked, as /today picks the
-// latest. A night ending 2026-10-14T16:30Z is 00:30 on Oct 15 local.
-TEST(HabitsEval, SleepLandsOnTheLocalDayItEnds) {
-    const json rows = json::array({
-        {{"end_at", "2026-10-13T23:30:00+00:00"}, {"time_asleep_minutes", 430}, {"is_nap", false}},
-        {{"end_at", "2026-10-14T05:00:00+00:00"}, {"time_asleep_minutes", 40}, {"is_nap", true}},
-        {{"end_at", "2026-10-14T01:00:00+00:00"}, {"time_asleep_minutes", 462}, {"is_nap", false}},
-        {{"end_at", "2026-10-14T16:30:00+00:00"}, {"time_asleep_minutes", 500}, {"is_nap", false}},
-        {{"end_at", "2026-10-12T22:00:00+00:00"}, {"time_asleep_minutes", nullptr}},
-    });
-    const auto by_day = Habits::sleep_by_local_day(rows, 8 * 3600);
-    ASSERT_EQ(by_day.size(), 2U);
-    EXPECT_DOUBLE_EQ(by_day.at(d("2026-10-14")), 462) << "7 h 42 m, the later night";
-    EXPECT_DOUBLE_EQ(by_day.at(d("2026-10-15")), 500);
-    // In UTC the 23:30 night stays on Oct 13.
-    EXPECT_DOUBLE_EQ(Habits::sleep_by_local_day(rows, 0).at(d("2026-10-13")), 430);
-}
-
-TEST(HabitsEval, StepsAndKcalByTheirDate) {
-    const json rows = json::array({
-        {{"date", "2026-10-13"}, {"steps", 9312}, {"active_kcal", 410.5}},
-        {{"date", "2026-10-14"}, {"steps", nullptr}, {"active_kcal", 120}},
-    });
-    const auto steps = Habits::activity_by_day(rows, "steps");
-    ASSERT_EQ(steps.size(), 1U);
-    EXPECT_DOUBLE_EQ(steps.at(d("2026-10-13")), 9312);
-    const auto kcal = Habits::activity_by_day(rows, "active_kcal");
-    EXPECT_DOUBLE_EQ(kcal.at(d("2026-10-13")), 410.5);
-    EXPECT_DOUBLE_EQ(kcal.at(d("2026-10-14")), 120);
-}
-
-// Asia/Almaty is UTC+5. A session finished 2026-10-13T20:30Z is 01:30 on Oct 14; one
-// finished Oct 14 18:00Z is 23:00 on Oct 14; one finished Oct 14 19:30Z is 00:30 on
-// Oct 15. Oct 14 has two sessions, Oct 15 one, Oct 13 none.
-TEST(HabitsEval, AWorkoutCountsOnTheLocalDayItFinished) {
-    const std::vector<Habits::Session> sessions{
-        {"2026-10-13T20:30:00Z", 5 * 3600},
-        {"2026-10-14T18:00:00Z", 5 * 3600},
-        {"2026-10-14T19:30:00Z", 5 * 3600},
-    };
-    const auto by_day = Habits::workouts_by_local_day(sessions);
-    EXPECT_EQ(by_day.count(d("2026-10-13")), 0U);
-    EXPECT_DOUBLE_EQ(by_day.at(d("2026-10-14")), 2);
-    EXPECT_DOUBLE_EQ(by_day.at(d("2026-10-15")), 1);
-    EXPECT_EQ(Habits::local_day("2026-10-13T20:30:00Z", 0), d("2026-10-13")) << "in UTC";
-    EXPECT_EQ(Habits::local_day("2026-10-14T02:00:00Z", -7 * 3600), d("2026-10-13")) << "west of UTC";
-}
-
-// Asia/Almaty is UTC+5 (offset 18000 s, as the SQL gives it). Oct 13 22:00Z is 03:00 on
-// Oct 14 local, Oct 14 03:00Z is 08:00 on Oct 14: the later one (71.8) is the day's.
-// Oct 12 21:00Z is 02:00 on Oct 13 local, 72.4 kg. Oct 14 19:30Z is 00:30 on Oct 15
-// local, with no weight in it.
-TEST(HabitsEval, AWeighInLandsOnTheLocalDayAndTheLatestWins) {
-    constexpr long long kAlmaty = 5 * 3600;
-    const std::vector<Habits::WeighIn> almaty{
-        {"2026-10-12T21:00:00Z", kAlmaty, 72.4},
-        {"2026-10-13T22:00:00Z", kAlmaty, 72.1},
-        {"2026-10-14T03:00:00Z", kAlmaty, 71.8},
-        {"2026-10-14T19:30:00Z", kAlmaty, std::nullopt},
-        {"bad", kAlmaty, 70},
-    };
-    const auto by_day = Habits::weight_by_local_day(almaty);
-    ASSERT_EQ(by_day.size(), 3U);
-    EXPECT_DOUBLE_EQ(by_day.at(d("2026-10-13")), 72.4) << "02:00 local is Oct 13, not Oct 12";
-    EXPECT_DOUBLE_EQ(by_day.at(d("2026-10-14")), 71.8) << "the 08:00 weighing, not the 03:00 one";
-    EXPECT_EQ(by_day.count(d("2026-10-12")), 0U);
-
-    // In UTC the 22:00 weighing stays on Oct 13 and the 19:30 one on Oct 14.
-    std::vector<Habits::WeighIn> utc_rows = almaty;
-    for (auto& w : utc_rows) {
-        w.offset_seconds = 0;
-    }
-    const auto utc = Habits::weight_by_local_day(utc_rows);
-    EXPECT_DOUBLE_EQ(utc.at(d("2026-10-12")), 72.4);
-    EXPECT_DOUBLE_EQ(utc.at(d("2026-10-13")), 72.1);
-    EXPECT_TRUE(std::isnan(utc.at(d("2026-10-14")))) << "the latest record of the day has no weight";
-
-    // A weigh-in is done whatever it weighs; a day without a number is still done, its value null.
-    const Habit weight = daily(Source::Weight);
-    const Habits::Checks none;
-    const auto weighed = Habits::day_state(weight, d("2026-10-14"), none, by_day);
-    EXPECT_TRUE(weighed.done);
-    EXPECT_FALSE(weighed.manual);
-    ASSERT_TRUE(weighed.value.has_value());
-    EXPECT_DOUBLE_EQ(*weighed.value, 71.8);
-    const auto no_number = Habits::day_state(weight, d("2026-10-15"), none, by_day);
-    EXPECT_TRUE(no_number.done) << "a record without weight_kg still ticks the day";
-    EXPECT_FALSE(no_number.value.has_value());
-    EXPECT_FALSE(Habits::day_state(weight, d("2026-10-12"), none, by_day).done) << "no weighing that day";
-    EXPECT_EQ(Habits::done_days(weight, none, by_day), days({"2026-10-13", "2026-10-14", "2026-10-15"}));
-
-    // A tick by hand on a day without a weighing counts, as for every source.
-    const Habits::Checks ticked{{d("2026-10-12"), std::nullopt}};
-    const auto by_hand = Habits::day_state(weight, d("2026-10-12"), ticked, by_day);
-    EXPECT_TRUE(by_hand.done);
-    EXPECT_TRUE(by_hand.manual);
 }
 
 // ── the Now plate ───────────────────────────────────────────────────────────

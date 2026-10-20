@@ -5,8 +5,11 @@
  *        manual ticks (a day after today and a day too far back refused), the
  *        days with auto values from seeded Mi Fitness and Training rows on the
  *        local day, a source without data, the streak from ticks, a weigh-in
- *        habit read from the scales' rows, the habits part of /api/v1/today, a daily target reached by adding to a day,
- * and the mood check-in of a day.
+ *        habit read from the scales' rows with and without a goal, the
+ *        catalog sources (the names of 1.33 taken, at most, a presence source
+ *        without a goal, a sum refused without one, habits:<id> not itself,
+ *        not sourced, not foreign), the habits part of /api/v1/today, a daily
+ *        target reached by adding to a day, and the mood check-in of a day.
  */
 
 #include <chrono>
@@ -77,6 +80,7 @@ protected:
         cfg["habits"]["enabled"] = true;
         cfg["fitness"]["enabled"] = true;
         cfg["workout"]["enabled"] = true;
+        cfg["food"]["enabled"] = true;
         cfg["now"]["enabled"] = true;
     }
 
@@ -89,6 +93,7 @@ protected:
                 const std::string o = id;
                 txn.exec_params("DELETE FROM habits WHERE owner_id = $1::uuid", o);
                 txn.exec_params("DELETE FROM workout_sessions WHERE owner_id = $1::uuid", o);
+                txn.exec_params("DELETE FROM food_entries WHERE owner_id = $1::uuid", o);
                 txn.exec_params("DELETE FROM mi_accounts WHERE owner_id = $1::uuid", o);
                 txn.exec_params(
                     "INSERT INTO users (id, email, confirmed, role_id) "
@@ -216,10 +221,19 @@ TEST_F(HabitsApiTest, AHabitBodyIsChecked) {
              json{{"name", "Reading"}, {"schedule", "daily"}, {"per_week", 3}},    // daily with per_week
              json{{"name", "Steps"}, {"schedule", "daily"}, {"source", "steps"}},  // a Mi source without a goal
              json{{"name", "Sleep"}, {"schedule", "daily"}, {"source", "sleep"}, {"goal", 25}},  // over 24 h
+             json{{"name", "Bed"}, {"schedule", "daily"}, {"source", "fitness:sleep_duration"}, {"goal", 25}},
              json{{"name", "Reading"}, {"schedule", "daily"}, {"goal", 0}},        // a goal must be above 0
              json{{"name", "Water"}, {"schedule", "daily"}, {"source", "water"}},  // unknown source
-             json{{"name", ""}, {"schedule", "daily"}},                            // empty name
-             json{{"name", std::string(81, 'x')}, {"schedule", "daily"}},          // 81 characters
+             json{{"name", "Water"}, {"schedule", "daily"}, {"source", "fitness:water:x"}},
+             json{{"name", "Water"}, {"schedule", "daily"}, {"source", 7}},
+             json{{"name", "Coffee"}, {"schedule", "daily"}, {"direction", "at_most"}},  // at most needs a source
+             json{{"name", "Coffee"},
+                  {"schedule", "daily"},
+                  {"source", "food:kcal"},
+                  {"goal", 2000},
+                  {"direction", "below"}},
+             json{{"name", ""}, {"schedule", "daily"}},                    // empty name
+             json{{"name", std::string(81, 'x')}, {"schedule", "daily"}},  // 81 characters
              json{{"name", "Reading"}, {"schedule", "daily"}, {"unit", std::string(17, 'u')}},
              json{{"name", "Reading"}, {"schedule", "monthly"}},
              json{{"schedule", "daily"}},
@@ -227,7 +241,7 @@ TEST_F(HabitsApiTest, AHabitBodyIsChecked) {
         auto r = call(kAnna, Post, bad, [&](auto req, auto cb) { c.create(req, std::move(cb)); });
         EXPECT_EQ(r->statusCode(), k400BadRequest) << bad.dump();
     }
-    // A workout is any finished session: its goal is dropped.
+    // A workout under its 1.33 name is any finished session: its goal is dropped, as then.
     auto w =
         call(kAnna,
              Post,
@@ -235,7 +249,177 @@ TEST_F(HabitsApiTest, AHabitBodyIsChecked) {
              [&](auto req, auto cb) { c.create(req, std::move(cb)); });
     ASSERT_EQ(w->statusCode(), k201Created) << std::string(w->body());
     EXPECT_TRUE(body_of(w)["data"]["goal"].is_null());
-    EXPECT_EQ(list(kAnna).size(), 4U);
+    EXPECT_EQ(body_of(w)["data"]["source"], "workout:sessions");
+    // Under its catalog id a goal counts sessions a day.
+    auto two = call(kAnna,
+                    Post,
+                    json{{"name", "Twice"}, {"schedule", "daily"}, {"source", "workout:sessions"}, {"goal", 2}},
+                    [&](auto req, auto cb) { c.create(req, std::move(cb)); });
+    ASSERT_EQ(two->statusCode(), k201Created) << std::string(two->body());
+    EXPECT_EQ(body_of(two)["data"]["goal"], 2);
+    EXPECT_EQ(list(kAnna).size(), 5U);
+}
+
+// POST with the names of 1.33: stored and answered as the catalog ids, at least by default.
+TEST_F(HabitsApiTest, LegacySourceNamesAreAccepted) {
+    const std::vector<std::pair<json, const char*>> cases{
+        {json{{"name", "Sleep"}, {"schedule", "daily"}, {"source", "sleep"}, {"goal", 8}}, "fitness:sleep"},
+        {json{{"name", "Steps"}, {"schedule", "daily"}, {"source", "steps"}, {"goal", 8000}}, "fitness:steps"},
+        {json{{"name", "Move"}, {"schedule", "daily"}, {"source", "active_kcal"}, {"goal", 500}},
+         "fitness:active_kcal"},
+        {json{{"name", "Workout"}, {"schedule", "daily"}, {"source", "workout"}}, "workout:sessions"},
+        {json{{"name", "Weigh-in"}, {"schedule", "daily"}, {"source", "weight"}}, "fitness:weight"},
+    };
+    for (const auto& [body, id] : cases) {
+        const auto habit = created(kAnna, body);
+        const json row = habit_of(list(kAnna), habit);
+        EXPECT_EQ(row["source"], id) << body.dump();
+        EXPECT_EQ(row["direction"], "at_least");
+        const std::string stored = Database::get().execute_read([&](auto& txn) {
+            return txn.exec_params("SELECT source FROM habits WHERE id = $1::uuid", habit)[0][0]
+                .template as<std::string>();
+        });
+        EXPECT_EQ(stored, id) << "stored under the catalog id";
+    }
+    // A row the previous binary wrote under an old name during a rollout reads as the catalog id.
+    sql(std::string("INSERT INTO habits (owner_id, name, schedule, goal, source) VALUES ('") + kAnna +
+        "', 'Old steps', 'daily', 8000, 'steps')");
+    bool seen = false;
+    for (const auto& h : list(kAnna)) {
+        if (h["name"] == "Old steps") {
+            seen = true;
+            EXPECT_EQ(h["source"], "fitness:steps");
+        }
+    }
+    EXPECT_TRUE(seen);
+}
+
+// A sum or an average without a goal ticks nothing: refused, 400 missing on goal.
+TEST_F(HabitsApiTest, SumWithoutGoalRefused) {
+    for (const char* source : {"food:kcal", "fitness:steps", "fitness:sleep", "fitness:hr_avg", "workout:volume"}) {
+        auto r = call(
+            kAnna, Post, json{{"name", "No goal"}, {"schedule", "daily"}, {"source", source}}, [&](auto req, auto cb) {
+                c.create(req, std::move(cb));
+            });
+        ASSERT_EQ(r->statusCode(), k400BadRequest) << source;
+        const json errors = body_of(r)["errors"];
+        ASSERT_EQ(errors.size(), 1U) << errors.dump();
+        EXPECT_EQ(errors[0]["field"], "goal");
+        EXPECT_EQ(errors[0]["code"], "missing");
+    }
+}
+
+// habits:<id> reads a habit of the caller's own ticked by hand: not itself, not one with a
+// source, not another owner's.
+TEST_F(HabitsApiTest, HabitSourceCannotBeItself) {
+    const auto reading = created(kAnna, json{{"name", "Reading"}, {"schedule", "daily"}});
+    const auto steps =
+        created(kAnna, json{{"name", "Steps"}, {"schedule", "daily"}, {"source", "fitness:steps"}, {"goal", 8000}});
+    const auto boris = created(kBoris, json{{"name", "Boris reads"}, {"schedule", "daily"}});
+
+    const auto code_of = [&](const HttpResponsePtr& r) {
+        EXPECT_EQ(r->statusCode(), k400BadRequest) << std::string(r->body());
+        const json errors = body_of(r)["errors"];
+        if (!errors.is_array() || errors.size() != 1U) {
+            ADD_FAILURE() << errors.dump();
+            return std::string();
+        }
+        EXPECT_EQ(errors[0]["field"], "source");
+        return errors[0]["code"].get<std::string>();
+    };
+    const auto edit_reading = [&](const std::string& source) {
+        return call(
+            kAnna, Patch, json{{"name", "Reading"}, {"schedule", "daily"}, {"source", source}}, [&](auto req, auto cb) {
+                c.update(req, std::move(cb), reading);
+            });
+    };
+    EXPECT_EQ(code_of(edit_reading("habits:" + reading)), "self");
+    const auto post = [&](const std::string& source) {
+        return call(
+            kAnna, Post, json{{"name", "Echo"}, {"schedule", "daily"}, {"source", source}}, [&](auto req, auto cb) {
+                c.create(req, std::move(cb));
+            });
+    };
+    EXPECT_EQ(code_of(post("habits:" + steps)), "not_manual");
+    EXPECT_EQ(code_of(post("habits:" + boris)), "not_yours");
+    EXPECT_EQ(code_of(post("habits:00000000-0000-4000-8000-000000000000")), "not_yours");
+    EXPECT_EQ(code_of(post("money:expense:KZT")), "not_yours") << "no KZT account of Anna's";
+
+    // Its own manual habit is taken, with no goal: a presence source.
+    const auto echo = created(kAnna, json{{"name", "Echo"}, {"schedule", "daily"}, {"source", "habits:" + reading}});
+    EXPECT_EQ(habit_of(list(kAnna), echo)["source"], "habits:" + reading);
+}
+
+// Echo reads Reading: a day Reading is ticked is done on Echo too, from data.
+TEST_F(HabitsApiTest, PresenceWithoutGoal) {
+    const auto reading = created(kAnna, json{{"name", "Reading"}, {"schedule", "daily"}, {"unit", "pages"}});
+    const auto echo = created(kAnna, json{{"name", "Echo"}, {"schedule", "daily"}, {"source", "habits:" + reading}});
+    ASSERT_EQ(tick(kAnna, reading, utc_day(-1), json{{"value", 12}})->statusCode(), k200OK);
+    ASSERT_EQ(tick(kAnna, reading, utc_day(-2))->statusCode(), k200OK);
+    const json h = habit_of(days(reader(kAnna), utc_day(-3), utc_day(0), "UTC")["data"], echo);
+    EXPECT_FALSE(h["no_data"]);
+    EXPECT_TRUE(day_of(h, utc_day(-1))["done"]);
+    EXPECT_FALSE(day_of(h, utc_day(-1))["manual"]) << "from data";
+    EXPECT_EQ(day_of(h, utc_day(-1))["value"], 12);
+    EXPECT_TRUE(day_of(h, utc_day(-2))["done"]) << "a tick without a value is still a tick";
+    EXPECT_TRUE(day_of(h, utc_day(-2))["value"].is_null());
+    EXPECT_FALSE(day_of(h, utc_day(-3))["done"]);
+    EXPECT_EQ(h["streak"], 2);
+
+    // Reading turned into a sourced habit: Echo can no longer read it and says so.
+    auto r = call(kAnna,
+                  Patch,
+                  json{{"name", "Reading"}, {"schedule", "daily"}, {"source", "fitness:steps"}, {"goal", 100}},
+                  [&](auto req, auto cb) { c.update(req, std::move(cb), reading); });
+    ASSERT_EQ(r->statusCode(), k200OK) << std::string(r->body());
+    const json after = habit_of(days(reader(kAnna), utc_day(-3), utc_day(0), "UTC")["data"], echo);
+    EXPECT_TRUE(after["no_data"]);
+    EXPECT_FALSE(day_of(after, utc_day(-1))["done"]);
+}
+
+// Calories at most 2200 from the food diary: D-3 2100 done, D-2 2300 not, D-1 nothing logged,
+// a tick by hand on D-2 still wins.
+TEST_F(HabitsApiTest, AtMostDirection) {
+    const auto eat = [&](int shift, int kcal) {
+        sql(std::string("INSERT INTO food_entries (owner_id, date, meal, name, kcal) VALUES ('") + kAnna + "', '" +
+            utc_day(shift) + "', 'lunch', 'Meal', " + std::to_string(kcal) + ")");
+    };
+    eat(-3, 1500);
+    eat(-3, 600);
+    eat(-2, 2300);
+    const auto kcal = created(kAnna,
+                              json{{"name", "Eat less"},
+                                   {"schedule", "daily"},
+                                   {"source", "food:kcal"},
+                                   {"goal", 2200},
+                                   {"direction", "at_most"}});
+    const json row = habit_of(list(kAnna), kcal);
+    EXPECT_EQ(row["direction"], "at_most");
+    EXPECT_EQ(row["source"], "food:kcal");
+
+    json h = habit_of(days(reader(kAnna), utc_day(-3), utc_day(-1), "UTC")["data"], kcal);
+    EXPECT_FALSE(h["no_data"]);
+    EXPECT_TRUE(day_of(h, utc_day(-3))["done"]) << "1500 + 600 = 2100 <= 2200";
+    EXPECT_EQ(day_of(h, utc_day(-3))["value"], 2100);
+    EXPECT_FALSE(day_of(h, utc_day(-2))["done"]) << "2300 > 2200";
+    EXPECT_FALSE(day_of(h, utc_day(-1))["done"]) << "nothing logged is not done";
+
+    ASSERT_EQ(tick(kAnna, kcal, utc_day(-2))->statusCode(), k200OK);
+    h = habit_of(days(reader(kAnna), utc_day(-3), utc_day(-1), "UTC")["data"], kcal);
+    EXPECT_TRUE(day_of(h, utc_day(-2))["done"]) << "the tick by hand wins";
+    EXPECT_TRUE(day_of(h, utc_day(-2))["manual"]);
+
+    // The same habit at least 2200 flips the days.
+    auto r = call(kAnna,
+                  Patch,
+                  json{{"name", "Eat more"}, {"schedule", "daily"}, {"source", "food:kcal"}, {"goal", 2200}},
+                  [&](auto req, auto cb) { c.update(req, std::move(cb), kcal); });
+    ASSERT_EQ(r->statusCode(), k200OK) << std::string(r->body());
+    EXPECT_EQ(body_of(r)["data"]["direction"], "at_least") << "a full replacement: the default again";
+    h = habit_of(days(reader(kAnna), utc_day(-3), utc_day(-1), "UTC")["data"], kcal);
+    EXPECT_FALSE(day_of(h, utc_day(-3))["done"]) << "2100 < 2200";
+    EXPECT_TRUE(day_of(h, utc_day(-2))["done"]);
+    EXPECT_EQ(day_of(h, utc_day(-2))["value"], 2300) << "a tick without a value shows the source's";
 }
 
 TEST_F(HabitsApiTest, CreateEditArchiveDelete) {
@@ -430,10 +614,11 @@ TEST_F(HabitsApiTest, TheRangeIsChecked) {
     EXPECT_EQ(bad({{"from", "2026-08-01"}, {"to", "2026-10-01"}}), k200OK) << "Aug 1 to Oct 1 is 62 days";
 }
 
-// Week Mon Sep 14 – Sun Sep 20 2026. Anna's Mi account is in region cn (UTC+8).
+// Week Mon Sep 14 – Sun Sep 20 2026. Anna's Mi account is in region cn (UTC+8); a night
+// lands on its local end day in the request zone (Asia/Almaty, UTC+5), not the region's.
 //   daily_activity: Sep 14 9312 steps, 512 kcal; Sep 15 7999 steps, 499 kcal.
-//   sleep: ends Sep 14 23:30Z = Sep 15 07:30 local, 462 min asleep (7 h 42 m >= 7.5 h = 450);
-//          ends Sep 15 22:00Z = Sep 16 06:00 local, 430 min (short).
+//   sleep: ends Sep 14 23:30Z = Sep 15 04:30 local, 462 min asleep = 7.7 h >= 7.5 h;
+//          ends Sep 15 22:00Z = Sep 16 03:00 local, 430 min = 7.17 h (short).
 //   Training (tz Asia/Almaty, UTC+5): finished Sep 14 10:00Z (Sep 14), Sep 16 20:30Z
 //          (01:30 on Sep 17), Sep 18 12:00Z (Sep 18): 3 days in the week, 3 of 4.
 TEST_F(HabitsApiTest, TheDaysCarryAutoValuesFromHealthAndTraining) {
@@ -477,9 +662,11 @@ TEST_F(HabitsApiTest, TheDaysCarryAutoValuesFromHealthAndTraining) {
 
     const json z = habit_of(out["data"], sleep);
     EXPECT_TRUE(day_of(z, "2026-09-14")["value"].is_null()) << "the 23:30Z night belongs to Sep 15 local";
+    EXPECT_EQ(z["source"], "fitness:sleep");
     EXPECT_TRUE(day_of(z, "2026-09-15")["done"]);
-    EXPECT_EQ(day_of(z, "2026-09-15")["value"], 462);
-    EXPECT_FALSE(day_of(z, "2026-09-16")["done"]) << "430 < 450";
+    EXPECT_NEAR(day_of(z, "2026-09-15")["value"].get<double>(), 462 / 60.0, 1e-9) << "hours, as the catalog gives";
+    EXPECT_FALSE(day_of(z, "2026-09-16")["done"]) << "7.17 h < 7.5 h";
+    EXPECT_NEAR(day_of(z, "2026-09-16")["value"].get<double>(), 430 / 60.0, 1e-9);
 
     const json w = habit_of(out["data"], workout);
     EXPECT_FALSE(w["no_data"]);
@@ -503,14 +690,34 @@ TEST_F(HabitsApiTest, TheDaysCarryAutoValuesFromHealthAndTraining) {
     EXPECT_FALSE(habit_of(blind, workout)["no_data"]);
 }
 
-TEST_F(HabitsApiTest, AWeighInHabitTakesNoGoal) {
-    const auto weight = created(kAnna, json{{"name", "Weigh-in"}, {"schedule", "daily"}, {"source", "weight"}});
-    const json row = habit_of(list(kAnna), weight);
-    EXPECT_EQ(row["source"], "weight");
-    EXPECT_TRUE(row["goal"].is_null());
+// A weigh-in may now have a goal: at most 80 kg. D-3 79.6 done, D-2 80.4 not; without a
+// goal (as in 1.33) both days are done. A goal of 0 or text is still refused.
+TEST_F(HabitsApiTest, WeightWithGoalAtMost) {
+    sql(std::string("INSERT INTO mi_accounts (owner_id, xiaomi_user_id, pass_token_sealed, nonce, region) VALUES ('") +
+        kAnna + "', '" + kAnnaMi + "', 'x', 'x', 'sg')");
+    sql(std::string("INSERT INTO body_measurements (user_id, timestamp, weight_kg) VALUES ('") + kAnnaMi + "', '" +
+        utc_day(-3) + "T08:00:00Z', 79.6), ('" + kAnnaMi + "', '" + utc_day(-2) + "T08:00:00Z', 80.4)");
+    const auto target = created(
+        kAnna,
+        json{
+            {"name", "Under 80"}, {"schedule", "daily"}, {"source", "weight"}, {"goal", 80}, {"direction", "at_most"}});
+    const auto any = created(kAnna, json{{"name", "Weigh-in"}, {"schedule", "daily"}, {"source", "fitness:weight"}});
+    const json row = habit_of(list(kAnna), target);
+    EXPECT_EQ(row["source"], "fitness:weight");
+    EXPECT_EQ(row["goal"], 80);
+    EXPECT_EQ(row["direction"], "at_most");
 
-    // Unlike a workout, whose goal is dropped, a goal on a weigh-in is refused.
-    for (const json& goal : {json(70), json(0), json("70")}) {
+    const json out = days(reader(kAnna), utc_day(-3), utc_day(-1), "UTC")["data"];
+    const json t = habit_of(out, target);
+    EXPECT_TRUE(day_of(t, utc_day(-3))["done"]) << "79.6 <= 80";
+    EXPECT_FALSE(day_of(t, utc_day(-2))["done"]) << "80.4 > 80";
+    EXPECT_DOUBLE_EQ(day_of(t, utc_day(-2))["value"].get<double>(), 80.4);
+    const json a = habit_of(out, any);
+    EXPECT_TRUE(day_of(a, utc_day(-3))["done"]);
+    EXPECT_TRUE(day_of(a, utc_day(-2))["done"]) << "no goal: any weighing";
+    EXPECT_FALSE(day_of(a, utc_day(-1))["done"]);
+
+    for (const json& goal : {json(0), json("70")}) {
         auto r = call(kAnna,
                       Post,
                       json{{"name", "Weigh-in"}, {"schedule", "daily"}, {"source", "weight"}, {"goal", goal}},
@@ -519,20 +726,8 @@ TEST_F(HabitsApiTest, AWeighInHabitTakesNoGoal) {
         const json errors = body_of(r)["errors"];
         ASSERT_EQ(errors.size(), 1U) << errors.dump();
         EXPECT_EQ(errors[0]["field"], "goal");
-        EXPECT_EQ(errors[0]["code"], "not_allowed");
+        EXPECT_EQ(errors[0]["code"], "invalid");
     }
-    auto edit = call(kAnna,
-                     Patch,
-                     json{{"name", "Weigh-in"}, {"schedule", "daily"}, {"source", "weight"}, {"goal", 70}},
-                     [&](auto req, auto cb) { c.update(req, std::move(cb), weight); });
-    EXPECT_EQ(edit->statusCode(), k400BadRequest) << "on edit as well";
-    auto weekly = call(kAnna,
-                       Patch,
-                       json{{"name", "Weigh-in"}, {"schedule", "weekly"}, {"per_week", 3}, {"source", "weight"}},
-                       [&](auto req, auto cb) { c.update(req, std::move(cb), weight); });
-    ASSERT_EQ(weekly->statusCode(), k200OK) << std::string(weekly->body());
-    EXPECT_EQ(body_of(weekly)["data"]["source"], "weight");
-    EXPECT_EQ(list(kAnna).size(), 1U);
 }
 
 // The caller is in Asia/Almaty (UTC+5); Anna's Mi account is in region sg, whose day is UTC,
