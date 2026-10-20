@@ -234,6 +234,12 @@ repositories/habits -> repositories/fitness
 api -> habits
 api -> habits/now
 api -> repositories/habits
+repositories/metrics -> database
+repositories/metrics -> domain
+repositories/metrics -> habits
+repositories/metrics -> metrics
+repositories/metrics -> repositories/money
+repositories/metrics -> utils
 repositories/notes -> database
 repositories/notes -> repositories
 api -> practice

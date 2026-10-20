@@ -1,0 +1,1 @@
+A reader for one catalog series over a range of days (`src/repositories/metrics/Series.hpp`): timestamptz rows land on their local day in the request zone, date rows on their date, and a series the caller cannot read says why (module_off, no_permission, not_linked, not_yours) instead of answering with rows.
