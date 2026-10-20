@@ -299,7 +299,7 @@ outage can never affect the money path.
 
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
-| `HABITS_ENABLED` | `habits.enabled` | bool | `false` | Master switch for the habits module (`Core::habits_enabled()`): habits every day or N times a week, ticked by hand or from Mi Fitness (sleep, steps, active kcal) and Training sessions, their streaks, and the habits part of `/api/v1/today`. Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
+| `HABITS_ENABLED` | `habits.enabled` | bool | `false` | Master switch for the habits module (`Core::habits_enabled()`): habits every day or N times a week, ticked by hand or from Mi Fitness (sleep, steps, active kcal, a weigh-in on the scales) and Training sessions, their streaks, and the habits part of `/api/v1/today`. Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
 
 ## Notes module
 

@@ -54,7 +54,7 @@ constexpr double kGoalMax = 1000000;
 constexpr double kSleepGoalMax = 24;
 
 const std::vector<std::string> kSchedules = {"daily", "weekly"};
-const std::vector<std::string> kSources = {"manual", "sleep", "steps", "active_kcal", "workout"};
+const std::vector<std::string> kSources = {"manual", "sleep", "steps", "active_kcal", "workout", "weight"};
 
 /// ?tz=, UTC by default; nullopt (answered) when not an IANA zone.
 std::optional<std::string> zone_of(const HttpRequestPtr& req, const HabitsController::Callback& callback) {
@@ -85,7 +85,10 @@ std::optional<HabitRepository::Input> habit_input(const json& body, const Habits
         errs.add("per_week", "not_allowed", "only a weekly habit takes per_week");
     }
     std::optional<double> goal;
-    if (body.contains("goal") && !body["goal"].is_null()) {
+    if (source == "weight" && body.contains("goal") && !body["goal"].is_null()) {
+        // Any weigh-in ticks the day: a goal would read as a weight to reach, which it is not.
+        errs.add("goal", "not_allowed", "a weigh-in habit takes no goal");
+    } else if (body.contains("goal") && !body["goal"].is_null()) {
         const double max = source == "sleep" ? kSleepGoalMax : kGoalMax;
         if (!body["goal"].is_number() || !(body["goal"].get<double>() > 0) || body["goal"].get<double>() > max) {
             errs.add("goal", "invalid", "a goal is a number above 0, at most " + json(max).dump());

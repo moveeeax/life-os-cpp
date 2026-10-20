@@ -1,7 +1,8 @@
 /**
  * @file HabitRepository.hpp
  * @brief habits and habit_checks: the owner's habits and their manual ticks,
- *        and the finished Training sessions a workout habit reads. Every
+ *        the finished Training sessions a workout habit reads, and the
+ *        weigh-ins of the Mi scales a weight habit reads. Every
  *        statement filters by owner; a habit of another owner is not found.
  */
 
@@ -50,7 +51,7 @@ public:
         std::optional<int> per_week;
         std::optional<double> goal;
         std::string unit;
-        std::string source;            // manual | sleep | steps | active_kcal | workout
+        std::string source;            // manual | sleep | steps | active_kcal | workout | weight
         std::optional<double> target;  // manual only: the amount a day must reach
     };
 
@@ -251,6 +252,33 @@ public:
                      to,
                      tz)) {
                 out.push_back({row[0].template as<std::string>(), row[1].template as<long long>()});
+            }
+            return out;
+        });
+    }
+
+    /// The weigh-ins of the Mi account @p xiaomi_user_id taken between @p from and @p to
+    /// (UTC days, one day of margin on each side for the zone), oldest first, with the
+    /// offset of @p tz at each. An empty id (no linked account) matches no row.
+    std::vector<::Habits::WeighIn> weigh_ins(const std::string& xiaomi_user_id,
+                                             const std::string& from,
+                                             const std::string& to,
+                                             const std::string& tz) {
+        return Database::get().execute_read([&](auto& txn) {
+            std::vector<::Habits::WeighIn> out;
+            for (const auto& row : txn.exec_params(
+                     "SELECT to_char(timestamp AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'), "
+                     " EXTRACT(EPOCH FROM (timestamp AT TIME ZONE $4) - (timestamp AT TIME ZONE 'UTC'))::bigint, "
+                     " weight_kg FROM body_measurements WHERE user_id = $1 AND $1 <> '' "
+                     " AND timestamp >= ($2::date - 1)::timestamp AT TIME ZONE 'UTC' "
+                     " AND timestamp < ($3::date + 2)::timestamp AT TIME ZONE 'UTC' ORDER BY timestamp",
+                     xiaomi_user_id,
+                     from,
+                     to,
+                     tz)) {
+                out.push_back({row[0].template as<std::string>(),
+                               row[1].template as<long long>(),
+                               row[2].is_null() ? std::nullopt : std::optional<double>(row[2].template as<double>())});
             }
             return out;
         });

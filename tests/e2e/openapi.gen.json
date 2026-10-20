@@ -822,7 +822,7 @@
        "number",
        "null"
       ],
-      "description": "Hours for sleep, steps for steps, kcal for active_kcal; shown only for manual; null for workout"
+      "description": "Hours for sleep, steps for steps, kcal for active_kcal; shown only for manual; null for workout and weight"
      },
      "unit": {
       "type": "string"
@@ -834,8 +834,10 @@
        "sleep",
        "steps",
        "active_kcal",
-       "workout"
-      ]
+       "workout",
+       "weight"
+      ],
+      "description": "What ticks the day besides a manual tick: sleep, steps and active_kcal from Mi Fitness against the goal, workout a finished Training session, weight any weigh-in on the Mi scales that day"
      },
      "target": {
       "type": [
@@ -894,7 +896,7 @@
        "null"
       ],
       "exclusiveMinimum": 0,
-      "description": "Required for sleep (hours, at most 24), steps and active_kcal; dropped for workout"
+      "description": "Required for sleep (hours, at most 24), steps and active_kcal; dropped for workout; refused for weight (400 on goal)"
      },
      "unit": {
       "type": "string",
@@ -907,9 +909,11 @@
        "sleep",
        "steps",
        "active_kcal",
-       "workout"
+       "workout",
+       "weight"
       ],
-      "default": "manual"
+      "default": "manual",
+      "description": "weight: a day is done when the Mi scales took a record in that local day by tz of the read (as a Training session), whatever it weighs; it takes no goal"
      },
      "target": {
       "type": [
@@ -947,7 +951,7 @@
        "number",
        "null"
       ],
-      "description": "The value of the tick, else the source value of the day (sleep minutes, steps, kcal, sessions)"
+      "description": "The value of the tick, else the source value of the day (sleep minutes, steps, kcal, sessions, kg of the latest weigh-in)"
      }
     }
    },
@@ -33639,7 +33643,7 @@
        "type": "string",
        "default": "UTC"
       },
-      "description": "IANA zone of the caller: today and the local day of a Training session"
+      "description": "IANA zone of the caller: today and the local day of a Training session and of a weigh-in"
      }
     ],
     "responses": {
@@ -34259,7 +34263,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 507304,
-  "source_fnv1a64": "267beb833bc91f9a"
+  "source_bytes": 507783,
+  "source_fnv1a64": "9b71a0490616e9ba"
  }
 }

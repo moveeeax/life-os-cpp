@@ -13,6 +13,8 @@ import {
   scheduleWords,
   splitNumbers,
   subline,
+  takesNoGoal,
+  SOURCE_LABEL,
   canGoBack,
   oldestTickDay,
   amountProblem,
@@ -117,6 +119,10 @@ describe('the words of a habit', () => {
     expect(subline({ schedule: 'daily', per_week: null, source: 'sleep', no_data: true })).toBe(
       'no data from Mi · every day',
     );
+    expect(subline({ schedule: 'daily', per_week: null, source: 'weight' })).toBe(
+      'from Mi · every day',
+    );
+    expect(SOURCE_LABEL.weight).toBe('Weigh-in on the Mi scales');
   });
 
   it('keeps the digits of a line apart for Hide numbers', () => {
@@ -136,9 +142,12 @@ describe('the words of a habit', () => {
     expect(formatValue({ source: 'workout', unit: '' }, 1)).toBe('1 session');
     expect(formatValue({ source: 'workout', unit: '' }, 2)).toBe('2 sessions');
     expect(formatValue({ source: 'manual', unit: 'min' }, 20)).toBe('20 min');
+    expect(formatValue({ source: 'weight', unit: '' }, 71.84)).toBe('71.8 kg');
+    expect(formatValue({ source: 'weight', unit: '' }, 72)).toBe('72 kg');
     expect(goalLine({ source: 'steps', goal: 8000, unit: '' })).toBe('8,000 steps');
     expect(goalLine({ source: 'sleep', goal: 7.5, unit: '' })).toBe('7.5 h');
     expect(goalLine({ source: 'workout', goal: null, unit: '' })).toBeNull();
+    expect(goalLine({ source: 'weight', goal: 70, unit: '' })).toBeNull();
   });
 });
 
@@ -201,6 +210,23 @@ describe('the habit form', () => {
       source: 'workout',
       target: null,
     });
+  });
+
+  it('sends no goal for a weigh-in and does not check one', () => {
+    expect(takesNoGoal('weight')).toBe(true);
+    expect(takesNoGoal('workout')).toBe(true);
+    expect(takesNoGoal('steps')).toBe(false);
+    const f = { ...habitForm(), name: 'Weigh-in', goal: '70', source: 'weight' as const };
+    expect(habitBody(f)).toEqual({
+      name: 'Weigh-in',
+      schedule: 'daily',
+      per_week: null,
+      goal: null,
+      unit: '',
+      source: 'weight',
+      target: null,
+    });
+    expect(habitProblem({ ...f, goal: 'heavy' })).toBeNull();
   });
 
   it('asks for a goal for a source from Mi', () => {

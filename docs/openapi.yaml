@@ -251,9 +251,9 @@ components:
         name: { type: string }
         schedule: { type: string, enum: [daily, weekly] }
         per_week: { type: [integer, 'null'], minimum: 1, maximum: 7 }
-        goal: { type: [number, 'null'], description: 'Hours for sleep, steps for steps, kcal for active_kcal; shown only for manual; null for workout' }
+        goal: { type: [number, 'null'], description: 'Hours for sleep, steps for steps, kcal for active_kcal; shown only for manual; null for workout and weight' }
         unit: { type: string }
-        source: { type: string, enum: [manual, sleep, steps, active_kcal, workout] }
+        source: { type: string, enum: [manual, sleep, steps, active_kcal, workout, weight], description: 'What ticks the day besides a manual tick: sleep, steps and active_kcal from Mi Fitness against the goal, workout a finished Training session, weight any weigh-in on the Mi scales that day' }
         target: { type: [number, 'null'], description: 'Manual only: the amount a day must reach (in unit) to count as done; null counts any tick' }
         position: { type: integer }
         archived_at: { type: [string, 'null'], format: date-time }
@@ -265,9 +265,9 @@ components:
         name: { type: string, minLength: 1, maxLength: 80 }
         schedule: { type: string, enum: [daily, weekly] }
         per_week: { type: [integer, 'null'], minimum: 1, maximum: 7, description: Required for weekly; not allowed for daily }
-        goal: { type: [number, 'null'], exclusiveMinimum: 0, description: 'Required for sleep (hours, at most 24), steps and active_kcal; dropped for workout' }
+        goal: { type: [number, 'null'], exclusiveMinimum: 0, description: 'Required for sleep (hours, at most 24), steps and active_kcal; dropped for workout; refused for weight (400 on goal)' }
         unit: { type: string, maxLength: 16 }
-        source: { type: string, enum: [manual, sleep, steps, active_kcal, workout], default: manual }
+        source: { type: string, enum: [manual, sleep, steps, active_kcal, workout, weight], default: manual, description: 'weight: a day is done when the Mi scales took a record in that local day by tz of the read (as a Training session), whatever it weighs; it takes no goal' }
         target: { type: [number, 'null'], exclusiveMinimum: 0, maximum: 1000000, description: 'Manual only: a day is done when the value of its tick (the sum of what was added) reaches it' }
     HabitDay:
       type: object
@@ -276,7 +276,7 @@ components:
         date: { type: string, format: date }
         done: { type: boolean }
         manual: { type: boolean, description: Ticked by hand }
-        value: { type: [number, 'null'], description: 'The value of the tick, else the source value of the day (sleep minutes, steps, kcal, sessions)' }
+        value: { type: [number, 'null'], description: 'The value of the tick, else the source value of the day (sleep minutes, steps, kcal, sessions, kg of the latest weigh-in)' }
     HabitDays:
       allOf:
         - { $ref: '#/components/schemas/Habit' }
@@ -12150,7 +12150,7 @@ paths:
       parameters:
         - { name: from, in: query, required: true, schema: { type: string, format: date } }
         - { name: to, in: query, required: true, schema: { type: string, format: date }, description: At most 61 days after from }
-        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: today and the local day of a Training session' }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: today and the local day of a Training session and of a weigh-in' }
       responses:
         '200':
           description: The habits with their days

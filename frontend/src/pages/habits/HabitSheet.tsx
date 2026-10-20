@@ -7,6 +7,7 @@ import {
   habitBody,
   habitForm,
   habitProblem,
+  takesNoGoal,
   type Habit,
   type HabitForm,
   type Source,
@@ -86,7 +87,7 @@ export function HabitSheet({ habit, onClose }: { habit?: Habit; onClose: () => v
             ))}
           </select>
         </label>
-        {f.source !== 'workout' && (
+        {!takesNoGoal(f.source) && (
           <div className="k-fields">
             <label className="k-field">
               <span>
@@ -121,8 +122,9 @@ export function HabitSheet({ habit, onClose }: { habit?: Habit; onClose: () => v
           </label>
         )}
         <p className="k-sub">
-          A source from Mi needs a goal; a Training session means any finished session that day.
-          With a daily target, a day counts once what you add that day reaches it (water in ml).
+          A source from Mi needs a goal; a Training session means any finished session that day, a
+          weigh-in any record of the Mi scales that day. With a daily target, a day counts once what
+          you add that day reaches it (water in ml).
         </p>
         {(problem || save.error) && (
           <p role="alert" className="k-error">

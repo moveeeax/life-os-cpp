@@ -19774,7 +19774,7 @@ export interface paths {
                     from: string;
                     /** @description At most 61 days after from */
                     to: string;
-                    /** @description IANA zone of the caller: today and the local day of a Training session */
+                    /** @description IANA zone of the caller: today and the local day of a Training session and of a weigh-in */
                     tz?: string;
                 };
                 header?: never;
@@ -20639,11 +20639,14 @@ export interface components {
             /** @enum {string} */
             schedule: "daily" | "weekly";
             per_week: number | null;
-            /** @description Hours for sleep, steps for steps, kcal for active_kcal; shown only for manual; null for workout */
+            /** @description Hours for sleep, steps for steps, kcal for active_kcal; shown only for manual; null for workout and weight */
             goal: number | null;
             unit: string;
-            /** @enum {string} */
-            source: "manual" | "sleep" | "steps" | "active_kcal" | "workout";
+            /**
+             * @description What ticks the day besides a manual tick: sleep, steps and active_kcal from Mi Fitness against the goal, workout a finished Training session, weight any weigh-in on the Mi scales that day
+             * @enum {string}
+             */
+            source: "manual" | "sleep" | "steps" | "active_kcal" | "workout" | "weight";
             /** @description Manual only: the amount a day must reach (in unit) to count as done; null counts any tick */
             target: number | null;
             position: number;
@@ -20658,14 +20661,15 @@ export interface components {
             schedule: "daily" | "weekly";
             /** @description Required for weekly; not allowed for daily */
             per_week?: number | null;
-            /** @description Required for sleep (hours, at most 24), steps and active_kcal; dropped for workout */
+            /** @description Required for sleep (hours, at most 24), steps and active_kcal; dropped for workout; refused for weight (400 on goal) */
             goal?: number | null;
             unit?: string;
             /**
+             * @description weight: a day is done when the Mi scales took a record in that local day by tz of the read (as a Training session), whatever it weighs; it takes no goal
              * @default manual
              * @enum {string}
              */
-            source: "manual" | "sleep" | "steps" | "active_kcal" | "workout";
+            source: "manual" | "sleep" | "steps" | "active_kcal" | "workout" | "weight";
             /** @description Manual only: a day is done when the value of its tick (the sum of what was added) reaches it */
             target?: number | null;
         };
@@ -20675,7 +20679,7 @@ export interface components {
             done: boolean;
             /** @description Ticked by hand */
             manual: boolean;
-            /** @description The value of the tick, else the source value of the day (sleep minutes, steps, kcal, sessions) */
+            /** @description The value of the tick, else the source value of the day (sleep minutes, steps, kcal, sessions, kg of the latest weigh-in) */
             value: number | null;
         };
         HabitDays: components["schemas"]["Habit"] & {
