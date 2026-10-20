@@ -8,7 +8,7 @@
 
 image:
   repository: ghcr.io/moveeeax/life-os-cpp
-  tag: "1.33.2"
+  tag: "1.34.0"
 
 replicaCount: 1
 
