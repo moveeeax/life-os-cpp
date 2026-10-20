@@ -1,0 +1,12 @@
+POST /api/v1/habits removed the enum value `manual` of the request property `source`
+POST /api/v1/habits removed the enum value `sleep` of the request property `source`
+POST /api/v1/habits removed the enum value `steps` of the request property `source`
+POST /api/v1/habits removed the enum value `active_kcal` of the request property `source`
+POST /api/v1/habits removed the enum value `workout` of the request property `source`
+POST /api/v1/habits removed the enum value `weight` of the request property `source`
+PATCH /api/v1/habits/{id} removed the enum value `manual` of the request property `source`
+PATCH /api/v1/habits/{id} removed the enum value `sleep` of the request property `source`
+PATCH /api/v1/habits/{id} removed the enum value `steps` of the request property `source`
+PATCH /api/v1/habits/{id} removed the enum value `active_kcal` of the request property `source`
+PATCH /api/v1/habits/{id} removed the enum value `workout` of the request property `source`
+PATCH /api/v1/habits/{id} removed the enum value `weight` of the request property `source`
