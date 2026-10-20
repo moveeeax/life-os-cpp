@@ -12941,6 +12941,8 @@ export interface paths {
                     status?: "active" | "done" | "dropped";
                     /** @description The person's local day the progress is computed at; defaults to today in UTC */
                     date?: string;
+                    /** @description IANA zone of the caller: the default day is today there, and the days of a goal source are counted there */
+                    tz?: string;
                 };
                 header?: never;
                 path?: never;
@@ -13008,6 +13010,8 @@ export interface paths {
                 query?: {
                     /** @description The person's local day the progress is computed at; defaults to today in UTC */
                     date?: string;
+                    /** @description IANA zone of the caller: the default day is today there, and the days of a goal source are counted there */
+                    tz?: string;
                 };
                 header?: never;
                 path?: never;
@@ -13089,6 +13093,8 @@ export interface paths {
                 query?: {
                     /** @description The person's local day the progress is computed at; defaults to today in UTC */
                     date?: string;
+                    /** @description IANA zone of the caller: the default day is today there, and the days of a goal source are counted there */
+                    tz?: string;
                 };
                 header?: never;
                 path: {
@@ -13217,6 +13223,8 @@ export interface paths {
                 query?: {
                     /** @description The person's local day the progress is computed at; defaults to today in UTC */
                     date?: string;
+                    /** @description IANA zone of the caller: the default day is today there, and the days of a goal source are counted there */
+                    tz?: string;
                 };
                 header?: never;
                 path: {
@@ -20616,6 +20624,13 @@ export interface components {
             target_count: number | null;
             /** @enum {string|null} */
             result: "pass" | "fail" | null;
+            /** @description A number goal only: the id of the metrics catalog series it follows (GET /api/v1/metrics), null when fed by check-ins alone */
+            source: string | null;
+            /**
+             * @description Why the source cannot be read for the caller; null when it can or there is none. An unreadable source leaves the check-ins alone driving the progress.
+             * @enum {string|null}
+             */
+            source_why: "module_off" | "no_permission" | "not_linked" | "not_yours" | null;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -20624,6 +20639,8 @@ export interface components {
         };
         GoalDetail: components["schemas"]["Goal"] & {
             checkins: components["schemas"]["GoalCheckin"][];
+            /** @description A number goal: the days of its source from start_date to the date asked for, merged with its check-ins (a check-in wins on its date), oldest first; empty for the other kinds */
+            points: components["schemas"]["GoalPoint"][];
             sections: (components["schemas"]["GoalSection"] & {
                 tasks: components["schemas"]["Task"][];
             })[];
@@ -20644,6 +20661,8 @@ export interface components {
             start_value?: number;
             target_value?: number;
             target_count?: number;
+            /** @description A number goal only: an id of the metrics catalog (GET /api/v1/metrics); stored canonical; 400 not_yours when it names a currency, category or habit not the caller's */
+            source?: string | null;
         };
         GoalPatch: {
             title?: string;
@@ -20659,6 +20678,8 @@ export interface components {
             target_count?: number;
             /** @enum {string} */
             result?: "pass" | "fail";
+            /** @description A number goal only: an id of the metrics catalog, or null to go back to check-ins alone */
+            source?: string | null;
         };
         GoalCheckin: {
             /** Format: uuid */
@@ -20667,6 +20688,13 @@ export interface components {
             date: string;
             value: number;
             note: string;
+        };
+        GoalPoint: {
+            /** Format: date */
+            date: string;
+            value: number;
+            /** @enum {string} */
+            from: "source" | "checkin";
         };
         GoalSection: {
             /** Format: uuid */

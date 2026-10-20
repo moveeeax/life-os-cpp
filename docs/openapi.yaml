@@ -98,7 +98,7 @@ components:
         result: { type: [string, 'null'], enum: [pass, fail, null] }
     Goal:
       type: object
-      required: [id, title, area, kind, why, start_date, due, status, completed_at, unit, start_value, target_value, target_count, result, created_at, updated_at, progress]
+      required: [id, title, area, kind, why, start_date, due, status, completed_at, unit, start_value, target_value, target_count, result, source, source_why, created_at, updated_at, progress]
       properties:
         id: { type: string, format: uuid }
         title: { type: string }
@@ -114,6 +114,11 @@ components:
         target_value: { type: [number, 'null'] }
         target_count: { type: [integer, 'null'] }
         result: { type: [string, 'null'], enum: [pass, fail, null] }
+        source: { type: [string, 'null'], description: 'A number goal only: the id of the metrics catalog series it follows (GET /api/v1/metrics), null when fed by check-ins alone' }
+        source_why:
+          type: [string, 'null']
+          enum: [module_off, no_permission, not_linked, not_yours, null]
+          description: Why the source cannot be read for the caller; null when it can or there is none. An unreadable source leaves the check-ins alone driving the progress.
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
         progress: { $ref: '#/components/schemas/GoalProgress' }
@@ -121,9 +126,10 @@ components:
       allOf:
         - { $ref: '#/components/schemas/Goal' }
         - type: object
-          required: [checkins, sections, tasks, milestones]
+          required: [checkins, points, sections, tasks, milestones]
           properties:
             checkins: { type: array, items: { $ref: '#/components/schemas/GoalCheckin' } }
+            points: { type: array, items: { $ref: '#/components/schemas/GoalPoint' }, description: 'A number goal: the days of its source from start_date to the date asked for, merged with its check-ins (a check-in wins on its date), oldest first; empty for the other kinds' }
             sections: { type: array, items: { allOf: [ { $ref: '#/components/schemas/GoalSection' }, { type: object, required: [tasks], properties: { tasks: { type: array, items: { $ref: '#/components/schemas/Task' } } } } ] } }
             tasks: { type: array, items: { $ref: '#/components/schemas/Task' }, description: The goal's tasks without a section }
             milestones: { type: array, items: { $ref: '#/components/schemas/GoalMilestone' } }
@@ -141,6 +147,7 @@ components:
         start_value: { type: number }
         target_value: { type: number }
         target_count: { type: integer, minimum: 1, maximum: 10000 }
+        source: { type: [string, 'null'], description: 'A number goal only: an id of the metrics catalog (GET /api/v1/metrics); stored canonical; 400 not_yours when it names a currency, category or habit not the caller''s' }
     GoalPatch:
       type: object
       properties:
@@ -154,6 +161,7 @@ components:
         target_value: { type: number }
         target_count: { type: integer, minimum: 1, maximum: 10000 }
         result: { type: string, enum: [pass, fail] }
+        source: { type: [string, 'null'], description: 'A number goal only: an id of the metrics catalog, or null to go back to check-ins alone' }
     GoalCheckin:
       type: object
       required: [id, date, value, note]
@@ -162,6 +170,13 @@ components:
         date: { type: string, format: date }
         value: { type: number }
         note: { type: string }
+    GoalPoint:
+      type: object
+      required: [date, value, from]
+      properties:
+        date: { type: string, format: date }
+        value: { type: number }
+        from: { type: string, enum: [source, checkin] }
     GoalSection:
       type: object
       required: [id, name, position]
@@ -8953,6 +8968,7 @@ paths:
       parameters:
         - { name: status, in: query, schema: { type: string, enum: [active, done, dropped] } }
         - { name: date, in: query, schema: { type: string, format: date }, description: The person's local day the progress is computed at; defaults to today in UTC }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there, and the days of a goal source are counted there' }
       responses:
         '200':
           description: Goals by due date
@@ -8987,6 +9003,7 @@ paths:
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: date, in: query, schema: { type: string, format: date }, description: The person's local day the progress is computed at; defaults to today in UTC }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there, and the days of a goal source are counted there' }
       requestBody:
         required: true
         content:
@@ -9027,6 +9044,7 @@ paths:
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: date, in: query, schema: { type: string, format: date }, description: The person's local day the progress is computed at; defaults to today in UTC }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there, and the days of a goal source are counted there' }
       responses:
         '200':
           description: The goal
@@ -9061,6 +9079,7 @@ paths:
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: date, in: query, schema: { type: string, format: date }, description: The person's local day the progress is computed at; defaults to today in UTC }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there, and the days of a goal source are counted there' }
       requestBody:
         required: true
         content:
