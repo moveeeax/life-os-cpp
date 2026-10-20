@@ -236,6 +236,8 @@ inline const std::vector<EndpointInfo>& get_endpoints() {
         {"GET", "/api/v1/habits/mood", "Habits: the mood check-ins of a range of days"},
         {"PUT", "/api/v1/habits/mood/{date}", "Habits: check in the mood of a day"},
         {"DELETE", "/api/v1/habits/mood/{date}", "Habits: remove the mood check-in of a day"},
+        {"GET", "/api/v1/metrics", "Metrics: the catalog of daily series, expanded for the caller"},
+        {"GET", "/api/v1/metrics/series", "Metrics: one series of the catalog by local day"},
         {"GET", "/api/v1/travel/documents", "Travel: the family's documents, the soonest to expire first"},
         {"POST", "/api/v1/travel/documents", "Travel: add a document"},
         {"PATCH", "/api/v1/travel/documents/{id}", "Travel: replace a document"},

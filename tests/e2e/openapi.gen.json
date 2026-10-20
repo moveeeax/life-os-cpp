@@ -1022,6 +1022,102 @@
      }
     }
    },
+   "MetricWhy": {
+    "type": [
+     "string",
+     "null"
+    ],
+    "enum": [
+     "module_off",
+     "no_permission",
+     "not_linked",
+     "not_yours",
+     null
+    ],
+    "description": "Why the series has no data for the caller: its module is off, the fitness read permission is missing, no Mi account is linked, or the id names a currency, category or habit that is not the caller's. Null when it is available."
+   },
+   "MetricEntry": {
+    "type": "object",
+    "required": [
+     "id",
+     "module",
+     "label",
+     "unit",
+     "reduce",
+     "presence",
+     "available",
+     "why"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "description": "The catalog id with its parameters: fitness:steps, money:expense:KZT, money:expense:KZT:<category uuid>, habits:<habit uuid>"
+     },
+     "module": {
+      "type": "string",
+      "enum": [
+       "fitness",
+       "food",
+       "habits",
+       "tape",
+       "workout",
+       "tasks",
+       "money",
+       "practice"
+      ],
+      "description": "The section the series comes from"
+     },
+     "label": {
+      "type": "string"
+     },
+     "unit": {
+      "type": "string",
+      "description": "kg, h, min, kcal, g, cm, bpm, %; the currency for money and practice; the habit's own unit; empty for a count without one"
+     },
+     "reduce": {
+      "type": "string",
+      "enum": [
+       "sum",
+       "last",
+       "avg",
+       "min",
+       "max",
+       "count"
+      ],
+      "description": "How the rows of a day become its value"
+     },
+     "presence": {
+      "type": "boolean",
+      "description": "A day with a value counts by itself (a weigh-in, a mood, a session): a habit on it needs no goal"
+     },
+     "available": {
+      "type": "boolean"
+     },
+     "why": {
+      "$ref": "#/components/schemas/MetricWhy"
+     }
+    }
+   },
+   "MetricPoint": {
+    "type": "object",
+    "required": [
+     "date",
+     "value"
+    ],
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "value": {
+      "type": [
+       "number",
+       "null"
+      ],
+      "description": "The value of the local day; null for a day with a record but no number (a tick without a value)"
+     }
+    }
+   },
    "MoodTag": {
     "type": "string",
     "enum": [
@@ -34258,12 +34354,159 @@
      }
     }
    }
+  },
+  "/api/v1/metrics": {
+   "get": {
+    "summary": "The catalog of daily series, expanded for the caller",
+    "description": "Every series a number goal or a habit can read, one value per local day. Parametrised entries are expanded: money by each currency of the caller's accounts and each expense category, practice by each currency of the accounts and of the practice entries, habits:<id> by each active habit ticked by hand. An entry the caller cannot read is listed with available false and the reason.",
+    "tags": [
+     "metrics"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The entries in catalog order",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/MetricEntry"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Goals and habits modules both disabled"
+     }
+    }
+   }
+  },
+  "/api/v1/metrics/series": {
+   "get": {
+    "summary": "One series of the catalog by local day",
+    "description": "The days of from..to that have a value. A timestamptz row lands on its day in tz, a dated row (food, tape, mood, money, practice, daily activity) on its date. A series the caller cannot read answers with no days and the reason in why. The five habit sources of before the catalog (sleep, steps, active_kcal, workout, weight) are accepted as source and answered under their catalog ids.",
+    "tags": [
+     "metrics"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "source",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "A catalog id, e.g. fitness:weight or money:expense:KZT"
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "At most 399 days after from"
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: the day boundary of timestamptz rows"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The series",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "source",
+          "unit",
+          "why",
+          "data"
+         ],
+         "properties": {
+          "source": {
+           "type": "string",
+           "description": "The catalog id of the series"
+          },
+          "unit": {
+           "type": "string"
+          },
+          "why": {
+           "$ref": "#/components/schemas/MetricWhy"
+          },
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/MetricPoint"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "invalid_query: not a catalog id, not calendar days, to before from, more than 400 days, or not an IANA zone"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Goals and habits modules both disabled"
+     }
+    }
+   }
   }
  },
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 507783,
-  "source_fnv1a64": "e1d6f98143dc5603"
+  "source_bytes": 512534,
+  "source_fnv1a64": "237aa205ea5dc897"
  }
 }

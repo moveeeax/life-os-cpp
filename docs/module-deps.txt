@@ -240,6 +240,8 @@ repositories/metrics -> habits
 repositories/metrics -> metrics
 repositories/metrics -> repositories/money
 repositories/metrics -> utils
+api -> metrics
+api -> repositories/metrics
 repositories/notes -> database
 repositories/notes -> repositories
 api -> practice

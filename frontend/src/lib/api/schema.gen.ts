@@ -20424,6 +20424,149 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The catalog of daily series, expanded for the caller
+         * @description Every series a number goal or a habit can read, one value per local day. Parametrised entries are expanded: money by each currency of the caller's accounts and each expense category, practice by each currency of the accounts and of the practice entries, habits:<id> by each active habit ticked by hand. An entry the caller cannot read is listed with available false and the reason.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The entries in catalog order */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MetricEntry"][];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Goals and habits modules both disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/metrics/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One series of the catalog by local day
+         * @description The days of from..to that have a value. A timestamptz row lands on its day in tz, a dated row (food, tape, mood, money, practice, daily activity) on its date. A series the caller cannot read answers with no days and the reason in why. The five habit sources of before the catalog (sleep, steps, active_kcal, workout, weight) are accepted as source and answered under their catalog ids.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description A catalog id, e.g. fitness:weight or money:expense:KZT */
+                    source: string;
+                    from: string;
+                    /** @description At most 399 days after from */
+                    to: string;
+                    /** @description IANA zone of the caller: the day boundary of timestamptz rows */
+                    tz?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The series */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description The catalog id of the series */
+                            source: string;
+                            unit: string;
+                            why: components["schemas"]["MetricWhy"];
+                            data: components["schemas"]["MetricPoint"][];
+                        };
+                    };
+                };
+                /** @description invalid_query: not a catalog id, not calendar days, to before from, more than 400 days, or not an IANA zone */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Goals and habits modules both disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -20697,6 +20840,38 @@ export interface components {
             habit_id: string;
             /** Format: date */
             date: string;
+            value: number | null;
+        };
+        /**
+         * @description Why the series has no data for the caller: its module is off, the fitness read permission is missing, no Mi account is linked, or the id names a currency, category or habit that is not the caller's. Null when it is available.
+         * @enum {string|null}
+         */
+        MetricWhy: "module_off" | "no_permission" | "not_linked" | "not_yours" | null;
+        MetricEntry: {
+            /** @description The catalog id with its parameters: fitness:steps, money:expense:KZT, money:expense:KZT:<category uuid>, habits:<habit uuid> */
+            id: string;
+            /**
+             * @description The section the series comes from
+             * @enum {string}
+             */
+            module: "fitness" | "food" | "habits" | "tape" | "workout" | "tasks" | "money" | "practice";
+            label: string;
+            /** @description kg, h, min, kcal, g, cm, bpm, %; the currency for money and practice; the habit's own unit; empty for a count without one */
+            unit: string;
+            /**
+             * @description How the rows of a day become its value
+             * @enum {string}
+             */
+            reduce: "sum" | "last" | "avg" | "min" | "max" | "count";
+            /** @description A day with a value counts by itself (a weigh-in, a mood, a session): a habit on it needs no goal */
+            presence: boolean;
+            available: boolean;
+            why: components["schemas"]["MetricWhy"];
+        };
+        MetricPoint: {
+            /** Format: date */
+            date: string;
+            /** @description The value of the local day; null for a day with a record but no number (a tick without a value) */
             value: number | null;
         };
         /** @enum {string} */

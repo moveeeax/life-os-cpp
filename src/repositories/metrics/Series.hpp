@@ -132,17 +132,13 @@ inline bool owns(const std::string& owner, const ::Metrics::Ref& r) {
 }  // namespace detail
 
 /**
- * Whether @p owner may read @p r: the module first (module_off), then for a Mi
- * series the permission (no_permission) and the link (not_linked), then the
- * parameters (not_yours: a currency without a money account of the owner, a
- * category or a habit of someone else, a habit with a source of its own).
+ * Whether the caller may read the entry @p d at all, before its parameters: the
+ * module first (module_off), then for a Mi series the permission
+ * (no_permission) and the link (not_linked).
  */
-inline Why available(const std::string& owner, const ::Metrics::Ref& r, const Access& a) {
-    if (r.def == nullptr) {
-        return Why::NotYours;
-    }
+inline Why gate_available(const ::Metrics::Def& d, const Access& a) {
     using ::Metrics::Gate;
-    switch (r.def->gate) {
+    switch (d.gate) {
         case Gate::Mi:
             if (!a.fitness) {
                 return Why::ModuleOff;
@@ -150,32 +146,52 @@ inline Why available(const std::string& owner, const ::Metrics::Ref& r, const Ac
             if (!a.mi_read) {
                 return Why::NoPermission;
             }
-            if (a.xiaomi_id.empty()) {
-                return Why::NotLinked;
-            }
-            return Why::Ok;
+            return a.xiaomi_id.empty() ? Why::NotLinked : Why::Ok;
         case Gate::Tape:
             return a.fitness ? Why::Ok : Why::ModuleOff;
         case Gate::Food:
             return a.food ? Why::Ok : Why::ModuleOff;
         case Gate::Habits:
-            if (!a.habits) {
-                return Why::ModuleOff;
-            }
-            break;
+            return a.habits ? Why::Ok : Why::ModuleOff;
         case Gate::Workout:
             return a.workout ? Why::Ok : Why::ModuleOff;
         case Gate::Tasks:
             return a.tasks ? Why::Ok : Why::ModuleOff;
         case Gate::Money:
-            if (!a.money) {
-                return Why::ModuleOff;
-            }
-            break;
+            return a.money ? Why::Ok : Why::ModuleOff;
         case Gate::Practice:
             return a.practice ? Why::Ok : Why::ModuleOff;
     }
+    return Why::ModuleOff;
+}
+
+/**
+ * Whether @p owner may read @p r: gate_available(), then the parameters
+ * (not_yours: a currency without a money account of the owner, a category or a
+ * habit of someone else, a habit with a source of its own).
+ */
+inline Why available(const std::string& owner, const ::Metrics::Ref& r, const Access& a) {
+    if (r.def == nullptr) {
+        return Why::NotYours;
+    }
+    const Why gate = gate_available(*r.def, a);
+    if (gate != Why::Ok) {
+        return gate;
+    }
     return detail::owns(owner, r) ? Why::Ok : Why::NotYours;
+}
+
+/// The unit of the series @p r: the catalog's (the currency for money and
+/// practice), the habit's own unit for `habits:<id>`.
+inline std::string unit_for(const std::string& owner, const ::Metrics::Ref& r) {
+    if (r.def == nullptr || r.def->param != ::Metrics::Param::Habit) {
+        return ::Metrics::unit_of(r);
+    }
+    return Database::get().execute_read([&](auto& txn) {
+        auto u =
+            txn.exec_params("SELECT unit FROM habits WHERE owner_id = $1::uuid AND id = $2::uuid", owner, r.habit_id);
+        return u.empty() ? std::string() : u[0][0].template as<std::string>();
+    });
 }
 
 /// The values of a series by local day, or why there are none.
