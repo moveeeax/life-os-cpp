@@ -117,14 +117,14 @@ TEST(MetricsCatalog, CanonicalRoundTrips) {
     const std::string upper = "0B0C3F6E-2A1D-4C55-9E1A-7D6F5B4A3C21";
     EXPECT_EQ(Metrics::canonical(*Metrics::parse("habits:" + upper)), std::string("habits:") + kUuid)
         << "a uuid is kept lower-case";
-    for (const std::string id : {std::string("fitness:steps"),
-                                 std::string("tape:waist"),
-                                 std::string("money:expense:KZT"),
-                                 std::string("money:expense:EUR:") + kUuid,
-                                 std::string("money:balance:USD"),
-                                 std::string("practice:expense:GBP"),
-                                 std::string("habits:") + kUuid,
-                                 std::string("habits:mood")}) {
+    for (const std::string& id : {std::string("fitness:steps"),
+                                  std::string("tape:waist"),
+                                  std::string("money:expense:KZT"),
+                                  std::string("money:expense:EUR:") + kUuid,
+                                  std::string("money:balance:USD"),
+                                  std::string("practice:expense:GBP"),
+                                  std::string("habits:") + kUuid,
+                                  std::string("habits:mood")}) {
         const auto r = Metrics::parse(id);
         ASSERT_TRUE(r) << id;
         EXPECT_EQ(Metrics::canonical(*r), id);
