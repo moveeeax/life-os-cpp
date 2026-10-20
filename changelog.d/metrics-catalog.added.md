@@ -1,0 +1,1 @@
+A catalog of daily series in `src/metrics/Catalog.hpp`: 57 entries from Fitness, Food, Habits, Tape, Training, Tasks, Money and Practice under ids like `fitness:steps` or `money:expense:KZT:<category>`, with the five legacy habit sources mapped to their catalog ids.
