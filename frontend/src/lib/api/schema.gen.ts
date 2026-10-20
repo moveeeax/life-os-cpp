@@ -12941,6 +12941,8 @@ export interface paths {
                     status?: "active" | "done" | "dropped";
                     /** @description The person's local day the progress is computed at; defaults to today in UTC */
                     date?: string;
+                    /** @description IANA zone of the caller: the default day is today there, and the days of a goal source are counted there */
+                    tz?: string;
                 };
                 header?: never;
                 path?: never;
@@ -13008,6 +13010,8 @@ export interface paths {
                 query?: {
                     /** @description The person's local day the progress is computed at; defaults to today in UTC */
                     date?: string;
+                    /** @description IANA zone of the caller: the default day is today there, and the days of a goal source are counted there */
+                    tz?: string;
                 };
                 header?: never;
                 path?: never;
@@ -13089,6 +13093,8 @@ export interface paths {
                 query?: {
                     /** @description The person's local day the progress is computed at; defaults to today in UTC */
                     date?: string;
+                    /** @description IANA zone of the caller: the default day is today there, and the days of a goal source are counted there */
+                    tz?: string;
                 };
                 header?: never;
                 path: {
@@ -13217,6 +13223,8 @@ export interface paths {
                 query?: {
                     /** @description The person's local day the progress is computed at; defaults to today in UTC */
                     date?: string;
+                    /** @description IANA zone of the caller: the default day is today there, and the days of a goal source are counted there */
+                    tz?: string;
                 };
                 header?: never;
                 path: {
@@ -19766,7 +19774,7 @@ export interface paths {
         };
         /**
          * Each active habit over a range of days with its streak
-         * @description A day is done by a manual tick or by its source meeting the goal; the auto values come from Mi Fitness and Training on read. The streak and the best count from today in tz over the stored ticks and the last 365 days of data.
+         * @description A day is done by a manual tick or by its source meeting the goal; the auto values come from the source series of the metrics catalog on read, each distinct source read once. The streak and the best count from today in tz over the stored ticks and the last 365 days of data.
          */
         get: {
             parameters: {
@@ -19774,7 +19782,7 @@ export interface paths {
                     from: string;
                     /** @description At most 61 days after from */
                     to: string;
-                    /** @description IANA zone of the caller: today and the local day of a Training session and of a weigh-in */
+                    /** @description IANA zone of the caller: today and the local day of every timestamped series (a night by its end, a session, a weigh-in) */
                     tz?: string;
                 };
                 header?: never;
@@ -20424,6 +20432,149 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The catalog of daily series, expanded for the caller
+         * @description Every series a number goal or a habit can read, one value per local day. Parametrised entries are expanded: money by each currency of the caller's accounts and each expense category, practice by each currency of the accounts and of the practice entries, habits:<id> by each active habit ticked by hand. An entry the caller cannot read is listed with available false and the reason.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The entries in catalog order */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MetricEntry"][];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Goals and habits modules both disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/metrics/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One series of the catalog by local day
+         * @description The days of from..to that have a value. A timestamptz row lands on its day in tz, a dated row (food, tape, mood, money, practice, daily activity) on its date. A series the caller cannot read answers with no days and the reason in why. The five habit sources of before the catalog (sleep, steps, active_kcal, workout, weight) are accepted as source and answered under their catalog ids.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description A catalog id, e.g. fitness:weight or money:expense:KZT */
+                    source: string;
+                    from: string;
+                    /** @description At most 399 days after from */
+                    to: string;
+                    /** @description IANA zone of the caller: the day boundary of timestamptz rows */
+                    tz?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The series */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description The catalog id of the series */
+                            source: string;
+                            unit: string;
+                            why: components["schemas"]["MetricWhy"];
+                            data: components["schemas"]["MetricPoint"][];
+                        };
+                    };
+                };
+                /** @description invalid_query: not a catalog id, not calendar days, to before from, more than 400 days, or not an IANA zone */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Goals and habits modules both disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -20473,6 +20624,13 @@ export interface components {
             target_count: number | null;
             /** @enum {string|null} */
             result: "pass" | "fail" | null;
+            /** @description A number goal only: the id of the metrics catalog series it follows (GET /api/v1/metrics), null when fed by check-ins alone */
+            source: string | null;
+            /**
+             * @description Why the source cannot be read for the caller; null when it can or there is none. An unreadable source leaves the check-ins alone driving the progress.
+             * @enum {string|null}
+             */
+            source_why: "module_off" | "no_permission" | "not_linked" | "not_yours" | null;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -20481,6 +20639,8 @@ export interface components {
         };
         GoalDetail: components["schemas"]["Goal"] & {
             checkins: components["schemas"]["GoalCheckin"][];
+            /** @description A number goal: the days of its source from start_date to the date asked for, merged with its check-ins (a check-in wins on its date), oldest first; empty for the other kinds */
+            points: components["schemas"]["GoalPoint"][];
             sections: (components["schemas"]["GoalSection"] & {
                 tasks: components["schemas"]["Task"][];
             })[];
@@ -20501,6 +20661,8 @@ export interface components {
             start_value?: number;
             target_value?: number;
             target_count?: number;
+            /** @description A number goal only: an id of the metrics catalog (GET /api/v1/metrics); stored canonical; 400 not_yours when it names a currency, category or habit not the caller's */
+            source?: string | null;
         };
         GoalPatch: {
             title?: string;
@@ -20516,6 +20678,8 @@ export interface components {
             target_count?: number;
             /** @enum {string} */
             result?: "pass" | "fail";
+            /** @description A number goal only: an id of the metrics catalog, or null to go back to check-ins alone */
+            source?: string | null;
         };
         GoalCheckin: {
             /** Format: uuid */
@@ -20524,6 +20688,13 @@ export interface components {
             date: string;
             value: number;
             note: string;
+        };
+        GoalPoint: {
+            /** Format: date */
+            date: string;
+            value: number;
+            /** @enum {string} */
+            from: "source" | "checkin";
         };
         GoalSection: {
             /** Format: uuid */
@@ -20639,14 +20810,16 @@ export interface components {
             /** @enum {string} */
             schedule: "daily" | "weekly";
             per_week: number | null;
-            /** @description Hours for sleep, steps for steps, kcal for active_kcal; shown only for manual; null for workout and weight */
+            /** @description In the unit of the source series (GET /api/v1/metrics: hours for fitness:sleep, the currency for money); shown only for manual. Null on a presence source: any value of the day counts */
             goal: number | null;
             unit: string;
+            /** @description What ticks the day besides a manual tick: manual, or a catalog id of GET /api/v1/metrics (fitness:steps, food:kcal, workout:sessions, money:expense:KZT, habits:<habit uuid>...), compared to the goal by direction. The names of 1.33 come back as their catalog ids */
+            source: string;
             /**
-             * @description What ticks the day besides a manual tick: sleep, steps and active_kcal from Mi Fitness against the goal, workout a finished Training session, weight any weigh-in on the Mi scales that day
+             * @description How the source value of a day compares to the goal
              * @enum {string}
              */
-            source: "manual" | "sleep" | "steps" | "active_kcal" | "workout" | "weight";
+            direction: "at_least" | "at_most";
             /** @description Manual only: the amount a day must reach (in unit) to count as done; null counts any tick */
             target: number | null;
             position: number;
@@ -20661,15 +20834,20 @@ export interface components {
             schedule: "daily" | "weekly";
             /** @description Required for weekly; not allowed for daily */
             per_week?: number | null;
-            /** @description Required for sleep (hours, at most 24), steps and active_kcal; dropped for workout; refused for weight (400 on goal) */
+            /** @description In the unit of the source series. Required (400 missing on goal) for a source that is not presence (sums and averages: fitness:steps, food:kcal, fitness:sleep in hours at most 24...); optional for a presence source (a weigh-in, a session, a mood): without it any value of the day counts. Dropped for the old name workout */
             goal?: number | null;
             unit?: string;
             /**
-             * @description weight: a day is done when the Mi scales took a record in that local day by tz of the read (as a Training session), whatever it weighs; it takes no goal
+             * @description manual or a catalog id of GET /api/v1/metrics; the names of 1.33 (sleep, steps, active_kcal, workout, weight) are taken and stored as fitness:sleep, fitness:steps, fitness:active_kcal, workout:sessions, fitness:weight. 400 on source: invalid (names nothing), not_yours (a currency, a category or a habit that is not the caller's), self (the habit itself), not_manual (a habit with a source of its own). A series the caller cannot read now is taken and shows no_data
              * @default manual
+             */
+            source: string;
+            /**
+             * @description at_most only with a source (400 not_allowed on direction for manual)
+             * @default at_least
              * @enum {string}
              */
-            source: "manual" | "sleep" | "steps" | "active_kcal" | "workout" | "weight";
+            direction: "at_least" | "at_most";
             /** @description Manual only: a day is done when the value of its tick (the sum of what was added) reaches it */
             target?: number | null;
         };
@@ -20679,7 +20857,7 @@ export interface components {
             done: boolean;
             /** @description Ticked by hand */
             manual: boolean;
-            /** @description The value of the tick, else the source value of the day (sleep minutes, steps, kcal, sessions, kg of the latest weigh-in) */
+            /** @description The value of the tick, else the source value of the day in the unit of its series (sleep hours, steps, kcal, sessions, kg of the latest weigh-in) */
             value: number | null;
         };
         HabitDays: components["schemas"]["Habit"] & {
@@ -20689,7 +20867,7 @@ export interface components {
             best: number;
             /** @description Weekly only: done days in the week of to */
             week_done: number | null;
-            /** @description The source has no data for the caller (no Mi account, fitness or Training off) */
+            /** @description The caller cannot read the source series (its module off, no fitness read permission, no Mi account, a habit or a currency no longer theirs) */
             no_data: boolean;
         };
         HabitCheck: {
@@ -20697,6 +20875,38 @@ export interface components {
             habit_id: string;
             /** Format: date */
             date: string;
+            value: number | null;
+        };
+        /**
+         * @description Why the series has no data for the caller: its module is off, the fitness read permission is missing, no Mi account is linked, or the id names a currency, category or habit that is not the caller's. Null when it is available.
+         * @enum {string|null}
+         */
+        MetricWhy: "module_off" | "no_permission" | "not_linked" | "not_yours" | null;
+        MetricEntry: {
+            /** @description The catalog id with its parameters: fitness:steps, money:expense:KZT, money:expense:KZT:<category uuid>, habits:<habit uuid> */
+            id: string;
+            /**
+             * @description The section the series comes from
+             * @enum {string}
+             */
+            module: "fitness" | "food" | "habits" | "tape" | "workout" | "tasks" | "money" | "practice";
+            label: string;
+            /** @description kg, h, min, kcal, g, cm, bpm, %; the currency for money and practice; the habit's own unit; empty for a count without one */
+            unit: string;
+            /**
+             * @description How the rows of a day become its value
+             * @enum {string}
+             */
+            reduce: "sum" | "last" | "avg" | "min" | "max" | "count";
+            /** @description A day with a value counts by itself (a weigh-in, a mood, a session): a habit on it needs no goal */
+            presence: boolean;
+            available: boolean;
+            why: components["schemas"]["MetricWhy"];
+        };
+        MetricPoint: {
+            /** Format: date */
+            date: string;
+            /** @description The value of the local day; null for a day with a record but no number (a tick without a value) */
             value: number | null;
         };
         /** @enum {string} */

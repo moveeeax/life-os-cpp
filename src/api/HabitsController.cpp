@@ -1,8 +1,9 @@
 /**
  * @file HabitsController.cpp
  * @brief The /api/v1/habits handlers: validation, the owner scope, the manual
- *        ticks, the days evaluated with the auto values of Mi Fitness and
- *        Training (docs/superpowers/specs/2026-10-14-habits-design.md).
+ *        ticks, the days evaluated with the auto values of a series of the
+ *        metrics catalog (docs/superpowers/specs/2026-10-14-habits-design.md,
+ *        docs/superpowers/specs/2026-10-20-metric-sources-design.md).
  */
 
 #include "api/HabitsController.hpp"
@@ -24,9 +25,11 @@
 #include "domain/Role.hpp"
 #include "habits/Habits.hpp"
 #include "habits/Mood.hpp"
+#include "metrics/Catalog.hpp"
 #include "repositories/habits/Days.hpp"
 #include "repositories/habits/HabitRepository.hpp"
 #include "repositories/habits/MoodRepository.hpp"
+#include "repositories/metrics/Series.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
 #include "security/Auth.hpp"
 #include "utils/ErrorResponse.hpp"
@@ -51,10 +54,13 @@ constexpr int kMoodRangeMax = 366;
 constexpr int kTickBackMax = 366;
 /// The largest goal: a step count with room to spare.
 constexpr double kGoalMax = 1000000;
-constexpr double kSleepGoalMax = 24;
+/// The largest goal of a series in hours (sleep, time in bed).
+constexpr double kHoursGoalMax = 24;
+/// The largest goal of a money series: a balance in a currency of small units.
+constexpr double kMoneyGoalMax = 1e12;
 
 const std::vector<std::string> kSchedules = {"daily", "weekly"};
-const std::vector<std::string> kSources = {"manual", "sleep", "steps", "active_kcal", "workout", "weight"};
+const std::vector<std::string> kDirections = {"at_least", "at_most"};
 
 /// ?tz=, UTC by default; nullopt (answered) when not an IANA zone.
 std::optional<std::string> zone_of(const HttpRequestPtr& req, const HabitsController::Callback& callback) {
@@ -66,17 +72,42 @@ std::optional<std::string> zone_of(const HttpRequestPtr& req, const HabitsContro
     return tz;
 }
 
+/// A checked habit body and the series its source names (nullopt for manual).
+struct HabitInput {
+    HabitRepository::Input in;
+    std::optional<::Metrics::Ref> ref;
+};
+
 /// A habit body, checked; nullopt (answered) when bad.
-std::optional<HabitRepository::Input> habit_input(const json& body, const HabitsController::Callback& callback) {
+std::optional<HabitInput> habit_input(const json& body, const HabitsController::Callback& callback) {
     Validation::Errors errs;
     Validation::require_string(errs, body, "name");
     Validation::require_string(errs, body, "schedule");
     text_length(errs, body, "name", 1, 80);
     text_length(errs, body, "unit", 0, 16);
     Validation::one_of(errs, body, "schedule", kSchedules);
-    Validation::one_of(errs, body, "source", kSources);
+    Validation::one_of(errs, body, "direction", kDirections);
     const std::string schedule = Validation::opt_string(body, "schedule").value_or("");
-    const std::string source = Validation::opt_string(body, "source").value_or("manual");
+    // "manual", a catalog id, or one of the five names of 1.33 (stored as its catalog id).
+    std::string source = "manual";
+    std::optional<::Metrics::Ref> ref;
+    if (body.contains("source") && !body["source"].is_null()) {
+        if (!body["source"].is_string()) {
+            errs.add("source", "invalid", "manual or an id of GET /api/v1/metrics");
+        } else {
+            source = body["source"].get<std::string>();
+            ref = ::Habits::source_of(source);
+            if (source != "manual" && !ref) {
+                errs.add("source", "invalid", "manual or an id of GET /api/v1/metrics");
+            }
+        }
+    }
+    // A workout of 1.33 is any finished session: its goal is dropped, as it was then.
+    const bool legacy_workout = source == "workout";
+    const std::string direction = Validation::opt_string(body, "direction").value_or("at_least");
+    if (!ref && direction == "at_most") {
+        errs.add("direction", "not_allowed", "only a habit with a source compares at most");
+    }
     const auto per_week = opt_int(body, "per_week");
     if (schedule == "weekly" && (!per_week || *per_week < 1 || *per_week > 7)) {
         errs.add("per_week", "invalid", "a weekly habit needs per_week from 1 to 7");
@@ -85,24 +116,28 @@ std::optional<HabitRepository::Input> habit_input(const json& body, const Habits
         errs.add("per_week", "not_allowed", "only a weekly habit takes per_week");
     }
     std::optional<double> goal;
-    if (source == "weight" && body.contains("goal") && !body["goal"].is_null()) {
-        // Any weigh-in ticks the day: a goal would read as a weight to reach, which it is not.
-        errs.add("goal", "not_allowed", "a weigh-in habit takes no goal");
-    } else if (body.contains("goal") && !body["goal"].is_null()) {
-        const double max = source == "sleep" ? kSleepGoalMax : kGoalMax;
+    const bool has_goal = body.contains("goal") && !body["goal"].is_null();
+    if (has_goal) {
+        // The goal is in the series' unit: hours for sleep, the currency for money.
+        double max = kGoalMax;
+        if (ref && ref->def->unit == "h") {
+            max = kHoursGoalMax;
+        } else if (ref && (ref->def->gate == ::Metrics::Gate::Money || ref->def->gate == ::Metrics::Gate::Practice)) {
+            max = kMoneyGoalMax;
+        }
         if (!body["goal"].is_number() || !(body["goal"].get<double>() > 0) || body["goal"].get<double>() > max) {
             errs.add("goal", "invalid", "a goal is a number above 0, at most " + json(max).dump());
         } else {
             goal = body["goal"].get<double>();
         }
     }
-    if ((source == "sleep" || source == "steps" || source == "active_kcal") && !goal &&
-        !(body.contains("goal") && !body["goal"].is_null())) {
-        errs.add("goal", "missing", "a source from Mi needs a goal");
+    if (ref && !ref->def->presence && !has_goal && !legacy_workout) {
+        // A sum or an average is there every day: without a goal it would tick nothing.
+        errs.add("goal", "missing", "this source needs a goal to compare the day with");
     }
     std::optional<double> target;
     if (body.contains("target") && !body["target"].is_null()) {
-        if (source != "manual") {
+        if (ref) {
             errs.add("target", "not_allowed", "only a habit ticked by hand takes a daily target");
         } else if (!body["target"].is_number() || !(body["target"].get<double>() > 0) ||
                    body["target"].get<double>() > kGoalMax) {
@@ -115,17 +150,58 @@ std::optional<HabitRepository::Input> habit_input(const json& body, const Habits
         callback(Validation::response_400(errs));
         return std::nullopt;
     }
-    // A workout is any finished session that day: its goal would mean nothing.
-    if (source == "workout") {
+    if (legacy_workout) {
         goal.reset();
     }
-    return HabitRepository::Input{body["name"].get<std::string>(),
-                                  schedule,
-                                  schedule == "weekly" ? per_week : std::nullopt,
-                                  goal,
-                                  Validation::opt_string(body, "unit").value_or(""),
-                                  source,
-                                  target};
+    return HabitInput{HabitRepository::Input{body["name"].get<std::string>(),
+                                             schedule,
+                                             schedule == "weekly" ? per_week : std::nullopt,
+                                             goal,
+                                             Validation::opt_string(body, "unit").value_or(""),
+                                             ref ? ::Metrics::canonical(*ref) : std::string("manual"),
+                                             target,
+                                             direction},
+                      ref};
+}
+
+/**
+ * Whether @p ref names a series that is @p owner's: a habit of theirs ticked by hand
+ * and not the habit @p self itself, a currency of their money accounts, a category of
+ * theirs. False (answered 400 on source) when not. The module switches, the
+ * permission and the Mi link are not asked here: a habit on a series the caller
+ * cannot read now shows no_data, it is not refused.
+ */
+bool source_is_yours(const std::string& owner,
+                     const std::optional<::Metrics::Ref>& ref,
+                     const std::string& self,
+                     const HabitsController::Callback& callback) {
+    if (!ref) {
+        return true;
+    }
+    Validation::Errors errs;
+    if (ref->def->param == ::Metrics::Param::Habit) {
+        const auto habit = HabitRepository().get(owner, ref->habit_id);
+        if (ref->habit_id == self) {
+            errs.add("source", "self", "a habit cannot read its own ticks");
+        } else if (!habit) {
+            errs.add("source", "not_yours", "no such habit of yours");
+        } else if ((*habit)["source"] != "manual") {
+            errs.add("source", "not_manual", "only a habit ticked by hand can be a source");
+        }
+    } else {
+        // Every gate open: only the parameters are asked (Repositories::Metrics::available).
+        Repositories::Metrics::Access all;
+        all.fitness = all.mi_read = all.workout = all.food = all.habits = all.tasks = all.money = all.practice = true;
+        all.xiaomi_id = "-";
+        if (Repositories::Metrics::available(owner, *ref, all) == Repositories::Metrics::Why::NotYours) {
+            errs.add("source", "not_yours", "the currency or the category is not one of yours");
+        }
+    }
+    if (errs.any()) {
+        callback(Validation::response_400(errs));
+        return false;
+    }
+    return true;
 }
 
 /// The day of a tick, checked against today in the caller's zone; false (answered) when bad.
@@ -172,7 +248,10 @@ void HabitsController::create(const HttpRequestPtr& req, Callback&& callback) {
         return;
     }
     with_repo_errors(callback, "habits.create", [&] {
-        callback(Response::created(json{{"data", HabitRepository().create(owner, *in)}}));
+        if (!source_is_yours(owner, in->ref, "", callback)) {
+            return;
+        }
+        callback(Response::created(json{{"data", HabitRepository().create(owner, in->in)}}));
     });
 }
 
@@ -190,7 +269,11 @@ void HabitsController::update(const HttpRequestPtr& req, Callback&& callback, co
         return;
     }
     with_repo_errors(callback, "habits.update", [&] {
-        callback(Response::ok(json{{"data", HabitRepository().replace(owner, id, *in)}}));
+        // The id as the catalog keeps a habit's (lower case), so an upper-case path still meets itself.
+        if (!source_is_yours(owner, in->ref, ::Metrics::detail::lower(id), callback)) {
+            return;
+        }
+        callback(Response::ok(json{{"data", HabitRepository().replace(owner, id, in->in)}}));
     });
 }
 
@@ -246,7 +329,8 @@ void HabitsController::days(const HttpRequestPtr& req, Callback&& callback) {
             return;
         }
         const std::string today = HabitRepository().today(*tz);
-        const Repositories::Habits::Access access{Core::fitness_enabled() && fitness_read, Core::workout_enabled()};
+        const auto access =
+            Repositories::Metrics::access_of(owner, fitness_read ? Domain::Permission::kFitnessRead : 0U);
         json out = json::array();
         for (const auto& e :
              Repositories::Habits::evaluate(owner, a, b, ::Habits::day_of(today), *tz, access, /*history=*/true)) {

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { chartPoints, formatValue, paceWord, shelf, weeklyPace } from './index';
+import {
+  axisLabels,
+  formatValue,
+  goalChart,
+  lastSourceDate,
+  paceWord,
+  shelf,
+  weeklyPace,
+} from './index';
 import type { Goal } from './types';
 
 const base = {
@@ -185,19 +193,66 @@ describe('weeklyPace', () => {
   });
 });
 
-describe('chartPoints', () => {
+describe('goalChart', () => {
+  const checkins = [
+    { id: 'c2', date: '2026-03-01', value: 80, note: '' },
+    { id: 'c1', date: '2026-01-01', value: 84, note: '' },
+  ];
+  const base = { start_date: '2026-01-01', start_value: 85 };
+
   it('starts the line at a check-in dated on the start date', () => {
-    const newestFirst = [
-      { date: '2026-03-01', value: 80 },
-      { date: '2026-01-01', value: 84 },
-    ];
-    expect(chartPoints('2026-01-01', 85, newestFirst)).toEqual([
-      ['2026-01-01', 84],
-      ['2026-03-01', 80],
+    expect(goalChart({ ...base, checkins, points: [] })).toEqual([
+      { date: '2026-01-01', value: 84, from: 'checkin' },
+      { date: '2026-03-01', value: 80, from: 'checkin' },
     ]);
-    expect(chartPoints('2026-01-01', 85, newestFirst.slice(0, 1))).toEqual([
-      ['2026-01-01', 85],
-      ['2026-03-01', 80],
+    expect(goalChart({ ...base, checkins: checkins.slice(0, 1), points: [] })).toEqual([
+      { date: '2026-01-01', value: 85, from: 'start' },
+      { date: '2026-03-01', value: 80, from: 'checkin' },
+    ]);
+  });
+
+  it('draws the points of a source with their origin', () => {
+    const points = [
+      { date: '2026-01-02', value: 84.6, from: 'source' as const },
+      { date: '2026-01-03', value: 84, from: 'checkin' as const },
+      { date: '2026-01-04', value: 84.2, from: 'source' as const },
+    ];
+    expect(goalChart({ ...base, checkins: [], points })).toEqual([
+      { date: '2026-01-01', value: 85, from: 'start' },
+      ...points,
+    ]);
+    expect(lastSourceDate(points)).toBe('2026-01-04');
+    expect(lastSourceDate(points.filter((p) => p.from === 'checkin'))).toBeNull();
+  });
+});
+
+describe('axisLabels', () => {
+  const start = { x: 46, text: '19 Oct' };
+  const end = { x: 628, text: '31 Dec' };
+  const texts = (today: number | null) => axisLabels({ start, end, today }).map((l) => l.text);
+
+  it('drops the start date when today sits on it', () => {
+    // The owner's screenshot: a goal started today, "today" over "19 Oct".
+    expect(texts(46)).toEqual(['31 Dec', 'today']);
+    expect(texts(100)).toEqual(['31 Dec', 'today']);
+  });
+
+  it('keeps both dates when today is clear of them', () => {
+    expect(texts(300)).toEqual(['19 Oct', '31 Dec', 'today']);
+    // 46 + 44 = 90 is the right edge of the start label; today's left edge is 112 - 22 = 90.
+    expect(texts(112)).toEqual(['19 Oct', '31 Dec', 'today']);
+  });
+
+  it('drops the due date when today is near it, and draws no today outside the goal', () => {
+    expect(texts(610)).toEqual(['19 Oct', 'today']);
+    expect(texts(null)).toEqual(['19 Oct', '31 Dec']);
+  });
+
+  it('anchors each label at its side', () => {
+    expect(axisLabels({ start, end, today: 300 }).map((l) => l.anchor)).toEqual([
+      'start',
+      'end',
+      'middle',
     ]);
   });
 });

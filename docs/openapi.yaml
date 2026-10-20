@@ -98,7 +98,7 @@ components:
         result: { type: [string, 'null'], enum: [pass, fail, null] }
     Goal:
       type: object
-      required: [id, title, area, kind, why, start_date, due, status, completed_at, unit, start_value, target_value, target_count, result, created_at, updated_at, progress]
+      required: [id, title, area, kind, why, start_date, due, status, completed_at, unit, start_value, target_value, target_count, result, source, source_why, created_at, updated_at, progress]
       properties:
         id: { type: string, format: uuid }
         title: { type: string }
@@ -114,6 +114,11 @@ components:
         target_value: { type: [number, 'null'] }
         target_count: { type: [integer, 'null'] }
         result: { type: [string, 'null'], enum: [pass, fail, null] }
+        source: { type: [string, 'null'], description: 'A number goal only: the id of the metrics catalog series it follows (GET /api/v1/metrics), null when fed by check-ins alone' }
+        source_why:
+          type: [string, 'null']
+          enum: [module_off, no_permission, not_linked, not_yours, null]
+          description: Why the source cannot be read for the caller; null when it can or there is none. An unreadable source leaves the check-ins alone driving the progress.
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
         progress: { $ref: '#/components/schemas/GoalProgress' }
@@ -121,9 +126,10 @@ components:
       allOf:
         - { $ref: '#/components/schemas/Goal' }
         - type: object
-          required: [checkins, sections, tasks, milestones]
+          required: [checkins, points, sections, tasks, milestones]
           properties:
             checkins: { type: array, items: { $ref: '#/components/schemas/GoalCheckin' } }
+            points: { type: array, items: { $ref: '#/components/schemas/GoalPoint' }, description: 'A number goal: the days of its source from start_date to the date asked for, merged with its check-ins (a check-in wins on its date), oldest first; empty for the other kinds' }
             sections: { type: array, items: { allOf: [ { $ref: '#/components/schemas/GoalSection' }, { type: object, required: [tasks], properties: { tasks: { type: array, items: { $ref: '#/components/schemas/Task' } } } } ] } }
             tasks: { type: array, items: { $ref: '#/components/schemas/Task' }, description: The goal's tasks without a section }
             milestones: { type: array, items: { $ref: '#/components/schemas/GoalMilestone' } }
@@ -141,6 +147,7 @@ components:
         start_value: { type: number }
         target_value: { type: number }
         target_count: { type: integer, minimum: 1, maximum: 10000 }
+        source: { type: [string, 'null'], description: 'A number goal only: an id of the metrics catalog (GET /api/v1/metrics); stored canonical; 400 not_yours when it names a currency, category or habit not the caller''s' }
     GoalPatch:
       type: object
       properties:
@@ -154,6 +161,7 @@ components:
         target_value: { type: number }
         target_count: { type: integer, minimum: 1, maximum: 10000 }
         result: { type: string, enum: [pass, fail] }
+        source: { type: [string, 'null'], description: 'A number goal only: an id of the metrics catalog, or null to go back to check-ins alone' }
     GoalCheckin:
       type: object
       required: [id, date, value, note]
@@ -162,6 +170,13 @@ components:
         date: { type: string, format: date }
         value: { type: number }
         note: { type: string }
+    GoalPoint:
+      type: object
+      required: [date, value, from]
+      properties:
+        date: { type: string, format: date }
+        value: { type: number }
+        from: { type: string, enum: [source, checkin] }
     GoalSection:
       type: object
       required: [id, name, position]
@@ -245,15 +260,16 @@ components:
         text: { type: string, minLength: 1, maxLength: 200, description: 'Required for text; ignored for task and goal (the title is copied)' }
     Habit:
       type: object
-      required: [id, name, schedule, per_week, goal, unit, source, target, position, archived_at, created_at]
+      required: [id, name, schedule, per_week, goal, unit, source, direction, target, position, archived_at, created_at]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
         schedule: { type: string, enum: [daily, weekly] }
         per_week: { type: [integer, 'null'], minimum: 1, maximum: 7 }
-        goal: { type: [number, 'null'], description: 'Hours for sleep, steps for steps, kcal for active_kcal; shown only for manual; null for workout and weight' }
+        goal: { type: [number, 'null'], description: 'In the unit of the source series (GET /api/v1/metrics: hours for fitness:sleep, the currency for money); shown only for manual. Null on a presence source: any value of the day counts' }
         unit: { type: string }
-        source: { type: string, enum: [manual, sleep, steps, active_kcal, workout, weight], description: 'What ticks the day besides a manual tick: sleep, steps and active_kcal from Mi Fitness against the goal, workout a finished Training session, weight any weigh-in on the Mi scales that day' }
+        source: { type: string, description: 'What ticks the day besides a manual tick: manual, or a catalog id of GET /api/v1/metrics (fitness:steps, food:kcal, workout:sessions, money:expense:KZT, habits:<habit uuid>...), compared to the goal by direction. The names of 1.33 come back as their catalog ids' }
+        direction: { type: string, enum: [at_least, at_most], description: 'How the source value of a day compares to the goal' }
         target: { type: [number, 'null'], description: 'Manual only: the amount a day must reach (in unit) to count as done; null counts any tick' }
         position: { type: integer }
         archived_at: { type: [string, 'null'], format: date-time }
@@ -265,9 +281,10 @@ components:
         name: { type: string, minLength: 1, maxLength: 80 }
         schedule: { type: string, enum: [daily, weekly] }
         per_week: { type: [integer, 'null'], minimum: 1, maximum: 7, description: Required for weekly; not allowed for daily }
-        goal: { type: [number, 'null'], exclusiveMinimum: 0, description: 'Required for sleep (hours, at most 24), steps and active_kcal; dropped for workout; refused for weight (400 on goal)' }
+        goal: { type: [number, 'null'], exclusiveMinimum: 0, description: 'In the unit of the source series. Required (400 missing on goal) for a source that is not presence (sums and averages: fitness:steps, food:kcal, fitness:sleep in hours at most 24...); optional for a presence source (a weigh-in, a session, a mood): without it any value of the day counts. Dropped for the old name workout' }
         unit: { type: string, maxLength: 16 }
-        source: { type: string, enum: [manual, sleep, steps, active_kcal, workout, weight], default: manual, description: 'weight: a day is done when the Mi scales took a record in that local day by tz of the read (as a Training session), whatever it weighs; it takes no goal' }
+        source: { type: string, default: manual, description: 'manual or a catalog id of GET /api/v1/metrics; the names of 1.33 (sleep, steps, active_kcal, workout, weight) are taken and stored as fitness:sleep, fitness:steps, fitness:active_kcal, workout:sessions, fitness:weight. 400 on source: invalid (names nothing), not_yours (a currency, a category or a habit that is not the caller''s), self (the habit itself), not_manual (a habit with a source of its own). A series the caller cannot read now is taken and shows no_data' }
+        direction: { type: string, enum: [at_least, at_most], default: at_least, description: 'at_most only with a source (400 not_allowed on direction for manual)' }
         target: { type: [number, 'null'], exclusiveMinimum: 0, maximum: 1000000, description: 'Manual only: a day is done when the value of its tick (the sum of what was added) reaches it' }
     HabitDay:
       type: object
@@ -276,7 +293,7 @@ components:
         date: { type: string, format: date }
         done: { type: boolean }
         manual: { type: boolean, description: Ticked by hand }
-        value: { type: [number, 'null'], description: 'The value of the tick, else the source value of the day (sleep minutes, steps, kcal, sessions, kg of the latest weigh-in)' }
+        value: { type: [number, 'null'], description: 'The value of the tick, else the source value of the day in the unit of its series (sleep hours, steps, kcal, sessions, kg of the latest weigh-in)' }
     HabitDays:
       allOf:
         - { $ref: '#/components/schemas/Habit' }
@@ -287,7 +304,7 @@ components:
             streak: { type: integer, description: 'Days for a daily habit, met weeks for a weekly one' }
             best: { type: integer }
             week_done: { type: [integer, 'null'], description: 'Weekly only: done days in the week of to' }
-            no_data: { type: boolean, description: 'The source has no data for the caller (no Mi account, fitness or Training off)' }
+            no_data: { type: boolean, description: 'The caller cannot read the source series (its module off, no fitness read permission, no Mi account, a habit or a currency no longer theirs)' }
     HabitCheck:
       type: object
       required: [habit_id, date, value]
@@ -295,6 +312,28 @@ components:
         habit_id: { type: string, format: uuid }
         date: { type: string, format: date }
         value: { type: [number, 'null'] }
+    MetricWhy:
+      type: [string, 'null']
+      enum: [module_off, no_permission, not_linked, not_yours, null]
+      description: 'Why the series has no data for the caller: its module is off, the fitness read permission is missing, no Mi account is linked, or the id names a currency, category or habit that is not the caller''s. Null when it is available.'
+    MetricEntry:
+      type: object
+      required: [id, module, label, unit, reduce, presence, available, why]
+      properties:
+        id: { type: string, description: 'The catalog id with its parameters: fitness:steps, money:expense:KZT, money:expense:KZT:<category uuid>, habits:<habit uuid>' }
+        module: { type: string, enum: [fitness, food, habits, tape, workout, tasks, money, practice], description: The section the series comes from }
+        label: { type: string }
+        unit: { type: string, description: 'kg, h, min, kcal, g, cm, bpm, %; the currency for money and practice; the habit''s own unit; empty for a count without one' }
+        reduce: { type: string, enum: [sum, last, avg, min, max, count], description: How the rows of a day become its value }
+        presence: { type: boolean, description: 'A day with a value counts by itself (a weigh-in, a mood, a session): a habit on it needs no goal' }
+        available: { type: boolean }
+        why: { $ref: '#/components/schemas/MetricWhy' }
+    MetricPoint:
+      type: object
+      required: [date, value]
+      properties:
+        date: { type: string, format: date }
+        value: { type: [number, 'null'], description: 'The value of the local day; null for a day with a record but no number (a tick without a value)' }
     MoodTag:
       type: string
       enum: [calm, happy, energetic, focused, grateful, social, tired, stressed, anxious, sad, irritable, sick]
@@ -8931,6 +8970,7 @@ paths:
       parameters:
         - { name: status, in: query, schema: { type: string, enum: [active, done, dropped] } }
         - { name: date, in: query, schema: { type: string, format: date }, description: The person's local day the progress is computed at; defaults to today in UTC }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there, and the days of a goal source are counted there' }
       responses:
         '200':
           description: Goals by due date
@@ -8965,6 +9005,7 @@ paths:
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: date, in: query, schema: { type: string, format: date }, description: The person's local day the progress is computed at; defaults to today in UTC }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there, and the days of a goal source are counted there' }
       requestBody:
         required: true
         content:
@@ -9005,6 +9046,7 @@ paths:
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: date, in: query, schema: { type: string, format: date }, description: The person's local day the progress is computed at; defaults to today in UTC }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there, and the days of a goal source are counted there' }
       responses:
         '200':
           description: The goal
@@ -9039,6 +9081,7 @@ paths:
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: date, in: query, schema: { type: string, format: date }, description: The person's local day the progress is computed at; defaults to today in UTC }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there, and the days of a goal source are counted there' }
       requestBody:
         required: true
         content:
@@ -12144,13 +12187,13 @@ paths:
   /api/v1/habits/days:
     get:
       summary: Each active habit over a range of days with its streak
-      description: 'A day is done by a manual tick or by its source meeting the goal; the auto values come from Mi Fitness and Training on read. The streak and the best count from today in tz over the stored ticks and the last 365 days of data.'
+      description: 'A day is done by a manual tick or by its source meeting the goal; the auto values come from the source series of the metrics catalog on read, each distinct source read once. The streak and the best count from today in tz over the stored ticks and the last 365 days of data.'
       tags: [habits]
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: from, in: query, required: true, schema: { type: string, format: date } }
         - { name: to, in: query, required: true, schema: { type: string, format: date }, description: At most 61 days after from }
-        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: today and the local day of a Training session and of a weigh-in' }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: today and the local day of every timestamped series (a night by its end, a session, a weigh-in)' }
       responses:
         '200':
           description: The habits with their days
@@ -12358,3 +12401,50 @@ paths:
         '400': { description: Not a calendar day }
         '401': { description: Not authenticated }
         '404': { description: Habits module disabled }
+  /api/v1/metrics:
+    get:
+      summary: The catalog of daily series, expanded for the caller
+      description: 'Every series a number goal or a habit can read, one value per local day. Parametrised entries are expanded: money by each currency of the caller''s accounts and each expense category, practice by each currency of the accounts and of the practice entries, habits:<id> by each active habit ticked by hand. An entry the caller cannot read is listed with available false and the reason.'
+      tags: [metrics]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The entries in catalog order
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/MetricEntry' } }
+        '401': { description: Not authenticated }
+        '403': { description: The principal is not a user account (no_user_account) }
+        '404': { description: Goals and habits modules both disabled }
+  /api/v1/metrics/series:
+    get:
+      summary: One series of the catalog by local day
+      description: 'The days of from..to that have a value. A timestamptz row lands on its day in tz, a dated row (food, tape, mood, money, practice, daily activity) on its date. A series the caller cannot read answers with no days and the reason in why. The five habit sources of before the catalog (sleep, steps, active_kcal, workout, weight) are accepted as source and answered under their catalog ids.'
+      tags: [metrics]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: source, in: query, required: true, schema: { type: string }, description: 'A catalog id, e.g. fitness:weight or money:expense:KZT' }
+        - { name: from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date }, description: At most 399 days after from }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the day boundary of timestamptz rows' }
+      responses:
+        '200':
+          description: The series
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [source, unit, why, data]
+                properties:
+                  source: { type: string, description: The catalog id of the series }
+                  unit: { type: string }
+                  why: { $ref: '#/components/schemas/MetricWhy' }
+                  data: { type: array, items: { $ref: '#/components/schemas/MetricPoint' } }
+        '400': { description: 'invalid_query: not a catalog id, not calendar days, to before from, more than 400 days, or not an IANA zone' }
+        '401': { description: Not authenticated }
+        '403': { description: The principal is not a user account (no_user_account) }
+        '404': { description: Goals and habits modules both disabled }

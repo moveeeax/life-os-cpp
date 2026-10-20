@@ -36,6 +36,7 @@
 #include "now/Weather.hpp"
 #include "repositories/Zones.hpp"
 #include "repositories/goals/GoalRepository.hpp"
+#include "repositories/metrics/Series.hpp"
 #include "repositories/now/FocusRepository.hpp"
 #include "repositories/now/NoteRepository.hpp"
 #include "repositories/now/SettingsRepository.hpp"
@@ -109,7 +110,12 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
         // that throws lands in "errors" (Now::Today::assemble), never fails the whole.
         const std::vector<::Now::Today::Part> parts = {
             {"tasks", Core::tasks_enabled(), [&] { return ::Tasks::digest(owner, date, tz); }},
-            {"goals", Core::goals_enabled(), [&] { return ::Goals::digest(owner, date); }},
+            {"goals",
+             Core::goals_enabled(),
+             [&] {
+                 return ::Goals::digest(
+                     owner, date, tz, fitness_read ? Domain::Permission::kFitnessRead : std::uint32_t{0});
+             }},
             {"food", Core::food_enabled(), [&] { return ::Food::digest(owner, date); }},
             {"money", Core::money_enabled(), [&] { return ::Money::digest(owner, date); }},
             {"health", Core::fitness_enabled() && fitness_read, [&] { return ::Fitness::digest(owner, date); }},
@@ -118,7 +124,10 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
              Core::habits_enabled(),
              [&] {
                  return ::Habits::digest(
-                     owner, date, tz, Core::fitness_enabled() && fitness_read, Core::workout_enabled());
+                     owner,
+                     date,
+                     tz,
+                     Repositories::Metrics::access_of(owner, fitness_read ? Domain::Permission::kFitnessRead : 0U));
              }},
         };
         const auto focus = FocusRepository().get(owner, date);

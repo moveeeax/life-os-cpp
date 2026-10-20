@@ -13,8 +13,6 @@ import {
   scheduleWords,
   splitNumbers,
   subline,
-  takesNoGoal,
-  SOURCE_LABEL,
   canGoBack,
   oldestTickDay,
   amountProblem,
@@ -29,6 +27,7 @@ import {
   weekDates,
   weekLine,
   type HabitDays,
+  type SourceInfo,
 } from './index';
 
 const habit = (over: Partial<HabitDays>): HabitDays => ({
@@ -39,6 +38,7 @@ const habit = (over: Partial<HabitDays>): HabitDays => ({
   goal: null,
   unit: '',
   source: 'manual',
+  direction: 'at_least',
   target: null,
   position: 1,
   archived_at: null,
@@ -110,19 +110,24 @@ describe('the words of a habit', () => {
 
   it('says where the ticks come from', () => {
     expect(subline({ schedule: 'daily', per_week: null, source: 'manual' })).toBe('every day');
-    expect(subline({ schedule: 'daily', per_week: null, source: 'steps' })).toBe(
+    expect(subline({ schedule: 'daily', per_week: null, source: 'fitness:steps' })).toBe(
       'from Mi · every day',
     );
-    expect(subline({ schedule: 'weekly', per_week: 4, source: 'workout' })).toBe(
+    expect(subline({ schedule: 'weekly', per_week: 4, source: 'workout:sessions' })).toBe(
       'from Training · 4 times a week',
     );
-    expect(subline({ schedule: 'daily', per_week: null, source: 'sleep', no_data: true })).toBe(
-      'no data from Mi · every day',
-    );
-    expect(subline({ schedule: 'daily', per_week: null, source: 'weight' })).toBe(
+    expect(
+      subline({ schedule: 'daily', per_week: null, source: 'fitness:sleep', no_data: true }),
+    ).toBe('no data from Mi · every day');
+    expect(subline({ schedule: 'daily', per_week: null, source: 'fitness:weight' })).toBe(
       'from Mi · every day',
     );
-    expect(SOURCE_LABEL.weight).toBe('Weigh-in on the Mi scales');
+    expect(subline({ schedule: 'daily', per_week: null, source: 'food:kcal' })).toBe(
+      'from Food · every day',
+    );
+    expect(subline({ schedule: 'daily', per_week: null, source: 'money:expense:KZT' })).toBe(
+      'from Money · every day',
+    );
   });
 
   it('keeps the digits of a line apart for Hide numbers', () => {
@@ -135,19 +140,23 @@ describe('the words of a habit', () => {
   });
 
   it('writes a value in its own terms', () => {
-    expect(formatValue({ source: 'sleep', unit: '' }, 462)).toBe('7 h 42 m');
-    expect(formatValue({ source: 'sleep', unit: '' }, 45)).toBe('45 m');
-    expect(formatValue({ source: 'steps', unit: '' }, 9312)).toBe('9,312');
-    expect(formatValue({ source: 'active_kcal', unit: '' }, 512.4)).toBe('512 kcal');
-    expect(formatValue({ source: 'workout', unit: '' }, 1)).toBe('1 session');
-    expect(formatValue({ source: 'workout', unit: '' }, 2)).toBe('2 sessions');
+    // Sleep comes in hours: 7.7 h = 462 min.
+    expect(formatValue({ source: 'fitness:sleep', unit: '' }, 7.7)).toBe('7 h 42 m');
+    expect(formatValue({ source: 'fitness:sleep', unit: '' }, 0.75)).toBe('45 m');
+    expect(formatValue({ source: 'fitness:steps', unit: '' }, 9312)).toBe('9,312');
+    expect(formatValue({ source: 'fitness:active_kcal', unit: '' }, 512.4)).toBe('512 kcal');
+    expect(formatValue({ source: 'workout:sessions', unit: '' }, 1)).toBe('1 session');
+    expect(formatValue({ source: 'workout:sessions', unit: '' }, 2)).toBe('2 sessions');
     expect(formatValue({ source: 'manual', unit: 'min' }, 20)).toBe('20 min');
-    expect(formatValue({ source: 'weight', unit: '' }, 71.84)).toBe('71.8 kg');
-    expect(formatValue({ source: 'weight', unit: '' }, 72)).toBe('72 kg');
-    expect(goalLine({ source: 'steps', goal: 8000, unit: '' })).toBe('8,000 steps');
-    expect(goalLine({ source: 'sleep', goal: 7.5, unit: '' })).toBe('7.5 h');
-    expect(goalLine({ source: 'workout', goal: null, unit: '' })).toBeNull();
-    expect(goalLine({ source: 'weight', goal: 70, unit: '' })).toBeNull();
+    expect(formatValue({ source: 'fitness:weight', unit: '' }, 71.84)).toBe('71.8 kg');
+    expect(formatValue({ source: 'fitness:weight', unit: '' }, 72)).toBe('72 kg');
+    expect(goalLine({ source: 'fitness:steps', goal: 8000, unit: '' })).toBe('8,000 steps');
+    expect(goalLine({ source: 'fitness:sleep', goal: 7.5, unit: '' })).toBe('7.5 h');
+    expect(goalLine({ source: 'workout:sessions', goal: null, unit: '' })).toBeNull();
+    expect(goalLine({ source: 'fitness:weight', goal: 80, unit: '' })).toBe('80 kg');
+    expect(goalLine({ source: 'workout:sessions', goal: 2, unit: '' })).toBe('2 sessions');
+    expect(goalLine({ source: 'food:kcal', goal: 2200, unit: 'kcal' })).toBe('2,200 kcal');
+    expect(formatValue({ source: 'food:kcal', unit: 'kcal' }, 2100)).toBe('2,100 kcal');
   });
 });
 
@@ -186,6 +195,7 @@ describe('the habit form', () => {
         unit: 'min',
         source: 'manual',
         target: '',
+        direction: 'at_least',
       }),
     ).toEqual({
       name: 'Swimming',
@@ -195,49 +205,56 @@ describe('the habit form', () => {
       unit: 'min',
       source: 'manual',
       target: null,
+      direction: 'at_least',
     });
   });
 
-  it('sends no count for a daily habit and no goal for a workout', () => {
+  const kcal: SourceInfo = { unit: 'kcal', presence: false };
+  const weight: SourceInfo = { unit: 'kg', presence: true };
+
+  it('sends the catalog id, its unit and the direction of a sourced habit', () => {
+    const f = {
+      ...habitForm(),
+      name: 'Calories',
+      per_week: '4',
+      goal: '2200',
+      source: 'food:kcal',
+    };
+    expect(habitBody({ ...f, direction: 'at_most' }, kcal)).toEqual({
+      name: 'Calories',
+      schedule: 'daily',
+      per_week: null,
+      goal: 2200,
+      unit: 'kcal',
+      source: 'food:kcal',
+      target: null,
+      direction: 'at_most',
+    });
+    // A habit by hand always compares at least.
+    expect(habitBody({ ...f, source: 'manual', direction: 'at_most' }).direction).toBe('at_least');
+  });
+
+  it('sends no goal for a presence source left empty, and a goal when one is given', () => {
+    const f = { ...habitForm(), name: 'Weigh-in', source: 'fitness:weight' };
+    expect(habitBody(f, weight).goal).toBeNull();
+    expect(habitProblem(f, weight)).toBeNull();
+    const capped = { ...f, goal: '80', direction: 'at_most' as const };
+    expect(habitBody(capped, weight)).toMatchObject({ goal: 80, unit: 'kg', direction: 'at_most' });
+  });
+
+  it('asks for a goal for a sum or an average', () => {
+    expect(habitProblem({ ...habitForm(), name: 'Steps', source: 'fitness:steps' }, kcal)).toBe(
+      'This source needs a goal to compare the day with.',
+    );
+    // Without the catalog the API is left to say it.
+    expect(habitProblem({ ...habitForm(), name: 'Steps', source: 'fitness:steps' })).toBeNull();
     expect(
-      habitBody({ ...habitForm(), name: 'Workout', per_week: '4', goal: '3', source: 'workout' }),
-    ).toEqual({
-      name: 'Workout',
-      schedule: 'daily',
-      per_week: null,
-      goal: null,
-      unit: '',
-      source: 'workout',
-      target: null,
-    });
-  });
-
-  it('sends no goal for a weigh-in and does not check one', () => {
-    expect(takesNoGoal('weight')).toBe(true);
-    expect(takesNoGoal('workout')).toBe(true);
-    expect(takesNoGoal('steps')).toBe(false);
-    const f = { ...habitForm(), name: 'Weigh-in', goal: '70', source: 'weight' as const };
-    expect(habitBody(f)).toEqual({
-      name: 'Weigh-in',
-      schedule: 'daily',
-      per_week: null,
-      goal: null,
-      unit: '',
-      source: 'weight',
-      target: null,
-    });
-    expect(habitProblem({ ...f, goal: 'heavy' })).toBeNull();
-  });
-
-  it('asks for a goal for a source from Mi', () => {
-    expect(habitProblem({ ...habitForm(), name: 'Steps', source: 'steps' })).toBe(
-      'A source from Mi needs a goal.',
-    );
-    expect(habitProblem({ ...habitForm(), name: 'Sleep', source: 'sleep', goal: '25' })).toBe(
-      'A sleep goal is in hours, at most 24.',
-    );
+      habitProblem({ ...habitForm(), name: 'Sleep', source: 'fitness:sleep', goal: '25' }),
+    ).toBe('A goal in hours is at most 24.');
     expect(habitProblem({ ...habitForm(), name: '' })).toBe('Give the habit a name.');
-    expect(habitProblem({ ...habitForm(), name: 'Sleep', source: 'sleep', goal: '8' })).toBeNull();
+    expect(
+      habitProblem({ ...habitForm(), name: 'Sleep', source: 'fitness:sleep', goal: '8' }),
+    ).toBeNull();
   });
 });
 
@@ -258,7 +275,7 @@ describe('a daily target', () => {
     const f = { ...habitForm(), name: 'Water', unit: 'ml', target: '2000' };
     expect(habitBody(f).target).toBe(2000);
     expect(habitBody({ ...f, target: ' ' }).target).toBeNull();
-    expect(habitBody({ ...f, source: 'steps', goal: '8000' }).target).toBeNull();
+    expect(habitBody({ ...f, source: 'fitness:steps', goal: '8000' }).target).toBeNull();
     expect(habitForm(water).target).toBe('2000');
     expect(habitProblem({ ...f, target: '0' })).toBe(
       'The daily target is a number above zero, at most 1,000,000.',
@@ -270,7 +287,7 @@ describe('a daily target', () => {
   it('reads as the sum of the day against the target', () => {
     expect(hasTarget(water)).toBe(true);
     expect(hasTarget(habit({}))).toBe(false);
-    expect(hasTarget(habit({ source: 'steps', target: 10 }))).toBe(false);
+    expect(hasTarget(habit({ source: 'fitness:steps', target: 10 }))).toBe(false);
     expect(progressLine(water, 750)).toBe('750 of 2,000 ml');
     expect(progressLine(water, null)).toBe('0 of 2,000 ml');
     expect(targetLine(water)).toBe('2,000 ml');

@@ -11,13 +11,18 @@
 
 #include <nlohmann/json_fwd.hpp>
 
+namespace Repositories::Metrics {
+struct Access;
+}
+
 namespace Habits {
 
 /// The Now plate of @p owner's habits: the week of @p day read up to @p day in
-/// @p tz; null without habits. @p health_read and @p workout_read say which
-/// sources the caller may read (the fitness and workout switches and the
-/// fitness read permission), as Repositories::Habits::Access.
-nlohmann::json digest(
-    const std::string& owner, const std::string& day, const std::string& tz, bool health_read, bool workout_read);
+/// @p tz; null without habits. @p access says which series the caller may read
+/// (Repositories::Metrics::access_of).
+nlohmann::json digest(const std::string& owner,
+                      const std::string& day,
+                      const std::string& tz,
+                      const Repositories::Metrics::Access& access);
 
 }  // namespace Habits

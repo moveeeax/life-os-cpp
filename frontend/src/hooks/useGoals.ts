@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
+import { localZone } from '@/lib/tasks';
 import type {
   Goal,
   GoalCheckin,
@@ -21,31 +22,62 @@ const BASE = '/api/v1/goals';
 export const GOAL_WRITES = [qk.goals.all(), qk.tasks.all(), qk.now.all()] as const;
 const ALL = GOAL_WRITES;
 
+// The goals routes count a goal's default day and the days of its source in
+// the caller's zone: every read and write sends the browser's IANA zone.
+
+export async function fetchGoals(
+  status: 'active' | 'done' | 'dropped',
+  date: string,
+  tz: string,
+  signal?: AbortSignal,
+): Promise<Goal[]> {
+  return (await api.getJson<{ data: Goal[] }>(BASE, { query: { status, date, tz }, signal })).data;
+}
+
+export async function fetchGoal(
+  id: string,
+  date: string,
+  tz: string,
+  signal?: AbortSignal,
+): Promise<GoalDetail> {
+  return (await api.getJson<{ data: GoalDetail }>(`${BASE}/${id}`, { query: { date, tz }, signal }))
+    .data;
+}
+
+/** A new goal (POST), or the changed fields of one (PATCH). */
+export async function saveGoal(
+  id: string | null,
+  body: GoalInput | GoalPatch,
+  tz: string,
+): Promise<Goal> {
+  const query = { tz };
+  return id
+    ? (await api.patchJson<{ data: Goal }>(`${BASE}/${id}`, { query, body })).data
+    : (await api.postJson<{ data: Goal }>(BASE, { query, body })).data;
+}
+
 export function useGoals(status: 'active' | 'done' | 'dropped', date: string) {
+  const tz = localZone();
   return useQuery({
-    queryKey: qk.goals.list(status, date),
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: Goal[] }>(BASE, { query: { status, date }, signal })).data,
+    queryKey: qk.goals.list(status, date, tz),
+    queryFn: ({ signal }) => fetchGoals(status, date, tz, signal),
   });
 }
 
 export function useGoal(id: string | null, date: string) {
+  const tz = localZone();
   return useQuery({
-    queryKey: qk.goals.detail(id ?? '', date),
+    queryKey: qk.goals.detail(id ?? '', date, tz),
     enabled: id !== null,
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: GoalDetail }>(`${BASE}/${id}`, { query: { date }, signal })).data,
+    queryFn: ({ signal }) => fetchGoal(id ?? '', date, tz, signal),
   });
 }
 
 export function useSaveGoal(id: string | null, onSuccess?: () => void) {
-  return useApiMutation(
-    async (body: GoalInput | GoalPatch) =>
-      id
-        ? (await api.patchJson<{ data: Goal }>(`${BASE}/${id}`, { body })).data
-        : (await api.postJson<{ data: Goal }>(BASE, { body })).data,
-    { invalidate: ALL, onSuccess },
-  );
+  return useApiMutation((body: GoalInput | GoalPatch) => saveGoal(id, body, localZone()), {
+    invalidate: ALL,
+    onSuccess,
+  });
 }
 
 export function useDeleteGoal(onSuccess?: () => void) {

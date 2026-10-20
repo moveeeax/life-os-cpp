@@ -21,8 +21,11 @@ export function habitsZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 }
 
-/** A habit write moves the section and Now's digest (the Habits plate). */
-export const HABIT_WRITES = [qk.habits.all(), qk.now.all()] as const;
+/**
+ * A habit write moves the section, Now's digest (the Habits plate) and the metrics
+ * catalog (each manual habit is a series there).
+ */
+export const HABIT_WRITES = [qk.habits.all(), qk.now.all(), qk.metrics.all()] as const;
 
 export function useHabits(archived = false) {
   return useQuery({

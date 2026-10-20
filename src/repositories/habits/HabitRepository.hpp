@@ -1,9 +1,9 @@
 /**
  * @file HabitRepository.hpp
- * @brief habits and habit_checks: the owner's habits and their manual ticks,
- *        the finished Training sessions a workout habit reads, and the
- *        weigh-ins of the Mi scales a weight habit reads. Every
- *        statement filters by owner; a habit of another owner is not found.
+ * @brief habits and habit_checks: the owner's habits and their manual ticks.
+ *        The series a sourced habit reads come from repositories/metrics.
+ *        Every statement filters by owner; a habit of another owner is not
+ *        found.
  */
 
 #pragma once
@@ -51,8 +51,9 @@ public:
         std::optional<int> per_week;
         std::optional<double> goal;
         std::string unit;
-        std::string source;            // manual | sleep | steps | active_kcal | workout | weight
-        std::optional<double> target;  // manual only: the amount a day must reach
+        std::string source;                  // manual | a catalog id (metrics/Catalog.hpp), canonical
+        std::optional<double> target;        // manual only: the amount a day must reach
+        std::string direction = "at_least";  // at_least | at_most
     };
 
     nlohmann::json create(const std::string& owner, const Input& in) {
@@ -60,8 +61,9 @@ public:
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
                     auto r = txn.exec_params(
-                        "INSERT INTO habits (owner_id, name, schedule, per_week, goal, unit, source, target, position) "
-                        "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, "
+                        "INSERT INTO habits (owner_id, name, schedule, per_week, goal, unit, source, target, "
+                        " direction, position) "
+                        "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, "
                         " (SELECT COALESCE(max(position), 0) + 1 FROM habits WHERE owner_id = $1::uuid)) "
                         "RETURNING id::text",
                         owner,
@@ -71,7 +73,8 @@ public:
                         in.goal,
                         in.unit,
                         in.source,
-                        in.target);
+                        in.target,
+                        in.direction);
                     return *find_in(txn, owner, r[0][0].template as<std::string>());
                 });
             },
@@ -85,7 +88,7 @@ public:
                 return Database::get().execute_write([&](auto& txn) {
                     auto r = txn.exec_params(
                         "UPDATE habits SET name = $3, schedule = $4, per_week = $5, goal = $6, unit = $7, source = $8, "
-                        " target = $9 WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
+                        " target = $9, direction = $10 WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
                         owner,
                         id,
                         in.name,
@@ -94,7 +97,8 @@ public:
                         in.goal,
                         in.unit,
                         in.source,
-                        in.target);
+                        in.target,
+                        in.direction);
                     if (r.empty()) {
                         throw NotFound();
                     }
@@ -233,60 +237,19 @@ public:
         });
     }
 
-    /// The owner's finished Training sessions ending between @p from and @p to (UTC days,
-    /// one day of margin on each side for the zone), with the zone's offset at the end.
-    std::vector<::Habits::Session> sessions(const std::string& owner,
-                                            const std::string& from,
-                                            const std::string& to,
-                                            const std::string& tz) {
-        return Database::get().execute_read([&](auto& txn) {
-            std::vector<::Habits::Session> out;
-            for (const auto& row : txn.exec_params(
-                     "SELECT to_char(finished_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'), "
-                     " EXTRACT(EPOCH FROM (finished_at AT TIME ZONE $4) - (finished_at AT TIME ZONE 'UTC'))::bigint "
-                     "FROM workout_sessions WHERE owner_id = $1::uuid AND finished_at IS NOT NULL "
-                     " AND finished_at >= ($2::date - 1)::timestamp AT TIME ZONE 'UTC' "
-                     " AND finished_at < ($3::date + 2)::timestamp AT TIME ZONE 'UTC' ORDER BY finished_at",
-                     owner,
-                     from,
-                     to,
-                     tz)) {
-                out.push_back({row[0].template as<std::string>(), row[1].template as<long long>()});
-            }
-            return out;
-        });
-    }
-
-    /// The weigh-ins of the Mi account @p xiaomi_user_id taken between @p from and @p to
-    /// (UTC days, one day of margin on each side for the zone), oldest first, with the
-    /// offset of @p tz at each. An empty id (no linked account) matches no row.
-    std::vector<::Habits::WeighIn> weigh_ins(const std::string& xiaomi_user_id,
-                                             const std::string& from,
-                                             const std::string& to,
-                                             const std::string& tz) {
-        return Database::get().execute_read([&](auto& txn) {
-            std::vector<::Habits::WeighIn> out;
-            for (const auto& row : txn.exec_params(
-                     "SELECT to_char(timestamp AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'), "
-                     " EXTRACT(EPOCH FROM (timestamp AT TIME ZONE $4) - (timestamp AT TIME ZONE 'UTC'))::bigint, "
-                     " weight_kg FROM body_measurements WHERE user_id = $1 AND $1 <> '' "
-                     " AND timestamp >= ($2::date - 1)::timestamp AT TIME ZONE 'UTC' "
-                     " AND timestamp < ($3::date + 2)::timestamp AT TIME ZONE 'UTC' ORDER BY timestamp",
-                     xiaomi_user_id,
-                     from,
-                     to,
-                     tz)) {
-                out.push_back({row[0].template as<std::string>(),
-                               row[1].template as<long long>(),
-                               row[2].is_null() ? std::nullopt : std::optional<double>(row[2].template as<double>())});
-            }
-            return out;
-        });
+    /// The owner's habit @p id, active or archived; nullopt when it is not theirs.
+    std::optional<nlohmann::json> get(const std::string& owner, const std::string& id) {
+        return Database::get().execute_read([&](auto& txn) { return find_in(txn, owner, id); });
     }
 
 private:
+    // A source the previous binary wrote under its 1.33 name (the CHECK of migration
+    // 056 still takes the five) reads as its catalog id.
     static constexpr const char* kColumns =
-        "id, name, schedule, per_week, goal::double precision AS goal, unit, source, "
+        "id, name, schedule, per_week, goal::double precision AS goal, unit, "
+        "CASE source WHEN 'sleep' THEN 'fitness:sleep' WHEN 'steps' THEN 'fitness:steps' "
+        " WHEN 'active_kcal' THEN 'fitness:active_kcal' WHEN 'workout' THEN 'workout:sessions' "
+        " WHEN 'weight' THEN 'fitness:weight' ELSE source END AS source, direction, "
         "target::double precision AS target, position, archived_at, created_at";
 
     template <typename Txn>

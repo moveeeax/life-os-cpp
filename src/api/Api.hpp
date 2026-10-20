@@ -41,6 +41,7 @@
 #include "api/JobsController.hpp"
 #include "api/MeasurementsController.hpp"
 #include "api/MedicalController.hpp"
+#include "api/MetricsController.hpp"
 #include "api/Middleware.hpp"
 #include "api/MoneyController.hpp"
 #include "api/NotesController.hpp"

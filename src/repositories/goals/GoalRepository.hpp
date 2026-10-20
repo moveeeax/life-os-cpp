@@ -35,6 +35,7 @@ public:
         std::optional<double> start_value;
         std::optional<double> target_value;
         std::optional<int> target_count;
+        std::optional<std::string> source;  // a canonical catalog id; a number goal only
     };
 
     struct Patch {
@@ -48,6 +49,8 @@ public:
         std::optional<double> target_value;
         std::optional<int> target_count;
         std::optional<std::string> result;  // pass | fail; closes the goal
+        bool set_source = false;            // source is given: a catalog id, or nullopt to clear it
+        std::optional<std::string> source;
     };
 
     nlohmann::json create(const std::string& owner, const Input& in) {
@@ -56,8 +59,9 @@ public:
                 return Database::get().execute_write([&](auto& txn) {
                     auto r = txn.exec_params(
                         "INSERT INTO goal_items (owner_id, title, area, kind, why, start_date, due, unit, "
-                        " start_value, target_value, target_count) "
-                        "VALUES ($1::uuid, $2, $3, $4, $5, $6::date, $7::date, $8, $9, $10, $11) RETURNING id::text",
+                        " start_value, target_value, target_count, source) "
+                        "VALUES ($1::uuid, $2, $3, $4, $5, $6::date, $7::date, $8, $9, $10, $11, $12) "
+                        "RETURNING id::text",
                         owner,
                         in.title,
                         in.area,
@@ -68,7 +72,8 @@ public:
                         in.unit,
                         in.start_value,
                         in.target_value,
-                        in.target_count);
+                        in.target_count,
+                        in.source);
                     return *find_in(txn, owner, r[0][0].template as<std::string>());
                 });
             },
@@ -109,7 +114,8 @@ public:
                             next_status +
                             ", unit = COALESCE($8, unit), start_value = COALESCE($9, start_value), "
                             " target_value = COALESCE($10, target_value), target_count = COALESCE($11, target_count), "
-                            " result = COALESCE($12, result) "
+                            " result = COALESCE($12, result), "
+                            " source = CASE WHEN $13::boolean THEN $14::text ELSE source END "
                             "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
                         owner,
                         id,
@@ -122,7 +128,9 @@ public:
                         p.start_value,
                         p.target_value,
                         p.target_count,
-                        p.result);
+                        p.result,
+                        p.set_source,
+                        p.source);
                     if (r.empty()) {
                         throw NotFound("goal");
                     }
@@ -417,7 +425,7 @@ public:
         "id, title, area, kind, why, to_char(start_date, 'YYYY-MM-DD') AS start_date, "
         " to_char(due, 'YYYY-MM-DD') AS due, status, "
         " " SQL_ISO_UTC("completed_at") " AS completed_at, "
-        " unit, start_value::float8 AS start_value, target_value::float8 AS target_value, target_count, result, "
+        " unit, start_value::float8 AS start_value, target_value::float8 AS target_value, target_count, result, source, "
         " " SQL_ISO_UTC("created_at") " AS created_at, "
         " " SQL_ISO_UTC("updated_at") " AS updated_at";
     static constexpr const char* kCheckinColumns =

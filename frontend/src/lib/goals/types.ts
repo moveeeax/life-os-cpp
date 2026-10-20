@@ -9,4 +9,5 @@ export type GoalProgress = S['GoalProgress'];
 export type GoalCheckin = S['GoalCheckin'];
 export type GoalSection = S['GoalSection'];
 export type GoalMilestone = S['GoalMilestone'];
+export type GoalPoint = S['GoalPoint'];
 export type GoalKind = S['GoalKind'];
