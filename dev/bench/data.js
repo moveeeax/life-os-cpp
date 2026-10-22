@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792573176133,
+  "lastUpdate": 1792659675849,
   "repoUrl": "https://github.com/moveeeax/life-os-cpp",
   "entries": {
     "Throughput": [
@@ -159,6 +159,38 @@ window.BENCHMARK_DATA = {
           {
             "name": "jobs req/s",
             "value": 12415.97,
+            "unit": "req/s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Michael Tarassov",
+            "username": "moveeeax",
+            "email": "michael@tarassov.me"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "8443e66b98d0dec41fe73d0f4b477f5eb5f9b07a",
+          "message": "chore(release): 1.34.0 — metric sources for goals and habits, goal edit (#163)",
+          "timestamp": "2026-10-20T07:17:30Z",
+          "url": "https://github.com/moveeeax/life-os-cpp/commit/8443e66b98d0dec41fe73d0f4b477f5eb5f9b07a"
+        },
+        "date": 1792659674856,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "healthz req/s",
+            "value": 63248.6,
+            "unit": "req/s"
+          },
+          {
+            "name": "jobs req/s",
+            "value": 12778.21,
             "unit": "req/s"
           }
         ]
