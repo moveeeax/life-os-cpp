@@ -554,8 +554,8 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   const COLL = [
     ['下半身', null, 1.5],
     // The seat: buttock skin reaches 1.27-1.34 from these bones.
-    ['buttocks_L', null, 1.2],
-    ['buttocks_R', null, 1.2],
+    ['Buttock_L', null, 1.2],
+    ['Buttock_R', null, 1.2],
     ['左足D', '左ひざD', 1.15],
     ['右足D', '右ひざD', 1.15],
     ['左ひざD', '左足首D', 0.7],
@@ -660,7 +660,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     }
   }
 
-  // Soft tissue: the chest bones (tit_L/R) are rigid in the PMX (their
+  // Soft tissue: the chest bones (Breast_L/R) are rigid in the PMX (their
   // bodies have every rotation locked). Each is a damped point mass trailing
   // the place the chest puts it (about 3.5 Hz, light damping), moved by
   // translating the bone; the offset is capped at 0.22.
@@ -672,7 +672,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   function jiggle(dt: number) {
     if (still) return;
     if (!soft.length)
-      for (const n of ['tit_L', 'tit_R'])
+      for (const n of ['Breast_L', 'Breast_R'])
         if (B[n]) soft.push({ n, p: null, v: new THREE.Vector3() });
     for (const s of soft) {
       const bone = B[s.n];
