@@ -660,10 +660,10 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     }
   }
 
-  // Soft tissue: the chest bones (Breast_L/R) are rigid in the PMX (their
-  // bodies have every rotation locked). Each is a damped point mass trailing
-  // the place the chest puts it (about 3.5 Hz, light damping), moved by
-  // translating the bone; the offset is capped at 0.22.
+  // Soft tissue: the chest and seat bones (Breast_L/R, Buttock_L/R; the PMX
+  // physics is not run). Each is a damped point mass trailing the place its
+  // parent puts it (about 3.5 Hz, light damping), moved by translating the
+  // bone; the offset is capped at 0.22.
   const JIG = { k: 480, c: 9, max: 0.22 };
   const soft: { n: string; p: THREE.Vector3 | null; v: THREE.Vector3 }[] = [];
   const _tw = new THREE.Vector3();
@@ -672,7 +672,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   function jiggle(dt: number) {
     if (still) return;
     if (!soft.length)
-      for (const n of ['Breast_L', 'Breast_R'])
+      for (const n of ['Breast_L', 'Breast_R', 'Buttock_L', 'Buttock_R'])
         if (B[n]) soft.push({ n, p: null, v: new THREE.Vector3() });
     for (const s of soft) {
       const bone = B[s.n];

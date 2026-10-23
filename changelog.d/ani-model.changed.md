@@ -1,1 +1,1 @@
-Ani on Now uses a new model, a body in white lingerie on the same skeleton; the engine follows its chest and seat bone names (Breast_L/R, Buttock_L/R) and loads it from wallpapers/ani/v2/ in the bucket.
+Ani on Now uses a new model, a body in white lingerie on the same skeleton; the engine follows its chest and seat bone names (Breast_L/R, Buttock_L/R), gives the seat the same damped jiggle as the chest, and loads the model from wallpapers/ani/v2/ in the bucket.
