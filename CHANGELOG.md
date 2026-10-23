@@ -6,6 +6,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.35.1] - 2026-10-24
+
+### Changed
+- Ani no longer walks out through the edge of the screen and back: she waves goodbye and fades out, and comes back fading in with a small rise and a greeting (an outfit change goes the same way).
+
 ## [1.35.0] - 2026-10-23
 
 ### Added
