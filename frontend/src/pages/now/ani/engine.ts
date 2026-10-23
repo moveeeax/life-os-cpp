@@ -64,11 +64,16 @@ const SPRINGS: SpringGroup[] = [
 
 // Camera framing in model units (the PMX is about 21.8 tall).
 const FRAME = { fov: 22, dist: 57, y: 11 };
-// Coming and going: she turns, walks out through the left edge and back.
 const FACE = 0.25;
-const OUT = -9;
-const SPEED = 4.2;
-const TURN = 0.7;
+// Going: a wave goodbye (the greeting clip from WAVE_FROM), then she fades
+// out over the last FADE_OUT s of LEAVE. Coming back: she fades in over
+// FADE_IN s rising RISE from below, then greets.
+const LEAVE = 2.3;
+const FADE_OUT = 0.8;
+const ARRIVE = 1.0;
+const FADE_IN = 0.8;
+const RISE = 0.5;
+const WAVE_FROM = 2.3;
 
 // Motion clips from pixiv's VRoid VRMA pack; from: seconds to skip (the
 // greeting starts sitting on the floor).
@@ -172,7 +177,6 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   const walk = {
     state: (opts.present ? 'here' : 'away') as Walk,
     t0: 0,
-    from: FACE,
     done: undefined as (() => void) | undefined,
   };
 
@@ -713,27 +717,33 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       }
       m.rotation.y = FACE + spin.yaw;
     }
-    let stride = 0;
+    let lift = 0;
     if (walk.state === 'leaving' || walk.state === 'arriving') {
       const leaving = walk.state === 'leaving';
       const u = now - walk.t0;
-      const span = Math.abs(OUT) / SPEED;
-      const side = leaving ? -Math.PI / 2 : Math.PI / 2;
-      const k = clamp01((u - (leaving ? 0 : span)) / TURN);
-      const from = leaving ? walk.from : side;
-      const to = leaving ? side : FACE;
-      m.rotation.y = from + (to - from) * smooth(k);
-      const w = clamp01((u - (leaving ? TURN : 0)) / span);
-      m.position.x = leaving ? OUT * w : OUT * (1 - w);
-      stride = w > 0 && w < 1 ? Math.min(1, Math.min(w, 1 - w) * 6) : 0;
+      let op: number;
+      if (leaving) op = 1 - smooth(clamp01((u - (LEAVE - FADE_OUT)) / FADE_OUT));
+      else {
+        op = smooth(clamp01(u / FADE_IN));
+        lift = -RISE * (1 - smooth(clamp01(u / ARRIVE)));
+      }
+      // Frame by frame here, not by the stylesheet's slow fade-in.
+      canvas.style.transition = 'none';
+      canvas.style.opacity = String(op);
+      m.rotation.y = FACE;
       m.visible = true;
-      if (u > span + TURN) {
+      if (u > (leaving ? LEAVE : ARRIVE)) {
         walk.state = leaving ? 'away' : 'here';
         m.visible = !leaving;
-        m.position.x = 0;
-        m.rotation.y = FACE;
+        canvas.style.opacity = '';
+        canvas.style.transition = '';
+        lift = 0;
         spin.yaw = spin.vel = 0;
-        walk.done?.();
+        const done = walk.done;
+        walk.done = undefined;
+        done?.();
+        // Back in her corner: a hello.
+        if (!leaving) void playClip('greet');
       }
     }
     const idle = walk.state === 'here' && !still;
@@ -744,21 +754,10 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     const wgt = idle ? life.w : 0; // +1: on her left leg
     const br = Math.sin(t * 1.5) * 0.5 + 0.5; // breath, 0..1
 
-    // Hips over the standing leg, a little down; the walk bobs them.
-    const ph = now * 6.2; // step phase
-    move(
-      'センター',
-      wgt * 0.4,
-      -0.18 - Math.abs(wgt) * 0.08 - Math.abs(Math.cos(ph)) * 0.22 * stride,
-      0,
-    );
-    pose('下半身', 0, Math.sin(ph) * 0.12 * stride, -wgt * 0.1);
-    pose(
-      '上半身',
-      -0.012 * br,
-      Math.sin(t * 0.33) * 0.05 - Math.sin(ph) * 0.1 * stride,
-      wgt * 0.06 + Math.sin(t * 0.5) * 0.012,
-    );
+    // Hips over the standing leg, a little down.
+    move('センター', wgt * 0.4, -0.18 - Math.abs(wgt) * 0.08 + lift, 0);
+    pose('下半身', 0, 0, -wgt * 0.1);
+    pose('上半身', -0.012 * br, Math.sin(t * 0.33) * 0.05, wgt * 0.06 + Math.sin(t * 0.5) * 0.012);
     pose('上半身2', -0.015 * br, 0, wgt * 0.025);
     // Shoulders: up a little on every breath and over the free leg.
     for (const [side, sg] of [
@@ -767,23 +766,14 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     ] as const)
       pose(side + '肩', 0, 0, sg * (0.035 * br + Math.max(0, -sg * wgt) * 0.03));
 
-    // Feet through IK, in the model's own space (forward is +z). Standing,
-    // the free foot slides a little forward and in, heel up; walking, a foot
-    // swings forward lifted and the other pushes back.
-    for (const [side, sgn, phase] of [
-      ['左', 1, 0],
-      ['右', -1, Math.PI],
+    // Feet through IK, in the model's own space (forward is +z): the free
+    // foot slides a little forward and in, heel up. They rise with her.
+    for (const [side, sgn] of [
+      ['左', 1],
+      ['右', -1],
     ] as const) {
       const f = smooth(clamp01(sgn * -wgt));
-      let x = -sgn * 0.25 * f;
-      let y = 0.25 * f;
-      let z = 0.55 * f;
-      if (stride) {
-        z = 1.1 * Math.sin(ph + phase) * stride;
-        y = Math.max(0, Math.cos(ph + phase)) * 0.7 * stride;
-        x = 0;
-      }
-      move(side + '足ＩＫ', x, y, z);
+      move(side + '足ＩＫ', -sgn * 0.25 * f, 0.25 * f + lift, 0.55 * f);
     }
     for (const n of LEG) B[n].quaternion.copy(baseQ[n]);
     m.updateMatrixWorld(true);
@@ -792,10 +782,8 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     // chain by grant.
     for (const n of LEG) B[n + 'D'].quaternion.copy(B[n].quaternion);
 
-    // Arms: at rest by plain angles, swinging with a walk; standing, the
-    // wrists go to a point on the skirt's flare (by the thighs in the slip)
-    // by two-bone IK, kept out of the body.
-    const swing = Math.sin(ph) * 0.18 * stride;
+    // Arms: the wrists go to a point on the skirt's flare (by the thighs in
+    // the slip) by two-bone IK, kept out of the body.
     const W = at('下半身');
     for (const c of BODY) {
       onBone(c.a[0], c.a[1], c.A);
@@ -806,24 +794,17 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       ['右', -1],
     ] as const) {
       const sway = Math.sin(t * 0.9 + sd) * 0.025 + life.gx * 0.02;
-      pose(side + '腕', -0.12 + swing * sd - wgt * sd * 0.03 + sway, 0, -sd * (0.72 + br * 0.02));
+      pose(side + '腕', -0.12 - wgt * sd * 0.03 + sway, 0, -sd * (0.72 + br * 0.02));
       B[side + '腕捩'].quaternion.copy(baseQ[side + '腕捩']);
       turn(side + 'ひじ', AX[side].flex, 0.35 + Math.sin(t * 0.7 + sd) * 0.04);
       pose(side + '手首', 0, 0, sd * 0.08);
       const S = at(side + '腕');
-      let T = at(side + '手首');
-      let P = at(side + 'ひじ')
-        .multiplyScalar(2)
-        .sub(T.clone().add(S).multiplyScalar(0.5));
-      if (walk.state === 'here') {
-        const lift = Math.sin(t * 0.9 + sd) * 0.05;
-        T =
-          outfit === 'p2'
-            ? W.clone().add(_off.set(sd * 2.75, -1.75 + lift, 0.3))
-            : W.clone().add(_off.set(sd * 2.6, -1.3 + lift, 0.9));
-        P = S.clone().add(_off.set(sd * 2, -2, -2.5));
-      }
-      reach(side, S, T, P);
+      const bob = Math.sin(t * 0.9 + sd) * 0.05;
+      const T =
+        outfit === 'p2'
+          ? W.clone().add(_off.set(sd * 2.75, -1.75 + bob, 0.3))
+          : W.clone().add(_off.set(sd * 2.6, -1.3 + bob, 0.9));
+      reach(side, S, T, S.clone().add(_off.set(sd * 2, -2, -2.5)));
     }
     for (const g of grants) g.bone.quaternion.copy(_id).slerp(g.from.quaternion, g.ratio);
 
@@ -889,15 +870,21 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       }
       if (on && (walk.state === 'here' || walk.state === 'arriving')) return done?.();
       if (!on && (walk.state === 'away' || walk.state === 'leaving')) return done?.();
-      walk.from = mesh.rotation.y;
       spin.drag = null;
+      spin.yaw = spin.vel = 0;
       play.clip = null;
       play.w = 0;
       walk.state = on ? 'arriving' : 'leaving';
       walk.t0 = clock.getElapsedTime();
       walk.done = done;
-      // She steps in from off screen: no whip from the jump.
+      // She appears where she stands: no whip in the cloth from the jump.
       if (on) settle = true;
+      // Going: a wave goodbye first.
+      else
+        void clipOf('greet').then((c) => {
+          if (c && !disposed && walk.state === 'leaving')
+            Object.assign(play, { clip: c, name: 'greet', t0: clock.getElapsedTime() - WAVE_FROM });
+        });
     },
     setOutfit: dress,
     dispose() {
