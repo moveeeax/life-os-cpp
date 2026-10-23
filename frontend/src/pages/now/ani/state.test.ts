@@ -7,7 +7,7 @@ import { aniBase, useAni } from './state';
 describe('aniBase', () => {
   it('puts Ani next to the wallpapers in the bucket', () => {
     expect(aniBase('https://s3.example.com/life-os/life-os/wallpapers/0b7c/file.mp4')).toBe(
-      'https://s3.example.com/life-os/life-os/wallpapers/ani/v1/',
+      'https://s3.example.com/life-os/life-os/wallpapers/ani/v2/',
     );
   });
 

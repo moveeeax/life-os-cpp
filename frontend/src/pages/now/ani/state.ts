@@ -64,7 +64,7 @@ export function useAni(): [AniState, (patch: Partial<AniState>) => void] {
 
 /**
  * Where Ani's files live: next to the wallpapers in the public bucket, under
- * wallpapers/ani/v1/ (the app's storage user may write only there and under
+ * wallpapers/ani/v2/ (the app's storage user may write only there and under
  * sounds/). Taken from a wallpaper's URL, so no host is configured twice;
  * null when there is no wallpaper to take it from.
  */
@@ -72,5 +72,5 @@ export function aniBase(wallpaperUrl: string | undefined): string | null {
   if (!wallpaperUrl) return null;
   const i = wallpaperUrl.indexOf('/wallpapers/');
   if (i < 0) return null;
-  return `${wallpaperUrl.slice(0, i)}/wallpapers/ani/v1/`;
+  return `${wallpaperUrl.slice(0, i)}/wallpapers/ani/v2/`;
 }
