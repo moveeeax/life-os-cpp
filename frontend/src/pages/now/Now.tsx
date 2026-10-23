@@ -3,7 +3,14 @@ import { Navigate } from 'react-router';
 
 import { useHabitsEnabled } from '@/hooks/useHabits';
 import { useMe } from '@/hooks/useMe';
-import { useNowSettings, useSaveDockOrder, useSounds, useToday, useWeather } from '@/hooks/useNow';
+import {
+  useNowSettings,
+  useSaveDockOrder,
+  useSounds,
+  useToday,
+  useWallpapers,
+  useWeather,
+} from '@/hooks/useNow';
 import {
   CORNER_KEYS,
   FOCUS_LENGTHS,
@@ -17,6 +24,8 @@ import {
 import { homeOf } from '@/shell/sections';
 import { useGlassNav } from '@/shell/useGlassNav';
 
+import { AniCorner } from './ani/AniCorner';
+import { aniBase, useAni } from './ani/state';
 import { Corners } from './corners/Corners';
 import { FocusMode } from './focus/FocusMode';
 import { useFocusSession } from './focus/useFocusSession';
@@ -59,6 +68,22 @@ function FocusStart({ onStart }: { onStart: (minutes: number) => void }) {
       </span>
     </div>
   );
+}
+
+/** True while the window is at least this wide. */
+function useWide(px: number): boolean {
+  const query = `(min-width: ${px}px)`;
+  const [wide, setWide] = useState(
+    () => typeof matchMedia === 'function' && matchMedia(query).matches,
+  );
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return;
+    const m = matchMedia(query);
+    const on = () => setWide(m.matches);
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, [query]);
+  return wide;
 }
 
 /** The current time, updated on the minute. */
@@ -125,6 +150,12 @@ function NowScreen() {
     for (const k of CORNER_KEYS) if (next[k] == null && raw[k]) next[k] = raw[k];
     saveOrder(next);
   };
+  // Ani: on a desktop wide enough for her ledge left of the dock, out of the
+  // way during a focus session. Her files sit next to the wallpapers.
+  const [ani] = useAni();
+  const wide = useWide(1024);
+  const base = aniBase(useWallpapers('desktop', ani.on && wide).data?.[0]?.url);
+  const showAni = ani.on && wide && base !== null && session.phase === 'idle';
   const clock = new Intl.DateTimeFormat('en-GB', {
     timeZone: tz,
     hour: '2-digit',
@@ -132,7 +163,7 @@ function NowScreen() {
   }).format(now);
 
   return (
-    <div className="n-now">
+    <div className="n-now" data-ani={showAni ? '' : undefined}>
       <div className="n-where">
         {weather.data ? (
           // The weather takes the place of the zone: the city says where.
@@ -196,6 +227,7 @@ function NowScreen() {
           onReorder={raw ? reorder : undefined}
         />
       )}
+      {showAni && base && <AniCorner base={base} />}
       {session.phase !== 'idle' && (
         <FocusMode
           phase={session.phase}

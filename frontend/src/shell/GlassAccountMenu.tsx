@@ -8,10 +8,11 @@ import { useMe } from '@/hooks/useMe';
 import { useNowSettings } from '@/hooks/useNow';
 import { useWalletSummary } from '@/hooks/useWallet';
 import { Permission, userCan } from '@/lib/auth/permissions';
+import { useAni } from '@/pages/now/ani/state';
 
 import { ArrangeSheet } from './ArrangeSheet';
 
-/** The account on the right of the bar: Arrange (on Now), Account, Admin, Billing, Sign out. */
+/** The account on the right of the bar: Arrange and Ani (on Now), Account, Admin, Billing, Sign out. */
 export function GlassAccountMenu() {
   const user = useMe().data ?? null;
   const logout = useLogout();
@@ -22,6 +23,7 @@ export function GlassAccountMenu() {
   // Also here, because on a phone the fixed pill is hidden (it sat over the
   // last row of every long list).
   const [hidden, setHidden] = useHideNumbers();
+  const [ani, setAni] = useAni();
   // Arrange belongs to Now: the weather city and the corners of that page.
   const onNow = useLocation().pathname === '/now';
   const settings = useNowSettings(onNow && user ? user.id : null);
@@ -93,6 +95,17 @@ export function GlassAccountMenu() {
               }}
             >
               Arrange Now
+            </button>
+          )}
+          {onNow && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                setAni({ on: !ani.on });
+              }}
+            >
+              {ani.on ? 'Hide Ani' : 'Show Ani'}
             </button>
           )}
           <Link to="/account" onClick={() => setOpen(false)}>
