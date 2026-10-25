@@ -6,6 +6,14 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.39.0] - 2026-10-25
+
+### Added
+- Ani's agent, phase 1: an OpenClaw pod per user, started on `POST /api/v1/ani/agent/wake` and stopped on logout, after 20 idle minutes, after 12 hours or on `POST /api/v1/ani/agent/stop`; `GET /api/v1/ani/agent` shows its state and the month's model usage. A new worker release, `life-os-ani-worker`, alone holds Kubernetes rights (pods and secrets in `life-os-agents`), runs the `ani_agent_start`, `ani_agent_stop` and `ani_agents_reconcile` jobs, and serves the pods' model proxy: the pods hold no provider key, only a per-run token, and every call is pinned to one model and counted against a monthly token budget per user. The pod's state is restored from and saved to S3 (`private/<owner>/ani/`) by an init container and a sidecar; a deleted user's snapshots go to the files sweep. Administrators only, behind `ANI_AGENT_ENABLED` (off by default).
+
+### Fixed
+- The outfit menu on Now fits its three outfits and the credit: the open ledge grows upwards instead of cutting Lingerie and the credit off.
+
 ## [1.38.0] - 2026-10-25
 
 ### Added
