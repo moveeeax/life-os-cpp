@@ -164,6 +164,9 @@
 .ani-sw-p2 {
   background: repeating-linear-gradient(45deg, #1b1416 0 2px, #4a3438 2px 3px);
 }
+.ani-sw-lingerie {
+  background: radial-gradient(circle, #d9cfcc 0 1px, #f6f2f0 1.5px) 0 0 / 4px 4px;
+}
 .ani-tick {
   margin-left: auto;
   opacity: 0;

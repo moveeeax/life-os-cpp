@@ -9,13 +9,18 @@ import { createSprings, type Collider, type SpringGroup, type Springs } from './
  * Ani on Now: the PMX model, posed every frame by a small director (weight
  * from one leg to the other, glances, blinks), the VRoid VRMA clips over it,
  * spring bones for the skirt, hair and ribbons, a damped jiggle for the
- * chest, and the arms kept out of the body.
+ * chest and seat, and the arms kept out of the body.
+ *
+ * The body is v2/Ani.pmx, in lingerie. The dress and the slip come from
+ * v1/Ani.pmx, the first model on the same skeleton (the same 628 bones in
+ * the same order at the same places): its clothes are skinned to the v2
+ * skeleton as they are.
  */
 
-export type Outfit = 'p1' | 'p2';
+export type Outfit = 'p1' | 'p2' | 'lingerie';
 
 export interface AniOptions {
-  /** Folder of Ani.pmx, its textures and motions/ (ends with a slash). */
+  /** Folder of v1/ and v2/ (ends with a slash). */
   base: string;
   /** The element that takes drags and taps (the canvas lets them through). */
   hit: HTMLElement;
@@ -88,9 +93,14 @@ const CLIPS: Record<string, { file: string; from?: number }> = {
 };
 const EMOTES = ['show', 'peace', 'spin', 'pose', 'squat', 'shoot'];
 
-// Two outfits. The PMX switches them with the material morph P2-Change,
-// which MMDLoader does not apply: P2-Change multiplies the P1 materials'
-// alpha by 0 and adds 1 to the P2 ones and the chest skin.
+// Files under the base.
+const BODY_PMX = 'v2/Ani.pmx';
+const CLOTHES_PMX = 'v1/Ani.pmx';
+const MOTIONS = 'v2/motions/';
+
+// The v1 outfits. v1 switches them with the material morph P2-Change, which
+// MMDLoader does not apply: P2-Change multiplies the P1 materials' alpha by
+// 0 and adds 1 to the P2 ones. Its own skin, face and hair are not used.
 const P1 = [
   'P1-BackBow',
   'P1-TopCloth',
@@ -101,13 +111,11 @@ const P1 = [
   'P1-OutSkirt',
   'Shared-Glove',
 ];
-const P2 = [
-  'BodySkin-Chest(Hide)',
-  'P2-Glove(Hide)',
-  'P2-Top(Hide)',
-  'P2-Panties(Hide)',
-  'P2-Skirt',
-];
+const P2 = ['P2-Glove(Hide)', 'P2-Top(Hide)', 'P2-Panties(Hide)', 'P2-Skirt'];
+// Worn with either v1 outfit.
+const SHARED = ['Shared-Socks-Lace', 'Shared-Collar', 'Shared-Boots', 'Hair-Band'];
+// The v2 body's own lingerie.
+const LINGERIE = ['Lingerie'];
 const LEG = ['左足', '右足', '左ひざ', '右ひざ', '左足首', '右足首'];
 
 const smooth = (a: number) => a * a * (3 - 2 * a);
@@ -173,6 +181,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   let grants: { bone: THREE.Bone; from: THREE.Bone; ratio: number }[] = [];
   let morphs: Record<string, number> = {};
   let outfit: Outfit = opts.outfit;
+  let clothes: THREE.SkinnedMesh | null = null;
 
   const walk = {
     state: (opts.present ? 'here' : 'away') as Walk,
@@ -231,18 +240,21 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   // The files are PNG where the PMX names BMP textures.
   const manager = new THREE.LoadingManager();
   manager.setURLModifier((u) => u.replace(/\.bmp$/i, '.png'));
-  new MMDLoader(manager).load(
-    `${opts.base}Ani.pmx`,
-    (m) => {
+  const loader = new MMDLoader(manager);
+  const load = (file: string) =>
+    new Promise<THREE.SkinnedMesh>((ok, fail) =>
+      loader.load(`${opts.base}${file}`, ok, undefined, fail),
+    );
+  Promise.all([load(BODY_PMX), load(CLOTHES_PMX)]).then(
+    ([m, v1]) => {
       if (disposed) return;
-      setUp(m);
+      setUp(m, v1);
       opts.onReady?.();
     },
-    undefined,
     (e) => opts.onError?.(e),
   );
 
-  function setUp(m: THREE.SkinnedMesh) {
+  function setUp(m: THREE.SkinnedMesh, v1: THREE.SkinnedMesh) {
     mesh = m;
     m.rotation.y = FACE;
     m.visible = walk.state === 'here';
@@ -253,10 +265,17 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       baseP[b.name] = b.position.clone();
     }
     morphs = m.morphTargetDictionary ?? {};
-    hugLace(m);
+    // v1's clothes on the v2 skeleton: v1's skin indices name the same bones.
+    const worn = new Set([...P1, ...P2, ...SHARED]);
+    for (const mat of v1.material as THREE.Material[]) if (!worn.has(mat.name)) mat.visible = false;
+    clothes = new THREE.SkinnedMesh(v1.geometry, v1.material);
+    clothes.frustumCulled = false;
+    m.add(clothes);
+    clothes.bind(m.skeleton, new THREE.Matrix4());
+    hugLace(clothes);
     // The skirts, frills and bows are single-sided in the PMX: once the
     // springs swing them, their inner side faces the camera and vanishes.
-    for (const mat of m.material as THREE.Material[])
+    for (const mat of clothes.material as THREE.Material[])
       if (/Skirt|BackBow|UnderPants|Socks-Lace/.test(mat.name)) mat.side = THREE.DoubleSide;
     m.updateMatrixWorld(true);
     for (const b of m.skeleton.bones)
@@ -319,17 +338,20 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
 
   function dress(o: Outfit) {
     outfit = o;
-    if (!mesh) return;
-    for (const mat of mesh.material as THREE.Material[]) {
+    if (!mesh || !clothes) return;
+    for (const mat of clothes.material as THREE.Material[]) {
       if (P1.includes(mat.name)) mat.visible = o === 'p1';
+      if (SHARED.includes(mat.name)) mat.visible = o !== 'lingerie';
       if (P2.includes(mat.name)) {
         mat.visible = o === 'p2';
         mat.opacity = o === 'p2' ? 1 : 0;
       }
     }
+    for (const mat of mesh.material as THREE.Material[])
+      if (LINGERIE.includes(mat.name)) mat.visible = o === 'lingerie';
     // Only the worn skirt swings.
     if (springs) {
-      springs.off = new Set([o === 'p1' ? 'p2' : 'p1']);
+      springs.off = new Set(['p1', 'p2'].filter((g) => g !== o));
       settle = true;
     }
   }
@@ -605,7 +627,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   // Clips: one now and then, faded in and out over the procedural pose.
   const loaded: Record<string, Promise<Clip | null> | undefined> = {};
   const clipOf = (name: string) =>
-    (loaded[name] ??= loadClip(`${opts.base}motions/${CLIPS[name].file}.vrma`, (n) =>
+    (loaded[name] ??= loadClip(`${opts.base}${MOTIONS}${CLIPS[name].file}.vrma`, (n) =>
       BIND[n].clone(),
     ).catch(() => null));
   const play = { clip: null as Clip | null, name: '', t0: 0, w: 0, next: 6 };
@@ -783,7 +805,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     for (const n of LEG) B[n + 'D'].quaternion.copy(B[n].quaternion);
 
     // Arms: the wrists go to a point on the skirt's flare (by the thighs in
-    // the slip) by two-bone IK, kept out of the body.
+    // the slip and the lingerie) by two-bone IK, kept out of the body.
     const W = at('下半身');
     for (const c of BODY) {
       onBone(c.a[0], c.a[1], c.A);
@@ -801,9 +823,9 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       const S = at(side + '腕');
       const bob = Math.sin(t * 0.9 + sd) * 0.05;
       const T =
-        outfit === 'p2'
-          ? W.clone().add(_off.set(sd * 2.75, -1.75 + bob, 0.3))
-          : W.clone().add(_off.set(sd * 2.6, -1.3 + bob, 0.9));
+        outfit === 'p1'
+          ? W.clone().add(_off.set(sd * 2.6, -1.3 + bob, 0.9))
+          : W.clone().add(_off.set(sd * 2.75, -1.75 + bob, 0.3));
       reach(side, S, T, S.clone().add(_off.set(sd * 2, -2, -2.5)));
     }
     for (const g of grants) g.bone.quaternion.copy(_id).slerp(g.from.quaternion, g.ratio);

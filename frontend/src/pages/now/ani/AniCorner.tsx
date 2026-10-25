@@ -27,6 +27,7 @@ function HangerIcon() {
 const OUTFITS: { id: AniOutfit; label: string }[] = [
   { id: 'p1', label: 'Dress' },
   { id: 'p2', label: 'Slip' },
+  { id: 'lingerie', label: 'Lingerie' },
 ];
 
 /**
