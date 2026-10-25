@@ -14646,6 +14646,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/now/voice-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A short-lived OpenAI Realtime client secret for talking with Ani on Now
+         * @description The browser opens a WebRTC call to OpenAI with the secret; the model and the voice are fixed by the server's config. At most 30 sessions per user and hour. Refused for API keys.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The secret */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["NowVoiceSession"];
+                        };
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too many sessions this hour */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No API key configured (not_configured), OpenAI did not issue a secret (upstream_unavailable), or the server is busy (busy) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/today/focus/done": {
         parameters: {
             query?: never;
@@ -21893,6 +21962,19 @@ export interface components {
             corners?: components["schemas"]["NowCorners"];
             /** @description Replaces the quick links; an empty array clears them */
             links?: components["schemas"]["NowLink"][];
+        };
+        NowVoiceSession: {
+            /** @description The client secret (ek_...) for POST https://api.openai.com/v1/realtime/calls */
+            value: string;
+            /**
+             * Format: int64
+             * @description Unix seconds
+             */
+            expires_at: number;
+            /** @example gpt-realtime-mini */
+            model: string;
+            /** @example marin */
+            voice: string;
         };
         NowWeather: {
             place: string;

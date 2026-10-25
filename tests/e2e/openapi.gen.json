@@ -4524,6 +4524,34 @@
      }
     }
    },
+   "NowVoiceSession": {
+    "type": "object",
+    "required": [
+     "value",
+     "expires_at",
+     "model",
+     "voice"
+    ],
+    "properties": {
+     "value": {
+      "type": "string",
+      "description": "The client secret (ek_...) for POST https://api.openai.com/v1/realtime/calls"
+     },
+     "expires_at": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Unix seconds"
+     },
+     "model": {
+      "type": "string",
+      "example": "gpt-realtime-mini"
+     },
+     "voice": {
+      "type": "string",
+      "example": "marin"
+     }
+    }
+   },
    "NowWeather": {
     "type": "object",
     "required": [
@@ -27974,6 +28002,52 @@
     }
    }
   },
+  "/api/v1/now/voice-session": {
+   "post": {
+    "summary": "A short-lived OpenAI Realtime client secret for talking with Ani on Now",
+    "description": "The browser opens a WebRTC call to OpenAI with the secret; the model and the voice are fixed by the server's config. At most 30 sessions per user and hour. Refused for API keys.",
+    "tags": [
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "The secret",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/NowVoiceSession"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "404": {
+      "description": "Now module disabled"
+     },
+     "429": {
+      "description": "Too many sessions this hour"
+     },
+     "503": {
+      "description": "No API key configured (not_configured), OpenAI did not issue a secret (upstream_unavailable), or the server is busy (busy)"
+     }
+    }
+   }
+  },
   "/api/v1/today/focus/done": {
    "post": {
     "summary": "Tick or untick the focus; a task focus closes or reopens the task",
@@ -34613,7 +34687,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 515718,
-  "source_fnv1a64": "899d5df7ea838316"
+  "source_bytes": 517196,
+  "source_fnv1a64": "8559daa6c595b42a"
  }
 }

@@ -210,3 +210,61 @@
     transition: none;
   }
 }
+
+/* What she says, in a glass bubble by her head. */
+.ani-say {
+  position: fixed;
+  z-index: 21;
+  left: 200px;
+  bottom: calc(var(--ani-floor) + 440px);
+  max-width: 220px;
+  padding: 9px 13px;
+  border-radius: 16px 16px 16px 4px;
+  border: 1px solid var(--g-glass-line);
+  background: var(--g-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: var(--g-ink);
+  font-size: 14px;
+  line-height: 1.35;
+  pointer-events: none;
+  animation: ani-say-in 0.25s ease-out;
+}
+@keyframes ani-say-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+}
+
+/* The microphone, under the hanger: a conversation with her. */
+.ani-mic {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--g-ink-faint);
+  transition:
+    color 0.2s,
+    background 0.2s;
+}
+.ani-mic:hover:not(:disabled) {
+  color: var(--g-ink);
+  background: rgba(255, 255, 255, 0.1);
+}
+.ani-mic[aria-pressed='true'] {
+  color: #1a1020;
+  background: #f0a993;
+}
+.ani-mic[data-state='hearing'] {
+  animation: ani-mic-pulse 1s ease-in-out infinite;
+}
+@keyframes ani-mic-pulse {
+  50% {
+    box-shadow: 0 0 0 5px rgba(240, 169, 147, 0.25);
+  }
+}

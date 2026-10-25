@@ -190,6 +190,9 @@ inline constexpr ConfigKey notes_enabled{"notes.enabled", "NOTES_ENABLED"};
 
 // --- now ---
 inline constexpr ConfigKey now_enabled{"now.enabled", "NOW_ENABLED"};
+inline constexpr ConfigKey now_ani_voice_api_key{"now.ani_voice.api_key", "ANI_VOICE_API_KEY"};
+inline constexpr ConfigKey now_ani_voice_model{"now.ani_voice.model", "ANI_VOICE_MODEL"};
+inline constexpr ConfigKey now_ani_voice_voice{"now.ani_voice.voice", "ANI_VOICE_VOICE"};
 
 // --- observability ---
 inline constexpr ConfigKey observability_metrics_address{"observability.metrics_address", "METRICS_ADDRESS"};

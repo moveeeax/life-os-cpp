@@ -243,7 +243,12 @@
     "enabled": "${GOALS_ENABLED:-false}"
   },
   "now": {
-    "enabled": "${NOW_ENABLED:-false}"
+    "enabled": "${NOW_ENABLED:-false}",
+    "ani_voice": {
+      "api_key": "${ANI_VOICE_API_KEY:-}",
+      "model": "${ANI_VOICE_MODEL:-gpt-realtime-mini}",
+      "voice": "${ANI_VOICE_VOICE:-marin}"
+    }
   },
   "storage": {
     "s3": {

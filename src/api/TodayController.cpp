@@ -9,6 +9,8 @@
 
 #include "api/TodayController.hpp"
 
+#include <exception>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -33,6 +35,7 @@
 #include "net/Http.hpp"
 #include "now/Settings.hpp"
 #include "now/Today.hpp"
+#include "now/Voice.hpp"
 #include "now/Weather.hpp"
 #include "repositories/Zones.hpp"
 #include "repositories/goals/GoalRepository.hpp"
@@ -44,6 +47,7 @@
 #include "security/Auth.hpp"
 #include "tasks/now/Digest.hpp"
 #include "travel/now/Digest.hpp"
+#include "utils/BlockingPool.hpp"
 #include "utils/ErrorResponse.hpp"
 #include "utils/Modules.hpp"
 
@@ -418,6 +422,55 @@ void TodayController::weather(const HttpRequestPtr& req, Callback&& callback) {
             Cache::get().set(down, "1", ::Now::Weather::kDownSeconds);
         }
         callback(ErrorResponse::service_unavailable("weather_unavailable", "the weather service is not answering"));
+    }
+}
+
+void TodayController::voiceSession(const HttpRequestPtr& req, Callback&& callback) {
+    API_MODULE_USER_GUARD(Core::now_enabled(), "now", req, callback, owner);
+    // A session is a browser conversation; an API key has no use for one.
+    API_REFUSE_API_KEY(req, callback);
+    const auto settings = ::Now::Voice::read_settings();
+    if (!settings) {
+        callback(ErrorResponse::service_unavailable("not_configured", "ANI_VOICE_API_KEY is not set"));
+        return;
+    }
+    // Each session spends the owner's OpenAI money: a few per user and hour.
+    if (Cache::is_initialized()) {
+        try {
+            const std::string rate_key = "now:voice:rate:" + owner;
+            const long long n = Cache::get().incr(rate_key);
+            if (n == 1) {
+                Cache::get().expire(rate_key, ::Now::Voice::kWindowSeconds);
+            }
+            if (n > ::Now::Voice::kMaxPerWindow) {
+                callback(ErrorResponse::too_many_requests(static_cast<int>(::Now::Voice::kWindowSeconds)));
+                return;
+            }
+        } catch (const std::exception& e) {
+            spdlog::warn("now.voice: the rate counter failed: {}", e.what());
+        }
+    }
+    // OpenAI answers in about a second; the call runs on the blocking pool.
+    auto respond = std::make_shared<Callback>(std::move(callback));
+    const bool queued = Utils::BlockingPool::shared().try_submit([respond, s = *settings] {
+        const Callback& reply = *respond;
+        try {
+            const auto session = ::Now::Voice::mint(Net::Http::transport(), s);
+            reply(Response::created(json{{"data",
+                                          {{"value", session.value},
+                                           {"expires_at", session.expires_at},
+                                           {"model", session.model},
+                                           {"voice", session.voice}}}}));
+        } catch (const ::Now::Voice::Unavailable& e) {
+            spdlog::warn("now.voice: no session: {}", e.what());
+            reply(ErrorResponse::service_unavailable("upstream_unavailable", "the voice service is not answering"));
+        } catch (const std::exception& e) {
+            spdlog::error("now.voiceSession failed: {}", e.what());
+            reply(ErrorResponse::internal_error());
+        }
+    });
+    if (!queued) {
+        (*respond)(ErrorResponse::service_unavailable("busy", "the server is busy, try again"));
     }
 }
 
