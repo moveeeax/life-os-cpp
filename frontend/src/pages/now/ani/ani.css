@@ -56,6 +56,11 @@
   -webkit-backdrop-filter: blur(16px);
   color: var(--g-ink);
 }
+.ani-ledge[data-wardrobe] {
+  /* Open, it grows upwards to fit the outfits and the credit. */
+  height: auto;
+  min-height: 102px;
+}
 .ani-ledge button:focus-visible {
   outline: 2px solid var(--g-ink);
   outline-offset: 1px;
@@ -126,7 +131,6 @@
   display: grid;
   align-content: start;
   gap: 1px;
-  height: 100%;
   box-sizing: border-box;
   padding: 6px 8px 4px;
 }
