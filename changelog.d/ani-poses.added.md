@@ -1,0 +1,1 @@
+Ani strikes poses on Now: between her VRoid moves she now and then holds one of 30 standing poses from the Pic♡Pix Free Pose set for six seconds. The poses were Unity humanoid clips, baked to VRM Animation (`wallpapers/ani/v2/motions/poses/`) and loaded when she first picks each one.
