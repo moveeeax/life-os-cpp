@@ -6,6 +6,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.42.0] - 2026-10-26
+
+### Added
+- The chat with Ani can be cleaned up: a message and its reply are deleted with the × beside them (`DELETE /api/v1/ani/turns/{id}`), and the bin in the panel's header clears the whole chat after a confirm (`DELETE /api/v1/ani/turns`). Clearing also starts a new conversation for her agent (migration 060, `ani_agents.chat_session` in its session key), so the cleared messages no longer come back in what she says; what she noted about the person in her own files stays. A message she is still answering cannot be deleted.
+
 ## [1.41.0] - 2026-10-26
 
 ### Added
