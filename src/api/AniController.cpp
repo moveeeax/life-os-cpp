@@ -266,4 +266,46 @@ void AniController::speech(const HttpRequestPtr& req, Callback&& callback, const
     }
 }
 
+void AniController::removeTurn(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    ANI_AGENT_GUARD(req, callback, owner);
+    if (!is_valid_uuid(id)) {
+        callback(ErrorResponse::not_found("turn_not_found"));
+        return;
+    }
+    try {
+        using Removed = Repositories::Agent::TurnRepository::Removed;
+        switch (Repositories::Agent::TurnRepository().remove(owner, id)) {
+            case Removed::Done:
+                no_content(callback);
+                return;
+            case Removed::Open:
+                callback(ErrorResponse::conflict("turn_open", "she is still answering this message"));
+                return;
+            case Removed::Missing:
+                callback(ErrorResponse::not_found("turn_not_found"));
+                return;
+        }
+    } catch (const std::exception& e) {
+        spdlog::error("ani.removeTurn failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
+void AniController::clearTurns(const HttpRequestPtr& req, Callback&& callback) {
+    ANI_AGENT_GUARD(req, callback, owner);
+    try {
+        Repositories::Agent::TurnRepository turns;
+        if (turns.has_open(owner)) {
+            callback(ErrorResponse::conflict("turn_open", "she is still answering the last message"));
+            return;
+        }
+        turns.clear(owner);
+        Repositories::Agent::AgentRepository().next_chat_session(owner);
+        no_content(callback);
+    } catch (const std::exception& e) {
+        spdlog::error("ani.clearTurns failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
 }  // namespace Api

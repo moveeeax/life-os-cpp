@@ -43,6 +43,10 @@ struct Sent {
 /// Queues @p text (already checked: 1 to kTurnTextMax characters, a known zone).
 Sent send(const std::string& owner, const std::string& text, const std::string& tz);
 
+/// The agent's session for the user's chat: the user id, then "#<n>" once the
+/// chat was cleared n times, so a cleared chat is a new conversation for it.
+std::string session_of(const std::string& owner, int chat_session);
+
 /// The bracketed line put in front of a message: the person's local time
 /// (@p local, empty when unknown), that the reply is spoken, and, when the
 /// turn offers @p tools, that their data is read with them and not recalled.

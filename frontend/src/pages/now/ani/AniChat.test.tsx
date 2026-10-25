@@ -12,6 +12,8 @@ vi.mock('./chat', async (orig) => ({
   sendMessage: vi.fn(),
   readTurn: vi.fn(),
   wakeAgent: vi.fn(),
+  deleteTurn: vi.fn(),
+  clearChat: vi.fn(),
 }));
 
 const turn = (over: Partial<Turn>): Turn => ({
@@ -114,5 +116,29 @@ describe('AniChat', () => {
     expect(await screen.findByText('Ок.')).toBeTruthy();
     expect(onReply).not.toHaveBeenCalled();
     localStorage.removeItem('now:ani:chat:sound');
+  });
+
+  it('deletes one message and clears the chat after a confirm', async () => {
+    vi.mocked(chat.loadTurns).mockResolvedValue([
+      turn({ id: 'a', status: 'done', text: 'Первое', reply: 'Раз.' }),
+      turn({ id: 'b', status: 'done', text: 'Второе', reply: 'Два.' }),
+    ]);
+    vi.mocked(chat.deleteTurn).mockResolvedValue();
+    vi.mocked(chat.clearChat).mockResolvedValue();
+    render(<AniChat tz="UTC" onClose={() => {}} />);
+    await screen.findByText('Раз.');
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Delete this message' })[0]);
+    await act(async () => {});
+    expect(chat.deleteTurn).toHaveBeenCalledWith('a');
+    expect(screen.queryByText('Раз.')).toBeNull();
+    expect(screen.getByText('Два.')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear the chat' }));
+    expect(chat.clearChat).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    await act(async () => {});
+    expect(chat.clearChat).toHaveBeenCalledOnce();
+    expect(await screen.findByText(/Write to her/)).toBeTruthy();
   });
 });

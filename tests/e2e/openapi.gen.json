@@ -28417,6 +28417,32 @@
       "description": "The agent is switched off"
      }
     }
+   },
+   "delete": {
+    "summary": "Clear the chat with Ani's agent",
+    "description": "Deletes every ended turn of the caller and starts a new conversation for the agent: it no longer sees the cleared messages (what it noted about the person in its own files stays). Refused while a turn is still running. Refused for API keys.",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Cleared"
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "404": {
+      "description": "The agent is switched off"
+     },
+     "409": {
+      "description": "A turn is still queued or running (turn_open)"
+     }
+    }
    }
   },
   "/api/v1/ani/turns/{id}": {
@@ -28465,6 +28491,43 @@
      },
      "404": {
       "description": "The agent is switched off, or no such turn of the caller (turn_not_found)"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Delete one message of the chat with Ani's agent, with its reply",
+    "description": "Removes the turn from the chat the page shows; the agent's own conversation keeps it (clear the chat to start a new one). Refused while the turn is queued or running. Refused for API keys.",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Deleted"
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "404": {
+      "description": "The agent is switched off, or no such turn of the caller (turn_not_found)"
+     },
+     "409": {
+      "description": "The turn is still queued or running (turn_open)"
      }
     }
    }
@@ -35204,7 +35267,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 526437,
-  "source_fnv1a64": "301c68a5f2e21852"
+  "source_bytes": 527942,
+  "source_fnv1a64": "dcce1359623d59ac"
  }
 }

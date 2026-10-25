@@ -222,3 +222,35 @@ TEST_F(AgentRepositoryTest, TheGatewayOfARunningAgentOnly) {
     agents.set_running(kAnna, "10.42.3.7");
     EXPECT_EQ(*agents.gateway(kAnna), (std::pair<std::string, std::string>{"10.42.3.7", "gw"}));
 }
+
+TEST_F(AgentRepositoryTest, TurnsAreDeletedOneByOneOrClearedButNotWhileOpen) {
+    TurnRepository turns;
+    const std::string done = (*turns.open(kAnna, "Привет", "UTC"))["id"];
+    turns.start(done);
+    turns.finish(done, "Привет!", nlohmann::json::array());
+    const std::string open = (*turns.open(kAnna, "Ещё", "UTC"))["id"];
+
+    EXPECT_EQ(turns.remove(kBoris, done), TurnRepository::Removed::Missing) << "not Boris's turn";
+    EXPECT_EQ(turns.remove(kAnna, open), TurnRepository::Removed::Open);
+    EXPECT_TRUE(turns.has_open(kAnna));
+    EXPECT_EQ(turns.remove(kAnna, done), TurnRepository::Removed::Done);
+    EXPECT_EQ(turns.remove(kAnna, done), TurnRepository::Removed::Missing);
+
+    turns.fail(open, "busy");
+    EXPECT_FALSE(turns.has_open(kAnna));
+    (*turns.open(kBoris, "Hi", "UTC"));
+    EXPECT_EQ(turns.clear(kAnna), 1);
+    EXPECT_TRUE(turns.list(kAnna, "", 10).empty());
+    EXPECT_EQ(turns.list(kBoris, "", 10).size(), 1U) << "Boris's chat stays";
+}
+
+TEST_F(AgentRepositoryTest, ClearingTheChatCountsAsANewConversation) {
+    EXPECT_EQ(agents.chat_session(kAnna), 0);
+    agents.next_chat_session(kAnna);
+    EXPECT_EQ(agents.chat_session(kAnna), 1) << "a user who never woke the agent gets a row";
+    EXPECT_EQ(agents.get(kAnna)->value("state", ""), "stopped");
+    agents.begin_start(kAnna);
+    agents.next_chat_session(kAnna);
+    EXPECT_EQ(agents.chat_session(kAnna), 2);
+    EXPECT_EQ(agents.get(kAnna)->value("state", ""), "starting") << "the run is untouched";
+}
