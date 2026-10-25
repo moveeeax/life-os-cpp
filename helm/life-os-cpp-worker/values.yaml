@@ -385,6 +385,31 @@ mail:
   subjectPrefix: "[App] "
 
 # ---------------------------------------------------------------
+# Ani's agents (src/agent/, docs/CONFIG.md "Ani agent"): an OpenClaw pod per
+# user in its own namespace. Enabled on the ONE worker release that runs the
+# ani_* jobs and serves the pods' model proxy (deploy/values-ani-worker-prod.yaml):
+# its pods get a service account bound to a Role in that namespace (pods and
+# secrets, nothing else), and the chart renders the namespace with a quota,
+# a default-deny network policy and an image pre-puller.
+# ---------------------------------------------------------------
+aniAgents:
+  enabled: false
+  namespace: life-os-agents
+  # Must match ANI_AGENT_MAX_RUNNING: the quota is a backstop, not the limit.
+  maxPods: 8
+  # Per pod, as Manifest.hpp sets them (gateway + restore + keeper).
+  podMemoryRequest: 1600Mi
+  podMemoryLimit: 2400Mi
+  # The pods reach this worker's proxy on its health port, and the bucket
+  # (restore and keeper) on 443 at these CIDRs; empty: no bucket egress.
+  s3Cidrs: []
+  prepull:
+    enabled: true
+    image: ghcr.io/openclaw/openclaw:2026.10.7-slim
+    # The node label key the agent pods require (ANI_AGENT_NODE_LABEL).
+    nodeLabel: node-role.kubernetes.io/worker
+
+# ---------------------------------------------------------------
 # Pod scheduling — annotations, node selection, tolerations, affinity
 # ---------------------------------------------------------------
 podAnnotations: {}

@@ -318,6 +318,34 @@ outage can never affect the money path.
 | `ANI_VOICE_MODEL` | `now.ani_voice.model` | string | `gpt-realtime-mini` | The Realtime model of those sessions. |
 | `ANI_VOICE_VOICE` | `now.ani_voice.voice` | string | `marin` | Ani's voice in those sessions (a Realtime voice name). |
 
+## Ani agent
+
+Ani's agent on Now: an OpenClaw pod per user in its own namespace, started by
+the worker when the user wakes it and stopped on logout, after the idle limit
+or the age limit; its state is saved to S3 (`<prefix>private/<owner>/ani/`)
+when it stops and restored when it starts. The worker alone talks to the
+Kubernetes API (its service account, see the worker chart's `aniAgents`) and
+serves the pods' model proxy on its health port (`POST
+/ani/llm/v1/chat/completions`); the API only changes the state and queues the
+jobs. In prod the knobs come from the Secret `life-os-ani-agent` into both
+the API and the worker.
+
+| Env | JSON key | Type | Default | Notes |
+|---|---|---|---|---|
+| `ANI_AGENT_ENABLED` | `ani.agent.enabled` | bool | `false` | Master switch. Off: `/api/v1/ani/agent*` answer 404, no reconcile tick, no proxy route. |
+| `ANI_AGENT_IMAGE` | `ani.agent.image` | string | `ghcr.io/openclaw/openclaw:2026.10.7-slim` | The OpenClaw image of the pods (arm64 and amd64). |
+| `ANI_AGENT_KEEPER_IMAGE` | `ani.agent.keeper_image` | string | `curlimages/curl:8.17.0` | The image of the restore init container and the keeper sidecar (sh, tar, curl). |
+| `ANI_AGENT_NAMESPACE` | `ani.agent.namespace` | string | `life-os-agents` | Where the pods and their Secrets live; the worker's Role is bound there. |
+| `ANI_AGENT_NODE_LABEL` | `ani.agent.node_label` | string | `node-role.kubernetes.io/worker` | A node label key the pods require (node affinity, `Exists`), so they stay off the control-plane nodes. Empty: any node. |
+| `ANI_AGENT_MAX_RUNNING` | `ani.agent.max_running` | int | `8` | Agents not stopped at once, across users; a wake past it answers 503 `busy`. |
+| `ANI_AGENT_IDLE_MINUTES` | `ani.agent.idle_minutes` | int | `20` | A running agent with no wake and no model call this long is stopped. |
+| `ANI_AGENT_MAX_HOURS` | `ani.agent.max_hours` | int | `12` | A run is stopped this long after its start, busy or not (its presigned snapshot URL lives one hour more). |
+| `ANI_AGENT_MODEL` | `ani.agent.model` | string | `gpt-5-mini` | The upstream model every proxied call is pinned to. |
+| `ANI_AGENT_UPSTREAM_URL` | `ani.agent.upstream_url` | string | `https://api.openai.com/v1` | An OpenAI-compatible base URL the proxy forwards to (`/chat/completions`). |
+| `ANI_AGENT_UPSTREAM_KEY` | `ani.agent.upstream_key` | string | empty | The upstream's key. It stays in the worker; the pods get a per-run proxy token. Empty: the agent counts as not configured. |
+| `ANI_AGENT_PROXY_URL` | `ani.agent.proxy_url` | string | empty | The proxy as the pods reach it, ending in `/v1`, e.g. `http://life-os-cpp-worker.life-os.svc.cluster.local:9091/ani/llm/v1`. Empty: not configured. |
+| `ANI_AGENT_MONTHLY_TOKENS` | `ani.agent.monthly_tokens` | int | `20000000` | Prompt plus completion tokens per user and calendar month (UTC); past it the proxy answers 429 `insufficient_quota`. |
+
 ## Storage (S3)
 
 | Env | JSON key | Type | Default | Notes |

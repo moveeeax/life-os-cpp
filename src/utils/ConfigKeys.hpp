@@ -188,6 +188,21 @@ inline constexpr ConfigKey money_rates_schedule_hours{"money.rates_schedule_hour
 // --- notes ---
 inline constexpr ConfigKey notes_enabled{"notes.enabled", "NOTES_ENABLED"};
 
+// --- ani agent ---
+inline constexpr ConfigKey ani_agent_enabled{"ani.agent.enabled", "ANI_AGENT_ENABLED"};
+inline constexpr ConfigKey ani_agent_image{"ani.agent.image", "ANI_AGENT_IMAGE"};
+inline constexpr ConfigKey ani_agent_keeper_image{"ani.agent.keeper_image", "ANI_AGENT_KEEPER_IMAGE"};
+inline constexpr ConfigKey ani_agent_namespace{"ani.agent.namespace", "ANI_AGENT_NAMESPACE"};
+inline constexpr ConfigKey ani_agent_node_label{"ani.agent.node_label", "ANI_AGENT_NODE_LABEL"};
+inline constexpr ConfigKey ani_agent_max_running{"ani.agent.max_running", "ANI_AGENT_MAX_RUNNING"};
+inline constexpr ConfigKey ani_agent_idle_minutes{"ani.agent.idle_minutes", "ANI_AGENT_IDLE_MINUTES"};
+inline constexpr ConfigKey ani_agent_max_hours{"ani.agent.max_hours", "ANI_AGENT_MAX_HOURS"};
+inline constexpr ConfigKey ani_agent_model{"ani.agent.model", "ANI_AGENT_MODEL"};
+inline constexpr ConfigKey ani_agent_upstream_url{"ani.agent.upstream_url", "ANI_AGENT_UPSTREAM_URL"};
+inline constexpr ConfigKey ani_agent_upstream_key{"ani.agent.upstream_key", "ANI_AGENT_UPSTREAM_KEY"};
+inline constexpr ConfigKey ani_agent_proxy_url{"ani.agent.proxy_url", "ANI_AGENT_PROXY_URL"};
+inline constexpr ConfigKey ani_agent_monthly_tokens{"ani.agent.monthly_tokens", "ANI_AGENT_MONTHLY_TOKENS"};
+
 // --- now ---
 inline constexpr ConfigKey now_enabled{"now.enabled", "NOW_ENABLED"};
 inline constexpr ConfigKey now_ani_voice_api_key{"now.ani_voice.api_key", "ANI_VOICE_API_KEY"};

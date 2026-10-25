@@ -20,6 +20,18 @@ struct Response {
     std::string body;
 };
 
+/// One request of any method, for the callers the two shortcuts below do not
+/// fit (the Kubernetes API, the agent's model proxy).
+struct Request {
+    std::string method = "GET";  // GET | POST | PUT | PATCH | DELETE
+    std::string url;
+    std::string body;          // sent when not empty
+    std::string content_type;  // the body's type; empty: no Content-Type header
+    std::vector<std::pair<std::string, std::string>> headers;
+    long timeout_seconds = 10;
+    std::string ca_file;  // a CA bundle to trust instead of the system store; empty: the system store
+};
+
 /// The request did not complete: DNS, connection, timeout.
 struct TransportError : std::runtime_error {
     explicit TransportError(const std::string& what) : std::runtime_error(what) {}
@@ -40,6 +52,11 @@ public:
                                const std::string& body,
                                const std::vector<std::pair<std::string, std::string>>& headers,
                                long timeout_seconds) = 0;
+
+    /// Any request. The default refuses: a scripted test transport that never
+    /// sees such a request need not implement it.
+    /// @throws TransportError when no response arrived.
+    virtual Response send(const Request& request);
 };
 
 class CurlTransport : public Transport {
@@ -50,6 +67,7 @@ public:
                        const std::string& body,
                        const std::vector<std::pair<std::string, std::string>>& headers,
                        long timeout_seconds) override;
+    Response send(const Request& request) override;
 
 private:
     long timeout_seconds_;

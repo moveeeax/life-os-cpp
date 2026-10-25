@@ -83,6 +83,9 @@ public:
     std::string private_upload_url(const std::string& key, const std::string&, long long) const override {
         return "https://fake/put/" + key;
     }
+    std::string private_put_url(const std::string& key, long) const override {
+        return "https://fake/private-put/" + key;
+    }
     std::string download_url(const std::string& key, long seconds, const std::string& disposition) const override {
         signed_downloads.emplace_back(key, disposition);
         return "https://fake/get/" + key + "?X-Amz-Expires=" + std::to_string(seconds);

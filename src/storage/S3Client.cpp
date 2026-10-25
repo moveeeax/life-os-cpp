@@ -135,6 +135,10 @@ std::string S3Client::private_upload_url(const std::string& key,
                        {"content-type", content_type}});
 }
 
+std::string S3Client::private_put_url(const std::string& key, long seconds) const {
+    return signed_url("PUT", key, seconds, {{"cache-control", kPrivateCacheControl}});
+}
+
 std::string S3Client::download_url(const std::string& key, long seconds, const std::string& disposition) const {
     return signed_url("GET", key, seconds, {}, {{"response-content-disposition", disposition}});
 }

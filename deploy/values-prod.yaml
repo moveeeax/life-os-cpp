@@ -48,6 +48,12 @@ extraEnvFrom:
   - secretRef:
       name: life-os-ani-voice
       optional: true
+  # Ani's agent (docs/RUNBOOK.md "Ani's agents"): the API reads the switch and
+  # the pod limit from the Secret life-os-ani-agent; without it the
+  # /api/v1/ani/agent routes answer 404.
+  - secretRef:
+      name: life-os-ani-agent
+      optional: true
 
 externalDatabase:
   host: postgresql-rw.db.svc.cluster.local

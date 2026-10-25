@@ -1,0 +1,39 @@
+# Production overlay of the second release of the worker chart,
+# life-os-ani-worker: Ani's agent pods (src/agent/). Installed ON TOP of
+# deploy/values-worker-prod.yaml, which carries the image tag, the database,
+# Redis and the bucket:
+#
+#   helm upgrade --install life-os-ani-worker ./helm/life-os-cpp-worker -n life-os \
+#     -f deploy/values-worker-prod.yaml -f deploy/values-ani-worker-prod.yaml
+#
+# A release of its own because the main worker runs one job at a time (a
+# fitness sync can hold it for half an hour) and must not carry Kubernetes
+# rights. This one pulls only the ani_* queues, holds the service account,
+# and serves the pods' model proxy on its health port; the pods reach it as
+# http://life-os-ani-worker.life-os.svc.cluster.local:9091/ani/llm/v1
+# (ANI_AGENT_PROXY_URL in the Secret life-os-ani-agent).
+
+fullnameOverride: life-os-ani-worker
+
+worker:
+  types: "ani_agent_start,ani_agent_stop,ani_agents_reconcile"
+  # A start or a stop waits on the cluster through short deferrals; a few at
+  # once keep one slow pod from holding the others.
+  concurrency: 3
+
+# extraEnvFrom replaces the list of values-worker-prod.yaml: the app Secret
+# (database and Redis passwords) and the agent's knobs and upstream key.
+extraEnvFrom:
+  - secretRef:
+      name: life-os-app
+  - secretRef:
+      name: life-os-ani-agent
+
+aniAgents:
+  enabled: true
+  namespace: life-os-agents
+  maxPods: 8
+  # s3.tarassov.me (the cluster's load balancer), for the restore and keeper
+  # containers. Re-check with `dig +short s3.tarassov.me` if the bucket moves.
+  s3Cidrs:
+    - 130.61.178.81/32

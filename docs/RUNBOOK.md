@@ -409,7 +409,7 @@ older schema is brought forward by the next API rollout.
 
 ## Upgrade order {#upgrade-order}
 
-A release is three helm releases, upgraded in this order:
+A release is four helm releases, upgraded in this order:
 
 1. API (`life-os-cpp`, `deploy/values-prod.yaml`). Its `migrate` init
    container applies the new migrations before the new API starts.
@@ -420,11 +420,52 @@ A release is three helm releases, upgraded in this order:
    the API was not upgraded first, the worker pod sits in `Init` and fails
    after 10 minutes (`schemaWait.timeoutSeconds`); upgrade the API and the
    pod recovers on its next restart.
-3. Frontend (`life-os-cpp-frontend`, `deploy/values-frontend-prod.yaml`), last,
+3. Ani's agent worker (`life-os-ani-worker`, the worker chart with
+   `deploy/values-worker-prod.yaml` and then `deploy/values-ani-worker-prod.yaml`),
+   once it is installed (see "Ani's agents" below). Same image and the same
+   schema wait as the worker.
+4. Frontend (`life-os-cpp-frontend`, `deploy/values-frontend-prod.yaml`), last,
    so the new SPA never calls routes the API does not serve yet.
 
 The helm commands are in the README ("Kubernetes"). Images come only from
 `release.yml` (tag `v<ver>` on master, CI green on that commit).
+
+### Ani's agents {#ani-agents}
+
+An OpenClaw pod per user (`src/agent/`, `docs/CONFIG.md` "Ani agent"),
+created and deleted by the `life-os-ani-worker` release, the only workload
+with Kubernetes rights: a Role on pods and secrets in `life-os-agents`. The
+chart renders that namespace (Pod Security `restricted`), a quota, a
+default-deny NetworkPolicy (in: the ani worker on 18789; out: DNS, the ani
+worker's proxy on 9091, the bucket's address on 443) and a DaemonSet that
+keeps the OpenClaw image on the worker nodes.
+
+First install:
+
+1. The Secret with the knobs, in both the API and the ani worker (the API
+   reads the switch and the pod limit, the worker everything):
+
+   ```bash
+   kubectl -n life-os create secret generic life-os-ani-agent \
+     --from-literal=ANI_AGENT_ENABLED=true \
+     --from-literal=ANI_AGENT_UPSTREAM_KEY=<an OpenAI key> \
+     --from-literal=ANI_AGENT_PROXY_URL=http://life-os-ani-worker.life-os.svc.cluster.local:9091/ani/llm/v1
+   ```
+
+   `deploy/values-prod.yaml` takes it as an optional `extraEnvFrom`; bump
+   `secretsVersion` there to restart the API after changing it.
+2. `helm upgrade --install life-os-ani-worker ./helm/life-os-cpp-worker -n life-os
+   -f deploy/values-worker-prod.yaml -f deploy/values-ani-worker-prod.yaml`.
+3. Check: `kubectl -n life-os-agents get ds,quota,netpol` and, as an
+   administrator, `POST /api/v1/ani/agent/wake`, then
+   `kubectl -n life-os-agents get pods -w` (ready in about 30 s with the image
+   cached).
+
+Snapshots live under `life-os/private/<owner>/ani/state-<n>.tgz`; the current
+one is `ani_agents.generation`, the one before it is kept. To stop every
+agent at once, set `ANI_AGENT_ENABLED=false` and delete the pods
+(`kubectl -n life-os-agents delete pods -l life-os.tarassov.me/managed-by=life-os-worker`):
+their keepers save the state as they go.
 
 ### NetworkPolicy on the API pods {#networkpolicy}
 

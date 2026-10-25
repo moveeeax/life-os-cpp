@@ -1,0 +1,179 @@
+{{- if .Values.aniAgents.enabled }}
+{{- $ns := .Values.aniAgents.namespace }}
+{{- $worker := include "life-os-cpp-worker.fullname" . }}
+# The namespace of Ani's agent pods. Kept on uninstall: a running agent's
+# pod would lose its keeper's save with it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $ns }}
+  annotations:
+    helm.sh/resource-policy: keep
+  labels:
+    {{- include "life-os-cpp-worker.labels" . | nindent 4 }}
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $worker }}
+  labels:
+    {{- include "life-os-cpp-worker.labels" . | nindent 4 }}
+automountServiceAccountToken: false
+---
+# Pods and their Secrets in the agents namespace: the whole of the worker's rights.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $worker }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "life-os-cpp-worker.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [pods, secrets]
+    verbs: [create, get, list, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $worker }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "life-os-cpp-worker.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $worker }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $worker }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: ani-agents
+  namespace: {{ $ns }}
+  labels:
+    {{- include "life-os-cpp-worker.labels" . | nindent 4 }}
+spec:
+  hard:
+    pods: {{ add (int .Values.aniAgents.maxPods) 6 | quote }}
+    requests.memory: {{ printf "%dMi" (mul (int .Values.aniAgents.maxPods) (trimSuffix "Mi" .Values.aniAgents.podMemoryRequest | int)) | quote }}
+    limits.memory: {{ printf "%dMi" (mul (int .Values.aniAgents.maxPods) (trimSuffix "Mi" .Values.aniAgents.podMemoryLimit | int)) | quote }}
+---
+# Agent pods: in only from this worker (the gateway, for the chat), out only to
+# DNS, this worker's model proxy and the bucket.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ani-agents
+  namespace: {{ $ns }}
+  labels:
+    {{- include "life-os-cpp-worker.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ani-agent
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Release.Namespace }}
+          podSelector:
+            matchLabels:
+              {{- include "life-os-cpp-worker.selectorLabels" . | nindent 14 }}
+      ports:
+        - port: 18789
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Release.Namespace }}
+          podSelector:
+            matchLabels:
+              {{- include "life-os-cpp-worker.selectorLabels" . | nindent 14 }}
+      ports:
+        - port: {{ .Values.worker.healthPort }}
+          protocol: TCP
+    {{- with .Values.aniAgents.s3Cidrs }}
+    - to:
+        {{- range . }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      ports:
+        - port: 443
+          protocol: TCP
+    {{- end }}
+{{- if .Values.aniAgents.prepull.enabled }}
+---
+# Keeps the OpenClaw image (about 650 MB) on every node an agent may land on,
+# so a start does not wait on the pull.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ani-agent-prepull
+  namespace: {{ $ns }}
+  labels:
+    {{- include "life-os-cpp-worker.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ani-agent-prepull
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ani-agent-prepull
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.aniAgents.prepull.nodeLabel }}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: {{ . }}
+                    operator: Exists
+      {{- end }}
+      initContainers:
+        - name: pull
+          image: {{ .Values.aniAgents.prepull.image }}
+          command: ["node", "-e", "0"]
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.10
+          resources:
+            requests: { cpu: 1m, memory: 8Mi }
+            limits: { memory: 16Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+{{- end }}
+{{- end }}

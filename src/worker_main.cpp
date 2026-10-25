@@ -26,6 +26,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "agent/ProxyRoute.hpp"
 #include "cache/Cache.hpp"
 #include "core/Core.hpp"
 #include "core/JobHandlers.hpp"
@@ -417,6 +418,9 @@ int main(int argc, char* argv[]) {
                 callback(resp);
             },
             {drogon::Get});
+
+        // Ani's agent pods call their model through the worker (agent/Proxy.hpp).
+        Agent::register_proxy_route();
 
         // Configure Drogon for health-only serving
         drogon::app().addListener("0.0.0.0", health_port).setThreadNum(1).setLogLevel(trantor::Logger::kWarn);

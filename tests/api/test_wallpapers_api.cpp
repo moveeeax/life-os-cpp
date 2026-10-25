@@ -83,6 +83,9 @@ public:
     std::string private_upload_url(const std::string& key, const std::string&, long long) const override {
         return "https://fake/" + key;
     }
+    std::string private_put_url(const std::string& key, long) const override {
+        return "https://fake/private-put/" + key;
+    }
     std::string download_url(const std::string& key, long, const std::string&) const override {
         return "https://fake/" + key;
     }

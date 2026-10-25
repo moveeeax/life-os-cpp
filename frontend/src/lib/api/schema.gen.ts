@@ -14646,6 +14646,206 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ani/agent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The state of the caller's agent pod and this month's model usage
+         * @description Ani's agent is an OpenClaw pod per user, started on a wake and stopped on logout, when idle or when too old. Administrators only for now; refused for API keys.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The agent */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniAgent"];
+                        };
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an administrator */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The agent is switched off */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/agent/wake": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start the caller's agent pod, or keep a running one alive
+         * @description Queues the start of a stopped agent (the pod is ready within a minute or so) and pushes the idle stop of a running one back. Administrators only for now; refused for API keys.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The agent after the wake */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniAgent"];
+                        };
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an administrator */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The agent is switched off */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not configured (not_configured), every agent slot is taken (busy), or the job queue is off (jobs_disabled) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/agent/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop the caller's agent pod; its state is saved first
+         * @description Queues the stop of a starting or running agent; a stopped one stays as it is. Administrators only for now; refused for API keys.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The agent after the request */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniAgent"];
+                        };
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an administrator */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The agent is switched off */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The job queue is off (jobs_disabled) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/now/voice-session": {
         parameters: {
             query?: never;
@@ -21962,6 +22162,42 @@ export interface components {
             corners?: components["schemas"]["NowCorners"];
             /** @description Replaces the quick links; an empty array clears them */
             links?: components["schemas"]["NowLink"][];
+        };
+        AniAgent: {
+            /** @enum {string} */
+            state: "stopped" | "starting" | "running" | "stopping";
+            /**
+             * Format: date-time
+             * @description The start of the current or last run
+             */
+            started_at: string | null;
+            /**
+             * Format: date-time
+             * @description The last wake or model call; the idle stop counts from it
+             */
+            last_active_at: string | null;
+            /** @description The current snapshot of the state in S3; 0 before the first saved run */
+            generation: number;
+            /** @description Why the last run failed */
+            last_error: string | null;
+            usage: {
+                /**
+                 * @description The calendar month (UTC)
+                 * @example 2026-10
+                 */
+                month: string;
+                /** Format: int64 */
+                requests: number;
+                /** Format: int64 */
+                prompt_tokens: number;
+                /** Format: int64 */
+                completion_tokens: number;
+                /**
+                 * Format: int64
+                 * @description Prompt plus completion tokens allowed per month
+                 */
+                budget_tokens: number;
+            };
         };
         NowVoiceSession: {
             /** @description The client secret (ek_...) for POST https://api.openai.com/v1/realtime/calls */

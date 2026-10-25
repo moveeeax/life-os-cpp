@@ -47,6 +47,9 @@ public:
     virtual std::string private_upload_url(const std::string& key,
                                            const std::string& content_type,
                                            long long bytes) const = 0;
+    /// A presigned PUT valid @p seconds, signed with kPrivateCacheControl only: for a writer that
+    /// does not know the size or the type ahead (the snapshot an agent pod saves when it stops).
+    virtual std::string private_put_url(const std::string& key, long seconds) const = 0;
     /// A presigned GET valid @p seconds that answers with @p disposition as its Content-Disposition.
     virtual std::string download_url(const std::string& key, long seconds, const std::string& disposition) const = 0;
     /// Whether the object answers an unsigned HEAD at its public URL (the bucket lets anyone read it).
