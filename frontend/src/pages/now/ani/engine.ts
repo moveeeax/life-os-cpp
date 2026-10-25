@@ -272,7 +272,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     clothes.frustumCulled = false;
     m.add(clothes);
     clothes.bind(m.skeleton, new THREE.Matrix4());
-    hugLace(clothes);
+    hugLace(clothes, m);
     // The skirts, frills and bows are single-sided in the PMX: once the
     // springs swing them, their inner side faces the camera and vanishes.
     for (const mat of clothes.material as THREE.Material[])
@@ -361,32 +361,41 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   // Lace lies on the skin. The petticoat (P1-InnerSkirt) shared the outer
   // skirt's bones and flared with it; the frills of the lace shorts
   // (P1-UnderPants) stood off the legs on the hip bone alone, so the seat
-  // ate them when a leg moved; the garter band swung on ribbon chains. Each
-  // of their vertices takes the bone weights of the nearest skin vertex, so
-  // it moves as the skin does; a vertex standing off the skin is laid onto
-  // it along the skin's normal, keeping a twentieth of its depth.
-  function hugLace(m: THREE.SkinnedMesh) {
-    const g = m.geometry;
+  // ate them when a leg moved; the garter band swung on ribbon chains. The
+  // v2 hips and thighs are up to 0.17 off v1's, so lace made for v1 sank
+  // into the v2 skin in places and stood off it in others. Each of their
+  // vertices (and the slip's panties) takes the bone weights of the nearest
+  // v2 skin vertex, so it moves as the skin does, and is put on the skin
+  // along its normal: 0.03 out, plus a twentieth of any depth it stood off.
+  function hugLace(cloth: THREE.SkinnedMesh, body: THREE.SkinnedMesh) {
+    const g = cloth.geometry;
+    const bg = body.geometry;
     const index = g.index;
-    if (!index) return;
-    const mats = m.material as THREE.Material[];
+    const bIndex = bg.index;
+    if (!index || !bIndex) return;
+    const vertsOf = (geo: THREE.BufferGeometry, mesh: THREE.SkinnedMesh, names: string[]) => {
+      const mats = mesh.material as THREE.Material[];
+      const idx = geo.index!;
+      const out = new Set<number>();
+      for (const grp of geo.groups) {
+        if (!names.includes(mats[grp.materialIndex ?? 0].name)) continue;
+        for (let k = grp.start; k < grp.start + grp.count; k++) out.add(idx.getX(k));
+      }
+      return out;
+    };
     const pos = g.attributes.position as THREE.BufferAttribute;
     const nrm = g.attributes.normal as THREE.BufferAttribute;
     const si = g.attributes.skinIndex as THREE.BufferAttribute;
     const sw = g.attributes.skinWeight as THREE.BufferAttribute;
-    const vertsOf = (names: string[]) => {
-      const out = new Set<number>();
-      for (const grp of g.groups) {
-        if (!names.includes(mats[grp.materialIndex ?? 0].name)) continue;
-        for (let k = grp.start; k < grp.start + grp.count; k++) out.add(index.getX(k));
-      }
-      return out;
-    };
+    const bPos = bg.attributes.position as THREE.BufferAttribute;
+    const bNrm = bg.attributes.normal as THREE.BufferAttribute;
+    const bSi = bg.attributes.skinIndex as THREE.BufferAttribute;
+    const bSw = bg.attributes.skinWeight as THREE.BufferAttribute;
     // A grid of the skin for the nearest-vertex search.
     const CELL = 0.6;
     const grid = new Map<string, number[]>();
-    for (const v of vertsOf(['BodySkin-LowerBody', 'Shared-Socks'])) {
-      const k = `${Math.floor(pos.getX(v) / CELL)},${Math.floor(pos.getY(v) / CELL)},${Math.floor(pos.getZ(v) / CELL)}`;
+    for (const v of vertsOf(bg, body, ['Body_Skin'])) {
+      const k = `${Math.floor(bPos.getX(v) / CELL)},${Math.floor(bPos.getY(v) / CELL)},${Math.floor(bPos.getZ(v) / CELL)}`;
       const cell = grid.get(k);
       if (cell) cell.push(v);
       else grid.set(k, [v]);
@@ -394,7 +403,8 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     const p = new THREE.Vector3();
     const sp = new THREE.Vector3();
     const sn = new THREE.Vector3();
-    for (const v of vertsOf(['P1-InnerSkirt', 'P1-UnderPants', 'Shared-Socks-Lace'])) {
+    const lace = ['P1-InnerSkirt', 'P1-UnderPants', 'Shared-Socks-Lace', 'P2-Panties(Hide)'];
+    for (const v of vertsOf(g, cloth, lace)) {
       p.fromBufferAttribute(pos, v);
       let best = -1;
       let bd = Infinity;
@@ -406,24 +416,25 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
           for (let y = cy - r; y <= cy + r; y++)
             for (let z = cz - r; z <= cz + r; z++)
               for (const u of grid.get(`${x},${y},${z}`) ?? []) {
-                const d = sp.fromBufferAttribute(pos, u).distanceToSquared(p);
+                const d = sp.fromBufferAttribute(bPos, u).distanceToSquared(p);
                 if (d < bd) {
                   bd = d;
                   best = u;
                 }
               }
       if (best < 0) continue;
-      sp.fromBufferAttribute(pos, best);
-      sn.fromBufferAttribute(nrm, best).normalize();
-      const out = Math.max(0, p.clone().sub(sp).dot(sn));
-      if (out > 0.03) {
-        p.addScaledVector(sn, 0.03 + out * 0.05 - out);
+      sp.fromBufferAttribute(bPos, best);
+      sn.fromBufferAttribute(bNrm, best).normalize();
+      const depth = p.clone().sub(sp).dot(sn);
+      const want = 0.03 + Math.max(0, depth - 0.03) * 0.05;
+      if (Math.abs(depth - want) > 0.005) {
+        p.addScaledVector(sn, want - depth);
         pos.setXYZ(v, p.x, p.y, p.z);
-        nrm.setXYZ(v, sn.x, sn.y, sn.z);
+        if (depth > 0.03) nrm.setXYZ(v, sn.x, sn.y, sn.z);
       }
       for (let c = 0; c < 4; c++) {
-        si.setComponent(v, c, si.getComponent(best, c));
-        sw.setComponent(v, c, sw.getComponent(best, c));
+        si.setComponent(v, c, bSi.getComponent(best, c));
+        sw.setComponent(v, c, bSw.getComponent(best, c));
       }
     }
     pos.needsUpdate = nrm.needsUpdate = si.needsUpdate = sw.needsUpdate = true;
