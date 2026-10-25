@@ -88,12 +88,12 @@ public:
         });
     }
 
-    /// starting -> running, with the pod's address.
+    /// starting -> running, with the pod's address; only a run whose pod was created (set_run).
     bool set_running(const std::string& owner, const std::string& pod_ip) {
         return Database::get().execute_write([&](auto& txn) {
             return !txn.exec_params(
                            "UPDATE ani_agents SET state = 'running', pod_ip = $2 WHERE owner_id = $1::uuid AND state "
-                           "= 'starting' RETURNING owner_id",
+                           "= 'starting' AND pod_name IS NOT NULL RETURNING owner_id",
                            owner,
                            pod_ip)
                         .empty();
