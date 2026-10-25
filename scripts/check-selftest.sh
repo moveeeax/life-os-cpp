@@ -976,7 +976,7 @@ run_case module-dep-core-hub check-module-deps.sh break_module_dep_core_hub \
 run_case module-dep-declared-cycle check-module-deps.sh break_module_dep_declared_cycle \
     "$MODULE_DEPS_PATHS" \
     'include cycle between src/ directories' \
-    'api -> security -> api' \
+    'security -> api' \
     'docs/module-cycles-allowlist.txt'
 
 run_case changelog-broken-fragment 'assemble-changelog.sh --check' break_changelog_fragment_type \

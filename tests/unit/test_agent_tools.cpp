@@ -155,7 +155,9 @@ TEST(AgentTools, AccessClaimsAreTheLoginsSet) {
     EXPECT_EQ(c["iss"], "life-os");
     EXPECT_EQ(c["aud"], "web");
 
-    const auto bare = Security::Auth::access_claims(Security::Auth::AccessSubject{"u-2"}, 0, 60, "roles", "", "");
+    Security::Auth::AccessSubject nobody;
+    nobody.id = "u-2";
+    const auto bare = Security::Auth::access_claims(nobody, 0, 60, "roles", "", "");
     EXPECT_EQ(bare["roles"], json::array());
     EXPECT_FALSE(bare.contains("iss"));
     EXPECT_FALSE(bare.contains("aud"));
