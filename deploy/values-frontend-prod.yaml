@@ -38,3 +38,6 @@ ingress:
 csp:
   storageHosts:
     - https://s3.tarassov.me
+  # Ani's voice: the browser's WebRTC offer goes to OpenAI.
+  connectHosts:
+    - https://api.openai.com

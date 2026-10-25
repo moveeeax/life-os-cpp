@@ -126,3 +126,6 @@ affinity: {}
 # and the app shows its gradient. Example: ["https://cdn.example.com"].
 csp:
   storageHosts: []
+  # Other origins added to connect-src only. Example: ["https://api.openai.com"]
+  # for talking with Ani on Now (docs/CONFIG.md, ANI_VOICE_API_KEY).
+  connectHosts: []

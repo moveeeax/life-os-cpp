@@ -74,8 +74,11 @@ data:
             # csp.storageHosts: the wallpaper bucket or its CDN (pictures,
             # videos and the admin's direct upload); docs/wallpapers.md. blob: lets
             # the upload page read the picked file for its poster and size.
+            # csp.connectHosts: other origins the SPA calls (Ani's voice
+            # talks to api.openai.com over WebRTC after an HTTPS offer).
             {{- $storage := join " " .Values.csp.storageHosts }}
-            add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: {{ $storage }}; media-src 'self' blob: {{ $storage }}; font-src 'self'; connect-src 'self' {{ $storage }}; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+            {{- $connect := join " " (.Values.csp.connectHosts | default list) }}
+            add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: {{ $storage }}; media-src 'self' blob: {{ $storage }}; font-src 'self'; connect-src 'self' {{ $storage }} {{ $connect }}; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
         }
 
         location /assets/ {

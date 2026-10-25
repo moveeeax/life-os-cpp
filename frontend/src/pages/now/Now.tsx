@@ -227,7 +227,12 @@ function NowScreen() {
           onReorder={raw ? reorder : undefined}
         />
       )}
-      {showAni && base && <AniCorner base={base} />}
+      {showAni && base && (
+        <AniCorner
+          base={base}
+          context={{ name: me?.first_name ?? undefined, tz, date, today: today.data }}
+        />
+      )}
       {session.phase !== 'idle' && (
         <FocusMode
           phase={session.phase}

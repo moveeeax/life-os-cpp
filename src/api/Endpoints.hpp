@@ -310,6 +310,7 @@ inline const std::vector<EndpointInfo>& get_endpoints() {
         {"GET", "/api/v1/now/settings", "Now: the weather city and the corner layout"},
         {"PUT", "/api/v1/now/settings", "Now: set the weather city (geocoded) and the corner layout"},
         {"GET", "/api/v1/now/weather", "Now: the weather of the settings city, cached for an hour"},
+        {"POST", "/api/v1/now/voice-session", "Now: a short-lived OpenAI Realtime secret for talking with Ani"},
         {"GET", "/api/v1/sounds", "Now: the ready focus sounds with their public URLs"},
         {"GET", "/api/v1/admin/sounds", "Admin: every focus sound, pending ones included"},
         {"POST", "/api/v1/admin/sounds", "Admin: start a sound upload; answers a presigned PUT URL"},

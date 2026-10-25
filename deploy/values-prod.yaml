@@ -43,6 +43,11 @@ extraEnvFrom:
   - configMapRef:
       name: life-os-tasks-llm
       optional: true
+  # Ani's voice on Now: ANI_VOICE_API_KEY (an OpenAI key) in the Secret
+  # life-os-ani-voice; without it POST /api/v1/now/voice-session answers 503.
+  - secretRef:
+      name: life-os-ani-voice
+      optional: true
 
 externalDatabase:
   host: postgresql-rw.db.svc.cluster.local

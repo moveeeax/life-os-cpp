@@ -28,6 +28,7 @@ public:
     ADD_METHOD_TO(TodayController::getSettings, "/api/v1/now/settings", Get);
     ADD_METHOD_TO(TodayController::putSettings, "/api/v1/now/settings", Put);
     ADD_METHOD_TO(TodayController::weather, "/api/v1/now/weather", Get);
+    ADD_METHOD_TO(TodayController::voiceSession, "/api/v1/now/voice-session", Post);
     METHOD_LIST_END
 
     using Callback = std::function<void(const HttpResponsePtr&)>;
@@ -41,6 +42,7 @@ public:
     void getSettings(const HttpRequestPtr& req, Callback&& callback);
     void putSettings(const HttpRequestPtr& req, Callback&& callback);
     void weather(const HttpRequestPtr& req, Callback&& callback);
+    void voiceSession(const HttpRequestPtr& req, Callback&& callback);
 };
 
 }  // namespace Api

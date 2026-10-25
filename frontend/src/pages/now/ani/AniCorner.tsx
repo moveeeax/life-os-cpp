@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 
+import type { Today } from '@/lib/now/types';
+
 import type { Ani } from './engine';
+import type { Talk, TalkState } from './talk';
 import { useAni, type AniOutfit } from './state';
 import './ani.css';
 
@@ -24,20 +27,75 @@ function HangerIcon() {
   );
 }
 
+// Lines recorded ahead with the voice she talks in (OpenAI TTS, marin),
+// under v2/voice/<line>.mp3.
+const LINES = {
+  morning: 'Доброе утро! Я уже тут.',
+  day: 'Привет! Как идут дела?',
+  evening: 'Добрый вечер. Долгий был день?',
+  night: 'Уже поздно. Может, пора спать?',
+  tickle: 'Эй, щекотно!',
+  dizzy: 'Ой, голова кружится.',
+} as const;
+type Line = keyof typeof LINES;
+
+function hello(): Line {
+  const h = new Date().getHours();
+  return h < 5 ? 'night' : h < 12 ? 'morning' : h < 18 ? 'day' : h < 23 ? 'evening' : 'night';
+}
+
+/** A microphone: talk with her (OpenAI Realtime). */
+function MicIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+    </svg>
+  );
+}
+
+const TALK_WORDS: Record<TalkState, string> = {
+  connecting: 'Connecting',
+  listening: 'Listening',
+  hearing: 'Hearing you',
+  thinking: 'Thinking',
+  speaking: 'Speaking',
+};
+
 const OUTFITS: { id: AniOutfit; label: string }[] = [
   { id: 'p1', label: 'Dress' },
   { id: 'p2', label: 'Slip' },
   { id: 'lingerie', label: 'Lingerie' },
 ];
 
+/** What she knows when a conversation starts. */
+export interface AniContext {
+  name?: string;
+  tz: string;
+  date: string;
+  today?: Today;
+}
+
 /**
  * Ani in the bottom left corner of Now: the model standing on a glass ledge
  * left of the dock. The ledge sends her off through the left edge and calls
  * her back; its hanger opens the outfits, and a change happens off screen.
- * A drag on her turns her round, a tap plays the greeting. The engine (three
- * and the model, about 15 MB from the bucket) loads only when she is on.
+ * A drag on her turns her round, a tap says hello (then tickles); coming
+ * back she greets. The microphone under the hanger starts a conversation in
+ * an AI voice (OpenAI). The engine (three and the model, about 15 MB from
+ * the bucket) loads only when she is on.
  */
-export function AniCorner({ base }: { base: string }) {
+export function AniCorner({ base, context }: { base: string; context: AniContext }) {
   const [ani, setAni] = useAni();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hitRef = useRef<HTMLDivElement>(null);
@@ -49,6 +107,46 @@ export function AniCorner({ base }: { base: string }) {
   const ledgeRef = useRef<HTMLDivElement>(null);
   // The first state the engine starts from; later changes go through calls.
   const initial = useRef(ani);
+  const [said, setSaid] = useState<string | null>(null);
+  const [talk, setTalk] = useState<TalkState | null>(null);
+  const talkRef = useRef<Talk | null>(null);
+  const stopTalk = () => {
+    talkRef.current?.stop();
+    talkRef.current = null;
+    engine.current?.follow(null);
+    setTalk(null);
+    setSaid(null);
+  };
+  const startTalking = async () => {
+    const e = engine.current;
+    if (!e) return;
+    setTalk('connecting');
+    setSaid(null);
+    const [{ startTalk }, persona] = await Promise.all([import('./talk'), import('./persona')]);
+    try {
+      talkRef.current = await startTalk({
+        instructions: persona.instructions({ ...context, now: new Date() }),
+        tools: persona.tools(context),
+        onAudio: (stream) => e.follow(stream),
+        onText: (t) => setSaid(t),
+        onState: (st) => setTalk(st),
+        onEnd: () => stopTalk(),
+      });
+    } catch {
+      stopTalk();
+      setSaid('Не получилось подключиться. Попробуй ещё раз чуть позже.');
+    }
+  };
+  useEffect(() => () => talkRef.current?.stop(), []);
+  const greeted = useRef(false);
+  const speak = useRef<(l: Line) => void>(() => {});
+  speak.current = (l: Line) => {
+    const e = engine.current;
+    // In a conversation she speaks for herself.
+    if (!e || talkRef.current) return;
+    setSaid(LINES[l]);
+    void e.say(`${base}v2/voice/${l}.mp3`).then(() => setSaid((v) => (v === LINES[l] ? null : v)));
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -67,6 +165,12 @@ export function AniCorner({ base }: { base: string }) {
           present: initial.current.here,
           onReady: () => setReady(true),
           onError: () => setFailed(true),
+          // The first tap greets her by the time of day, later ones tickle.
+          onTap: () => {
+            speak.current(greeted.current ? 'tickle' : hello());
+            greeted.current = true;
+          },
+          onSpin: () => speak.current('dizzy'),
         });
         engine.current = made;
       } catch {
@@ -104,7 +208,18 @@ export function AniCorner({ base }: { base: string }) {
     const here = !ani.here;
     setAni({ here });
     setBusy(here ? 'arriving' : 'leaving');
-    engine.current.present(here, () => setBusy(null));
+    if (!here) {
+      stopTalk();
+      setSaid(null);
+    }
+    engine.current.present(here, () => {
+      setBusy(null);
+      // Back: she says hello.
+      if (here) {
+        greeted.current = true;
+        speak.current(hello());
+      }
+    });
   };
 
   const wear = (o: AniOutfit) => {
@@ -127,8 +242,9 @@ export function AniCorner({ base }: { base: string }) {
     });
   };
 
-  const words =
-    busy === 'changing'
+  const words = talk
+    ? ['Talking', TALK_WORDS[talk]]
+    : busy === 'changing'
       ? ['Changing', 'Back in a moment']
       : ani.here
         ? ['With you', 'Send her off']
@@ -137,6 +253,11 @@ export function AniCorner({ base }: { base: string }) {
   return (
     <div className="ani-corner" data-ready={ready ? '' : undefined}>
       <canvas ref={canvasRef} className="ani-canvas" aria-hidden="true" />
+      {said && ani.here ? (
+        <div className="ani-say" role="status" data-num-ok>
+          {said}
+        </div>
+      ) : null}
       <div
         ref={hitRef}
         className="ani-hit"
@@ -163,7 +284,8 @@ export function AniCorner({ base }: { base: string }) {
               </button>
             ))}
             <span className="ani-credit" data-num-ok>
-              Animation credits to pixiv Inc.&apos;s VRoid Project
+              Animation credits to pixiv Inc.&apos;s VRoid Project. Her voice is AI-generated
+              (OpenAI).
             </span>
           </div>
         ) : (
@@ -193,6 +315,20 @@ export function AniCorner({ base }: { base: string }) {
         >
           <HangerIcon />
         </button>
+        {wardrobe ? null : (
+          <button
+            type="button"
+            className="ani-mic"
+            aria-label={talk ? 'Stop talking' : 'Talk with Ani'}
+            title={talk ? 'Stop talking' : 'Talk with Ani (AI-generated voice, OpenAI)'}
+            aria-pressed={talk != null}
+            data-state={talk ?? undefined}
+            disabled={!ready || !ani.here}
+            onClick={() => (talk ? stopTalk() : void startTalking())}
+          >
+            <MicIcon />
+          </button>
+        )}
       </div>
     </div>
   );

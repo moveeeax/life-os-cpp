@@ -314,6 +314,9 @@ outage can never affect the money path.
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
 | `NOW_ENABLED` | `now.enabled` | bool | `false` | Master switch for the now module (`Core::now_enabled()`): `GET /api/v1/today` (the day's digest for the Now screen), the focus of the day, and the wallpaper library. Routes stay registered, handlers 404 while off. |
+| `ANI_VOICE_API_KEY` | `now.ani_voice.api_key` | string | empty | OpenAI API key for talking with Ani on Now: `POST /api/v1/now/voice-session` mints a short-lived Realtime client secret with it (30 per user and hour); the key itself never reaches the browser. Empty: the route answers 503 `not_configured`. In prod it comes from the Secret `life-os-ani-voice`. |
+| `ANI_VOICE_MODEL` | `now.ani_voice.model` | string | `gpt-realtime-mini` | The Realtime model of those sessions. |
+| `ANI_VOICE_VOICE` | `now.ani_voice.voice` | string | `marin` | Ani's voice in those sessions (a Realtime voice name). |
 
 ## Storage (S3)
 

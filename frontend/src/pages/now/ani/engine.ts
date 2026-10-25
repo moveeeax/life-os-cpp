@@ -4,6 +4,7 @@ import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js';
 
 import { loadClip, type Clip } from './motion';
 import { createSprings, type Collider, type SpringGroup, type Springs } from './springs';
+import { createVoice } from './voice';
 
 /*
  * Ani on Now: the PMX model, posed every frame by a small director (weight
@@ -12,7 +13,7 @@ import { createSprings, type Collider, type SpringGroup, type Springs } from './
  * chest and seat, and the arms kept out of the body.
  *
  * The body is v2/Ani.pmx, in lingerie. The dress and the slip come from
- * v1/Ani.pmx, the first model on the same skeleton (the same 628 bones in
+ * clothes/Ani.pmx, the first model on the same skeleton (the same 628 bones in
  * the same order at the same places): its clothes are skinned to the v2
  * skeleton as they are.
  */
@@ -30,12 +31,20 @@ export interface AniOptions {
   present: boolean;
   onReady?: () => void;
   onError?: (e: unknown) => void;
+  /** A tap on her (not a drag). */
+  onTap?: () => void;
+  /** A long drag that spun her round more than once. */
+  onSpin?: () => void;
 }
 
 export interface Ani {
   /** false sends her off through the left edge, true calls her back. */
   present(on: boolean, done?: () => void): void;
   setOutfit(o: Outfit): void;
+  /** Says a recorded line, lips in time; resolves when it ends. */
+  say(url: string): Promise<void>;
+  /** Lips follow a live voice stream (played elsewhere); null stops. */
+  follow(stream: MediaStream | null): void;
   dispose(): void;
 }
 
@@ -95,7 +104,10 @@ const EMOTES = ['show', 'peace', 'spin', 'pose', 'squat', 'shoot'];
 
 // Files under the base.
 const BODY_PMX = 'v2/Ani.pmx';
-const CLOTHES_PMX = 'v1/Ani.pmx';
+// The dressed v1 model and its textures. v1/ in the bucket holds another
+// variant of it (every garment at alpha 0, other body and outfit textures),
+// cached as immutable, so the dressed one has its own folder.
+const CLOTHES_PMX = 'clothes/Ani.pmx';
 const MOTIONS = 'v2/motions/';
 
 // The v1 outfits. v1 switches them with the material morph P2-Change, which
@@ -164,6 +176,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   resize.observe(canvas);
 
   const clock = new THREE.Clock();
+  const voice = createVoice();
   let disposed = false;
   let raf = 0;
   let mesh: THREE.SkinnedMesh | null = null;
@@ -227,7 +240,8 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     if (spin.drag.moved < 5) {
       spin.vel = 0;
       if (!play.clip) void playClip('greet');
-    }
+      opts.onTap?.();
+    } else if (spin.drag.moved * 0.012 > Math.PI * 2) opts.onSpin?.();
     spin.drag = null;
     spin.idleAt = clock.getElapsedTime();
     delete hit.dataset.dragging;
@@ -342,8 +356,15 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     outfit = o;
     if (!mesh || !clothes) return;
     for (const mat of clothes.material as THREE.Material[]) {
-      if (P1.includes(mat.name)) mat.visible = o === 'p1';
-      if (SHARED.includes(mat.name)) mat.visible = o !== 'lingerie';
+      // Worn means opaque, whatever alpha the PMX gives the material.
+      if (P1.includes(mat.name)) {
+        mat.visible = o === 'p1';
+        mat.opacity = 1;
+      }
+      if (SHARED.includes(mat.name)) {
+        mat.visible = o !== 'lingerie';
+        mat.opacity = 1;
+      }
       if (P2.includes(mat.name)) {
         mat.visible = o === 'p2';
         mat.opacity = o === 'p2' ? 1 : 0;
@@ -913,10 +934,13 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     const ty = (fresh ? pointer.y : life.glance.y) * follow;
     life.gx += (tx - life.gx) * Math.min(1, dt * 2.4);
     life.gy += (ty - life.gy) * Math.min(1, dt * 2.4);
+    // Speaking: the lips from the voice, and the head nods a little with
+    // the stress of the words.
+    const mo = voice.read(dt);
     pose('首', life.gy * 0.15, life.gx * 0.25, -wgt * 0.03);
     pose(
       '頭',
-      life.gy * 0.25 + Math.sin(t * 0.7) * 0.02,
+      life.gy * 0.25 + Math.sin(t * 0.7) * 0.02 + mo.open * 0.05,
       life.gx * 0.35,
       Math.sin(t * 0.45) * 0.05 - wgt * 0.04,
     );
@@ -930,8 +954,13 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     if (d > 0 && d < 0.16) blink = Math.sin((d / 0.16) * Math.PI);
     else if (d >= 0.16) life.blinkAt = t + rnd(3, 6);
     morph('まばたき', blink);
-    morph('mouthSmileLeft', 0.3);
-    morph('mouthSmileRight', 0.3);
+    morph('mouthSmileLeft', 0.3 - mo.open * 0.15);
+    morph('mouthSmileRight', 0.3 - mo.open * 0.15);
+    morph('あ', mo.a * 0.8);
+    morph('い', mo.i * 0.8);
+    morph('う', mo.u * 0.8);
+    morph('え', mo.e * 0.8);
+    morph('お', mo.o * 0.8);
 
     applyClip(now, dt);
 
@@ -985,8 +1014,11 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
         });
     },
     setOutfit: dress,
+    say: (url) => voice.say(url),
+    follow: (stream) => voice.follow(stream),
     dispose() {
       disposed = true;
+      voice.dispose();
       cancelAnimationFrame(raf);
       resize.disconnect();
       removeEventListener('pointermove', onPointer);
