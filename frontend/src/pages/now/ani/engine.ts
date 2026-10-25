@@ -8,9 +8,10 @@ import { createVoice } from './voice';
 
 /*
  * Ani on Now: the PMX model, posed every frame by a small director (weight
- * from one leg to the other, glances, blinks), the VRoid VRMA clips over it,
- * spring bones for the skirt, hair and ribbons, a damped jiggle for the
- * chest and seat, and the arms kept out of the body.
+ * from one leg to the other, glances, blinks), the VRoid VRMA clips and the
+ * Pic♡Pix standing poses over it, spring bones for the skirt, hair and
+ * ribbons, a damped jiggle for the chest and seat, and the arms kept out of
+ * the body.
  *
  * The body is v2/Ani.pmx, in lingerie. The dress and the slip come from
  * clothes/Ani.pmx, the first model on the same skeleton (the same 628 bones in
@@ -101,6 +102,13 @@ const CLIPS: Record<string, { file: string; from?: number }> = {
   squat: { file: 'VRMA_07' },
 };
 const EMOTES = ['show', 'peace', 'spin', 'pose', 'squat', 'shoot'];
+// Standing poses from the Pic♡Pix Free Pose set (Unity humanoid poses baked
+// to VRMA, each held for 6 s), under poses/pose<n>.
+const POSES: string[] = [];
+for (let n = 1; n <= 30; n++) {
+  POSES.push(`pose${n}`);
+  CLIPS[`pose${n}`] = { file: `poses/pose${n}` };
+}
 
 // Files under the base.
 const BODY_PMX = 'v2/Ani.pmx';
@@ -322,7 +330,8 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       }));
     // The model's own leg IK: the feet stay put while the hips sway.
     ik = new CCDIKSolver(m, mmd.iks);
-    for (const name of Object.keys(CLIPS)) void clipOf(name);
+    // The moves load now; a pose loads when she first picks it.
+    for (const name of Object.keys(CLIPS)) if (!POSES.includes(name)) void clipOf(name);
     if (!still) {
       // v2 has rigid bodies for its hair and chest only; the clothes' bones
       // have theirs in v1.
@@ -762,7 +771,8 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       life.nextEye = now + rnd(0.6, 2.8);
     }
     if (!play.clip && now > play.next) {
-      const pool = EMOTES.filter((n) => n !== play.name);
+      // Every other time or so she strikes a pose instead of a move.
+      const pool = (Math.random() < 0.5 ? POSES : EMOTES).filter((n) => n !== play.name);
       play.next = now + 1e9; // set again when the clip ends
       void playClip(pool[Math.floor(Math.random() * pool.length)]).then((ok) => {
         if (!ok) play.next = now + 10;
