@@ -316,6 +316,7 @@ outage can never affect the money path.
 | `NOW_ENABLED` | `now.enabled` | bool | `false` | Master switch for the now module (`Core::now_enabled()`): `GET /api/v1/today` (the day's digest for the Now screen), the focus of the day, and the wallpaper library. Routes stay registered, handlers 404 while off. |
 | `ANI_VOICE_API_KEY` | `now.ani_voice.api_key` | string | empty | OpenAI API key for talking with Ani on Now: `POST /api/v1/now/voice-session` mints a short-lived Realtime client secret with it (30 per user and hour); the key itself never reaches the browser. Empty: the route answers 503 `not_configured`. In prod it comes from the Secret `life-os-ani-voice`. |
 | `ANI_VOICE_MODEL` | `now.ani_voice.model` | string | `gpt-realtime-mini` | The Realtime model of those sessions. |
+| `ANI_VOICE_TTS_MODEL` | `now.ani_voice.tts_model` | string | `gpt-4o-mini-tts` | The text-to-speech model that reads the replies of Ani's agent aloud (`GET /api/v1/ani/turns/{id}/speech`), in `ANI_VOICE_VOICE`. |
 | `ANI_VOICE_VOICE` | `now.ani_voice.voice` | string | `marin` | Ani's voice in those sessions (a Realtime voice name). |
 
 ## Ani agent
@@ -344,6 +345,7 @@ the API and the worker.
 | `ANI_AGENT_UPSTREAM_URL` | `ani.agent.upstream_url` | string | `https://api.openai.com/v1` | An OpenAI-compatible base URL the proxy forwards to (`/chat/completions`). |
 | `ANI_AGENT_UPSTREAM_KEY` | `ani.agent.upstream_key` | string | empty | The upstream's key. It stays in the worker; the pods get a per-run proxy token. Empty: the agent counts as not configured. |
 | `ANI_AGENT_PROXY_URL` | `ani.agent.proxy_url` | string | empty | The proxy as the pods reach it, ending in `/v1`, e.g. `http://life-os-cpp-worker.life-os.svc.cluster.local:9091/ani/llm/v1`. Empty: not configured. |
+| `ANI_AGENT_API_URL` | `ani.agent.api_url` | string | empty | The site's API as the worker reaches it, e.g. `http://life-os-cpp.life-os.svc.cluster.local:8080`: the agent's tools read the user's data there with a five-minute token of the user. Empty: the agent chats without tools. |
 | `ANI_AGENT_MONTHLY_TOKENS` | `ani.agent.monthly_tokens` | int | `20000000` | Prompt plus completion tokens per user and calendar month (UTC); past it the proxy answers 429 `insufficient_quota`. |
 
 ## Storage (S3)

@@ -256,6 +256,7 @@
       "upstream_url": "${ANI_AGENT_UPSTREAM_URL:-https://api.openai.com/v1}",
       "upstream_key": "${ANI_AGENT_UPSTREAM_KEY:-}",
       "proxy_url": "${ANI_AGENT_PROXY_URL:-}",
+      "api_url": "${ANI_AGENT_API_URL:-}",
       "monthly_tokens": "${ANI_AGENT_MONTHLY_TOKENS:-20000000}"
     }
   },
@@ -264,6 +265,7 @@
     "ani_voice": {
       "api_key": "${ANI_VOICE_API_KEY:-}",
       "model": "${ANI_VOICE_MODEL:-gpt-realtime-mini}",
+      "tts_model": "${ANI_VOICE_TTS_MODEL:-gpt-4o-mini-tts}",
       "voice": "${ANI_VOICE_VOICE:-marin}"
     }
   },

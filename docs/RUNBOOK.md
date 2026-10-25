@@ -449,17 +449,30 @@ First install:
    kubectl -n life-os create secret generic life-os-ani-agent \
      --from-literal=ANI_AGENT_ENABLED=true \
      --from-literal=ANI_AGENT_UPSTREAM_KEY=<an OpenAI key> \
-     --from-literal=ANI_AGENT_PROXY_URL=http://life-os-ani-worker.life-os.svc.cluster.local:9091/ani/llm/v1
+     --from-literal=ANI_AGENT_PROXY_URL=http://life-os-ani-worker.life-os.svc.cluster.local:9091/ani/llm/v1 \
+     --from-literal=ANI_AGENT_API_URL=http://life-os-cpp.life-os.svc.cluster.local:8080
    ```
+
+   An existing Secret gets a new key with
+   `kubectl -n life-os patch secret life-os-ani-agent --type merge -p '{"stringData":{"ANI_AGENT_API_URL":"..."}}'`
+   and a restart of the ani worker (`kubectl -n life-os rollout restart deploy/life-os-ani-worker`).
 
    `deploy/values-prod.yaml` takes it as an optional `extraEnvFrom`; bump
    `secretsVersion` there to restart the API after changing it.
 2. `helm upgrade --install life-os-ani-worker ./helm/life-os-cpp-worker -n life-os
    -f deploy/values-worker-prod.yaml -f deploy/values-ani-worker-prod.yaml`.
-3. Check: `kubectl -n life-os-agents get ds,quota,netpol` and, as an
-   administrator, `POST /api/v1/ani/agent/wake`, then
+3. Check: `kubectl -n life-os-agents get ds,quota,netpol` and, signed in,
+   `POST /api/v1/ani/agent/wake`, then
    `kubectl -n life-os-agents get pods -w` (ready in about 30 s with the image
    cached).
+
+The chat (`POST /api/v1/ani/messages`, a row in `ani_turns`) runs in the ani
+worker as the job `ani_turn`: it wakes the agent and waits for it, then calls
+the pod's gateway; the agent's tools read the user's data through the API at
+`ANI_AGENT_API_URL` with a five-minute token of that user, which is why the
+API's NetworkPolicy lets the ani worker in (below). A turn that cannot run
+ends `failed` with a code in `ani_turns.error`; one stuck open for 15 minutes
+is failed by the next message of that user.
 
 Snapshots live under `life-os/private/<owner>/ani/state-<n>.tgz`; the current
 one is `ani_agents.generation`, the one before it is kept. To stop every
@@ -471,7 +484,9 @@ their keepers save the state as they go.
 
 `deploy/values-prod.yaml` enables `helm/life-os-cpp/templates/networkpolicy.yaml`:
 ingress to 8080 only from the pods labelled
-`app.kubernetes.io/name=cpp-frontend`, `app.kubernetes.io/instance=life-os-cpp-frontend`;
+`app.kubernetes.io/name=cpp-frontend`, `app.kubernetes.io/instance=life-os-cpp-frontend`
+and from the ani worker (`app.kubernetes.io/instance=life-os-ani-worker`, for
+Ani's agent tools);
 ingress to 9090 from namespace `monitoring` (a placeholder until the
 Prometheus namespace is known); egress to namespace `db` on 5432 and 6379,
 DNS, and TCP 443 anywhere (s3.tarassov.me, the LLM providers, Xiaomi, Open

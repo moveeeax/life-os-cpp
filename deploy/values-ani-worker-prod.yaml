@@ -11,15 +11,19 @@
 # rights. This one pulls only the ani_* queues, holds the service account,
 # and serves the pods' model proxy on its health port; the pods reach it as
 # http://life-os-ani-worker.life-os.svc.cluster.local:9091/ani/llm/v1
-# (ANI_AGENT_PROXY_URL in the Secret life-os-ani-agent).
+# (ANI_AGENT_PROXY_URL in the Secret life-os-ani-agent). It also runs the
+# chat turns (ani_turn): it calls the pods' gateways and, for the agent's
+# tools, the API at ANI_AGENT_API_URL (same Secret), which lets this release
+# in through its NetworkPolicy (deploy/values-prod.yaml).
 
 fullnameOverride: life-os-ani-worker
 
 worker:
-  types: "ani_agent_start,ani_agent_stop,ani_agents_reconcile"
-  # A start or a stop waits on the cluster through short deferrals; a few at
-  # once keep one slow pod from holding the others.
-  concurrency: 3
+  types: "ani_agent_start,ani_agent_stop,ani_agents_reconcile,ani_turn"
+  # A start, a stop or a turn waiting for its agent defers instead of
+  # holding a thread; a turn talking to its agent holds one for its seconds
+  # to a few minutes, so a few at once keep users from queueing behind one.
+  concurrency: 6
 
 # extraEnvFrom replaces the list of values-worker-prod.yaml: the app Secret
 # (database and Redis passwords) and the agent's knobs and upstream key.

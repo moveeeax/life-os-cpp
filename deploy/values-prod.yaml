@@ -230,6 +230,12 @@ networkPolicy:
           matchLabels:
             app.kubernetes.io/name: cpp-frontend
             app.kubernetes.io/instance: life-os-cpp-frontend
+      # Ani's agent tools: the ani worker reads the user's data through the API
+      # (ANI_AGENT_API_URL, src/agent/Tools.hpp).
+      - podSelector:
+          matchLabels:
+            app.kubernetes.io/name: life-os-cpp-worker
+            app.kubernetes.io/instance: life-os-ani-worker
     # PLACEHOLDER: the namespace of the Prometheus that will scrape :9090 is
     # not known from this repository. `monitoring` is the chart default and
     # harmless while no such namespace exists; set the real one together with

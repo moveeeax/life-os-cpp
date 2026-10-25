@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { Today } from '@/lib/now/types';
 
+import { AniChat } from './AniChat';
+import { speechUrl } from './chat';
 import type { Ani } from './engine';
 import type { Talk, TalkState } from './talk';
 import { useAni, type AniOutfit } from './state';
@@ -64,6 +66,25 @@ function MicIcon() {
   );
 }
 
+/** A speech balloon: write to her agent. */
+function ChatIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M20 12.5c0 3.6-3.6 6.5-8 6.5-1 0-2-.15-2.9-.43L4.5 20l1.2-3.3C4.6 15.5 4 14 4 12.5 4 8.9 7.6 6 12 6s8 2.9 8 6.5Z" />
+    </svg>
+  );
+}
+
 const TALK_WORDS: Record<TalkState, string> = {
   connecting: 'Connecting',
   listening: 'Listening',
@@ -92,8 +113,9 @@ export interface AniContext {
  * her back; its hanger opens the outfits, and a change happens off screen.
  * A drag on her turns her round, a tap says hello (then tickles); coming
  * back she greets. The microphone under the hanger starts a conversation in
- * an AI voice (OpenAI). The engine (three and the model, about 15 MB from
- * the bucket) loads only when she is on.
+ * an AI voice (OpenAI); the speech balloon next to the hanger opens a chat
+ * with her agent (AniChat). The engine (three and the model, about 15 MB
+ * from the bucket) loads only when she is on.
  */
 export function AniCorner({ base, context }: { base: string; context: AniContext }) {
   const [ani, setAni] = useAni();
@@ -104,6 +126,7 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<'leaving' | 'arriving' | 'changing' | null>(null);
   const [wardrobe, setWardrobe] = useState(false);
+  const [chat, setChat] = useState(false);
   const ledgeRef = useRef<HTMLDivElement>(null);
   // The first state the engine starts from; later changes go through calls.
   const initial = useRef(ani);
@@ -253,7 +276,7 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
   return (
     <div className="ani-corner" data-ready={ready ? '' : undefined}>
       <canvas ref={canvasRef} className="ani-canvas" aria-hidden="true" />
-      {said && ani.here ? (
+      {said && ani.here && !chat ? (
         <div className="ani-say" role="status" data-num-ok>
           {said}
         </div>
@@ -318,6 +341,18 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
         {wardrobe ? null : (
           <button
             type="button"
+            className="ani-chat-btn"
+            aria-label={chat ? 'Close the chat' : 'Write to Ani'}
+            title="Write to Ani (an AI agent, OpenAI)"
+            aria-expanded={chat}
+            onClick={() => setChat((v) => !v)}
+          >
+            <ChatIcon />
+          </button>
+        )}
+        {wardrobe ? null : (
+          <button
+            type="button"
             className="ani-mic"
             aria-label={talk ? 'Stop talking' : 'Talk with Ani'}
             title={talk ? 'Stop talking' : 'Talk with Ani (AI-generated voice, OpenAI)'}
@@ -330,6 +365,18 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
           </button>
         )}
       </div>
+      {chat ? (
+        <AniChat
+          tz={context.tz}
+          onClose={() => setChat(false)}
+          onReply={(t) => {
+            // She speaks only when she is on screen and not in a voice call.
+            if (engine.current && ani.here && !talkRef.current) {
+              void engine.current.say(speechUrl(t.id));
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -302,37 +302,20 @@ std::optional<AuthController::Session> AuthController::mint_session(const Domain
         spdlog::error("mint_session: JWT_SECRET unset");
         return std::nullopt;
     }
-    // iat_ms next to iat: the per-user "valid since" marker
-    // (Security::Sessions::access_revoked) compares in ms, so a session
-    // re-issued in the same second as a revocation is not refused with it.
     const std::int64_t now_ms = Utils::Time::now_epoch_millis();
     const long now = static_cast<long>(now_ms / 1000);
 
-    // Roles claim — string array, even for a single role, so the
-    // existing AuthPrincipal extractor parses it consistently.
-    json roles_array = json::array();
+    // The permissions bitmask in the JWT lets the request layer answer
+    // require_permission(...) without re-loading the user from DB; it matches
+    // the Domain::Permission constants.
+    Security::Auth::AccessSubject who;
+    who.id = user.id;
+    who.confirmed = user.confirmed;
+    who.permissions = user.role ? user.role->permissions : 0u;
     if (user.role)
-        roles_array.push_back(user.role->name);
-
-    // Permissions bitmask in the JWT lets the request layer answer
-    // require_permission(...) without re-loading the user from DB.
-    // The bitmask matches Domain::Permission constants.
-    const std::uint32_t perm_bits = user.role ? user.role->permissions : 0u;
-
-    json access_claims = {
-        {"sub", user.id},
-        {"iat", now},
-        {"iat_ms", now_ms},
-        {"exp", now + cfg.cookies.access_ttl_sec},
-        {"typ", "access"},
-        {"confirmed", user.confirmed},
-        {"permissions", perm_bits},
-        {cfg.jwt_roles_claim, roles_array},
-    };
-    if (!cfg.jwt_issuer.empty())
-        access_claims["iss"] = cfg.jwt_issuer;
-    if (!cfg.jwt_audience.empty())
-        access_claims["aud"] = cfg.jwt_audience;
+        who.roles.push_back(user.role->name);
+    const json access_claims = Security::Auth::access_claims(
+        who, now_ms, cfg.cookies.access_ttl_sec, cfg.jwt_roles_claim, cfg.jwt_issuer, cfg.jwt_audience);
 
     const std::string jti = make_jti();
     json refresh_claims = {

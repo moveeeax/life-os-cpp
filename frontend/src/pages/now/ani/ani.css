@@ -272,3 +272,212 @@
     box-shadow: 0 0 0 5px rgba(240, 169, 147, 0.25);
   }
 }
+
+/* The speech balloon, left of the hanger: the chat with her agent. */
+.ani-chat-btn {
+  position: absolute;
+  top: 10px;
+  right: 44px;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--g-ink-faint);
+  transition:
+    color 0.2s,
+    background 0.2s;
+}
+.ani-chat-btn:hover,
+.ani-chat-btn[aria-expanded='true'] {
+  color: var(--g-ink);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* The chat: a glass panel right of her, standing on the dock like she does. */
+.ani-chat {
+  position: fixed;
+  z-index: 22;
+  left: 232px;
+  bottom: calc(var(--ani-floor) + 12px);
+  width: min(360px, 100vw - 260px);
+  max-height: min(540px, 100vh - var(--ani-floor) - 120px);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 10px 10px 8px;
+  border-radius: 22px;
+  border: 1px solid var(--g-glass-line);
+  /* Denser than the tiles: the clock and the focus behind it must not read through the text. */
+  background: linear-gradient(var(--g-glass), var(--g-glass)), rgba(12, 14, 30, 0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  color: var(--g-ink);
+  animation: ani-say-in 0.2s ease-out;
+}
+.ani-chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 6px 8px;
+}
+.ani-chat-head .ani-k {
+  margin-right: auto;
+}
+.ani-chat-sound {
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--g-ink-faint);
+}
+.ani-chat-sound:hover {
+  color: var(--g-ink);
+  background: rgba(255, 255, 255, 0.1);
+}
+.ani-chat-close {
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--g-ink-faint);
+}
+.ani-chat-close:hover {
+  color: var(--g-ink);
+  background: rgba(255, 255, 255, 0.1);
+}
+.ani-chat-list {
+  flex: 1;
+  min-height: 120px;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 2px 4px 8px;
+}
+.ani-chat-note {
+  margin: 8px 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--g-ink-soft);
+}
+.ani-turn {
+  display: grid;
+  gap: 6px;
+}
+.ani-msg {
+  margin: 0;
+  max-width: 85%;
+  padding: 7px 11px;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ani-msg-you {
+  justify-self: end;
+  border-radius: 14px 14px 4px 14px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.ani-msg-her {
+  justify-self: start;
+  border-radius: 14px 14px 14px 4px;
+  background: rgba(240, 169, 147, 0.16);
+}
+.ani-msg-wait {
+  color: var(--g-ink-soft);
+}
+.ani-msg-fail {
+  justify-self: start;
+  font-size: 13px;
+  color: var(--g-ink-soft);
+}
+.ani-dots::after {
+  content: '';
+  animation: ani-dots 1.2s steps(4, end) infinite;
+}
+@keyframes ani-dots {
+  0% {
+    content: '';
+  }
+  25% {
+    content: '.';
+  }
+  50% {
+    content: '..';
+  }
+  75% {
+    content: '...';
+  }
+}
+.ani-chat-problem {
+  margin: 0 6px 6px;
+  font-size: 12.5px;
+  color: #f0a993;
+}
+.ani-chat-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.07);
+}
+.ani-chat-form textarea {
+  flex: 1;
+  min-height: 22px;
+  max-height: 120px;
+  padding: 6px 8px;
+  border: 0;
+  outline: 0;
+  resize: none;
+  field-sizing: content;
+  background: transparent;
+  color: var(--g-ink);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.ani-chat-form textarea:focus-visible {
+  outline: none;
+}
+.ani-chat-form:focus-within {
+  box-shadow: inset 0 0 0 1px var(--g-glass-line);
+}
+.ani-chat-form textarea::placeholder {
+  color: var(--g-ink-faint);
+}
+.ani-chat-send {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  color: #1a1020;
+  background: #f0a993;
+  transition: opacity 0.2s;
+}
+.ani-chat-send:disabled {
+  opacity: 0.35;
+}
+.ani-chat button:focus-visible,
+.ani-chat-btn:focus-visible {
+  outline: 2px solid var(--g-ink);
+  outline-offset: 1px;
+}
+.ani-chat-credit {
+  margin: 6px 6px 0;
+  font-size: 9.5px;
+  line-height: 1.2;
+  color: var(--g-ink-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ani-chat,
+  .ani-dots::after {
+    animation: none;
+  }
+}
