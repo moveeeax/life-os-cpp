@@ -344,6 +344,7 @@ the API and the worker.
 | `ANI_AGENT_UPSTREAM_URL` | `ani.agent.upstream_url` | string | `https://api.openai.com/v1` | An OpenAI-compatible base URL the proxy forwards to (`/chat/completions`). |
 | `ANI_AGENT_UPSTREAM_KEY` | `ani.agent.upstream_key` | string | empty | The upstream's key. It stays in the worker; the pods get a per-run proxy token. Empty: the agent counts as not configured. |
 | `ANI_AGENT_PROXY_URL` | `ani.agent.proxy_url` | string | empty | The proxy as the pods reach it, ending in `/v1`, e.g. `http://life-os-cpp-worker.life-os.svc.cluster.local:9091/ani/llm/v1`. Empty: not configured. |
+| `ANI_AGENT_API_URL` | `ani.agent.api_url` | string | empty | The site's API as the worker reaches it, e.g. `http://life-os-cpp.life-os.svc.cluster.local:8080`: the agent's tools read the user's data there with a five-minute token of the user. Empty: the agent chats without tools. |
 | `ANI_AGENT_MONTHLY_TOKENS` | `ani.agent.monthly_tokens` | int | `20000000` | Prompt plus completion tokens per user and calendar month (UTC); past it the proxy answers 429 `insufficient_quota`. |
 
 ## Storage (S3)

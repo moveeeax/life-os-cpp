@@ -14655,7 +14655,7 @@ export interface paths {
         };
         /**
          * The state of the caller's agent pod and this month's model usage
-         * @description Ani's agent is an OpenClaw pod per user, started on a wake and stopped on logout, when idle or when too old. Administrators only for now; refused for API keys.
+         * @description Ani's agent is an OpenClaw pod per user, started on a wake and stopped on logout, when idle or when too old. Refused for API keys.
          */
         get: {
             parameters: {
@@ -14679,13 +14679,6 @@ export interface paths {
                 };
                 /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not an administrator */
-                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -14719,7 +14712,7 @@ export interface paths {
         put?: never;
         /**
          * Start the caller's agent pod, or keep a running one alive
-         * @description Queues the start of a stopped agent (the pod is ready within a minute or so) and pushes the idle stop of a running one back. Administrators only for now; refused for API keys.
+         * @description Queues the start of a stopped agent (the pod is ready within a minute or so) and pushes the idle stop of a running one back. The Now page wakes it when the chat opens. Refused for API keys.
          */
         post: {
             parameters: {
@@ -14743,13 +14736,6 @@ export interface paths {
                 };
                 /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not an administrator */
-                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -14788,7 +14774,7 @@ export interface paths {
         put?: never;
         /**
          * Stop the caller's agent pod; its state is saved first
-         * @description Queues the stop of a starting or running agent; a stopped one stays as it is. Administrators only for now; refused for API keys.
+         * @description Queues the stop of a starting or running agent; a stopped one stays as it is. Refused for API keys.
          */
         post: {
             parameters: {
@@ -14817,13 +14803,6 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not an administrator */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
                 /** @description The agent is switched off */
                 404: {
                     headers: {
@@ -14840,6 +14819,224 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Ani's agent a message
+         * @description Queues a turn and wakes the agent if it sleeps; the worker runs the turn (the agent may read the caller's Life OS through its tools) and the page polls GET /api/v1/ani/turns/{id} for the reply. One turn at a time per user, at most 60 an hour. Refused for API keys.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        text: string;
+                        /**
+                         * @description The caller's IANA zone; UTC when left out
+                         * @example Asia/Almaty
+                         */
+                        tz?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The queued turn */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniTurn"];
+                        };
+                    };
+                };
+                /** @description Empty or too long text (invalid_text), an unknown zone (invalid_tz), or not a JSON object */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The agent is switched off */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The previous turn is still running (turn_open) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description This month's tokens are spent (budget) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description More than 60 messages in an hour */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not configured (not_configured), every agent slot is taken (busy), or the job queue is off (jobs_disabled) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/turns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The chat with Ani's agent, newest first */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description A turn id: the page before it */
+                    before?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The turns */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniTurn"][];
+                        };
+                    };
+                };
+                /** @description before is not a turn id */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The agent is switched off */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/turns/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One turn of the chat with Ani's agent */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The turn */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniTurn"];
+                        };
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The agent is switched off, or no such turn of the caller (turn_not_found) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -22198,6 +22395,24 @@ export interface components {
                  */
                 budget_tokens: number;
             };
+        };
+        AniTurn: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            status: "queued" | "running" | "done" | "failed";
+            /** @description What the user wrote */
+            text: string;
+            /** @description Her answer, once done */
+            reply: string | null;
+            /** @description Why a failed turn failed: busy (no agent slot), budget (the month's tokens are spent), timeout (the agent did not come up), unavailable (the agent did not answer) or failed */
+            error: string | null;
+            /** @description The tools the agent ran, in order */
+            tools: string[];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
         };
         NowVoiceSession: {
             /** @description The client secret (ek_...) for POST https://api.openai.com/v1/realtime/calls */

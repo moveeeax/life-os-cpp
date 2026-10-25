@@ -28,6 +28,7 @@ struct Settings {
     std::string upstream_url;               // an OpenAI-compatible base URL, e.g. https://api.openai.com/v1
     std::string upstream_key;               // its key: never leaves the worker
     std::string proxy_url;                  // the worker's model proxy as the pods reach it, ending in /v1
+    std::string api_url;                    // the site's API as the worker reaches it (the tools); empty: no tools
     long long monthly_tokens = 20'000'000;  // prompt + completion tokens per user and month
 };
 
@@ -56,6 +57,10 @@ inline std::optional<Settings> read_settings() {
         cfg.get<std::string>("ani.agent.upstream_url", "ANI_AGENT_UPSTREAM_URL", "https://api.openai.com/v1");
     s.upstream_key = cfg.get<std::string>("ani.agent.upstream_key", "ANI_AGENT_UPSTREAM_KEY", "");
     s.proxy_url = cfg.get<std::string>("ani.agent.proxy_url", "ANI_AGENT_PROXY_URL", "");
+    s.api_url = cfg.get<std::string>("ani.agent.api_url", "ANI_AGENT_API_URL", "");
+    while (!s.api_url.empty() && s.api_url.back() == '/') {
+        s.api_url.pop_back();
+    }
     s.monthly_tokens = cfg.get<long>("ani.agent.monthly_tokens", "ANI_AGENT_MONTHLY_TOKENS", 20000000L);
     if (s.image.empty() || s.keeper_image.empty() || s.ns.empty() || s.model.empty() || s.upstream_url.empty() ||
         s.upstream_key.empty() || s.proxy_url.empty() || s.max_running < 1 || s.idle_minutes < 1 || s.max_hours < 1) {

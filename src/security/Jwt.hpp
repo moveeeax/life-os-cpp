@@ -9,9 +9,11 @@
 
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -108,6 +110,44 @@ inline std::string issue_hs256_jwt(const json& claims, const std::string& secret
     const std::string signing_input = header_b64 + "." + payload_b64;
     const std::string sig = Utils::Crypto::hmac_sha256(secret, signing_input);
     return signing_input + "." + Utils::Base64::url_encode(sig);
+}
+
+/// What an access token of a user says about them. The login and the agent's
+/// tools (agent/Tools.hpp) mint through access_claims, so both carry the same set.
+struct AccessSubject {
+    std::string id;
+    bool confirmed = false;
+    std::uint32_t permissions = 0;
+    std::vector<std::string> roles;
+};
+
+/// The claims of an access token for @p who, valid @p ttl_sec from @p now_ms.
+/// iat_ms next to iat: the per-user "valid since" marker
+/// (Security::Sessions::access_revoked) compares in ms, so a session re-issued
+/// in the same second as a revocation is not refused with it. Roles are a
+/// string array even for one role, as the principal extractor reads them.
+inline json access_claims(const AccessSubject& who,
+                          std::int64_t now_ms,
+                          long ttl_sec,
+                          const std::string& roles_claim,
+                          const std::string& issuer,
+                          const std::string& audience) {
+    const long now = static_cast<long>(now_ms / 1000);
+    json claims = {
+        {"sub", who.id},
+        {"iat", now},
+        {"iat_ms", now_ms},
+        {"exp", now + ttl_sec},
+        {"typ", "access"},
+        {"confirmed", who.confirmed},
+        {"permissions", who.permissions},
+        {roles_claim, who.roles},
+    };
+    if (!issuer.empty())
+        claims["iss"] = issuer;
+    if (!audience.empty())
+        claims["aud"] = audience;
+    return claims;
 }
 
 }  // namespace Security::Auth

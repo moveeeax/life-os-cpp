@@ -4608,6 +4608,67 @@
      }
     }
    },
+   "AniTurn": {
+    "type": "object",
+    "required": [
+     "id",
+     "status",
+     "text",
+     "reply",
+     "error",
+     "tools",
+     "created_at",
+     "updated_at"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "queued",
+       "running",
+       "done",
+       "failed"
+      ]
+     },
+     "text": {
+      "type": "string",
+      "description": "What the user wrote"
+     },
+     "reply": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Her answer, once done"
+     },
+     "error": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Why a failed turn failed: busy (no agent slot), budget (the month's tokens are spent), timeout (the agent did not come up), unavailable (the agent did not answer) or failed"
+     },
+     "tools": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "The tools the agent ran, in order"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
    "NowVoiceSession": {
     "type": "object",
     "required": [
@@ -28089,7 +28150,7 @@
   "/api/v1/ani/agent": {
    "get": {
     "summary": "The state of the caller's agent pod and this month's model usage",
-    "description": "Ani's agent is an OpenClaw pod per user, started on a wake and stopped on logout, when idle or when too old. Administrators only for now; refused for API keys.",
+    "description": "Ani's agent is an OpenClaw pod per user, started on a wake and stopped on logout, when idle or when too old. Refused for API keys.",
     "tags": [
      "ani"
     ],
@@ -28120,9 +28181,6 @@
      "401": {
       "description": "Not authenticated, or an API key (key_not_allowed)"
      },
-     "403": {
-      "description": "Not an administrator"
-     },
      "404": {
       "description": "The agent is switched off"
      }
@@ -28132,7 +28190,7 @@
   "/api/v1/ani/agent/wake": {
    "post": {
     "summary": "Start the caller's agent pod, or keep a running one alive",
-    "description": "Queues the start of a stopped agent (the pod is ready within a minute or so) and pushes the idle stop of a running one back. Administrators only for now; refused for API keys.",
+    "description": "Queues the start of a stopped agent (the pod is ready within a minute or so) and pushes the idle stop of a running one back. The Now page wakes it when the chat opens. Refused for API keys.",
     "tags": [
      "ani"
     ],
@@ -28163,9 +28221,6 @@
      "401": {
       "description": "Not authenticated, or an API key (key_not_allowed)"
      },
-     "403": {
-      "description": "Not an administrator"
-     },
      "404": {
       "description": "The agent is switched off"
      },
@@ -28178,7 +28233,7 @@
   "/api/v1/ani/agent/stop": {
    "post": {
     "summary": "Stop the caller's agent pod; its state is saved first",
-    "description": "Queues the stop of a starting or running agent; a stopped one stays as it is. Administrators only for now; refused for API keys.",
+    "description": "Queues the stop of a starting or running agent; a stopped one stays as it is. Refused for API keys.",
     "tags": [
      "ani"
     ],
@@ -28209,14 +28264,207 @@
      "401": {
       "description": "Not authenticated, or an API key (key_not_allowed)"
      },
-     "403": {
-      "description": "Not an administrator"
-     },
      "404": {
       "description": "The agent is switched off"
      },
      "503": {
       "description": "The job queue is off (jobs_disabled)"
+     }
+    }
+   }
+  },
+  "/api/v1/ani/messages": {
+   "post": {
+    "summary": "Send Ani's agent a message",
+    "description": "Queues a turn and wakes the agent if it sleeps; the worker runs the turn (the agent may read the caller's Life OS through its tools) and the page polls GET /api/v1/ani/turns/{id} for the reply. One turn at a time per user, at most 60 an hour. Refused for API keys.",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "text"
+        ],
+        "properties": {
+         "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+         },
+         "tz": {
+          "type": "string",
+          "example": "Asia/Almaty",
+          "description": "The caller's IANA zone; UTC when left out"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "The queued turn",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/AniTurn"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Empty or too long text (invalid_text), an unknown zone (invalid_tz), or not a JSON object"
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "404": {
+      "description": "The agent is switched off"
+     },
+     "409": {
+      "description": "The previous turn is still running (turn_open)"
+     },
+     "422": {
+      "description": "This month's tokens are spent (budget)"
+     },
+     "429": {
+      "description": "More than 60 messages in an hour"
+     },
+     "503": {
+      "description": "Not configured (not_configured), every agent slot is taken (busy), or the job queue is off (jobs_disabled)"
+     }
+    }
+   }
+  },
+  "/api/v1/ani/turns": {
+   "get": {
+    "summary": "The chat with Ani's agent, newest first",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "before",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "description": "A turn id: the page before it"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 100,
+       "default": 30
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The turns",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/AniTurn"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "before is not a turn id"
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "404": {
+      "description": "The agent is switched off"
+     }
+    }
+   }
+  },
+  "/api/v1/ani/turns/{id}": {
+   "get": {
+    "summary": "One turn of the chat with Ani's agent",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The turn",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/AniTurn"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "404": {
+      "description": "The agent is switched off, or no such turn of the caller (turn_not_found)"
      }
     }
    }
@@ -34906,7 +35154,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 521225,
-  "source_fnv1a64": "368b8c10354f5c0e"
+  "source_bytes": 525321,
+  "source_fnv1a64": "65ccd63556d1fae0"
  }
 }

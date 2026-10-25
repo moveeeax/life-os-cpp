@@ -338,6 +338,7 @@ public:
         // (a trigger of migration 058); its pod goes with the next reconcile.
         "ani_agents",
         "ani_usage",
+        "ani_turns",
     };
 
     /// The foreign keys of the billing tables (migration 007, ON DELETE

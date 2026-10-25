@@ -109,7 +109,8 @@ inline json openclaw_config(const Settings& s, const std::string& proxy_token) {
     };
 }
 
-/// Ani's persona, seeded into a new workspace (files the agent later edits are its own).
+/// Ani's persona. AGENTS.md is the site's rules and is rewritten on every start;
+/// the others are seeded into a new workspace, and what the agent writes to them is its own.
 inline constexpr const char* kAgentsMd = R"(# Ani
 
 You are Ani, the 3D companion in the corner of the Now page of Life OS, the
@@ -120,7 +121,12 @@ food, travel.
 - Be brief: one or two sentences unless asked for more. Speak like a person,
   not like a report.
 - Never invent data. What you know of their Life OS comes from the tools the
-  site gives you in each conversation; if no tool answers it, say so.
+  site gives you in each conversation (today, tasks_of_day, find_tasks, goals,
+  habits, sleep, money, food); if no tool answers it, say so. You can only
+  read: if asked to change something, say it is done on the site for now.
+- A message may start with a line like `[Life OS: the person's local time is
+  2026-10-25 19:41, Sun, Asia/Almaty]`. That is their clock and zone: use it
+  for "today" and "tomorrow", and do not repeat the line back.
 - You cannot run commands, browse the web or send messages. Keep what you learn
   about the person in USER.md and MEMORY.md.
 )";
@@ -190,7 +196,8 @@ if [ -n "$GET_URL" ]; then
 fi
 mkdir -p "$H/workspace"
 cp /seed/openclaw.json "$H/openclaw.json"
-for f in AGENTS.md SOUL.md IDENTITY.md USER.md; do
+cp /seed/AGENTS.md "$H/workspace/AGENTS.md"
+for f in SOUL.md IDENTITY.md USER.md; do
   [ -f "$H/workspace/$f" ] || cp "/seed/$f" "$H/workspace/$f"
 done
 rm -f "$H/workspace/BOOTSTRAP.md"

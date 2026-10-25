@@ -201,6 +201,7 @@ inline constexpr ConfigKey ani_agent_model{"ani.agent.model", "ANI_AGENT_MODEL"}
 inline constexpr ConfigKey ani_agent_upstream_url{"ani.agent.upstream_url", "ANI_AGENT_UPSTREAM_URL"};
 inline constexpr ConfigKey ani_agent_upstream_key{"ani.agent.upstream_key", "ANI_AGENT_UPSTREAM_KEY"};
 inline constexpr ConfigKey ani_agent_proxy_url{"ani.agent.proxy_url", "ANI_AGENT_PROXY_URL"};
+inline constexpr ConfigKey ani_agent_api_url{"ani.agent.api_url", "ANI_AGENT_API_URL"};
 inline constexpr ConfigKey ani_agent_monthly_tokens{"ani.agent.monthly_tokens", "ANI_AGENT_MONTHLY_TOKENS"};
 
 // --- now ---

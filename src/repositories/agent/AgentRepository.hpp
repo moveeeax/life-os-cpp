@@ -15,6 +15,7 @@
 
 #include <optional>
 #include <string>
+#include <utility>
 
 #include <nlohmann/json.hpp>
 
@@ -137,6 +138,20 @@ public:
                 return std::nullopt;
             }
             return r[0][0].template as<std::string>();
+        });
+    }
+
+    /// Where the user's running agent listens and the token it takes; nullopt unless running.
+    std::optional<std::pair<std::string, std::string>> gateway(const std::string& owner) {
+        return Database::get().execute_read([&](auto& txn) -> std::optional<std::pair<std::string, std::string>> {
+            auto r = txn.exec_params(
+                "SELECT pod_ip, gateway_token FROM ani_agents WHERE owner_id = $1::uuid AND state = 'running' AND "
+                "pod_ip IS NOT NULL AND gateway_token IS NOT NULL",
+                owner);
+            if (r.empty()) {
+                return std::nullopt;
+            }
+            return std::make_pair(r[0][0].template as<std::string>(), r[0][1].template as<std::string>());
         });
     }
 
