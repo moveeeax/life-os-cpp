@@ -1,0 +1,1 @@
+Ani wore nothing in the dress and the slip on 1.37.0: v1/Ani.pmx in the bucket is a variant with every garment at alpha 0 and other body and outfit textures. The dressed model and its textures now load from their own folder (wallpapers/ani/clothes/), and a worn garment is drawn opaque whatever alpha the file gives it.

@@ -13,7 +13,7 @@ import { createVoice } from './voice';
  * chest and seat, and the arms kept out of the body.
  *
  * The body is v2/Ani.pmx, in lingerie. The dress and the slip come from
- * v1/Ani.pmx, the first model on the same skeleton (the same 628 bones in
+ * clothes/Ani.pmx, the first model on the same skeleton (the same 628 bones in
  * the same order at the same places): its clothes are skinned to the v2
  * skeleton as they are.
  */
@@ -104,7 +104,10 @@ const EMOTES = ['show', 'peace', 'spin', 'pose', 'squat', 'shoot'];
 
 // Files under the base.
 const BODY_PMX = 'v2/Ani.pmx';
-const CLOTHES_PMX = 'v1/Ani.pmx';
+// The dressed v1 model and its textures. v1/ in the bucket holds another
+// variant of it (every garment at alpha 0, other body and outfit textures),
+// cached as immutable, so the dressed one has its own folder.
+const CLOTHES_PMX = 'clothes/Ani.pmx';
 const MOTIONS = 'v2/motions/';
 
 // The v1 outfits. v1 switches them with the material morph P2-Change, which
@@ -353,8 +356,15 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     outfit = o;
     if (!mesh || !clothes) return;
     for (const mat of clothes.material as THREE.Material[]) {
-      if (P1.includes(mat.name)) mat.visible = o === 'p1';
-      if (SHARED.includes(mat.name)) mat.visible = o !== 'lingerie';
+      // Worn means opaque, whatever alpha the PMX gives the material.
+      if (P1.includes(mat.name)) {
+        mat.visible = o === 'p1';
+        mat.opacity = 1;
+      }
+      if (SHARED.includes(mat.name)) {
+        mat.visible = o !== 'lingerie';
+        mat.opacity = 1;
+      }
       if (P2.includes(mat.name)) {
         mat.visible = o === 'p2';
         mat.opacity = o === 'p2' ? 1 : 0;
