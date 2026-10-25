@@ -6,6 +6,14 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.41.0] - 2026-10-26
+
+### Added
+- Ani strikes poses on Now: between her VRoid moves she now and then holds one of 30 standing poses from the Pic♡Pix Free Pose set for six seconds. The poses were Unity humanoid clips, baked to VRM Animation (`wallpapers/ani/v2/motions/poses/`) and loaded when she first picks each one.
+
+### Fixed
+- Ani's agent answered from memory instead of reading the user's Life OS: the line before each message now names its tools and asks for them every time (the model called them in 3 of 3 probes, against about half before), and its rules say the same. The first message to a freshly woken agent failed when the gateway was listening but the agent was still being prepared; such a turn now goes back to the queue and is sent again.
+
 ## [1.40.0] - 2026-10-25
 
 ### Added
