@@ -175,3 +175,8 @@ TEST(AgentTools, ThePrefaceSendsTheModelToTheTools) {
     const auto bare = Agent::preface("", "UTC", json::array());
     EXPECT_EQ(bare, "[Life OS: Reply in one or two short spoken sentences.]");
 }
+
+TEST(AgentTools, AClearedChatIsANewSession) {
+    EXPECT_EQ(Agent::session_of("u-1", 0), "u-1") << "the key before any clear stays as it was";
+    EXPECT_EQ(Agent::session_of("u-1", 2), "u-1#2");
+}

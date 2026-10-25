@@ -141,6 +141,45 @@ public:
         });
     }
 
+    enum class Removed { Done, Open, Missing };
+
+    /// Deletes one turn of the user; one still queued or running stays (Open).
+    Removed remove(const std::string& owner, const std::string& id) {
+        return Database::get().execute_write([&](auto& txn) {
+            auto r = txn.exec_params(
+                "WITH t AS (SELECT status FROM ani_turns WHERE id::text = $1 AND owner_id = $2::uuid), "
+                "d AS (DELETE FROM ani_turns WHERE id::text = $1 AND owner_id = $2::uuid "
+                "AND status IN ('done', 'failed') RETURNING id) "
+                "SELECT (SELECT status FROM t), (SELECT count(*) FROM d)",
+                id,
+                owner);
+            if (r[0][0].is_null()) {
+                return Removed::Missing;
+            }
+            return r[0][1].template as<int>() > 0 ? Removed::Done : Removed::Open;
+        });
+    }
+
+    /// Whether a turn of the user is queued or running.
+    bool has_open(const std::string& owner) {
+        return Database::get().execute_read([&](auto& txn) {
+            return !txn.exec_params(
+                           "SELECT 1 FROM ani_turns WHERE owner_id = $1::uuid AND status IN ('queued', 'running')",
+                           owner)
+                        .empty();
+        });
+    }
+
+    /// Deletes every ended turn of the user; returns how many went.
+    int clear(const std::string& owner) {
+        return Database::get().execute_write([&](auto& txn) {
+            return static_cast<int>(txn.exec_params("DELETE FROM ani_turns WHERE owner_id = $1::uuid AND status IN "
+                                                    "('done', 'failed') RETURNING id",
+                                                    owner)
+                                        .size());
+        });
+    }
+
     /// The wall clock in @p tz as the agent reads it ("2026-10-25 19:41, Sun"), or
     /// nullopt for a zone Postgres does not know.
     std::optional<std::string> local_now(const std::string& tz) {

@@ -155,6 +155,25 @@ public:
         });
     }
 
+    /// How many times the user cleared the chat: part of the agent's session key (migration 060).
+    int chat_session(const std::string& owner) {
+        return Database::get().execute_read([&](auto& txn) {
+            auto r = txn.exec_params("SELECT chat_session FROM ani_agents WHERE owner_id = $1::uuid", owner);
+            return r.empty() ? 0 : r[0][0].template as<int>();
+        });
+    }
+
+    /// The chat was cleared: the next turn starts a new conversation with the agent.
+    void next_chat_session(const std::string& owner) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params(
+                "INSERT INTO ani_agents (owner_id, chat_session) VALUES ($1::uuid, 1) "
+                "ON CONFLICT (owner_id) DO UPDATE SET chat_session = ani_agents.chat_session + 1",
+                owner);
+            return true;
+        });
+    }
+
     /// Every agent not stopped, with its ages: what the reconcile pass walks.
     nlohmann::json active() {
         return Database::get().execute_read([](auto& txn) {

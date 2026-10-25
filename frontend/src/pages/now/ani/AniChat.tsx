@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 
+import { ApiClientError } from '@/lib/api/client';
+
 import {
   POLL_MS,
+  clearChat,
+  deleteTurn,
   TEXT_MAX,
   failure,
   isOpen,
@@ -14,6 +18,25 @@ import {
   wakeAgent,
   type Turn,
 } from './chat';
+
+/** A bin: clear the chat. */
+function TrashIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="15"
+      height="15"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4.5 7h15M9.5 7V4.8h5V7M6.5 7l.9 12.2h9.2L17.5 7" />
+    </svg>
+  );
+}
 
 /** A speaker, with waves when her replies are spoken. */
 function SpeakerIcon({ on }: { on: boolean }) {
@@ -43,8 +66,10 @@ function SpeakerIcon({ on }: { on: boolean }) {
  * The chat with Ani's agent, right of her on Now. Opening it wakes her agent,
  * so it is usually up by the first message; the reply of an open turn is
  * polled every second, and a reply that arrives while the panel is open is
- * handed to onReply to be spoken (unless the sound is off). Messages and
- * replies are personal: Hide numbers blurs them.
+ * handed to onReply to be spoken (unless the sound is off). A message can be
+ * deleted (×, on hover), and the bin clears the chat, which her agent takes
+ * as a new conversation. Messages and replies are personal: Hide numbers
+ * blurs them.
  */
 export function AniChat({
   tz,
@@ -117,6 +142,33 @@ export function AniChat({
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  const remove = async (id: string) => {
+    setProblem(null);
+    try {
+      await deleteTurn(id);
+      setTurns((all) => all?.filter((t) => t.id !== id) ?? all);
+    } catch {
+      setProblem('The message was not deleted. Try again.');
+    }
+  };
+
+  const clear = async () => {
+    setConfirmClear(false);
+    setProblem(null);
+    try {
+      await clearChat();
+      setTurns([]);
+    } catch (err) {
+      setProblem(
+        err instanceof ApiClientError && err.code === 'turn_open'
+          ? 'She is still answering. Clear the chat when she is done.'
+          : 'The chat was not cleared. Try again.',
+      );
+    }
+  };
+
   const send = async (e?: FormEvent) => {
     e?.preventDefault();
     const t = text.trim();
@@ -164,6 +216,16 @@ export function AniChat({
         </button>
         <button
           type="button"
+          className="ani-chat-sound"
+          aria-label="Clear the chat"
+          title="Clear the chat"
+          disabled={!turns?.length || waiting}
+          onClick={() => setConfirmClear(true)}
+        >
+          <TrashIcon />
+        </button>
+        <button
+          type="button"
           className="ani-chat-close"
           aria-label="Close the chat"
           onClick={onClose}
@@ -171,6 +233,17 @@ export function AniChat({
           ×
         </button>
       </header>
+      {confirmClear ? (
+        <div className="ani-chat-confirm" role="alertdialog" aria-label="Clear the chat">
+          <span>Clear the chat? She starts a new conversation.</span>
+          <button type="button" onClick={() => void clear()}>
+            Clear
+          </button>
+          <button type="button" onClick={() => setConfirmClear(false)}>
+            Cancel
+          </button>
+        </div>
+      ) : null}
       <div ref={listRef} className="ani-chat-list" aria-live="polite">
         {loadFailed ? (
           <p className="ani-chat-note">The chat did not load. Close it and open again.</p>
@@ -184,6 +257,17 @@ export function AniChat({
         ) : (
           turns.map((t) => (
             <div key={t.id} className="ani-turn">
+              {isOpen(t) ? null : (
+                <button
+                  type="button"
+                  className="ani-turn-del"
+                  aria-label="Delete this message"
+                  title="Delete this message"
+                  onClick={() => void remove(t.id)}
+                >
+                  ×
+                </button>
+              )}
               <p className="ani-msg ani-msg-you num">{t.text}</p>
               {t.status === 'done' ? (
                 <p className="ani-msg ani-msg-her num">{t.reply}</p>

@@ -42,6 +42,10 @@ json ended(const std::string& id, const std::string& owner, const std::string& e
 
 }  // namespace
 
+std::string session_of(const std::string& owner, int chat_session) {
+    return chat_session == 0 ? owner : owner + "#" + std::to_string(chat_session);
+}
+
 std::string preface(const std::string& local, const std::string& tz, const json& tools) {
     std::string out = "[Life OS: ";
     if (!local.empty()) {
@@ -149,7 +153,7 @@ json process_turn(const json& payload) {
         const auto out = Gateway::converse(Net::Http::transport(),
                                            "http://" + gateway->first + ":" + std::to_string(Gateway::kGatewayPort),
                                            gateway->second,
-                                           owner,
+                                           session_of(owner, agents.chat_session(owner)),
                                            text,
                                            tools,
                                            run);

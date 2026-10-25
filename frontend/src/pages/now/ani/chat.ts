@@ -84,6 +84,16 @@ export function setSoundOn(on: boolean): void {
   }
 }
 
+/** Deletes one message and her reply from the chat (her agent still remembers it). */
+export async function deleteTurn(id: string): Promise<void> {
+  await api.deleteJson(`/api/v1/ani/turns/${encodeURIComponent(id)}`);
+}
+
+/** Clears the chat; her agent starts a new conversation. */
+export async function clearChat(): Promise<void> {
+  await api.deleteJson('/api/v1/ani/turns');
+}
+
 /** Starts her agent while the user types; a refusal here shows up on send. */
 export function wakeAgent(): void {
   void api.POST('/api/v1/ani/agent/wake').catch(() => {});
