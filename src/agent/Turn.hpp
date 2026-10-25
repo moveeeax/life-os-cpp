@@ -43,6 +43,11 @@ struct Sent {
 /// Queues @p text (already checked: 1 to kTurnTextMax characters, a known zone).
 Sent send(const std::string& owner, const std::string& text, const std::string& tz);
 
+/// The bracketed line put in front of a message: the person's local time
+/// (@p local, empty when unknown), that the reply is spoken, and, when the
+/// turn offers @p tools, that their data is read with them and not recalled.
+std::string preface(const std::string& local, const std::string& tz, const nlohmann::json& tools);
+
 /// The job handler (registered in agent/jobs/Register.cpp).
 nlohmann::json process_turn(const nlohmann::json& payload);
 

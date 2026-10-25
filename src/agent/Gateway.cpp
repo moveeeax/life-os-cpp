@@ -50,7 +50,8 @@ Outcome converse(Net::Http::Transport& transport,
             throw Error("unavailable", std::string("the gateway did not answer: ") + e.what());
         }
         if (res.status != 200) {
-            throw Error("unavailable", "the gateway answered " + std::to_string(res.status));
+            const bool not_ready = round == 0 && res.body.find(kNotReadyMarker) != std::string::npos;
+            throw Error("unavailable", "the gateway answered " + std::to_string(res.status), not_ready);
         }
         const auto body = json::parse(res.body, nullptr, /*allow_exceptions=*/false);
         const auto message = body.is_object() ? body.value(json::json_pointer("/choices/0/message"), json()) : json();

@@ -42,6 +42,27 @@ json ended(const std::string& id, const std::string& owner, const std::string& e
 
 }  // namespace
 
+std::string preface(const std::string& local, const std::string& tz, const json& tools) {
+    std::string out = "[Life OS: ";
+    if (!local.empty()) {
+        out += "the person's local time is " + local + ", " + tz + ". ";
+    }
+    out += "Reply in one or two short spoken sentences.";
+    if (tools.is_array() && !tools.empty()) {
+        // Left to itself the model answers from its memory of the person; it
+        // calls the tools every time once told the data is not there.
+        std::string names;
+        for (const auto& t : tools) {
+            names += (names.empty() ? "" : ", ") + t.value(json::json_pointer("/function/name"), std::string());
+        }
+        out +=
+            " Their Life OS data (day, tasks, goals, habits, sleep, money, food) is not in your memory: read it "
+            "with the tools of this request (" +
+            names + ") every time it is asked about, never from memory.";
+    }
+    return out + "]";
+}
+
 Sent send(const std::string& owner, const std::string& text, const std::string& tz) {
     const auto s = read_settings();
     if (!s) {
@@ -115,14 +136,6 @@ json process_turn(const json& payload) {
         agents.touch(owner);
 
         const std::string tz = turn->value("tz", "UTC");
-        const std::string local = turns.local_now(tz).value_or("");
-        std::string text = turn->value("text", "");
-        if (!local.empty()) {
-            // The gateway ignores system messages: the time and the reminder that the
-            // reply is spoken go in front of the text.
-            text = "[Life OS: the person's local time is " + local + ", " + tz +
-                   "; your reply is read aloud, one or two short sentences]\n" + text;
-        }
         json tools = json::array();
         Gateway::ToolRunner run = [](const std::string&, const json&) { return json{{"error", "unavailable"}}.dump(); };
         if (!s->api_url.empty()) {
@@ -131,6 +144,8 @@ json process_turn(const json& payload) {
                 run = Tools::runner(Net::Http::transport(), s->api_url, *token, tz);
             }
         }
+        // The gateway ignores system messages: the context goes in front of the text.
+        const std::string text = preface(turns.local_now(tz).value_or(""), tz, tools) + "\n" + turn->value("text", "");
         const auto out = Gateway::converse(Net::Http::transport(),
                                            "http://" + gateway->first + ":" + std::to_string(Gateway::kGatewayPort),
                                            gateway->second,
@@ -144,6 +159,10 @@ json process_turn(const json& payload) {
     } catch (const Jobs::DeferJob&) {
         throw;
     } catch (const Gateway::Error& e) {
+        // Woken just now, the agent may still be preparing: the turn waits for it.
+        if (e.not_ready && turn->value("age_seconds", 0LL) <= kTurnWaitSeconds && turns.requeue(id)) {
+            throw Jobs::DeferJob("the agent is still starting", 3000);
+        }
         return ended(id, owner, e.code, e.what());
     } catch (const std::exception& e) {
         return ended(id, owner, "failed", e.what());
