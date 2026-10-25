@@ -1158,6 +1158,24 @@ components:
           maxItems: 8
           description: Replaces the quick links; an empty array clears them
           items: { $ref: '#/components/schemas/NowLink' }
+    AniAgent:
+      type: object
+      required: [state, started_at, last_active_at, generation, last_error, usage]
+      properties:
+        state: { type: string, enum: [stopped, starting, running, stopping] }
+        started_at: { type: [string, 'null'], format: date-time, description: The start of the current or last run }
+        last_active_at: { type: [string, 'null'], format: date-time, description: 'The last wake or model call; the idle stop counts from it' }
+        generation: { type: integer, description: 'The current snapshot of the state in S3; 0 before the first saved run' }
+        last_error: { type: [string, 'null'], description: Why the last run failed, if it did }
+        usage:
+          type: object
+          required: [month, requests, prompt_tokens, completion_tokens, budget_tokens]
+          properties:
+            month: { type: string, example: '2026-10', description: The calendar month (UTC) }
+            requests: { type: integer, format: int64 }
+            prompt_tokens: { type: integer, format: int64 }
+            completion_tokens: { type: integer, format: int64 }
+            budget_tokens: { type: integer, format: int64, description: 'Prompt plus completion tokens allowed per month' }
     NowVoiceSession:
       type: object
       required: [value, expires_at, model, voice]
@@ -9662,6 +9680,73 @@ paths:
         '401': { description: Not authenticated }
         '404': { description: Now module disabled }
         '503': { description: The weather service is not answering and nothing is cached (weather_unavailable) }
+  /api/v1/ani/agent:
+    get:
+      summary: The state of the caller's agent pod and this month's model usage
+      description: >-
+        Ani's agent is an OpenClaw pod per user, started on a wake and stopped
+        on logout, when idle or when too old. Administrators only for now;
+        refused for API keys.
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The agent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/AniAgent' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '403': { description: Not an administrator }
+        '404': { description: The agent is switched off }
+  /api/v1/ani/agent/wake:
+    post:
+      summary: Start the caller's agent pod, or keep a running one alive
+      description: >-
+        Queues the start of a stopped agent (the pod is ready within a minute
+        or so) and pushes the idle stop of a running one back.
+        Administrators only for now; refused for API keys.
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '202':
+          description: The agent after the wake
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/AniAgent' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '403': { description: Not an administrator }
+        '404': { description: The agent is switched off }
+        '503': { description: 'Not configured (not_configured), every agent slot is taken (busy), or the job queue is off (jobs_disabled)' }
+  /api/v1/ani/agent/stop:
+    post:
+      summary: Stop the caller's agent pod; its state is saved first
+      description: >-
+        Queues the stop of a starting or running agent; a stopped one stays
+        as it is. Administrators only for now; refused for API keys.
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '202':
+          description: The agent after the request
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/AniAgent' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '403': { description: Not an administrator }
+        '404': { description: The agent is switched off }
+        '503': { description: The job queue is off (jobs_disabled) }
   /api/v1/now/voice-session:
     post:
       summary: A short-lived OpenAI Realtime client secret for talking with Ani on Now

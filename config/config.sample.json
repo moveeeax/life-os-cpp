@@ -242,6 +242,23 @@
   "goals": {
     "enabled": "${GOALS_ENABLED:-false}"
   },
+  "ani": {
+    "agent": {
+      "enabled": "${ANI_AGENT_ENABLED:-false}",
+      "image": "${ANI_AGENT_IMAGE:-ghcr.io/openclaw/openclaw:2026.10.7-slim}",
+      "keeper_image": "${ANI_AGENT_KEEPER_IMAGE:-curlimages/curl:8.17.0}",
+      "namespace": "${ANI_AGENT_NAMESPACE:-life-os-agents}",
+      "node_label": "${ANI_AGENT_NODE_LABEL:-node-role.kubernetes.io/worker}",
+      "max_running": "${ANI_AGENT_MAX_RUNNING:-8}",
+      "idle_minutes": "${ANI_AGENT_IDLE_MINUTES:-20}",
+      "max_hours": "${ANI_AGENT_MAX_HOURS:-12}",
+      "model": "${ANI_AGENT_MODEL:-gpt-5-mini}",
+      "upstream_url": "${ANI_AGENT_UPSTREAM_URL:-https://api.openai.com/v1}",
+      "upstream_key": "${ANI_AGENT_UPSTREAM_KEY:-}",
+      "proxy_url": "${ANI_AGENT_PROXY_URL:-}",
+      "monthly_tokens": "${ANI_AGENT_MONTHLY_TOKENS:-20000000}"
+    }
+  },
   "now": {
     "enabled": "${NOW_ENABLED:-false}",
     "ani_voice": {

@@ -30,6 +30,7 @@ public:
     std::string private_upload_url(const std::string& key,
                                    const std::string& content_type,
                                    long long bytes) const override;
+    std::string private_put_url(const std::string& key, long seconds) const override;
     std::string download_url(const std::string& key, long seconds, const std::string& disposition) const override;
     bool publicly_readable(const std::string& key) const override;
 

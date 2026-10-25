@@ -32,6 +32,15 @@
 # of an include): fitness/xiaomi, fitness/sync, repositories/fitness,
 # domain/fitness are edges in their own right, not folded into their parent.
 
+agent -> cache
+agent -> jobs
+agent -> net
+agent -> repositories/agent
+agent -> storage
+agent -> utils
+agent/jobs -> agent
+agent/jobs -> jobs
+api -> agent
 api -> billing
 api -> cache
 api -> core
@@ -53,6 +62,7 @@ api -> money/now
 api -> net
 api -> notes
 api -> now
+api -> repositories/agent
 api -> repositories/money
 api -> observability
 api -> repositories
@@ -69,6 +79,8 @@ billing -> domain
 billing -> repositories
 billing -> utils
 cache -> utils
+core -> agent
+core -> agent/jobs
 core -> billing
 core -> cache
 core -> database
@@ -156,6 +168,7 @@ observability -> utils
 repositories -> database
 repositories -> domain
 repositories -> utils
+repositories/agent -> database
 repositories/fitness -> database
 repositories/fitness -> domain/fitness
 repositories/fitness -> fitness/xiaomi
@@ -171,6 +184,7 @@ repositories/now -> now
 repositories/now -> repositories
 repositories/workout -> database
 repositories/workout -> repositories
+root -> agent
 root -> api
 root -> cache
 root -> core

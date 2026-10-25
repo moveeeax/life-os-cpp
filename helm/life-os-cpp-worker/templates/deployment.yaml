@@ -28,8 +28,14 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.aniAgents.enabled }}
+      # Ani's agents: this worker creates and deletes their pods (templates/ani-agents.yaml).
+      serviceAccountName: {{ include "life-os-cpp-worker.fullname" . }}
+      automountServiceAccountToken: true
+      {{- else }}
       # The worker never talks to the Kubernetes API.
       automountServiceAccountToken: false
+      {{- end }}
       securityContext:
         runAsUser: 1000
         runAsNonRoot: true

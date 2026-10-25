@@ -13,6 +13,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "agent/Lifecycle.hpp"
+#include "agent/Settings.hpp"
 #include "api/HandlerSupport.hpp"
 #include "api/Validation.hpp"
 #include "cache/Cache.hpp"
@@ -172,8 +174,17 @@ void AuthController::login(const HttpRequestPtr& req, std::function<void(const H
 void AuthController::logout(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
     const auto& cfg = Security::Auth::get().config();
     const std::string refresh = Security::Auth::extract_refresh_token(req, cfg.cookies);
-    if (!refresh.empty())
+    if (!refresh.empty()) {
         revoke_refresh(cfg, refresh);
+        // The user left: their agent pod stops now instead of at its idle limit.
+        if (::Agent::enabled()) {
+            std::string err;
+            if (const auto claims = Security::Auth::verify_hs256_jwt(refresh, cfg.jwt_secret, err)) {
+                if (const std::string sub = claims->value("sub", ""); !sub.empty())
+                    ::Agent::request_stop(sub);
+            }
+        }
+    }
 
     auto http = Response::ok({{"message", "logged out"}});
     Security::Auth::set_session_cookies(http, cfg.cookies, "", "");

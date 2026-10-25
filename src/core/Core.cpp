@@ -25,6 +25,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "agent/Lifecycle.hpp"
+#include "agent/Settings.hpp"
 #include "billing/PayPalClient.hpp"
 #include "cache/Cache.hpp"
 #include "database/Database.hpp"
@@ -588,6 +590,7 @@ void Application::init_jobs_(Config::AppConfig& cfg) {
     register_money_advisor_schedule_(cfg);
     register_now_media_sweep_schedule_();
     register_files_sweep_schedule_();
+    register_ani_agents_schedule_();
 }
 
 void Application::register_fitness_sync_schedule_(Config::AppConfig& cfg) {
@@ -719,6 +722,25 @@ void Application::register_files_sweep_schedule_() {
             Jobs::get().submit(Jobs::FilesSweep::kJobType, nlohmann::json::object());
         } catch (const std::exception& e) {
             spdlog::warn("files sweep schedule tick failed: {}", e.what());
+        }
+    });
+}
+
+void Application::register_ani_agents_schedule_() {
+    // Same shape as the sweeps: a tick in the API pod queues the reconcile pass, the worker
+    // (which alone holds Kubernetes rights) runs it. A minute keeps the idle stop close to its limit.
+    if (!Tasks::is_initialized() || !Database::is_initialized() || !Jobs::is_initialized())
+        return;
+    if (!Agent::enabled())
+        return;
+    spdlog::info("ani agents reconcile enabled: every minute");
+    Tasks::schedule_recurring("ani_agents_reconcile_schedule", std::chrono::minutes(1), [] {
+        if (!Jobs::is_initialized())
+            return;
+        try {
+            Jobs::get().submit(Agent::kReconcileJob, nlohmann::json::object());
+        } catch (const std::exception& e) {
+            spdlog::warn("ani agents reconcile tick failed: {}", e.what());
         }
     });
 }

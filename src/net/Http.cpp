@@ -111,6 +111,36 @@ Response CurlTransport::post_json(const std::string& url,
     return perform(handle.get(), url, with_type, timeout_seconds > 0 ? timeout_seconds : timeout_seconds_);
 }
 
+Response Transport::send(const Request& request) {
+    throw TransportError("this transport does not send " + request.method + " requests");
+}
+
+Response CurlTransport::send(const Request& request) {
+    Utils::ensure_curl_init();
+    std::unique_ptr<CURL, void (*)(CURL*)> handle(::curl_easy_init(), ::curl_easy_cleanup);
+    if (!handle) {
+        throw TransportError("curl_easy_init failed");
+    }
+    auto headers = request.headers;
+    if (!request.content_type.empty()) {
+        headers.emplace_back("Content-Type", request.content_type);
+    }
+    if (request.method == "POST") {
+        ::curl_easy_setopt(handle.get(), CURLOPT_POST, 1L);
+    } else if (request.method != "GET") {
+        ::curl_easy_setopt(handle.get(), CURLOPT_CUSTOMREQUEST, request.method.c_str());
+    }
+    if (!request.body.empty() || request.method == "POST") {
+        ::curl_easy_setopt(handle.get(), CURLOPT_POSTFIELDS, request.body.c_str());
+        ::curl_easy_setopt(handle.get(), CURLOPT_POSTFIELDSIZE, static_cast<long>(request.body.size()));
+    }
+    if (!request.ca_file.empty()) {
+        ::curl_easy_setopt(handle.get(), CURLOPT_CAINFO, request.ca_file.c_str());
+    }
+    return perform(
+        handle.get(), request.url, headers, request.timeout_seconds > 0 ? request.timeout_seconds : timeout_seconds_);
+}
+
 Transport& transport() {
     if (override_slot() != nullptr) {
         return *override_slot();

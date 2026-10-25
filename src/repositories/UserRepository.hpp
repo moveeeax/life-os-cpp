@@ -334,6 +334,10 @@ public:
         "medical_visits",
         "medical_providers",
         "medical_people",
+        // A deleted ani_agents row queues its snapshots in private_file_purges
+        // (a trigger of migration 058); its pod goes with the next reconcile.
+        "ani_agents",
+        "ani_usage",
     };
 
     /// The foreign keys of the billing tables (migration 007, ON DELETE

@@ -6,6 +6,7 @@
 
 #include "core/JobHandlers.hpp"
 
+#include "agent/jobs/Register.hpp"
 #include "email/jobs/Register.hpp"
 #include "files/jobs/Register.hpp"
 #include "fitness/jobs/Register.hpp"
@@ -21,6 +22,7 @@ namespace Core {
 void register_job_handlers() {
     auto& d = Jobs::Dispatcher::get();
     Jobs::register_builtin_handlers();
+    Agent::register_jobs(d);
     Email::register_jobs(d);
     Files::register_jobs(d);
     Fitness::register_jobs(d);

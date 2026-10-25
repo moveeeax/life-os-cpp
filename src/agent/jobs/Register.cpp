@@ -1,0 +1,27 @@
+/**
+ * @file Register.cpp
+ * @brief Body for src/agent/jobs/Register.hpp — compiled once into app_core.
+ */
+
+#include "agent/jobs/Register.hpp"
+
+#include <string>
+
+#include <nlohmann/json.hpp>
+
+#include "agent/Lifecycle.hpp"
+#include "jobs/Dispatcher.hpp"
+
+namespace Agent {
+
+void register_jobs(Jobs::Dispatcher& d) {
+    d.register_handler(kStartJob, [](const nlohmann::json& payload) { return process_start(payload); });
+    d.register_handler(kStopJob, [](const nlohmann::json& payload) { return process_stop(payload); });
+    d.register_handler(kReconcileJob, [](const nlohmann::json& payload) { return process_reconcile(payload); });
+    // A start that dead-letters leaves its row starting; stop it, so the next wake can try again.
+    d.register_dead_letter(kStartJob, [](const nlohmann::json& payload, const std::string& error) {
+        request_stop(payload.value("owner", std::string()), "the start failed: " + error.substr(0, 200));
+    });
+}
+
+}  // namespace Agent
