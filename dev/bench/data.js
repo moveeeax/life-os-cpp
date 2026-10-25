@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792918048752,
+  "lastUpdate": 1792918050974,
   "repoUrl": "https://github.com/moveeeax/life-os-cpp",
   "entries": {
     "Throughput": [
@@ -740,6 +740,63 @@ window.BENCHMARK_DATA = {
           {
             "name": "cold start to /ready",
             "value": 894,
+            "unit": "ms"
+          },
+          {
+            "name": "idle RSS",
+            "value": 4.8,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Michael Tarassov",
+            "username": "moveeeax",
+            "email": "michael@tarassov.me"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "104528738046bf6155312cd568e7bf14502f91f4",
+          "message": "Merge pull request #173 from moveeeax/release/1.38.0\n\nchore(release): 1.38.0",
+          "timestamp": "2026-10-25T08:05:19Z",
+          "url": "https://github.com/moveeeax/life-os-cpp/commit/104528738046bf6155312cd568e7bf14502f91f4"
+        },
+        "date": 1792918050549,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "healthz p50",
+            "value": 2.32,
+            "unit": "ms"
+          },
+          {
+            "name": "healthz p99",
+            "value": 9.84,
+            "unit": "ms"
+          },
+          {
+            "name": "jobs p50",
+            "value": 10.98,
+            "unit": "ms"
+          },
+          {
+            "name": "jobs p99",
+            "value": 23.09,
+            "unit": "ms"
+          },
+          {
+            "name": "runtime image size",
+            "value": 114.5,
+            "unit": "MB"
+          },
+          {
+            "name": "cold start to /ready",
+            "value": 746,
             "unit": "ms"
           },
           {
