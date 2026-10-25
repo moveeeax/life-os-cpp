@@ -6,7 +6,7 @@ import { useCallback, useSyncExternalStore } from 'react';
  * or sent away, and her outfit.
  */
 
-export type AniOutfit = 'p1' | 'p2';
+export type AniOutfit = 'p1' | 'p2' | 'lingerie';
 
 interface AniState {
   on: boolean;
@@ -24,11 +24,15 @@ function read(key: string): string | null {
   }
 }
 
+function outfitOf(v: string | null): AniOutfit {
+  return v === 'p1' || v === 'p2' ? v : 'lingerie';
+}
+
 function load(): AniState {
   return {
     on: read(KEYS.on) === '1',
     here: read(KEYS.here) !== '0',
-    outfit: read(KEYS.outfit) === 'p2' ? 'p2' : 'p1',
+    outfit: outfitOf(read(KEYS.outfit)),
   };
 }
 
@@ -64,7 +68,7 @@ export function useAni(): [AniState, (patch: Partial<AniState>) => void] {
 
 /**
  * Where Ani's files live: next to the wallpapers in the public bucket, under
- * wallpapers/ani/v2/ (the app's storage user may write only there and under
+ * wallpapers/ani/ (the app's storage user may write only there and under
  * sounds/). Taken from a wallpaper's URL, so no host is configured twice;
  * null when there is no wallpaper to take it from.
  */
@@ -72,5 +76,5 @@ export function aniBase(wallpaperUrl: string | undefined): string | null {
   if (!wallpaperUrl) return null;
   const i = wallpaperUrl.indexOf('/wallpapers/');
   if (i < 0) return null;
-  return `${wallpaperUrl.slice(0, i)}/wallpapers/ani/v2/`;
+  return `${wallpaperUrl.slice(0, i)}/wallpapers/ani/`;
 }

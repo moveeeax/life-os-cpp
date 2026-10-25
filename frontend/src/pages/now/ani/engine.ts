@@ -9,13 +9,18 @@ import { createSprings, type Collider, type SpringGroup, type Springs } from './
  * Ani on Now: the PMX model, posed every frame by a small director (weight
  * from one leg to the other, glances, blinks), the VRoid VRMA clips over it,
  * spring bones for the skirt, hair and ribbons, a damped jiggle for the
- * chest, and the arms kept out of the body.
+ * chest and seat, and the arms kept out of the body.
+ *
+ * The body is v2/Ani.pmx, in lingerie. The dress and the slip come from
+ * v1/Ani.pmx, the first model on the same skeleton (the same 628 bones in
+ * the same order at the same places): its clothes are skinned to the v2
+ * skeleton as they are.
  */
 
-export type Outfit = 'p1' | 'p2';
+export type Outfit = 'p1' | 'p2' | 'lingerie';
 
 export interface AniOptions {
-  /** Folder of Ani.pmx, its textures and motions/ (ends with a slash). */
+  /** Folder of v1/ and v2/ (ends with a slash). */
   base: string;
   /** The element that takes drags and taps (the canvas lets them through). */
   hit: HTMLElement;
@@ -88,9 +93,14 @@ const CLIPS: Record<string, { file: string; from?: number }> = {
 };
 const EMOTES = ['show', 'peace', 'spin', 'pose', 'squat', 'shoot'];
 
-// Two outfits. The PMX switches them with the material morph P2-Change,
-// which MMDLoader does not apply: P2-Change multiplies the P1 materials'
-// alpha by 0 and adds 1 to the P2 ones and the chest skin.
+// Files under the base.
+const BODY_PMX = 'v2/Ani.pmx';
+const CLOTHES_PMX = 'v1/Ani.pmx';
+const MOTIONS = 'v2/motions/';
+
+// The v1 outfits. v1 switches them with the material morph P2-Change, which
+// MMDLoader does not apply: P2-Change multiplies the P1 materials' alpha by
+// 0 and adds 1 to the P2 ones. Its own skin, face and hair are not used.
 const P1 = [
   'P1-BackBow',
   'P1-TopCloth',
@@ -101,13 +111,11 @@ const P1 = [
   'P1-OutSkirt',
   'Shared-Glove',
 ];
-const P2 = [
-  'BodySkin-Chest(Hide)',
-  'P2-Glove(Hide)',
-  'P2-Top(Hide)',
-  'P2-Panties(Hide)',
-  'P2-Skirt',
-];
+const P2 = ['P2-Glove(Hide)', 'P2-Top(Hide)', 'P2-Panties(Hide)', 'P2-Skirt'];
+// Worn with either v1 outfit.
+const SHARED = ['Shared-Socks-Lace', 'Shared-Collar', 'Shared-Boots', 'Hair-Band'];
+// The v2 body's own lingerie.
+const LINGERIE = ['Lingerie'];
 const LEG = ['左足', '右足', '左ひざ', '右ひざ', '左足首', '右足首'];
 
 const smooth = (a: number) => a * a * (3 - 2 * a);
@@ -173,6 +181,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   let grants: { bone: THREE.Bone; from: THREE.Bone; ratio: number }[] = [];
   let morphs: Record<string, number> = {};
   let outfit: Outfit = opts.outfit;
+  let clothes: THREE.SkinnedMesh | null = null;
 
   const walk = {
     state: (opts.present ? 'here' : 'away') as Walk,
@@ -231,18 +240,21 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   // The files are PNG where the PMX names BMP textures.
   const manager = new THREE.LoadingManager();
   manager.setURLModifier((u) => u.replace(/\.bmp$/i, '.png'));
-  new MMDLoader(manager).load(
-    `${opts.base}Ani.pmx`,
-    (m) => {
+  const loader = new MMDLoader(manager);
+  const load = (file: string) =>
+    new Promise<THREE.SkinnedMesh>((ok, fail) =>
+      loader.load(`${opts.base}${file}`, ok, undefined, fail),
+    );
+  Promise.all([load(BODY_PMX), load(CLOTHES_PMX)]).then(
+    ([m, v1]) => {
       if (disposed) return;
-      setUp(m);
+      setUp(m, v1);
       opts.onReady?.();
     },
-    undefined,
     (e) => opts.onError?.(e),
   );
 
-  function setUp(m: THREE.SkinnedMesh) {
+  function setUp(m: THREE.SkinnedMesh, v1: THREE.SkinnedMesh) {
     mesh = m;
     m.rotation.y = FACE;
     m.visible = walk.state === 'here';
@@ -253,10 +265,17 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       baseP[b.name] = b.position.clone();
     }
     morphs = m.morphTargetDictionary ?? {};
-    hugLace(m);
+    // v1's clothes on the v2 skeleton: v1's skin indices name the same bones.
+    const worn = new Set([...P1, ...P2, ...SHARED]);
+    for (const mat of v1.material as THREE.Material[]) if (!worn.has(mat.name)) mat.visible = false;
+    clothes = new THREE.SkinnedMesh(v1.geometry, v1.material);
+    clothes.frustumCulled = false;
+    m.add(clothes);
+    clothes.bind(m.skeleton, new THREE.Matrix4());
+    hugLace(clothes, m);
     // The skirts, frills and bows are single-sided in the PMX: once the
     // springs swing them, their inner side faces the camera and vanishes.
-    for (const mat of m.material as THREE.Material[])
+    for (const mat of clothes.material as THREE.Material[])
       if (/Skirt|BackBow|UnderPants|Socks-Lace/.test(mat.name)) mat.side = THREE.DoubleSide;
     m.updateMatrixWorld(true);
     for (const b of m.skeleton.bones)
@@ -291,7 +310,9 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     ik = new CCDIKSolver(m, mmd.iks);
     for (const name of Object.keys(CLIPS)) void clipOf(name);
     if (!still) {
-      springs = createSprings(m, SPRINGS);
+      // v2 has rigid bodies for its hair and chest only; the clothes' bones
+      // have theirs in v1.
+      springs = createSprings(m, SPRINGS, [v1]);
       // Calibrate in the bind pose, against every collider.
       m.updateMatrixWorld(true);
       placeColliders();
@@ -319,17 +340,20 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
 
   function dress(o: Outfit) {
     outfit = o;
-    if (!mesh) return;
-    for (const mat of mesh.material as THREE.Material[]) {
+    if (!mesh || !clothes) return;
+    for (const mat of clothes.material as THREE.Material[]) {
       if (P1.includes(mat.name)) mat.visible = o === 'p1';
+      if (SHARED.includes(mat.name)) mat.visible = o !== 'lingerie';
       if (P2.includes(mat.name)) {
         mat.visible = o === 'p2';
         mat.opacity = o === 'p2' ? 1 : 0;
       }
     }
+    for (const mat of mesh.material as THREE.Material[])
+      if (LINGERIE.includes(mat.name)) mat.visible = o === 'lingerie';
     // Only the worn skirt swings.
     if (springs) {
-      springs.off = new Set([o === 'p1' ? 'p2' : 'p1']);
+      springs.off = new Set(['p1', 'p2'].filter((g) => g !== o));
       settle = true;
     }
   }
@@ -337,72 +361,137 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   // Lace lies on the skin. The petticoat (P1-InnerSkirt) shared the outer
   // skirt's bones and flared with it; the frills of the lace shorts
   // (P1-UnderPants) stood off the legs on the hip bone alone, so the seat
-  // ate them when a leg moved; the garter band swung on ribbon chains. Each
-  // of their vertices takes the bone weights of the nearest skin vertex, so
-  // it moves as the skin does; a vertex standing off the skin is laid onto
-  // it along the skin's normal, keeping a twentieth of its depth.
-  function hugLace(m: THREE.SkinnedMesh) {
-    const g = m.geometry;
-    const index = g.index;
-    if (!index) return;
-    const mats = m.material as THREE.Material[];
+  // ate them when a leg moved; the garter band swung on ribbon chains. The
+  // v2 hips and thighs are up to 0.17 off v1's, so lace made for v1 sank
+  // into the v2 skin in places and stood off it in others. Each of their
+  // vertices (and the slip's panties) goes to the nearest point of the v2
+  // skin: it takes the bone weights the skin has there (its triangle's three
+  // vertices blended by barycentric weight, the four strongest bones kept),
+  // so it moves as that point of the skin does, and sits on it along the
+  // skin's normal: 0.03 out, plus a twentieth of any depth it stood off.
+  // The lace is drawn with a depth bias, so the skin wins no near tie.
+  function hugLace(cloth: THREE.SkinnedMesh, body: THREE.SkinnedMesh) {
+    const g = cloth.geometry;
+    const bg = body.geometry;
+    if (!g.index || !bg.index) return;
+    const groupsOf = (geo: THREE.BufferGeometry, mesh: THREE.SkinnedMesh, names: string[]) => {
+      const mats = mesh.material as THREE.Material[];
+      return geo.groups.filter((grp) => names.includes(mats[grp.materialIndex ?? 0].name));
+    };
     const pos = g.attributes.position as THREE.BufferAttribute;
     const nrm = g.attributes.normal as THREE.BufferAttribute;
     const si = g.attributes.skinIndex as THREE.BufferAttribute;
     const sw = g.attributes.skinWeight as THREE.BufferAttribute;
-    const vertsOf = (names: string[]) => {
-      const out = new Set<number>();
-      for (const grp of g.groups) {
-        if (!names.includes(mats[grp.materialIndex ?? 0].name)) continue;
-        for (let k = grp.start; k < grp.start + grp.count; k++) out.add(index.getX(k));
-      }
-      return out;
-    };
-    // A grid of the skin for the nearest-vertex search.
+    const bPos = bg.attributes.position as THREE.BufferAttribute;
+    const bNrm = bg.attributes.normal as THREE.BufferAttribute;
+    const bSi = bg.attributes.skinIndex as THREE.BufferAttribute;
+    const bSw = bg.attributes.skinWeight as THREE.BufferAttribute;
+    // The skin's triangles around each of its vertices, and a grid of the
+    // vertices for the nearest-vertex search.
+    const bIdx = bg.index;
+    const around = new Map<number, number[]>();
     const CELL = 0.6;
     const grid = new Map<string, number[]>();
-    for (const v of vertsOf(['BodySkin-LowerBody', 'Shared-Socks'])) {
-      const k = `${Math.floor(pos.getX(v) / CELL)},${Math.floor(pos.getY(v) / CELL)},${Math.floor(pos.getZ(v) / CELL)}`;
-      const cell = grid.get(k);
-      if (cell) cell.push(v);
-      else grid.set(k, [v]);
-    }
+    const cellOf = (x: number, y: number, z: number) =>
+      `${Math.floor(x / CELL)},${Math.floor(y / CELL)},${Math.floor(z / CELL)}`;
+    for (const grp of groupsOf(bg, body, ['Body_Skin']))
+      for (let k = grp.start; k < grp.start + grp.count; k += 3)
+        for (let e = 0; e < 3; e++) {
+          const v = bIdx.getX(k + e);
+          let tris = around.get(v);
+          if (!tris) {
+            around.set(v, (tris = []));
+            const key = cellOf(bPos.getX(v), bPos.getY(v), bPos.getZ(v));
+            const cell = grid.get(key);
+            if (cell) cell.push(v);
+            else grid.set(key, [v]);
+          }
+          tris.push(k);
+        }
     const p = new THREE.Vector3();
     const sp = new THREE.Vector3();
+    const cp = new THREE.Vector3();
     const sn = new THREE.Vector3();
-    for (const v of vertsOf(['P1-InnerSkirt', 'P1-UnderPants', 'Shared-Socks-Lace'])) {
-      p.fromBufferAttribute(pos, v);
-      let best = -1;
-      let bd = Infinity;
-      const cx = Math.floor(p.x / CELL);
-      const cy = Math.floor(p.y / CELL);
-      const cz = Math.floor(p.z / CELL);
-      for (let r = 1; best < 0 && r <= 4; r++)
-        for (let x = cx - r; x <= cx + r; x++)
-          for (let y = cy - r; y <= cy + r; y++)
-            for (let z = cz - r; z <= cz + r; z++)
-              for (const u of grid.get(`${x},${y},${z}`) ?? []) {
-                const d = sp.fromBufferAttribute(pos, u).distanceToSquared(p);
-                if (d < bd) {
-                  bd = d;
-                  best = u;
+    const bary = new THREE.Vector3();
+    const tri = new THREE.Triangle();
+    const corner = [0, 0, 0];
+    const lace = ['P1-InnerSkirt', 'P1-UnderPants', 'Shared-Socks-Lace', 'P2-Panties(Hide)'];
+    const done = new Set<number>();
+    for (const grp of groupsOf(g, cloth, lace))
+      for (let k = grp.start; k < grp.start + grp.count; k++) {
+        const v = g.index.getX(k);
+        if (done.has(v)) continue;
+        done.add(v);
+        p.fromBufferAttribute(pos, v);
+        let best = -1;
+        let bd = Infinity;
+        const cx = Math.floor(p.x / CELL);
+        const cy = Math.floor(p.y / CELL);
+        const cz = Math.floor(p.z / CELL);
+        for (let r = 1; best < 0 && r <= 4; r++)
+          for (let x = cx - r; x <= cx + r; x++)
+            for (let y = cy - r; y <= cy + r; y++)
+              for (let z = cz - r; z <= cz + r; z++)
+                for (const u of grid.get(`${x},${y},${z}`) ?? []) {
+                  const d = sp.fromBufferAttribute(bPos, u).distanceToSquared(p);
+                  if (d < bd) {
+                    bd = d;
+                    best = u;
+                  }
                 }
-              }
-      if (best < 0) continue;
-      sp.fromBufferAttribute(pos, best);
-      sn.fromBufferAttribute(nrm, best).normalize();
-      const out = Math.max(0, p.clone().sub(sp).dot(sn));
-      if (out > 0.03) {
-        p.addScaledVector(sn, 0.03 + out * 0.05 - out);
+        if (best < 0) continue;
+        // The nearest point on the triangles around that vertex.
+        let bt = -1;
+        bd = Infinity;
+        for (const t of around.get(best)!) {
+          tri.a.fromBufferAttribute(bPos, bIdx.getX(t));
+          tri.b.fromBufferAttribute(bPos, bIdx.getX(t + 1));
+          tri.c.fromBufferAttribute(bPos, bIdx.getX(t + 2));
+          tri.closestPointToPoint(p, cp);
+          const d = cp.distanceToSquared(p);
+          if (d < bd) {
+            bd = d;
+            bt = t;
+            sp.copy(cp);
+          }
+        }
+        for (let e = 0; e < 3; e++) corner[e] = bIdx.getX(bt + e);
+        tri.a.fromBufferAttribute(bPos, corner[0]);
+        tri.b.fromBufferAttribute(bPos, corner[1]);
+        tri.c.fromBufferAttribute(bPos, corner[2]);
+        tri.getBarycoord(sp, bary);
+        sn.set(0, 0, 0);
+        const weights = new Map<number, number>();
+        for (let e = 0; e < 3; e++) {
+          const b = bary.getComponent(e);
+          sn.addScaledVector(cp.fromBufferAttribute(bNrm, corner[e]), b);
+          for (let c = 0; c < 4; c++) {
+            const w = bSw.getComponent(corner[e], c) * b;
+            if (w <= 0) continue;
+            const bone = bSi.getComponent(corner[e], c);
+            weights.set(bone, (weights.get(bone) ?? 0) + w);
+          }
+        }
+        sn.normalize();
+        const depth = cp.subVectors(p, sp).dot(sn);
+        const want = 0.03 + Math.max(0, depth - 0.03) * 0.05;
+        p.copy(sp).addScaledVector(sn, want);
         pos.setXYZ(v, p.x, p.y, p.z);
-        nrm.setXYZ(v, sn.x, sn.y, sn.z);
+        if (depth > 0.03) nrm.setXYZ(v, sn.x, sn.y, sn.z);
+        const top = [...weights].sort((a, b) => b[1] - a[1]).slice(0, 4);
+        const sum = top.reduce((a, [, w]) => a + w, 0) || 1;
+        for (let c = 0; c < 4; c++) {
+          si.setComponent(v, c, top[c]?.[0] ?? 0);
+          sw.setComponent(v, c, (top[c]?.[1] ?? 0) / sum);
+        }
       }
-      for (let c = 0; c < 4; c++) {
-        si.setComponent(v, c, si.getComponent(best, c));
-        sw.setComponent(v, c, sw.getComponent(best, c));
-      }
-    }
     pos.needsUpdate = nrm.needsUpdate = si.needsUpdate = sw.needsUpdate = true;
+    for (const mat of cloth.material as THREE.Material[])
+      if (lace.includes(mat.name)) {
+        mat.polygonOffset = true;
+        mat.polygonOffsetFactor = -1;
+        mat.polygonOffsetUnits = -4;
+      }
   }
 
   const q = new THREE.Quaternion();
@@ -605,7 +694,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   // Clips: one now and then, faded in and out over the procedural pose.
   const loaded: Record<string, Promise<Clip | null> | undefined> = {};
   const clipOf = (name: string) =>
-    (loaded[name] ??= loadClip(`${opts.base}motions/${CLIPS[name].file}.vrma`, (n) =>
+    (loaded[name] ??= loadClip(`${opts.base}${MOTIONS}${CLIPS[name].file}.vrma`, (n) =>
       BIND[n].clone(),
     ).catch(() => null));
   const play = { clip: null as Clip | null, name: '', t0: 0, w: 0, next: 6 };
@@ -662,10 +751,13 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
 
   // Soft tissue: the chest and seat bones (Breast_L/R, Buttock_L/R; the PMX
   // physics is not run). Each is a damped point mass trailing the place its
-  // parent puts it (about 3.5 Hz, light damping), moved by translating the
-  // bone; the offset is capped at 0.22.
-  const JIG = { k: 480, c: 9, max: 0.22 };
-  const soft: { n: string; p: THREE.Vector3 | null; v: THREE.Vector3 }[] = [];
+  // parent puts it, moved by translating the bone. The chest: about 3.5 Hz,
+  // light damping, offset capped at 0.22. The seat is firmer (about 4.2 Hz,
+  // more damping, capped at 0.12), so the lace over it keeps up.
+  const CHEST = { k: 480, c: 9, max: 0.22 };
+  const SEAT = { k: 700, c: 14, max: 0.12 };
+  type Jig = typeof CHEST;
+  const soft: { n: string; j: Jig; p: THREE.Vector3 | null; v: THREE.Vector3 }[] = [];
   const _tw = new THREE.Vector3();
   const _acc = new THREE.Vector3();
   const _pinv = new THREE.Quaternion();
@@ -673,7 +765,13 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     if (still) return;
     if (!soft.length)
       for (const n of ['Breast_L', 'Breast_R', 'Buttock_L', 'Buttock_R'])
-        if (B[n]) soft.push({ n, p: null, v: new THREE.Vector3() });
+        if (B[n])
+          soft.push({
+            n,
+            j: n.startsWith('Buttock') ? SEAT : CHEST,
+            p: null,
+            v: new THREE.Vector3(),
+          });
     for (const s of soft) {
       const bone = B[s.n];
       _tw.copy(baseP[s.n]).applyMatrix4(bone.parent!.matrixWorld);
@@ -684,12 +782,12 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
         // Two substeps keep the spring stable at low frame rates.
         const h = dt / 2;
         for (let i = 0; i < 2; i++) {
-          _acc.subVectors(_tw, s.p).multiplyScalar(JIG.k).addScaledVector(s.v, -JIG.c);
+          _acc.subVectors(_tw, s.p).multiplyScalar(s.j.k).addScaledVector(s.v, -s.j.c);
           s.v.addScaledVector(_acc, h);
           s.p.addScaledVector(s.v, h);
         }
         const off = _off.subVectors(s.p, _tw);
-        if (off.length() > JIG.max) s.p.copy(_tw).add(off.setLength(JIG.max));
+        if (off.length() > s.j.max) s.p.copy(_tw).add(off.setLength(s.j.max));
       }
       bone.parent!.getWorldQuaternion(_pinv).invert();
       _off.subVectors(s.p, _tw).applyQuaternion(_pinv);
@@ -783,7 +881,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     for (const n of LEG) B[n + 'D'].quaternion.copy(B[n].quaternion);
 
     // Arms: the wrists go to a point on the skirt's flare (by the thighs in
-    // the slip) by two-bone IK, kept out of the body.
+    // the slip and the lingerie) by two-bone IK, kept out of the body.
     const W = at('下半身');
     for (const c of BODY) {
       onBone(c.a[0], c.a[1], c.A);
@@ -801,9 +899,9 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       const S = at(side + '腕');
       const bob = Math.sin(t * 0.9 + sd) * 0.05;
       const T =
-        outfit === 'p2'
-          ? W.clone().add(_off.set(sd * 2.75, -1.75 + bob, 0.3))
-          : W.clone().add(_off.set(sd * 2.6, -1.3 + bob, 0.9));
+        outfit === 'p1'
+          ? W.clone().add(_off.set(sd * 2.6, -1.3 + bob, 0.9))
+          : W.clone().add(_off.set(sd * 2.75, -1.75 + bob, 0.3));
       reach(side, S, T, S.clone().add(_off.set(sd * 2, -2, -2.5)));
     }
     for (const g of grants) g.bone.quaternion.copy(_id).slerp(g.from.quaternion, g.ratio);
