@@ -321,6 +321,21 @@
   justify-content: space-between;
   padding: 2px 6px 8px;
 }
+.ani-chat-head .ani-k {
+  margin-right: auto;
+}
+.ani-chat-sound {
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--g-ink-faint);
+}
+.ani-chat-sound:hover {
+  color: var(--g-ink);
+  background: rgba(255, 255, 255, 0.1);
+}
 .ani-chat-close {
   width: 26px;
   height: 26px;

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Today } from '@/lib/now/types';
 
 import { AniChat } from './AniChat';
+import { speechUrl } from './chat';
 import type { Ani } from './engine';
 import type { Talk, TalkState } from './talk';
 import { useAni, type AniOutfit } from './state';
@@ -364,7 +365,18 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
           </button>
         )}
       </div>
-      {chat ? <AniChat tz={context.tz} onClose={() => setChat(false)} /> : null}
+      {chat ? (
+        <AniChat
+          tz={context.tz}
+          onClose={() => setChat(false)}
+          onReply={(t) => {
+            // She speaks only when she is on screen and not in a voice call.
+            if (engine.current && ani.here && !talkRef.current) {
+              void engine.current.say(speechUrl(t.id));
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

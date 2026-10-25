@@ -118,8 +118,10 @@ json process_turn(const json& payload) {
         const std::string local = turns.local_now(tz).value_or("");
         std::string text = turn->value("text", "");
         if (!local.empty()) {
-            // The gateway ignores system messages: the time goes in front of the text.
-            text = "[Life OS: the person's local time is " + local + ", " + tz + "]\n" + text;
+            // The gateway ignores system messages: the time and the reminder that the
+            // reply is spoken go in front of the text.
+            text = "[Life OS: the person's local time is " + local + ", " + tz +
+                   "; your reply is read aloud, one or two short sentences]\n" + text;
         }
         json tools = json::array();
         Gateway::ToolRunner run = [](const std::string&, const json&) { return json{{"error", "unavailable"}}.dump(); };

@@ -9839,6 +9839,28 @@ paths:
                   data: { $ref: '#/components/schemas/AniTurn' }
         '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
         '404': { description: 'The agent is switched off, or no such turn of the caller (turn_not_found)' }
+  /api/v1/ani/turns/{id}/speech:
+    get:
+      summary: The reply of a turn read aloud in Ani's voice
+      description: >-
+        OpenAI text to speech (ANI_VOICE_TTS_MODEL) in the voice of her
+        Realtime sessions, made on each call from the done turn's reply; the
+        browser keeps it for a day. At most 120 per user and hour. Refused for
+        API keys.
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: The spoken reply
+          content:
+            audio/mpeg:
+              schema: { type: string, format: binary }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'The agent is switched off, or no done turn of the caller with that id (turn_not_found)' }
+        '429': { description: More than 120 spoken replies in an hour }
+        '503': { description: 'No voice key (not_configured), OpenAI is not answering (upstream_unavailable), or the server is busy' }
   /api/v1/now/voice-session:
     post:
       summary: A short-lived OpenAI Realtime client secret for talking with Ani on Now

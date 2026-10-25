@@ -6,6 +6,7 @@
 #include "api/AniController.hpp"
 
 #include <exception>
+#include <memory>
 #include <string>
 
 #include <drogon/drogon.h>
@@ -19,10 +20,14 @@
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
 #include "api/RequestUtils.hpp"
+#include "cache/Cache.hpp"
 #include "jobs/Jobs.hpp"
+#include "net/Http.hpp"
+#include "now/Voice.hpp"
 #include "repositories/Zones.hpp"
 #include "repositories/agent/AgentRepository.hpp"
 #include "repositories/agent/TurnRepository.hpp"
+#include "utils/BlockingPool.hpp"
 #include "utils/ErrorResponse.hpp"
 
 namespace Api {
@@ -195,6 +200,69 @@ void AniController::turn(const HttpRequestPtr& req, Callback&& callback, const s
     } catch (const std::exception& e) {
         spdlog::error("ani.turn failed: {}", e.what());
         callback(ErrorResponse::internal_error());
+    }
+}
+
+void AniController::speech(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    ANI_AGENT_GUARD(req, callback, owner);
+    if (!is_valid_uuid(id)) {
+        callback(ErrorResponse::not_found("turn_not_found"));
+        return;
+    }
+    const auto settings = ::Now::Voice::read_settings();
+    if (!settings) {
+        callback(ErrorResponse::service_unavailable("not_configured", "ANI_VOICE_API_KEY is not set"));
+        return;
+    }
+    std::string reply;
+    try {
+        const auto t = Repositories::Agent::TurnRepository().get(owner, id);
+        if (!t || t->value("status", "") != "done" || !(*t)["reply"].is_string()) {
+            callback(ErrorResponse::not_found("turn_not_found"));
+            return;
+        }
+        reply = (*t)["reply"].get<std::string>();
+    } catch (const std::exception& e) {
+        spdlog::error("ani.speech failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+        return;
+    }
+    // Every reply read aloud is paid for from the voice key.
+    if (Cache::is_initialized()) {
+        try {
+            const std::string rate_key = "ani:speech:rate:" + owner;
+            const long long n = Cache::get().incr(rate_key);
+            if (n == 1) {
+                Cache::get().expire(rate_key, ::Now::Voice::kWindowSeconds);
+            }
+            if (n > ::Now::Voice::kMaxSpeechPerWindow) {
+                callback(ErrorResponse::too_many_requests(static_cast<int>(::Now::Voice::kWindowSeconds)));
+                return;
+            }
+        } catch (const std::exception& e) {
+            spdlog::warn("ani.speech: the rate counter failed: {}", e.what());
+        }
+    }
+    // A few seconds at OpenAI: the call runs on the blocking pool.
+    auto respond = std::make_shared<Callback>(std::move(callback));
+    const bool queued = Utils::BlockingPool::shared().try_submit([respond, s = *settings, text = std::move(reply)] {
+        const Callback& answer = *respond;
+        try {
+            auto r = HttpResponse::newHttpResponse();
+            r->setContentTypeString("audio/mpeg");
+            r->addHeader("Cache-Control", "private, max-age=86400");
+            r->setBody(::Now::Voice::speak(Net::Http::transport(), s, text));
+            answer(r);
+        } catch (const ::Now::Voice::Unavailable& e) {
+            spdlog::warn("ani.speech: no audio: {}", e.what());
+            answer(ErrorResponse::service_unavailable("upstream_unavailable", "the voice service is not answering"));
+        } catch (const std::exception& e) {
+            spdlog::error("ani.speech failed: {}", e.what());
+            answer(ErrorResponse::internal_error());
+        }
+    });
+    if (!queued) {
+        (*respond)(ErrorResponse::service_unavailable("busy", "the server is busy, try again"));
     }
 }
 

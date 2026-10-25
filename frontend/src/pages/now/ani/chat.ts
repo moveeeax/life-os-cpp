@@ -60,6 +60,30 @@ export async function readTurn(id: string): Promise<Turn> {
   return (await api.getJson<{ data: Turn }>(`/api/v1/ani/turns/${encodeURIComponent(id)}`)).data;
 }
 
+/** The reply of a done turn read aloud (MP3); `engine.say` plays it with her lips. */
+export function speechUrl(id: string): string {
+  return `/api/v1/ani/turns/${encodeURIComponent(id)}/speech`;
+}
+
+const SOUND_KEY = 'now:ani:chat:sound';
+
+/** Whether her replies are spoken; on unless the user turned it off here. */
+export function soundOn(): boolean {
+  try {
+    return localStorage.getItem(SOUND_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+export function setSoundOn(on: boolean): void {
+  try {
+    localStorage.setItem(SOUND_KEY, on ? 'on' : 'off');
+  } catch {
+    // Private mode: the choice lasts for this page.
+  }
+}
+
 /** Starts her agent while the user types; a refusal here shows up on send. */
 export function wakeAgent(): void {
   void api.POST('/api/v1/ani/agent/wake').catch(() => {});

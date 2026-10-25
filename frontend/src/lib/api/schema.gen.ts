@@ -15043,6 +15043,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ani/turns/{id}/speech": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The reply of a turn read aloud in Ani's voice
+         * @description OpenAI text to speech (ANI_VOICE_TTS_MODEL) in the voice of her Realtime sessions, made on each call from the done turn's reply; the browser keeps it for a day. At most 120 per user and hour. Refused for API keys.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The spoken reply */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "audio/mpeg": string;
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The agent is switched off, or no done turn of the caller with that id (turn_not_found) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description More than 120 spoken replies in an hour */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No voice key (not_configured), OpenAI is not answering (upstream_unavailable), or the server is busy */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/now/voice-session": {
         parameters: {
             query?: never;

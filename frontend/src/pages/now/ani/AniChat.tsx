@@ -9,18 +9,60 @@ import {
   readTurn,
   refusal,
   sendMessage,
+  setSoundOn,
+  soundOn,
   wakeAgent,
   type Turn,
 } from './chat';
 
+/** A speaker, with waves when her replies are spoken. */
+function SpeakerIcon({ on }: { on: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="15"
+      height="15"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" />
+      {on ? (
+        <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" />
+      ) : (
+        <path d="m16 9.5 5 5m0-5-5 5" />
+      )}
+    </svg>
+  );
+}
+
 /**
  * The chat with Ani's agent, right of her on Now. Opening it wakes her agent,
  * so it is usually up by the first message; the reply of an open turn is
- * polled every second. Messages and replies are personal: Hide numbers blurs
- * them.
+ * polled every second, and a reply that arrives while the panel is open is
+ * handed to onReply to be spoken (unless the sound is off). Messages and
+ * replies are personal: Hide numbers blurs them.
  */
-export function AniChat({ tz, onClose }: { tz: string; onClose(): void }) {
+export function AniChat({
+  tz,
+  onClose,
+  onReply,
+}: {
+  tz: string;
+  onClose(): void;
+  /** A reply just arrived and the sound is on. */
+  onReply?(turn: Turn): void;
+}) {
   const [turns, setTurns] = useState<Turn[] | null>(null);
+  const [sound, setSound] = useState(soundOn);
+  const soundRef = useRef(sound);
+  soundRef.current = sound;
+  const replyRef = useRef(onReply);
+  const spoken = useRef(new Set<string>());
+  replyRef.current = onReply;
   const [loadFailed, setLoadFailed] = useState(false);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -49,7 +91,14 @@ export function AniChat({ tz, onClose }: { tz: string; onClose(): void }) {
     const id = last.id;
     const timer = window.setInterval(() => {
       readTurn(id)
-        .then((t) => setTurns((all) => all?.map((x) => (x.id === t.id ? t : x)) ?? all))
+        .then((t) => {
+          setTurns((all) => all?.map((x) => (x.id === t.id ? t : x)) ?? all);
+          // Two reads in flight can both see it done: each reply is spoken once.
+          if (t.status === 'done' && soundRef.current && !spoken.current.has(t.id)) {
+            spoken.current.add(t.id);
+            replyRef.current?.(t);
+          }
+        })
         .catch(() => {});
     }, POLL_MS);
     return () => window.clearInterval(timer);
@@ -100,6 +149,19 @@ export function AniChat({ tz, onClose }: { tz: string; onClose(): void }) {
           <span className="ani-dot" />
           Ani
         </span>
+        <button
+          type="button"
+          className="ani-chat-sound"
+          aria-pressed={sound}
+          aria-label={sound ? 'Her replies are spoken: mute' : 'Her replies are muted: speak them'}
+          title={sound ? 'Mute her replies' : 'Speak her replies'}
+          onClick={() => {
+            setSound(!sound);
+            setSoundOn(!sound);
+          }}
+        >
+          <SpeakerIcon on={sound} />
+        </button>
         <button
           type="button"
           className="ani-chat-close"
