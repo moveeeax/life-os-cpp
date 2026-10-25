@@ -204,3 +204,36 @@ TEST(AgentGateway, NoWordsOrEndlessToolsFail) {
     }
     EXPECT_EQ(looping.sent.size(), static_cast<std::size_t>(G::kMaxRounds));
 }
+
+TEST(AgentGateway, AnAgentStillStartingIsNotReadyOnTheFirstCallOnly) {
+    const std::string starting =
+        R"({"error":{"message":"AgentDatabaseAdmissionError: Agent main has not completed startup inspection"}})";
+    Pod first;
+    first.replies = {{500, starting}};
+    try {
+        talk(first, no_tools());
+        FAIL() << "expected an error";
+    } catch (const G::Error& e) {
+        EXPECT_EQ(e.code, "unavailable");
+        EXPECT_TRUE(e.not_ready);
+    }
+
+    // After a round of tools the model has been called: sending again could repeat it.
+    Pod later;
+    later.replies = {calls(json::array({call("c1", "habits", "{}")})), {500, starting}};
+    try {
+        talk(later, [](const std::string&, const json&) { return std::string("[]"); });
+        FAIL() << "expected an error";
+    } catch (const G::Error& e) {
+        EXPECT_FALSE(e.not_ready);
+    }
+
+    Pod broken;
+    broken.replies = {{500, R"({"error":{"message":"boom"}})"}};
+    try {
+        talk(broken, no_tools());
+        FAIL() << "expected an error";
+    } catch (const G::Error& e) {
+        EXPECT_FALSE(e.not_ready);
+    }
+}

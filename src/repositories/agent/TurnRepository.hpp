@@ -105,6 +105,17 @@ public:
         });
     }
 
+    /// running -> queued: the agent refused the turn before it reached the model, so it is sent again.
+    bool requeue(const std::string& id) {
+        return Database::get().execute_write([&](auto& txn) {
+            return !txn.exec_params(
+                           "UPDATE ani_turns SET status = 'queued' WHERE id::text = $1 AND status = 'running' "
+                           "RETURNING id",
+                           id)
+                        .empty();
+        });
+    }
+
     /// running -> done with the reply and the tools it ran.
     bool finish(const std::string& id, const std::string& reply, const nlohmann::json& tools) {
         return Database::get().execute_write([&](auto& txn) {

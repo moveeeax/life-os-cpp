@@ -36,10 +36,18 @@ inline constexpr long kCallTimeoutSeconds = 120;
 /// The turn did not end in a reply. @p code is what the turn row records:
 /// "unavailable" (no answer, or the gateway refused) or "failed" (no words
 /// after kMaxRounds, or an answer that is not a chat completion).
+/// @p not_ready: the gateway refused the first call because its agent is
+/// still being prepared (it listens, and passes /readyz, before that ends);
+/// nothing reached the model, so the turn may simply be sent again.
 struct Error : std::runtime_error {
-    Error(std::string c, const std::string& what) : std::runtime_error(what), code(std::move(c)) {}
+    Error(std::string c, const std::string& what, bool nr = false)
+        : std::runtime_error(what), code(std::move(c)), not_ready(nr) {}
     std::string code;
+    bool not_ready = false;
 };
+
+/// What OpenClaw answers while its agent has not finished starting up.
+inline constexpr const char* kNotReadyMarker = "has not completed startup";
 
 /// Runs one tool: its name and parsed arguments in, the text the model reads out.
 using ToolRunner = std::function<std::string(const std::string& name, const nlohmann::json& args)>;

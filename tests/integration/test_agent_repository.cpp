@@ -148,8 +148,12 @@ TEST_F(AgentRepositoryTest, ATurnRunsOnceAndOneAtATime) {
     EXPECT_FALSE(turns.get(kBoris, id).has_value()) << "not Boris's turn";
 
     EXPECT_FALSE(turns.finish(id, "Привет!", nlohmann::json::array())) << "not running yet";
+    EXPECT_FALSE(turns.requeue(id)) << "not running yet";
     EXPECT_TRUE(turns.start(id));
     EXPECT_FALSE(turns.start(id)) << "running already";
+    EXPECT_TRUE(turns.requeue(id)) << "the agent was not ready: back in the queue";
+    EXPECT_EQ((*turns.get(kAnna, id))["status"], "queued");
+    EXPECT_TRUE(turns.start(id));
     EXPECT_TRUE(turns.finish(id, "Привет!", nlohmann::json::array({"today"})));
     EXPECT_FALSE(turns.fail(id, "failed")) << "a done turn stays done";
     const auto done = turns.get(kAnna, id);

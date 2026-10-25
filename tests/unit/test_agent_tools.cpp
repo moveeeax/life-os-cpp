@@ -17,6 +17,7 @@
 #include <nlohmann/json.hpp>
 
 #include "agent/Tools.hpp"
+#include "agent/Turn.hpp"
 #include "net/Http.hpp"
 #include "security/Jwt.hpp"
 
@@ -161,4 +162,16 @@ TEST(AgentTools, AccessClaimsAreTheLoginsSet) {
     EXPECT_EQ(bare["roles"], json::array());
     EXPECT_FALSE(bare.contains("iss"));
     EXPECT_FALSE(bare.contains("aud"));
+}
+
+TEST(AgentTools, ThePrefaceSendsTheModelToTheTools) {
+    const auto p = Agent::preface("2026-10-26 00:05, Mon", "Asia/Almaty", T::definitions());
+    EXPECT_EQ(p.rfind("[Life OS: the person's local time is 2026-10-26 00:05, Mon, Asia/Almaty. ", 0), 0U);
+    EXPECT_NE(p.find("one or two short spoken sentences"), std::string::npos);
+    EXPECT_NE(p.find("(today, tasks_of_day, find_tasks, goals, habits, sleep, money, food)"), std::string::npos);
+    EXPECT_NE(p.find("never from memory"), std::string::npos);
+    EXPECT_EQ(p.back(), ']');
+
+    const auto bare = Agent::preface("", "UTC", json::array());
+    EXPECT_EQ(bare, "[Life OS: Reply in one or two short spoken sentences.]");
 }
