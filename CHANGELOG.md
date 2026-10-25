@@ -6,6 +6,14 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.38.0] - 2026-10-25
+
+### Added
+- Talk with Ani on Now: the microphone on her ledge starts a spoken conversation over the OpenAI Realtime API (gpt-realtime-mini, voice marin). `POST /api/v1/now/voice-session` mints a short-lived client secret (30 per user and hour) from `ANI_VOICE_API_KEY`, so the key never reaches the browser; she starts from the day's digest and reads tasks, goals and habits through the site's API as the signed-in user, read-only, and hangs up after 90 s of silence. A tap says hello and coming back she greets, in lines recorded with the same voice; the voice is marked as AI-generated. The frontend chart takes `csp.connectHosts` for the call to api.openai.com.
+
+### Fixed
+- Ani wore nothing in the dress and the slip on 1.37.0: v1/Ani.pmx in the bucket is a variant with every garment at alpha 0 and other body and outfit textures. The dressed model and its textures now load from their own folder (wallpapers/ani/clothes/), and a worn garment is drawn opaque whatever alpha the file gives it.
+
 ## [1.37.0] - 2026-10-25
 
 ### Added
