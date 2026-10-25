@@ -212,10 +212,17 @@ export interface Springs {
 /**
  * The spring bones of a PMX mesh: the bones the model gave physics rigid
  * bodies (type 1 or 2), so the author's choice of what moves is kept, sorted
- * into the groups by name.
+ * into the groups by name. Other PMX files on the same skeleton may lend
+ * their rigid bodies (their bone indices name the same bones).
  */
-export function createSprings(mesh: THREE.SkinnedMesh, groups: SpringGroup[]): Springs {
-  const bodies = (mesh.geometry.userData.MMD?.rigidBodies ?? []) as MmdRigidBody[];
+export function createSprings(
+  mesh: THREE.SkinnedMesh,
+  groups: SpringGroup[],
+  lenders: THREE.SkinnedMesh[] = [],
+): Springs {
+  const bodies = [mesh, ...lenders].flatMap(
+    (m) => (m.geometry.userData.MMD?.rigidBodies ?? []) as MmdRigidBody[],
+  );
   const bones = mesh.skeleton.bones;
   const physical = new Set(bodies.filter((r) => r.type !== 0).map((r) => r.boneIndex));
   const depthOf = (b: THREE.Object3D) => {

@@ -310,7 +310,9 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     ik = new CCDIKSolver(m, mmd.iks);
     for (const name of Object.keys(CLIPS)) void clipOf(name);
     if (!still) {
-      springs = createSprings(m, SPRINGS);
+      // v2 has rigid bodies for its hair and chest only; the clothes' bones
+      // have theirs in v1.
+      springs = createSprings(m, SPRINGS, [v1]);
       // Calibrate in the bind pose, against every collider.
       m.updateMatrixWorld(true);
       placeColliders();
