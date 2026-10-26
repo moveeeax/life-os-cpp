@@ -6,6 +6,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.43.0] - 2026-10-26
+
+### Added
+- Ani's agent can propose changes: a new task, closing a task, ticking a habit or adding to it, and a note to the inbox. Nothing is written by the agent; each proposal shows under her reply with Confirm and Cancel, and a confirmed one is made by the ani worker as the user through the site's API (the job `ani_action`, migration 061, `POST /api/v1/ani/actions/{id}/confirm|cancel`). The next message tells her what became of her proposals. In a voice call she hands harder questions and every change to her agent (`ask_agent`), and the chat opens when a change waits for confirmation.
+
 ## [1.42.0] - 2026-10-26
 
 ### Added
