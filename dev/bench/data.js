@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792918050974,
+  "lastUpdate": 1793006870945,
   "repoUrl": "https://github.com/moveeeax/life-os-cpp",
   "entries": {
     "Throughput": [
@@ -287,6 +287,38 @@ window.BENCHMARK_DATA = {
           {
             "name": "jobs req/s",
             "value": 18090.25,
+            "unit": "req/s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Michael Tarassov",
+            "username": "moveeeax",
+            "email": "michael@tarassov.me"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "2372f14f95d3b763b36993a407622b0439531127",
+          "message": "Merge pull request #189 from moveeeax/release/1.44.0\n\nchore(release): 1.44.0 — Ani watches the page",
+          "timestamp": "2026-10-26T08:17:29Z",
+          "url": "https://github.com/moveeeax/life-os-cpp/commit/2372f14f95d3b763b36993a407622b0439531127"
+        },
+        "date": 1793006870310,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "healthz req/s",
+            "value": 39211.13,
+            "unit": "req/s"
+          },
+          {
+            "name": "jobs req/s",
+            "value": 8300.95,
             "unit": "req/s"
           }
         ]
