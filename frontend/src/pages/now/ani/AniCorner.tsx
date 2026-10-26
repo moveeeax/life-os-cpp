@@ -127,6 +127,7 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
   const [busy, setBusy] = useState<'leaving' | 'arriving' | 'changing' | null>(null);
   const [wardrobe, setWardrobe] = useState(false);
   const [chat, setChat] = useState(false);
+  const cornerRef = useRef<HTMLDivElement>(null);
   // Bumped when a voice question reaches her agent: the chat opens, or loads again.
   const [chatKey, setChatKey] = useState(0);
   const ledgeRef = useRef<HTMLDivElement>(null);
@@ -194,7 +195,18 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
         made = mountAni(canvas, {
           base,
           hit,
-          anchor: 110,
+          height: 340,
+          // The middle of her ledge's top edge.
+          feet: () => {
+            const r = ledgeRef.current?.getBoundingClientRect();
+            return r ? { x: r.left + r.width / 2, y: r.top } : { x: 110, y: innerHeight - 126 };
+          },
+          field: () => document.querySelector<HTMLInputElement>('.n-input'),
+          // Her speech bubble rides by her head.
+          onHead: (x, y) => {
+            cornerRef.current?.style.setProperty('--ani-hx', `${Math.round(x)}px`);
+            cornerRef.current?.style.setProperty('--ani-hy', `${Math.round(y)}px`);
+          },
           outfit: initial.current.outfit,
           present: initial.current.here,
           onReady: () => setReady(true),
@@ -285,7 +297,7 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
         : ['Away', 'Call her back'];
 
   return (
-    <div className="ani-corner" data-ready={ready ? '' : undefined}>
+    <div ref={cornerRef} className="ani-corner" data-ready={ready ? '' : undefined}>
       <canvas ref={canvasRef} className="ani-canvas" aria-hidden="true" />
       {said && ani.here && !chat ? (
         <div className="ani-say" role="status" data-num-ok>
@@ -318,8 +330,8 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
               </button>
             ))}
             <span className="ani-credit" data-num-ok>
-              Animation credits to pixiv Inc.&apos;s VRoid Project. Her voice is AI-generated
-              (OpenAI).
+              Animation credits to pixiv Inc.&apos;s VRoid Project, Pic♡Pix and Mixamo. Her voice is
+              AI-generated (OpenAI).
             </span>
           </div>
         ) : (

@@ -9,9 +9,15 @@ import { createVoice } from './voice';
 /*
  * Ani on Now: the PMX model, posed every frame by a small director (weight
  * from one leg to the other, glances, blinks), the VRoid VRMA clips and the
- * Pic♡Pix standing poses over it, spring bones for the skirt, hair and
- * ribbons, a damped jiggle for the chest and seat, and the arms kept out of
- * the body.
+ * Pic♡Pix standing poses and a few Mixamo gestures over it, spring bones for
+ * the skirt, hair and ribbons, a damped jiggle for the chest and seat, and
+ * the arms kept out of the body.
+ *
+ * She is drawn on a layer over the whole page (orthographic, at a fixed
+ * height in CSS px), standing on her ledge, so she can face whatever she
+ * looks at: she turns to the cursor while it moves, to the end of the text
+ * while the user types in the focus field, and stands as usual looking
+ * straight ahead when the cursor rests (STILL s) or is over her.
  *
  * The body is v2/Ani.pmx, in lingerie. The dress and the slip come from
  * clothes/Ani.pmx, the first model on the same skeleton (the same 628 bones in
@@ -26,8 +32,14 @@ export interface AniOptions {
   base: string;
   /** The element that takes drags and taps (the canvas lets them through). */
   hit: HTMLElement;
-  /** Where her centre sits, in CSS px from the canvas's left edge. */
-  anchor: number;
+  /** Her height on screen, CSS px. */
+  height: number;
+  /** Where she stands: the middle of her ledge's top edge, viewport CSS px. */
+  feet(): { x: number; y: number };
+  /** The field she watches while the user types in it. */
+  field?(): HTMLInputElement | HTMLTextAreaElement | null;
+  /** Where her head is on screen (CSS px), every frame: for her speech bubble. */
+  onHead?: (x: number, y: number) => void;
   outfit: Outfit;
   present: boolean;
   onReady?: () => void;
@@ -77,9 +89,12 @@ const SPRINGS: SpringGroup[] = [
   },
 ];
 
-// Camera framing in model units (the PMX is about 21.8 tall).
-const FRAME = { fov: 22, dist: 57, y: 11 };
+// The PMX is about 21.8 units tall.
+const MODEL_HEIGHT = 21.8;
+// Her turn when she looks ahead.
 const FACE = 0.25;
+// A cursor still this long (s) is let go of.
+const STILL = 5;
 // Going: a wave goodbye (the greeting clip from WAVE_FROM), then she fades
 // out over the last FADE_OUT s of LEAVE. Coming back: she fades in over
 // FADE_IN s rising RISE from below, then greets.
@@ -101,11 +116,17 @@ const CLIPS: Record<string, { file: string; from?: number }> = {
   pose: { file: 'VRMA_06' },
   squat: { file: 'VRMA_07' },
 };
-const EMOTES = ['show', 'peace', 'spin', 'pose', 'squat', 'shoot'];
+// Gestures from Mixamo, baked to VRMA under mixamo/.
+for (const n of ['idle_happy', 'idle_cat', 'wave']) CLIPS[n] = { file: `mixamo/${n}` };
+// No squat: on her ledge it read as hanging in the air.
+const EMOTES = ['show', 'peace', 'spin', 'pose', 'shoot', 'idle_happy', 'idle_cat', 'wave'];
 // Standing poses from the Pic♡Pix Free Pose set (Unity humanoid poses baked
-// to VRMA, each held for 6 s), under poses/pose<n>.
+// to VRMA, each held for 6 s), under poses/pose<n>. Poses 20 to 29 sit or
+// kneel on a floor (hips 0.15 to 0.47 m against 0.95 standing) and are not
+// used: on her glass ledge they read as sitting in the air.
 const POSES: string[] = [];
 for (let n = 1; n <= 30; n++) {
+  if (n >= 20 && n <= 29) continue;
   POSES.push(`pose${n}`);
   CLIPS[`pose${n}`] = { file: `poses/pose${n}` };
 }
@@ -157,7 +178,9 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   // The toon materials read right with linear output.
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
   const scene = new THREE.Scene();
-  const cam = new THREE.PerspectiveCamera(FRAME.fov, 1, 1, 200);
+  // Model units per CSS px; y up from the viewport's bottom edge.
+  const S = MODEL_HEIGHT / opts.height;
+  const cam = new THREE.OrthographicCamera(0, 1, 1, 0, 1, 400);
   scene.add(new THREE.AmbientLight(0xffffff, 0.9));
   const key = new THREE.DirectionalLight(0xffe2d6, 1.1);
   key.position.set(-6, 12, 10);
@@ -166,20 +189,24 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   rim.position.set(8, 10, -6);
   scene.add(rim);
 
+  let VH = 1;
   const place = () => {
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
     if (!w || !h) return;
+    VH = h;
     renderer.setSize(w, h, false);
-    const ax = opts.anchor;
-    // A symmetric frustum twice as wide as the far side, viewed off centre.
-    const full = 2 * Math.max(ax, w - ax);
-    cam.aspect = full / h;
-    cam.setViewOffset(full, h, full / 2 - ax, 0, w, h);
-    cam.position.set(0, FRAME.y, FRAME.dist);
-    cam.lookAt(0, FRAME.y, 0);
+    cam.left = 0;
+    cam.right = w * S;
+    cam.top = h * S;
+    cam.bottom = 0;
+    cam.position.set(0, 0, 150);
+    cam.lookAt(0, 0, 0);
     cam.updateProjectionMatrix();
   };
+  // Her feet, moved to her ledge every frame.
+  const root = new THREE.Group();
+  scene.add(root);
   const resize = new ResizeObserver(place);
   resize.observe(canvas);
 
@@ -210,19 +237,40 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     done: undefined as (() => void) | undefined,
   };
 
-  // The head follows the cursor while it moves.
-  const pointer = { x: 0, y: 0, at: -10 };
+  // She turns to the cursor while it moves (viewport CSS px).
+  const pointer = { x: -1, y: -1, at: -10 };
   const onPointer = (e: PointerEvent) => {
-    const r = canvas.getBoundingClientRect();
-    pointer.x = THREE.MathUtils.clamp((e.clientX - (r.left + opts.anchor)) / (r.width * 4), -1, 1);
-    pointer.y = THREE.MathUtils.clamp(
-      (e.clientY - (r.top + r.height * 0.15)) / (r.height * 3),
-      -1,
-      1,
-    );
+    pointer.x = e.clientX;
+    pointer.y = e.clientY;
     pointer.at = clock.getElapsedTime();
   };
   addEventListener('pointermove', onPointer);
+  // And to the text while the user types.
+  let typedAt = -10;
+  const onInput = () => (typedAt = clock.getElapsedTime());
+  addEventListener('input', onInput, true);
+  const meter = document.createElement('canvas').getContext('2d');
+  /** The end of what is typed in the field, viewport CSS px. */
+  function caret(f: HTMLInputElement | HTMLTextAreaElement) {
+    const r = f.getBoundingClientRect();
+    const cs = getComputedStyle(f);
+    let w = 0;
+    if (meter) {
+      meter.font = `${cs.fontSize} ${cs.fontFamily}`;
+      const line =
+        f.value
+          .slice(0, f.selectionStart ?? f.value.length)
+          .split('\n')
+          .pop() ?? '';
+      w = meter.measureText(line).width;
+    }
+    // A centred field grows from its middle.
+    const left =
+      cs.textAlign === 'center'
+        ? r.left + r.width / 2 - w / 2
+        : r.left + parseFloat(cs.paddingLeft);
+    return { x: Math.min(r.right - 8, left + w), y: r.top + r.height / 2 };
+  }
 
   // A drag turns her around (with a little inertia); after a few idle
   // seconds she turns back. A tap plays the greeting.
@@ -280,7 +328,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     mesh = m;
     m.rotation.y = FACE;
     m.visible = walk.state === 'here';
-    scene.add(m);
+    root.add(m);
     for (const b of m.skeleton.bones) {
       B[b.name] = b;
       baseQ[b.name] = b.quaternion.clone();
@@ -380,7 +428,13 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       }
     }
     for (const mat of mesh.material as THREE.Material[])
-      if (LINGERIE.includes(mat.name)) mat.visible = o === 'lingerie';
+      if (LINGERIE.includes(mat.name)) {
+        mat.visible = o === 'lingerie';
+        // It lies on the skin: seen from the side the skin would win near ties.
+        mat.polygonOffset = true;
+        mat.polygonOffsetFactor = -1;
+        mat.polygonOffsetUnits = -4;
+      }
     // Only the worn skirt swings.
     if (springs) {
       springs.off = new Set(['p1', 'p2'].filter((g) => g !== o));
@@ -770,7 +824,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       life.eye = { x: rnd(-1, 1), y: rnd(-0.6, 0.5) };
       life.nextEye = now + rnd(0.6, 2.8);
     }
-    if (!play.clip && now > play.next) {
+    if (!play.clip && now > play.next && now - typedAt > 3) {
       // Every other time or so she strikes a pose instead of a move.
       const pool = (Math.random() < 0.5 ? POSES : EMOTES).filter((n) => n !== play.name);
       play.next = now + 1e9; // set again when the clip ends
@@ -828,11 +882,46 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   }
 
   let lastT = 0;
+  let face = FACE;
+  // How far in front of her the screen is, for the angle to a point on it.
+  const DEPTH = 30;
   function frame(m: THREE.SkinnedMesh) {
     const now = clock.getElapsedTime();
     const t = still ? 0 : now;
     const dt = Math.min(0.05, now - lastT);
     lastT = now;
+
+    // Her ledge, read again: the page may have moved.
+    const ft = opts.feet();
+    root.position.set(ft.x * S, (VH - ft.y) * S, 0);
+
+    // What she looks at: the end of the typed text, the cursor while it
+    // moves and is not over her, or nothing (ahead). From her head, as last
+    // drawn, to the target on the screen plane DEPTH units in front of her.
+    const headW = m.localToWorld(at('頭').add(_off.set(0, 1.2, 0)));
+    const hx = headW.x / S;
+    const hy = VH - headW.y / S;
+    opts.onHead?.(hx, hy);
+    const field = opts.field?.() ?? null;
+    const typing = field != null && document.activeElement === field && now - typedAt < 8;
+    const onHer = Math.abs(pointer.x - hx) < 70 && pointer.y > hy - 70 && pointer.y < ft.y;
+    const target = typing
+      ? caret(field)
+      : now - pointer.at < STILL && pointer.x >= 0 && !onHer
+        ? pointer
+        : null;
+    let lookYaw = 0;
+    let lookPitch = 0;
+    if (target) {
+      const dx = (target.x - hx) * S;
+      const dy = (hy - target.y) * S;
+      lookYaw = Math.atan2(dx, DEPTH);
+      lookPitch = Math.atan2(dy, Math.hypot(dx, DEPTH));
+    }
+    // The body takes most of a turn, unless a clip leads.
+    const faceWant =
+      target && !play.clip ? THREE.MathUtils.clamp(lookYaw * 0.85, -1.25, 1.25) : FACE;
+    face += (faceWant - face) * Math.min(1, dt * 2.5);
 
     // Where she stands and which way she faces.
     if (walk.state === 'here') {
@@ -844,7 +933,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
           spin.yaw -= spin.yaw * Math.min(1, dt * 2.2);
         }
       }
-      m.rotation.y = FACE + spin.yaw;
+      m.rotation.y = face + spin.yaw;
     }
     let lift = 0;
     if (walk.state === 'leaving' || walk.state === 'arriving') {
@@ -937,13 +1026,13 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     }
     for (const g of grants) g.bone.quaternion.copy(_id).slerp(g.from.quaternion, g.ratio);
 
-    // Head: the cursor while it moves, otherwise her own glances.
+    // Head and eyes: what the body did not turn to; ahead with nothing to watch.
     const follow = walk.state === 'here' ? 1 : 0;
-    const fresh = now - pointer.at < 4;
-    const tx = (fresh ? pointer.x : life.glance.x) * follow;
-    const ty = (fresh ? pointer.y : life.glance.y) * follow;
-    life.gx += (tx - life.gx) * Math.min(1, dt * 2.4);
-    life.gy += (ty - life.gy) * Math.min(1, dt * 2.4);
+    const rel = Math.atan2(Math.sin(lookYaw - m.rotation.y), Math.cos(lookYaw - m.rotation.y));
+    const tx = target ? THREE.MathUtils.clamp(rel / 0.75, -1.4, 1.4) * follow : 0;
+    const ty = target ? THREE.MathUtils.clamp(-lookPitch / 0.45, -1.2, 1.3) * follow : 0;
+    life.gx += (tx - life.gx) * Math.min(1, dt * 3);
+    life.gy += (ty - life.gy) * Math.min(1, dt * 3);
     // Speaking: the lips from the voice, and the head nods a little with
     // the stress of the words.
     const mo = voice.read(dt);
@@ -954,8 +1043,9 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       life.gx * 0.35,
       Math.sin(t * 0.45) * 0.05 - wgt * 0.04,
     );
-    life.ex += (life.eye.x * 0.12 + life.gx * 0.1 - life.ex) * Math.min(1, dt * 12);
-    life.ey += (life.eye.y * 0.08 + life.gy * 0.06 - life.ey) * Math.min(1, dt * 12);
+    // Eyes on the target, or straight ahead.
+    life.ex += (life.gx * 0.14 - life.ex) * Math.min(1, dt * 12);
+    life.ey += (life.gy * 0.08 - life.ey) * Math.min(1, dt * 12);
     pose('両目', life.ey, life.ex, 0);
 
     // A blink every three to six seconds and a soft smile.
@@ -1032,6 +1122,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       cancelAnimationFrame(raf);
       resize.disconnect();
       removeEventListener('pointermove', onPointer);
+      removeEventListener('input', onInput, true);
       hit.removeEventListener('pointerdown', onDown);
       hit.removeEventListener('pointermove', onMove);
       hit.removeEventListener('pointerup', onUp);
