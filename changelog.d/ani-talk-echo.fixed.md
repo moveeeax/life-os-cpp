@@ -1,0 +1,1 @@
+Ani no longer answers herself on a voice call: the microphone is off while her voice plays and for 0.6 s after the last of it, her status stays "speaking" until the voice ends rather than until the reply is generated, and her tap lines keep quiet from the moment the call starts. A tap on her during a call cuts her off.
