@@ -177,7 +177,11 @@ export function AniCorner({
   const [said, setSaid] = useState<string | null>(null);
   const [talk, setTalk] = useState<TalkState | null>(null);
   const talkRef = useRef<Talk | null>(null);
+  // From the microphone tap until the call ends, connecting included: her
+  // own lines keep quiet, the call's microphone would hear them.
+  const calling = useRef(false);
   const stopTalk = () => {
+    calling.current = false;
     talkRef.current?.stop();
     talkRef.current = null;
     engine.current?.follow(null);
@@ -187,11 +191,14 @@ export function AniCorner({
   const startTalking = async () => {
     const e = engine.current;
     if (!e) return;
+    calling.current = true;
+    e.hush();
+    clearTimeout(sayTimer.current);
     setTalk('connecting');
     setSaid(null);
     const [{ startTalk }, persona] = await Promise.all([import('./talk'), import('./persona')]);
     try {
-      talkRef.current = await startTalk({
+      const t = await startTalk({
         instructions: persona.instructions({ ...context, now: new Date() }),
         tools: persona.tools({
           ...context,
@@ -208,12 +215,21 @@ export function AniCorner({
         onState: (st) => setTalk(st),
         onEnd: () => stopTalk(),
       });
+      // Hung up while it was connecting.
+      if (!calling.current) t.stop();
+      else talkRef.current = t;
     } catch {
       stopTalk();
       setSaid('Не получилось подключиться. Попробуй ещё раз чуть позже.');
     }
   };
-  useEffect(() => () => talkRef.current?.stop(), []);
+  useEffect(
+    () => () => {
+      calling.current = false;
+      talkRef.current?.stop();
+    },
+    [],
+  );
   // Her answers to taps on her body read the day as it is now.
   const contextRef = useRef(context);
   contextRef.current = context;
@@ -237,7 +253,7 @@ export function AniCorner({
   const answer = useRef<(a: Answer) => void>(() => {});
   answer.current = (a: Answer) => {
     const e = engine.current;
-    if (!e || talkRef.current) return;
+    if (!e || calling.current) return;
     if (a.mood) e.mood(moodLevel(moveMood(contextRef.current.date, a.mood)));
     lastSaidAt.current = Date.now();
     setSaidChat(Boolean(a.chat));
@@ -283,7 +299,7 @@ export function AniCorner({
     for (const ev of events) addEventListener(ev, onActive, { passive: true });
     const id = window.setInterval(() => {
       const now = Date.now();
-      if (!hereRef.current || talkRef.current || document.visibilityState !== 'visible') return;
+      if (!hereRef.current || calling.current || document.visibilityState !== 'visible') return;
       // Not over another line.
       if (now - lastSaidAt.current < 60_000) return;
       const c = contextRef.current;
@@ -384,6 +400,11 @@ export function AniCorner({
           onError: () => setFailed(true),
           // A tap answers by where it landed (touch.ts).
           onTap: (z, at) => {
+            // On a call a tap cuts her off, so the user can speak.
+            if (calling.current) {
+              talkRef.current?.interrupt();
+              return;
+            }
             const a = toucher.current.tap(z, at);
             if (a) answer.current(a);
           },
@@ -601,7 +622,7 @@ export function AniCorner({
           onClose={() => setChat(false)}
           onReply={(t) => {
             // She speaks only when she is on screen and not in a voice call.
-            if (engine.current && ani.here && !talkRef.current) {
+            if (engine.current && ani.here && !calling.current) {
               void engine.current.say(speechUrl(t.id));
             }
           }}

@@ -33,6 +33,8 @@ export interface TalkOptions {
 }
 
 export interface Talk {
+  /** Cuts her off mid-sentence (a tap on her while she talks). */
+  interrupt(): void;
   stop(): void;
 }
 
@@ -45,12 +47,19 @@ const TRIES = 3;
 const QUIET_MS = 90_000;
 // A tool answer longer than this is cut (the model reads it all as input).
 const TOOL_MAX = 6000;
+// The microphone stays off while her voice plays and this long after the
+// server has sent the last of it (what the browser still has buffered):
+// through speakers it would hear her and answer her as the user.
+const TAIL_MS = 600;
 
 export async function startTalk(o: TalkOptions): Promise<Talk> {
   let pc: RTCPeerConnection | null = null;
   let mic: MediaStream | null = null;
   let stopped = false;
   let quiet = 0;
+  let tail = 0;
+  // Sends a client event on the current call.
+  let send: (ev: object) => void = () => {};
   const audio = new Audio();
   audio.autoplay = true;
   const hangUp = () => {
@@ -60,6 +69,7 @@ export async function startTalk(o: TalkOptions): Promise<Talk> {
   const stop = () => {
     stopped = true;
     clearInterval(quiet);
+    clearTimeout(tail);
     hangUp();
     for (const t of mic?.getTracks() ?? []) t.stop();
     mic = null;
@@ -89,12 +99,27 @@ export async function startTalk(o: TalkOptions): Promise<Talk> {
     p.addTrack(mic!.getTracks()[0], mic!);
 
     const dc = p.createDataChannel('oai-events');
-    const send = (ev: object) => {
+    send = (ev: object) => {
       if (dc.readyState === 'open') dc.send(JSON.stringify(ev));
     };
     let text = '';
     let heard = Date.now();
+    // From her reply's start until its audio has played out.
     let speaking = false;
+    let audible = false;
+    const listen = (on: boolean) => {
+      for (const t of mic?.getAudioTracks() ?? []) t.enabled = on;
+    };
+    const quietDown = (wait: number) => {
+      audible = false;
+      clearTimeout(tail);
+      tail = window.setTimeout(() => {
+        if (audible || stopped) return;
+        listen(true);
+        if (!speaking) o.onState('listening');
+        heard = Date.now();
+      }, wait);
+    };
     const runTool = async (callId: string, name: string, raw: string) => {
       const tool = o.tools.find((t) => t.name === name);
       let output: string;
@@ -145,7 +170,21 @@ export async function startTalk(o: TalkOptions): Promise<Talk> {
         case 'response.done':
           speaking = false;
           heard = Date.now();
-          o.onState('listening');
+          if (!audible) o.onState('listening');
+          break;
+        // Her voice as the server streams it (WebRTC only): the reply text
+        // and response.done run ahead of what is heard.
+        case 'output_audio_buffer.started':
+          audible = true;
+          clearTimeout(tail);
+          listen(false);
+          o.onState('speaking');
+          break;
+        case 'output_audio_buffer.stopped':
+          quietDown(TAIL_MS);
+          break;
+        case 'output_audio_buffer.cleared':
+          quietDown(0);
           break;
       }
     };
@@ -186,7 +225,7 @@ export async function startTalk(o: TalkOptions): Promise<Talk> {
     // She opens the conversation.
     send({ type: 'response.create' });
     quiet = window.setInterval(() => {
-      if (!speaking && Date.now() - heard > QUIET_MS) end();
+      if (!speaking && !audible && Date.now() - heard > QUIET_MS) end();
     }, 5000);
     return true;
   };
@@ -205,5 +244,11 @@ export async function startTalk(o: TalkOptions): Promise<Talk> {
     stop();
     throw e;
   }
-  return { stop };
+  return {
+    interrupt: () => {
+      send({ type: 'response.cancel' });
+      send({ type: 'output_audio_buffer.clear' });
+    },
+    stop,
+  };
 }
