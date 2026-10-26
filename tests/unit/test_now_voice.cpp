@@ -165,6 +165,22 @@ TEST_F(NowVoiceTest, ALongReplyIsCutOnACharacterBoundary) {
     EXPECT_GE(input.size(), Now::Voice::kSpeechTextMax - 1);
 }
 
+TEST_F(NowVoiceTest, ALineIsSomeShortTextWithoutControlCharacters) {
+    EXPECT_TRUE(Now::Voice::line_ok("Эй, руки!"));
+    EXPECT_TRUE(Now::Voice::line_ok("6 120 шагов. До десяти тысяч ещё 3 880."));
+    EXPECT_FALSE(Now::Voice::line_ok("")) << "nothing";
+    EXPECT_FALSE(Now::Voice::line_ok("   ")) << "only spaces";
+    EXPECT_FALSE(Now::Voice::line_ok("a\nb")) << "a newline";
+    EXPECT_FALSE(Now::Voice::line_ok(std::string("a\x7f", 2))) << "DEL";
+    // Characters, not bytes: 200 Cyrillic letters are 400 bytes and still a line.
+    std::string line;
+    for (std::size_t i = 0; i < Now::Voice::kLineCharsMax; ++i) {
+        line += "ж";
+    }
+    EXPECT_TRUE(Now::Voice::line_ok(line));
+    EXPECT_FALSE(Now::Voice::line_ok(line + "ж")) << "one character too many";
+}
+
 TEST_F(NowVoiceTest, NoAudioIsUnavailable) {
     ScriptedTransport t;
     t.reply = {429, R"({"error":{"message":"rate limited"}})"};

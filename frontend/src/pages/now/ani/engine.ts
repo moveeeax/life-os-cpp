@@ -5,7 +5,7 @@ import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js';
 import { loadClip, type Clip } from './motion';
 import { createSprings, type Collider, type SpringGroup, type Springs } from './springs';
 import { createVoice } from './voice';
-import { sameZone, zoneOf, type Zone } from './zones';
+import { zoneOf, type Zone } from './zones';
 
 /*
  * Ani on Now: the PMX model, posed every frame by a small director (weight
@@ -365,7 +365,6 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     const z = spin.drag.moved < 5 ? touched(e.clientX, e.clientY) : null;
     if (z) {
       spin.vel = 0;
-      glow(z);
       opts.onTap?.(z, { x: e.clientX, y: e.clientY });
     } else if (spin.drag.moved * 0.012 > Math.PI * 2) opts.onSpin?.();
     spin.drag = null;
@@ -433,56 +432,6 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     }
     return null;
   }
-  // The zone lights up for a moment, through her clothes.
-  const GLOW = 1.4;
-  const glowMat = new THREE.MeshBasicMaterial({
-    color: 0xff5fa2,
-    transparent: true,
-    opacity: 0,
-    depthTest: false,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  // One glow per mesh, sharing its vertex buffers: a tap swaps only the
-  // triangles (disposing a glow's geometry would free the shared buffers).
-  const glows = new Map<THREE.SkinnedMesh, THREE.SkinnedMesh>();
-  let glowAt = -10;
-  function glow(z: Zone) {
-    if (!mesh) return;
-    for (const src of clothes ? [mesh, clothes] : [mesh]) {
-      const geo = src.geometry;
-      const index = geo.index;
-      if (!index) continue;
-      const faces: number[] = [];
-      for (const grp of geo.groups) {
-        const mat = shown(src, grp.materialIndex);
-        if (!mat) continue;
-        for (let k = grp.start; k < grp.start + grp.count; k += 3) {
-          const a = index.getX(k);
-          const b = index.getX(k + 1);
-          const c = index.getX(k + 2);
-          const fz = zoneOfFace(src, a, b, c, mat.name);
-          if (fz && sameZone(fz, z)) faces.push(a, b, c);
-        }
-      }
-      let g = glows.get(src);
-      if (!g) {
-        const part = new THREE.BufferGeometry();
-        for (const n of ['position', 'skinIndex', 'skinWeight'])
-          part.setAttribute(n, geo.getAttribute(n));
-        g = new THREE.SkinnedMesh(part, glowMat);
-        g.frustumCulled = false;
-        g.renderOrder = 10;
-        mesh.add(g);
-        g.bind(mesh.skeleton, new THREE.Matrix4());
-        glows.set(src, g);
-      }
-      g.geometry.setIndex(faces);
-      g.userData.some = faces.length > 0;
-    }
-    glowAt = clock.getElapsedTime();
-  }
-
   // The files are PNG where the PMX names BMP textures.
   const manager = new THREE.LoadingManager();
   manager.setURLModifier((u) => u.replace(/\.bmp$/i, '.png'));
@@ -1317,12 +1266,16 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     }
   }
 
+  // Sent away she is not drawn: after a frame that clears her, the loop
+  // only waits for her to be called back. (A hidden tab gets no frames.)
+  let awayFrames = 0;
   function tick() {
     if (disposed) return;
-    if (mesh) frame(mesh);
-    glowMat.opacity = 0.5 * clamp01(1 - (clock.getElapsedTime() - glowAt) / GLOW);
-    for (const g of glows.values()) g.visible = glowMat.opacity > 0 && g.userData.some === true;
-    renderer.render(scene, cam);
+    awayFrames = walk.state === 'away' ? awayFrames + 1 : 0;
+    if (awayFrames < 3) {
+      if (mesh) frame(mesh);
+      renderer.render(scene, cam);
+    }
     raf = requestAnimationFrame(tick);
   }
   place();

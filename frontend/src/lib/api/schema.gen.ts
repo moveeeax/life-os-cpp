@@ -15402,6 +15402,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/now/voice-line": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A short line read aloud in Ani's voice
+         * @description Her answer to a tap on her on Now, when it holds the day's data (the focus, protein left, steps): OpenAI text to speech (ANI_VOICE_TTS_MODEL) in the voice of her Realtime sessions, made on each call; the browser keeps it for a day. At most 240 per user and hour. Refused for API keys.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description What she says, 1 to 200 characters, no control characters */
+                    text: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The spoken line */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "audio/mpeg": string;
+                    };
+                };
+                /** @description No text, a text over 200 characters or with control characters (invalid_query) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description More than 240 lines in an hour */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No voice key (not_configured), OpenAI is not answering (upstream_unavailable), or the server is busy */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/today/focus/done": {
         parameters: {
             query?: never;

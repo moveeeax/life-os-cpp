@@ -474,4 +474,56 @@ void TodayController::voiceSession(const HttpRequestPtr& req, Callback&& callbac
     }
 }
 
+void TodayController::voiceLine(const HttpRequestPtr& req, Callback&& callback) {
+    API_MODULE_USER_GUARD(Core::now_enabled(), "now", req, callback, owner);
+    API_REFUSE_API_KEY(req, callback);
+    std::string text = req->getParameter("text");
+    if (!::Now::Voice::line_ok(text)) {
+        callback(ErrorResponse::bad_request("invalid_query", "text must be 1 to 200 characters"));
+        return;
+    }
+    const auto settings = ::Now::Voice::read_settings();
+    if (!settings) {
+        callback(ErrorResponse::service_unavailable("not_configured", "ANI_VOICE_API_KEY is not set"));
+        return;
+    }
+    // Every line spoken is paid for from the voice key.
+    if (Cache::is_initialized()) {
+        try {
+            const std::string rate_key = "now:voice:line:rate:" + owner;
+            const long long n = Cache::get().incr(rate_key);
+            if (n == 1) {
+                Cache::get().expire(rate_key, ::Now::Voice::kWindowSeconds);
+            }
+            if (n > ::Now::Voice::kMaxLinesPerWindow) {
+                callback(ErrorResponse::too_many_requests(static_cast<int>(::Now::Voice::kWindowSeconds)));
+                return;
+            }
+        } catch (const std::exception& e) {
+            spdlog::warn("now.voiceLine: the rate counter failed: {}", e.what());
+        }
+    }
+    // A second or two at OpenAI: the call runs on the blocking pool.
+    auto respond = std::make_shared<Callback>(std::move(callback));
+    const bool queued = Utils::BlockingPool::shared().try_submit([respond, s = *settings, text = std::move(text)] {
+        const Callback& answer = *respond;
+        try {
+            auto r = HttpResponse::newHttpResponse();
+            r->setContentTypeString("audio/mpeg");
+            r->addHeader("Cache-Control", "private, max-age=86400");
+            r->setBody(::Now::Voice::speak(Net::Http::transport(), s, text));
+            answer(r);
+        } catch (const ::Now::Voice::Unavailable& e) {
+            spdlog::warn("now.voiceLine: no audio: {}", e.what());
+            answer(ErrorResponse::service_unavailable("upstream_unavailable", "the voice service is not answering"));
+        } catch (const std::exception& e) {
+            spdlog::error("now.voiceLine failed: {}", e.what());
+            answer(ErrorResponse::internal_error());
+        }
+    });
+    if (!queued) {
+        (*respond)(ErrorResponse::service_unavailable("busy", "the server is busy, try again"));
+    }
+}
+
 }  // namespace Api

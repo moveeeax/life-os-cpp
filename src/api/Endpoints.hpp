@@ -311,6 +311,7 @@ inline const std::vector<EndpointInfo>& get_endpoints() {
         {"PUT", "/api/v1/now/settings", "Now: set the weather city (geocoded) and the corner layout"},
         {"GET", "/api/v1/now/weather", "Now: the weather of the settings city, cached for an hour"},
         {"POST", "/api/v1/now/voice-session", "Now: a short-lived OpenAI Realtime secret for talking with Ani"},
+        {"GET", "/api/v1/now/voice-line", "Now: a short line read aloud in Ani's voice (MP3)"},
         {"GET", "/api/v1/ani/agent", "Ani: the state of the caller's agent pod and this month's model usage"},
         {"POST", "/api/v1/ani/agent/wake", "Ani: start the caller's agent pod, or keep it alive"},
         {"POST", "/api/v1/ani/agent/stop", "Ani: stop the caller's agent pod (its state is saved)"},

@@ -11,11 +11,54 @@ import type { Zone } from './zones';
  * while. Five taps in two seconds make her dizzy.
  */
 
-/** What she says back: a line to show, and a recorded one to play if any. */
+/**
+ * What she says back. A fixed line is recorded ahead under
+ * v2/voice/<recorded>.mp3; a line with the day in it has no recording and is
+ * read aloud by the server (GET /api/v1/now/voice-line); a silent one is
+ * only shown.
+ */
 export interface Answer {
   text: string;
-  voice?: 'dizzy';
+  recorded?: string;
+  silent?: boolean;
 }
+
+/** Her fixed lines, recorded ahead (OpenAI TTS, marin) as v2/voice/touch/<id>.mp3. */
+export const SAID = {
+  hands: 'Эй, руки!',
+  serious: 'Я серьёзно.',
+  offended: 'Всё, обиделась.',
+  silent: 'Не разговариваю.',
+  hm: 'Хм.',
+  purr: 'Мурр. Ещё.',
+  focusDone: 'Фокус дня сделан. Я тобой горжусь.',
+  focusNone: 'В голове пусто. Выберем фокус дня?',
+  hair: 'Эй, причёску не трогай!',
+  hairDone: 'Я её час укладывала.',
+  oh: 'Ой.',
+  giggle: 'Хи-хи, щекотно.',
+  sneeze: 'Апчхи!',
+  neck: 'Щекотно же!',
+  who: 'А? Кто там?',
+  clap: 'Хлоп!',
+  five: 'Дай пять!',
+  fiveDone: 'Дай пять! Привычки на сегодня закрыты.',
+  strong: 'Сильная, да?',
+  proteinDone: 'Белок на сегодня закрыт. Может, десерт?',
+  hungry: 'Урчит. Еды сегодня ещё не было?',
+  noSteps: 'Шагомер молчит. Пройдёмся?',
+  // In place of the day's data while numbers are hidden (a shared screen).
+  focusKept: 'Твой фокус держу в голове.',
+  tummy: 'Урчит. Перекусим?',
+  walk: 'Ноги просятся гулять.',
+  // Not taps: the focus ticked, a focus session run to its end.
+  focusTicked: 'Есть! Фокус сделан.',
+  breakTime: 'Перерыв. Ты молодец, разомнись.',
+} as const;
+export type Said = keyof typeof SAID;
+
+/** One of her fixed lines, with its recording. */
+export const say = (id: Said): Answer => ({ text: SAID[id], recorded: `touch/${id}` });
 
 const SULK_S = 10;
 // Off-limits taps are forgotten after this long (s).
@@ -29,12 +72,23 @@ export interface Toucher {
   tap(z: Zone, at: { x: number; y: number }): Answer | null;
 }
 
-export function createToucher(
-  ani: () => Ani | null,
-  today: () => Today | undefined,
-  focusField: () => HTMLInputElement | null,
-  clock: () => number = () => performance.now(),
-): Toucher {
+export interface ToucherOptions {
+  ani: () => Ani | null;
+  today: () => Today | undefined;
+  /** The focus field, focused when she asks for a focus. */
+  focusField: () => HTMLInputElement | null;
+  /** "Hide numbers" is on: she keeps the day's data to herself. */
+  hidden?: () => boolean;
+  clock?: () => number;
+}
+
+export function createToucher({
+  ani,
+  today,
+  focusField,
+  hidden = () => false,
+  clock = () => performance.now(),
+}: ToucherOptions): Toucher {
   const taps: number[] = [];
   const count: Record<string, number> = {};
   let lastAt: Record<string, number> = {};
@@ -58,7 +112,10 @@ export function createToucher(
       const day = today();
 
       // Sulking: she does not turn round for a while.
-      if (now < sulkUntil) return { text: pick(['…', 'Не разговариваю.', 'Хм.'], taps.length) };
+      if (now < sulkUntil) {
+        const n = (count.sulk = (count.sulk ?? 0) + 1);
+        return n % 3 === 1 ? { text: '…', silent: true } : say(n % 3 === 2 ? 'silent' : 'hm');
+      }
 
       taps.push(now);
       while (taps.length && now - taps[0] > 2000) taps.shift();
@@ -66,7 +123,7 @@ export function createToucher(
         taps.length = 0;
         a.feel('surprised', 2);
         a.act('spin');
-        return { text: 'Ой, голова кружится.', voice: 'dizzy' };
+        return { text: 'Ой, голова кружится.', recorded: 'dizzy' };
       }
 
       switch (z.part) {
@@ -80,17 +137,17 @@ export function createToucher(
           if (offended === 1) {
             a.feel('surprised', 1.6);
             a.glance(at.x, at.y, 1.6);
-            return { text: 'Эй, руки!' };
+            return say('hands');
           }
           if (offended === 2) {
             a.feel('cross', 3);
-            return { text: 'Я серьёзно.' };
+            return say('serious');
           }
           offended = 0;
           a.feel('cross', SULK_S);
           a.sulk(SULK_S);
           sulkUntil = now + SULK_S * 1000;
-          return { text: 'Всё, обиделась.' };
+          return say('offended');
         }
 
         case 'head': {
@@ -99,25 +156,21 @@ export function createToucher(
           a.tilt(at.x < innerWidth / 2 ? -1 : 1, 2.5);
           if (n === 3) {
             a.act('idle_happy');
-            return { text: 'Мурр. Ещё.' };
+            return say('purr');
           }
           if (n > 1) return null;
           const f = day?.focus;
-          if (f?.text && !f.done) return { text: `Держу в голове: «${f.text}».` };
-          if (f?.done) return { text: 'Фокус дня сделан. Я тобой горжусь.' };
+          if (f?.text && !f.done)
+            return hidden() ? say('focusKept') : { text: `Держу в голове: «${f.text}».` };
+          if (f?.done) return say('focusDone');
           focusField()?.focus();
-          return { text: 'В голове пусто. Выберем фокус дня?' };
+          return say('focusNone');
         }
 
         case 'hair': {
           a.feel('cross', 1.8);
           a.glance(at.x, at.y, 1.8);
-          return {
-            text: pick(
-              ['Эй, причёску не трогай!', 'Я её час укладывала.'],
-              again('hair', 20, now) - 1,
-            ),
-          };
+          return say(pick(['hair', 'hairDone'] as const, again('hair', 20, now) - 1));
         }
 
         case 'face': {
@@ -125,20 +178,20 @@ export function createToucher(
           if (n >= 3) {
             count.nose = 0;
             a.feel('sneeze', 0.9);
-            return { text: 'Апчхи!' };
+            return say('sneeze');
           }
           a.feel('scrunch', 1.2);
-          return { text: n === 1 ? 'Ой.' : 'Хи-хи, щекотно.' };
+          return say(n === 1 ? 'oh' : 'giggle');
         }
 
         case 'neck':
           a.feel('surprised', 1.4);
-          return { text: 'Щекотно же!' };
+          return say('neck');
 
         case 'shoulder':
           a.glance(at.x < innerWidth / 2 ? 0 : innerWidth, at.y - 120, 1.8);
           a.feel('surprised', 1.4);
-          return { text: 'А? Кто там?' };
+          return say('who');
 
         case 'hand':
         case 'forearm': {
@@ -146,43 +199,45 @@ export function createToucher(
           if (now - fiveAt < 2500) {
             fiveAt = -1e9;
             a.feel('happy', 2);
-            return { text: 'Хлоп!' };
+            return say('clap');
           }
           fiveAt = now;
           a.act('wave');
           a.feel('happy', 2.5);
           const left = day?.habits?.left ?? [];
-          if (left.length) return { text: `Дай пять! Осталось: ${left[0]}.` };
-          if (day?.habits && day.habits.total > 0)
-            return { text: 'Дай пять! Привычки на сегодня закрыты.' };
-          return { text: 'Дай пять!' };
+          if (left.length)
+            return hidden() ? say('five') : { text: `Дай пять! Осталось: ${left[0]}.` };
+          if (day?.habits && day.habits.total > 0) return say('fiveDone');
+          return say('five');
         }
 
         case 'upperArm':
           a.feel('happy', 1.8);
           a.act('peace');
-          return { text: 'Сильная, да?' };
+          return say('strong');
 
         case 'belly': {
           a.feel('surprised', 1.2);
+          if (hidden()) return say('tummy');
           const food = day?.food;
           const t = food?.target;
           if (food && t) {
             const left = t.protein_g - food.eaten.protein_g;
             if (left > 1) return { text: `Ещё ${grams(left)} белка, и я довольна.` };
-            return { text: 'Белок на сегодня закрыт. Может, десерт?' };
+            return say('proteinDone');
           }
           if (food && food.eaten.kcal > 0)
             return { text: `Сегодня ${Math.round(food.eaten.kcal)} ккал. Урчит.` };
-          return { text: 'Урчит. Еды сегодня ещё не было?' };
+          return say('hungry');
         }
 
         case 'thigh':
         case 'shin':
         case 'foot': {
           a.feel('happy', 1.8);
+          if (hidden()) return say('walk');
           const n = day?.health?.steps;
-          if (n == null) return { text: 'Шагомер молчит. Пройдёмся?' };
+          if (n == null) return say('noSteps');
           if (n < 10000)
             return { text: `${steps(n)} шагов. До десяти тысяч ещё ${steps(10000 - n)}.` };
           return { text: `${steps(n)} шагов! Ноги гудят.` };
