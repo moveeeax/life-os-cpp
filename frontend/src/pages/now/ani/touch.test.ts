@@ -141,6 +141,33 @@ describe('createToucher', () => {
     expect(tap('hand', 'right', 1000)).toBe('Хлоп!');
   });
 
+  it('dances on a pat, a high five and a tap on her feet in a row', () => {
+    const { ani, tap } = setUp();
+    tap('hair');
+    tap('hand', 'left', 1500);
+    expect(tap('foot', 'right', 1500)).toBe('Та-дам!');
+    expect(ani.act).toHaveBeenCalledWith('spin');
+  });
+
+  it('moves her mood: kind taps up, rude ones down', () => {
+    const t = createToucher({
+      ani: () =>
+        ({
+          feel: vi.fn(),
+          tilt: vi.fn(),
+          glance: vi.fn(),
+          sulk: vi.fn(),
+          act: vi.fn(),
+        }) as unknown as Ani,
+      today: () => base,
+      focusField: () => null,
+      clock: () => 0,
+    });
+    expect(t.tap({ part: 'head', side: null }, { x: 0, y: 0 })?.mood).toBe(1);
+    expect(t.tap({ part: 'skirt', side: null }, { x: 0, y: 0 })?.mood).toBe(-2);
+    expect(t.tap({ part: 'belly', side: null }, { x: 0, y: 0 })?.mood).toBe(0);
+  });
+
   it('gets dizzy on five taps in two seconds', () => {
     const { tap } = setUp();
     for (let i = 0; i < 4; i++) tap('shin', 'left', 300);
@@ -174,7 +201,7 @@ describe('answers', () => {
       focusField: () => null,
       clock: () => 0,
     });
-    expect(t.tap({ part: 'neck', side: null }, { x: 0, y: 0 })).toEqual({
+    expect(t.tap({ part: 'neck', side: null }, { x: 0, y: 0 })).toMatchObject({
       text: SAID.neck,
       recorded: 'touch/neck',
     });

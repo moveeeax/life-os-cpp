@@ -6,6 +6,7 @@ import { AniChat, SpeakerIcon } from './AniChat';
 import { soundOn, speechUrl, useSound } from './chat';
 import type { Ani } from './engine';
 import { greeting, HELLO, hourOf } from './greet';
+import { moodLevel, moodOf, moveMood } from './mood';
 import type { Talk, TalkState } from './talk';
 import { useAni, type AniOutfit } from './state';
 import { createToucher, say, type Answer } from './touch';
@@ -42,22 +43,32 @@ function hello(): Answer {
   return { text: HELLO[h], recorded: h };
 }
 
-// The day her first hello was said in this browser (YYYY-MM-DD).
+// The day her first hello and her evening word were said in this browser
+// (YYYY-MM-DD).
 const HELLO_KEY = 'now:ani:hello';
-function helloDay(): string | null {
+const EVENING_KEY = 'now:ani:evening';
+function dayOf(key: string): string | null {
   try {
-    return localStorage.getItem(HELLO_KEY);
+    return localStorage.getItem(key);
   } catch {
     return null;
   }
 }
-function setHelloDay(day: string) {
+function setDayOf(key: string, day: string) {
   try {
-    localStorage.setItem(HELLO_KEY, day);
+    localStorage.setItem(key, day);
   } catch {
     // Private mode: she may say it again on the next visit.
   }
 }
+const helloDay = () => dayOf(HELLO_KEY);
+const setHelloDay = (day: string) => setDayOf(HELLO_KEY, day);
+
+// An hour of activity on the page, with no pause of five minutes, earns a
+// word about a break; at most one an hour. Her evening word comes after 21:00.
+const STRETCH_MS = 60 * 60_000;
+const PAUSE_MS = 5 * 60_000;
+const EVENING_HOUR = 21;
 
 /** A microphone: talk with her (OpenAI Realtime). */
 function MicIcon() {
@@ -215,6 +226,9 @@ export function AniCorner({
     }),
   );
   const sayTimer = useRef(0);
+  const lastSaidAt = useRef(0);
+  // The bubble opens the chat (her evening word).
+  const [saidChat, setSaidChat] = useState(false);
   /**
    * Her answer to a tap, in the bubble while she says it: a recorded line
    * from the bucket, one with the day in it read by the server, or a silent
@@ -224,6 +238,9 @@ export function AniCorner({
   answer.current = (a: Answer) => {
     const e = engine.current;
     if (!e || talkRef.current) return;
+    if (a.mood) e.mood(moodLevel(moveMood(contextRef.current.date, a.mood)));
+    lastSaidAt.current = Date.now();
+    setSaidChat(Boolean(a.chat));
     setSaid(a.text);
     clearTimeout(sayTimer.current);
     const done = () => setSaid((v) => (v === a.text ? null : v));
@@ -243,6 +260,56 @@ export function AniCorner({
     });
   };
   const [sound, setSound] = useSound();
+
+  // Her mood of the day shows in her face from the start.
+  useEffect(() => {
+    if (ready) engine.current?.mood(moodLevel(moodOf(contextRef.current.date)));
+  }, [ready]);
+
+  // An hour at the screen and the evening: checked every half minute while
+  // she is here, ready and not in a conversation, on a visible page.
+  const hereRef = useRef(ani.here);
+  hereRef.current = ani.here && ready;
+  useEffect(() => {
+    let active = Date.now();
+    let streak = active;
+    let stretched = active;
+    const onActive = () => {
+      const now = Date.now();
+      if (now - active > PAUSE_MS) streak = now;
+      active = now;
+    };
+    const events = ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const;
+    for (const ev of events) addEventListener(ev, onActive, { passive: true });
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      if (!hereRef.current || talkRef.current || document.visibilityState !== 'visible') return;
+      // Not over another line.
+      if (now - lastSaidAt.current < 60_000) return;
+      const c = contextRef.current;
+      if (
+        new Date().getHours() >= EVENING_HOUR &&
+        helloDay() === c.date &&
+        dayOf(EVENING_KEY) !== c.date
+      ) {
+        setDayOf(EVENING_KEY, c.date);
+        const f = c.today?.focus;
+        const line = f && !f.done ? say('focusOpen') : f?.done ? say('dayDone') : say('howWasDay');
+        answer.current({ ...line, chat: true });
+        return;
+      }
+      if (now - active < 60_000 && now - streak >= STRETCH_MS && now - stretched >= STRETCH_MS) {
+        stretched = now;
+        streak = now;
+        engine.current?.act('idle_happy');
+        answer.current(say('stretch'));
+      }
+    }, 30_000);
+    return () => {
+      clearInterval(id);
+      for (const ev of events) removeEventListener(ev, onActive);
+    };
+  }, []);
 
   // Her first hello: once a day in this browser, with a thing from the day
   // (late tasks, rain, the night's sleep); after a focus session, a break.
@@ -321,6 +388,12 @@ export function AniCorner({
             if (a) answer.current(a);
           },
           onSpin: () => answer.current(DIZZY),
+          // A double tap opens the chat with her agent.
+          onDoubleTap: () => {
+            made?.hush();
+            setSaid(null);
+            setChat(true);
+          },
         });
         engine.current = made;
       } catch {
@@ -365,7 +438,11 @@ export function AniCorner({
     engine.current.present(here, () => {
       setBusy(null);
       // Back: she says hello.
-      if (here) answer.current(hello());
+      if (here) {
+        // Back in a good mood she missed the user; in a bad one, a "Хм".
+        const level = moodLevel(moodOf(contextRef.current.date));
+        answer.current(level === 1 ? say('missed') : level === -1 ? say('grumpyHello') : hello());
+      }
     });
   };
 
@@ -401,9 +478,25 @@ export function AniCorner({
     <div ref={cornerRef} className="ani-corner" data-ready={ready ? '' : undefined}>
       <canvas ref={canvasRef} className="ani-canvas" aria-hidden="true" />
       {said && ani.here && !chat ? (
-        <div className="ani-say" role="status" data-num-ok>
-          {said}
-        </div>
+        saidChat ? (
+          <button
+            type="button"
+            className="ani-say ani-say-chat"
+            data-num-ok
+            title="Write to Ani"
+            onClick={() => {
+              engine.current?.hush();
+              setSaid(null);
+              setChat(true);
+            }}
+          >
+            {said}
+          </button>
+        ) : (
+          <div className="ani-say" role="status" data-num-ok>
+            {said}
+          </div>
+        )
       ) : null}
       <div
         ref={hitRef}

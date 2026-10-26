@@ -240,6 +240,17 @@
   }
 }
 
+/* Her evening word opens the chat. */
+.ani-say-chat {
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  pointer-events: auto;
+}
+.ani-say-chat:hover {
+  border-color: var(--g-ink-faint);
+}
+
 /* The speaker, left of the microphone: mutes her. */
 .ani-sound {
   position: absolute;

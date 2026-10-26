@@ -8,7 +8,11 @@ import type { Zone } from './zones';
  * high five are sweet; her head, her belly and her legs answer with the day
  * (the focus, food, steps); the chest, the seat, the hips and the skirt are
  * off limits: she steps in, then gets cross, then turns her back for a
- * while. Five taps in two seconds make her dizzy.
+ * while. Five taps in two seconds make her dizzy, and a pat, a high five
+ * and a tap on her feet in a row (within six seconds) make her dance.
+ *
+ * Each answer carries what it does to her mood of the day (mood.ts): kind
+ * taps lift it, off-limits ones and pulled hair bring it down.
  */
 
 /**
@@ -21,6 +25,10 @@ export interface Answer {
   text: string;
   recorded?: string;
   silent?: boolean;
+  /** Her mood moved by this tap (up kind, down rude). */
+  mood?: number;
+  /** A tap on the bubble opens the chat with her agent. */
+  chat?: boolean;
 }
 
 /** Her fixed lines, recorded ahead (OpenAI TTS, marin) as v2/voice/touch/<id>.mp3. */
@@ -54,6 +62,15 @@ export const SAID = {
   // Not taps: the focus ticked, a focus session run to its end.
   focusTicked: 'Есть! Фокус сделан.',
   breakTime: 'Перерыв. Ты молодец, разомнись.',
+  // Not taps either: an hour without a break, the evening, coming back.
+  stretch: 'Ты уже час за компом. Разомнёмся?',
+  focusOpen: 'Фокус сегодня не закрыт. Может, ещё успеешь?',
+  dayDone: 'Фокус сделан. Хороший был день.',
+  howWasDay: 'Расскажешь, как прошёл день?',
+  grumpyHello: 'Хм. Привет.',
+  missed: 'Снова ты! Я скучала.',
+  // The combo: a pat, a high five, her feet.
+  dance: 'Та-дам!',
 } as const;
 export type Said = keyof typeof SAID;
 
@@ -104,146 +121,186 @@ export function createToucher({
     return n;
   };
 
+  // The parts of the last taps, for the combo.
+  let combo: { part: string; at: number }[] = [];
+  const COMBO = ['head', 'hand', 'foot'];
+  const groupOf = (p: Zone['part']) =>
+    p === 'head' || p === 'hair'
+      ? 'head'
+      : p === 'hand' || p === 'forearm'
+        ? 'hand'
+        : p === 'foot' || p === 'shin'
+          ? 'foot'
+          : p;
+  // What a tap on a part does to her mood, unless the answer says otherwise.
+  const MOOD: Partial<Record<Zone['part'], number>> = {
+    head: 1,
+    hand: 1,
+    forearm: 1,
+    upperArm: 1,
+    hair: -1,
+    chest: -2,
+    seat: -2,
+    hips: -2,
+    skirt: -2,
+  };
+
   return {
     tap(z, at) {
-      const a = ani();
-      if (!a) return null;
-      const now = clock();
-      const day = today();
-
-      // Sulking: she does not turn round for a while.
-      if (now < sulkUntil) {
-        const n = (count.sulk = (count.sulk ?? 0) + 1);
-        return n % 3 === 1 ? { text: '…', silent: true } : say(n % 3 === 2 ? 'silent' : 'hm');
-      }
-
-      taps.push(now);
-      while (taps.length && now - taps[0] > 2000) taps.shift();
-      if (taps.length >= 5) {
-        taps.length = 0;
-        a.feel('surprised', 2);
-        a.act('spin');
-        return { text: 'Ой, голова кружится.', recorded: 'dizzy' };
-      }
-
-      switch (z.part) {
-        case 'chest':
-        case 'seat':
-        case 'hips':
-        case 'skirt': {
-          if (now - offendedAt > FORGIVE_S * 1000) offended = 0;
-          offended += 1;
-          offendedAt = now;
-          if (offended === 1) {
-            a.feel('surprised', 1.6);
-            a.glance(at.x, at.y, 1.6);
-            return say('hands');
-          }
-          if (offended === 2) {
-            a.feel('cross', 3);
-            return say('serious');
-          }
-          offended = 0;
-          a.feel('cross', SULK_S);
-          a.sulk(SULK_S);
-          sulkUntil = now + SULK_S * 1000;
-          return say('offended');
-        }
-
-        case 'head': {
-          const n = again('pat', 4, now);
-          a.feel('happy', 3);
-          a.tilt(at.x < innerWidth / 2 ? -1 : 1, 2.5);
-          if (n === 3) {
-            a.act('idle_happy');
-            return say('purr');
-          }
-          if (n > 1) return null;
-          const f = day?.focus;
-          if (f?.text && !f.done)
-            return hidden() ? say('focusKept') : { text: `Держу в голове: «${f.text}».` };
-          if (f?.done) return say('focusDone');
-          focusField()?.focus();
-          return say('focusNone');
-        }
-
-        case 'hair': {
-          a.feel('cross', 1.8);
-          a.glance(at.x, at.y, 1.8);
-          return say(pick(['hair', 'hairDone'] as const, again('hair', 20, now) - 1));
-        }
-
-        case 'face': {
-          const n = again('nose', 5, now);
-          if (n >= 3) {
-            count.nose = 0;
-            a.feel('sneeze', 0.9);
-            return say('sneeze');
-          }
-          a.feel('scrunch', 1.2);
-          return say(n === 1 ? 'oh' : 'giggle');
-        }
-
-        case 'neck':
-          a.feel('surprised', 1.4);
-          return say('neck');
-
-        case 'shoulder':
-          a.glance(at.x < innerWidth / 2 ? 0 : innerWidth, at.y - 120, 1.8);
-          a.feel('surprised', 1.4);
-          return say('who');
-
-        case 'hand':
-        case 'forearm': {
-          // A second tap while her hand is up claps it.
-          if (now - fiveAt < 2500) {
-            fiveAt = -1e9;
-            a.feel('happy', 2);
-            return say('clap');
-          }
-          fiveAt = now;
-          a.act('wave');
-          a.feel('happy', 2.5);
-          const left = day?.habits?.left ?? [];
-          if (left.length)
-            return hidden() ? say('five') : { text: `Дай пять! Осталось: ${left[0]}.` };
-          if (day?.habits && day.habits.total > 0) return say('fiveDone');
-          return say('five');
-        }
-
-        case 'upperArm':
-          a.feel('happy', 1.8);
-          a.act('peace');
-          return say('strong');
-
-        case 'belly': {
-          a.feel('surprised', 1.2);
-          if (hidden()) return say('tummy');
-          const food = day?.food;
-          const t = food?.target;
-          if (food && t) {
-            const left = t.protein_g - food.eaten.protein_g;
-            if (left > 1) return { text: `Ещё ${grams(left)} белка, и я довольна.` };
-            return say('proteinDone');
-          }
-          if (food && food.eaten.kcal > 0)
-            return { text: `Сегодня ${Math.round(food.eaten.kcal)} ккал. Урчит.` };
-          return say('hungry');
-        }
-
-        case 'thigh':
-        case 'shin':
-        case 'foot': {
-          a.feel('happy', 1.8);
-          if (hidden()) return say('walk');
-          const n = day?.health?.steps;
-          if (n == null) return say('noSteps');
-          if (n < 10000)
-            return { text: `${steps(n)} шагов. До десяти тысяч ещё ${steps(10000 - n)}.` };
-          return { text: `${steps(n)} шагов! Ноги гудят.` };
-        }
-      }
-      return null;
+      const r = react(z, at);
+      return r && r.mood === undefined ? { ...r, mood: MOOD[z.part] ?? 0 } : r;
     },
   };
+
+  function react(z: Zone, at: { x: number; y: number }): Answer | null {
+    const a = ani();
+    if (!a) return null;
+    const now = clock();
+    const day = today();
+
+    // Sulking: she does not turn round for a while.
+    if (now < sulkUntil) {
+      const n = (count.sulk = (count.sulk ?? 0) + 1);
+      return n % 3 === 1 ? { text: '…', silent: true } : say(n % 3 === 2 ? 'silent' : 'hm');
+    }
+
+    taps.push(now);
+    while (taps.length && now - taps[0] > 2000) taps.shift();
+    if (taps.length >= 5) {
+      taps.length = 0;
+      a.feel('surprised', 2);
+      a.act('spin');
+      combo = [];
+      return { text: 'Ой, голова кружится.', recorded: 'dizzy', mood: -1 };
+    }
+
+    combo = [...combo, { part: groupOf(z.part), at: now }]
+      .slice(-3)
+      .filter((c) => now - c.at < 6000);
+    if (combo.map((c) => c.part).join() === COMBO.join()) {
+      combo = [];
+      a.feel('happy', 3);
+      a.act('spin');
+      return { ...say('dance'), mood: 2 };
+    }
+
+    switch (z.part) {
+      case 'chest':
+      case 'seat':
+      case 'hips':
+      case 'skirt': {
+        if (now - offendedAt > FORGIVE_S * 1000) offended = 0;
+        offended += 1;
+        offendedAt = now;
+        if (offended === 1) {
+          a.feel('surprised', 1.6);
+          a.glance(at.x, at.y, 1.6);
+          return say('hands');
+        }
+        if (offended === 2) {
+          a.feel('cross', 3);
+          return say('serious');
+        }
+        offended = 0;
+        a.feel('cross', SULK_S);
+        a.sulk(SULK_S);
+        sulkUntil = now + SULK_S * 1000;
+        return say('offended');
+      }
+
+      case 'head': {
+        const n = again('pat', 4, now);
+        a.feel('happy', 3);
+        a.tilt(at.x < innerWidth / 2 ? -1 : 1, 2.5);
+        if (n === 3) {
+          a.act('idle_happy');
+          return say('purr');
+        }
+        if (n > 1) return null;
+        const f = day?.focus;
+        if (f?.text && !f.done)
+          return hidden() ? say('focusKept') : { text: `Держу в голове: «${f.text}».` };
+        if (f?.done) return say('focusDone');
+        focusField()?.focus();
+        return say('focusNone');
+      }
+
+      case 'hair': {
+        a.feel('cross', 1.8);
+        a.glance(at.x, at.y, 1.8);
+        return say(pick(['hair', 'hairDone'] as const, again('hair', 20, now) - 1));
+      }
+
+      case 'face': {
+        const n = again('nose', 5, now);
+        if (n >= 3) {
+          count.nose = 0;
+          a.feel('sneeze', 0.9);
+          return say('sneeze');
+        }
+        a.feel('scrunch', 1.2);
+        return say(n === 1 ? 'oh' : 'giggle');
+      }
+
+      case 'neck':
+        a.feel('surprised', 1.4);
+        return say('neck');
+
+      case 'shoulder':
+        a.glance(at.x < innerWidth / 2 ? 0 : innerWidth, at.y - 120, 1.8);
+        a.feel('surprised', 1.4);
+        return say('who');
+
+      case 'hand':
+      case 'forearm': {
+        // A second tap while her hand is up claps it.
+        if (now - fiveAt < 2500) {
+          fiveAt = -1e9;
+          a.feel('happy', 2);
+          return say('clap');
+        }
+        fiveAt = now;
+        a.act('wave');
+        a.feel('happy', 2.5);
+        const left = day?.habits?.left ?? [];
+        if (left.length)
+          return hidden() ? say('five') : { text: `Дай пять! Осталось: ${left[0]}.` };
+        if (day?.habits && day.habits.total > 0) return say('fiveDone');
+        return say('five');
+      }
+
+      case 'upperArm':
+        a.feel('happy', 1.8);
+        a.act('peace');
+        return say('strong');
+
+      case 'belly': {
+        a.feel('surprised', 1.2);
+        if (hidden()) return say('tummy');
+        const food = day?.food;
+        const t = food?.target;
+        if (food && t) {
+          const left = t.protein_g - food.eaten.protein_g;
+          if (left > 1) return { text: `Ещё ${grams(left)} белка, и я довольна.` };
+          return say('proteinDone');
+        }
+        if (food && food.eaten.kcal > 0)
+          return { text: `Сегодня ${Math.round(food.eaten.kcal)} ккал. Урчит.` };
+        return say('hungry');
+      }
+
+      case 'thigh':
+      case 'shin':
+      case 'foot': {
+        a.feel('happy', 1.8);
+        if (hidden()) return say('walk');
+        const n = day?.health?.steps;
+        if (n == null) return say('noSteps');
+        if (n < 10000)
+          return { text: `${steps(n)} шагов. До десяти тысяч ещё ${steps(10000 - n)}.` };
+        return { text: `${steps(n)} шагов! Ноги гудят.` };
+      }
+    }
+    return null;
+  }
 }
