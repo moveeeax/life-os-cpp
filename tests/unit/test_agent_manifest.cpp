@@ -92,6 +92,7 @@ TEST(AgentManifest, TheOnlyModelIsTheProxyAndNoProviderKeyIsInside) {
         EXPECT_NE(std::find(deny.begin(), deny.end(), group), deny.end()) << group;
     }
     EXPECT_FALSE(c["cron"]["enabled"].get<bool>());
+    EXPECT_FALSE(c["tools"]["toolSearch"].get<bool>()) << "the site's tools are given to the model as they are";
 }
 
 TEST(AgentManifest, TheSecretCarriesTheRunAndThePersona) {

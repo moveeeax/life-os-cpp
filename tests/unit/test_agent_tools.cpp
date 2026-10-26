@@ -344,6 +344,13 @@ TEST(AgentActions, AConfirmedChangeIsSentAsTheUser) {
     EXPECT_EQ(told["proposed"], "Note to the inbox: «x»");
 }
 
+TEST(AgentTools, ARepeatedPrefaceIsCutFromTheReply) {
+    EXPECT_EQ(Agent::without_preface("[Life OS: the person's local time is 10:51.]\n\nПривет!"), "Привет!");
+    EXPECT_EQ(Agent::without_preface("Привет! [Life OS: x]"), "Привет! [Life OS: x]");
+    EXPECT_EQ(Agent::without_preface("[Life OS: nothing after]"), "[Life OS: nothing after]") << "never empty";
+    EXPECT_EQ(Agent::without_preface("Просто ответ"), "Просто ответ");
+}
+
 TEST(AgentTools, AClearedChatIsANewSession) {
     EXPECT_EQ(Agent::session_of("u-1", 0), "u-1") << "the key before any clear stays as it was";
     EXPECT_EQ(Agent::session_of("u-1", 2), "u-1#2");
