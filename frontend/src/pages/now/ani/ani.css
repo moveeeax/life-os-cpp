@@ -6,15 +6,14 @@
   --ani-floor: calc(max(24px, env(safe-area-inset-bottom, 0px)) + 102px);
 }
 
-/* The picture: wider than her so a raised hand is not cut off; it takes no
-   input, the hit area below does. */
+/* The picture: a layer over the whole page, so she can turn to whatever she
+   watches; it takes no input, the hit area below does. */
 .ani-canvas {
   position: fixed;
   z-index: 19;
-  left: 0;
-  bottom: var(--ani-floor);
-  width: 340px;
-  height: 500px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.6s ease;
@@ -25,10 +24,10 @@
 .ani-hit {
   position: fixed;
   z-index: 19;
-  left: 0;
+  left: 30px;
   bottom: var(--ani-floor);
-  width: 220px;
-  height: 500px;
+  width: 160px;
+  height: 350px;
   cursor: grab;
   touch-action: none;
 }
@@ -219,8 +218,8 @@
 .ani-say {
   position: fixed;
   z-index: 21;
-  left: 200px;
-  bottom: calc(var(--ani-floor) + 440px);
+  left: calc(var(--ani-hx, 110px) + 40px);
+  top: calc(var(--ani-hy, 50vh) - 60px);
   max-width: 220px;
   padding: 9px 13px;
   border-radius: 16px 16px 16px 4px;
