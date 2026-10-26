@@ -121,7 +121,7 @@ std::optional<json> read(Net::Http::Transport& transport,
     if (res.status != 200 || !body.is_object() || !body.contains("data")) {
         return std::nullopt;
     }
-    return body["data"];
+    return std::optional<json>(std::in_place, body["data"]);
 }
 
 Proposed create_task(const json& args, const std::string& tz) {

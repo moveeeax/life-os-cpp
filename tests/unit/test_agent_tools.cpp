@@ -265,7 +265,7 @@ TEST(AgentActions, ANewTaskAndANoteNeedNoLookup) {
 
     p = std::get<A::Proposal>(propose(site, "add_note", json{{"text", "Позвонить маме"}}));
     EXPECT_EQ(p.summary, "Note to the inbox: «Позвонить маме»");
-    EXPECT_EQ(p.request["body"], json{{"text", "Позвонить маме"}});
+    EXPECT_EQ(p.request["body"], (json{{"text", "Позвонить маме"}}));
     EXPECT_TRUE(site.sent.empty());
 }
 
@@ -284,7 +284,7 @@ TEST(AgentActions, ATaskIsClosedOnlyWhenItsWordsFindOneOpenTask) {
     EXPECT_EQ(p.summary, "Close the task «Паспорт»") << "the exact title wins";
     EXPECT_EQ(p.request["method"], "PATCH");
     EXPECT_EQ(p.request["path"], "/api/v1/tasks/items/t1");
-    EXPECT_EQ(p.request["body"], json{{"status", "done"}});
+    EXPECT_EQ(p.request["body"], (json{{"status", "done"}}));
 
     site.answers = {{kApi + "/api/v1/tasks/items", {200, R"({"data":[]})"}}};
     EXPECT_EQ(refused(propose(site, "complete_task", json{{"task", "Визa"}}))["error"], "not_found");
@@ -307,7 +307,7 @@ TEST(AgentActions, AHabitIsFoundByItsNameAndTickedByHandOnly) {
     EXPECT_EQ(p.summary, "Add 1.5 л to «Вода» for 2026-10-25");
     EXPECT_EQ(p.request["method"], "POST");
     EXPECT_EQ(p.request["path"], "/api/v1/habits/h2/checks/2026-10-25/add");
-    EXPECT_EQ(p.request["body"], json{{"value", 1.5}});
+    EXPECT_EQ(p.request["body"], (json{{"value", 1.5}}));
 
     EXPECT_EQ(refused(propose(site, "check_habit", json{{"habit", "Шаги"}}))["error"], "automatic");
     const auto none = refused(propose(site, "check_habit", json{{"habit", "Йога"}}));
