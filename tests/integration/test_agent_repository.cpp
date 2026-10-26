@@ -4,7 +4,9 @@
  *        once and only from its own state, the proxy token finds only a live
  *        run, the month's usage adds up, and a deleted row leaves its
  *        snapshots to the files sweep (migration 058). And the chat's turns
- *        (migration 059): one open turn per user, its states, the pages.
+ *        (migration 059): one open turn per user, its states, the pages. And
+ *        the changes the agent proposes (migration 061): answered once, by
+ *        their owner, while fresh; run once; told to the next turn.
  */
 
 #include <string>
@@ -16,12 +18,14 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/agent/ActionRepository.hpp"
 #include "repositories/agent/AgentRepository.hpp"
 #include "repositories/agent/TurnRepository.hpp"
 #include "test_helpers.hpp"
 
 namespace {
 
+using Repositories::Agent::ActionRepository;
 using Repositories::Agent::AgentRepository;
 using Repositories::Agent::TurnRepository;
 
@@ -41,6 +45,7 @@ protected:
         Database::get().execute_write([](auto& txn) {
             txn.exec("DELETE FROM ani_agents");
             txn.exec("DELETE FROM ani_usage");
+            txn.exec("DELETE FROM ani_actions");
             txn.exec("DELETE FROM ani_turns");
             txn.exec("DELETE FROM private_file_purges WHERE object_key LIKE 'test/%'");
             return true;
@@ -253,4 +258,68 @@ TEST_F(AgentRepositoryTest, ClearingTheChatCountsAsANewConversation) {
     agents.next_chat_session(kAnna);
     EXPECT_EQ(agents.chat_session(kAnna), 2);
     EXPECT_EQ(agents.get(kAnna)->value("state", ""), "starting") << "the run is untouched";
+}
+
+TEST_F(AgentRepositoryTest, AProposalIsAnsweredOnceByItsOwnerWhileFresh) {
+    TurnRepository turns;
+    ActionRepository actions;
+    const std::string turn = (*turns.open(kAnna, "Добавь молоко", "UTC"))["id"];
+    const nlohmann::json req = {{"method", "POST"}, {"path", "/api/v1/tasks/notes"}, {"body", {{"text", "молоко"}}}};
+    const std::string a = actions.add(kAnna, turn, "add_note", "Note to the inbox: «молоко»", req);
+    const std::string b = actions.add(kAnna, turn, "add_note", "Note to the inbox: «хлеб»", req);
+    EXPECT_EQ(actions.count_for_turn(turn), 2);
+
+    const auto view = turns.get(kAnna, turn);
+    ASSERT_EQ((*view)["actions"].size(), 2U);
+    EXPECT_EQ((*view)["actions"][0]["id"], a);
+    EXPECT_EQ((*view)["actions"][0]["status"], "pending");
+    EXPECT_FALSE((*view)["actions"][0].contains("request")) << "the panel does not see the request";
+
+    using Answer = ActionRepository::Answer;
+    EXPECT_EQ(actions.answer(kBoris, a, true), Answer::Missing) << "not Boris's";
+    EXPECT_EQ(actions.answer(kAnna, a, true), Answer::Done);
+    EXPECT_EQ(actions.answer(kAnna, a, false), Answer::NotPending) << "confirmed already";
+    EXPECT_EQ(actions.answer(kAnna, b, false), Answer::Done);
+    EXPECT_EQ(actions.get(kAnna, b)->value("status", ""), "cancelled");
+
+    const std::string c = actions.add(kAnna, turn, "add_note", "Note to the inbox: «сыр»", req);
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE ani_actions SET created_at = now() - interval '2 hours' WHERE id::text = $1", c);
+        return true;
+    });
+    EXPECT_EQ(actions.get(kAnna, c)->value("status", ""), "expired");
+    EXPECT_EQ(actions.answer(kAnna, c, true), Answer::Expired);
+    EXPECT_EQ(actions.answer(kAnna, c, false), Answer::Done) << "an old one can still be cancelled";
+}
+
+TEST_F(AgentRepositoryTest, AConfirmedActionRunsOnceAndTheNextTurnHearsOfIt) {
+    TurnRepository turns;
+    ActionRepository actions;
+    const std::string turn = (*turns.open(kAnna, "Отметь зарядку", "UTC"))["id"];
+    const std::string a =
+        actions.add(kAnna, turn, "check_habit", "Tick «Зарядка» for today", nlohmann::json{{"method", "PUT"}});
+    EXPECT_FALSE(actions.start(a)) << "not confirmed";
+    actions.answer(kAnna, a, true);
+    const auto w = actions.for_worker(a);
+    EXPECT_EQ(w->value("owner_id", ""), kAnna);
+    EXPECT_EQ((*w)["request"]["method"], "PUT");
+    EXPECT_TRUE(actions.start(a));
+    EXPECT_FALSE(actions.start(a)) << "running already";
+    EXPECT_TRUE(actions.finish(a, ""));
+    EXPECT_FALSE(actions.finish(a, "failed")) << "a done action stays done";
+    EXPECT_EQ(actions.get(kAnna, a)->value("status", ""), "done");
+
+    turns.start(turn);
+    turns.finish(turn, "Отметить?", nlohmann::json::array({"check_habit"}));
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE ani_turns SET created_at = now() - interval '1 minute' WHERE id::text = $1", turn);
+        return true;
+    });
+    const std::string next = (*turns.open(kAnna, "Готово?", "UTC"))["id"];
+    EXPECT_EQ(actions.of_previous_turn(kAnna, next),
+              nlohmann::json::parse(R"([{"summary":"Tick «Зарядка» for today","status":"done"}])"));
+    EXPECT_EQ(actions.of_previous_turn(kAnna, turn), nlohmann::json::array()) << "no turn before the first";
+
+    EXPECT_EQ(turns.remove(kAnna, turn), TurnRepository::Removed::Done);
+    EXPECT_FALSE(actions.for_worker(a).has_value()) << "the turn takes its actions with it";
 }

@@ -13,6 +13,8 @@ vi.mock('./chat', async (orig) => ({
   readTurn: vi.fn(),
   wakeAgent: vi.fn(),
   deleteTurn: vi.fn(),
+  confirmAction: vi.fn(),
+  cancelAction: vi.fn(),
   clearChat: vi.fn(),
 }));
 
@@ -23,6 +25,7 @@ const turn = (over: Partial<Turn>): Turn => ({
   reply: null,
   error: null,
   tools: [],
+  actions: [],
   created_at: '2026-10-25T16:00:00Z',
   updated_at: '2026-10-25T16:00:00Z',
   ...over,
@@ -140,5 +143,50 @@ describe('AniChat', () => {
     await act(async () => {});
     expect(chat.clearChat).toHaveBeenCalledOnce();
     expect(await screen.findByText(/Write to her/)).toBeTruthy();
+  });
+
+  it('shows a proposal with Confirm and reads the turn until it is made', async () => {
+    const pending = {
+      id: 'a1',
+      kind: 'add_note' as const,
+      summary: 'Note to the inbox: «молоко»',
+      status: 'pending' as const,
+      error: null,
+    };
+    vi.mocked(chat.loadTurns).mockResolvedValue([
+      turn({ status: 'done', reply: 'Записать?', actions: [pending] }),
+    ]);
+    vi.mocked(chat.confirmAction).mockResolvedValue({ ...pending, status: 'confirmed' });
+    vi.mocked(chat.readTurn).mockResolvedValue(
+      turn({ status: 'done', reply: 'Записать?', actions: [{ ...pending, status: 'done' }] }),
+    );
+    render(<AniChat tz="UTC" onClose={() => {}} />);
+    expect(await screen.findByText('Note to the inbox: «молоко»')).toBeTruthy();
+    fireEvent.click(screen.getByText('Confirm'));
+    expect(await screen.findByText('Doing it')).toBeTruthy();
+    expect(chat.confirmAction).toHaveBeenCalledWith('a1');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(chat.POLL_MS);
+    });
+    expect(await screen.findByText('Done')).toBeTruthy();
+    expect(screen.queryByText('Confirm')).toBeNull();
+  });
+
+  it('cancels a proposal', async () => {
+    const pending = {
+      id: 'a2',
+      kind: 'create_task' as const,
+      summary: 'Add the task «Паспорт»',
+      status: 'pending' as const,
+      error: null,
+    };
+    vi.mocked(chat.loadTurns).mockResolvedValue([
+      turn({ status: 'done', reply: 'Добавить?', actions: [pending] }),
+    ]);
+    vi.mocked(chat.cancelAction).mockResolvedValue({ ...pending, status: 'cancelled' });
+    render(<AniChat tz="UTC" onClose={() => {}} />);
+    fireEvent.click(await screen.findByText('Cancel'));
+    expect(await screen.findByText('Cancelled')).toBeTruthy();
+    expect(chat.readTurn).not.toHaveBeenCalled();
   });
 });

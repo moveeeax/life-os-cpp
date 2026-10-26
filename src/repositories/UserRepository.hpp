@@ -338,6 +338,7 @@ public:
         // (a trigger of migration 058); its pod goes with the next reconcile.
         "ani_agents",
         "ani_usage",
+        "ani_actions",
         "ani_turns",
     };
 

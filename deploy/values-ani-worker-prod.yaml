@@ -14,12 +14,13 @@
 # (ANI_AGENT_PROXY_URL in the Secret life-os-ani-agent). It also runs the
 # chat turns (ani_turn): it calls the pods' gateways and, for the agent's
 # tools, the API at ANI_AGENT_API_URL (same Secret), which lets this release
-# in through its NetworkPolicy (deploy/values-prod.yaml).
+# in through its NetworkPolicy (deploy/values-prod.yaml); the changes the
+# user confirms in the chat (ani_action) go to the same API.
 
 fullnameOverride: life-os-ani-worker
 
 worker:
-  types: "ani_agent_start,ani_agent_stop,ani_agents_reconcile,ani_turn"
+  types: "ani_agent_start,ani_agent_stop,ani_agents_reconcile,ani_turn,ani_action"
   # A start, a stop or a turn waiting for its agent defers instead of
   # holding a thread; a turn talking to its agent holds one for its seconds
   # to a few minutes, so a few at once keep users from queueing behind one.

@@ -10,6 +10,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include "agent/Actions.hpp"
 #include "agent/Gateway.hpp"
 #include "agent/Lifecycle.hpp"
 #include "agent/Manifest.hpp"
@@ -18,6 +19,7 @@
 #include "jobs/Job.hpp"
 #include "jobs/Jobs.hpp"
 #include "net/Http.hpp"
+#include "repositories/agent/ActionRepository.hpp"
 #include "repositories/agent/AgentRepository.hpp"
 #include "repositories/agent/TurnRepository.hpp"
 
@@ -26,6 +28,7 @@ namespace Agent {
 namespace {
 
 using json = nlohmann::json;
+using Repositories::Agent::ActionRepository;
 using Repositories::Agent::AgentRepository;
 using Repositories::Agent::TurnRepository;
 
@@ -40,29 +43,63 @@ json ended(const std::string& id, const std::string& owner, const std::string& e
     return json{{"status", "failed"}, {"error", error}};
 }
 
+/// What became of a proposal, as the agent is told.
+std::string outcome_words(const std::string& status) {
+    if (status == "done") {
+        return "done";
+    }
+    if (status == "failed") {
+        return "failed";
+    }
+    if (status == "cancelled") {
+        return "cancelled by the person";
+    }
+    if (status == "expired") {
+        return "never confirmed";
+    }
+    if (status == "pending") {
+        return "still waiting for the person";
+    }
+    return "being done";
+}
+
 }  // namespace
 
 std::string session_of(const std::string& owner, int chat_session) {
     return chat_session == 0 ? owner : owner + "#" + std::to_string(chat_session);
 }
 
-std::string preface(const std::string& local, const std::string& tz, const json& tools) {
+std::string preface(const std::string& local, const std::string& tz, const json& tools, const json& outcomes) {
     std::string out = "[Life OS: ";
     if (!local.empty()) {
         out += "the person's local time is " + local + ", " + tz + ". ";
     }
     out += "Reply in one or two short spoken sentences.";
-    if (tools.is_array() && !tools.empty()) {
+    std::string reads;
+    std::string writes;
+    for (const auto& t : tools.is_array() ? tools : json::array()) {
+        const std::string name = t.value(json::json_pointer("/function/name"), std::string());
+        std::string& names = Actions::is_write(name) ? writes : reads;
+        names += (names.empty() ? "" : ", ") + name;
+    }
+    if (!reads.empty()) {
         // Left to itself the model answers from its memory of the person; it
         // calls the tools every time once told the data is not there.
-        std::string names;
-        for (const auto& t : tools) {
-            names += (names.empty() ? "" : ", ") + t.value(json::json_pointer("/function/name"), std::string());
-        }
         out +=
             " Their Life OS data (day, tasks, goals, habits, sleep, money, food) is not in your memory: read it "
             "with the tools of this request (" +
-            names + ") every time it is asked about, never from memory.";
+            reads + ") every time it is asked about, never from memory.";
+    }
+    if (!writes.empty()) {
+        out += " Changes (" + writes +
+               ") are only proposed: the person confirms each with a button under your reply, so never say one "
+               "is done.";
+    }
+    if (outcomes.is_array() && !outcomes.empty()) {
+        out += " Your proposals of the last message:";
+        for (const auto& o : outcomes) {
+            out += " " + o.value("summary", std::string()) + ": " + outcome_words(o.value("status", "")) + ".";
+        }
     }
     return out + "]";
 }
@@ -140,16 +177,26 @@ json process_turn(const json& payload) {
         agents.touch(owner);
 
         const std::string tz = turn->value("tz", "UTC");
+        const std::string local = turns.local_now(tz).value_or("");
         json tools = json::array();
         Gateway::ToolRunner run = [](const std::string&, const json&) { return json{{"error", "unavailable"}}.dump(); };
         if (!s->api_url.empty()) {
             if (const auto token = Tools::access_token(owner)) {
                 tools = Tools::definitions();
                 run = Tools::runner(Net::Http::transport(), s->api_url, *token, tz);
+                // Changes need the person's day (a habit is ticked for today or before).
+                if (local.size() >= 10) {
+                    for (const auto& t : Actions::definitions()) {
+                        tools.push_back(t);
+                    }
+                    run = Actions::runner(
+                        Net::Http::transport(), s->api_url, *token, tz, local.substr(0, 10), owner, id, std::move(run));
+                }
             }
         }
+        const json outcomes = ActionRepository().of_previous_turn(owner, id);
         // The gateway ignores system messages: the context goes in front of the text.
-        const std::string text = preface(turns.local_now(tz).value_or(""), tz, tools) + "\n" + turn->value("text", "");
+        const std::string text = preface(local, tz, tools, outcomes) + "\n" + turn->value("text", "");
         const auto out = Gateway::converse(Net::Http::transport(),
                                            "http://" + gateway->first + ":" + std::to_string(Gateway::kGatewayPort),
                                            gateway->second,

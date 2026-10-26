@@ -4,7 +4,8 @@
  *        The API queues the turn (send); the worker runs it in the job
  *        ani_turn: wakes the user's agent if it sleeps and waits for it
  *        (DeferJob), then talks to the pod's gateway with the Life OS tools
- *        (agent/Gateway.hpp, agent/Tools.hpp) and stores the reply. A turn
+ *        (agent/Gateway.hpp, agent/Tools.hpp; the changes it proposes are
+ *        agent/Actions.hpp) and stores the reply. A turn
  *        that cannot run ends failed with a short code the panel words;
  *        it never throws past the job, so a half-run turn is not repeated.
  *        Payload: {"turn": "<turn id>"}.
@@ -48,9 +49,14 @@ Sent send(const std::string& owner, const std::string& text, const std::string& 
 std::string session_of(const std::string& owner, int chat_session);
 
 /// The bracketed line put in front of a message: the person's local time
-/// (@p local, empty when unknown), that the reply is spoken, and, when the
-/// turn offers @p tools, that their data is read with them and not recalled.
-std::string preface(const std::string& local, const std::string& tz, const nlohmann::json& tools);
+/// (@p local, empty when unknown), that the reply is spoken; when the turn
+/// offers @p tools, that their data is read with them and not recalled and
+/// that changes are only proposed; and what became of the proposals of the
+/// previous turn (@p outcomes, [{summary, status}]).
+std::string preface(const std::string& local,
+                    const std::string& tz,
+                    const nlohmann::json& tools,
+                    const nlohmann::json& outcomes = nlohmann::json::array());
 
 /// The job handler (registered in agent/jobs/Register.cpp).
 nlohmann::json process_turn(const nlohmann::json& payload);

@@ -127,6 +127,8 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
   const [busy, setBusy] = useState<'leaving' | 'arriving' | 'changing' | null>(null);
   const [wardrobe, setWardrobe] = useState(false);
   const [chat, setChat] = useState(false);
+  // Bumped when a voice question reaches her agent: the chat opens, or loads again.
+  const [chatKey, setChatKey] = useState(0);
   const ledgeRef = useRef<HTMLDivElement>(null);
   // The first state the engine starts from; later changes go through calls.
   const initial = useRef(ani);
@@ -149,7 +151,16 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
     try {
       talkRef.current = await startTalk({
         instructions: persona.instructions({ ...context, now: new Date() }),
-        tools: persona.tools(context),
+        tools: persona.tools({
+          ...context,
+          // A change she proposed from the call waits for the user in the chat.
+          onAgentTurn: (t) => {
+            if (t.actions.some((a) => a.status === 'pending')) {
+              setChatKey((k) => k + 1);
+              setChat(true);
+            }
+          },
+        }),
         onAudio: (stream) => e.follow(stream),
         onText: (t) => setSaid(t),
         onState: (st) => setTalk(st),
@@ -367,6 +378,7 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
       </div>
       {chat ? (
         <AniChat
+          key={chatKey}
           tz={context.tz}
           onClose={() => setChat(false)}
           onReply={(t) => {

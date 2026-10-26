@@ -1,6 +1,7 @@
 import { api } from '@/lib/api/client';
 import type { Today } from '@/lib/now/types';
 
+import { askAgent, refusal, type Turn } from './chat';
 import type { Tool } from './talk';
 
 /*
@@ -8,6 +9,9 @@ import type { Tool } from './talk';
  * digest the Now page already has), and the tools she reads more with. The
  * tools run in the browser against the site's API as the signed-in user, so
  * she sees only what that user sees; everything she reads goes to OpenAI.
+ * Anything harder, and every change, goes to her agent (ask_agent): a chat
+ * message whose reply she says, and whose proposed changes wait in the chat
+ * for the user's Confirm.
  */
 
 /** The digest without ids and empty values: less to read, nothing she needs lost. */
@@ -46,7 +50,10 @@ export function instructions(o: { name?: string; now: Date; tz: string; today?: 
 # Данные
 Сейчас ${time} (${o.tz}). Сводка дня со страницы Now (JSON):
 ${JSON.stringify(compact(o.today ?? {}))}
-Если нужно больше, вызывай инструменты: задачи на день, поиск задач, цели, привычки. Не выдумывай того, чего нет в данных. Ты только читаешь: ничего не создаёшь и не меняешь, а если просят, скажи, что это пока можно сделать только на сайте.
+Если нужно больше, вызывай инструменты: задачи на день, поиск задач, цели, привычки. Не выдумывай того, чего нет в данных.
+
+# Агент
+Для всего, на что не хватает этих инструментов (сон, деньги, еда, сложные вопросы), и для любых изменений (добавить или закрыть задачу, отметить привычку, записать заметку) вызывай ask_agent и передай просьбу своими словами. Перед вызовом коротко скажи, что сейчас посмотришь: ответ может идти до минуты. Потом перескажи его ответ. Изменения сам агент только предлагает: человек подтверждает их кнопкой в чате, который откроется рядом, так и скажи. Никогда не говори, что изменение уже сделано.
 
 # Начало
 Начни разговор сама: коротко поздоровайся и спроси, чем займёмся.`;
@@ -54,7 +61,24 @@ ${JSON.stringify(compact(o.today ?? {}))}
 
 const none = { type: 'object', properties: {}, additionalProperties: false };
 
-export function tools(o: { tz: string; date: string }): Tool[] {
+/** What the voice reads of her agent's turn. */
+export function agentAnswer(t: Turn): Record<string, unknown> {
+  if (t.status === 'done') {
+    const waiting = t.actions.filter((a) => a.status === 'pending').map((a) => a.summary);
+    return waiting.length
+      ? { reply: t.reply, waiting_for_confirm_in_chat: waiting }
+      : { reply: t.reply };
+  }
+  if (t.status === 'failed') return { error: t.error ?? 'failed' };
+  return { error: 'still_thinking', message: 'Агент ещё отвечает; ответ появится в чате.' };
+}
+
+export function tools(o: {
+  tz: string;
+  date: string;
+  /** Her agent answered a question from the call. */
+  onAgentTurn?(t: Turn): void;
+}): Tool[] {
   return [
     {
       name: 'tasks_of_day',
@@ -114,6 +138,28 @@ export function tools(o: { tz: string; date: string }): Tool[] {
       description: 'Привычки по порядку.',
       parameters: none,
       run: async () => compact(await api.getJson('/api/v1/habits')),
+    },
+    {
+      name: 'ask_agent',
+      description:
+        'Спросить твоего агента, у которого есть все данные Life OS и который может предложить изменения: задачу, закрытие задачи, отметку привычки, заметку. Ответ до минуты.',
+      parameters: {
+        type: 'object',
+        properties: { request: { type: 'string', description: 'Просьба или вопрос человека' } },
+        required: ['request'],
+        additionalProperties: false,
+      },
+      run: async (a) => {
+        const request = typeof a.request === 'string' ? a.request.trim() : '';
+        if (!request) return { error: 'empty_request' };
+        try {
+          const t = await askAgent(request, o.tz);
+          o.onAgentTurn?.(t);
+          return agentAnswer(t);
+        } catch (e) {
+          return { error: refusal(e) };
+        }
+      },
     },
   ];
 }

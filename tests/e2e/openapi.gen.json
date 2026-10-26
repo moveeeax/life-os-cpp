@@ -4617,6 +4617,7 @@
      "reply",
      "error",
      "tools",
+     "actions",
      "created_at",
      "updated_at"
     ],
@@ -4659,6 +4660,13 @@
       },
       "description": "The tools the agent ran, in order"
      },
+     "actions": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/AniAction"
+      },
+      "description": "The changes the agent proposed in this turn, in order"
+     },
      "created_at": {
       "type": "string",
       "format": "date-time"
@@ -4666,6 +4674,55 @@
      "updated_at": {
       "type": "string",
       "format": "date-time"
+     }
+    }
+   },
+   "AniAction": {
+    "type": "object",
+    "required": [
+     "id",
+     "kind",
+     "summary",
+     "status",
+     "error"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "create_task",
+       "complete_task",
+       "check_habit",
+       "add_note"
+      ]
+     },
+     "summary": {
+      "type": "string",
+      "description": "What the user confirms, in words"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "pending",
+       "confirmed",
+       "running",
+       "done",
+       "failed",
+       "cancelled",
+       "expired"
+      ],
+      "description": "pending until the user answers (expired after an hour unanswered); confirmed and running while the worker makes it; then done or failed, or cancelled"
+     },
+     "error": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Why a failed action failed: the API's error code, unavailable or interrupted"
      }
     }
    },
@@ -28582,6 +28639,117 @@
     }
    }
   },
+  "/api/v1/ani/actions/{id}/confirm": {
+   "post": {
+    "summary": "Confirm a change Ani's agent proposed",
+    "description": "The agent's write tools (a new task, closing a task, ticking a habit, a note to the inbox) only propose; this queues the change for the worker, which makes it as the caller through this API. The turn shows the action's status. Refused for API keys.",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     }
+    ],
+    "responses": {
+     "202": {
+      "description": "Confirmed and queued",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/AniAction"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "404": {
+      "description": "The agent is switched off, or no such action of the caller (action_not_found)"
+     },
+     "409": {
+      "description": "Confirmed or cancelled already (action_answered), or older than an hour (action_expired)"
+     },
+     "503": {
+      "description": "The job queue is not ready (jobs_disabled)"
+     }
+    }
+   }
+  },
+  "/api/v1/ani/actions/{id}/cancel": {
+   "post": {
+    "summary": "Cancel a change Ani's agent proposed",
+    "description": "Refused for API keys.",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Cancelled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/AniAction"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "404": {
+      "description": "The agent is switched off, or no such action of the caller (action_not_found)"
+     },
+     "409": {
+      "description": "Confirmed or cancelled already (action_answered)"
+     }
+    }
+   }
+  },
   "/api/v1/now/voice-session": {
    "post": {
     "summary": "A short-lived OpenAI Realtime client secret for talking with Ani on Now",
@@ -35267,7 +35435,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 527942,
-  "source_fnv1a64": "8869196d296c4937"
+  "source_bytes": 531046,
+  "source_fnv1a64": "a62cb003b0f46a94"
  }
 }
