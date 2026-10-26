@@ -6,6 +6,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.43.1] - 2026-10-26
+
+### Fixed
+- Ani's agent makes its tool calls again: with the four write tools it had twelve, past the point where OpenClaw hides client tools behind its Tool Search, and the model wrote the calls out as text. The managed config sets `tools.toolSearch: false`. A first call the gateway refuses within two minutes of the message (an agent just woken for it) is sent again whatever the refusal says, and a reply that starts by repeating the bracketed preface loses it.
+
 ## [1.43.0] - 2026-10-26
 
 ### Added
