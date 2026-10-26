@@ -5,10 +5,13 @@ import type { components } from '@/lib/api/schema.gen';
  * Writing to Ani's agent: an OpenClaw pod of the user's own, run by the
  * site's worker. A message queues a turn; the worker wakes the agent if it
  * sleeps (about half a minute), lets it read the user's Life OS through
- * read-only tools, and stores the reply, which the panel polls for.
+ * tools, and stores the reply, which the panel polls for. A change the
+ * agent wants to make (a task, a habit tick, a note) comes as a proposal
+ * under the reply, and only the user's Confirm makes it.
  */
 
 export type Turn = components['schemas']['AniTurn'];
+export type Action = components['schemas']['AniAction'];
 
 /** How often an open turn is read again. */
 export const POLL_MS = 1000;
@@ -97,4 +100,61 @@ export async function clearChat(): Promise<void> {
 /** Starts her agent while the user types; a refusal here shows up on send. */
 export function wakeAgent(): void {
   void api.POST('/api/v1/ani/agent/wake').catch(() => {});
+}
+
+/** Whether a confirmed change of the turn is still being made. */
+export function isDoing(t: Turn): boolean {
+  return t.actions.some((a) => a.status === 'confirmed' || a.status === 'running');
+}
+
+/** What became of a proposal, as the panel says it; null while it waits for the user. */
+export function actionState(a: Action): string | null {
+  switch (a.status) {
+    case 'pending':
+      return null;
+    case 'confirmed':
+    case 'running':
+      return 'Doing it';
+    case 'done':
+      return 'Done';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'expired':
+      return 'Not confirmed in time';
+    default:
+      return 'Did not work';
+  }
+}
+
+export async function confirmAction(id: string): Promise<Action> {
+  return (
+    await api.postJson<{ data: Action }>(`/api/v1/ani/actions/${encodeURIComponent(id)}/confirm`)
+  ).data;
+}
+
+export async function cancelAction(id: string): Promise<Action> {
+  return (
+    await api.postJson<{ data: Action }>(`/api/v1/ani/actions/${encodeURIComponent(id)}/cancel`)
+  ).data;
+}
+
+/** How long a question from the voice waits for her agent (a cold start is about a minute). */
+export const ASK_WAIT_MS = 150_000;
+
+/**
+ * A question from the voice call to her agent: sent as a chat message, then
+ * read until the reply. What comes back is what the voice says; the turn
+ * itself stays in the chat, with any change it proposes waiting there.
+ */
+export async function askAgent(
+  question: string,
+  tz: string,
+  wait = (ms: number) => new Promise((r) => setTimeout(r, ms)),
+): Promise<Turn> {
+  let t = await sendMessage(question, tz);
+  for (let waited = 0; isOpen(t) && waited < ASK_WAIT_MS; waited += POLL_MS) {
+    await wait(POLL_MS);
+    t = await readTurn(t.id);
+  }
+  return t;
 }

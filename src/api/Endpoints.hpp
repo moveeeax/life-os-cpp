@@ -320,6 +320,8 @@ inline const std::vector<EndpointInfo>& get_endpoints() {
         {"DELETE", "/api/v1/ani/turns/{id}", "Ani: delete one message of the chat and its reply"},
         {"DELETE", "/api/v1/ani/turns", "Ani: clear the chat; her agent starts a new conversation"},
         {"GET", "/api/v1/ani/turns/{id}/speech", "Ani: the reply of a turn read aloud in her voice (MP3)"},
+        {"POST", "/api/v1/ani/actions/{id}/confirm", "Ani: confirm a change her agent proposed; the worker makes it"},
+        {"POST", "/api/v1/ani/actions/{id}/cancel", "Ani: cancel a change her agent proposed"},
         {"GET", "/api/v1/sounds", "Now: the ready focus sounds with their public URLs"},
         {"GET", "/api/v1/admin/sounds", "Admin: every focus sound, pending ones included"},
         {"POST", "/api/v1/admin/sounds", "Admin: start a sound upload; answers a presigned PUT URL"},

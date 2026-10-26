@@ -5,7 +5,10 @@ import type { Today } from '@/lib/now/types';
 
 import { compact, instructions, tools } from './persona';
 
-vi.mock('@/lib/api/client', () => ({ api: { getJson: vi.fn() } }));
+vi.mock('@/lib/api/client', async (orig) => ({
+  ...(await orig<typeof import('@/lib/api/client')>()),
+  api: { getJson: vi.fn(), postJson: vi.fn() },
+}));
 const getJson = vi.mocked(api.getJson);
 
 describe('compact', () => {
@@ -66,5 +69,44 @@ describe('tools', () => {
     });
     await habits.run({});
     expect(getJson).toHaveBeenLastCalledWith('/api/v1/habits');
+  });
+
+  it('ask her agent and open the chat for a change to confirm', async () => {
+    vi.useFakeTimers();
+    vi.mocked(api.postJson).mockResolvedValueOnce({
+      data: {
+        id: 'q',
+        status: 'done',
+        text: 'x',
+        reply: 'Добавить задачу «Паспорт»?',
+        error: null,
+        tools: ['create_task'],
+        actions: [
+          {
+            id: 'a',
+            kind: 'create_task',
+            summary: 'Add the task «Паспорт»',
+            status: 'pending',
+            error: null,
+          },
+        ],
+        created_at: '',
+        updated_at: '',
+      },
+    });
+    const onAgentTurn = vi.fn();
+    const ask = tools({ tz: 'UTC', date: '2026-10-26', onAgentTurn }).find(
+      (t) => t.name === 'ask_agent',
+    )!;
+    expect(await ask.run({ request: 'Добавь задачу паспорт' })).toEqual({
+      reply: 'Добавить задачу «Паспорт»?',
+      waiting_for_confirm_in_chat: ['Add the task «Паспорт»'],
+    });
+    expect(api.postJson).toHaveBeenCalledWith('/api/v1/ani/messages', {
+      body: { text: 'Добавь задачу паспорт', tz: 'UTC' },
+    });
+    expect(onAgentTurn).toHaveBeenCalledOnce();
+    expect(await ask.run({ request: ' ' })).toEqual({ error: 'empty_request' });
+    vi.useRealTimers();
   });
 });

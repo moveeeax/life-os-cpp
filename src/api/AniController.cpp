@@ -14,6 +14,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "agent/Actions.hpp"
 #include "agent/Lifecycle.hpp"
 #include "agent/Settings.hpp"
 #include "agent/Turn.hpp"
@@ -25,6 +26,7 @@
 #include "net/Http.hpp"
 #include "now/Voice.hpp"
 #include "repositories/Zones.hpp"
+#include "repositories/agent/ActionRepository.hpp"
 #include "repositories/agent/AgentRepository.hpp"
 #include "repositories/agent/TurnRepository.hpp"
 #include "utils/BlockingPool.hpp"
@@ -64,6 +66,22 @@ HttpResponsePtr accepted(const json& body) {
     auto r = Response::ok(body);
     r->setStatusCode(k202Accepted);
     return r;
+}
+
+/// The refusal of an answer that did not take; nullptr when it did.
+HttpResponsePtr unanswered(Repositories::Agent::ActionRepository::Answer a) {
+    using Answer = Repositories::Agent::ActionRepository::Answer;
+    switch (a) {
+        case Answer::Done:
+            return nullptr;
+        case Answer::Missing:
+            return ErrorResponse::not_found("action_not_found");
+        case Answer::Expired:
+            return ErrorResponse::conflict("action_expired", "this proposal is too old: ask her again");
+        case Answer::NotPending:
+            break;
+    }
+    return ErrorResponse::conflict("action_answered", "this proposal was confirmed or cancelled already");
 }
 
 }  // namespace
@@ -304,6 +322,46 @@ void AniController::clearTurns(const HttpRequestPtr& req, Callback&& callback) {
         no_content(callback);
     } catch (const std::exception& e) {
         spdlog::error("ani.clearTurns failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
+void AniController::confirmAction(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    ANI_AGENT_GUARD(req, callback, owner);
+    API_REQUIRE_JOBS_READY(callback);
+    if (!is_valid_uuid(id)) {
+        callback(ErrorResponse::not_found("action_not_found"));
+        return;
+    }
+    try {
+        Repositories::Agent::ActionRepository actions;
+        if (auto refused = unanswered(actions.answer(owner, id, /*confirm=*/true))) {
+            callback(refused);
+            return;
+        }
+        Jobs::get().submit(::Agent::Actions::kActionJob, json{{"action", id}});
+        callback(accepted(json{{"data", actions.get(owner, id).value_or(json::object())}}));
+    } catch (const std::exception& e) {
+        spdlog::error("ani.confirmAction failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
+void AniController::cancelAction(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    ANI_AGENT_GUARD(req, callback, owner);
+    if (!is_valid_uuid(id)) {
+        callback(ErrorResponse::not_found("action_not_found"));
+        return;
+    }
+    try {
+        Repositories::Agent::ActionRepository actions;
+        if (auto refused = unanswered(actions.answer(owner, id, /*confirm=*/false))) {
+            callback(refused);
+            return;
+        }
+        callback(Response::ok(json{{"data", actions.get(owner, id).value_or(json::object())}}));
+    } catch (const std::exception& e) {
+        spdlog::error("ani.cancelAction failed: {}", e.what());
         callback(ErrorResponse::internal_error());
     }
 }

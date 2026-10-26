@@ -3,19 +3,22 @@
  * @brief The Life OS tools of Ani's agent: the list the gateway gets, the API
  *        request each call becomes, what the model reads of an answer, and
  *        the runner's requests. And the access claims the tools' token shares
- *        with the login.
+ *        with the login. And the write tools: what a call proposes, how a
+ *        task or a habit is found, and how a confirmed change is sent.
  */
 
 #include <set>
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <gtest/gtest.h>
 
 #include <nlohmann/json.hpp>
 
+#include "agent/Actions.hpp"
 #include "agent/Tools.hpp"
 #include "agent/Turn.hpp"
 #include "net/Http.hpp"
@@ -174,6 +177,171 @@ TEST(AgentTools, ThePrefaceSendsTheModelToTheTools) {
 
     const auto bare = Agent::preface("", "UTC", json::array());
     EXPECT_EQ(bare, "[Life OS: Reply in one or two short spoken sentences.]");
+}
+
+TEST(AgentTools, ThePrefaceTellsOfProposalsAndWhatBecameOfThem) {
+    json tools = T::definitions();
+    for (const auto& t : Agent::Actions::definitions()) {
+        tools.push_back(t);
+    }
+    const auto p = Agent::preface(
+        "2026-10-26 00:05, Mon", "UTC", tools, json::parse(R"([{"summary":"Add the task «Молоко»","status":"done"},
+                                                  {"summary":"Tick «Зарядка» for today","status":"cancelled"}])"));
+    EXPECT_NE(p.find("(today, tasks_of_day, find_tasks, goals, habits, sleep, money, food)"), std::string::npos)
+        << "the write tools are not in the read list";
+    EXPECT_NE(p.find("Changes (create_task, complete_task, check_habit, add_note) are only proposed"),
+              std::string::npos);
+    EXPECT_NE(p.find("Add the task «Молоко»: done. Tick «Зарядка» for today: cancelled by the person."),
+              std::string::npos);
+    EXPECT_EQ(p.back(), ']');
+}
+
+namespace {
+
+namespace A = Agent::Actions;
+
+/// Answers each GET by its path; records every request.
+struct Site : Net::Http::Transport {
+    std::vector<std::pair<std::string, Net::Http::Response>> answers;
+    std::vector<Net::Http::Request> sent;
+    Net::Http::Response get(const std::string&, const std::vector<std::pair<std::string, std::string>>&) override {
+        throw std::runtime_error("not expected");
+    }
+    Net::Http::Response post_json(const std::string&,
+                                  const std::string&,
+                                  const std::vector<std::pair<std::string, std::string>>&,
+                                  long) override {
+        throw std::runtime_error("not expected");
+    }
+    Net::Http::Response send(const Net::Http::Request& r) override {
+        sent.push_back(r);
+        for (const auto& [prefix, res] : answers) {
+            if (r.url.rfind(prefix, 0) == 0) {
+                return res;
+            }
+        }
+        return {404, R"({"error":"not_found"})"};
+    }
+};
+
+const std::string kApi = "http://api:8080";
+
+A::Proposed propose(Site& site, const std::string& name, const json& args) {
+    return A::propose(site, kApi, "jwt", "Asia/Almaty", "2026-10-26", name, args);
+}
+
+json refused(const A::Proposed& p) {
+    EXPECT_TRUE(std::holds_alternative<std::string>(p));
+    return std::holds_alternative<std::string>(p) ? json::parse(std::get<std::string>(p)) : json();
+}
+
+}  // namespace
+
+TEST(AgentActions, EveryWriteToolIsKnown) {
+    std::set<std::string> names;
+    for (const auto& d : A::definitions()) {
+        names.insert(d["function"]["name"].get<std::string>());
+        EXPECT_FALSE(d["function"]["parameters"]["required"].empty());
+    }
+    EXPECT_EQ(names, (std::set<std::string>{"create_task", "complete_task", "check_habit", "add_note"}));
+    for (const auto& n : names) {
+        EXPECT_TRUE(A::is_write(n)) << n;
+    }
+    EXPECT_FALSE(A::is_write("habits"));
+}
+
+TEST(AgentActions, ANewTaskAndANoteNeedNoLookup) {
+    Site site;
+    auto p = std::get<A::Proposal>(
+        propose(site, "create_task", json{{"title", "  Купить молоко "}, {"area", "health"}, {"due", "2026-10-27"}}));
+    EXPECT_EQ(p.kind, "create_task");
+    EXPECT_EQ(p.summary, "Add the task «Купить молоко», due 2026-10-27");
+    EXPECT_EQ(p.request["method"], "POST");
+    EXPECT_EQ(p.request["path"], "/api/v1/tasks/items");
+    EXPECT_EQ(p.request["body"], json::parse(R"({"title":"Купить молоко","area":"health","due":"2026-10-27"})"));
+
+    EXPECT_EQ(refused(propose(site, "create_task", json{{"title", "x"}, {"area", "work"}}))["error"], "invalid");
+    EXPECT_EQ(refused(propose(site, "create_task", json{{"area", "health"}}))["error"], "invalid");
+
+    p = std::get<A::Proposal>(propose(site, "add_note", json{{"text", "Позвонить маме"}}));
+    EXPECT_EQ(p.summary, "Note to the inbox: «Позвонить маме»");
+    EXPECT_EQ(p.request["body"], (json{{"text", "Позвонить маме"}}));
+    EXPECT_TRUE(site.sent.empty());
+}
+
+TEST(AgentActions, ATaskIsClosedOnlyWhenItsWordsFindOneOpenTask) {
+    Site site;
+    site.answers = {{kApi + "/api/v1/tasks/items", {200, R"({"data":[{"id":"t1","title":"Паспорт","status":"open"},
+                                       {"id":"t2","title":"Паспорт сыну","status":"in_progress"},
+                                       {"id":"t3","title":"Паспорт старый","status":"done"}]})"}}};
+    const auto many = refused(propose(site, "complete_task", json{{"task", "Пасп"}}));
+    EXPECT_EQ(many["error"], "ambiguous");
+    EXPECT_EQ(many["matches"], json::array({"Паспорт", "Паспорт сыну"})) << "a done task is not offered";
+    EXPECT_EQ(site.sent[0].url, kApi + "/api/v1/tasks/items?q=%D0%9F%D0%B0%D1%81%D0%BF&limit=10&tz=Asia/Almaty");
+    EXPECT_EQ(site.sent[0].headers[0], (std::pair<std::string, std::string>{"Authorization", "Bearer jwt"}));
+
+    const auto p = std::get<A::Proposal>(propose(site, "complete_task", json{{"task", "Паспорт"}}));
+    EXPECT_EQ(p.summary, "Close the task «Паспорт»") << "the exact title wins";
+    EXPECT_EQ(p.request["method"], "PATCH");
+    EXPECT_EQ(p.request["path"], "/api/v1/tasks/items/t1");
+    EXPECT_EQ(p.request["body"], (json{{"status", "done"}}));
+
+    site.answers = {{kApi + "/api/v1/tasks/items", {200, R"({"data":[]})"}}};
+    EXPECT_EQ(refused(propose(site, "complete_task", json{{"task", "Визa"}}))["error"], "not_found");
+}
+
+TEST(AgentActions, AHabitIsFoundByItsNameAndTickedByHandOnly) {
+    Site site;
+    site.answers = {
+        {kApi + "/api/v1/habits", {200, R"({"data":[{"id":"h1","name":"Зарядка","source":"manual","unit":""},
+                                       {"id":"h2","name":"Вода","source":"manual","unit":"л"},
+                                       {"id":"h3","name":"Шаги","source":"fitness:steps","unit":"steps"}]})"}}};
+    auto p = std::get<A::Proposal>(propose(site, "check_habit", json{{"habit", "Зарядка"}}));
+    EXPECT_EQ(p.summary, "Tick «Зарядка» for today");
+    EXPECT_EQ(p.request["method"], "PUT");
+    EXPECT_EQ(p.request["path"], "/api/v1/habits/h1/checks/2026-10-26");
+    EXPECT_EQ(p.request["query"], json::parse(R"([["tz","Asia/Almaty"]])"));
+
+    p = std::get<A::Proposal>(
+        propose(site, "check_habit", json{{"habit", "Вод"}, {"amount", 1.5}, {"date", "2026-10-25"}}));
+    EXPECT_EQ(p.summary, "Add 1.5 л to «Вода» for 2026-10-25");
+    EXPECT_EQ(p.request["method"], "POST");
+    EXPECT_EQ(p.request["path"], "/api/v1/habits/h2/checks/2026-10-25/add");
+    EXPECT_EQ(p.request["body"], (json{{"value", 1.5}}));
+
+    EXPECT_EQ(refused(propose(site, "check_habit", json{{"habit", "Шаги"}}))["error"], "automatic");
+    const auto none = refused(propose(site, "check_habit", json{{"habit", "Йога"}}));
+    EXPECT_EQ(none["error"], "not_found");
+    EXPECT_EQ(none["habits"].size(), 3U);
+    EXPECT_EQ(refused(propose(site, "check_habit", json{{"habit", "Зарядка"}, {"date", "2026-10-27"}}))["error"],
+              "invalid")
+        << "not a day ahead";
+}
+
+TEST(AgentActions, AConfirmedChangeIsSentAsTheUser) {
+    Site site;
+    site.answers = {{kApi + "/api/v1/tasks/notes", {201, R"({"data":{"id":"n1"}})"}},
+                    {kApi + "/api/v1/tasks/items/t1", {422, R"({"error":"invalid_status","status":422})"}}};
+    EXPECT_EQ(
+        A::execute(
+            site, kApi, "jwt", json{{"method", "POST"}, {"path", "/api/v1/tasks/notes"}, {"body", {{"text", "x"}}}}),
+        "");
+    EXPECT_EQ(site.sent[0].method, "POST");
+    EXPECT_EQ(site.sent[0].body, R"({"text":"x"})");
+    EXPECT_EQ(site.sent[0].content_type, "application/json");
+    EXPECT_EQ(A::execute(site,
+                         kApi,
+                         "jwt",
+                         json{{"method", "PATCH"},
+                              {"path", "/api/v1/tasks/items/t1"},
+                              {"query", json::parse(R"([["tz","UTC"]])")},
+                              {"body", {{"status", "done"}}}}),
+              "invalid_status");
+    EXPECT_EQ(site.sent[1].url, kApi + "/api/v1/tasks/items/t1?tz=UTC");
+    EXPECT_EQ(A::execute(site, kApi, "jwt", json{{"method", "DELETE"}, {"path", "/nope"}}), "not_found");
+
+    const auto told = json::parse(A::proposed_text(A::Proposal{"add_note", "Note to the inbox: «x»", json()}));
+    EXPECT_EQ(told["proposed"], "Note to the inbox: «x»");
 }
 
 TEST(AgentTools, AClearedChatIsANewSession) {

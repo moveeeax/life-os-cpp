@@ -4,10 +4,14 @@ import { ApiClientError } from '@/lib/api/client';
 
 import {
   POLL_MS,
+  actionState,
+  cancelAction,
   clearChat,
+  confirmAction,
   deleteTurn,
   TEXT_MAX,
   failure,
+  isDoing,
   isOpen,
   loadTurns,
   readTurn,
@@ -16,6 +20,7 @@ import {
   setSoundOn,
   soundOn,
   wakeAgent,
+  type Action,
   type Turn,
 } from './chat';
 
@@ -66,9 +71,11 @@ function SpeakerIcon({ on }: { on: boolean }) {
  * The chat with Ani's agent, right of her on Now. Opening it wakes her agent,
  * so it is usually up by the first message; the reply of an open turn is
  * polled every second, and a reply that arrives while the panel is open is
- * handed to onReply to be spoken (unless the sound is off). A message can be
- * deleted (×, on hover), and the bin clears the chat, which her agent takes
- * as a new conversation. Messages and replies are personal: Hide numbers
+ * handed to onReply to be spoken (unless the sound is off). A change her
+ * agent proposes shows under the reply with Confirm and Cancel; a confirmed
+ * one is read again until it is made. A message can be deleted (×, on
+ * hover), and the bin clears the chat, which her agent takes as a new
+ * conversation. Messages, replies and proposals are personal: Hide numbers
  * blurs them.
  */
 export function AniChat({
@@ -109,11 +116,14 @@ export function AniChat({
 
   const last = turns?.[turns.length - 1];
   const waiting = last != null && isOpen(last);
+  // The turn read again: the open one until it ends, or one whose confirmed
+  // change is still being made.
+  const watched = waiting ? last : turns?.slice().reverse().find(isDoing);
+  const watching = watched != null && (isOpen(watched) || isDoing(watched));
 
-  // The open turn, read again until it ends.
   useEffect(() => {
-    if (!last || !isOpen(last)) return;
-    const id = last.id;
+    if (!watched || !watching) return;
+    const id = watched.id;
     const timer = window.setInterval(() => {
       readTurn(id)
         .then((t) => {
@@ -127,7 +137,7 @@ export function AniChat({
         .catch(() => {});
     }, POLL_MS);
     return () => window.clearInterval(timer);
-  }, [last?.id, last?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [watched?.id, watching]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const el = listRef.current;
@@ -143,6 +153,35 @@ export function AniChat({
   }, [onClose]);
 
   const [confirmClear, setConfirmClear] = useState(false);
+
+  const answer = async (turnId: string, a: Action, confirm: boolean) => {
+    setProblem(null);
+    const put = (next: Action) =>
+      setTurns(
+        (all) =>
+          all?.map((t) =>
+            t.id === turnId
+              ? { ...t, actions: t.actions.map((x) => (x.id === next.id ? next : x)) }
+              : t,
+          ) ?? all,
+      );
+    try {
+      put(await (confirm ? confirmAction(a.id) : cancelAction(a.id)));
+    } catch (err) {
+      if (err instanceof ApiClientError && err.code === 'action_expired') {
+        put({ ...a, status: 'expired' });
+        setProblem('That was too long ago. Ask her again.');
+      } else if (err instanceof ApiClientError && err.code === 'action_answered') {
+        readTurn(turnId)
+          .then((t) => setTurns((all) => all?.map((x) => (x.id === t.id ? t : x)) ?? all))
+          .catch(() => {});
+      } else {
+        setProblem(
+          confirm ? 'It was not confirmed. Try again.' : 'It was not cancelled. Try again.',
+        );
+      }
+    }
+  };
 
   const remove = async (id: string) => {
     setProblem(null);
@@ -251,8 +290,8 @@ export function AniChat({
           <p className="ani-chat-note">Loading</p>
         ) : turns.length === 0 ? (
           <p className="ani-chat-note">
-            Write to her. She can look at your day, tasks, goals, habits, sleep, money and food, but
-            cannot change anything yet.
+            Write to her. She can look at your day, tasks, goals, habits, sleep, money and food. She
+            can also add or close a task, tick a habit or note something down, once you confirm it.
           </p>
         ) : (
           turns.map((t) => (
@@ -279,6 +318,30 @@ export function AniChat({
                   <span className="ani-dots" aria-hidden="true" />
                 </p>
               )}
+              {isOpen(t)
+                ? null
+                : t.actions.map((a) => {
+                    const state = actionState(a);
+                    return (
+                      <div key={a.id} className="ani-act" data-status={a.status}>
+                        <span className="num">{a.summary}</span>
+                        {state == null ? (
+                          <span className="ani-act-btns">
+                            <button type="button" onClick={() => void answer(t.id, a, true)}>
+                              Confirm
+                            </button>
+                            <button type="button" onClick={() => void answer(t.id, a, false)}>
+                              Cancel
+                            </button>
+                          </span>
+                        ) : (
+                          <span className="ani-act-state" role="status">
+                            {state}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
             </div>
           ))
         )}

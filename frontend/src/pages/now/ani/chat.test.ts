@@ -2,7 +2,19 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ApiClientError, api } from '@/lib/api/client';
 
-import { failure, isOpen, loadTurns, refusal, sendMessage, type Turn } from './chat';
+import {
+  actionState,
+  askAgent,
+  confirmAction,
+  failure,
+  isDoing,
+  isOpen,
+  loadTurns,
+  refusal,
+  sendMessage,
+  type Action,
+  type Turn,
+} from './chat';
 
 vi.mock('@/lib/api/client', async (orig) => ({
   ...(await orig<typeof import('@/lib/api/client')>()),
@@ -16,6 +28,7 @@ const turn = (id: string, status: Turn['status']): Turn => ({
   reply: null,
   error: null,
   tools: [],
+  actions: [],
   created_at: '2026-10-25T16:00:00Z',
   updated_at: '2026-10-25T16:00:00Z',
 });
@@ -51,5 +64,40 @@ describe('chat', () => {
     expect(refusal(err(429))).toMatch(/one hour/);
     expect(refusal(err(422, 'budget'))).toBe(failure('budget'));
     expect(refusal(new Error('offline'))).toMatch(/not sent/);
+  });
+
+  it('words what became of a proposal; a pending one has buttons instead', () => {
+    const a = (status: Action['status']): Action => ({
+      id: 'x',
+      kind: 'add_note',
+      summary: 'Note',
+      status,
+      error: null,
+    });
+    expect(actionState(a('pending'))).toBeNull();
+    expect(actionState(a('running'))).toBe('Doing it');
+    expect(actionState(a('done'))).toBe('Done');
+    expect(actionState(a('expired'))).toBe('Not confirmed in time');
+    expect(actionState(a('failed'))).toBe('Did not work');
+    expect(isDoing({ ...turn('a', 'done'), actions: [a('confirmed')] })).toBe(true);
+    expect(isDoing({ ...turn('a', 'done'), actions: [a('done'), a('pending')] })).toBe(false);
+  });
+
+  it('confirms a proposal by its id', async () => {
+    vi.mocked(api.postJson).mockResolvedValueOnce({ data: { id: 'x', status: 'confirmed' } });
+    expect((await confirmAction('x')).status).toBe('confirmed');
+    expect(api.postJson).toHaveBeenLastCalledWith('/api/v1/ani/actions/x/confirm');
+  });
+
+  it('asks her agent from the voice and waits for the reply', async () => {
+    vi.mocked(api.postJson).mockResolvedValueOnce({ data: turn('q', 'queued') });
+    vi.mocked(api.getJson)
+      .mockResolvedValueOnce({ data: turn('q', 'running') })
+      .mockResolvedValueOnce({ data: { ...turn('q', 'done'), reply: 'Добавить молоко?' } });
+    const wait = vi.fn(() => Promise.resolve());
+    const t = await askAgent('Добавь молоко', 'UTC', wait);
+    expect(t.reply).toBe('Добавить молоко?');
+    expect(wait).toHaveBeenCalledTimes(2);
+    expect(api.getJson).toHaveBeenLastCalledWith('/api/v1/ani/turns/q');
   });
 });

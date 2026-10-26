@@ -15198,6 +15198,141 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ani/actions/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a change Ani's agent proposed
+         * @description The agent's write tools (a new task, closing a task, ticking a habit, a note to the inbox) only propose; this queues the change for the worker, which makes it as the caller through this API. The turn shows the action's status. Refused for API keys.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Confirmed and queued */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniAction"];
+                        };
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The agent is switched off, or no such action of the caller (action_not_found) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Confirmed or cancelled already (action_answered), or older than an hour (action_expired) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The job queue is not ready (jobs_disabled) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/actions/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a change Ani's agent proposed
+         * @description Refused for API keys.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Cancelled */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniAction"];
+                        };
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The agent is switched off, or no such action of the caller (action_not_found) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Confirmed or cancelled already (action_answered) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/now/voice-session": {
         parameters: {
             query?: never;
@@ -22564,10 +22699,27 @@ export interface components {
             error: string | null;
             /** @description The tools the agent ran, in order */
             tools: string[];
+            /** @description The changes the agent proposed in this turn, in order */
+            actions: components["schemas"]["AniAction"][];
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
             updated_at: string;
+        };
+        AniAction: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "create_task" | "complete_task" | "check_habit" | "add_note";
+            /** @description What the user confirms, in words */
+            summary: string;
+            /**
+             * @description pending until the user answers (expired after an hour unanswered); confirmed and running while the worker makes it; then done or failed, or cancelled
+             * @enum {string}
+             */
+            status: "pending" | "confirmed" | "running" | "done" | "failed" | "cancelled" | "expired";
+            /** @description Why a failed action failed: the API's error code, unavailable or interrupted */
+            error: string | null;
         };
         NowVoiceSession: {
             /** @description The client secret (ek_...) for POST https://api.openai.com/v1/realtime/calls */

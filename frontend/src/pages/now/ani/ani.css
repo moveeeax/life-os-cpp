@@ -418,6 +418,41 @@
   color: #1a1020;
   background: #f0a993;
 }
+.ani-act {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-self: start;
+  gap: 6px 10px;
+  max-width: 85%;
+  padding: 7px 11px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 13px;
+  color: var(--g-ink);
+}
+.ani-act-btns {
+  display: flex;
+  gap: 6px;
+}
+.ani-act-btns button {
+  padding: 3px 10px;
+  border-radius: 8px;
+  color: var(--g-ink);
+  background: rgba(255, 255, 255, 0.1);
+}
+.ani-act-btns button:first-child {
+  color: #1a1020;
+  background: #f0a993;
+}
+.ani-act-state {
+  font-size: 12px;
+  color: var(--g-ink-soft);
+}
+.ani-act[data-status='failed'] .ani-act-state,
+.ani-act[data-status='expired'] .ani-act-state {
+  color: #f0a993;
+}
 .ani-msg {
   margin: 0;
   max-width: 85%;

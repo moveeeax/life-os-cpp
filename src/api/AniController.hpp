@@ -5,8 +5,9 @@
  *        (agent/Turn.hpp): a message queues a turn, the page polls the turn
  *        for the reply and fetches it spoken (now/Voice.hpp). A turn can be
  *        deleted, and clearing the chat also starts a new conversation for
- *        the agent. 404 while the agent is switched off; a browser session
- *        only (an API key gets 401).
+ *        the agent. A change the agent proposed (agent/Actions.hpp) is
+ *        confirmed, which queues it for the worker, or cancelled. 404 while the agent is switched off; a browser
+ * session only (an API key gets 401).
  */
 
 #pragma once
@@ -32,6 +33,8 @@ public:
     ADD_METHOD_TO(AniController::removeTurn, "/api/v1/ani/turns/{id}", Delete);
     ADD_METHOD_TO(AniController::clearTurns, "/api/v1/ani/turns", Delete);
     ADD_METHOD_TO(AniController::speech, "/api/v1/ani/turns/{id}/speech", Get);
+    ADD_METHOD_TO(AniController::confirmAction, "/api/v1/ani/actions/{id}/confirm", Post);
+    ADD_METHOD_TO(AniController::cancelAction, "/api/v1/ani/actions/{id}/cancel", Post);
     METHOD_LIST_END
 
     using Callback = std::function<void(const HttpResponsePtr&)>;
@@ -45,6 +48,8 @@ public:
     void speech(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void removeTurn(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void clearTurns(const HttpRequestPtr& req, Callback&& callback);
+    void confirmAction(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void cancelAction(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
 };
 
 }  // namespace Api
