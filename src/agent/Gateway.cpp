@@ -51,7 +51,7 @@ Outcome converse(Net::Http::Transport& transport,
         }
         if (res.status != 200) {
             const bool not_ready = round == 0 && res.body.find(kNotReadyMarker) != std::string::npos;
-            throw Error("unavailable", "the gateway answered " + std::to_string(res.status), not_ready);
+            throw Error("unavailable", "the gateway answered " + std::to_string(res.status), not_ready, round == 0);
         }
         const auto body = json::parse(res.body, nullptr, /*allow_exceptions=*/false);
         const auto message = body.is_object() ? body.value(json::json_pointer("/choices/0/message"), json()) : json();

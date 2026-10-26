@@ -226,6 +226,7 @@ TEST(AgentGateway, AnAgentStillStartingIsNotReadyOnTheFirstCallOnly) {
         FAIL() << "expected an error";
     } catch (const G::Error& e) {
         EXPECT_FALSE(e.not_ready);
+        EXPECT_FALSE(e.first_call);
     }
 
     Pod broken;
@@ -235,5 +236,6 @@ TEST(AgentGateway, AnAgentStillStartingIsNotReadyOnTheFirstCallOnly) {
         FAIL() << "expected an error";
     } catch (const G::Error& e) {
         EXPECT_FALSE(e.not_ready);
+        EXPECT_TRUE(e.first_call) << "refused before the model: may be sent again while the turn is young";
     }
 }

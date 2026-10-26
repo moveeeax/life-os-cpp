@@ -104,7 +104,10 @@ inline json openclaw_config(const Settings& s, const std::string& proxy_token) {
                         "group:automation",
                         "group:web",
                         "group:messaging",
-                        "group:media"})}}},
+                        "group:media"})},
+          // Past a handful of tools OpenClaw hides them behind its Tool Search,
+          // and the model then writes the calls as text instead of making them.
+          {"toolSearch", false}}},
         {"cron", {{"enabled", false}}},
     };
 }

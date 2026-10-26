@@ -104,6 +104,16 @@ std::string preface(const std::string& local, const std::string& tz, const json&
     return out + "]";
 }
 
+std::string without_preface(const std::string& reply) {
+    const auto start = reply.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos || reply.compare(start, 9, "[Life OS:") != 0) {
+        return reply;
+    }
+    const auto end = reply.find(']', start);
+    const auto rest = end == std::string::npos ? std::string::npos : reply.find_first_not_of(" \t\r\n", end + 1);
+    return rest == std::string::npos ? reply : reply.substr(rest);
+}
+
 Sent send(const std::string& owner, const std::string& text, const std::string& tz) {
     const auto s = read_settings();
     if (!s) {
@@ -204,14 +214,17 @@ json process_turn(const json& payload) {
                                            text,
                                            tools,
                                            run);
-        turns.finish(id, out.reply, out.tools);
+        turns.finish(id, without_preface(out.reply), out.tools);
         agents.touch(owner);
         return json{{"status", "done"}, {"tools", out.tools.size()}};
     } catch (const Jobs::DeferJob&) {
         throw;
     } catch (const Gateway::Error& e) {
         // Woken just now, the agent may still be preparing: the turn waits for it.
-        if (e.not_ready && turn->value("age_seconds", 0LL) <= kTurnWaitSeconds && turns.requeue(id)) {
+        const long long age = turn->value("age_seconds", 0LL);
+        const bool again =
+            (e.not_ready && age <= kTurnWaitSeconds) || (e.first_call && age <= kFirstRefusalRetrySeconds);
+        if (again && turns.requeue(id)) {
             throw Jobs::DeferJob("the agent is still starting", 3000);
         }
         return ended(id, owner, e.code, e.what());

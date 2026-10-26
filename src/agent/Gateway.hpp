@@ -39,11 +39,15 @@ inline constexpr long kCallTimeoutSeconds = 120;
 /// @p not_ready: the gateway refused the first call because its agent is
 /// still being prepared (it listens, and passes /readyz, before that ends);
 /// nothing reached the model, so the turn may simply be sent again.
+/// @p first: the gateway refused the first call, whatever it said; nothing
+/// reached the model either (a just-woken agent may refuse without naming
+/// its startup).
 struct Error : std::runtime_error {
-    Error(std::string c, const std::string& what, bool nr = false)
-        : std::runtime_error(what), code(std::move(c)), not_ready(nr) {}
+    Error(std::string c, const std::string& what, bool nr = false, bool first = false)
+        : std::runtime_error(what), code(std::move(c)), not_ready(nr), first_call(first) {}
     std::string code;
     bool not_ready = false;
+    bool first_call = false;
 };
 
 /// What OpenClaw answers while its agent has not finished starting up.

@@ -27,6 +27,9 @@ inline constexpr int kTurnsPerHour = 60;
 inline constexpr std::size_t kTurnTextMax = 4000;
 /// A turn still waiting for its agent after this long fails as a timeout.
 inline constexpr int kTurnWaitSeconds = 480;
+/// A first call refused for any reason is sent again while the turn is this
+/// young: the agent was most likely woken for it and is still preparing.
+inline constexpr int kFirstRefusalRetrySeconds = 120;
 
 enum class Send {
     Queued,  // the turn is in; its view is in `turn`
@@ -57,6 +60,10 @@ std::string preface(const std::string& local,
                     const std::string& tz,
                     const nlohmann::json& tools,
                     const nlohmann::json& outcomes = nlohmann::json::array());
+
+/// @p reply without the bracketed preface, which the model now and then
+/// repeats at its start; it is not for the person.
+std::string without_preface(const std::string& reply);
 
 /// The job handler (registered in agent/jobs/Register.cpp).
 nlohmann::json process_turn(const nlohmann::json& payload);
