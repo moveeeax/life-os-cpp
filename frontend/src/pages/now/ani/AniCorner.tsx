@@ -7,6 +7,8 @@ import { speechUrl } from './chat';
 import type { Ani } from './engine';
 import type { Talk, TalkState } from './talk';
 import { useAni, type AniOutfit } from './state';
+import { createToucher } from './touch';
+import { zoneWords } from './zones';
 import './ani.css';
 
 /** A hanger: opens the outfits in place of the ledge's state. */
@@ -36,7 +38,6 @@ const LINES = {
   day: 'Привет! Как идут дела?',
   evening: 'Добрый вечер. Долгий был день?',
   night: 'Уже поздно. Может, пора спать?',
-  tickle: 'Эй, щекотно!',
   dizzy: 'Ой, голова кружится.',
 } as const;
 type Line = keyof typeof LINES;
@@ -111,8 +112,8 @@ export interface AniContext {
  * Ani in the bottom left corner of Now: the model standing on a glass ledge
  * left of the dock. The ledge sends her off through the left edge and calls
  * her back; its hanger opens the outfits, and a change happens off screen.
- * A drag on her turns her round, a tap says hello (then tickles); coming
- * back she greets. The microphone under the hanger starts a conversation in
+ * A drag on her turns her round; a tap answers by where it lands on her
+ * (touch.ts), lit for a moment and named by the tap; coming back she greets. The microphone under the hanger starts a conversation in
  * an AI voice (OpenAI); the speech balloon next to the hanger opens a chat
  * with her agent (AniChat). The engine (three and the model, about 15 MB
  * from the bucket) loads only when she is on.
@@ -134,6 +135,10 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
   // The first state the engine starts from; later changes go through calls.
   const initial = useRef(ani);
   const [said, setSaid] = useState<string | null>(null);
+  // Where the last tap landed on her, named by the tap for a moment.
+  const [touch, setTouch] = useState<{ text: string; x: number; y: number; n: number } | null>(
+    null,
+  );
   const [talk, setTalk] = useState<TalkState | null>(null);
   const talkRef = useRef<Talk | null>(null);
   const stopTalk = () => {
@@ -173,7 +178,29 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
     }
   };
   useEffect(() => () => talkRef.current?.stop(), []);
-  const greeted = useRef(false);
+  // Her answers to taps on her body read the day as it is now.
+  const contextRef = useRef(context);
+  contextRef.current = context;
+  const toucher = useRef(
+    createToucher(
+      () => engine.current,
+      () => contextRef.current.today,
+      () => document.querySelector<HTMLInputElement>('.n-input'),
+    ),
+  );
+  const sayTimer = useRef(0);
+  /** A line with no recording: shown for a while. */
+  const show = (text: string) => {
+    if (talkRef.current) return;
+    setSaid(text);
+    clearTimeout(sayTimer.current);
+    sayTimer.current = window.setTimeout(
+      () => setSaid((v) => (v === text ? null : v)),
+      1800 + text.length * 45,
+    );
+  };
+  const showRef = useRef(show);
+  showRef.current = show;
   const speak = useRef<(l: Line) => void>(() => {});
   speak.current = (l: Line) => {
     const e = engine.current;
@@ -211,10 +238,13 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
           present: initial.current.here,
           onReady: () => setReady(true),
           onError: () => setFailed(true),
-          // The first tap greets her by the time of day, later ones tickle.
-          onTap: () => {
-            speak.current(greeted.current ? 'tickle' : hello());
-            greeted.current = true;
+          // A tap answers by where it landed (touch.ts).
+          onTap: (z, at) => {
+            setTouch((t) => ({ text: zoneWords(z), x: at.x, y: at.y, n: (t?.n ?? 0) + 1 }));
+            const a = toucher.current.tap(z, at);
+            if (!a) return;
+            if (a.voice) speak.current(a.voice);
+            else showRef.current(a.text);
           },
           onSpin: () => speak.current('dizzy'),
         });
@@ -261,10 +291,7 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
     engine.current.present(here, () => {
       setBusy(null);
       // Back: she says hello.
-      if (here) {
-        greeted.current = true;
-        speak.current(hello());
-      }
+      if (here) speak.current(hello());
     });
   };
 
@@ -304,12 +331,23 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
           {said}
         </div>
       ) : null}
+      {touch ? (
+        <div
+          key={touch.n}
+          className="ani-touch"
+          style={{ left: touch.x, top: touch.y }}
+          onAnimationEnd={() => setTouch((t) => (t?.n === touch.n ? null : t))}
+          data-num-ok
+        >
+          {touch.text}
+        </div>
+      ) : null}
       <div
         ref={hitRef}
         className="ani-hit"
         data-away={ani.here ? undefined : ''}
         role="img"
-        aria-label="Ani. Drag to turn her, tap to say hello."
+        aria-label="Ani. Drag to turn her, tap her to see what she says."
       />
       <div ref={ledgeRef} className="ani-ledge" data-wardrobe={wardrobe ? '' : undefined}>
         {wardrobe ? (
