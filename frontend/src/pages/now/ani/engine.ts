@@ -5,6 +5,7 @@ import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js';
 import { loadClip, type Clip } from './motion';
 import { createSprings, type Collider, type SpringGroup, type Springs } from './springs';
 import { createVoice } from './voice';
+import { sameZone, zoneOf, type Zone } from './zones';
 
 /*
  * Ani on Now: the PMX model, posed every frame by a small director (weight
@@ -44,13 +45,26 @@ export interface AniOptions {
   present: boolean;
   onReady?: () => void;
   onError?: (e: unknown) => void;
-  /** A tap on her (not a drag). */
-  onTap?: () => void;
+  /** A tap on her (not a drag); taps beside her body are let go. */
+  onTap?: (z: Zone, at: { x: number; y: number }) => void;
   /** A long drag that spun her round more than once. */
   onSpin?: () => void;
 }
 
+/** A face she makes for a while, over her own. */
+export type Feeling = 'happy' | 'cross' | 'scrunch' | 'surprised' | 'sneeze';
+
 export interface Ani {
+  /** Makes a face for `seconds`. */
+  feel(f: Feeling, seconds: number): void;
+  /** Leans her head into a pat on her `side` (1 her left, -1 her right). */
+  tilt(side: number, seconds: number): void;
+  /** Looks at a point of the page (viewport CSS px) for `seconds`. */
+  glance(x: number, y: number, seconds: number): void;
+  /** Turns her back on the page for `seconds`; 0 turns her round again. */
+  sulk(seconds: number): void;
+  /** Plays one of her clips (wave, idle_happy, spin, peace...). */
+  act(name: string): void;
   /** false sends her off through the left edge, true calls her back. */
   present(on: boolean, done?: () => void): void;
   setOutfit(o: Outfit): void;
@@ -89,6 +103,59 @@ const SPRINGS: SpringGroup[] = [
   },
 ];
 
+// The faces (ARKit shapes and MMD's 笑い in the PMX), at full weight.
+const FACES: Record<Feeling, Record<string, number>> = {
+  happy: {
+    笑い: 0.85,
+    mouthSmileLeft: 0.8,
+    mouthSmileRight: 0.8,
+    cheekSquintLeft: 0.4,
+    cheekSquintRight: 0.4,
+  },
+  cross: {
+    browDownLeft: 0.9,
+    browDownRight: 0.9,
+    mouthFrownLeft: 0.6,
+    mouthFrownRight: 0.6,
+    mouthSmileLeft: 0,
+    mouthSmileRight: 0,
+    cheekPuff: 0.5,
+  },
+  scrunch: {
+    noseSneerLeft: 1,
+    noseSneerRight: 1,
+    eyeSquintLeft: 0.8,
+    eyeSquintRight: 0.8,
+    mouthSmileLeft: 0.5,
+    mouthSmileRight: 0.5,
+  },
+  surprised: {
+    eyeWideLeft: 0.9,
+    eyeWideRight: 0.9,
+    browInnerUp: 0.9,
+    browOuterUpLeft: 0.6,
+    browOuterUpRight: 0.6,
+    jawOpen: 0.25,
+    mouthSmileLeft: 0,
+    mouthSmileRight: 0,
+  },
+  sneeze: {
+    まばたき: 1,
+    noseSneerLeft: 1,
+    noseSneerRight: 1,
+    jawOpen: 0.45,
+    browInnerUp: 0.7,
+    mouthSmileLeft: 0,
+    mouthSmileRight: 0,
+  },
+};
+// The shapes of those faces that her own face does not set every frame.
+const FACE_ONLY = [...new Set(Object.values(FACES).flatMap((f) => Object.keys(f)))].filter(
+  (n) => !['まばたき', 'mouthSmileLeft', 'mouthSmileRight'].includes(n),
+);
+// Her back to the page, sulking (rad past her usual turn).
+const SULK = 2.7;
+
 // The PMX is about 21.8 units tall.
 const MODEL_HEIGHT = 21.8;
 // Her turn when she looks ahead.
@@ -122,11 +189,13 @@ for (const n of ['idle_happy', 'idle_cat', 'wave']) CLIPS[n] = { file: `mixamo/$
 const EMOTES = ['show', 'peace', 'spin', 'pose', 'shoot', 'idle_happy', 'idle_cat', 'wave'];
 // Standing poses from the Pic♡Pix Free Pose set (Unity humanoid poses baked
 // to VRMA, each held for 6 s), under poses/pose<n>. Poses 20 to 29 sit or
-// kneel on a floor (hips 0.15 to 0.47 m against 0.95 standing) and are not
-// used: on her glass ledge they read as sitting in the air.
+// kneel on a floor (hips 0.15 to 0.47 m against 0.95 standing), 16 and 17
+// are caught mid-jump, 18 kneels and 30 sits on a chair that is not there:
+// on her glass ledge they read as hanging in the air, so they are not used.
 const POSES: string[] = [];
+const OFF_LEDGE = new Set([16, 17, 18, 30]);
 for (let n = 1; n <= 30; n++) {
-  if (n >= 20 && n <= 29) continue;
+  if ((n >= 20 && n <= 29) || OFF_LEDGE.has(n)) continue;
   POSES.push(`pose${n}`);
   CLIPS[`pose${n}`] = { file: `poses/pose${n}` };
 }
@@ -291,12 +360,13 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     spin.yaw += dx * 0.012;
     spin.vel = dx * 0.012;
   };
-  const onUp = () => {
+  const onUp = (e: PointerEvent) => {
     if (!spin.drag) return;
-    if (spin.drag.moved < 5) {
+    const z = spin.drag.moved < 5 ? touched(e.clientX, e.clientY) : null;
+    if (z) {
       spin.vel = 0;
-      if (!play.clip) void playClip('greet');
-      opts.onTap?.();
+      glow(z);
+      opts.onTap?.(z, { x: e.clientX, y: e.clientY });
     } else if (spin.drag.moved * 0.012 > Math.PI * 2) opts.onSpin?.();
     spin.drag = null;
     spin.idleAt = clock.getElapsedTime();
@@ -306,6 +376,112 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   hit.addEventListener('pointermove', onMove);
   hit.addEventListener('pointerup', onUp);
   hit.addEventListener('pointercancel', onUp);
+
+  // A tap is read by a ray from the camera into her meshes as posed now:
+  // the bone that moves the triangle under it most names the zone.
+  const ray = new THREE.Raycaster();
+  const zones = new Map<string, Zone | null>();
+  const shown = (m: THREE.SkinnedMesh, i: number | undefined) => {
+    const mat = (m.material as THREE.Material[])[i ?? 0];
+    return mat && mat.visible && mat.opacity > 0 ? mat : null;
+  };
+  function zoneOfFace(m: THREE.SkinnedMesh, a: number, b: number, c: number, material: string) {
+    const si = m.geometry.attributes.skinIndex as THREE.BufferAttribute;
+    const sw = m.geometry.attributes.skinWeight as THREE.BufferAttribute;
+    const w = new Map<number, number>();
+    for (const v of [a, b, c])
+      for (let k = 0; k < 4; k++) {
+        const bone = si.getComponent(v, k);
+        w.set(bone, (w.get(bone) ?? 0) + sw.getComponent(v, k));
+      }
+    let top = 0;
+    let most = -1;
+    for (const [bone, x] of w)
+      if (x > most) {
+        most = x;
+        top = bone;
+      }
+    const key = `${top}|${material}`;
+    if (!zones.has(key)) {
+      const chain: { name: string; parent: string | null }[] = [];
+      for (
+        let o: THREE.Object3D | null = m.skeleton.bones[top];
+        o && (o as THREE.Bone).isBone;
+        o = o.parent
+      )
+        chain.push({ name: o.name, parent: o.parent?.name ?? null });
+      zones.set(key, zoneOf(chain, material));
+    }
+    return zones.get(key) ?? null;
+  }
+  function touched(x: number, y: number): Zone | null {
+    if (!mesh) return null;
+    const r = canvas.getBoundingClientRect();
+    ray.setFromCamera(
+      new THREE.Vector2(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1),
+      cam,
+    );
+    const targets = clothes ? [mesh, clothes] : [mesh];
+    // The spheres follow the pose.
+    for (const t of targets) t.computeBoundingSphere();
+    for (const h of ray.intersectObjects(targets, false)) {
+      const m = h.object as THREE.SkinnedMesh;
+      const mat = shown(m, h.face?.materialIndex);
+      if (!mat || !h.face) continue;
+      const z = zoneOfFace(m, h.face.a, h.face.b, h.face.c, mat.name);
+      if (z) return z;
+    }
+    return null;
+  }
+  // The zone lights up for a moment, through her clothes.
+  const GLOW = 1.4;
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: 0xff5fa2,
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  // One glow per mesh, sharing its vertex buffers: a tap swaps only the
+  // triangles (disposing a glow's geometry would free the shared buffers).
+  const glows = new Map<THREE.SkinnedMesh, THREE.SkinnedMesh>();
+  let glowAt = -10;
+  function glow(z: Zone) {
+    if (!mesh) return;
+    for (const src of clothes ? [mesh, clothes] : [mesh]) {
+      const geo = src.geometry;
+      const index = geo.index;
+      if (!index) continue;
+      const faces: number[] = [];
+      for (const grp of geo.groups) {
+        const mat = shown(src, grp.materialIndex);
+        if (!mat) continue;
+        for (let k = grp.start; k < grp.start + grp.count; k += 3) {
+          const a = index.getX(k);
+          const b = index.getX(k + 1);
+          const c = index.getX(k + 2);
+          const fz = zoneOfFace(src, a, b, c, mat.name);
+          if (fz && sameZone(fz, z)) faces.push(a, b, c);
+        }
+      }
+      let g = glows.get(src);
+      if (!g) {
+        const part = new THREE.BufferGeometry();
+        for (const n of ['position', 'skinIndex', 'skinWeight'])
+          part.setAttribute(n, geo.getAttribute(n));
+        g = new THREE.SkinnedMesh(part, glowMat);
+        g.frustumCulled = false;
+        g.renderOrder = 10;
+        mesh.add(g);
+        g.bind(mesh.skeleton, new THREE.Matrix4());
+        glows.set(src, g);
+      }
+      g.geometry.setIndex(faces);
+      g.userData.some = faces.length > 0;
+    }
+    glowAt = clock.getElapsedTime();
+  }
 
   // The files are PNG where the PMX names BMP textures.
   const manager = new THREE.LoadingManager();
@@ -810,6 +986,35 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     B['センター'].position.lerp(_off.add(baseP['センター']), w);
     for (const n of LEG) B[n + 'D'].quaternion.copy(B[n].quaternion);
   }
+  // A clip may lift both feet off the floor (a pose struck in a jump, a
+  // sit without a chair): while one plays, she is moved down (or up) until
+  // her lowest point rests on the ledge. The points: the ankles and toes at
+  // their bind height, the knees and the seat with a little flesh round them.
+  const CONTACTS: [string, number | null][] = [
+    ['左足首D', null],
+    ['右足首D', null],
+    ['左足先EX', null],
+    ['右足先EX', null],
+    ['左ひざD', 0.6],
+    ['右ひざD', 0.6],
+    ['Buttock_L', 1.0],
+    ['Buttock_R', 1.0],
+  ];
+  function ground(m: THREE.SkinnedMesh) {
+    if (!play.clip || play.w <= 0.001) return;
+    m.updateMatrixWorld(true);
+    // The floor in the model's space: the feet at their bind height.
+    const floor = Math.min(BIND['左足首D'].y, BIND['右足首D'].y);
+    let low = Infinity;
+    for (const [n, r] of CONTACTS) {
+      if (!B[n]) continue;
+      // How high above the floor this point puts it.
+      const h = at(n).y - (r == null ? BIND[n].y - floor : r);
+      low = Math.min(low, h);
+    }
+    if (!Number.isFinite(low)) return;
+    B['センター'].position.y -= (low - floor) * smooth(clamp01(play.w));
+  }
   function direct(now: number) {
     if (now > life.nextShift) {
       life.weight = -life.weight;
@@ -883,6 +1088,18 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
 
   let lastT = 0;
   let face = FACE;
+  // What a touch set off: a face, a lean into a pat, a glance, a sulk.
+  const touch = {
+    feel: 'happy' as Feeling,
+    feelUntil: -10,
+    feelW: 0,
+    tiltSide: 0,
+    tiltUntil: -10,
+    tiltW: 0,
+    glance: { x: 0, y: 0 },
+    glanceUntil: -10,
+    sulkUntil: -10,
+  };
   // How far in front of her the screen is, for the angle to a point on it.
   const DEPTH = 30;
   function frame(m: THREE.SkinnedMesh) {
@@ -905,11 +1122,16 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     const field = opts.field?.() ?? null;
     const typing = field != null && document.activeElement === field && now - typedAt < 8;
     const onHer = Math.abs(pointer.x - hx) < 70 && pointer.y > hy - 70 && pointer.y < ft.y;
-    const target = typing
-      ? caret(field)
-      : now - pointer.at < STILL && pointer.x >= 0 && !onHer
-        ? pointer
-        : null;
+    const sulking = now < touch.sulkUntil;
+    const target = sulking
+      ? null
+      : now < touch.glanceUntil
+        ? touch.glance
+        : typing
+          ? caret(field)
+          : now - pointer.at < STILL && pointer.x >= 0 && !onHer
+            ? pointer
+            : null;
     let lookYaw = 0;
     let lookPitch = 0;
     if (target) {
@@ -919,8 +1141,11 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       lookPitch = Math.atan2(dy, Math.hypot(dx, DEPTH));
     }
     // The body takes most of a turn, unless a clip leads.
-    const faceWant =
-      target && !play.clip ? THREE.MathUtils.clamp(lookYaw * 0.85, -1.25, 1.25) : FACE;
+    const faceWant = sulking
+      ? FACE + SULK
+      : target && !play.clip
+        ? THREE.MathUtils.clamp(lookYaw * 0.85, -1.25, 1.25)
+        : FACE;
     face += (faceWant - face) * Math.min(1, dt * 2.5);
 
     // Where she stands and which way she faces.
@@ -1036,12 +1261,14 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     // Speaking: the lips from the voice, and the head nods a little with
     // the stress of the words.
     const mo = voice.read(dt);
-    pose('首', life.gy * 0.15, life.gx * 0.25, -wgt * 0.03);
+    touch.tiltW += ((now < touch.tiltUntil ? 1 : 0) - touch.tiltW) * Math.min(1, dt * 4);
+    const lean = touch.tiltW * touch.tiltSide;
+    pose('首', life.gy * 0.15 + touch.tiltW * 0.06, life.gx * 0.25, -wgt * 0.03 + lean * 0.1);
     pose(
       '頭',
-      life.gy * 0.25 + Math.sin(t * 0.7) * 0.02 + mo.open * 0.05,
+      life.gy * 0.25 + Math.sin(t * 0.7) * 0.02 + mo.open * 0.05 + touch.tiltW * 0.08,
       life.gx * 0.35,
-      Math.sin(t * 0.45) * 0.05 - wgt * 0.04,
+      Math.sin(t * 0.45) * 0.05 - wgt * 0.04 + lean * 0.22,
     );
     // Eyes on the target, or straight ahead.
     life.ex += (life.gx * 0.14 - life.ex) * Math.min(1, dt * 12);
@@ -1061,8 +1288,20 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     morph('う', mo.u * 0.8);
     morph('え', mo.e * 0.8);
     morph('お', mo.o * 0.8);
+    // A face from a touch, eased in and out over her own.
+    // Shapes only the faces use rest at 0 unless a face holds them this frame.
+    touch.feelW += ((now < touch.feelUntil ? 1 : 0) - touch.feelW) * Math.min(1, dt * 6);
+    for (const n of FACE_ONLY) morph(n, 0);
+    if (touch.feelW > 0.001 && m.morphTargetInfluences)
+      for (const [n, v] of Object.entries(FACES[touch.feel])) {
+        const i = morphs[n];
+        if (i == null) continue;
+        const was = m.morphTargetInfluences[i];
+        m.morphTargetInfluences[i] = was + (v - was) * touch.feelW;
+      }
 
     applyClip(now, dt);
+    ground(m);
 
     // Cloth, hair and the chest last, on the finished pose.
     m.updateMatrixWorld(true);
@@ -1081,6 +1320,8 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   function tick() {
     if (disposed) return;
     if (mesh) frame(mesh);
+    glowMat.opacity = 0.5 * clamp01(1 - (clock.getElapsedTime() - glowAt) / GLOW);
+    for (const g of glows.values()) g.visible = glowMat.opacity > 0 && g.userData.some === true;
     renderer.render(scene, cam);
     raf = requestAnimationFrame(tick);
   }
@@ -1112,6 +1353,27 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
           if (c && !disposed && walk.state === 'leaving')
             Object.assign(play, { clip: c, name: 'greet', t0: clock.getElapsedTime() - WAVE_FROM });
         });
+    },
+    feel(f, seconds) {
+      const now = clock.getElapsedTime();
+      // A new face replaces the old one at once.
+      if (f !== touch.feel) touch.feelW = 0;
+      touch.feel = f;
+      touch.feelUntil = now + seconds;
+    },
+    tilt(side, seconds) {
+      touch.tiltSide = side;
+      touch.tiltUntil = clock.getElapsedTime() + seconds;
+    },
+    glance(x, y, seconds) {
+      touch.glance = { x, y };
+      touch.glanceUntil = clock.getElapsedTime() + seconds;
+    },
+    sulk(seconds) {
+      touch.sulkUntil = clock.getElapsedTime() + seconds;
+    },
+    act(name) {
+      if (CLIPS[name]) void playClip(name);
     },
     setOutfit: dress,
     say: (url) => voice.say(url),
