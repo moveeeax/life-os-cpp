@@ -102,6 +102,3 @@ export function zoneWords(z: Zone): string {
   const w = WORDS[z.part];
   return z.side ? `${z.side === 'left' ? 'Left' : 'Right'} ${w.toLowerCase()}` : w;
 }
-
-/** The same zone. */
-export const sameZone = (a: Zone, b: Zone) => a.part === b.part && a.side === b.side;

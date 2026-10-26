@@ -47,6 +47,31 @@ inline constexpr const char* kSpeechUrl = "https://api.openai.com/v1/audio/speec
 inline constexpr std::size_t kSpeechTextMax = 4096;
 /// Spoken replies one user gets per window.
 inline constexpr long long kMaxSpeechPerWindow = 120;
+/// A line she says on Now (her answer to a tap): at most this many characters.
+inline constexpr std::size_t kLineCharsMax = 200;
+/// Lines one user gets spoken per window (taps come quicker than replies).
+inline constexpr long long kMaxLinesPerWindow = 240;
+
+/// Whether @p text may be spoken as a line: some text that is not only
+/// spaces, no control characters, at most kLineCharsMax characters (UTF-8).
+inline bool line_ok(const std::string& text) {
+    std::size_t chars = 0;
+    bool seen = false;
+    for (const char ch : text) {
+        const auto c = static_cast<unsigned char>(ch);
+        if (c < 0x20 || c == 0x7F) {
+            return false;
+        }
+        if ((c & 0xC0) != 0x80) {
+            ++chars;
+        }
+        if (c != ' ') {
+            seen = true;
+        }
+    }
+    return seen && chars <= kLineCharsMax;
+}
+
 /// How the replies sound (the speech model takes a direction next to the text).
 inline constexpr const char* kSpeechInstructions =
     "Speak Russian like a native speaker, with Russian stress and intonation and no English accent. "

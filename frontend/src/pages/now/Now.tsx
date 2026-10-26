@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router';
 
 import { useHabitsEnabled } from '@/hooks/useHabits';
@@ -156,6 +156,15 @@ function NowScreen() {
   const wide = useWide(1024);
   const base = aniBase(useWallpapers('desktop', ani.on && wide).data?.[0]?.url);
   const showAni = ani.on && wide && base !== null && session.phase === 'idle';
+  // A session that reached its end (not one left early) sends her back
+  // with a word about a break.
+  const [afterFocus, setAfterFocus] = useState(false);
+  const lastPhase = useRef(session.phase);
+  useEffect(() => {
+    if (session.phase === 'idle' && lastPhase.current === 'done') setAfterFocus(true);
+    if (session.phase === 'running') setAfterFocus(false);
+    lastPhase.current = session.phase;
+  }, [session.phase]);
   const clock = new Intl.DateTimeFormat('en-GB', {
     timeZone: tz,
     hour: '2-digit',
@@ -230,7 +239,15 @@ function NowScreen() {
       {showAni && base && (
         <AniCorner
           base={base}
-          context={{ name: me?.first_name ?? undefined, tz, date, today: today.data }}
+          context={{
+            name: me?.first_name ?? undefined,
+            tz,
+            date,
+            today: today.data,
+            weather: weather.data ?? undefined,
+          }}
+          afterFocus={afterFocus}
+          onAfterFocus={() => setAfterFocus(false)}
         />
       )}
       {session.phase !== 'idle' && (

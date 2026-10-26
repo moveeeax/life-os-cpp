@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Today } from '@/lib/now/types';
 
 import type { Ani } from './engine';
-import { createToucher } from './touch';
+import { createToucher, SAID } from './touch';
 import type { Part, Zone } from './zones';
 
 const base: Today = {
@@ -26,17 +26,19 @@ function setUp(today: Today = base) {
   const field = document.createElement('input');
   document.body.append(field);
   let now = 0;
-  const t = createToucher(
-    () => ani,
-    () => today,
-    () => field,
-    () => now,
-  );
+  let hide = false;
+  const t = createToucher({
+    ani: () => ani,
+    today: () => today,
+    focusField: () => field,
+    hidden: () => hide,
+    clock: () => now,
+  });
   const tap = (part: Part, side: Zone['side'] = null, wait = 3000) => {
     now += wait;
     return t.tap({ part, side }, { x: 100, y: 400 })?.text;
   };
-  return { ani, field, tap };
+  return { ani, field, tap, hideNumbers: () => (hide = true) };
 }
 
 describe('createToucher', () => {
@@ -91,6 +93,26 @@ describe('createToucher', () => {
     );
   });
 
+  it('keeps the day to herself while numbers are hidden', () => {
+    const { tap, hideNumbers } = setUp({
+      ...base,
+      focus: {
+        date: '2026-10-26',
+        kind: 'text',
+        ref_id: null,
+        text: 'Сдать отчёт',
+        done: false,
+        missing: false,
+      },
+      habits: { done: 0, total: 1, left: ['Зарядка'], week: [] },
+    });
+    hideNumbers();
+    expect(tap('head')).toBe('Твой фокус держу в голове.');
+    expect(tap('hand', 'left')).toBe('Дай пять!');
+    expect(tap('belly')).toBe('Урчит. Перекусим?');
+    expect(tap('foot', 'right')).toBe('Ноги просятся гулять.');
+  });
+
   it('gets cross, then turns her back, on off-limits taps', () => {
     const { ani, tap } = setUp();
     expect(tap('chest', 'left')).toBe('Эй, руки!');
@@ -98,7 +120,8 @@ describe('createToucher', () => {
     expect(tap('hips')).toBe('Всё, обиделась.');
     expect(ani.sulk).toHaveBeenCalledWith(10);
     // While she sulks no tap reaches her.
-    expect(['…', 'Не разговариваю.', 'Хм.']).toContain(tap('hand', 'left', 1000));
+    expect(tap('hand', 'left', 1000)).toBe('…');
+    expect(tap('hand', 'left', 1000)).toBe('Не разговариваю.');
     expect(ani.act).not.toHaveBeenCalled();
   });
 
@@ -118,9 +141,76 @@ describe('createToucher', () => {
     expect(tap('hand', 'right', 1000)).toBe('Хлоп!');
   });
 
+  it('dances on a pat, a high five and a tap on her feet in a row', () => {
+    const { ani, tap } = setUp();
+    tap('hair');
+    tap('hand', 'left', 1500);
+    expect(tap('foot', 'right', 1500)).toBe('Та-дам!');
+    expect(ani.act).toHaveBeenCalledWith('spin');
+  });
+
+  it('moves her mood: kind taps up, rude ones down', () => {
+    const t = createToucher({
+      ani: () =>
+        ({
+          feel: vi.fn(),
+          tilt: vi.fn(),
+          glance: vi.fn(),
+          sulk: vi.fn(),
+          act: vi.fn(),
+        }) as unknown as Ani,
+      today: () => base,
+      focusField: () => null,
+      clock: () => 0,
+    });
+    expect(t.tap({ part: 'head', side: null }, { x: 0, y: 0 })?.mood).toBe(1);
+    expect(t.tap({ part: 'skirt', side: null }, { x: 0, y: 0 })?.mood).toBe(-2);
+    expect(t.tap({ part: 'belly', side: null }, { x: 0, y: 0 })?.mood).toBe(0);
+  });
+
   it('gets dizzy on five taps in two seconds', () => {
     const { tap } = setUp();
     for (let i = 0; i < 4; i++) tap('shin', 'left', 300);
     expect(tap('shin', 'left', 300)).toBe('Ой, голова кружится.');
+  });
+});
+
+describe('answers', () => {
+  it('play a recording for a fixed line and none for a line with the day in it', () => {
+    const t = createToucher({
+      ani: () =>
+        ({
+          feel: vi.fn(),
+          tilt: vi.fn(),
+          glance: vi.fn(),
+          sulk: vi.fn(),
+          act: vi.fn(),
+        }) as unknown as Ani,
+      today: () => ({
+        ...base,
+        health: {
+          steps: 4200,
+          active_kcal: null,
+          resting_bpm: null,
+          sleep: null,
+          sleep_minutes: null,
+          weight_kg: null,
+          weight_change_7d: null,
+        },
+      }),
+      focusField: () => null,
+      clock: () => 0,
+    });
+    expect(t.tap({ part: 'neck', side: null }, { x: 0, y: 0 })).toMatchObject({
+      text: SAID.neck,
+      recorded: 'touch/neck',
+    });
+    const steps = t.tap({ part: 'foot', side: 'left' }, { x: 0, y: 0 });
+    expect(steps?.recorded).toBeUndefined();
+    expect(steps?.silent).toBeUndefined();
+  });
+
+  it('keep every fixed line short enough for the voice line route', () => {
+    for (const text of Object.values(SAID)) expect([...text].length).toBeLessThanOrEqual(200);
   });
 });

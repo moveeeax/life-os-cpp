@@ -240,37 +240,39 @@
   }
 }
 
-/* The name of the zone a tap landed on, by the tap. */
-.ani-touch {
-  position: fixed;
-  z-index: 22;
-  transform: translate(14px, -50%);
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--g-glass-line);
-  background: var(--g-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  color: var(--g-ink);
-  font-size: 12px;
-  white-space: nowrap;
-  pointer-events: none;
-  animation: ani-touch 1.6s ease-out forwards;
+/* Her evening word opens the chat. */
+.ani-say-chat {
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  pointer-events: auto;
 }
-@keyframes ani-touch {
-  0% {
-    opacity: 0;
-    transform: translate(14px, -50%) scale(0.92);
-  }
-  12%,
-  70% {
-    opacity: 1;
-    transform: translate(14px, -50%);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(14px, -80%);
-  }
+.ani-say-chat:hover {
+  border-color: var(--g-ink-faint);
+}
+
+/* The speaker, left of the microphone: mutes her. */
+.ani-sound {
+  position: absolute;
+  bottom: 10px;
+  right: 44px;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--g-ink-faint);
+  transition:
+    color 0.2s,
+    background 0.2s;
+}
+.ani-sound:hover {
+  color: var(--g-ink);
+  background: rgba(255, 255, 255, 0.1);
+}
+.ani-sound[aria-pressed='false'] {
+  color: var(--g-ink-faint);
+  opacity: 0.7;
 }
 
 /* The microphone, under the hanger: a conversation with her. */

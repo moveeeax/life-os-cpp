@@ -17,8 +17,7 @@ import {
   readTurn,
   refusal,
   sendMessage,
-  setSoundOn,
-  soundOn,
+  useSound,
   wakeAgent,
   type Action,
   type Turn,
@@ -44,7 +43,7 @@ function TrashIcon() {
 }
 
 /** A speaker, with waves when her replies are spoken. */
-function SpeakerIcon({ on }: { on: boolean }) {
+export function SpeakerIcon({ on }: { on: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -89,7 +88,7 @@ export function AniChat({
   onReply?(turn: Turn): void;
 }) {
   const [turns, setTurns] = useState<Turn[] | null>(null);
-  const [sound, setSound] = useState(soundOn);
+  const [sound, setSound] = useSound();
   const soundRef = useRef(sound);
   soundRef.current = sound;
   const replyRef = useRef(onReply);
@@ -248,7 +247,6 @@ export function AniChat({
           title={sound ? 'Mute her replies' : 'Speak her replies'}
           onClick={() => {
             setSound(!sound);
-            setSoundOn(!sound);
           }}
         >
           <SpeakerIcon on={sound} />

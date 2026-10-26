@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react';
+
 import { ApiClientError, api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema.gen';
 
@@ -68,23 +70,47 @@ export function speechUrl(id: string): string {
   return `/api/v1/ani/turns/${encodeURIComponent(id)}/speech`;
 }
 
+// Kept under the chat's old key: the choice made there still holds.
 const SOUND_KEY = 'now:ani:chat:sound';
+let sound: boolean | null = null;
+const soundListeners = new Set<() => void>();
 
-/** Whether her replies are spoken; on unless the user turned it off here. */
+/**
+ * Whether she speaks aloud (her chat replies, her answers to taps, her
+ * hellos); on unless the user turned it off. Off, her lines are only shown.
+ */
 export function soundOn(): boolean {
-  try {
-    return localStorage.getItem(SOUND_KEY) !== 'off';
-  } catch {
-    return true;
+  if (sound === null) {
+    try {
+      sound = localStorage.getItem(SOUND_KEY) !== 'off';
+    } catch {
+      sound = true;
+    }
   }
+  return sound;
 }
 
 export function setSoundOn(on: boolean): void {
+  sound = on;
   try {
     localStorage.setItem(SOUND_KEY, on ? 'on' : 'off');
   } catch {
     // Private mode: the choice lasts for this page.
   }
+  for (const l of soundListeners) l();
+}
+
+/** The sound switch, the same in the chat and on her ledge. */
+export function useSound(): [boolean, (on: boolean) => void] {
+  const on = useSyncExternalStore(
+    (l) => {
+      soundListeners.add(l);
+      return () => soundListeners.delete(l);
+    },
+    soundOn,
+    () => true,
+  );
+  return [on, setSoundOn];
 }
 
 /** Deletes one message and her reply from the chat (her agent still remembers it). */

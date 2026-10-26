@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { Today } from '@/lib/now/types';
+import type { NowWeather, Today } from '@/lib/now/types';
 
-import { AniChat } from './AniChat';
-import { speechUrl } from './chat';
+import { AniChat, SpeakerIcon } from './AniChat';
+import { soundOn, speechUrl, useSound } from './chat';
 import type { Ani } from './engine';
+import { greeting, HELLO, hourOf } from './greet';
+import { moodLevel, moodOf, moveMood } from './mood';
 import type { Talk, TalkState } from './talk';
 import { useAni, type AniOutfit } from './state';
-import { createToucher } from './touch';
-import { zoneWords } from './zones';
+import { createToucher, say, type Answer } from './touch';
 import './ani.css';
 
 /** A hanger: opens the outfits in place of the ledge's state. */
@@ -31,21 +32,43 @@ function HangerIcon() {
   );
 }
 
-// Lines recorded ahead with the voice she talks in (OpenAI TTS, marin),
-// under v2/voice/<line>.mp3.
-const LINES = {
-  morning: 'Доброе утро! Я уже тут.',
-  day: 'Привет! Как идут дела?',
-  evening: 'Добрый вечер. Долгий был день?',
-  night: 'Уже поздно. Может, пора спать?',
-  dizzy: 'Ой, голова кружится.',
-} as const;
-type Line = keyof typeof LINES;
+// Recorded ahead with the voice she talks in (OpenAI TTS, marin), under
+// v2/voice/: the hellos of the hour (greet.ts), the taps' lines
+// (touch.ts) and this one.
+const DIZZY: Answer = { text: 'Ой, голова кружится.', recorded: 'dizzy' };
 
-function hello(): Line {
-  const h = new Date().getHours();
-  return h < 5 ? 'night' : h < 12 ? 'morning' : h < 18 ? 'day' : h < 23 ? 'evening' : 'night';
+/** The hello of this hour, recorded. */
+function hello(): Answer {
+  const h = hourOf(new Date().getHours());
+  return { text: HELLO[h], recorded: h };
 }
+
+// The day her first hello and her evening word were said in this browser
+// (YYYY-MM-DD).
+const HELLO_KEY = 'now:ani:hello';
+const EVENING_KEY = 'now:ani:evening';
+function dayOf(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function setDayOf(key: string, day: string) {
+  try {
+    localStorage.setItem(key, day);
+  } catch {
+    // Private mode: she may say it again on the next visit.
+  }
+}
+const helloDay = () => dayOf(HELLO_KEY);
+const setHelloDay = (day: string) => setDayOf(HELLO_KEY, day);
+
+// An hour of activity on the page, with no pause of five minutes, earns a
+// word about a break; at most one an hour. Her evening word comes after 21:00.
+const STRETCH_MS = 60 * 60_000;
+const PAUSE_MS = 5 * 60_000;
+const EVENING_HOUR = 21;
 
 /** A microphone: talk with her (OpenAI Realtime). */
 function MicIcon() {
@@ -106,6 +129,7 @@ export interface AniContext {
   tz: string;
   date: string;
   today?: Today;
+  weather?: NowWeather;
 }
 
 /**
@@ -113,12 +137,28 @@ export interface AniContext {
  * left of the dock. The ledge sends her off through the left edge and calls
  * her back; its hanger opens the outfits, and a change happens off screen.
  * A drag on her turns her round; a tap answers by where it lands on her
- * (touch.ts), lit for a moment and named by the tap; coming back she greets. The microphone under the hanger starts a conversation in
- * an AI voice (OpenAI); the speech balloon next to the hanger opens a chat
- * with her agent (AniChat). The engine (three and the model, about 15 MB
+ * (touch.ts), aloud; coming back she greets. Her first hello of the day
+ * names a thing from the day (greet.ts); she cheers a ticked focus and sends
+ * the user on a break after a focus session. The speaker on the ledge mutes
+ * her (the chat's switch too); muted, her lines are only shown. The
+ * microphone under the hanger starts a conversation in an AI voice
+ * (OpenAI); the speech balloon next to the hanger opens a chat with her
+ * agent (AniChat). The engine (three and the model, about 15 MB
  * from the bucket) loads only when she is on.
  */
-export function AniCorner({ base, context }: { base: string; context: AniContext }) {
+export function AniCorner({
+  base,
+  context,
+  afterFocus = false,
+  onAfterFocus,
+}: {
+  base: string;
+  context: AniContext;
+  /** She comes back after a focus session that ran to its end. */
+  afterFocus?: boolean;
+  /** Her word about a break is said (once). */
+  onAfterFocus?: () => void;
+}) {
   const [ani, setAni] = useAni();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hitRef = useRef<HTMLDivElement>(null);
@@ -135,10 +175,6 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
   // The first state the engine starts from; later changes go through calls.
   const initial = useRef(ani);
   const [said, setSaid] = useState<string | null>(null);
-  // Where the last tap landed on her, named by the tap for a moment.
-  const [touch, setTouch] = useState<{ text: string; x: number; y: number; n: number } | null>(
-    null,
-  );
   const [talk, setTalk] = useState<TalkState | null>(null);
   const talkRef = useRef<Talk | null>(null);
   const stopTalk = () => {
@@ -182,33 +218,141 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
   const contextRef = useRef(context);
   contextRef.current = context;
   const toucher = useRef(
-    createToucher(
-      () => engine.current,
-      () => contextRef.current.today,
-      () => document.querySelector<HTMLInputElement>('.n-input'),
-    ),
+    createToucher({
+      ani: () => engine.current,
+      today: () => contextRef.current.today,
+      focusField: () => document.querySelector<HTMLInputElement>('.n-input'),
+      hidden: () => document.documentElement.classList.contains('hide-numbers'),
+    }),
   );
   const sayTimer = useRef(0);
-  /** A line with no recording: shown for a while. */
-  const show = (text: string) => {
-    if (talkRef.current) return;
-    setSaid(text);
-    clearTimeout(sayTimer.current);
-    sayTimer.current = window.setTimeout(
-      () => setSaid((v) => (v === text ? null : v)),
-      1800 + text.length * 45,
-    );
-  };
-  const showRef = useRef(show);
-  showRef.current = show;
-  const speak = useRef<(l: Line) => void>(() => {});
-  speak.current = (l: Line) => {
+  const lastSaidAt = useRef(0);
+  // The bubble opens the chat (her evening word).
+  const [saidChat, setSaidChat] = useState(false);
+  /**
+   * Her answer to a tap, in the bubble while she says it: a recorded line
+   * from the bucket, one with the day in it read by the server, or a silent
+   * one shown for a moment.
+   */
+  const answer = useRef<(a: Answer) => void>(() => {});
+  answer.current = (a: Answer) => {
     const e = engine.current;
-    // In a conversation she speaks for herself.
     if (!e || talkRef.current) return;
-    setSaid(LINES[l]);
-    void e.say(`${base}v2/voice/${l}.mp3`).then(() => setSaid((v) => (v === LINES[l] ? null : v)));
+    if (a.mood) e.mood(moodLevel(moveMood(contextRef.current.date, a.mood)));
+    lastSaidAt.current = Date.now();
+    setSaidChat(Boolean(a.chat));
+    setSaid(a.text);
+    clearTimeout(sayTimer.current);
+    const done = () => setSaid((v) => (v === a.text ? null : v));
+    if (a.silent || !soundOn()) {
+      sayTimer.current = window.setTimeout(done, a.silent ? 1500 : 1500 + a.text.length * 50);
+      return;
+    }
+    const url = a.recorded
+      ? `${base}v2/voice/${a.recorded}.mp3`
+      : `/api/v1/now/voice-line?text=${encodeURIComponent(a.text)}`;
+    // No voice (offline, the limit): the line still stays up for a while.
+    const started = Date.now();
+    void e.say(url).then(() => {
+      const left = 1200 + a.text.length * 40 - (Date.now() - started);
+      if (left > 0) sayTimer.current = window.setTimeout(done, left);
+      else done();
+    });
   };
+  const [sound, setSound] = useSound();
+
+  // Her mood of the day shows in her face from the start.
+  useEffect(() => {
+    if (ready) engine.current?.mood(moodLevel(moodOf(contextRef.current.date)));
+  }, [ready]);
+
+  // An hour at the screen and the evening: checked every half minute while
+  // she is here, ready and not in a conversation, on a visible page.
+  const hereRef = useRef(ani.here);
+  hereRef.current = ani.here && ready;
+  useEffect(() => {
+    let active = Date.now();
+    let streak = active;
+    let stretched = active;
+    const onActive = () => {
+      const now = Date.now();
+      if (now - active > PAUSE_MS) streak = now;
+      active = now;
+    };
+    const events = ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const;
+    for (const ev of events) addEventListener(ev, onActive, { passive: true });
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      if (!hereRef.current || talkRef.current || document.visibilityState !== 'visible') return;
+      // Not over another line.
+      if (now - lastSaidAt.current < 60_000) return;
+      const c = contextRef.current;
+      if (
+        new Date().getHours() >= EVENING_HOUR &&
+        helloDay() === c.date &&
+        dayOf(EVENING_KEY) !== c.date
+      ) {
+        setDayOf(EVENING_KEY, c.date);
+        const f = c.today?.focus;
+        const line = f && !f.done ? say('focusOpen') : f?.done ? say('dayDone') : say('howWasDay');
+        answer.current({ ...line, chat: true });
+        return;
+      }
+      if (now - active < 60_000 && now - streak >= STRETCH_MS && now - stretched >= STRETCH_MS) {
+        stretched = now;
+        streak = now;
+        engine.current?.act('idle_happy');
+        answer.current(say('stretch'));
+      }
+    }, 30_000);
+    return () => {
+      clearInterval(id);
+      for (const ev of events) removeEventListener(ev, onActive);
+    };
+  }, []);
+
+  // Her first hello: once a day in this browser, with a thing from the day
+  // (late tasks, rain, the night's sleep); after a focus session, a break.
+  // Browsers play sound only after a gesture on the page: until one she waits.
+  const hasToday = context.today != null;
+  useEffect(() => {
+    if (!ready || !ani.here || (!afterFocus && !hasToday)) return;
+    let line: Answer;
+    if (afterFocus) {
+      line = say('breakTime');
+      onAfterFocus?.();
+      engine.current?.feel('happy', 3);
+      engine.current?.act('peace');
+    } else {
+      if (helloDay() === contextRef.current.date) return;
+      setHelloDay(contextRef.current.date);
+      const c = contextRef.current;
+      const hidden = document.documentElement.classList.contains('hide-numbers');
+      line = greeting(c.today, c.weather, new Date().getHours(), hidden);
+    }
+    if (navigator.userActivation?.hasBeenActive !== false) {
+      answer.current(line);
+      return;
+    }
+    const go = () => answer.current(line);
+    addEventListener('pointerdown', go, { once: true });
+    return () => removeEventListener('pointerdown', go);
+    // Once per mount: when she is ready and the day is in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, hasToday]);
+
+  // A focus ticked while she watches: she cheers.
+  const focus = context.today?.focus;
+  const focusKey = focus ? `${focus.date}|${focus.kind}|${focus.ref_id ?? focus.text}` : null;
+  const ticked = useRef<{ key: string | null; done: boolean }>({ key: null, done: false });
+  useEffect(() => {
+    const was = ticked.current;
+    ticked.current = { key: focusKey, done: Boolean(focus?.done) };
+    if (!ready || !ani.here || !focus?.done || was.key !== focusKey || was.done) return;
+    engine.current?.feel('happy', 3);
+    engine.current?.act('peace');
+    answer.current(say('focusTicked'));
+  }, [focusKey, focus?.done, ready, ani.here]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -240,13 +384,16 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
           onError: () => setFailed(true),
           // A tap answers by where it landed (touch.ts).
           onTap: (z, at) => {
-            setTouch((t) => ({ text: zoneWords(z), x: at.x, y: at.y, n: (t?.n ?? 0) + 1 }));
             const a = toucher.current.tap(z, at);
-            if (!a) return;
-            if (a.voice) speak.current(a.voice);
-            else showRef.current(a.text);
+            if (a) answer.current(a);
           },
-          onSpin: () => speak.current('dizzy'),
+          onSpin: () => answer.current(DIZZY),
+          // A double tap opens the chat with her agent.
+          onDoubleTap: () => {
+            made?.hush();
+            setSaid(null);
+            setChat(true);
+          },
         });
         engine.current = made;
       } catch {
@@ -291,7 +438,11 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
     engine.current.present(here, () => {
       setBusy(null);
       // Back: she says hello.
-      if (here) speak.current(hello());
+      if (here) {
+        // Back in a good mood she missed the user; in a bad one, a "Хм".
+        const level = moodLevel(moodOf(contextRef.current.date));
+        answer.current(level === 1 ? say('missed') : level === -1 ? say('grumpyHello') : hello());
+      }
     });
   };
 
@@ -327,20 +478,25 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
     <div ref={cornerRef} className="ani-corner" data-ready={ready ? '' : undefined}>
       <canvas ref={canvasRef} className="ani-canvas" aria-hidden="true" />
       {said && ani.here && !chat ? (
-        <div className="ani-say" role="status" data-num-ok>
-          {said}
-        </div>
-      ) : null}
-      {touch ? (
-        <div
-          key={touch.n}
-          className="ani-touch"
-          style={{ left: touch.x, top: touch.y }}
-          onAnimationEnd={() => setTouch((t) => (t?.n === touch.n ? null : t))}
-          data-num-ok
-        >
-          {touch.text}
-        </div>
+        saidChat ? (
+          <button
+            type="button"
+            className="ani-say ani-say-chat"
+            data-num-ok
+            title="Write to Ani"
+            onClick={() => {
+              engine.current?.hush();
+              setSaid(null);
+              setChat(true);
+            }}
+          >
+            {said}
+          </button>
+        ) : (
+          <div className="ani-say" role="status" data-num-ok>
+            {said}
+          </div>
+        )
       ) : null}
       <div
         ref={hitRef}
@@ -423,6 +579,18 @@ export function AniCorner({ base, context }: { base: string; context: AniContext
             onClick={() => (talk ? stopTalk() : void startTalking())}
           >
             <MicIcon />
+          </button>
+        )}
+        {wardrobe ? null : (
+          <button
+            type="button"
+            className="ani-sound"
+            aria-pressed={sound}
+            aria-label={sound ? 'Ani speaks aloud: mute her' : 'Ani is muted: let her speak'}
+            title={sound ? 'Mute Ani' : 'Let Ani speak'}
+            onClick={() => setSound(!sound)}
+          >
+            <SpeakerIcon on={sound} />
           </button>
         )}
       </div>

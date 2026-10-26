@@ -5,7 +5,7 @@ import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js';
 import { loadClip, type Clip } from './motion';
 import { createSprings, type Collider, type SpringGroup, type Springs } from './springs';
 import { createVoice } from './voice';
-import { sameZone, zoneOf, type Zone } from './zones';
+import { zoneOf, type Zone } from './zones';
 
 /*
  * Ani on Now: the PMX model, posed every frame by a small director (weight
@@ -49,10 +49,12 @@ export interface AniOptions {
   onTap?: (z: Zone, at: { x: number; y: number }) => void;
   /** A long drag that spun her round more than once. */
   onSpin?: () => void;
+  /** Two taps on her in quick succession (after the first one's answer). */
+  onDoubleTap?: () => void;
 }
 
 /** A face she makes for a while, over her own. */
-export type Feeling = 'happy' | 'cross' | 'scrunch' | 'surprised' | 'sneeze';
+export type Feeling = 'happy' | 'cross' | 'scrunch' | 'surprised' | 'sneeze' | 'yawn';
 
 export interface Ani {
   /** Makes a face for `seconds`. */
@@ -65,6 +67,10 @@ export interface Ani {
   sulk(seconds: number): void;
   /** Plays one of her clips (wave, idle_happy, spin, peace...). */
   act(name: string): void;
+  /** Her mood shows in her face: -1 a little cross, 0 as usual, 1 happy. */
+  mood(level: -1 | 0 | 1): void;
+  /** Stops what she is saying. */
+  hush(): void;
   /** false sends her off through the left edge, true calls her back. */
   present(on: boolean, done?: () => void): void;
   setOutfit(o: Outfit): void;
@@ -145,6 +151,14 @@ const FACES: Record<Feeling, Record<string, number>> = {
     noseSneerRight: 1,
     jawOpen: 0.45,
     browInnerUp: 0.7,
+    mouthSmileLeft: 0,
+    mouthSmileRight: 0,
+  },
+  yawn: {
+    jawOpen: 0.8,
+    まばたき: 0.85,
+    browInnerUp: 0.5,
+    mouthFunnel: 0.3,
     mouthSmileLeft: 0,
     mouthSmileRight: 0,
   },
@@ -308,10 +322,35 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
 
   // She turns to the cursor while it moves (viewport CSS px).
   const pointer = { x: -1, y: -1, at: -10 };
+  // A cursor flying at her face startles her (px/s, px, s between).
+  const FLINCH_SPEED = 2200;
+  const FLINCH_NEAR = 160;
+  const FLINCH_EVERY = 4;
+  const head = { x: -1e4, y: -1e4 };
   const onPointer = (e: PointerEvent) => {
+    const now = clock.getElapsedTime();
+    const dt = now - pointer.at;
+    if (dt > 0 && dt < 0.1 && pointer.x >= 0 && walk.state === 'here') {
+      const vx = (e.clientX - pointer.x) / dt;
+      const vy = (e.clientY - pointer.y) / dt;
+      const dx = head.x - e.clientX;
+      const dy = head.y - e.clientY;
+      if (
+        Math.hypot(vx, vy) > FLINCH_SPEED &&
+        Math.hypot(dx, dy) < FLINCH_NEAR &&
+        vx * dx + vy * dy > 0 &&
+        now - touch.flinchAt > FLINCH_EVERY
+      ) {
+        touch.flinchAt = now;
+        if (now >= touch.feelUntil) {
+          touch.feel = 'surprised';
+          touch.feelUntil = now + 0.9;
+        }
+      }
+    }
     pointer.x = e.clientX;
     pointer.y = e.clientY;
-    pointer.at = clock.getElapsedTime();
+    pointer.at = now;
   };
   addEventListener('pointermove', onPointer);
   // And to the text while the user types.
@@ -360,13 +399,24 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     spin.yaw += dx * 0.012;
     spin.vel = dx * 0.012;
   };
+  // Two taps close together, with no third after them, are a double tap;
+  // a flurry of taps is not (it makes her dizzy).
+  const DOUBLE_TAP = 0.35;
+  const burst = { n: 0, at: -10, timer: 0 };
   const onUp = (e: PointerEvent) => {
     if (!spin.drag) return;
     const z = spin.drag.moved < 5 ? touched(e.clientX, e.clientY) : null;
     if (z) {
       spin.vel = 0;
-      glow(z);
       opts.onTap?.(z, { x: e.clientX, y: e.clientY });
+      const now = clock.getElapsedTime();
+      burst.n = now - burst.at < DOUBLE_TAP ? burst.n + 1 : 1;
+      burst.at = now;
+      clearTimeout(burst.timer);
+      if (burst.n === 2)
+        burst.timer = window.setTimeout(() => {
+          if (burst.n === 2) opts.onDoubleTap?.();
+        }, DOUBLE_TAP * 1000);
     } else if (spin.drag.moved * 0.012 > Math.PI * 2) opts.onSpin?.();
     spin.drag = null;
     spin.idleAt = clock.getElapsedTime();
@@ -433,56 +483,6 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     }
     return null;
   }
-  // The zone lights up for a moment, through her clothes.
-  const GLOW = 1.4;
-  const glowMat = new THREE.MeshBasicMaterial({
-    color: 0xff5fa2,
-    transparent: true,
-    opacity: 0,
-    depthTest: false,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  // One glow per mesh, sharing its vertex buffers: a tap swaps only the
-  // triangles (disposing a glow's geometry would free the shared buffers).
-  const glows = new Map<THREE.SkinnedMesh, THREE.SkinnedMesh>();
-  let glowAt = -10;
-  function glow(z: Zone) {
-    if (!mesh) return;
-    for (const src of clothes ? [mesh, clothes] : [mesh]) {
-      const geo = src.geometry;
-      const index = geo.index;
-      if (!index) continue;
-      const faces: number[] = [];
-      for (const grp of geo.groups) {
-        const mat = shown(src, grp.materialIndex);
-        if (!mat) continue;
-        for (let k = grp.start; k < grp.start + grp.count; k += 3) {
-          const a = index.getX(k);
-          const b = index.getX(k + 1);
-          const c = index.getX(k + 2);
-          const fz = zoneOfFace(src, a, b, c, mat.name);
-          if (fz && sameZone(fz, z)) faces.push(a, b, c);
-        }
-      }
-      let g = glows.get(src);
-      if (!g) {
-        const part = new THREE.BufferGeometry();
-        for (const n of ['position', 'skinIndex', 'skinWeight'])
-          part.setAttribute(n, geo.getAttribute(n));
-        g = new THREE.SkinnedMesh(part, glowMat);
-        g.frustumCulled = false;
-        g.renderOrder = 10;
-        mesh.add(g);
-        g.bind(mesh.skeleton, new THREE.Matrix4());
-        glows.set(src, g);
-      }
-      g.geometry.setIndex(faces);
-      g.userData.some = faces.length > 0;
-    }
-    glowAt = clock.getElapsedTime();
-  }
-
   // The files are PNG where the PMX names BMP textures.
   const manager = new THREE.LoadingManager();
   manager.setURLModifier((u) => u.replace(/\.bmp$/i, '.png'));
@@ -1099,7 +1099,15 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     glance: { x: 0, y: 0 },
     glanceUntil: -10,
     sulkUntil: -10,
+    flinchAt: -10,
+    flinchW: 0,
+    mood: 0 as -1 | 0 | 1,
   };
+  // Late at night (23:00 to 5:00 here) she is sleepy: slow, heavy blinks and
+  // a yawn now and then. The hour is read every half minute.
+  let sleepy = false;
+  let hourAt = -100;
+  let yawnAt = 0;
   // How far in front of her the screen is, for the angle to a point on it.
   const DEPTH = 30;
   function frame(m: THREE.SkinnedMesh) {
@@ -1119,6 +1127,13 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     const hx = headW.x / S;
     const hy = VH - headW.y / S;
     opts.onHead?.(hx, hy);
+    head.x = hx;
+    head.y = hy;
+    if (now - hourAt > 30) {
+      hourAt = now;
+      const h = new Date().getHours();
+      sleepy = h >= 23 || h < 5;
+    }
     const field = opts.field?.() ?? null;
     const typing = field != null && document.activeElement === field && now - typedAt < 8;
     const onHer = Math.abs(pointer.x - hx) < 70 && pointer.y > hy - 70 && pointer.y < ft.y;
@@ -1263,10 +1278,18 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     const mo = voice.read(dt);
     touch.tiltW += ((now < touch.tiltUntil ? 1 : 0) - touch.tiltW) * Math.min(1, dt * 4);
     const lean = touch.tiltW * touch.tiltSide;
-    pose('首', life.gy * 0.15 + touch.tiltW * 0.06, life.gx * 0.25, -wgt * 0.03 + lean * 0.1);
+    // A flinch: the head jerks back and eases forward again.
+    touch.flinchW += ((now - touch.flinchAt < 0.25 ? 1 : 0) - touch.flinchW) * Math.min(1, dt * 10);
+    const back = touch.flinchW * 0.16;
+    pose(
+      '首',
+      life.gy * 0.15 + touch.tiltW * 0.06 - back * 0.5,
+      life.gx * 0.25,
+      -wgt * 0.03 + lean * 0.1,
+    );
     pose(
       '頭',
-      life.gy * 0.25 + Math.sin(t * 0.7) * 0.02 + mo.open * 0.05 + touch.tiltW * 0.08,
+      life.gy * 0.25 + Math.sin(t * 0.7) * 0.02 + mo.open * 0.05 + touch.tiltW * 0.08 - back,
       life.gx * 0.35,
       Math.sin(t * 0.45) * 0.05 - wgt * 0.04 + lean * 0.22,
     );
@@ -1275,14 +1298,25 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     life.ey += (life.gy * 0.08 - life.ey) * Math.min(1, dt * 12);
     pose('両目', life.ey, life.ex, 0);
 
-    // A blink every three to six seconds and a soft smile.
+    // A blink every three to six seconds and a soft smile (more of one in a
+    // good mood, none in a bad one). Sleepy, the blinks are slower and the
+    // lids hang a little, and now and then she yawns.
+    const blinkLen = sleepy ? 0.4 : 0.16;
     const d = t - life.blinkAt;
     let blink = 0;
-    if (d > 0 && d < 0.16) blink = Math.sin((d / 0.16) * Math.PI);
-    else if (d >= 0.16) life.blinkAt = t + rnd(3, 6);
-    morph('まばたき', blink);
-    morph('mouthSmileLeft', 0.3 - mo.open * 0.15);
-    morph('mouthSmileRight', 0.3 - mo.open * 0.15);
+    if (d > 0 && d < blinkLen) blink = Math.sin((d / blinkLen) * Math.PI);
+    else if (d >= blinkLen) life.blinkAt = t + (sleepy ? rnd(2, 4) : rnd(3, 6));
+    morph('まばたき', sleepy ? Math.max(0.22, blink) : blink);
+    if (sleepy && idle && !play.clip && now > touch.feelUntil + 2 && now > yawnAt) {
+      if (yawnAt > 0) {
+        touch.feel = 'yawn';
+        touch.feelUntil = now + 2.4;
+      }
+      yawnAt = now + rnd(45, 100);
+    }
+    const smile = touch.mood === 1 ? 0.5 : touch.mood === -1 ? 0 : 0.3;
+    morph('mouthSmileLeft', smile - mo.open * 0.15);
+    morph('mouthSmileRight', smile - mo.open * 0.15);
     morph('あ', mo.a * 0.8);
     morph('い', mo.i * 0.8);
     morph('う', mo.u * 0.8);
@@ -1292,6 +1326,14 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     // Shapes only the faces use rest at 0 unless a face holds them this frame.
     touch.feelW += ((now < touch.feelUntil ? 1 : 0) - touch.feelW) * Math.min(1, dt * 6);
     for (const n of FACE_ONLY) morph(n, 0);
+    // A bad mood: brows down (mostly under her fringe) and the corners of
+    // the mouth too.
+    if (touch.mood === -1) {
+      morph('browDownLeft', 0.3);
+      morph('browDownRight', 0.3);
+      morph('mouthFrownLeft', 0.3);
+      morph('mouthFrownRight', 0.3);
+    }
     if (touch.feelW > 0.001 && m.morphTargetInfluences)
       for (const [n, v] of Object.entries(FACES[touch.feel])) {
         const i = morphs[n];
@@ -1317,12 +1359,16 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     }
   }
 
+  // Sent away she is not drawn: after a frame that clears her, the loop
+  // only waits for her to be called back. (A hidden tab gets no frames.)
+  let awayFrames = 0;
   function tick() {
     if (disposed) return;
-    if (mesh) frame(mesh);
-    glowMat.opacity = 0.5 * clamp01(1 - (clock.getElapsedTime() - glowAt) / GLOW);
-    for (const g of glows.values()) g.visible = glowMat.opacity > 0 && g.userData.some === true;
-    renderer.render(scene, cam);
+    awayFrames = walk.state === 'away' ? awayFrames + 1 : 0;
+    if (awayFrames < 3) {
+      if (mesh) frame(mesh);
+      renderer.render(scene, cam);
+    }
     raf = requestAnimationFrame(tick);
   }
   place();
@@ -1375,11 +1421,16 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     act(name) {
       if (CLIPS[name]) void playClip(name);
     },
+    mood(level) {
+      touch.mood = level;
+    },
+    hush: () => voice.stop(),
     setOutfit: dress,
     say: (url) => voice.say(url),
     follow: (stream) => voice.follow(stream),
     dispose() {
       disposed = true;
+      clearTimeout(burst.timer);
       voice.dispose();
       cancelAnimationFrame(raf);
       resize.disconnect();

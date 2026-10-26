@@ -28796,6 +28796,61 @@
     }
    }
   },
+  "/api/v1/now/voice-line": {
+   "get": {
+    "summary": "A short line read aloud in Ani's voice",
+    "description": "Her answer to a tap on her on Now, when it holds the day's data (the focus, protein left, steps): OpenAI text to speech (ANI_VOICE_TTS_MODEL) in the voice of her Realtime sessions, made on each call; the browser keeps it for a day. At most 240 per user and hour. Refused for API keys.",
+    "tags": [
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "text",
+      "in": "query",
+      "required": true,
+      "description": "What she says, 1 to 200 characters, no control characters",
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The spoken line",
+      "content": {
+       "audio/mpeg": {
+        "schema": {
+         "type": "string",
+         "format": "binary"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "No text, a text over 200 characters or with control characters (invalid_query)"
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "404": {
+      "description": "Now module disabled"
+     },
+     "429": {
+      "description": "More than 240 lines in an hour"
+     },
+     "503": {
+      "description": "No voice key (not_configured), OpenAI is not answering (upstream_unavailable), or the server is busy"
+     }
+    }
+   }
+  },
   "/api/v1/today/focus/done": {
    "post": {
     "summary": "Tick or untick the focus; a task focus closes or reopens the task",
@@ -35435,7 +35490,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 531046,
-  "source_fnv1a64": "b98eaee05035f3f6"
+  "source_bytes": 532384,
+  "source_fnv1a64": "a66b3398c52d09dd"
  }
 }
