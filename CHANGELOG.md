@@ -6,6 +6,13 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.45.0] - 2026-10-26
+
+### Added
+- Ani on Now opens the chat with her agent on a double tap, suggests a break after an hour of activity on the page (no pause of five minutes; at most once an hour), and after 21:00 says one evening word (the focus still open, the focus done, or "how was the day") whose bubble opens the chat. She has a mood of the day that kind taps lift and rude ones lower: it shows in her smile or a frown and in how she greets on coming back, and a pat, a high five and a tap on her feet in a row make her dance. A cursor flying at her face startles her, and after 23:00 she is sleepy, with slow, heavy blinks and a yawn now and then.
+- Ani on Now answers a tap by where it lands on her: a ray into her posed meshes finds the bone under the tap, which names one of sixteen zones (face, hair, head, hands, belly, legs and so on, with her side), lit for a moment and named by the tap. A pat on the head says the day's focus (or puts the cursor in the focus field), a tap on her hand asks for a high five with the next open habit, her belly and her legs answer with the protein left and the steps, her hair, face, neck and shoulders get small faces and glances, five quick taps make her dizzy, and the chest, seat, hips and skirt are off limits: she gets cross and then turns her back for ten seconds. Taps beside her body no longer greet her, a face she makes from a tap fades back to her own, and while a clip plays her lowest point is kept on the ledge; Pic♡Pix poses 16, 17, 18 and 30 (mid-jump, kneeling, sitting on nothing) are no longer played.
+- Ani on Now speaks her answers to taps aloud: fixed lines are recorded in her voice under `wallpapers/ani/v2/voice/touch/`, and a line with the day in it (the focus, protein left, steps, the next open habit) is read by the new `GET /api/v1/now/voice-line` (OpenAI text to speech in her Realtime voice, 1 to 200 characters, at most 240 per user and hour, refused for API keys); while numbers are hidden she keeps the day to herself. Her first hello of the day names one thing from it (late tasks, rain or snow, the night's sleep in the morning), she cheers when the focus is ticked and sends the user on a break after a focus session that ran to its end, and a speaker on her ledge mutes her together with the chat's switch (muted, her lines are only shown). Taps no longer light the zone or name it, and she is not drawn while she is sent away.
+
 ## [1.44.0] - 2026-10-26
 
 ### Changed
