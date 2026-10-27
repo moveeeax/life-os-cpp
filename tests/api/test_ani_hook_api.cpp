@@ -57,6 +57,7 @@ protected:
 
     std::string config_file_name() const override { return "ani_hook_api_test_config.json"; }
     void config_overrides(nlohmann::json& cfg) override {
+        cfg["jobs"]["enabled"] = true;  // events queue the worker's jobs
         cfg["ani"]["agent"]["enabled"] = agent_on;
         cfg["ani"]["agent"]["upstream_key"] = "sk-test";
         cfg["ani"]["agent"]["proxy_url"] = "http://worker.test/v1";
