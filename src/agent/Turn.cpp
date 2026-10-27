@@ -16,6 +16,7 @@
 #include "agent/Actions.hpp"
 #include "agent/Gateway.hpp"
 #include "agent/Hook.hpp"
+#include "agent/Intake.hpp"
 #include "agent/Lifecycle.hpp"
 #include "agent/Manifest.hpp"
 #include "agent/Settings.hpp"
@@ -455,7 +456,9 @@ void fail_hook_events(const std::string& owner, const std::string& error) {
 }
 
 json process_inbox_purge(const json& /*payload*/) {
-    return json{{"status", "done"}, {"rows", InboxRepository().purge()}};
+    // Asks that ran out unanswered tell their senders before they are purged.
+    const int callbacks = Intake::send_callbacks();
+    return json{{"status", "done"}, {"rows", InboxRepository().purge()}, {"callbacks", callbacks}};
 }
 
 }  // namespace Agent

@@ -114,4 +114,36 @@ void AniHookController::count(const HttpRequestPtr& req, Callback&& callback) {
     }
 }
 
+void AniHookController::answer(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    API_REQUIRE_USER(req, callback, owner);
+    API_REFUSE_API_KEY(req, callback);
+    const auto body = json::parse(req->body(), nullptr, false);
+    const auto it = body.is_object() ? body.find("answer") : body.end();
+    if (!body.is_object() || it == body.end() || !it->is_string()) {
+        callback(ErrorResponse::bad_request("invalid_answer", "answer is one of the question's options"));
+        return;
+    }
+    try {
+        using A = Repositories::Agent::InboxRepository::Answer;
+        switch (::Agent::Intake::answer(owner, id, it->get<std::string>())) {
+            case A::Ok:
+                callback(Response::ok(json{{"data", {{"id", id}, {"answer", *it}}}}));
+                return;
+            case A::Unknown:
+                callback(ErrorResponse::not_found("not_found"));
+                return;
+            case A::NotAsk:
+            case A::BadOption:
+                callback(ErrorResponse::unprocessable("invalid_answer", "answer is one of the question's options"));
+                return;
+            case A::Answered:
+                callback(ErrorResponse::conflict("answered", "this question was answered already"));
+                return;
+        }
+    } catch (const std::exception& e) {
+        spdlog::error("ani.inbox answer failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
 }  // namespace Api

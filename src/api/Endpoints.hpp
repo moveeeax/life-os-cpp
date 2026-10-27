@@ -332,6 +332,7 @@ inline const std::vector<EndpointInfo>& get_endpoints() {
         {"POST", "/api/v1/ani/hook", "Ani: webhook for other systems, token in X-Ani-Hook-Token (public)"},
         {"POST", "/api/v1/ani/inbox/claim", "Ani: webhook items for the Now page to play now"},
         {"GET", "/api/v1/ani/inbox/count", "Ani: how many webhook items wait for the page"},
+        {"POST", "/api/v1/ani/inbox/{id}/answer", "Ani: the user's answer to one of her questions"},
         {"POST", "/api/v1/ani/mcp", "Ani: MCP endpoint (Streamable HTTP, JSON-RPC), an ani-scope API key"},
         {"GET", "/api/v1/ani/mcp", "Ani: MCP endpoint, no server stream (405)"},
         {"GET", "/api/v1/sounds", "Now: the ready focus sounds with their public URLs"},

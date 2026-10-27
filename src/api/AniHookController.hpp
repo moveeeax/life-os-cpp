@@ -29,6 +29,7 @@ public:
     ADD_METHOD_TO(AniHookController::ingestHeader, "/api/v1/ani/hook", Post);
     ADD_METHOD_TO(AniHookController::claim, "/api/v1/ani/inbox/claim", Post);
     ADD_METHOD_TO(AniHookController::count, "/api/v1/ani/inbox/count", Get);
+    ADD_METHOD_TO(AniHookController::answer, "/api/v1/ani/inbox/{id}/answer", Post);
     METHOD_LIST_END
 
     using Callback = std::function<void(const HttpResponsePtr&)>;
@@ -40,6 +41,8 @@ public:
     void ingestHeader(const HttpRequestPtr& req, Callback&& callback);
     void claim(const HttpRequestPtr& req, Callback&& callback);
     void count(const HttpRequestPtr& req, Callback&& callback);
+    /// The user's answer to one of her questions (an ask item), from the page.
+    void answer(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
 };
 
 }  // namespace Api

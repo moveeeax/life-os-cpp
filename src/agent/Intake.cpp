@@ -16,6 +16,7 @@
 #include "repositories/agent/HookRepository.hpp"
 #include "repositories/agent/InboxRepository.hpp"
 #include "repositories/agent/PrefsRepository.hpp"
+#include "webhooks/Webhooks.hpp"
 
 namespace Agent::Intake {
 
@@ -69,23 +70,66 @@ std::variant<Accepted, Refused> accept(const std::string& owner, Hook::Item item
             return Refused{503, "jobs_disabled", "Job queue not enabled"};
         }
     }
+    if (item.callback && Webhooks::detail::host_is_blocked(Webhooks::detail::url_host(*item.callback))) {
+        return Refused{400, "bad_callback", "callback must be a public https address"};
+    }
     Repositories::Agent::InboxRepository inbox;
-    if (inbox.pending_count(owner) >= Hook::kPendingMax) {
+    const bool hold = item.kind == "hold";
+    if (!hold && inbox.pending_count(owner) >= Hook::kPendingMax) {
         return Refused{429, "backlog", "50 items wait for the page already"};
     }
     item.payload["via"] = via;
-    const auto added =
-        inbox.add(owner, item.kind, item.payload, item.source_id, item.ttl, event ? "thinking" : "ready");
+    const std::string status = hold ? "delivered" : event ? "thinking" : "ready";
+    const auto added = inbox.add(
+        owner, item.kind, item.payload, item.source_id, item.ttl, status, {item.delay_seconds, item.at, item.callback});
+    if (added.bad_time) {
+        return Refused{400, "invalid_when", "a reminder is due between now and a week ahead"};
+    }
     if (added.duplicate) {
         return Refused{409, "duplicate", "this id was sent in the last 24 hours", json{{"id", added.id}}};
     }
     if (event) {
         Jobs::get().submit(Hook::kEventJob, json{{"owner", owner}});
     }
+    if (hold) {
+        Repositories::Agent::PrefsRepository().hold(owner, item.payload.value("minutes", 0));
+    }
     if (via == "webhook") {
         Repositories::Agent::HookRepository().touch(owner);
     }
     return Accepted{added.id};
+}
+
+Repositories::Agent::InboxRepository::Answer answer(const std::string& owner,
+                                                    const std::string& id,
+                                                    const std::string& text) {
+    const auto a = Repositories::Agent::InboxRepository().answer(owner, id, text);
+    if (a == Repositories::Agent::InboxRepository::Answer::Ok) {
+        send_callbacks();
+    }
+    return a;
+}
+
+int send_callbacks() {
+    if (!Jobs::is_initialized()) {
+        return 0;
+    }
+    int sent = 0;
+    for (const auto& c : Repositories::Agent::InboxRepository().due_callbacks()) {
+        json body{{"id", c.id},
+                  {"source_id", c.source_id ? json(*c.source_id) : json(nullptr)},
+                  {"question", c.question},
+                  {"answer", c.answer ? json(*c.answer) : json(nullptr)}};
+        if (!c.answer) {
+            body["reason"] = "expired";
+        }
+        // Signed with the user's webhook token, which the sender already holds.
+        const std::string secret = Repositories::Agent::HookRepository().ensure(c.owner);
+        Jobs::get().submit(Webhooks::kJobType,
+                           json{{"url", c.url}, {"event", "ani.answer"}, {"body", body}, {"secret", secret}});
+        ++sent;
+    }
+    return sent;
 }
 
 }  // namespace Agent::Intake

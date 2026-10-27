@@ -15993,6 +15993,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ani/inbox/{id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The user's answer to one of Ani's questions
+         * @description For an ask item played on Now: one of its options, once. With a callback, the answer is POSTed there (signed with the user's webhook token). Refused for API keys.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        answer: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Taken */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                                answer: string;
+                            };
+                        };
+                    };
+                };
+                /** @description No answer in the body */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No such item */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Answered already */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not a question, or not one of its options */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/now/voice-session": {
         parameters: {
             query?: never;
@@ -23507,13 +23595,20 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "say" | "outfit" | "act" | "event";
-            /** @description What she says: a say item's text, or her reply to an event */
+            kind: "say" | "outfit" | "act" | "event" | "mood" | "remind" | "ask" | "focus" | "card" | "wallpaper" | "sound" | "hold";
+            /** @description What she says: the text of a say, remind or ask item, or her reply to an event */
             say: string | null;
             /** @description The item as it came */
             payload: {
                 [key: string]: unknown;
             };
+            /** @description An ask item's answer, once the user chose one of its options */
+            answer?: string | null;
+            /**
+             * Format: date-time
+             * @description When a reminder is due
+             */
+            not_before?: string | null;
             /** Format: date-time */
             created_at: string;
         };

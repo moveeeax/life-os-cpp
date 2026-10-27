@@ -4892,7 +4892,15 @@
        "say",
        "outfit",
        "act",
-       "event"
+       "event",
+       "mood",
+       "remind",
+       "ask",
+       "focus",
+       "card",
+       "wallpaper",
+       "sound",
+       "hold"
       ]
      },
      "say": {
@@ -4900,12 +4908,27 @@
        "string",
        "null"
       ],
-      "description": "What she says: a say item's text, or her reply to an event"
+      "description": "What she says: the text of a say, remind or ask item, or her reply to an event"
      },
      "payload": {
       "type": "object",
       "additionalProperties": true,
       "description": "The item as it came"
+     },
+     "answer": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "An ask item's answer, once the user chose one of its options"
+     },
+     "not_before": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time",
+      "description": "When a reminder is due"
      },
      "created_at": {
       "type": "string",
@@ -29522,6 +29545,97 @@
     }
    }
   },
+  "/api/v1/ani/inbox/{id}/answer": {
+   "post": {
+    "summary": "The user's answer to one of Ani's questions",
+    "description": "For an ask item played on Now: one of its options, once. With a callback, the answer is POSTed there (signed with the user's webhook token). Refused for API keys.",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "answer"
+        ],
+        "properties": {
+         "answer": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Taken",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "id",
+            "answer"
+           ],
+           "properties": {
+            "id": {
+             "type": "string",
+             "format": "uuid"
+            },
+            "answer": {
+             "type": "string"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "No answer in the body"
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "404": {
+      "description": "No such item"
+     },
+     "409": {
+      "description": "Answered already"
+     },
+     "422": {
+      "description": "Not a question, or not one of its options"
+     }
+    }
+   }
+  },
   "/api/v1/now/voice-session": {
    "post": {
     "summary": "A short-lived OpenAI Realtime client secret for talking with Ani on Now",
@@ -36262,7 +36376,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 546275,
-  "source_fnv1a64": "9699b3a92056c542"
+  "source_bytes": 547907,
+  "source_fnv1a64": "e116c85648b629a9"
  }
 }
