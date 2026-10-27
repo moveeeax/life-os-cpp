@@ -288,10 +288,14 @@ export function AniCorner({
   // Says a line; the promise ends when the bubble goes (a webhook backlog
   // plays one line after the other).
   const answer = useRef<(a: Answer) => Promise<void>>(() => Promise.resolve());
+  // The promise of the line on screen: a line that cuts it short ends it.
+  const lineEnds = useRef<(() => void) | null>(null);
   answer.current = (a: Answer) =>
     new Promise<void>((finished) => {
       const e = engine.current;
       if (!e || calling.current) return finished();
+      lineEnds.current?.();
+      lineEnds.current = finished;
       if (a.mood) e.mood(moodLevel(moveMood(contextRef.current.date, a.mood)));
       lastSaidAt.current = Date.now();
       setSaidChat(Boolean(a.chat));
@@ -299,6 +303,7 @@ export function AniCorner({
       clearTimeout(sayTimer.current);
       const done = () => {
         setSaid((v) => (v === a.text ? null : v));
+        if (lineEnds.current === finished) lineEnds.current = null;
         finished();
       };
       if (a.silent || !soundOn()) {

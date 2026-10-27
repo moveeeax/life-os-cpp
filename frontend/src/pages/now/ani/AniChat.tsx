@@ -77,6 +77,9 @@ export function SpeakerIcon({ on }: { on: boolean }) {
  * conversation. Messages, replies and proposals are personal: Hide numbers
  * blurs them.
  */
+/** Her answer to webhook events meaning "not worth telling" (SILENT, any case, bare punctuation). */
+const isSilent = (reply: string | null) => /^[\s\p{P}]*silent[\s\p{P}]*$/iu.test(reply ?? '');
+
 export function AniChat({
   tz,
   onClose,
@@ -113,11 +116,13 @@ export function AniChat({
     };
   }, []);
 
-  const last = turns?.[turns.length - 1];
+  // Only the user's own open turn holds the box: a webhook turn runs beside it.
+  const mine = turns?.filter((t) => t.origin !== 'hook');
+  const last = mine?.[mine.length - 1];
   const waiting = last != null && isOpen(last);
-  // The turn read again: the open one until it ends, or one whose confirmed
-  // change is still being made.
-  const watched = waiting ? last : turns?.slice().reverse().find(isDoing);
+  // The turn read again: the newest open one until it ends, or one whose
+  // confirmed change is still being made.
+  const watched = turns?.slice().reverse().find(isOpen) ?? turns?.slice().reverse().find(isDoing);
   const watching = watched != null && (isOpen(watched) || isDoing(watched));
 
   useEffect(() => {
@@ -128,7 +133,14 @@ export function AniChat({
         .then((t) => {
           setTurns((all) => all?.map((x) => (x.id === t.id ? t : x)) ?? all);
           // Two reads in flight can both see it done: each reply is spoken once.
-          if (t.status === 'done' && soundRef.current && !spoken.current.has(t.id)) {
+          // A webhook turn's answer is played by her inbox (and kept back
+          // under Hide numbers), not here.
+          if (
+            t.status === 'done' &&
+            t.origin !== 'hook' &&
+            soundRef.current &&
+            !spoken.current.has(t.id)
+          ) {
             spoken.current.add(t.id);
             replyRef.current?.(t);
           }
@@ -311,7 +323,7 @@ export function AniChat({
                 </p>
               ) : null}
               <p className="ani-msg ani-msg-you num">{t.text}</p>
-              {t.status === 'done' && t.origin === 'hook' && t.reply?.trim() === 'SILENT' ? (
+              {t.status === 'done' && t.origin === 'hook' && isSilent(t.reply) ? (
                 <p className="ani-msg-fail" data-num-ok>
                   She kept quiet: not worth your attention.
                 </p>

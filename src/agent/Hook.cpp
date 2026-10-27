@@ -6,6 +6,7 @@
 #include "agent/Hook.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <utility>
 
 #include "now/Voice.hpp"
@@ -149,6 +150,36 @@ std::variant<Item, Error> parse(std::string_view body, std::string_view content_
         item.ttl = static_cast<int>(std::min<long long>(it->get<long long>(), kTtlMax));
     }
     return r;
+}
+
+bool is_silent(std::string_view reply) {
+    // Spaces and ASCII punctuation, and the quote marks a model may add (« » “ ”).
+    std::string word;
+    for (std::size_t i = 0; i < reply.size(); ++i) {
+        const auto c = static_cast<unsigned char>(reply[i]);
+        if (std::isalpha(c)) {
+            word += static_cast<char>(std::toupper(c));
+        } else if (c >= 0x80) {
+            // A letter outside ASCII is not part of SILENT; the quotes are punctuation.
+            const std::string_view rest = reply.substr(i);
+            bool quote = false;
+            for (const std::string_view q : {"«", "»", "“", "”", "„"}) {
+                if (rest.substr(0, q.size()) == q) {
+                    i += q.size() - 1;
+                    quote = true;
+                    break;
+                }
+            }
+            if (!quote) {
+                return false;
+            }
+        } else if (std::isspace(c) == 0 && std::ispunct(c) == 0) {
+            return false;
+        } else if (!word.empty() && i + 1 < reply.size() && std::isalpha(static_cast<unsigned char>(reply[i + 1]))) {
+            return false;  // two words
+        }
+    }
+    return word == "SILENT";
 }
 
 std::string redact(std::string_view path) {

@@ -104,9 +104,8 @@ function Webhook({ hook }: { hook: AniWebhook }) {
             id="ani-hook-url"
             readOnly
             value={hook.url}
-            data-num-ok
             onFocus={(e) => e.currentTarget.select()}
-            className="font-mono text-xs"
+            className="num font-mono text-xs"
           />
           <Button
             variant="outline"

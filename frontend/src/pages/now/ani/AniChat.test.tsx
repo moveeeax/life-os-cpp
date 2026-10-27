@@ -50,6 +50,7 @@ describe('AniChat', () => {
         text: '[telegram] Реклама',
         reply: 'SILENT',
       }),
+      turn({ id: 'h3', origin: 'hook', status: 'done', text: '[ci] ok', reply: 'Silent.' }),
       turn({
         id: 'h2',
         origin: 'hook',
@@ -60,9 +61,38 @@ describe('AniChat', () => {
     ]);
     render(<AniChat tz="Asia/Almaty" onClose={() => {}} />);
     expect(await screen.findByText('Маша зовёт.')).toBeTruthy();
-    expect(screen.getAllByText(/from your webhook/i)).toHaveLength(2);
+    expect(screen.getAllByText(/from your webhook/i)).toHaveLength(3);
     expect(screen.queryByText('SILENT')).toBeNull();
-    expect(screen.getByText(/kept quiet/i)).toBeTruthy();
+    expect(screen.queryByText('Silent.')).toBeNull();
+    expect(screen.getAllByText(/kept quiet/i)).toHaveLength(2);
+  });
+
+  it('takes a message while a webhook turn is open, and does not speak its reply', async () => {
+    vi.mocked(chat.loadTurns).mockResolvedValue([
+      turn({ id: 'h1', origin: 'hook', status: 'running', text: '[telegram] Маша' }),
+    ]);
+    vi.mocked(chat.readTurn).mockResolvedValue(
+      turn({
+        id: 'h1',
+        origin: 'hook',
+        status: 'done',
+        text: '[telegram] Маша',
+        reply: 'Маша пишет.',
+      }),
+    );
+    const onReply = vi.fn();
+    render(<AniChat tz="Asia/Almaty" onClose={() => {}} onReply={onReply} />);
+    const box = await screen.findByLabelText('Message to Ani');
+    await screen.findByText('[telegram] Маша');
+    fireEvent.change(box, { target: { value: 'Привет' } });
+    expect((screen.getByRole('button', { name: /send/i }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(chat.POLL_MS);
+    });
+    expect(await screen.findByText('Маша пишет.')).toBeTruthy();
+    expect(onReply).not.toHaveBeenCalled();
   });
 
   it('wakes her agent and shows the chat so far', async () => {

@@ -131,3 +131,12 @@ TEST(AniHookParse, RedactsToken) {
     EXPECT_EQ(Hook::redact("/api/v1/ani/hook"), "/api/v1/ani/hook");
     EXPECT_EQ(Hook::redact("/api/v1/tasks/1"), "/api/v1/tasks/1");
 }
+
+TEST(AniHookParse, SilentAnswers) {
+    for (const char* s : {"SILENT", " SILENT\n", "Silent.", "silent", "«SILENT»", "SILENT!"}) {
+        EXPECT_TRUE(Hook::is_silent(s)) << s;
+    }
+    for (const char* s : {"", "Silent night is on TV.", "Маша зовёт.", "SILENTLY"}) {
+        EXPECT_FALSE(Hook::is_silent(s)) << s;
+    }
+}

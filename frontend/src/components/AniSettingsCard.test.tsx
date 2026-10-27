@@ -84,7 +84,9 @@ describe('AniSettingsCard', () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
     renderCard();
-    expect(((await screen.findByLabelText(/webhook url/i)) as HTMLInputElement).value).toBe(URL1);
+    const field = (await screen.findByLabelText(/webhook url/i)) as HTMLInputElement;
+    expect(field.value).toBe(URL1);
+    expect(field.classList.contains('num')).toBe(true); // a secret: Hide numbers blurs it
     fireEvent.click(screen.getByRole('button', { name: /^copy$/i }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(URL1));
     expect(await screen.findByRole('button', { name: /copied/i })).toBeTruthy();

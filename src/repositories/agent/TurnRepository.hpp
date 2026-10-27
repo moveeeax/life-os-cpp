@@ -13,6 +13,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -201,6 +202,23 @@ public:
                            "SELECT 1 FROM ani_turns WHERE owner_id = $1::uuid AND status IN ('queued', 'running')",
                            owner)
                         .empty();
+        });
+    }
+
+    /// Fails the user's open turns older than kStaleSeconds (their job was
+    /// lost or their worker died) and returns their ids, so nothing waits on
+    /// them for ever.
+    std::vector<std::string> reap_stale(const std::string& owner) {
+        return Database::get().execute_write([&](auto& txn) {
+            std::vector<std::string> ids;
+            for (const auto& row : txn.exec_params(
+                     "UPDATE ani_turns SET status = 'failed', error = 'timeout' WHERE owner_id = $1::uuid AND status "
+                     "IN ('queued', 'running') AND created_at < now() - make_interval(secs => $2) RETURNING id::text",
+                     owner,
+                     kStaleSeconds)) {
+                ids.push_back(row[0].template as<std::string>());
+            }
+            return ids;
         });
     }
 

@@ -300,5 +300,32 @@ describe('AniCorner', () => {
     claimSpy.mockClear();
     await tick(20_000);
     expect(claimSpy).not.toHaveBeenCalledWith('/api/v1/ani/inbox/claim');
+    // Her state outlives the test: back on the ledge for the next one.
+    fireEvent.click(screen.getByRole('button', { name: 'Ani: call back' }));
+  });
+
+  it('keeps playing the webhook after another line cut one short', async () => {
+    setSoundOn(false);
+    try {
+      await mount();
+      await tick(20_000);
+      inbox.items = [hookSay('Первая строка из вебхука.')];
+      await tick();
+      expect(bubble()).toBe('Первая строка из вебхука.');
+      // She says something else meanwhile.
+      act(() => {
+        engine.opts!.onSpin?.();
+      });
+      expect(bubble()).toBe('Ой, голова кружится.');
+      inbox.items = [hookSay('Вторая.')];
+      const seen = new Set<string | null>();
+      for (let i = 0; i < 40; i++) {
+        await tick(500);
+        seen.add(bubble());
+      }
+      expect(seen.has('Вторая.')).toBe(true);
+    } finally {
+      setSoundOn(true);
+    }
   });
 });

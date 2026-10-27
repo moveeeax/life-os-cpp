@@ -62,6 +62,10 @@ struct Error {
 
 std::variant<Item, Error> parse(std::string_view body, std::string_view content_type);
 
+/// Whether the agent's answer to webhook events is its "not worth telling"
+/// word: SILENT in any case, with nothing around it but spaces and punctuation.
+bool is_silent(std::string_view reply);
+
 /// @p path with a webhook token cut to its first 10 characters, for logs.
 std::string redact(std::string_view path);
 

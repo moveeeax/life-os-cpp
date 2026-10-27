@@ -215,3 +215,51 @@ TEST_F(AniHookEvents, BusyRetriesUntilTtlThenFails) {
     run_event();
     EXPECT_EQ(status_of(fresh), "failed") << "their time is out";
 }
+
+TEST_F(AniHookEvents, StaleHookTurnDoesNotLockTheChat) {
+    running(kAnna);
+    const std::string item = event("x");
+    run_event();
+    const std::string hook = hook_turn();
+    ASSERT_TRUE(turns.start(hook));
+    // Its worker died long ago: the row still says running.
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE ani_turns SET created_at = now() - interval '20 minutes' WHERE id::text = $1", hook);
+        return true;
+    });
+    const auto sent = Agent::send(kAnna, "Привет", "UTC");
+    ASSERT_EQ(sent.status, Agent::Send::Queued);
+    Agent::process_turn(json{{"turn", sent.turn["id"]}});
+    EXPECT_EQ((*turns.get(kAnna, sent.turn["id"].get<std::string>()))["status"], "done") << "not held by a dead turn";
+    EXPECT_EQ((*turns.get(kAnna, hook))["status"], "failed");
+    EXPECT_EQ(status_of(item), "failed") << "its events fail with it";
+}
+
+TEST_F(AniHookEvents, LostQueuedHookTurnIsReplaced) {
+    running(kAnna);
+    event("first");
+    run_event();
+    const std::string lost = hook_turn();
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE ani_turns SET created_at = now() - interval '20 minutes' WHERE id::text = $1", lost);
+        return true;
+    });
+    const std::string next = event("second");
+    run_event();
+    const std::string fresh = hook_turn();
+    ASSERT_FALSE(fresh.empty());
+    EXPECT_NE(fresh, lost) << "the lost turn is not joined";
+    EXPECT_EQ((*turns.get(kAnna, lost))["status"], "failed");
+    EXPECT_EQ(status_of(next), "thinking");
+    EXPECT_NE((*turns.get(kAnna, fresh))["text"].get<std::string>().find("second"), std::string::npos);
+}
+
+TEST_F(AniHookEvents, SilentWithPunctuation) {
+    running(kAnna);
+    const std::string a = event("Реклама");
+    run_event();
+    gateway.reply = "Silent.";
+    Agent::process_turn(json{{"turn", hook_turn()}});
+    EXPECT_EQ(status_of(a), "delivered");
+    EXPECT_TRUE(inbox.claim(kAnna, 5).empty());
+}

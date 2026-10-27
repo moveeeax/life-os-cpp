@@ -55,6 +55,16 @@ void more_events(const std::string& owner) {
     }
 }
 
+/// Fails the user's turns that went stale (and their webhook events), so a
+/// lost job or a dead worker never holds the chat or the webhook.
+void reap(const std::string& owner) {
+    InboxRepository inbox;
+    for (const auto& id : TurnRepository().reap_stale(owner)) {
+        spdlog::warn("ani agent {}: turn {} went stale", Manifest::owner_hash(owner), id);
+        inbox.fail_turn(id);
+    }
+}
+
 json ended(const std::string& id, const std::string& owner, const std::string& error, const std::string& why) {
     spdlog::warn("ani agent {}: turn {} failed ({}): {}", Manifest::owner_hash(owner), id, error, why);
     TurnRepository().fail(id, error);
@@ -260,6 +270,7 @@ json process_turn(const json& payload) {
         }
         // One turn of a user at a time: the user's own and a webhook turn wait for each other.
         const std::string origin = turn->value("origin", "user");
+        reap(owner);
         if (turns.running_other(owner, origin)) {
             throw Jobs::DeferJob("another turn of the user runs", 2000);
         }
@@ -270,6 +281,8 @@ json process_turn(const json& payload) {
             }
             return json{{"status", "skipped"}, {"reason", "not_queued"}};
         }
+        // Read after the start: events may have joined a webhook turn while it was queued.
+        const auto started = turns.for_worker(id);
         agents.touch(owner);
 
         const std::string tz = turn->value("tz", "UTC");
@@ -292,7 +305,7 @@ json process_turn(const json& payload) {
         }
         const json outcomes = ActionRepository().of_previous_turn(owner, id);
         // The gateway ignores system messages: the context goes in front of the text.
-        const std::string said = turn->value("text", "");
+        const std::string said = (started ? *started : *turn).value("text", "");
         const std::string text =
             preface(local, tz, tools, outcomes) + "\n" + (origin == "hook" ? hook_note() + "\n" + said : said);
         const auto out = Gateway::converse(Net::Http::transport(),
@@ -308,7 +321,7 @@ json process_turn(const json& payload) {
         if (origin == "hook") {
             // Her answer is the line the page plays; SILENT, nothing.
             const std::string line = trimmed(reply);
-            InboxRepository().resolve_turn(id, line == kSilent ? std::nullopt : std::optional<std::string>(line));
+            InboxRepository().resolve_turn(id, Hook::is_silent(line) ? std::nullopt : std::optional<std::string>(line));
             more_events(owner);
         }
         return json{{"status", "done"}, {"tools", out.tools.size()}};
@@ -349,6 +362,7 @@ json process_hook_event(const json& payload) {
     if (!lock.held()) {
         throw Jobs::DeferJob("another event job of the user runs", 1000);
     }
+    reap(owner);
     InboxRepository inbox;
     TurnRepository turns;
     const json waiting = inbox.thinking_unlinked(owner);
