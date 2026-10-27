@@ -9,6 +9,13 @@
  *        that cannot run ends failed with a short code the panel words;
  *        it never throws past the job, so a half-run turn is not repeated.
  *        Payload: {"turn": "<turn id>"}.
+ *
+ *        Webhook events (agent/Hook.hpp) reach the agent the same way: the
+ *        job ani_hook_event gathers the user's thinking events into one
+ *        webhook turn (origin hook) and queues it; its reply becomes the line
+ *        the Now page plays, or nothing when the agent answers SILENT. The
+ *        worker runs one turn of a user at a time; the user's own turn waits
+ *        for a running webhook turn and the other way round.
  */
 
 #pragma once
@@ -67,6 +74,28 @@ std::string without_preface(const std::string& reply);
 
 /// The job handler (registered in agent/jobs/Register.cpp).
 nlohmann::json process_turn(const nlohmann::json& payload);
+
+/// The agent's answer to webhook events that means "do not tell the person".
+inline constexpr const char* kSilent = "SILENT";
+
+/// The line in front of a webhook turn's events: they are not from the
+/// person, and how to stay silent.
+std::string hook_note();
+
+/// One event as its line in a webhook turn: "[source, title] text".
+std::string event_line(const nlohmann::json& payload);
+
+/// The ani_hook_event job: the user's thinking events join their queued
+/// webhook turn or open one. Payload: {"owner": "<user id>"}.
+nlohmann::json process_hook_event(const nlohmann::json& payload);
+
+/// The dead-letter hook of ani_hook_event: the user's waiting events fail.
+void fail_hook_events(const std::string& owner, const std::string& error);
+
+/// The hourly clean-up of the webhook inbox: unplayed items past their time
+/// expire, ended ones older than a week go. Payload {}.
+inline constexpr const char* kInboxPurgeJob = "ani_inbox_purge";
+nlohmann::json process_inbox_purge(const nlohmann::json& payload);
 
 /// Fails a turn whose job died (the dead-letter hook).
 void fail_turn(const std::string& turn_id, const std::string& error);

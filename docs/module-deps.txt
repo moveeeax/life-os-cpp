@@ -35,6 +35,7 @@
 agent -> cache
 agent -> jobs
 agent -> net
+agent -> now
 agent -> repositories
 agent -> repositories/agent
 agent -> security
@@ -171,6 +172,7 @@ repositories -> database
 repositories -> domain
 repositories -> utils
 repositories/agent -> database
+repositories/agent -> utils
 repositories/fitness -> database
 repositories/fitness -> domain/fitness
 repositories/fitness -> fitness/xiaomi

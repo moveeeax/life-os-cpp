@@ -4635,9 +4635,17 @@
        "failed"
       ]
      },
+     "origin": {
+      "type": "string",
+      "enum": [
+       "user",
+       "hook"
+      ],
+      "description": "user: the user wrote it; hook: events that came through the webhook"
+     },
      "text": {
       "type": "string",
-      "description": "What the user wrote"
+      "description": "What the user wrote, or the events of a webhook turn"
      },
      "reply": {
       "type": [
@@ -4723,6 +4731,184 @@
        "null"
       ],
       "description": "Why a failed action failed: the API's error code, unavailable or interrupted"
+     }
+    }
+   },
+   "AniPrefs": {
+    "type": "object",
+    "required": [
+     "bare"
+    ],
+    "properties": {
+     "bare": {
+      "type": "boolean",
+      "description": "The bare outfit is on"
+     }
+    }
+   },
+   "AniBare": {
+    "type": "object",
+    "required": [
+     "model_url",
+     "texture_url",
+     "expires_in"
+    ],
+    "properties": {
+     "model_url": {
+      "type": "string",
+      "description": "Presigned GET of the model (PMX)"
+     },
+     "texture_url": {
+      "type": "string",
+      "description": "Presigned GET of its body texture (PNG)"
+     },
+     "expires_in": {
+      "type": "integer",
+      "description": "Seconds the links stay valid"
+     }
+    }
+   },
+   "AniWebhook": {
+    "type": "object",
+    "required": [
+     "url",
+     "recent"
+    ],
+    "properties": {
+     "url": {
+      "type": "string",
+      "description": "The webhook URL; its last segment is the secret token"
+     },
+     "recent": {
+      "type": "array",
+      "description": "The last 10 calls, newest first",
+      "items": {
+       "type": "object",
+       "required": [
+        "id",
+        "kind",
+        "status",
+        "created_at"
+       ],
+       "properties": {
+        "id": {
+         "type": "string",
+         "format": "uuid"
+        },
+        "kind": {
+         "type": "string",
+         "enum": [
+          "say",
+          "outfit",
+          "act",
+          "event"
+         ]
+        },
+        "status": {
+         "type": "string",
+         "enum": [
+          "queued",
+          "thinking",
+          "ready",
+          "delivered",
+          "expired",
+          "failed"
+         ]
+        },
+        "created_at": {
+         "type": "string",
+         "format": "date-time"
+        }
+       }
+      }
+     }
+    }
+   },
+   "AniHookItem": {
+    "type": "object",
+    "required": [
+     "type"
+    ],
+    "description": "say: text (1-200 characters). outfit: outfit (p1, p2, lingerie, or bare when the user turned it on). act: name (one of her moves). event: text (1-2000), source and title (1-60 each). Any type may carry id (the sender's id, a repeat within 24 hours is refused) and ttl (seconds to wait for the page; default 86400, at most 604800).",
+    "properties": {
+     "type": {
+      "type": "string",
+      "enum": [
+       "say",
+       "outfit",
+       "act",
+       "event"
+      ]
+     },
+     "text": {
+      "type": "string"
+     },
+     "outfit": {
+      "type": "string",
+      "enum": [
+       "p1",
+       "p2",
+       "lingerie",
+       "bare"
+      ]
+     },
+     "name": {
+      "type": "string"
+     },
+     "source": {
+      "type": "string"
+     },
+     "title": {
+      "type": "string"
+     },
+     "id": {
+      "type": "string",
+      "maxLength": 200
+     },
+     "ttl": {
+      "type": "integer",
+      "minimum": 1
+     }
+    }
+   },
+   "AniInboxItem": {
+    "type": "object",
+    "required": [
+     "id",
+     "kind",
+     "say",
+     "payload",
+     "created_at"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "say",
+       "outfit",
+       "act",
+       "event"
+      ]
+     },
+     "say": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "What she says: a say item's text, or her reply to an event"
+     },
+     "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "The item as it came"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
      }
     }
    },
@@ -28750,6 +28936,476 @@
     }
    }
   },
+  "/api/v1/ani/prefs": {
+   "get": {
+    "summary": "Ani's settings kept on the server",
+    "description": "Whether the bare outfit is on for the caller. Refused for API keys.",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The settings",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/AniPrefs"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     }
+    }
+   },
+   "put": {
+    "summary": "Turn the bare outfit on or off",
+    "description": "Turning it on needs \"adult\": true, the user's word that they are an adult (422 adult_required without it). Refused for API keys.",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "bare"
+        ],
+        "properties": {
+         "bare": {
+          "type": "boolean"
+         },
+         "adult": {
+          "type": "boolean",
+          "description": "Required (true) to turn bare on"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The settings after the change",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/AniPrefs"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "bare is missing or not a boolean"
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "422": {
+      "description": "adult_required: bare on without \"adult\": true"
+     }
+    }
+   }
+  },
+  "/api/v1/ani/bare": {
+   "get": {
+    "summary": "Short signed links to the bare outfit's model",
+    "description": "Two presigned GET links (the model and its body texture) to the private part of the bucket, valid two minutes; the page loads them at once. 403 bare_off while the bare outfit is off. Never cached. Refused for API keys.",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The links",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/AniBare"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "403": {
+      "description": "bare_off: the bare outfit is off"
+     },
+     "503": {
+      "description": "File storage is not configured or did not answer"
+     }
+    }
+   }
+  },
+  "/api/v1/ani/webhook": {
+   "get": {
+    "summary": "The caller's Ani webhook URL and its last calls",
+    "description": "The URL is made on the first read and stays until replaced. Anyone with it can make Ani say a line, change, play a move, or hand an event to the caller's agent (which only proposes changes). The last calls carry time, type and status, never their text. Refused for API keys.",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The webhook",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/AniWebhook"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     }
+    }
+   }
+  },
+  "/api/v1/ani/webhook/rotate": {
+   "post": {
+    "summary": "Replace the caller's Ani webhook URL",
+    "description": "The old URL stops working at once. Refused for API keys.",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The webhook with its new URL",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/AniWebhook"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     }
+    }
+   }
+  },
+  "/api/v1/ani/hook/{token}": {
+   "post": {
+    "summary": "Ani webhook, the token in the path",
+    "description": "For other systems (a chat bot, n8n, a script): Ani says a line, changes, plays a move, or hands an event to the user's agent, which answers in her words or stays silent. Items wait for the user's Now page (up to ttl seconds) and play when it is open. A text/plain body is an event with that text. 120 calls per hour, 50 waiting items. The same answer for a token that never existed and one replaced.",
+    "tags": [
+     "ani"
+    ],
+    "security": [],
+    "parameters": [
+     {
+      "name": "token",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "aniwh_ and 48 hex characters"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AniHookItem"
+       }
+      },
+      "text/plain": {
+       "schema": {
+        "type": "string",
+        "maxLength": 2000
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Taken; the item waits for the page",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "id"
+           ],
+           "properties": {
+            "id": {
+             "type": "string",
+             "format": "uuid"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "The body is not a valid item"
+     },
+     "404": {
+      "description": "Unknown token"
+     },
+     "409": {
+      "description": "duplicate (the sender's id was used within 24 hours; error.id is the first item) or agent_off (an event while the agent is off)"
+     },
+     "413": {
+      "description": "The body is over 8 KB"
+     },
+     "422": {
+      "description": "A value that is not allowed (an unknown outfit or move; bare_off)"
+     },
+     "429": {
+      "description": "Over 120 calls an hour, 50 waiting items (backlog), or the agent budget (agent_budget)"
+     }
+    }
+   }
+  },
+  "/api/v1/ani/hook": {
+   "post": {
+    "summary": "Ani webhook, the token in a header",
+    "description": "The same as POST /api/v1/ani/hook/{token}, with the token in X-Ani-Hook-Token.",
+    "tags": [
+     "ani"
+    ],
+    "security": [],
+    "parameters": [
+     {
+      "name": "X-Ani-Hook-Token",
+      "in": "header",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AniHookItem"
+       }
+      },
+      "text/plain": {
+       "schema": {
+        "type": "string",
+        "maxLength": 2000
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Taken; the item waits for the page",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "id"
+           ],
+           "properties": {
+            "id": {
+             "type": "string",
+             "format": "uuid"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "The body is not a valid item"
+     },
+     "404": {
+      "description": "Unknown or missing token"
+     },
+     "409": {
+      "description": "duplicate or agent_off"
+     },
+     "413": {
+      "description": "The body is over 8 KB"
+     },
+     "422": {
+      "description": "A value that is not allowed"
+     },
+     "429": {
+      "description": "Over the limits, or agent_budget"
+     }
+    }
+   }
+  },
+  "/api/v1/ani/inbox/claim": {
+   "post": {
+    "summary": "Webhook items for the Now page to play now",
+    "description": "Up to 5 ready items, oldest first; each is handed out once. The page does not call this while Hide numbers or a voice call is on, or while Ani is off her ledge. Refused for API keys.",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The items",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/AniInboxItem"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     }
+    }
+   }
+  },
+  "/api/v1/ani/inbox/count": {
+   "get": {
+    "summary": "How many webhook items wait for the page",
+    "description": "For the dot on Ani's ledge. Refused for API keys.",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The count",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "waiting"
+           ],
+           "properties": {
+            "waiting": {
+             "type": "integer",
+             "minimum": 0
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     }
+    }
+   }
+  },
   "/api/v1/now/voice-session": {
    "post": {
     "summary": "A short-lived OpenAI Realtime client secret for talking with Ani on Now",
@@ -35490,7 +36146,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 532384,
-  "source_fnv1a64": "d97b64a56e264b8c"
+  "source_bytes": 543781,
+  "source_fnv1a64": "f03a3f2fe788ab0d"
  }
 }

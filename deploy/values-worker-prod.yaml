@@ -133,6 +133,12 @@ storage:
       accessKeyIdKey: access-key-id
       secretAccessKeyKey: secret-access-key
 
+# The site's address: the links the app renders (account e-mails, Ani's
+# webhook URL in the settings) start with it.
+app:
+  baseUrl: "https://life-os.tarassov.me"
+  name: Life OS
+
 mail:
   enabled: false
 

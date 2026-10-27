@@ -95,6 +95,17 @@
   background: #f0a993;
   transition: opacity 0.3s;
 }
+.ani-inbox {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f0a993;
+  box-shadow: 0 0 0 2px rgba(240, 169, 147, 0.25);
+  pointer-events: none;
+}
 .ani-main[aria-pressed='false'] .ani-dot {
   opacity: 0.25;
 }
@@ -505,6 +516,12 @@
   justify-self: start;
   border-radius: 14px 14px 14px 4px;
   background: rgba(240, 169, 147, 0.16);
+}
+.ani-msg-from {
+  justify-self: end;
+  margin: 0 4px -4px 0;
+  font-size: 11px;
+  color: var(--g-ink-soft);
 }
 .ani-msg-wait {
   color: var(--g-ink-soft);

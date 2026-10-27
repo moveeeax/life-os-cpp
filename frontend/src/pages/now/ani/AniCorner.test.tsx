@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
+import { api } from '@/lib/api/client';
 import type { Today } from '@/lib/now/types';
 
 import { AniCorner } from './AniCorner';
@@ -13,6 +14,19 @@ vi.mock('./chat', async (orig) => ({
   ...(await orig<typeof import('./chat')>()),
   loadTurns: vi.fn(() => Promise.resolve([])),
   wakeAgent: vi.fn(() => Promise.resolve()),
+}));
+
+// Ani's server settings: the bare switch, and the bare model's signed links.
+const prefs = { bare: false };
+const bareLinks = {
+  model_url: 'https://s3.test/private/Ani.pmx?sig',
+  texture_url: 'https://s3.test/private/k.png?sig',
+  expires_in: 120,
+};
+const fetchAniBare = vi.fn(() => Promise.resolve(bareLinks));
+vi.mock('@/hooks/useAni', () => ({
+  useAniPrefs: () => ({ data: { ...prefs }, isPending: false, isSuccess: true }),
+  fetchAniBare: () => fetchAniBare(),
 }));
 
 // The engine draws with WebGL; here it is a stand-in that is ready at once
@@ -37,6 +51,9 @@ vi.mock('./engine', () => ({
       act: vi.fn(),
       mood: vi.fn(),
       hush: vi.fn(),
+      cover: vi.fn(),
+      blush: vi.fn(),
+      hug: vi.fn(),
     };
     setTimeout(() => opts.onReady?.(), 0);
     return engine.ani as unknown as Ani;
@@ -71,12 +88,28 @@ async function mount(today: Today = base, props: { afterFocus?: boolean } = {}) 
 const bubble = () => document.querySelector('.ani-say')?.textContent ?? null;
 const played = () => engine.ani!.say.mock.calls.map((c: unknown[]) => String(c[0]));
 
+// Her webhook inbox: empty unless a test fills it.
+const inbox = { items: [] as unknown[], waiting: 0 };
+let claimSpy: ReturnType<typeof vi.spyOn>;
+
 beforeEach(() => {
+  inbox.items = [];
+  inbox.waiting = 0;
+  claimSpy = vi.spyOn(api, 'postJson').mockImplementation(async () => {
+    const data = inbox.items;
+    inbox.items = [];
+    return { data };
+  });
+  vi.spyOn(api, 'getJson').mockImplementation(async () => ({ data: { waiting: inbox.waiting } }));
   localStorage.clear();
   localStorage.setItem('now:ani', '1');
   vi.useFakeTimers({ now: new Date(2026, 9, 26, 15, 0) });
 });
 afterEach(() => {
+  vi.restoreAllMocks();
+  document.documentElement.classList.remove('hide-numbers');
+  prefs.bare = false;
+  fetchAniBare.mockClear();
   cleanup();
   vi.useRealTimers();
   engine.opts = null;
@@ -179,6 +212,118 @@ describe('AniCorner', () => {
       await mount(late);
       expect(bubble()).toBe('Привет! Одна задача просрочена, глянешь?');
       expect(played()).toEqual([]);
+    } finally {
+      setSoundOn(true);
+    }
+  });
+
+  it('mounts the bare model from the given URLs', async () => {
+    prefs.bare = true;
+    await mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Outfit' }));
+    fireEvent.click(screen.getByRole('button', { name: /bare/i }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(fetchAniBare).toHaveBeenCalledTimes(1);
+    expect(engine.opts?.outfit).toBe('bare');
+    expect(engine.opts?.bare).toEqual({
+      model: bareLinks.model_url,
+      texture: bareLinks.texture_url,
+    });
+    // Back in clothes: the dressed model, no links.
+    fireEvent.click(screen.getByRole('button', { name: 'Outfit' }));
+    fireEvent.click(screen.getByRole('button', { name: /lingerie/i }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(engine.opts?.bare).toBeUndefined();
+  });
+
+  it('has no Bare in the wardrobe while the switch is off', async () => {
+    await mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Outfit' }));
+    expect(screen.queryByRole('button', { name: /bare/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /lingerie/i })).toBeTruthy();
+  });
+
+  const hookSay = (text: string) => ({
+    id: text,
+    kind: 'say',
+    say: text,
+    payload: { text },
+    created_at: new Date().toISOString(),
+  });
+  const tick = async (ms = 5100) =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+
+  it('plays a webhook line through her voice', async () => {
+    await mount();
+    await tick(20_000); // her own hello is over
+    engine.ani!.say.mockClear();
+    inbox.items = [hookSay('Сборка прошла.')];
+    await tick();
+    expect(claimSpy).toHaveBeenCalledWith('/api/v1/ani/inbox/claim');
+    expect(bubble()).toBe('Сборка прошла.');
+  });
+
+  it('changes her outfit when the webhook asks', async () => {
+    await mount();
+    await tick(20_000);
+    inbox.items = [
+      {
+        id: 'o',
+        kind: 'outfit',
+        say: null,
+        payload: { outfit: 'p2' },
+        created_at: new Date().toISOString(),
+      },
+    ];
+    await tick();
+    expect(engine.ani!.setOutfit).toHaveBeenCalledWith('p2');
+  });
+
+  it('claims nothing while Hide numbers is on, and shows the dot', async () => {
+    document.documentElement.classList.add('hide-numbers');
+    inbox.waiting = 2;
+    await mount();
+    await tick(20_000);
+    expect(claimSpy).not.toHaveBeenCalledWith('/api/v1/ani/inbox/claim');
+    expect(screen.getByRole('status', { name: /2 waiting/i })).toBeTruthy();
+  });
+
+  it('claims nothing while she is away', async () => {
+    await mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Ani: send away' }));
+    claimSpy.mockClear();
+    await tick(20_000);
+    expect(claimSpy).not.toHaveBeenCalledWith('/api/v1/ani/inbox/claim');
+    // Her state outlives the test: back on the ledge for the next one.
+    fireEvent.click(screen.getByRole('button', { name: 'Ani: call back' }));
+  });
+
+  it('keeps playing the webhook after another line cut one short', async () => {
+    setSoundOn(false);
+    try {
+      await mount();
+      await tick(20_000);
+      inbox.items = [hookSay('Первая строка из вебхука.')];
+      await tick();
+      expect(bubble()).toBe('Первая строка из вебхука.');
+      // She says something else meanwhile.
+      act(() => {
+        engine.opts!.onSpin?.();
+      });
+      expect(bubble()).toBe('Ой, голова кружится.');
+      inbox.items = [hookSay('Вторая.')];
+      const seen = new Set<string | null>();
+      for (let i = 0; i < 40; i++) {
+        await tick(500);
+        seen.add(bubble());
+      }
+      expect(seen.has('Вторая.')).toBe(true);
     } finally {
       setSoundOn(true);
     }

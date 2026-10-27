@@ -1,0 +1,176 @@
+/**
+ * @file AniHookController.cpp
+ * @brief Body for src/api/AniHookController.hpp.
+ */
+
+#include "api/AniHookController.hpp"
+
+#include <exception>
+#include <optional>
+#include <string>
+#include <variant>
+
+#include <drogon/drogon.h>
+#include <spdlog/spdlog.h>
+
+#include <nlohmann/json.hpp>
+
+#include "agent/Hook.hpp"
+#include "agent/Settings.hpp"
+#include "api/Guards.hpp"
+#include "api/HandlerSupport.hpp"
+#include "cache/Cache.hpp"
+#include "jobs/Jobs.hpp"
+#include "repositories/agent/AgentRepository.hpp"
+#include "repositories/agent/HookRepository.hpp"
+#include "repositories/agent/InboxRepository.hpp"
+#include "repositories/agent/PrefsRepository.hpp"
+#include "utils/ErrorResponse.hpp"
+
+namespace Api {
+
+namespace {
+
+using json = nlohmann::json;
+namespace Hook = ::Agent::Hook;
+using Repositories::Agent::InboxRepository;
+
+HttpResponsePtr error(HttpStatusCode status, const std::string& code, const std::string& message, json extra = {}) {
+    return ErrorResponse::make({status, code, message, extra.is_object() ? extra : json::object()});
+}
+
+/// Counts the call; true while the user is within kCallsPerHour.
+bool within_rate(const std::string& owner) {
+    if (!Cache::is_initialized()) {
+        return true;
+    }
+    try {
+        const std::string key = "ani:hook:rate:" + owner;
+        const long long n = Cache::get().incr(key);
+        if (n == 1) {
+            Cache::get().expire(key, Hook::kWindowSeconds);
+        }
+        return n <= Hook::kCallsPerHour;
+    } catch (const std::exception& e) {
+        spdlog::warn("ani.hook: the rate counter failed: {}", e.what());
+        return true;
+    }
+}
+
+/// The refusal of an event the agent cannot take now; nullptr when it can.
+HttpResponsePtr agent_refusal(const std::string& owner) {
+    const auto s = ::Agent::read_settings();
+    if (!s) {
+        return error(k409Conflict, "agent_off", "her agent is off: send say, outfit or act");
+    }
+    const json used = Repositories::Agent::AgentRepository().month_usage(owner);
+    if (used.value("prompt_tokens", 0LL) + used.value("completion_tokens", 0LL) >= s->monthly_tokens) {
+        return error(k429TooManyRequests, "agent_budget", "her agent's tokens for this month are spent");
+    }
+    return nullptr;
+}
+
+void take(const HttpRequestPtr& req, AniHookController::Callback& callback, const std::string& token) {
+    const std::string path = Hook::redact(req->path());
+    std::optional<std::string> owner_opt;
+    if (!token.empty()) {
+        owner_opt = Repositories::Agent::HookRepository().owner_of(token);
+    }
+    if (!owner_opt) {
+        callback(ErrorResponse::not_found("not_found"));
+        return;
+    }
+    const std::string& owner = *owner_opt;
+    if (!within_rate(owner)) {
+        callback(error(k429TooManyRequests,
+                       "rate_limited",
+                       "at most 120 calls an hour",
+                       json{{"retry_after_sec", Hook::kWindowSeconds}}));
+        return;
+    }
+    auto parsed = Hook::parse(req->body(), req->getHeader("Content-Type"));
+    if (std::holds_alternative<Hook::Error>(parsed)) {
+        const auto& e = std::get<Hook::Error>(parsed);
+        spdlog::info("ani.hook {}: refused {} ({})", path, e.status, e.code);
+        callback(error(static_cast<HttpStatusCode>(e.status), e.code, e.message));
+        return;
+    }
+    const auto& item = std::get<Hook::Item>(parsed);
+    try {
+        if (item.kind == "outfit" && item.payload.value("outfit", "") == "bare" &&
+            !Repositories::Agent::PrefsRepository().get(owner).value("bare", false)) {
+            callback(error(k422UnprocessableEntity, "bare_off", "the bare outfit is off in Ani's settings"));
+            return;
+        }
+        const bool event = item.kind == "event";
+        if (event) {
+            if (auto refused = agent_refusal(owner)) {
+                callback(refused);
+                return;
+            }
+            if (!Jobs::is_initialized()) {
+                callback(ErrorResponse::service_unavailable("jobs_disabled", "Job queue not enabled"));
+                return;
+            }
+        }
+        InboxRepository inbox;
+        if (inbox.pending_count(owner) >= Hook::kPendingMax) {
+            callback(error(k429TooManyRequests, "backlog", "50 items wait for the page already"));
+            return;
+        }
+        const auto added =
+            inbox.add(owner, item.kind, item.payload, item.source_id, item.ttl, event ? "thinking" : "ready");
+        if (added.duplicate) {
+            callback(error(k409Conflict, "duplicate", "this id was sent in the last 24 hours", json{{"id", added.id}}));
+            return;
+        }
+        if (event) {
+            Jobs::get().submit(Hook::kEventJob, json{{"owner", owner}});
+        }
+        Repositories::Agent::HookRepository().touch(owner);
+        auto r = Response::ok(json{{"data", {{"id", added.id}}}});
+        r->setStatusCode(k202Accepted);
+        callback(r);
+    } catch (const std::exception& e) {
+        spdlog::error("ani.hook {} failed: {}", path, e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
+}  // namespace
+
+void AniHookController::ingest(const HttpRequestPtr& req, Callback&& callback, const std::string& token) {
+    take(req, callback, token);
+}
+
+void AniHookController::ingestHeader(const HttpRequestPtr& req, Callback&& callback) {
+    take(req, callback, req->getHeader("X-Ani-Hook-Token"));
+}
+
+void AniHookController::claim(const HttpRequestPtr& req, Callback&& callback) {
+    API_REQUIRE_USER(req, callback, owner);
+    API_REFUSE_API_KEY(req, callback);
+    try {
+        auto r = Response::ok(json{{"data", InboxRepository().claim(owner, kClaimMax)}});
+        r->addHeader("Cache-Control", "no-store");
+        callback(r);
+    } catch (const std::exception& e) {
+        spdlog::error("ani.inbox claim failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
+void AniHookController::count(const HttpRequestPtr& req, Callback&& callback) {
+    API_REQUIRE_USER(req, callback, owner);
+    API_REFUSE_API_KEY(req, callback);
+    try {
+        auto r = Response::ok(json{{"data", {{"waiting", InboxRepository().waiting(owner)}}}});
+        r->addHeader("Cache-Control", "no-store");
+        callback(r);
+    } catch (const std::exception& e) {
+        spdlog::error("ani.inbox count failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
+}  // namespace Api

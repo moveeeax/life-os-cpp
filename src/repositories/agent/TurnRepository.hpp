@@ -2,15 +2,18 @@
  * @file TurnRepository.hpp
  * @brief ani_turns (migration 059): the user's messages to Ani's agent and its
  *        replies, as the chat panel shows them. A turn is queued by the API,
- *        run by the worker (agent/Turn.hpp) and ends done or failed; a user
- *        has at most one turn open at a time (a unique partial index). A
- *        turn's view carries the actions it proposed (ActionRepository).
+ *        run by the worker (agent/Turn.hpp) and ends done or failed. A turn
+ *        is the user's or the webhook's (origin, migration 062); each origin
+ *        has at most one turn open (unique partial indexes), and the worker
+ *        runs one at a time. A turn's view carries the actions it proposed
+ *        (ActionRepository).
  */
 
 #pragma once
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -24,22 +27,31 @@ public:
     /// An open turn older than this is taken for lost and failed as a timeout.
     static constexpr int kStaleSeconds = 900;
 
-    /// Queues a turn. nullopt while another turn of the user is open; an open
-    /// turn older than kStaleSeconds is failed first, so a lost job cannot
-    /// lock the chat.
-    std::optional<nlohmann::json> open(const std::string& owner, const std::string& text, const std::string& tz) {
+    /// Queues a turn of @p origin ("user" or "hook"). nullopt while another
+    /// turn of the user from the same origin is open; an open turn older than
+    /// kStaleSeconds is failed first, so a lost job cannot lock the chat.
+    std::optional<nlohmann::json> open(const std::string& owner,
+                                       const std::string& text,
+                                       const std::string& tz,
+                                       const std::string& origin = "user") {
         return Database::get().execute_write([&](auto& txn) -> std::optional<nlohmann::json> {
             txn.exec_params(
                 "UPDATE ani_turns SET status = 'failed', error = 'timeout' WHERE owner_id = $1::uuid "
-                "AND status IN ('queued', 'running') AND created_at < now() - make_interval(secs => $2)",
+                "AND status IN ('queued', 'running') AND origin = $3 AND created_at < now() - make_interval(secs => "
+                "$2)",
                 owner,
-                kStaleSeconds);
-            auto r = txn.exec_params(
-                "INSERT INTO ani_turns (owner_id, text, tz) VALUES ($1::uuid, $2, $3) "
-                "ON CONFLICT (owner_id) WHERE status IN ('queued', 'running') DO NOTHING RETURNING id::text",
-                owner,
-                text,
-                tz);
+                kStaleSeconds,
+                origin);
+            // The conflict target names the origin's own index (exactly its predicate).
+            const std::string target = origin == "hook" ? "'hook'" : "'user'";
+            auto r = txn.exec_params("INSERT INTO ani_turns (owner_id, text, tz, origin) VALUES ($1::uuid, $2, $3, " +
+                                         target +
+                                         ") ON CONFLICT (owner_id) WHERE status IN ('queued', 'running') AND "
+                                         "origin = " +
+                                         target + " DO NOTHING RETURNING id::text",
+                                     owner,
+                                     text,
+                                     tz);
             if (r.empty()) {
                 return std::nullopt;
             }
@@ -96,14 +108,35 @@ public:
         });
     }
 
-    /// queued -> running. False when the turn is not queued (run already, or ended).
+    /// queued -> running. False when the turn is not queued (run already, or
+    /// ended), or while another turn of the user runs: a user runs one turn at
+    /// a time (a per-user lock makes the check and the change one step).
     bool start(const std::string& id) {
         return Database::get().execute_write([&](auto& txn) {
+            auto o = txn.exec_params("SELECT owner_id::text FROM ani_turns WHERE id::text = $1", id);
+            if (o.empty()) {
+                return false;
+            }
+            const std::string owner = o[0][0].template as<std::string>();
+            txn.exec_params("SELECT pg_advisory_xact_lock(hashtext('ani_turn_run:' || $1))", owner);
             return !txn.exec_params(
-                           "UPDATE ani_turns SET status = 'running' WHERE id::text = $1 AND status = 'queued' "
-                           "RETURNING id",
-                           id)
+                           "UPDATE ani_turns SET status = 'running' WHERE id::text = $1 AND status = 'queued' AND "
+                           "NOT EXISTS (SELECT 1 FROM ani_turns r WHERE r.owner_id = $2::uuid AND r.status = "
+                           "'running' AND r.id::text <> $1) RETURNING id",
+                           id,
+                           owner)
                         .empty();
+        });
+    }
+
+    /// The zone of the user's last turn they wrote (for a webhook turn); UTC without one.
+    std::string last_tz(const std::string& owner) {
+        return Database::get().execute_read([&](auto& txn) {
+            auto r = txn.exec_params(
+                "SELECT tz FROM ani_turns WHERE owner_id = $1::uuid AND origin = 'user' ORDER BY created_at DESC "
+                "LIMIT 1",
+                owner);
+            return r.empty() ? std::string("UTC") : r[0][0].template as<std::string>();
         });
     }
 
@@ -172,6 +205,63 @@ public:
         });
     }
 
+    /// Fails the user's open turns older than kStaleSeconds (their job was
+    /// lost or their worker died) and returns their ids, so nothing waits on
+    /// them for ever.
+    std::vector<std::string> reap_stale(const std::string& owner) {
+        return Database::get().execute_write([&](auto& txn) {
+            std::vector<std::string> ids;
+            for (const auto& row : txn.exec_params(
+                     "UPDATE ani_turns SET status = 'failed', error = 'timeout' WHERE owner_id = $1::uuid AND status "
+                     "IN ('queued', 'running') AND created_at < now() - make_interval(secs => $2) RETURNING id::text",
+                     owner,
+                     kStaleSeconds)) {
+                ids.push_back(row[0].template as<std::string>());
+            }
+            return ids;
+        });
+    }
+
+    /// Whether a turn of the user from another origin than @p origin is
+    /// running: the worker runs one turn of a user at a time.
+    bool running_other(const std::string& owner, const std::string& origin) {
+        return Database::get().execute_read([&](auto& txn) {
+            return !txn.exec_params(
+                           "SELECT 1 FROM ani_turns WHERE owner_id = $1::uuid AND status = 'running' AND "
+                           "origin <> $2",
+                           owner,
+                           origin)
+                        .empty();
+        });
+    }
+
+    /// The user's open webhook turn (queued or running), with its owner_id.
+    std::optional<nlohmann::json> open_hook_turn(const std::string& owner) {
+        return Database::get().execute_read([&](auto& txn) -> std::optional<nlohmann::json> {
+            auto r = txn.exec_params(
+                "SELECT row_to_json(t) FROM (SELECT id::text AS id, status FROM ani_turns WHERE owner_id = $1::uuid "
+                "AND origin = 'hook' AND status IN ('queued', 'running')) t",
+                owner);
+            if (r.empty()) {
+                return std::nullopt;
+            }
+            return nlohmann::json::parse(r[0][0].template as<std::string>());
+        });
+    }
+
+    /// Adds a line to a turn still queued (events that came while it waited).
+    /// False when it runs already or the text would pass the column's limit.
+    bool append_text(const std::string& id, const std::string& text) {
+        return Database::get().execute_write([&](auto& txn) {
+            return !txn.exec_params(
+                           "UPDATE ani_turns SET text = text || E'\\n' || $2 WHERE id::text = $1 AND status = "
+                           "'queued' AND char_length(text) + 1 + char_length($2) <= 4000 RETURNING id",
+                           id,
+                           text)
+                        .empty();
+        });
+    }
+
     /// Deletes every ended turn of the user; returns how many went.
     int clear(const std::string& owner) {
         return Database::get().execute_write([&](auto& txn) {
@@ -200,7 +290,7 @@ public:
 private:
     /// The turn as the panel shows it, with the actions it proposed.
     static std::string columns() {
-        return "id::text AS id, status, text, reply, error, tools, "
+        return "id::text AS id, status, origin, text, reply, error, tools, "
                "to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at, "
                "to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS updated_at, " +
                ActionRepository::of_turn_sql();

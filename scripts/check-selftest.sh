@@ -522,10 +522,18 @@ import re, sys
 path = sys.argv[1]
 with open(path, encoding="utf-8") as fh:
     text = fh.read()
-if re.search(r"(?m)^app:", text):
-    sys.exit("break_helm_app_env_dev: %s already has a top-level app block — flip app.env inside it instead of appending" % path)
-with open(path, "a", encoding="utf-8") as fh:
-    fh.write("\n# planted by scripts/check-selftest.sh\napp:\n  env: development\n")
+if re.search(r"(?m)^app:\n(?:  .*\n)*?  env:", text):
+    text, n = re.subn(r"(?m)^(app:\n(?:  .*\n)*?)  env: .*$", r"\1  env: development", text, count=1)
+elif re.search(r"(?m)^app:$", text):
+    # The prod values carry an app block (baseUrl, name): plant env inside it.
+    text, n = re.subn(r"(?m)^app:$", "app:\n  env: development  # planted by scripts/check-selftest.sh", text, count=1)
+else:
+    text += "\n# planted by scripts/check-selftest.sh\napp:\n  env: development\n"
+    n = 1
+if n != 1:
+    sys.exit("break_helm_app_env_dev: could not plant app.env in %s" % path)
+with open(path, "w", encoding="utf-8") as fh:
+    fh.write(text)
 PY
 }
 

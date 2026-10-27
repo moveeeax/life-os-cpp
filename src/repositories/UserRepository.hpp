@@ -340,6 +340,9 @@ public:
         "ani_usage",
         "ani_actions",
         "ani_turns",
+        "ani_inbox",
+        "ani_hooks",
+        "ani_prefs",
     };
 
     /// The foreign keys of the billing tables (migration 007, ON DELETE

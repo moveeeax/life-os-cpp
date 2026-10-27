@@ -6,7 +6,7 @@ import { useCallback, useSyncExternalStore } from 'react';
  * or sent away, and her outfit.
  */
 
-export type AniOutfit = 'p1' | 'p2' | 'lingerie';
+export type AniOutfit = 'p1' | 'p2' | 'lingerie' | 'bare';
 
 interface AniState {
   on: boolean;
@@ -25,7 +25,7 @@ function read(key: string): string | null {
 }
 
 function outfitOf(v: string | null): AniOutfit {
-  return v === 'p1' || v === 'p2' ? v : 'lingerie';
+  return v === 'p1' || v === 'p2' || v === 'bare' ? v : 'lingerie';
 }
 
 function load(): AniState {

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { fetchAniBare, useAniPrefs } from '@/hooks/useAni';
 import type { NowWeather, Today } from '@/lib/now/types';
 
 import { AniChat, SpeakerIcon } from './AniChat';
 import { soundOn, speechUrl, useSound } from './chat';
 import type { Ani } from './engine';
 import { greeting, HELLO, hourOf } from './greet';
+import { useInbox, type Play } from './inbox';
 import { moodLevel, moodOf, moveMood } from './mood';
 import type { Talk, TalkState } from './talk';
 import { useAni, type AniOutfit } from './state';
@@ -117,10 +119,18 @@ const TALK_WORDS: Record<TalkState, string> = {
   speaking: 'Speaking',
 };
 
+// Cold while bare: from COLD_FROM to COLD_TO o'clock; the first shiver after
+// COLD_FIRST_MS bare, the next COLD_EVERY_MS later, then she dresses.
+const COLD_FROM = 21;
+const COLD_TO = 6;
+const COLD_FIRST_MS = 90_000;
+const COLD_EVERY_MS = 4 * 60_000;
+
 const OUTFITS: { id: AniOutfit; label: string }[] = [
   { id: 'p1', label: 'Dress' },
   { id: 'p2', label: 'Slip' },
   { id: 'lingerie', label: 'Lingerie' },
+  { id: 'bare', label: 'Bare' },
 ];
 
 /** What she knows when a conversation starts. */
@@ -173,7 +183,31 @@ export function AniCorner({
   const [chatKey, setChatKey] = useState(0);
   const ledgeRef = useRef<HTMLDivElement>(null);
   // The first state the engine starts from; later changes go through calls.
-  const initial = useRef(ani);
+  // Hide numbers (a shared screen): she is not shown bare, the lingerie
+  // stands in until it is off again.
+  const [hideNums, setHideNums] = useState(() =>
+    document.documentElement.classList.contains('hide-numbers'),
+  );
+  useEffect(() => {
+    const root = document.documentElement;
+    const mo = new MutationObserver(() => setHideNums(root.classList.contains('hide-numbers')));
+    mo.observe(root, { attributes: true, attributeFilter: ['class'] });
+    return () => mo.disconnect();
+  }, []);
+  // Bare only while it is on in her settings (server side, 18+).
+  const prefs = useAniPrefs();
+  const bareOn = prefs.data?.bare === true;
+  const bareHidden = hideNums || !bareOn;
+  const shown: AniOutfit = ani.outfit === 'bare' && bareHidden ? 'lingerie' : ani.outfit;
+  // A stored bare outfit waits for the settings, so she is not mounted twice.
+  const waitPrefs = ani.outfit === 'bare' && prefs.isPending;
+  const outfitRef = useRef(shown);
+  outfitRef.current = shown;
+  // Bare is another model: switching to or from it mounts her again, as she
+  // is now (the engine starts from these).
+  const body = shown === 'bare' ? 'bare' : 'dressed';
+  const mountRef = useRef({ outfit: shown, here: ani.here });
+  mountRef.current = { outfit: shown, here: ani.here };
   const [said, setSaid] = useState<string | null>(null);
   const [talk, setTalk] = useState<TalkState | null>(null);
   const talkRef = useRef<Talk | null>(null);
@@ -239,6 +273,7 @@ export function AniCorner({
       today: () => contextRef.current.today,
       focusField: () => document.querySelector<HTMLInputElement>('.n-input'),
       hidden: () => document.documentElement.classList.contains('hide-numbers'),
+      bare: () => outfitRef.current === 'bare',
     }),
   );
   const sayTimer = useRef(0);
@@ -250,31 +285,42 @@ export function AniCorner({
    * from the bucket, one with the day in it read by the server, or a silent
    * one shown for a moment.
    */
-  const answer = useRef<(a: Answer) => void>(() => {});
-  answer.current = (a: Answer) => {
-    const e = engine.current;
-    if (!e || calling.current) return;
-    if (a.mood) e.mood(moodLevel(moveMood(contextRef.current.date, a.mood)));
-    lastSaidAt.current = Date.now();
-    setSaidChat(Boolean(a.chat));
-    setSaid(a.text);
-    clearTimeout(sayTimer.current);
-    const done = () => setSaid((v) => (v === a.text ? null : v));
-    if (a.silent || !soundOn()) {
-      sayTimer.current = window.setTimeout(done, a.silent ? 1500 : 1500 + a.text.length * 50);
-      return;
-    }
-    const url = a.recorded
-      ? `${base}v2/voice/${a.recorded}.mp3`
-      : `/api/v1/now/voice-line?text=${encodeURIComponent(a.text)}`;
-    // No voice (offline, the limit): the line still stays up for a while.
-    const started = Date.now();
-    void e.say(url).then(() => {
-      const left = 1200 + a.text.length * 40 - (Date.now() - started);
-      if (left > 0) sayTimer.current = window.setTimeout(done, left);
-      else done();
+  // Says a line; the promise ends when the bubble goes (a webhook backlog
+  // plays one line after the other).
+  const answer = useRef<(a: Answer) => Promise<void>>(() => Promise.resolve());
+  // The promise of the line on screen: a line that cuts it short ends it.
+  const lineEnds = useRef<(() => void) | null>(null);
+  answer.current = (a: Answer) =>
+    new Promise<void>((finished) => {
+      const e = engine.current;
+      if (!e || calling.current) return finished();
+      lineEnds.current?.();
+      lineEnds.current = finished;
+      if (a.mood) e.mood(moodLevel(moveMood(contextRef.current.date, a.mood)));
+      lastSaidAt.current = Date.now();
+      setSaidChat(Boolean(a.chat));
+      setSaid(a.text);
+      clearTimeout(sayTimer.current);
+      const done = () => {
+        setSaid((v) => (v === a.text ? null : v));
+        if (lineEnds.current === finished) lineEnds.current = null;
+        finished();
+      };
+      if (a.silent || !soundOn()) {
+        sayTimer.current = window.setTimeout(done, a.silent ? 1500 : 1500 + a.text.length * 50);
+        return;
+      }
+      const url = a.recorded
+        ? `${base}v2/voice/${a.recorded}.mp3`
+        : `/api/v1/now/voice-line?text=${encodeURIComponent(a.text)}`;
+      // No voice (offline, the limit): the line still stays up for a while.
+      const started = Date.now();
+      void e.say(url).then(() => {
+        const left = 1200 + a.text.length * 40 - (Date.now() - started);
+        if (left > 0) sayTimer.current = window.setTimeout(done, left);
+        else done();
+      });
     });
-  };
   const [sound, setSound] = useSound();
 
   // Her mood of the day shows in her face from the start.
@@ -327,6 +373,65 @@ export function AniCorner({
     };
   }, []);
 
+  // Bare in the evening and at night she gets cold: after a while she hugs
+  // herself and shivers, later once more, and then goes to dress (the
+  // lingerie). Checked every 20 s while she is here and nothing else goes on.
+  // Her outfit change, set once wear() is defined below.
+  const wearRef = useRef<(o: AniOutfit) => void>(() => {});
+
+  // Her webhook: items play while she may speak (here, no voice call, no
+  // Hide numbers on); otherwise they wait on the server and a dot says so.
+  const { waiting } = useInbox(
+    ready && !failed && ani.here && !hideNums && talk == null,
+    (p: Play): Promise<void> => {
+      if (p.kind === 'say') return answer.current({ text: p.text });
+      if (p.kind === 'act') engine.current?.act(p.name);
+      else wearRef.current(p.outfit);
+      return new Promise((ok) => window.setTimeout(ok, p.kind === 'act' ? 4000 : 3000));
+    },
+  );
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  useEffect(() => {
+    let since = 0;
+    let shivers = 0;
+    let last = 0;
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      const h = new Date().getHours();
+      const cold = h >= COLD_FROM || h < COLD_TO;
+      if (
+        !cold ||
+        outfitRef.current !== 'bare' ||
+        !hereRef.current ||
+        calling.current ||
+        busyRef.current ||
+        document.visibilityState !== 'visible'
+      ) {
+        since = 0;
+        shivers = 0;
+        return;
+      }
+      if (!since) since = now;
+      if (now - since < COLD_FIRST_MS || now - last < COLD_EVERY_MS) return;
+      if (now - lastSaidAt.current < 15_000) return;
+      last = now;
+      shivers += 1;
+      const e = engine.current;
+      e?.hug(5);
+      e?.feel('shy', 3);
+      if (shivers === 1) {
+        answer.current({ text: 'Брр… прохладно.', mood: 0 });
+        return;
+      }
+      answer.current({ text: 'Холодно. Пойду оденусь.', mood: 0 });
+      since = 0;
+      shivers = 0;
+      window.setTimeout(() => wearRef.current('lingerie'), 4500);
+    }, 20_000);
+    return () => clearInterval(id);
+  }, []);
+
   // Her first hello: once a day in this browser, with a thing from the day
   // (late tasks, rain, the night's sleep); after a focus session, a break.
   // Browsers play sound only after a gesture on the page: until one she waits.
@@ -374,13 +479,27 @@ export function AniCorner({
     const canvas = canvasRef.current;
     const hit = hitRef.current;
     if (!canvas || !hit) return;
+    if (waitPrefs) return;
     let gone = false;
     let made: Ani | null = null;
-    void import('./engine').then(({ mountAni }) => {
+    // The bare model comes by short signed links; without them, the lingerie.
+    const links =
+      body === 'bare'
+        ? fetchAniBare().then(
+            (l) => ({ model: l.model_url, texture: l.texture_url }),
+            () => null,
+          )
+        : Promise.resolve(undefined);
+    void Promise.all([import('./engine'), links]).then(([{ mountAni }, bare]) => {
       if (gone) return;
+      if (bare === null) {
+        setAni({ outfit: 'lingerie' });
+        return;
+      }
       try {
         made = mountAni(canvas, {
           base,
+          bare,
           hit,
           height: 340,
           // The middle of her ledge's top edge.
@@ -394,8 +513,8 @@ export function AniCorner({
             cornerRef.current?.style.setProperty('--ani-hx', `${Math.round(x)}px`);
             cornerRef.current?.style.setProperty('--ani-hy', `${Math.round(y)}px`);
           },
-          outfit: initial.current.outfit,
-          present: initial.current.here,
+          outfit: mountRef.current.outfit,
+          present: mountRef.current.here,
           onReady: () => setReady(true),
           onError: () => setFailed(true),
           // A tap answers by where it landed (touch.ts).
@@ -409,6 +528,11 @@ export function AniCorner({
             if (a) answer.current(a);
           },
           onSpin: () => answer.current(DIZZY),
+          // The cursor resting on her body (bare): "eyes up".
+          onDwell: (z, at) => {
+            const a = toucher.current.stare(z, at);
+            if (a) answer.current(a);
+          },
           // A double tap opens the chat with her agent.
           onDoubleTap: () => {
             made?.hush();
@@ -426,8 +550,11 @@ export function AniCorner({
       gone = true;
       made?.dispose();
       engine.current = null;
+      setReady(false);
     };
-  }, [base]);
+    // setAni is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [base, body, waitPrefs]);
 
   useEffect(() => {
     if (!wardrobe) return;
@@ -471,10 +598,24 @@ export function AniCorner({
     setWardrobe(false);
     const e = engine.current;
     if (busy || !e || o === ani.outfit) return;
+    const next: AniOutfit = o === 'bare' && bareHidden ? 'lingerie' : o;
+    if ((next === 'bare') !== (shown === 'bare')) {
+      // The other model: she leaves, and comes back in it.
+      const swap = () => {
+        setAni({ outfit: o, here: true });
+        setBusy(null);
+      };
+      if (!ani.here) swap();
+      else {
+        setBusy('changing');
+        e.present(false, swap);
+      }
+      return;
+    }
     setAni({ outfit: o });
     if (!ani.here) {
       // Away: she comes back already changed.
-      e.setOutfit(o);
+      e.setOutfit(next);
       setAni({ here: true });
       setBusy('arriving');
       e.present(true, () => setBusy(null));
@@ -482,10 +623,11 @@ export function AniCorner({
     }
     setBusy('changing');
     e.present(false, () => {
-      e.setOutfit(o);
+      e.setOutfit(next);
       e.present(true, () => setBusy(null));
     });
   };
+  wearRef.current = wear;
 
   const words = talk
     ? ['Talking', TALK_WORDS[talk]]
@@ -527,10 +669,18 @@ export function AniCorner({
         aria-label="Ani. Drag to turn her, tap her to see what she says."
       />
       <div ref={ledgeRef} className="ani-ledge" data-wardrobe={wardrobe ? '' : undefined}>
+        {waiting > 0 ? (
+          <span
+            className="ani-inbox"
+            role="status"
+            aria-label={`${waiting} waiting from your webhook`}
+            title="Something came through your webhook"
+          />
+        ) : null}
         {wardrobe ? (
           <div className="ani-wardrobe" role="group" aria-label="Outfit">
             <span className="ani-k">Outfit</span>
-            {OUTFITS.map((o) => (
+            {OUTFITS.filter((o) => !(bareHidden && o.id === 'bare')).map((o) => (
               <button
                 key={o.id}
                 type="button"

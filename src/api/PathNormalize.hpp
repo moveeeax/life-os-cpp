@@ -91,12 +91,15 @@ inline std::string normalize_path_for_metrics(const std::string& path) {
     const bool account_token_route = segs.size() == base + 3 && segs[0] == "api" && segs[base] == "account" &&
                                      (segs[base + 1] == "confirm" || segs[base + 1] == "reset-password" ||
                                       segs[base + 1] == "change-email" || segs[base + 1] == "join-from-invite");
+    // Ani's webhook: /api[/vN]/ani/hook/<token>, the token is the credential.
+    const bool hook_token_route =
+        segs.size() == base + 3 && segs[0] == "api" && segs[base] == "ani" && segs[base + 1] == "hook";
 
     std::string out;
     out.reserve(path.size());
     for (size_t k = 0; k < segs.size(); ++k) {
         out += '/';
-        if (account_token_route && k == token_idx) {
+        if ((account_token_route || hook_token_route) && k == token_idx) {
             out += ":token";
             continue;
         }

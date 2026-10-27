@@ -15333,6 +15333,551 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ani/prefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ani's settings kept on the server
+         * @description Whether the bare outfit is on for the caller. Refused for API keys.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The settings */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniPrefs"];
+                        };
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Turn the bare outfit on or off
+         * @description Turning it on needs "adult": true, the user's word that they are an adult (422 adult_required without it). Refused for API keys.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        bare: boolean;
+                        /** @description Required (true) to turn bare on */
+                        adult?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description The settings after the change */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniPrefs"];
+                        };
+                    };
+                };
+                /** @description bare is missing or not a boolean */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description adult_required: bare on without "adult": true */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/bare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Short signed links to the bare outfit's model
+         * @description Two presigned GET links (the model and its body texture) to the private part of the bucket, valid two minutes; the page loads them at once. 403 bare_off while the bare outfit is off. Never cached. Refused for API keys.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The links */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniBare"];
+                        };
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description bare_off: the bare outfit is off */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description File storage is not configured or did not answer */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's Ani webhook URL and its last calls
+         * @description The URL is made on the first read and stays until replaced. Anyone with it can make Ani say a line, change, play a move, or hand an event to the caller's agent (which only proposes changes). The last calls carry time, type and status, never their text. Refused for API keys.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The webhook */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniWebhook"];
+                        };
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/webhook/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace the caller's Ani webhook URL
+         * @description The old URL stops working at once. Refused for API keys.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The webhook with its new URL */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniWebhook"];
+                        };
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/hook/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ani webhook, the token in the path
+         * @description For other systems (a chat bot, n8n, a script): Ani says a line, changes, plays a move, or hands an event to the user's agent, which answers in her words or stays silent. Items wait for the user's Now page (up to ttl seconds) and play when it is open. A text/plain body is an event with that text. 120 calls per hour, 50 waiting items. The same answer for a token that never existed and one replaced.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description aniwh_ and 48 hex characters */
+                    token: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AniHookItem"];
+                    "text/plain": string;
+                };
+            };
+            responses: {
+                /** @description Taken; the item waits for the page */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                            };
+                        };
+                    };
+                };
+                /** @description The body is not a valid item */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unknown token */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description duplicate (the sender's id was used within 24 hours; error.id is the first item) or agent_off (an event while the agent is off) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The body is over 8 KB */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description A value that is not allowed (an unknown outfit or move; bare_off) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Over 120 calls an hour, 50 waiting items (backlog), or the agent budget (agent_budget) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/hook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ani webhook, the token in a header
+         * @description The same as POST /api/v1/ani/hook/{token}, with the token in X-Ani-Hook-Token.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    "X-Ani-Hook-Token": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AniHookItem"];
+                    "text/plain": string;
+                };
+            };
+            responses: {
+                /** @description Taken; the item waits for the page */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                            };
+                        };
+                    };
+                };
+                /** @description The body is not a valid item */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unknown or missing token */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description duplicate or agent_off */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The body is over 8 KB */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description A value that is not allowed */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Over the limits, or agent_budget */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/inbox/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webhook items for the Now page to play now
+         * @description Up to 5 ready items, oldest first; each is handed out once. The page does not call this while Hide numbers or a voice call is on, or while Ani is off her ledge. Refused for API keys.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The items */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniInboxItem"][];
+                        };
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/inbox/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How many webhook items wait for the page
+         * @description For the dot on Ani's ledge. Refused for API keys.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The count */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                waiting: number;
+                            };
+                        };
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/now/voice-session": {
         parameters: {
             query?: never;
@@ -22768,7 +23313,12 @@ export interface components {
             id: string;
             /** @enum {string} */
             status: "queued" | "running" | "done" | "failed";
-            /** @description What the user wrote */
+            /**
+             * @description user: the user wrote it; hook: events that came through the webhook
+             * @enum {string}
+             */
+            origin?: "user" | "hook";
+            /** @description What the user wrote, or the events of a webhook turn */
             text: string;
             /** @description Her answer, once done */
             reply: string | null;
@@ -22797,6 +23347,60 @@ export interface components {
             status: "pending" | "confirmed" | "running" | "done" | "failed" | "cancelled" | "expired";
             /** @description Why a failed action failed: the API's error code, unavailable or interrupted */
             error: string | null;
+        };
+        AniPrefs: {
+            /** @description The bare outfit is on */
+            bare: boolean;
+        };
+        AniBare: {
+            /** @description Presigned GET of the model (PMX) */
+            model_url: string;
+            /** @description Presigned GET of its body texture (PNG) */
+            texture_url: string;
+            /** @description Seconds the links stay valid */
+            expires_in: number;
+        };
+        AniWebhook: {
+            /** @description The webhook URL; its last segment is the secret token */
+            url: string;
+            /** @description The last 10 calls, newest first */
+            recent: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                kind: "say" | "outfit" | "act" | "event";
+                /** @enum {string} */
+                status: "queued" | "thinking" | "ready" | "delivered" | "expired" | "failed";
+                /** Format: date-time */
+                created_at: string;
+            }[];
+        };
+        /** @description say: text (1-200 characters). outfit: outfit (p1, p2, lingerie, or bare when the user turned it on). act: name (one of her moves). event: text (1-2000), source and title (1-60 each). Any type may carry id (the sender's id, a repeat within 24 hours is refused) and ttl (seconds to wait for the page; default 86400, at most 604800). */
+        AniHookItem: {
+            /** @enum {string} */
+            type: "say" | "outfit" | "act" | "event";
+            text?: string;
+            /** @enum {string} */
+            outfit?: "p1" | "p2" | "lingerie" | "bare";
+            name?: string;
+            source?: string;
+            title?: string;
+            id?: string;
+            ttl?: number;
+        };
+        AniInboxItem: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "say" | "outfit" | "act" | "event";
+            /** @description What she says: a say item's text, or her reply to an event */
+            say: string | null;
+            /** @description The item as it came */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            created_at: string;
         };
         NowVoiceSession: {
             /** @description The client secret (ek_...) for POST https://api.openai.com/v1/realtime/calls */

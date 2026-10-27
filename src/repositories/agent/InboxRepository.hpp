@@ -1,0 +1,208 @@
+/**
+ * @file InboxRepository.hpp
+ * @brief ani_inbox (migration 062): what came through the user's webhook,
+ *        waiting for the Now page. say, outfit and act items are ready at
+ *        once; an event is thinking until its agent turn ends: then the
+ *        oldest item of the turn carries her reply (ready) and the rest are
+ *        delivered, or all are delivered when she chose silence, or failed.
+ *        The page claims ready items oldest first, each once.
+ */
+
+#pragma once
+
+#include <optional>
+#include <string>
+#include <vector>
+
+#include <nlohmann/json.hpp>
+
+#include "database/Database.hpp"
+
+namespace Repositories::Agent {
+
+class InboxRepository {
+public:
+    /// A sender's id is taken once in this window.
+    static constexpr int kDedupeSeconds = 86400;
+    /// Ended rows are deleted after this long.
+    static constexpr int kKeepSeconds = 7 * 86400;
+
+    struct AddResult {
+        std::string id;
+        bool duplicate = false;
+    };
+
+    /// Stores an item (@p status "ready" or "thinking"). With @p source_id
+    /// already used by the user within kDedupeSeconds: that item's id, duplicate.
+    AddResult add(const std::string& owner,
+                  const std::string& kind,
+                  const nlohmann::json& payload,
+                  const std::optional<std::string>& source_id,
+                  int ttl_seconds,
+                  const std::string& status) {
+        return Database::get().execute_write([&](auto& txn) {
+            // One writer per user at a time: the duplicate check holds.
+            txn.exec_params("SELECT pg_advisory_xact_lock(hashtext('ani_inbox:' || $1))", owner);
+            if (source_id) {
+                auto d = txn.exec_params(
+                    "SELECT id::text FROM ani_inbox WHERE owner_id = $1::uuid AND source_id = $2 AND created_at > "
+                    "now() - make_interval(secs => $3) ORDER BY created_at LIMIT 1",
+                    owner,
+                    *source_id,
+                    kDedupeSeconds);
+                if (!d.empty()) {
+                    return AddResult{d[0][0].template as<std::string>(), true};
+                }
+            }
+            const std::optional<std::string> say =
+                kind == "say" ? std::optional<std::string>(payload.value("text", std::string())) : std::nullopt;
+            auto r = txn.exec_params(
+                "INSERT INTO ani_inbox (owner_id, kind, payload, source_id, status, say, ready_at, expires_at) "
+                "VALUES ($1::uuid, $2, $3::jsonb, $4, $5, $6, CASE WHEN $5 = 'ready' THEN now() END, now() + "
+                "make_interval(secs => $7)) RETURNING id::text",
+                owner,
+                kind,
+                payload.dump(),
+                source_id,
+                status,
+                say,
+                ttl_seconds);
+            return AddResult{r[0][0].template as<std::string>(), false};
+        });
+    }
+
+    /// Items not played or ended yet (queued, thinking, ready, unexpired): the cap.
+    int pending_count(const std::string& owner) { return count_(owner, "('queued', 'thinking', 'ready')"); }
+
+    /// Ready items the page has not claimed: the dot on her ledge.
+    int waiting(const std::string& owner) { return count_(owner, "('ready')"); }
+
+    /// Up to @p limit ready items, oldest first, marked delivered.
+    nlohmann::json claim(const std::string& owner, int limit) {
+        return Database::get().execute_write([&](auto& txn) {
+            auto r = txn.exec_params(
+                "WITH c AS (SELECT id FROM ani_inbox WHERE owner_id = $1::uuid AND status = 'ready' AND expires_at > "
+                "now() ORDER BY created_at, id LIMIT $2 FOR UPDATE SKIP LOCKED), "
+                "u AS (UPDATE ani_inbox i SET status = 'delivered', delivered_at = now() FROM c WHERE i.id = c.id "
+                "RETURNING i.id, i.kind, i.say, i.payload, i.created_at) "
+                "SELECT COALESCE(json_agg(json_build_object('id', id::text, 'kind', kind, 'say', say, 'payload', "
+                "payload, 'created_at', " +
+                    iso("created_at") + ") ORDER BY created_at, id), '[]'::json) FROM u",
+                owner,
+                limit);
+            return nlohmann::json::parse(r[0][0].template as<std::string>());
+        });
+    }
+
+    /// The user's thinking events no turn has taken yet, oldest first:
+    /// [{id, payload, expires_in}].
+    nlohmann::json thinking_unlinked(const std::string& owner) {
+        return Database::get().execute_read([&](auto& txn) {
+            auto r = txn.exec_params(
+                "SELECT COALESCE(json_agg(json_build_object('id', id::text, 'payload', payload, 'created_at', " +
+                    iso("created_at") +
+                    ", 'expires_in', EXTRACT(EPOCH FROM expires_at - now())::bigint) ORDER BY created_at, id), "
+                    "'[]'::json) FROM ani_inbox WHERE owner_id = $1::uuid AND status = 'thinking' AND turn_id IS "
+                    "NULL",
+                owner);
+            return nlohmann::json::parse(r[0][0].template as<std::string>());
+        });
+    }
+
+    void link(const std::vector<std::string>& ids, const std::string& turn_id) {
+        Database::get().execute_write([&](auto& txn) {
+            for (const auto& id : ids) {
+                txn.exec_params(
+                    "UPDATE ani_inbox SET turn_id = $2::uuid WHERE id::text = $1 AND status = 'thinking'", id, turn_id);
+            }
+            return true;
+        });
+    }
+
+    /// The turn's items end: the oldest carries @p say (ready), the others are
+    /// delivered; without a line (she chose silence) all are delivered.
+    void resolve_turn(const std::string& turn_id, const std::optional<std::string>& say) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params(
+                "WITH f AS (SELECT id FROM ani_inbox WHERE turn_id = $1::uuid AND status = 'thinking' ORDER BY "
+                "created_at, id LIMIT 1) "
+                "UPDATE ani_inbox i SET status = CASE WHEN $2::text IS NOT NULL AND i.id IN (SELECT id FROM f) THEN "
+                "'ready' ELSE 'delivered' END, say = CASE WHEN i.id IN (SELECT id FROM f) THEN $2::text END, "
+                "ready_at = now(), delivered_at = CASE WHEN $2::text IS NOT NULL AND i.id IN (SELECT id FROM f) "
+                "THEN NULL ELSE now() END WHERE i.turn_id = $1::uuid AND i.status = 'thinking'",
+                turn_id,
+                say);
+            return true;
+        });
+    }
+
+    /// The turn's thinking items fail (the agent could not answer).
+    void fail_turn(const std::string& turn_id) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params("UPDATE ani_inbox SET status = 'failed' WHERE turn_id = $1::uuid AND status = 'thinking'",
+                            turn_id);
+            return true;
+        });
+    }
+
+    /// Thinking items of the user that no turn took: they fail (the agent
+    /// cannot take them before they expire).
+    void fail_unlinked(const std::string& owner) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params(
+                "UPDATE ani_inbox SET status = 'failed' WHERE owner_id = $1::uuid AND status = 'thinking' AND "
+                "turn_id IS NULL",
+                owner);
+            return true;
+        });
+    }
+
+    /// The user's last @p limit calls for the settings list: time, kind,
+    /// status; never their text.
+    nlohmann::json recent(const std::string& owner, int limit) {
+        return Database::get().execute_read([&](auto& txn) {
+            auto r = txn.exec_params(
+                "SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT id::text AS id, kind, CASE WHEN status IN "
+                "('queued', 'thinking', 'ready') AND expires_at <= now() THEN 'expired' ELSE status END AS status, " +
+                    iso("created_at") +
+                    " AS created_at FROM ani_inbox WHERE owner_id = $1::uuid ORDER BY created_at DESC, id LIMIT $2) t",
+                owner,
+                limit);
+            return nlohmann::json::parse(r[0][0].template as<std::string>());
+        });
+    }
+
+    /// Marks unplayed items past their time expired and deletes ended rows
+    /// older than kKeepSeconds; returns how many rows changed or went.
+    int purge() {
+        return Database::get().execute_write([&](auto& txn) {
+            const auto expired = txn.exec(
+                "UPDATE ani_inbox SET status = 'expired' WHERE status IN ('queued', 'thinking', 'ready') AND "
+                "expires_at <= now() RETURNING id");
+            const auto gone = txn.exec_params(
+                "DELETE FROM ani_inbox WHERE status IN ('delivered', 'expired', 'failed') AND created_at < now() - "
+                "make_interval(secs => $1) RETURNING id",
+                kKeepSeconds);
+            return static_cast<int>(expired.size() + gone.size());
+        });
+    }
+
+private:
+    static std::string iso(const std::string& col) {
+        return "to_char(" + col + " AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')";
+    }
+
+    int count_(const std::string& owner, const std::string& statuses) {
+        return Database::get().execute_read([&](auto& txn) {
+            return txn
+                .exec_params(
+                    "SELECT count(*) FROM ani_inbox WHERE owner_id = $1::uuid AND expires_at > now() AND "
+                    "status IN " +
+                        statuses,
+                    owner)[0][0]
+                .template as<int>();
+        });
+    }
+};
+
+}  // namespace Repositories::Agent
