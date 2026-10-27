@@ -161,7 +161,7 @@ TEST_F(AniHookApi, SayIsQueuedReady) {
 }
 
 TEST_F(AniHookApi, BadBodiesAreRefused) {
-    EXPECT_EQ(hook("not json")->statusCode(), k400BadRequest);
+    EXPECT_EQ(hook(std::string("not json"))->statusCode(), k400BadRequest);
     EXPECT_EQ(hook(json{{"type", "act"}, {"name", "pole"}})->statusCode(), k422UnprocessableEntity);
     EXPECT_EQ(hook(std::string(9000, ' '))->statusCode(), k413RequestEntityTooLarge);
     EXPECT_EQ(waiting(), 0);
@@ -187,7 +187,7 @@ TEST_F(AniHookApi, DuplicateId409) {
 
 TEST_F(AniHookApi, RateLimit429) {
     for (int i = 0; i < 120; ++i) {
-        ASSERT_EQ(hook("bad")->statusCode(), k400BadRequest) << i;
+        ASSERT_EQ(hook(std::string("bad"))->statusCode(), k400BadRequest) << i;
     }
     auto r = hook(json{{"type", "say"}, {"text", "Ещё"}});
     EXPECT_EQ(r->statusCode(), k429TooManyRequests);
