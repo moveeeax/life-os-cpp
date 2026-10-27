@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { fetchAniBare, useAniPrefs } from '@/hooks/useAni';
 import type { NowWeather, Today } from '@/lib/now/types';
 
 import { AniChat, SpeakerIcon } from './AniChat';
@@ -192,7 +193,13 @@ export function AniCorner({
     mo.observe(root, { attributes: true, attributeFilter: ['class'] });
     return () => mo.disconnect();
   }, []);
-  const shown: AniOutfit = ani.outfit === 'bare' && hideNums ? 'lingerie' : ani.outfit;
+  // Bare only while it is on in her settings (server side, 18+).
+  const prefs = useAniPrefs();
+  const bareOn = prefs.data?.bare === true;
+  const bareHidden = hideNums || !bareOn;
+  const shown: AniOutfit = ani.outfit === 'bare' && bareHidden ? 'lingerie' : ani.outfit;
+  // A stored bare outfit waits for the settings, so she is not mounted twice.
+  const waitPrefs = ani.outfit === 'bare' && prefs.isPending;
   const outfitRef = useRef(shown);
   outfitRef.current = shown;
   // Bare is another model: switching to or from it mounts her again, as she
@@ -448,13 +455,27 @@ export function AniCorner({
     const canvas = canvasRef.current;
     const hit = hitRef.current;
     if (!canvas || !hit) return;
+    if (waitPrefs) return;
     let gone = false;
     let made: Ani | null = null;
-    void import('./engine').then(({ mountAni }) => {
+    // The bare model comes by short signed links; without them, the lingerie.
+    const links =
+      body === 'bare'
+        ? fetchAniBare().then(
+            (l) => ({ model: l.model_url, texture: l.texture_url }),
+            () => null,
+          )
+        : Promise.resolve(undefined);
+    void Promise.all([import('./engine'), links]).then(([{ mountAni }, bare]) => {
       if (gone) return;
+      if (bare === null) {
+        setAni({ outfit: 'lingerie' });
+        return;
+      }
       try {
         made = mountAni(canvas, {
           base,
+          bare,
           hit,
           height: 340,
           // The middle of her ledge's top edge.
@@ -507,7 +528,9 @@ export function AniCorner({
       engine.current = null;
       setReady(false);
     };
-  }, [base, body]);
+    // setAni is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [base, body, waitPrefs]);
 
   useEffect(() => {
     if (!wardrobe) return;
@@ -551,7 +574,7 @@ export function AniCorner({
     setWardrobe(false);
     const e = engine.current;
     if (busy || !e || o === ani.outfit) return;
-    const next: AniOutfit = o === 'bare' && hideNums ? 'lingerie' : o;
+    const next: AniOutfit = o === 'bare' && bareHidden ? 'lingerie' : o;
     if ((next === 'bare') !== (shown === 'bare')) {
       // The other model: she leaves, and comes back in it.
       const swap = () => {
@@ -625,7 +648,7 @@ export function AniCorner({
         {wardrobe ? (
           <div className="ani-wardrobe" role="group" aria-label="Outfit">
             <span className="ani-k">Outfit</span>
-            {OUTFITS.filter((o) => !(hideNums && o.id === 'bare')).map((o) => (
+            {OUTFITS.filter((o) => !(bareHidden && o.id === 'bare')).map((o) => (
               <button
                 key={o.id}
                 type="button"

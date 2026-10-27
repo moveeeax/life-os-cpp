@@ -15,6 +15,19 @@ vi.mock('./chat', async (orig) => ({
   wakeAgent: vi.fn(() => Promise.resolve()),
 }));
 
+// Ani's server settings: the bare switch, and the bare model's signed links.
+const prefs = { bare: false };
+const bareLinks = {
+  model_url: 'https://s3.test/private/Ani.pmx?sig',
+  texture_url: 'https://s3.test/private/k.png?sig',
+  expires_in: 120,
+};
+const fetchAniBare = vi.fn(() => Promise.resolve(bareLinks));
+vi.mock('@/hooks/useAni', () => ({
+  useAniPrefs: () => ({ data: { ...prefs }, isPending: false, isSuccess: true }),
+  fetchAniBare: () => fetchAniBare(),
+}));
+
 // The engine draws with WebGL; here it is a stand-in that is ready at once
 // and remembers what the corner asked of it.
 const engine = {
@@ -80,6 +93,8 @@ beforeEach(() => {
   vi.useFakeTimers({ now: new Date(2026, 9, 26, 15, 0) });
 });
 afterEach(() => {
+  prefs.bare = false;
+  fetchAniBare.mockClear();
   cleanup();
   vi.useRealTimers();
   engine.opts = null;
@@ -185,5 +200,35 @@ describe('AniCorner', () => {
     } finally {
       setSoundOn(true);
     }
+  });
+
+  it('mounts the bare model from the given URLs', async () => {
+    prefs.bare = true;
+    await mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Outfit' }));
+    fireEvent.click(screen.getByRole('button', { name: /bare/i }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(fetchAniBare).toHaveBeenCalledTimes(1);
+    expect(engine.opts?.outfit).toBe('bare');
+    expect(engine.opts?.bare).toEqual({
+      model: bareLinks.model_url,
+      texture: bareLinks.texture_url,
+    });
+    // Back in clothes: the dressed model, no links.
+    fireEvent.click(screen.getByRole('button', { name: 'Outfit' }));
+    fireEvent.click(screen.getByRole('button', { name: /lingerie/i }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(engine.opts?.bare).toBeUndefined();
+  });
+
+  it('has no Bare in the wardrobe while the switch is off', async () => {
+    await mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Outfit' }));
+    expect(screen.queryByRole('button', { name: /bare/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /lingerie/i })).toBeTruthy();
   });
 });
