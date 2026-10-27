@@ -17,6 +17,7 @@
 
 #include "agent/Hook.hpp"
 #include "agent/Intake.hpp"
+#include "agent/Presence.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
 #include "repositories/agent/HookRepository.hpp"
@@ -89,6 +90,7 @@ void AniHookController::claim(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
     API_REFUSE_API_KEY(req, callback);
     try {
+        ::Agent::Presence::mark(owner);
         auto r = Response::ok(json{{"data", InboxRepository().claim(owner, kClaimMax)}});
         r->addHeader("Cache-Control", "no-store");
         callback(r);
@@ -102,6 +104,7 @@ void AniHookController::count(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
     API_REFUSE_API_KEY(req, callback);
     try {
+        ::Agent::Presence::mark(owner);
         auto r = Response::ok(json{{"data", {{"waiting", InboxRepository().waiting(owner)}}}});
         r->addHeader("Cache-Control", "no-store");
         callback(r);
