@@ -22,6 +22,14 @@ Now page and chat with her agent.
 | `ani_outfit` | p1, p2, lingerie, or bare (only while bare is on in her settings). |
 | `ani_act` | One of her moves: show, greet, peace, shoot, spin, pose, idle_happy, idle_cat, wave. |
 | `ani_event` | An event for her agent; she says something about it or stays silent. |
+| `ani_mood` | Her face takes a mood for a while: -1, 0 or 1 (`seconds` 60-3600, default 600). |
+| `ani_remind` | A line said later: `in_seconds` (60 to a week) or `at` (ISO-8601 with a zone). |
+| `ani_ask` | A question with answer buttons on Now (default Да / Нет, up to 4); read the answer with `ani_item`, or give an https `callback` to get it POSTed. |
+| `ani_focus` | Starts (`minutes` 1-180) or stops the focus timer on Now. |
+| `ani_card` | A small card over her ledge for a few seconds (`title`, `text`, https `url`), not spoken. |
+| `ani_wallpaper` / `ani_sound` | Switch the wallpaper (an id, or the next one) or the focus sound (an id, or `off`); `list: true` returns the ids. |
+| `ani_hold` | Holds everything back from the page for 0-480 minutes (0 ends it). |
+| `ani_task` / `ani_habit` / `ani_note` | Proposes a task, a habit tick or a note; the user confirms it on Now. `ani_reply` with the turn_id shows the proposal. |
 | `ani_presence` | Whether the Now page is open (from the page's polls; a tab in the background may read as away). |
 | `ani_items` / `ani_item` | Items sent to her (MCP and webhook) and what became of them, with her reply to events. |
 | `ani_chat` | A message to her agent, as in the chat on Now; returns a `turn_id`. Works with the page closed. |
@@ -34,6 +42,15 @@ The four commands share the webhook's rules: they wait for the open page
 messages count in the chat's own limit (60 an hour). A short chat reply is
 also said aloud on an open Now page. Changes her agent proposes (a task, a
 habit) still wait for your confirmation on Now.
+
+## Answers to a question
+
+With a `callback`, the answer to `ani_ask` (or the webhook's `ask`) is
+POSTed there once, as `{id, source_id, question, answer}`; a question that
+ran out unanswered sends `answer: null, reason: "expired"` within the hour.
+The body is signed: `X-Webhook-Signature: sha256=<HMAC-SHA256 of the body,
+keyed with your webhook token>`. The callback must be a public https
+address.
 
 ## Connecting a client
 
