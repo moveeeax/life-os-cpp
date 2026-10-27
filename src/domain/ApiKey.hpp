@@ -18,7 +18,7 @@ struct ApiKey {
     std::string user_id;
     std::string name;
     std::string prefix;  // first chars of the key, e.g. "cpk_a1b2c3d4"
-    std::string scope;   // "full" (reads and writes) or "read" (GET, HEAD, OPTIONS only)
+    std::string scope;   // "full" (reads and writes), "read" (GET, HEAD, OPTIONS only) or "ani" (Ani's MCP only)
     std::optional<std::string> last_used_at;
     std::optional<std::string> revoked_at;
     std::string created_at;

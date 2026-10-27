@@ -14,6 +14,7 @@
 
 namespace {
 
+using Security::ApiKeys::ani_key_allows;
 using Security::ApiKeys::path_allows_key;
 using Security::ApiKeys::read_key_allows;
 
@@ -83,6 +84,19 @@ TEST(ApiKeyScope, ReadKeySkipsTheGetThatLinksAMiAccount) {
     EXPECT_FALSE(read_key_allows(drogon::Get, "/API/v1//Fitness/./account/%6Cink/0b7c"));
     EXPECT_TRUE(read_key_allows(drogon::Get, "/api/v1/fitness/account"));
     EXPECT_TRUE(read_key_allows(drogon::Get, "/api/v1/fitness/sleep"));
+}
+
+TEST(ApiKeyScope, AniKeyOnlyForMcp) {
+    EXPECT_TRUE(ani_key_allows("/api/v1/ani/mcp"));
+    EXPECT_TRUE(ani_key_allows("/api/v2/ani/mcp"));
+    for (const char* p : {"/api/v1/tasks",
+                          "/api/v1/ani/messages",
+                          "/api/v1/ani/mcp/x",
+                          "/api/v1/ani",
+                          "/api/v1/ani/../tasks",
+                          "/api/v1/ani/mcp/../../tasks",
+                          "/api/v1/account/api-keys"})
+        EXPECT_FALSE(ani_key_allows(p)) << p;
 }
 
 }  // namespace

@@ -162,6 +162,19 @@ inline bool path_allows_key(std::string_view path) {
 }
 
 /**
+ * @brief Whether a key of scope "ani" may make this request: Ani's MCP
+ *        endpoint only (/api/vN/ani/mcp, canonicalized as above). Any other
+ *        path is answered 403 key_scope by the middleware.
+ */
+inline bool ani_key_allows(std::string_view path) {
+    const auto segs = detail::canonical_segments(path);
+    const bool version =
+        segs.size() == 4 && segs[1].size() >= 2 && segs[1][0] == 'v' &&
+        std::all_of(segs[1].begin() + 1, segs[1].end(), [](unsigned char c) { return std::isdigit(c) != 0; });
+    return version && segs[0] == "api" && segs[2] == "ani" && segs[3] == "mcp";
+}
+
+/**
  * @brief Whether a key of scope "read" may make this request: the safe
  *        methods only, and never a GET that writes. One does: a step of the
  *        Mi account link (/fitness/account/link/{id}) completes the link and
@@ -232,6 +245,7 @@ inline std::optional<Security::Auth::AuthPrincipal> authenticate(const drogon::H
             p.subject = user_id;
             p.via_api_key = true;
             p.key_read_only = scope == "read";
+            p.key_scope = scope;
             p.raw_claims =
                 json{{"sub", user_id}, {"permissions", permissions}, {"api_key", true}, {"key_scope", scope}};
             return p;

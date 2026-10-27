@@ -86,6 +86,9 @@ struct AuthPrincipal {
     // HEAD and OPTIONS only, minus the GETs that write
     // (Security::ApiKeys::read_key_allows).
     bool key_read_only = false;
+    // The key's scope ("full", "read" or "ani"); empty for a session. An
+    // "ani" key works only for Ani's MCP (Security::ApiKeys::ani_key_allows).
+    std::string key_scope;
 };
 
 /**

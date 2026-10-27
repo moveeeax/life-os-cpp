@@ -162,6 +162,18 @@ TEST_F(ApiKeysTest, ReadScopeIsStoredAndMarksThePrincipal) {
     EXPECT_NE(std::find(scopes.begin(), scopes.end(), "full"), scopes.end());
 }
 
+TEST_F(ApiKeysTest, AniScopeIsStoredAndMarksThePrincipal) {
+    auto user = seed_user("key-ani@example.com");
+    int status = 0;
+    auto k = create_key(user, "Ani MCP", &status, {{"scope", "ani"}});
+    ASSERT_EQ(status, k201Created);
+    EXPECT_EQ(k["scope"], "ani");
+    auto principal = Security::ApiKeys::authenticate(with_key(k["key"]));
+    ASSERT_TRUE(principal.has_value());
+    EXPECT_EQ(principal->key_scope, "ani");
+    EXPECT_FALSE(principal->key_read_only);
+}
+
 TEST_F(ApiKeysTest, CreateRefusesAnUnknownScope) {
     auto user = seed_user("key-scope-bad@example.com");
     int status = 0;
