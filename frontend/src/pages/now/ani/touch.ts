@@ -87,7 +87,13 @@ const steps = (n: number) => n.toLocaleString('ru-RU');
 
 export interface Toucher {
   tap(z: Zone, at: { x: number; y: number }): Answer | null;
+  /** The cursor rested on a part of her: bare, she catches the look. */
+  stare(z: Zone, at: { x: number; y: number }): Answer | null;
 }
+
+// A look caught at most this often (ms), and the lines for it in turn.
+const STARE_EVERY = 25_000;
+const STARE = ['Глаза выше.', 'Я всё вижу.', 'Эй, я тут, повыше.'];
 
 export interface ToucherOptions {
   ani: () => Ani | null;
@@ -96,6 +102,8 @@ export interface ToucherOptions {
   focusField: () => HTMLInputElement | null;
   /** "Hide numbers" is on: she keeps the day's data to herself. */
   hidden?: () => boolean;
+  /** She wears nothing (the bare outfit): shy rather than cross. */
+  bare?: () => boolean;
   clock?: () => number;
 }
 
@@ -104,6 +112,7 @@ export function createToucher({
   today,
   focusField,
   hidden = () => false,
+  bare = () => false,
   clock = () => performance.now(),
 }: ToucherOptions): Toucher {
   const taps: number[] = [];
@@ -113,6 +122,9 @@ export function createToucher({
   let offendedAt = -1e9;
   let sulkUntil = 0;
   let fiveAt = -1e9;
+  let coverUntil = -1e9;
+  let staredAt = -1e9;
+  let stares = 0;
 
   const again = (key: string, within: number, now: number) => {
     const n = now - (lastAt[key] ?? -1e9) < within * 1000 ? (count[key] ?? 0) + 1 : 1;
@@ -150,6 +162,19 @@ export function createToucher({
       const r = react(z, at);
       return r && r.mood === undefined ? { ...r, mood: MOOD[z.part] ?? 0 } : r;
     },
+    stare(z, at) {
+      const a = ani();
+      const now = clock();
+      if (!a || !bare() || now < sulkUntil || now - staredAt < STARE_EVERY) return null;
+      if (z.part !== 'chest' && z.part !== 'hips' && z.part !== 'seat') return null;
+      staredAt = now;
+      coverUntil = now + 2000;
+      a.feel('squint', 2.5);
+      a.glance(at.x, at.y, 2);
+      a.cover(2);
+      a.blush(4);
+      return { text: STARE[stares++ % STARE.length], mood: 0 };
+    },
   };
 
   function react(z: Zone, at: { x: number; y: number }): Answer | null {
@@ -184,7 +209,12 @@ export function createToucher({
       return { ...say('dance'), mood: 2 };
     }
 
-    switch (z.part) {
+    // Covering herself: a tap on the arm over her body counts as on the body.
+    const part =
+      now < coverUntil && (z.part === 'hand' || z.part === 'forearm' || z.part === 'upperArm')
+        ? 'chest'
+        : z.part;
+    switch (part) {
       case 'chest':
       case 'seat':
       case 'hips':
@@ -192,6 +222,29 @@ export function createToucher({
         if (now - offendedAt > FORGIVE_S * 1000) offended = 0;
         offended += 1;
         offendedAt = now;
+        if (bare()) {
+          // Bare: she covers herself and goes pink; the third time she
+          // turns away for a while.
+          a.blush(offended < 3 ? 8 : SULK_S);
+          coverUntil = now + (offended === 1 ? 3 : offended === 2 ? 4 : SULK_S) * 1000;
+          if (offended === 1) {
+            a.feel('shy', 3);
+            a.cover(3);
+            return { text: 'Ой! Я же без всего…', mood: -1 };
+          }
+          if (offended === 2) {
+            a.feel('shy', 4);
+            a.cover(4);
+            a.glance(at.x, at.y, 1.5);
+            return { text: 'Не смотри так. Смущаешь.', mood: -1 };
+          }
+          offended = 0;
+          a.feel('shy', SULK_S);
+          a.cover(SULK_S);
+          a.sulk(SULK_S);
+          sulkUntil = now + SULK_S * 1000;
+          return { text: 'Всё, отвернусь. Сам виноват.', mood: -1 };
+        }
         if (offended === 1) {
           a.feel('surprised', 1.6);
           a.glance(at.x, at.y, 1.6);

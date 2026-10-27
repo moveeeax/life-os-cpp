@@ -26,7 +26,7 @@ import { zoneOf, type Zone } from './zones';
  * skeleton as they are.
  */
 
-export type Outfit = 'p1' | 'p2' | 'lingerie';
+export type Outfit = 'p1' | 'p2' | 'lingerie' | 'bare';
 
 export interface AniOptions {
   /** Folder of v1/ and v2/ (ends with a slash). */
@@ -42,6 +42,8 @@ export interface AniOptions {
   /** Where her head is on screen (CSS px), every frame: for her speech bubble. */
   onHead?: (x: number, y: number) => void;
   outfit: Outfit;
+  /** The bare body (signed links): mounted instead of the dressed one. */
+  bare?: { model: string; texture: string };
   present: boolean;
   onReady?: () => void;
   onError?: (e: unknown) => void;
@@ -49,12 +51,22 @@ export interface AniOptions {
   onTap?: (z: Zone, at: { x: number; y: number }) => void;
   /** A long drag that spun her round more than once. */
   onSpin?: () => void;
+  /** The cursor has rested on one part of her for a while (once per rest). */
+  onDwell?: (z: Zone, at: { x: number; y: number }) => void;
   /** Two taps on her in quick succession (after the first one's answer). */
   onDoubleTap?: () => void;
 }
 
 /** A face she makes for a while, over her own. */
-export type Feeling = 'happy' | 'cross' | 'scrunch' | 'surprised' | 'sneeze' | 'yawn';
+export type Feeling =
+  | 'happy'
+  | 'cross'
+  | 'scrunch'
+  | 'surprised'
+  | 'sneeze'
+  | 'yawn'
+  | 'shy'
+  | 'squint';
 
 export interface Ani {
   /** Makes a face for `seconds`. */
@@ -71,6 +83,12 @@ export interface Ani {
   mood(level: -1 | 0 | 1): void;
   /** Stops what she is saying. */
   hush(): void;
+  /** Covers herself with her hands for `seconds` (bare). */
+  cover(seconds: number): void;
+  /** Her cheeks go pink for `seconds`, fading at the end. */
+  blush(seconds: number): void;
+  /** Hugs herself and shivers for `seconds` (cold). */
+  hug(seconds: number): void;
   /** false sends her off through the left edge, true calls her back. */
   present(on: boolean, done?: () => void): void;
   setOutfit(o: Outfit): void;
@@ -154,6 +172,26 @@ const FACES: Record<Feeling, Record<string, number>> = {
     mouthSmileLeft: 0,
     mouthSmileRight: 0,
   },
+  shy: {
+    browInnerUp: 0.75,
+    eyeLookDownLeft: 0.5,
+    eyeLookDownRight: 0.5,
+    mouthPressLeft: 0.5,
+    mouthPressRight: 0.5,
+    mouthSmileLeft: 0.2,
+    mouthSmileRight: 0.2,
+    mouthRollLower: 0.3,
+  },
+  squint: {
+    eyeSquintLeft: 0.75,
+    eyeSquintRight: 0.75,
+    browDownLeft: 0.45,
+    browDownRight: 0.45,
+    mouthPressLeft: 0.35,
+    mouthPressRight: 0.35,
+    mouthSmileLeft: 0,
+    mouthSmileRight: 0,
+  },
   yawn: {
     jawOpen: 0.8,
     まばたき: 0.85,
@@ -216,6 +254,17 @@ for (let n = 1; n <= 30; n++) {
 
 // Files under the base.
 const BODY_PMX = 'v2/Ani.pmx';
+// The MMD morph names the engine uses, and their English names.
+const MORPH_EN: Record<string, string> = {
+  まばたき: 'Blink',
+  笑い: 'Smile Eyes',
+  あ: 'A',
+  い: 'I',
+  う: 'U',
+  え: 'E',
+  お: 'O',
+};
+// Bare: her head on another body (outfits are made for v2's, so it has none).
 // The dressed v1 model and its textures. v1/ in the bucket holds another
 // variant of it (every garment at alpha 0, other body and outfit textures),
 // cached as immutable, so the dressed one has its own folder.
@@ -353,6 +402,34 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     pointer.at = now;
   };
   addEventListener('pointermove', onPointer);
+  // The cursor resting on her: the zone under it, read a few times a second
+  // while it is over her, reported once it has stayed on a part DWELL s.
+  const DWELL = 1.5;
+  const dwell = { part: '', since: 0, told: false, checked: -10 };
+  function watchDwell(now: number) {
+    if (now - dwell.checked < 0.2) return;
+    dwell.checked = now;
+    const r = hit.getBoundingClientRect();
+    const inside =
+      walk.state === 'here' &&
+      !spin.drag &&
+      pointer.x >= r.left &&
+      pointer.x <= r.right &&
+      pointer.y >= r.top &&
+      pointer.y <= r.bottom;
+    const z = inside ? touched(pointer.x, pointer.y) : null;
+    const part = z ? `${z.part}` : '';
+    if (part !== dwell.part) {
+      dwell.part = part;
+      dwell.since = now;
+      dwell.told = false;
+      return;
+    }
+    if (z && !dwell.told && now - dwell.since > DWELL) {
+      dwell.told = true;
+      opts.onDwell?.(z, { x: pointer.x, y: pointer.y });
+    }
+  }
   // And to the text while the user types.
   let typedAt = -10;
   const onInput = () => (typedAt = clock.getElapsedTime());
@@ -483,15 +560,20 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     }
     return null;
   }
-  // The files are PNG where the PMX names BMP textures.
+  // The files are PNG where the PMX names BMP textures. The bare model and
+  // its body texture come by signed links; its head textures are v2's.
   const manager = new THREE.LoadingManager();
-  manager.setURLModifier((u) => u.replace(/\.bmp$/i, '.png'));
+  manager.setURLModifier((u) =>
+    opts.bare && /kanata_body\.png$/i.test(u) ? opts.bare.texture : u.replace(/\.bmp$/i, '.png'),
+  );
   const loader = new MMDLoader(manager);
-  const load = (file: string) =>
-    new Promise<THREE.SkinnedMesh>((ok, fail) =>
-      loader.load(`${opts.base}${file}`, ok, undefined, fail),
-    );
-  Promise.all([load(BODY_PMX), load(CLOTHES_PMX)]).then(
+  const fetchModel = (l: MMDLoader, url: string) =>
+    new Promise<THREE.SkinnedMesh>((ok, fail) => l.load(url, ok, undefined, fail));
+  const load = (file: string) => fetchModel(loader, `${opts.base}${file}`);
+  const body = opts.bare
+    ? fetchModel(new MMDLoader(manager).setResourcePath(`${opts.base}v2/`), opts.bare.model)
+    : load(BODY_PMX);
+  Promise.all([body, load(CLOTHES_PMX)]).then(
     ([m, v1]) => {
       if (disposed) return;
       setUp(m, v1);
@@ -499,6 +581,97 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     },
     (e) => opts.onError?.(e),
   );
+
+  // Her blush: a pink mask on the face texture's cheeks, faded in by a
+  // uniform (0..1).
+  const blushU = { value: 0 };
+  function addBlush(m: THREE.SkinnedMesh) {
+    const mats = m.material as THREE.Material[];
+    const fi = mats.findIndex((x) => x.name === 'Face_Skin');
+    const face = mats[fi] as THREE.Material & { map?: THREE.Texture | null };
+    if (fi < 0 || !face.map) return;
+    const g = m.geometry;
+    const grp = g.groups.find((x) => x.materialIndex === fi);
+    const pos = g.attributes.position as THREE.BufferAttribute;
+    const uv = g.attributes.uv as THREE.BufferAttribute;
+    if (!grp || !g.index || !uv) return;
+    const verts = new Set<number>();
+    for (let k = grp.start; k < grp.start + grp.count; k++) verts.add(g.index.getX(k));
+    // Front is where the eyes are, off the head bone.
+    const local = (n: string) => m.worldToLocal(B[n].getWorldPosition(new THREE.Vector3()));
+    const eye = local('左目');
+    const fz = Math.sign(eye.z - local('頭').z) || 1;
+    const cheek = (sx: number) => {
+      // The front-most face vertex under the eye, a little out from it.
+      let best = -1;
+      let bz = -1e9;
+      for (const v of verts) {
+        const x = pos.getX(v);
+        const y = pos.getY(v);
+        if (
+          Math.abs(x - sx * (Math.abs(eye.x) + 0.12)) < 0.12 &&
+          Math.abs(y - (eye.y - 0.42)) < 0.12
+        ) {
+          const z = pos.getZ(v) * fz;
+          if (z > bz) {
+            bz = z;
+            best = v;
+          }
+        }
+      }
+      return best;
+    };
+    const size = 512;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = size;
+    const cx = cv.getContext('2d');
+    if (!cx) return;
+    for (const sx of [1, -1]) {
+      const v = cheek(sx);
+      if (v < 0) continue;
+      // UV per model unit near the cheek, for the spot's size.
+      let du = 0;
+      for (const w of verts) {
+        const d = Math.hypot(pos.getX(w) - pos.getX(v), pos.getY(w) - pos.getY(v));
+        if (d > 0.15 && d < 0.25) {
+          du = Math.hypot(uv.getX(w) - uv.getX(v), uv.getY(w) - uv.getY(v)) / d;
+          break;
+        }
+      }
+      const r = Math.max(0.01, du * 0.19) * size;
+      const px = uv.getX(v) * size;
+      const py = (face.map.flipY ? 1 - uv.getY(v) : uv.getY(v)) * size;
+      const gr = cx.createRadialGradient(px, py, 0, px, py, r);
+      gr.addColorStop(0, 'rgba(255,255,255,1)');
+      gr.addColorStop(1, 'rgba(255,255,255,0)');
+      cx.fillStyle = gr;
+      cx.save();
+      cx.translate(px, py);
+      cx.scale(1.35, 0.8);
+      cx.translate(-px, -py);
+      cx.beginPath();
+      cx.arc(px, py, r, 0, Math.PI * 2);
+      cx.fill();
+      cx.restore();
+    }
+    const mask = new THREE.CanvasTexture(cv);
+    mask.flipY = face.map.flipY;
+    mask.channel = face.map.channel;
+    face.onBeforeCompile = (sh) => {
+      sh.uniforms.blushMap = { value: mask };
+      sh.uniforms.blush = blushU;
+      sh.fragmentShader = sh.fragmentShader
+        .replace(
+          'void main() {',
+          'uniform sampler2D blushMap;\nuniform float blush;\nvoid main() {',
+        )
+        .replace(
+          '#include <map_fragment>',
+          '#include <map_fragment>\n  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.0, 0.62, 0.66), texture2D(blushMap, vMapUv).a * blush);',
+        );
+    };
+    face.needsUpdate = true;
+  }
 
   function setUp(m: THREE.SkinnedMesh, v1: THREE.SkinnedMesh) {
     mesh = m;
@@ -510,7 +683,13 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       baseQ[b.name] = b.quaternion.clone();
       baseP[b.name] = b.position.clone();
     }
-    morphs = m.morphTargetDictionary ?? {};
+    morphs = { ...(m.morphTargetDictionary ?? {}) };
+    // A model with English morph names (the bare one): the MMD names the
+    // engine uses find them too.
+    for (const [jp, en] of Object.entries(MORPH_EN))
+      if (morphs[jp] == null && morphs[en] != null) morphs[jp] = morphs[en];
+    m.updateMatrixWorld(true);
+    addBlush(m);
     // v1's clothes on the v2 skeleton: v1's skin indices name the same bones.
     const worn = new Set([...P1, ...P2, ...SHARED]);
     for (const mat of v1.material as THREE.Material[]) if (!worn.has(mat.name)) mat.visible = false;
@@ -595,7 +774,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
         mat.opacity = 1;
       }
       if (SHARED.includes(mat.name)) {
-        mat.visible = o !== 'lingerie';
+        mat.visible = o !== 'lingerie' && o !== 'bare';
         mat.opacity = 1;
       }
       if (P2.includes(mat.name)) {
@@ -977,7 +1156,8 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       play.next = now + rnd(8, 20);
       return;
     }
-    const w = smooth(clamp01(play.w));
+    // Covering herself wins over a clip.
+    const w = smooth(clamp01(play.w)) * (1 - Math.max(touch.coverW, touch.hugW));
     const p = play.clip.sample(Math.min(u, len));
     for (const [n, qq] of p.rotations) B[n]?.quaternion.slerp(qq, w);
     // She keeps to her corner: sideways steps of a clip are cut to a third.
@@ -1029,7 +1209,13 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       life.eye = { x: rnd(-1, 1), y: rnd(-0.6, 0.5) };
       life.nextEye = now + rnd(0.6, 2.8);
     }
-    if (!play.clip && now > play.next && now - typedAt > 3) {
+    if (
+      !play.clip &&
+      now > play.next &&
+      now - typedAt > 3 &&
+      now > touch.coverUntil &&
+      now > touch.hugUntil
+    ) {
       // Every other time or so she strikes a pose instead of a move.
       const pool = (Math.random() < 0.5 ? POSES : EMOTES).filter((n) => n !== play.name);
       play.next = now + 1e9; // set again when the clip ends
@@ -1099,6 +1285,11 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     glance: { x: 0, y: 0 },
     glanceUntil: -10,
     sulkUntil: -10,
+    coverUntil: -10,
+    coverW: 0,
+    hugUntil: -10,
+    hugW: 0,
+    blushUntil: -10,
     flinchAt: -10,
     flinchW: 0,
     mood: 0 as -1 | 0 | 1,
@@ -1243,6 +1434,12 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     // Arms: the wrists go to a point on the skirt's flare (by the thighs in
     // the slip and the lingerie) by two-bone IK, kept out of the body.
     const W = at('下半身');
+    // Covering: one hand over her chest, the other low in front.
+    touch.coverW += ((now < touch.coverUntil ? 1 : 0) - touch.coverW) * Math.min(1, dt * 5);
+    blushU.value += ((now < touch.blushUntil ? 0.7 : 0) - blushU.value) * Math.min(1, dt * 1.5);
+    const cw = smooth(clamp01(touch.coverW));
+    touch.hugW += ((now < touch.hugUntil ? 1 : 0) - touch.hugW) * Math.min(1, dt * 4);
+    const hw = smooth(clamp01(touch.hugW));
     for (const c of BODY) {
       onBone(c.a[0], c.a[1], c.A);
       onBone(c.b[0], c.b[1], c.Bp);
@@ -1262,7 +1459,26 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
         outfit === 'p1'
           ? W.clone().add(_off.set(sd * 2.6, -1.3 + bob, 0.9))
           : W.clone().add(_off.set(sd * 2.75, -1.75 + bob, 0.3));
-      reach(side, S, T, S.clone().add(_off.set(sd * 2, -2, -2.5)));
+      const Pl = S.clone().add(_off.set(sd * 2, -2, -2.5));
+      if (cw > 0.001) {
+        // Her right hand over her chest, her left low in front of her hips.
+        const C =
+          sd < 0
+            ? at('上半身2').add(_off.set(0.35, 0.75, 1.05))
+            : W.clone().add(_off.set(-0.2, -0.85, 1.25));
+        T.lerp(C, cw);
+        Pl.lerp(S.clone().add(_off.set(sd * 2.2, -1.2, -0.8)), cw);
+      }
+      if (hw > 0.001) {
+        // Hugging herself: each hand on the other arm, below the shoulder.
+        const other = sd > 0 ? '右' : '左';
+        const C = at(other + '腕')
+          .lerp(at(other + 'ひじ'), 0.7)
+          .add(_off.set(0, -0.1, 0.6));
+        T.lerp(C, hw);
+        Pl.lerp(S.clone().add(_off.set(sd * 1.5, -2.2, 0.6)), hw);
+      }
+      reach(side, S, T, Pl);
     }
     for (const g of grants) g.bone.quaternion.copy(_id).slerp(g.from.quaternion, g.ratio);
 
@@ -1341,7 +1557,15 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
         const was = m.morphTargetInfluences[i];
         m.morphTargetInfluences[i] = was + (v - was) * touch.feelW;
       }
+    // Cold: a fast small shiver through the neck and shoulders.
+    if (touch.hugW > 0.01) {
+      const sh = Math.sin(now * 52) * 0.018 * touch.hugW;
+      B['首'].rotateZ(sh);
+      B['左肩'].rotateZ(sh * 0.6);
+      B['右肩'].rotateZ(-sh * 0.6);
+    }
 
+    if (!still) watchDwell(now);
     applyClip(now, dt);
     ground(m);
 
@@ -1417,6 +1641,15 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     },
     sulk(seconds) {
       touch.sulkUntil = clock.getElapsedTime() + seconds;
+    },
+    cover(seconds) {
+      touch.coverUntil = clock.getElapsedTime() + seconds;
+    },
+    hug(seconds) {
+      touch.hugUntil = clock.getElapsedTime() + seconds;
+    },
+    blush(seconds) {
+      touch.blushUntil = Math.max(touch.blushUntil, clock.getElapsedTime() + seconds);
     },
     act(name) {
       if (CLIPS[name]) void playClip(name);

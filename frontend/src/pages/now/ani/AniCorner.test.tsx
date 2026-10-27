@@ -37,6 +37,9 @@ vi.mock('./engine', () => ({
       act: vi.fn(),
       mood: vi.fn(),
       hush: vi.fn(),
+      cover: vi.fn(),
+      blush: vi.fn(),
+      hug: vi.fn(),
     };
     setTimeout(() => opts.onReady?.(), 0);
     return engine.ani as unknown as Ani;

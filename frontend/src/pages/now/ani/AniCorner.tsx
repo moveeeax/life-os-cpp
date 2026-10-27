@@ -117,10 +117,18 @@ const TALK_WORDS: Record<TalkState, string> = {
   speaking: 'Speaking',
 };
 
+// Cold while bare: from COLD_FROM to COLD_TO o'clock; the first shiver after
+// COLD_FIRST_MS bare, the next COLD_EVERY_MS later, then she dresses.
+const COLD_FROM = 21;
+const COLD_TO = 6;
+const COLD_FIRST_MS = 90_000;
+const COLD_EVERY_MS = 4 * 60_000;
+
 const OUTFITS: { id: AniOutfit; label: string }[] = [
   { id: 'p1', label: 'Dress' },
   { id: 'p2', label: 'Slip' },
   { id: 'lingerie', label: 'Lingerie' },
+  { id: 'bare', label: 'Bare' },
 ];
 
 /** What she knows when a conversation starts. */
@@ -173,7 +181,25 @@ export function AniCorner({
   const [chatKey, setChatKey] = useState(0);
   const ledgeRef = useRef<HTMLDivElement>(null);
   // The first state the engine starts from; later changes go through calls.
-  const initial = useRef(ani);
+  // Hide numbers (a shared screen): she is not shown bare, the lingerie
+  // stands in until it is off again.
+  const [hideNums, setHideNums] = useState(() =>
+    document.documentElement.classList.contains('hide-numbers'),
+  );
+  useEffect(() => {
+    const root = document.documentElement;
+    const mo = new MutationObserver(() => setHideNums(root.classList.contains('hide-numbers')));
+    mo.observe(root, { attributes: true, attributeFilter: ['class'] });
+    return () => mo.disconnect();
+  }, []);
+  const shown: AniOutfit = ani.outfit === 'bare' && hideNums ? 'lingerie' : ani.outfit;
+  const outfitRef = useRef(shown);
+  outfitRef.current = shown;
+  // Bare is another model: switching to or from it mounts her again, as she
+  // is now (the engine starts from these).
+  const body = shown === 'bare' ? 'bare' : 'dressed';
+  const mountRef = useRef({ outfit: shown, here: ani.here });
+  mountRef.current = { outfit: shown, here: ani.here };
   const [said, setSaid] = useState<string | null>(null);
   const [talk, setTalk] = useState<TalkState | null>(null);
   const talkRef = useRef<Talk | null>(null);
@@ -239,6 +265,7 @@ export function AniCorner({
       today: () => contextRef.current.today,
       focusField: () => document.querySelector<HTMLInputElement>('.n-input'),
       hidden: () => document.documentElement.classList.contains('hide-numbers'),
+      bare: () => outfitRef.current === 'bare',
     }),
   );
   const sayTimer = useRef(0);
@@ -327,6 +354,53 @@ export function AniCorner({
     };
   }, []);
 
+  // Bare in the evening and at night she gets cold: after a while she hugs
+  // herself and shivers, later once more, and then goes to dress (the
+  // lingerie). Checked every 20 s while she is here and nothing else goes on.
+  // Her outfit change, set once wear() is defined below.
+  const wearRef = useRef<(o: AniOutfit) => void>(() => {});
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  useEffect(() => {
+    let since = 0;
+    let shivers = 0;
+    let last = 0;
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      const h = new Date().getHours();
+      const cold = h >= COLD_FROM || h < COLD_TO;
+      if (
+        !cold ||
+        outfitRef.current !== 'bare' ||
+        !hereRef.current ||
+        calling.current ||
+        busyRef.current ||
+        document.visibilityState !== 'visible'
+      ) {
+        since = 0;
+        shivers = 0;
+        return;
+      }
+      if (!since) since = now;
+      if (now - since < COLD_FIRST_MS || now - last < COLD_EVERY_MS) return;
+      if (now - lastSaidAt.current < 15_000) return;
+      last = now;
+      shivers += 1;
+      const e = engine.current;
+      e?.hug(5);
+      e?.feel('shy', 3);
+      if (shivers === 1) {
+        answer.current({ text: 'Брр… прохладно.', mood: 0 });
+        return;
+      }
+      answer.current({ text: 'Холодно. Пойду оденусь.', mood: 0 });
+      since = 0;
+      shivers = 0;
+      window.setTimeout(() => wearRef.current('lingerie'), 4500);
+    }, 20_000);
+    return () => clearInterval(id);
+  }, []);
+
   // Her first hello: once a day in this browser, with a thing from the day
   // (late tasks, rain, the night's sleep); after a focus session, a break.
   // Browsers play sound only after a gesture on the page: until one she waits.
@@ -394,8 +468,8 @@ export function AniCorner({
             cornerRef.current?.style.setProperty('--ani-hx', `${Math.round(x)}px`);
             cornerRef.current?.style.setProperty('--ani-hy', `${Math.round(y)}px`);
           },
-          outfit: initial.current.outfit,
-          present: initial.current.here,
+          outfit: mountRef.current.outfit,
+          present: mountRef.current.here,
           onReady: () => setReady(true),
           onError: () => setFailed(true),
           // A tap answers by where it landed (touch.ts).
@@ -409,6 +483,11 @@ export function AniCorner({
             if (a) answer.current(a);
           },
           onSpin: () => answer.current(DIZZY),
+          // The cursor resting on her body (bare): "eyes up".
+          onDwell: (z, at) => {
+            const a = toucher.current.stare(z, at);
+            if (a) answer.current(a);
+          },
           // A double tap opens the chat with her agent.
           onDoubleTap: () => {
             made?.hush();
@@ -426,8 +505,9 @@ export function AniCorner({
       gone = true;
       made?.dispose();
       engine.current = null;
+      setReady(false);
     };
-  }, [base]);
+  }, [base, body]);
 
   useEffect(() => {
     if (!wardrobe) return;
@@ -471,10 +551,24 @@ export function AniCorner({
     setWardrobe(false);
     const e = engine.current;
     if (busy || !e || o === ani.outfit) return;
+    const next: AniOutfit = o === 'bare' && hideNums ? 'lingerie' : o;
+    if ((next === 'bare') !== (shown === 'bare')) {
+      // The other model: she leaves, and comes back in it.
+      const swap = () => {
+        setAni({ outfit: o, here: true });
+        setBusy(null);
+      };
+      if (!ani.here) swap();
+      else {
+        setBusy('changing');
+        e.present(false, swap);
+      }
+      return;
+    }
     setAni({ outfit: o });
     if (!ani.here) {
       // Away: she comes back already changed.
-      e.setOutfit(o);
+      e.setOutfit(next);
       setAni({ here: true });
       setBusy('arriving');
       e.present(true, () => setBusy(null));
@@ -482,10 +576,11 @@ export function AniCorner({
     }
     setBusy('changing');
     e.present(false, () => {
-      e.setOutfit(o);
+      e.setOutfit(next);
       e.present(true, () => setBusy(null));
     });
   };
+  wearRef.current = wear;
 
   const words = talk
     ? ['Talking', TALK_WORDS[talk]]
@@ -530,7 +625,7 @@ export function AniCorner({
         {wardrobe ? (
           <div className="ani-wardrobe" role="group" aria-label="Outfit">
             <span className="ani-k">Outfit</span>
-            {OUTFITS.map((o) => (
+            {OUTFITS.filter((o) => !(hideNums && o.id === 'bare')).map((o) => (
               <button
                 key={o.id}
                 type="button"

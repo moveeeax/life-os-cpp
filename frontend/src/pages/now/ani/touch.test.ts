@@ -21,13 +21,20 @@ function setUp(today: Today = base) {
     glance: vi.fn(),
     sulk: vi.fn(),
     act: vi.fn(),
+    cover: vi.fn(),
+    blush: vi.fn(),
   } as unknown as Ani &
-    Record<'feel' | 'tilt' | 'glance' | 'sulk' | 'act', ReturnType<typeof vi.fn>>;
+    Record<
+      'feel' | 'tilt' | 'glance' | 'sulk' | 'act' | 'cover' | 'blush',
+      ReturnType<typeof vi.fn>
+    >;
   const field = document.createElement('input');
   document.body.append(field);
   let now = 0;
   let hide = false;
+  let bare = false;
   const t = createToucher({
+    bare: () => bare,
     ani: () => ani,
     today: () => today,
     focusField: () => field,
@@ -38,7 +45,11 @@ function setUp(today: Today = base) {
     now += wait;
     return t.tap({ part, side }, { x: 100, y: 400 })?.text;
   };
-  return { ani, field, tap, hideNumbers: () => (hide = true) };
+  const stare = (part: Part, wait = 3000) => {
+    now += wait;
+    return t.stare({ part, side: null }, { x: 100, y: 400 })?.text ?? null;
+  };
+  return { ani, field, tap, stare, hideNumbers: () => (hide = true), undress: () => (bare = true) };
 }
 
 describe('createToucher', () => {
@@ -212,5 +223,28 @@ describe('answers', () => {
 
   it('keep every fixed line short enough for the voice line route', () => {
     for (const text of Object.values(SAID)) expect([...text].length).toBeLessThanOrEqual(200);
+  });
+
+  it('bare, covers herself and goes pink, and turns away the third time', () => {
+    const t = setUp();
+    t.undress();
+    expect(t.tap('chest')).toBe('Ой! Я же без всего…');
+    expect(t.ani.cover).toHaveBeenCalledWith(3);
+    expect(t.ani.blush).toHaveBeenCalled();
+    // A tap on the arm she covers herself with counts as on her chest.
+    expect(t.tap('forearm', 'right', 1000)).toBe('Не смотри так. Смущаешь.');
+    expect(t.tap('seat', null, 1000)).toBe('Всё, отвернусь. Сам виноват.');
+    expect(t.ani.sulk).toHaveBeenCalled();
+  });
+
+  it('catches a look resting on her body, bare only and not too often', () => {
+    const t = setUp();
+    expect(t.stare('chest')).toBeNull();
+    t.undress();
+    expect(t.stare('hand')).toBeNull();
+    expect(t.stare('chest')).toBe('Глаза выше.');
+    expect(t.ani.feel).toHaveBeenCalledWith('squint', 2.5);
+    expect(t.stare('hips', 10_000)).toBeNull();
+    expect(t.stare('hips', 20_000)).toBe('Я всё вижу.');
   });
 });
