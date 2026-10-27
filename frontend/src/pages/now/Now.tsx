@@ -12,6 +12,7 @@ import {
   useWeather,
 } from '@/hooks/useNow';
 import {
+  ANI_WALLPAPER_EVENT,
   CORNER_KEYS,
   FOCUS_LENGTHS,
   greeting,
@@ -248,6 +249,22 @@ function NowScreen() {
           }}
           afterFocus={afterFocus}
           onAfterFocus={() => setAfterFocus(false)}
+          onFocus={(action, minutes) =>
+            action === 'start' && minutes ? session.start(minutes) : session.exit()
+          }
+          onWallpaper={(which) =>
+            window.dispatchEvent(new CustomEvent(ANI_WALLPAPER_EVENT, { detail: { which } }))
+          }
+          onSound={(which) => {
+            // A browser may refuse sound before the first click: then the
+            // choice stays and the next click starts it.
+            if (which === 'off') player.stop();
+            else if (which) {
+              player.choose(which);
+              if (player.state !== 'playing')
+                player.play(player.sounds.find((x) => x.id === which));
+            } else player.play();
+          }}
         />
       )}
       {session.phase !== 'idle' && (

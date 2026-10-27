@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { api } from '@/lib/api/client';
+
 import { fetchAniBare, useAniPrefs } from '@/hooks/useAni';
 import type { NowWeather, Today } from '@/lib/now/types';
 
@@ -161,6 +163,9 @@ export function AniCorner({
   context,
   afterFocus = false,
   onAfterFocus,
+  onFocus,
+  onWallpaper,
+  onSound,
 }: {
   base: string;
   context: AniContext;
@@ -168,6 +173,12 @@ export function AniCorner({
   afterFocus?: boolean;
   /** Her word about a break is said (once). */
   onAfterFocus?: () => void;
+  /** Her webhook or MCP starts or stops the focus timer. */
+  onFocus?: (action: 'start' | 'stop', minutes?: number) => void;
+  /** ... switches the wallpaper (an id; none: the next one). */
+  onWallpaper?: (which?: string) => void;
+  /** ... switches the focus sound (an id, or off). */
+  onSound?: (which?: string) => void;
 }) {
   const [ani, setAni] = useAni();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -381,13 +392,60 @@ export function AniCorner({
 
   // Her webhook: items play while she may speak (here, no voice call, no
   // Hide numbers on); otherwise they wait on the server and a dot says so.
+  // A card over her ledge and a question with buttons, from the same inbox.
+  const [card, setCard] = useState<{ title: string; text?: string; url?: string } | null>(null);
+  const [ask, setAsk] = useState<{ id: string; options: string[] } | null>(null);
+  const cardTimer = useRef(0);
+  const moodTimer = useRef(0);
+  const pageRef = useRef({ onFocus, onWallpaper, onSound });
+  pageRef.current = { onFocus, onWallpaper, onSound };
+  useEffect(
+    () => () => {
+      window.clearTimeout(cardTimer.current);
+      window.clearTimeout(moodTimer.current);
+    },
+    [],
+  );
+  const sendAnswer = (id: string, text: string) => {
+    setAsk(null);
+    void api.postJson(`/api/v1/ani/inbox/${id}/answer`, { body: { answer: text } }).catch(() => {});
+  };
   const { waiting } = useInbox(
     ready && !failed && ani.here && !hideNums && talk == null,
     (p: Play): Promise<void> => {
-      if (p.kind === 'say') return answer.current({ text: p.text });
-      if (p.kind === 'act') engine.current?.act(p.name);
-      else wearRef.current(p.outfit);
-      return new Promise((ok) => window.setTimeout(ok, p.kind === 'act' ? 4000 : 3000));
+      const pause = (ms: number) => new Promise<void>((ok) => window.setTimeout(ok, ms));
+      switch (p.kind) {
+        case 'say':
+          return answer.current({ text: p.text });
+        case 'ask':
+          setAsk({ id: p.id, options: p.options });
+          return answer.current({ text: p.text });
+        case 'act':
+          engine.current?.act(p.name);
+          return pause(4000);
+        case 'outfit':
+          wearRef.current(p.outfit);
+          return pause(3000);
+        case 'mood':
+          engine.current?.mood(p.level);
+          window.clearTimeout(moodTimer.current);
+          moodTimer.current = window.setTimeout(() => engine.current?.mood(0), p.seconds * 1000);
+          return pause(500);
+        case 'card':
+          setCard({ title: p.title, text: p.text, url: p.url });
+          window.clearTimeout(cardTimer.current);
+          cardTimer.current = window.setTimeout(() => setCard(null), p.seconds * 1000);
+          return pause(1000);
+        case 'focus':
+          pageRef.current.onFocus?.(p.action, p.minutes);
+          return pause(500);
+        case 'wallpaper':
+          pageRef.current.onWallpaper?.(p.which);
+          return pause(500);
+        case 'sound':
+          pageRef.current.onSound?.(p.which);
+          return pause(500);
+      }
     },
   );
   const busyRef = useRef(busy);
@@ -668,6 +726,26 @@ export function AniCorner({
         role="img"
         aria-label="Ani. Drag to turn her, tap her to see what she says."
       />
+      {card && !hideNums ? (
+        <div className="ani-card num" role="note" aria-label={card.title}>
+          <div className="ani-card-title">{card.title}</div>
+          {card.text ? <div className="ani-card-text">{card.text}</div> : null}
+          {card.url ? (
+            <a href={card.url} target="_blank" rel="noopener noreferrer">
+              Open
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+      {ask && !hideNums ? (
+        <div className="ani-ask" role="group" aria-label="Her question">
+          {ask.options.map((o) => (
+            <button key={o} type="button" className="num" onClick={() => sendAnswer(ask.id, o)}>
+              {o}
+            </button>
+          ))}
+        </div>
+      ) : null}
       <div ref={ledgeRef} className="ani-ledge" data-wardrobe={wardrobe ? '' : undefined}>
         {waiting > 0 ? (
           <span

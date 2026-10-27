@@ -19,22 +19,31 @@ export type InboxItem = components['schemas']['AniInboxItem'];
 export type Play =
   | { kind: 'say'; text: string }
   | { kind: 'outfit'; outfit: AniOutfit }
-  | { kind: 'act'; name: string };
+  | { kind: 'act'; name: string }
+  | { kind: 'mood'; level: -1 | 0 | 1; seconds: number }
+  | { kind: 'card'; title: string; text?: string; url?: string; seconds: number }
+  | { kind: 'ask'; id: string; text: string; options: string[] }
+  | { kind: 'focus'; action: 'start' | 'stop'; minutes?: number }
+  | { kind: 'wallpaper'; which?: string }
+  | { kind: 'sound'; which?: string };
 
 export const POLL_MS = 5000;
 /** The pause between two of her lines. */
 export const GAP_MS = 1500;
-/** A move that came longer ago than this means nothing any more. */
+/** A move or a card that came longer ago than this means nothing any more. */
 const ACT_FRESH_MS = 10 * 60_000;
 /** More lines than this at once: she says first that they piled up. */
 const BACKLOG_LINES = 3;
 
 const OUTFITS: readonly string[] = ['p1', 'p2', 'lingerie', 'bare'];
 
+const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
+
 /**
- * The items as she plays them, oldest first: moves older than 10 minutes are
- * dropped, only the newest outfit applies, and more than 3 lines open with a
- * line that they piled up while the user was away.
+ * The items as she plays them, oldest first: moves and cards older than 10
+ * minutes are dropped, only the newest outfit, mood, focus, wallpaper and
+ * sound apply, a hold is the server's (nothing to play), and more than 3
+ * lines open with a line that they piled up while the user was away.
  */
 export function planBacklog(items: InboxItem[], now: number): Play[] {
   const lastOutfit = items.reduce(
@@ -42,16 +51,51 @@ export function planBacklog(items: InboxItem[], now: number): Play[] {
       it.kind === 'outfit' && OUTFITS.includes(String(it.payload.outfit)) ? i : last,
     -1,
   );
+  const lastOf = (kind: string) => items.reduce((last, it, i) => (it.kind === kind ? i : last), -1);
+  const last = {
+    mood: lastOf('mood'),
+    focus: lastOf('focus'),
+    wallpaper: lastOf('wallpaper'),
+    sound: lastOf('sound'),
+  };
+  const fresh = (it: InboxItem) => now - Date.parse(it.created_at) <= ACT_FRESH_MS;
   const plan: Play[] = [];
   items.forEach((it, i) => {
-    if (it.kind === 'say' || it.kind === 'event') {
+    const p = it.payload;
+    if (it.kind === 'say' || it.kind === 'event' || it.kind === 'remind') {
       if (it.say) plan.push({ kind: 'say', text: it.say });
+    } else if (it.kind === 'ask') {
+      const options = Array.isArray(p.options) ? p.options.map(String) : [];
+      if (it.say && options.length > 0)
+        plan.push({ kind: 'ask', id: it.id, text: it.say, options });
+    } else if (it.kind === 'mood') {
+      const level = Number(p.level);
+      if (i === last.mood && (level === -1 || level === 0 || level === 1))
+        plan.push({ kind: 'mood', level, seconds: Number(p.seconds) || 600 });
+    } else if (it.kind === 'card') {
+      const title = str(p.title);
+      if (title && fresh(it))
+        plan.push({
+          kind: 'card',
+          title,
+          text: str(p.text),
+          url: str(p.url),
+          seconds: Number(p.seconds) || 20,
+        });
+    } else if (it.kind === 'focus') {
+      if (i === last.focus && (p.action === 'start' || p.action === 'stop'))
+        plan.push({
+          kind: 'focus',
+          action: p.action,
+          minutes: typeof p.minutes === 'number' ? p.minutes : undefined,
+        });
+    } else if (it.kind === 'wallpaper' || it.kind === 'sound') {
+      if (i === last[it.kind]) plan.push({ kind: it.kind, which: str(p.which) });
     } else if (it.kind === 'outfit') {
       if (i === lastOutfit) plan.push({ kind: 'outfit', outfit: it.payload.outfit as AniOutfit });
     } else if (it.kind === 'act') {
       const name = it.payload.name;
-      if (typeof name === 'string' && now - Date.parse(it.created_at) <= ACT_FRESH_MS)
-        plan.push({ kind: 'act', name });
+      if (typeof name === 'string' && fresh(it)) plan.push({ kind: 'act', name });
     }
   });
   const lines = plan.filter((p) => p.kind === 'say').length;

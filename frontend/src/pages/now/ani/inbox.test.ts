@@ -18,6 +18,61 @@ const item = (over: Partial<InboxItem>): InboxItem => ({
   ...over,
 });
 
+describe('planBacklog, the newer kinds', () => {
+  it('plays reminders and questions as lines, and the rest as they are', () => {
+    expect(
+      planBacklog(
+        [
+          item({ kind: 'remind', say: 'Встань' }),
+          item({
+            id: 'q1',
+            kind: 'ask',
+            say: 'Чай?',
+            payload: { text: 'Чай?', options: ['Да', 'Нет'] },
+          }),
+          item({ kind: 'mood', say: null, payload: { level: 1, seconds: 600 } }),
+          item({ kind: 'card', say: null, payload: { title: 'CI', text: 'ok', seconds: 20 } }),
+          item({ kind: 'focus', say: null, payload: { action: 'start', minutes: 25 } }),
+          item({ kind: 'wallpaper', say: null, payload: {} }),
+          item({ kind: 'sound', say: null, payload: { which: 'off' } }),
+          item({ kind: 'hold', say: null, payload: { minutes: 30 } }),
+        ],
+        NOW,
+      ),
+    ).toEqual([
+      { kind: 'say', text: 'Встань' },
+      { kind: 'ask', id: 'q1', text: 'Чай?', options: ['Да', 'Нет'] },
+      { kind: 'mood', level: 1, seconds: 600 },
+      { kind: 'card', title: 'CI', text: 'ok', url: undefined, seconds: 20 },
+      { kind: 'focus', action: 'start', minutes: 25 },
+      { kind: 'wallpaper', which: undefined },
+      { kind: 'sound', which: 'off' },
+    ]);
+  });
+
+  it('keeps only the newest mood, focus, wallpaper and sound, and drops stale cards', () => {
+    const plan = planBacklog(
+      [
+        item({ kind: 'mood', say: null, payload: { level: -1, seconds: 600 } }),
+        item({
+          kind: 'card',
+          say: null,
+          payload: { title: 'old', seconds: 20 },
+          created_at: at(11),
+        }),
+        item({ kind: 'mood', say: null, payload: { level: 1, seconds: 600 } }),
+        item({ kind: 'focus', say: null, payload: { action: 'start', minutes: 25 } }),
+        item({ kind: 'focus', say: null, payload: { action: 'stop' } }),
+      ],
+      NOW,
+    );
+    expect(plan).toEqual([
+      { kind: 'mood', level: 1, seconds: 600 },
+      { kind: 'focus', action: 'stop', minutes: undefined },
+    ]);
+  });
+});
+
 describe('planBacklog', () => {
   it('plays lines, moves and outfits in order', () => {
     expect(
