@@ -1269,7 +1269,7 @@ components:
         id: { type: string, format: uuid }
         kind: { type: string, enum: [say, outfit, act, event] }
         say: { type: [string, 'null'], description: "What she says: a say item's text, or her reply to an event" }
-        payload: { type: object, description: The item as it came }
+        payload: { type: object, additionalProperties: true, description: The item as it came }
         created_at: { type: string, format: date-time }
     NowVoiceSession:
       type: object

@@ -4903,6 +4903,7 @@
      },
      "payload": {
       "type": "object",
+      "additionalProperties": true,
       "description": "The item as it came"
      },
      "created_at": {
@@ -36145,7 +36146,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 543753,
-  "source_fnv1a64": "38eb1b03a8932707"
+  "source_bytes": 543781,
+  "source_fnv1a64": "f03a3f2fe788ab0d"
  }
 }

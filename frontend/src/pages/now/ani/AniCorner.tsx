@@ -7,6 +7,7 @@ import { AniChat, SpeakerIcon } from './AniChat';
 import { soundOn, speechUrl, useSound } from './chat';
 import type { Ani } from './engine';
 import { greeting, HELLO, hourOf } from './greet';
+import { useInbox, type Play } from './inbox';
 import { moodLevel, moodOf, moveMood } from './mood';
 import type { Talk, TalkState } from './talk';
 import { useAni, type AniOutfit } from './state';
@@ -284,31 +285,37 @@ export function AniCorner({
    * from the bucket, one with the day in it read by the server, or a silent
    * one shown for a moment.
    */
-  const answer = useRef<(a: Answer) => void>(() => {});
-  answer.current = (a: Answer) => {
-    const e = engine.current;
-    if (!e || calling.current) return;
-    if (a.mood) e.mood(moodLevel(moveMood(contextRef.current.date, a.mood)));
-    lastSaidAt.current = Date.now();
-    setSaidChat(Boolean(a.chat));
-    setSaid(a.text);
-    clearTimeout(sayTimer.current);
-    const done = () => setSaid((v) => (v === a.text ? null : v));
-    if (a.silent || !soundOn()) {
-      sayTimer.current = window.setTimeout(done, a.silent ? 1500 : 1500 + a.text.length * 50);
-      return;
-    }
-    const url = a.recorded
-      ? `${base}v2/voice/${a.recorded}.mp3`
-      : `/api/v1/now/voice-line?text=${encodeURIComponent(a.text)}`;
-    // No voice (offline, the limit): the line still stays up for a while.
-    const started = Date.now();
-    void e.say(url).then(() => {
-      const left = 1200 + a.text.length * 40 - (Date.now() - started);
-      if (left > 0) sayTimer.current = window.setTimeout(done, left);
-      else done();
+  // Says a line; the promise ends when the bubble goes (a webhook backlog
+  // plays one line after the other).
+  const answer = useRef<(a: Answer) => Promise<void>>(() => Promise.resolve());
+  answer.current = (a: Answer) =>
+    new Promise<void>((finished) => {
+      const e = engine.current;
+      if (!e || calling.current) return finished();
+      if (a.mood) e.mood(moodLevel(moveMood(contextRef.current.date, a.mood)));
+      lastSaidAt.current = Date.now();
+      setSaidChat(Boolean(a.chat));
+      setSaid(a.text);
+      clearTimeout(sayTimer.current);
+      const done = () => {
+        setSaid((v) => (v === a.text ? null : v));
+        finished();
+      };
+      if (a.silent || !soundOn()) {
+        sayTimer.current = window.setTimeout(done, a.silent ? 1500 : 1500 + a.text.length * 50);
+        return;
+      }
+      const url = a.recorded
+        ? `${base}v2/voice/${a.recorded}.mp3`
+        : `/api/v1/now/voice-line?text=${encodeURIComponent(a.text)}`;
+      // No voice (offline, the limit): the line still stays up for a while.
+      const started = Date.now();
+      void e.say(url).then(() => {
+        const left = 1200 + a.text.length * 40 - (Date.now() - started);
+        if (left > 0) sayTimer.current = window.setTimeout(done, left);
+        else done();
+      });
     });
-  };
   const [sound, setSound] = useSound();
 
   // Her mood of the day shows in her face from the start.
@@ -366,6 +373,18 @@ export function AniCorner({
   // lingerie). Checked every 20 s while she is here and nothing else goes on.
   // Her outfit change, set once wear() is defined below.
   const wearRef = useRef<(o: AniOutfit) => void>(() => {});
+
+  // Her webhook: items play while she may speak (here, no voice call, no
+  // Hide numbers on); otherwise they wait on the server and a dot says so.
+  const { waiting } = useInbox(
+    ready && !failed && ani.here && !hideNums && talk == null,
+    (p: Play): Promise<void> => {
+      if (p.kind === 'say') return answer.current({ text: p.text });
+      if (p.kind === 'act') engine.current?.act(p.name);
+      else wearRef.current(p.outfit);
+      return new Promise((ok) => window.setTimeout(ok, p.kind === 'act' ? 4000 : 3000));
+    },
+  );
   const busyRef = useRef(busy);
   busyRef.current = busy;
   useEffect(() => {
@@ -645,6 +664,14 @@ export function AniCorner({
         aria-label="Ani. Drag to turn her, tap her to see what she says."
       />
       <div ref={ledgeRef} className="ani-ledge" data-wardrobe={wardrobe ? '' : undefined}>
+        {waiting > 0 ? (
+          <span
+            className="ani-inbox"
+            role="status"
+            aria-label={`${waiting} waiting from your webhook`}
+            title="Something came through your webhook"
+          />
+        ) : null}
         {wardrobe ? (
           <div className="ani-wardrobe" role="group" aria-label="Outfit">
             <span className="ani-k">Outfit</span>

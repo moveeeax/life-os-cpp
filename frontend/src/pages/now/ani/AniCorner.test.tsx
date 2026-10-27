@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
+import { api } from '@/lib/api/client';
 import type { Today } from '@/lib/now/types';
 
 import { AniCorner } from './AniCorner';
@@ -87,12 +88,26 @@ async function mount(today: Today = base, props: { afterFocus?: boolean } = {}) 
 const bubble = () => document.querySelector('.ani-say')?.textContent ?? null;
 const played = () => engine.ani!.say.mock.calls.map((c: unknown[]) => String(c[0]));
 
+// Her webhook inbox: empty unless a test fills it.
+const inbox = { items: [] as unknown[], waiting: 0 };
+let claimSpy: ReturnType<typeof vi.spyOn>;
+
 beforeEach(() => {
+  inbox.items = [];
+  inbox.waiting = 0;
+  claimSpy = vi.spyOn(api, 'postJson').mockImplementation(async () => {
+    const data = inbox.items;
+    inbox.items = [];
+    return { data };
+  });
+  vi.spyOn(api, 'getJson').mockImplementation(async () => ({ data: { waiting: inbox.waiting } }));
   localStorage.clear();
   localStorage.setItem('now:ani', '1');
   vi.useFakeTimers({ now: new Date(2026, 9, 26, 15, 0) });
 });
 afterEach(() => {
+  vi.restoreAllMocks();
+  document.documentElement.classList.remove('hide-numbers');
   prefs.bare = false;
   fetchAniBare.mockClear();
   cleanup();
@@ -230,5 +245,60 @@ describe('AniCorner', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Outfit' }));
     expect(screen.queryByRole('button', { name: /bare/i })).toBeNull();
     expect(screen.getByRole('button', { name: /lingerie/i })).toBeTruthy();
+  });
+
+  const hookSay = (text: string) => ({
+    id: text,
+    kind: 'say',
+    say: text,
+    payload: { text },
+    created_at: new Date().toISOString(),
+  });
+  const tick = async (ms = 5100) =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+
+  it('plays a webhook line through her voice', async () => {
+    await mount();
+    await tick(20_000); // her own hello is over
+    engine.ani!.say.mockClear();
+    inbox.items = [hookSay('Сборка прошла.')];
+    await tick();
+    expect(claimSpy).toHaveBeenCalledWith('/api/v1/ani/inbox/claim');
+    expect(bubble()).toBe('Сборка прошла.');
+  });
+
+  it('changes her outfit when the webhook asks', async () => {
+    await mount();
+    await tick(20_000);
+    inbox.items = [
+      {
+        id: 'o',
+        kind: 'outfit',
+        say: null,
+        payload: { outfit: 'p2' },
+        created_at: new Date().toISOString(),
+      },
+    ];
+    await tick();
+    expect(engine.ani!.setOutfit).toHaveBeenCalledWith('p2');
+  });
+
+  it('claims nothing while Hide numbers is on, and shows the dot', async () => {
+    document.documentElement.classList.add('hide-numbers');
+    inbox.waiting = 2;
+    await mount();
+    await tick(20_000);
+    expect(claimSpy).not.toHaveBeenCalledWith('/api/v1/ani/inbox/claim');
+    expect(screen.getByRole('status', { name: /2 waiting/i })).toBeTruthy();
+  });
+
+  it('claims nothing while she is away', async () => {
+    await mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Ani: send away' }));
+    claimSpy.mockClear();
+    await tick(20_000);
+    expect(claimSpy).not.toHaveBeenCalledWith('/api/v1/ani/inbox/claim');
   });
 });

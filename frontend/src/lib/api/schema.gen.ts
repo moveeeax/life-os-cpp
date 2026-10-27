@@ -23396,7 +23396,9 @@ export interface components {
             /** @description What she says: a say item's text, or her reply to an event */
             say: string | null;
             /** @description The item as it came */
-            payload: Record<string, never>;
+            payload: {
+                [key: string]: unknown;
+            };
             /** Format: date-time */
             created_at: string;
         };
