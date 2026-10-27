@@ -264,3 +264,34 @@ TEST_F(AniHookEvents, SilentWithPunctuation) {
     EXPECT_EQ(status_of(a), "delivered");
     EXPECT_TRUE(inbox.claim(kAnna, 5).empty());
 }
+
+TEST_F(AniHookEvents, McpTurnReplySpokenOnPage) {
+    running(kAnna);
+    const auto sent = Agent::send(kAnna, "Привет", "UTC", "mcp");
+    ASSERT_EQ(sent.status, Agent::Send::Queued);
+    EXPECT_EQ(sent.turn["origin"], "mcp");
+    gateway.reply = "Привет!";
+    Agent::process_turn(json{{"turn", sent.turn["id"]}});
+    const json items = inbox.claim(kAnna, 5);
+    ASSERT_EQ(items.size(), 1u);
+    EXPECT_EQ(items[0]["kind"], "say");
+    EXPECT_EQ(items[0]["say"], "Привет!");
+}
+
+TEST_F(AniHookEvents, LongMcpReplyStaysInTheChat) {
+    running(kAnna);
+    const auto sent = Agent::send(kAnna, "Расскажи длинно", "UTC", "mcp");
+    ASSERT_EQ(sent.status, Agent::Send::Queued);
+    gateway.reply = std::string(300, 'a');
+    Agent::process_turn(json{{"turn", sent.turn["id"]}});
+    EXPECT_EQ((*turns.get(kAnna, sent.turn["id"].get<std::string>()))["status"], "done");
+    EXPECT_TRUE(inbox.claim(kAnna, 5).empty());
+}
+
+TEST_F(AniHookEvents, McpTurnBesideUserTurn) {
+    running(kAnna);
+    ASSERT_EQ(Agent::send(kAnna, "С сайта", "UTC").status, Agent::Send::Queued);
+    EXPECT_EQ(Agent::send(kAnna, "Из MCP", "UTC", "mcp").status, Agent::Send::Queued)
+        << "an open user turn does not stop an MCP one";
+    EXPECT_EQ(Agent::send(kAnna, "Еще из MCP", "UTC", "mcp").status, Agent::Send::Open);
+}

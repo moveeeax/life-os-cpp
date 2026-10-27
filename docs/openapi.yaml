@@ -1184,8 +1184,8 @@ components:
         status: { type: string, enum: [queued, running, done, failed] }
         origin:
           type: string
-          enum: [user, hook]
-          description: 'user: the user wrote it; hook: events that came through the webhook'
+          enum: [user, hook, mcp]
+          description: 'user: the user wrote it; hook: events that came through the webhook; mcp: a message sent through her MCP'
         text: { type: string, description: 'What the user wrote, or the events of a webhook turn' }
         reply: { type: [string, 'null'], description: 'Her answer, once done' }
         error:
