@@ -15,7 +15,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include "InMemoryCache.hpp"
 #include "agent/Hook.hpp"
 #include "agent/Intake.hpp"
 #include "agent/Presence.hpp"
@@ -50,7 +49,9 @@ protected:
         TestHelpers::CoreBackedTest::SetUp();
         if (::testing::Test::IsSkipped())
             return;
-        Cache::install_for_testing(std::make_unique<TestSupport::InMemoryCache>());
+        // The real cache of the fixture: waking her agent takes its locks.
+        Cache::get().del(std::string("ani:seen:") + kAnna);
+        Cache::get().del(std::string("ani:hook:rate:") + kAnna);
         Database::get().execute_write([](auto& txn) {
             txn.exec("DELETE FROM ani_inbox");
             txn.exec("DELETE FROM ani_prefs");
@@ -59,11 +60,6 @@ protected:
             txn.exec("DELETE FROM ani_agents");
             return true;
         });
-    }
-
-    void TearDown() override {
-        Cache::reset_for_testing();
-        TestHelpers::CoreBackedTest::TearDown();
     }
 
     /// Calls a tool; the scheduler runs each wait at once and counts it.
