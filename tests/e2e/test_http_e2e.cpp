@@ -525,6 +525,32 @@ TEST(HttpE2E, ReadKeyReadsButNeverWrites) {
     EXPECT_NE(send(head)->statusCode(), k403Forbidden);
 }
 
+TEST(HttpE2E, AniKeyOnlyReachesHerMcp) {
+    // A key of scope ani opens Ani's MCP and nothing else: the middleware
+    // answers 403 key_scope before any other handler.
+    REQUIRE_E2E_ENV();
+    auto sc = register_and_login("e2e-anikey@example.com", "password-e2e-1");
+    auto create = json_post("/api/v1/account/api-keys", {{"name", "Ani MCP"}, {"scope", "ani"}});
+    attach_session(create, sc);
+    auto created = send(create);
+    ASSERT_EQ(created->statusCode(), k201Created) << created->getBody();
+    const std::string key = body_of(created)["key"];
+
+    auto me = HttpRequest::newHttpRequest();
+    me->setPath("/api/v1/auth/me");
+    me->addHeader("Authorization", "Bearer " + key);
+    auto refused = send(me);
+    EXPECT_EQ(refused->statusCode(), k403Forbidden) << refused->getBody();
+    EXPECT_EQ(body_of(refused)["error"], "key_scope");
+
+    auto list = json_post("/api/v1/ani/mcp", {{"jsonrpc", "2.0"}, {"id", 1}, {"method", "tools/list"}});
+    list->addHeader("Authorization", "Bearer " + key);
+    list->addHeader("MCP-Protocol-Version", "2025-11-25");
+    auto listed = send(list);
+    ASSERT_EQ(listed->statusCode(), k200OK) << listed->getBody();
+    EXPECT_EQ(body_of(listed)["result"]["tools"].size(), 10u);
+}
+
 TEST(HttpE2E, IdempotencyKeyReplaysResponse) {
     REQUIRE_E2E_ENV();
     auto sc = register_and_login("e2e-idem@example.com", "password-e2e-1");

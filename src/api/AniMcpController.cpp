@@ -6,12 +6,14 @@
 #include "api/AniMcpController.hpp"
 
 #include <algorithm>
+#include <exception>
 #include <memory>
 #include <optional>
 #include <string>
 #include <utility>
 
 #include <drogon/drogon.h>
+#include <spdlog/spdlog.h>
 
 #include <nlohmann/json.hpp>
 
@@ -101,7 +103,14 @@ void AniMcpController::post(const HttpRequestPtr& req, Callback&& callback) {
     r.method = req->getHeader("Mcp-Method");
     r.name = req->getHeader("Mcp-Name");
     auto cb = std::make_shared<Callback>(std::move(callback));
-    Mcp::handle(Mcp::ani_server(owner), r, [cb](Mcp::Outcome o) { (*cb)(json_response(o.status, o.body)); });
+    try {
+        Mcp::handle(Mcp::ani_server(owner), r, [cb](Mcp::Outcome o) { (*cb)(json_response(o.status, o.body)); });
+    } catch (const std::exception& e) {
+        spdlog::error("ani.mcp: a request failed: {}", e.what());
+        (*cb)(json_response(
+            500,
+            json{{"jsonrpc", "2.0"}, {"id", nullptr}, {"error", {{"code", -32603}, {"message", "Internal error"}}}}));
+    }
 }
 
 void AniMcpController::get(const HttpRequestPtr&, Callback&& callback) {

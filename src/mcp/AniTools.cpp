@@ -177,9 +177,12 @@ json chat(const std::string& owner, const json& args) {
 void reply(const std::string& owner, const json& args, const Scheduler& after, Reply done) {
     const std::string id = args.value("turn_id", "");
     const int wait = clamp_arg(args, "wait_seconds", 0, 0, kReplyWaitMax);
-    // Checks the turn, then again every second until it ends or the wait is over.
+    // Checks the turn, then again every second until it ends or the wait is
+    // over. The closure keeps itself only weakly; each pending timer holds
+    // the strong reference, so it goes once the answer is given.
     auto check = std::make_shared<std::function<void(int)>>();
-    *check = [owner, id, wait, after, done, check](int n) {
+    std::weak_ptr<std::function<void(int)>> self = check;
+    *check = [owner, id, wait, after, done, self](int n) {
         try {
             const auto t = TurnRepository().get(owner, id);
             if (!t) {
@@ -194,7 +197,9 @@ void reply(const std::string& owner, const json& args, const Scheduler& after, R
                                                         : "No answer yet (" + shown + "); ask again later.",
                                    v));
             }
-            after(1.0, [check, n] { (*check)(n + 1); });
+            if (auto next = self.lock()) {
+                after(1.0, [next, n] { (*next)(n + 1); });
+            }
         } catch (const std::exception& e) {
             spdlog::error("ani.mcp reply failed: {}", e.what());
             done(refusal("Could not read the turn."));

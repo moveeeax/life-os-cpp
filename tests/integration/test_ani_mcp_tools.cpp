@@ -155,3 +155,16 @@ TEST_F(AniMcpTools, ReplyWaitClamped) {
     EXPECT_EQ(waits, Mcp::kReplyWaitMax) << "one check a second, 25 at most";
     EXPECT_NE(text(r).find("queued"), std::string::npos) << text(r);
 }
+
+TEST_F(AniMcpTools, ReplyLeavesNothingBehind) {
+    // The reply's closures hold the caller's callback; once it answered,
+    // nothing may keep it (a self-referencing closure would leak it).
+    const auto server = Mcp::ani_server(kAnna, [](double, std::function<void()> fn) { fn(); });
+    auto token = std::make_shared<int>(0);
+    bool answered = false;
+    server.run("ani_reply",
+               {{"turn_id", "00000000-0000-4000-8000-000000000000"}, {"wait_seconds", 3}},
+               [token, &answered](json) { answered = true; });
+    EXPECT_TRUE(answered);
+    EXPECT_EQ(token.use_count(), 1) << "the reply callback was not released";
+}

@@ -4,8 +4,11 @@
  *        HTTP status of each answer, tool calls through the runner.
  */
 
+#include <functional>
+#include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -148,4 +151,45 @@ TEST(McpProtocol, PingAnswers) {
 TEST(McpProtocol, DecodesBase64Header) {
     EXPECT_EQ(Mcp::decode_header("=?base64?SGVsbG8sIOS4lueVjA==?="), "Hello, 世界");
     EXPECT_EQ(Mcp::decode_header("ani_say"), "ani_say");
+}
+
+TEST(McpProtocol, LateReplyOutlivesTheServer) {
+    // A tool that answers later (ani_reply's wait): the server object is gone
+    // by then, as in the controller, which builds it per request.
+    std::vector<std::function<void()>> later;
+    std::optional<Mcp::Outcome> out;
+    {
+        Mcp::Server s;
+        s.name = std::string("late-server-") + std::string(40, 'x');
+        s.version = "1.0";
+        s.tools = {{"wait", "Answers later", json{{"type", "object"}}}};
+        s.run = [&later](const std::string&, const json&, Mcp::Reply reply) {
+            later.push_back([reply] { reply(Mcp::tool_text("done")); });
+        };
+        Mcp::handle(s, {modern("tools/call", {{"name", "wait"}}), "2026-07-28", "", ""}, [&](Mcp::Outcome o) {
+            out = std::move(o);
+        });
+    }
+    ASSERT_FALSE(out.has_value());
+    ASSERT_EQ(later.size(), 1u);
+    later[0]();
+    ASSERT_TRUE(out.has_value());
+    EXPECT_EQ((*out->body)["result"]["_meta"]["io.modelcontextprotocol/serverInfo"]["name"],
+              std::string("late-server-") + std::string(40, 'x'));
+}
+
+TEST(McpProtocol, WrongTypesAreErrorsNotThrows) {
+    EXPECT_NO_THROW({
+        const auto a = run(json{{"jsonrpc", 2}, {"id", 1}, {"method", "ping"}});
+        EXPECT_EQ((*a.body)["error"]["code"], -32600);
+    });
+    EXPECT_NO_THROW({
+        const auto b =
+            run({{"jsonrpc", "2.0"}, {"id", 1}, {"method", "initialize"}, {"params", {{"protocolVersion", 7}}}});
+        EXPECT_EQ((*b.body)["result"]["protocolVersion"], "2025-11-25");
+    });
+    EXPECT_NO_THROW({
+        const auto c = run(modern("tools/call", {{"name", 5}}), "2026-07-28");
+        EXPECT_EQ((*c.body)["error"]["code"], -32602);
+    });
 }

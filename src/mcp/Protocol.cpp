@@ -69,6 +69,12 @@ std::string base64_decode(std::string_view in) {
     return out;
 }
 
+/// A string member, or "" when it is missing or not a string.
+std::string str(const json& o, const char* key) {
+    const auto it = o.find(key);
+    return it != o.end() && it->is_string() ? it->get<std::string>() : std::string();
+}
+
 json server_info(const Server& s) {
     return json{{"name", s.name}, {"version", s.version}};
 }
@@ -102,7 +108,7 @@ void handle(const Server& server, const Request& request, std::function<void(Out
         return done(fail(400, nullptr, kInvalidRequest, "a single JSON-RPC request object is expected"));
     }
     const json id = body.contains("id") ? body["id"] : json(nullptr);
-    if (body.value("jsonrpc", "") != "2.0" || !body.contains("method") || !body["method"].is_string()) {
+    if (str(body, "jsonrpc") != "2.0" || !body.contains("method") || !body["method"].is_string()) {
         return done(fail(400, id, kInvalidRequest, "not a JSON-RPC 2.0 request"));
     }
     if (!body.contains("id")) {
@@ -138,17 +144,18 @@ void handle(const Server& server, const Request& request, std::function<void(Out
                          json{{"supported", versions()}, {"requested", request.protocol_version}}));
     }
 
-    // A modern result says it is complete and who answered.
-    const auto answer = [&server, modern, id, done](json result) {
+    // A modern result says it is complete and who answered. Taken by value:
+    // a tool may answer after the server object is gone.
+    const auto answer = [info = server_info(server), modern, id, done](json result) {
         if (modern) {
             result["resultType"] = "complete";
-            result["_meta"][kServerInfoKey] = server_info(server);
+            result["_meta"][kServerInfoKey] = info;
         }
         done(Outcome{200, json{{"jsonrpc", "2.0"}, {"id", id}, {"result", std::move(result)}}});
     };
 
     if (method == "initialize" && !modern) {
-        const std::string asked = params.value("protocolVersion", "");
+        const std::string asked = str(params, "protocolVersion");
         const bool legacy_known = known(asked) && asked != kVersions[0];
         json r{{"protocolVersion", legacy_known ? asked : std::string(kLegacyDefault)},
                {"capabilities", {{"tools", json::object()}}},
@@ -175,7 +182,7 @@ void handle(const Server& server, const Request& request, std::function<void(Out
         return answer(json{{"tools", tool_list(server)}});
     }
     if (method == "tools/call") {
-        const std::string name = params.value("name", "");
+        const std::string name = str(params, "name");
         if (modern && !request.name.empty() && decode_header(request.name) != name) {
             return done(fail(400, id, kHeaderMismatch, "Mcp-Name does not match the tool's name"));
         }
