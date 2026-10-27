@@ -34,6 +34,7 @@ export const qk = {
   ani: {
     prefs: () => ['ani', 'prefs'] as const,
     webhook: () => ['ani', 'webhook'] as const,
+    mcpKeys: () => ['ani', 'mcp-keys'] as const,
   },
   /** Workout section. Lists are keyed under a prefix so one write invalidates every variant. */
   workout: {

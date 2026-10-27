@@ -6,7 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import {
   useAniPrefs,
+  useAniMcpKeys,
   useAniWebhook,
+  useCreateAniMcpKey,
+  useRevokeAniMcpKey,
   useRotateAniWebhook,
   useSaveAniPrefs,
   type AniWebhook,
@@ -182,6 +185,81 @@ function Webhook({ hook }: { hook: AniWebhook }) {
   );
 }
 
+/** Her MCP: the endpoint, a key made here (shown once) and the keys to revoke. */
+function Mcp() {
+  const keys = useAniMcpKeys();
+  const create = useCreateAniMcpKey();
+  const revoke = useRevokeAniMcpKey();
+  const [made, setMade] = useState<string | null>(null);
+  const endpoint = `${window.location.origin}/api/v1/ani/mcp`;
+  const command = made
+    ? `claude mcp add --transport http ani ${endpoint} --header "Authorization: Bearer ${made}"`
+    : '';
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <div className="text-sm font-medium">MCP</div>
+        <p className="text-xs text-muted-foreground">
+          An AI client (Claude Code, Cursor, OpenClaw, Grok) can drive her and chat with her agent
+          at <span className="font-mono">{endpoint}</span> with a key made here. The key works only
+          for Ani.
+        </p>
+      </div>
+      {made ? (
+        <div className="space-y-2 rounded-md border p-3" role="group" aria-label="New MCP key">
+          <p className="text-sm">Copy it now: the key is not shown again.</p>
+          <pre className="num overflow-x-auto rounded-md bg-muted p-2 text-xs">{command}</pre>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigator.clipboard.writeText(command)}>
+              Copy
+            </Button>
+            <Button variant="outline" onClick={() => setMade(null)}>
+              Done
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button
+          variant="outline"
+          disabled={create.isPending}
+          onClick={() => create.mutate(undefined, { onSuccess: (k) => setMade(k.key) })}
+        >
+          Create key
+        </Button>
+      )}
+      {keys.data && keys.data.length > 0 && (
+        <ul className="divide-y text-sm">
+          {keys.data.map((k) => (
+            <li key={k.id} className="flex items-center justify-between gap-4 py-1.5">
+              <span className="font-mono text-xs" data-num-ok>
+                {k.prefix}
+              </span>
+              <span className="text-muted-foreground tabular-nums" data-num-ok>
+                {when(k.created_at)}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={`Revoke ${k.prefix}`}
+                disabled={revoke.isPending}
+                onClick={() => revoke.mutate(k.id)}
+              >
+                Revoke
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {(create.error || revoke.error) && (
+        <Alert variant="destructive">
+          <AlertDescription>{create.error || revoke.error}</AlertDescription>
+        </Alert>
+      )}
+    </div>
+  );
+}
+
 export function AniSettingsCard() {
   const hook = useAniWebhook();
   return (
@@ -189,12 +267,13 @@ export function AniSettingsCard() {
       <CardHeader>
         <CardTitle>Ani</CardTitle>
         <CardDescription>
-          Her wardrobe, and a webhook other systems use to talk to you through her.
+          Her wardrobe, a webhook other systems use to talk to you through her, and her MCP.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <BareSwitch />
         {hook.data && <Webhook hook={hook.data} />}
+        <Mcp />
       </CardContent>
     </Card>
   );
