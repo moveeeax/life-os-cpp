@@ -255,13 +255,19 @@ json run_proposal(TurnRepository& turns, const std::string& id, const std::strin
     const std::string tz = turn.value("tz", "UTC");
     const std::string local = turns.local_now(tz).value_or("");
     const std::string token = Tools::access_token(owner).value_or("");
-    const auto got = Actions::propose(Net::Http::transport(),
-                                      s->api_url,
-                                      token,
-                                      tz,
-                                      local.size() >= 10 ? local.substr(0, 10) : "",
-                                      proposal.value("tool", ""),
-                                      proposal.value("args", json::object()));
+    // A lookup the site's API cannot answer ends the turn with the reason, not a failure.
+    Actions::Proposed got = std::string("Could not look that up on the site; try again later.");
+    try {
+        got = Actions::propose(Net::Http::transport(),
+                               s->api_url,
+                               token,
+                               tz,
+                               local.size() >= 10 ? local.substr(0, 10) : "",
+                               proposal.value("tool", ""),
+                               proposal.value("args", json::object()));
+    } catch (const std::exception& e) {
+        spdlog::warn("ani agent {}: proposal of turn {} not resolved: {}", Manifest::owner_hash(owner), id, e.what());
+    }
     if (const auto* p = std::get_if<Actions::Proposal>(&got)) {
         ActionRepository().add(owner, id, p->kind, p->summary, p->request);
         turns.finish(id, Actions::proposed_text(*p), json::array());
