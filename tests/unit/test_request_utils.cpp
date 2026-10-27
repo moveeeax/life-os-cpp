@@ -50,6 +50,14 @@ TEST(RequestUtilsTest, AccountTokensRedacted) {
               "/api/v1/account/join-from-invite/:token");
 }
 
+TEST(RequestUtilsTest, AniHookTokenRedacted) {
+    // The webhook token is a credential in the path: it never reaches logs or metric labels.
+    EXPECT_EQ(normalize_path_for_metrics("/api/v1/ani/hook/aniwh_0123456789abcdef0123456789abcdef0123456789abcdef"),
+              "/api/v1/ani/hook/:token");
+    EXPECT_EQ(normalize_path_for_metrics("/api/v1/ani/hook"), "/api/v1/ani/hook");
+    EXPECT_EQ(normalize_path_for_metrics("/api/v1/ani/webhook/rotate"), "/api/v1/ani/webhook/rotate");
+}
+
 TEST(RequestUtilsTest, RequestVariantsNotMistakenForTokenRoutes) {
     // The *-request / *-resend single-segment routes carry no token.
     EXPECT_EQ(normalize_path_for_metrics("/api/v1/account/reset-password-request"),

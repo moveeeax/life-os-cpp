@@ -35,6 +35,7 @@
 agent -> cache
 agent -> jobs
 agent -> net
+agent -> now
 agent -> repositories
 agent -> repositories/agent
 agent -> security

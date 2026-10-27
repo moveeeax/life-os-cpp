@@ -139,7 +139,7 @@ TEST_F(AniSettingsApi, PrefsDefaultOff) {
 TEST_F(AniSettingsApi, BareNeedsAdult) {
     auto r = put_prefs(json{{"bare", true}});
     EXPECT_EQ(r->statusCode(), k422UnprocessableEntity) << std::string(r->body());
-    EXPECT_EQ(body_of(r)["error"]["code"], "adult_required");
+    EXPECT_EQ(body_of(r)["error"], "adult_required");
     EXPECT_EQ(body_of(get_prefs())["data"]["bare"], false);
 
     auto bad = put_prefs(json{{"bare", "yes"}});
@@ -167,7 +167,7 @@ TEST_F(AniSettingsApi, BareOnGivesPresignedUrls) {
 TEST_F(AniSettingsApi, BareOffIs403) {
     auto r = get_bare();
     EXPECT_EQ(r->statusCode(), k403Forbidden) << std::string(r->body());
-    EXPECT_EQ(body_of(r)["error"]["code"], "bare_off");
+    EXPECT_EQ(body_of(r)["error"], "bare_off");
     EXPECT_TRUE(store.signed_downloads.empty()) << "nothing signed while off";
 }
 
@@ -175,7 +175,7 @@ TEST_F(AniSettingsApi, ApiKeyRefused) {
     auto r = call(
         Get, json::object(), [&](auto req, auto cb) { c.prefs(req, std::move(cb)); }, nullptr, true);
     EXPECT_EQ(r->statusCode(), k401Unauthorized);
-    EXPECT_EQ(body_of(r)["error"]["code"], "key_not_allowed");
+    EXPECT_EQ(body_of(r)["error"], "key_not_allowed");
     auto b = call(
         Get, json::object(), [&](auto req, auto cb) { c.bare(req, std::move(cb)); }, nullptr, true);
     EXPECT_EQ(b->statusCode(), k401Unauthorized);
