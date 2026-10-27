@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793093448327,
+  "lastUpdate": 1793093451105,
   "repoUrl": "https://github.com/moveeeax/life-os-cpp",
   "entries": {
     "Throughput": [
@@ -923,6 +923,63 @@ window.BENCHMARK_DATA = {
           {
             "name": "idle RSS",
             "value": 4.7,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Michael Tarassov",
+            "username": "moveeeax",
+            "email": "michael@tarassov.me"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "1c3a90dd5329419ea6f6506cbbc8a4448d6d2582",
+          "message": "Merge pull request #195 from moveeeax/release/1.46.0\n\nchore(release): 1.46.0 — Ani's bare outfit and her personal webhook",
+          "timestamp": "2026-10-27T06:44:20Z",
+          "url": "https://github.com/moveeeax/life-os-cpp/commit/1c3a90dd5329419ea6f6506cbbc8a4448d6d2582"
+        },
+        "date": 1793093450467,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "healthz p50",
+            "value": 3.1,
+            "unit": "ms"
+          },
+          {
+            "name": "healthz p99",
+            "value": 12.7,
+            "unit": "ms"
+          },
+          {
+            "name": "jobs p50",
+            "value": 16.52,
+            "unit": "ms"
+          },
+          {
+            "name": "jobs p99",
+            "value": 33.88,
+            "unit": "ms"
+          },
+          {
+            "name": "runtime image size",
+            "value": 116,
+            "unit": "MB"
+          },
+          {
+            "name": "cold start to /ready",
+            "value": 839,
+            "unit": "ms"
+          },
+          {
+            "name": "idle RSS",
+            "value": 4.9,
             "unit": "MB"
           }
         ]
