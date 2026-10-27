@@ -10238,8 +10238,10 @@ paths:
         POST, answered with plain JSON. Serves 2026-07-28 (per-request
         version in params._meta, server/discover) and 2025-11-25 /
         2025-06-18 (initialize). Tools ani_say, ani_outfit, ani_act,
-        ani_event, ani_presence, ani_items, ani_item, ani_chat, ani_reply,
-        ani_history. Sign in with an API key of scope ani (or full) in
+        ani_event, ani_mood, ani_remind, ani_ask, ani_focus, ani_card,
+        ani_wallpaper, ani_sound, ani_hold, ani_presence, ani_items,
+        ani_item, ani_chat, ani_reply, ani_history, ani_task, ani_habit,
+        ani_note. Sign in with an API key of scope ani (or full) in
         Authorization; a read key gets 403. A notification gets 202 with no
         body; an unsupported version or a header that does not match the
         body gets 400; an unknown method 404. A page of another site

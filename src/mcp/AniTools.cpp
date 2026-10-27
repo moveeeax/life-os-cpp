@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <exception>
 #include <memory>
+#include <set>
 #include <utility>
 #include <variant>
 
@@ -22,7 +23,10 @@
 #include "jobs/Jobs.hpp"
 #include "repositories/agent/AgentRepository.hpp"
 #include "repositories/agent/InboxRepository.hpp"
+#include "repositories/agent/PrefsRepository.hpp"
 #include "repositories/agent/TurnRepository.hpp"
+#include "repositories/now/SoundRepository.hpp"
+#include "repositories/now/WallpaperRepository.hpp"
 
 namespace Mcp {
 
@@ -96,19 +100,47 @@ json command(const std::string& owner, const std::string& type, const json& args
         return refusal(r->message);
     }
     const std::string id = std::get<Agent::Intake::Accepted>(got).id;
-    const bool event = type == "event";
-    return result(event ? "Sent to her agent; she decides whether to say something." : "Queued for the Now page.",
-                  json{{"id", id}, {"status", event ? "thinking" : "ready"}});
+    if (type == "event") {
+        return result("Sent to her agent; she decides whether to say something.",
+                      json{{"id", id}, {"status", "thinking"}});
+    }
+    if (type == "hold") {
+        return result("Done.", json{{"id", id}, {"status", "delivered"}});
+    }
+    return result(type == "ask" ? "Asked on the Now page; read the answer with ani_item." : "Queued for the Now page.",
+                  json{{"id", id}, {"status", "ready"}});
 }
 
 json presence(const std::string& owner) {
     const auto ago = Agent::Presence::seen_ago(owner);
-    if (!ago) {
-        return result("Not known whether the Now page is open.", json{{"page", "unknown"}});
+    const auto held = Repositories::Agent::PrefsRepository().held_until(owner);
+    json data{{"page", "unknown"}};
+    std::string line = "Not known whether the Now page is open.";
+    if (ago) {
+        const bool open = *ago <= Agent::Presence::kOpenSeconds;
+        data = json{{"page", open ? "open" : "away"}, {"seen_seconds_ago", *ago}};
+        line = open ? "The Now page is open." : "The Now page is not open.";
     }
-    const bool open = *ago <= Agent::Presence::kOpenSeconds;
-    return result(open ? "The Now page is open." : "The Now page is not open.",
-                  json{{"page", open ? "open" : "away"}, {"seen_seconds_ago", *ago}});
+    if (held) {
+        data["held_until"] = *held;
+        line += " Everything is held back until then.";
+    }
+    return result(line, data);
+}
+
+/// The wallpapers or sounds the page can switch to: [{id, title or kind}].
+json choices(const std::string& what) {
+    json out = json::array();
+    if (what == "wallpaper") {
+        for (const auto& w : Repositories::Now::WallpaperRepository().list_ready("desktop")) {
+            out.push_back(json{{"id", w.value("id", "")}, {"kind", w.value("kind", "")}});
+        }
+    } else {
+        for (const auto& x : Repositories::Now::SoundRepository().list_ready()) {
+            out.push_back(json{{"id", x.value("id", "")}, {"title", x.value("title", "")}});
+        }
+    }
+    return out;
 }
 
 /// A turn as the MCP shows it; "starting" while it waits for her agent to come up.
@@ -255,14 +287,84 @@ Server ani_server(const std::string& owner, Scheduler after) {
          schema({{"turn_id", {{"type", "string"}}},
                  {"wait_seconds", {{"type", "integer"}, {"minimum", 0}, {"maximum", kReplyWaitMax}}}},
                 {"turn_id"})},
+        {"ani_mood",
+         "Her mood shows in her face for a while: -1 a little cross, 0 as usual, 1 happy.",
+         schema({{"level", {{"type", "integer"}, {"minimum", -1}, {"maximum", 1}}},
+                 {"seconds", {{"type", "integer"}, {"minimum", 60}, {"maximum", 3600}}},
+                 {"id", kId},
+                 {"ttl", kTtl}},
+                {"level"})},
+        {"ani_remind",
+         "She says a line later: in_seconds (60 to a week) or at (ISO-8601 with a zone), one of them.",
+         schema({{"text", {{"type", "string"}, {"minLength", 1}, {"maxLength", 200}}},
+                 {"in_seconds", {{"type", "integer"}, {"minimum", 60}, {"maximum", 604800}}},
+                 {"at", {{"type", "string"}, {"description", "e.g. 2026-10-28T18:30:00+05:00"}}},
+                 {"id", kId},
+                 {"ttl", kTtl}},
+                {"text"})},
+        {"ani_ask",
+         "She asks the user with answer buttons on Now (default Да / Нет); read the answer with ani_item, or "
+         "give an https callback to get it POSTed.",
+         schema({{"text", {{"type", "string"}, {"minLength", 1}, {"maxLength", 200}}},
+                 {"options",
+                  {{"type", "array"},
+                   {"minItems", 1},
+                   {"maxItems", 4},
+                   {"items", {{"type", "string"}, {"minLength", 1}, {"maxLength", 30}}}}},
+                 {"callback", {{"type", "string"}, {"description", "https URL"}}},
+                 {"id", kId},
+                 {"ttl", kTtl}},
+                {"text"})},
+        {"ani_focus",
+         "Starts (minutes 1-180) or stops the focus timer on Now.",
+         schema({{"action", {{"type", "string"}, {"enum", {"start", "stop"}}}},
+                 {"minutes", {{"type", "integer"}, {"minimum", 1}, {"maximum", 180}}},
+                 {"id", kId},
+                 {"ttl", kTtl}},
+                {"action"})},
+        {"ani_card",
+         "A small card above her ledge for a few seconds, not spoken; a url opens on click.",
+         schema({{"title", {{"type", "string"}, {"minLength", 1}, {"maxLength", 60}}},
+                 {"text", {{"type", "string"}, {"maxLength", 200}}},
+                 {"url", {{"type", "string"}, {"description", "https URL"}}},
+                 {"seconds", {{"type", "integer"}, {"minimum", 5}, {"maximum", 120}}},
+                 {"id", kId},
+                 {"ttl", kTtl}},
+                {"title"})},
+        {"ani_wallpaper",
+         "Switches the wallpaper of Now (which: an id; none: the next one); list: true returns the ids.",
+         schema({{"which", {{"type", "string"}}}, {"list", {{"type", "boolean"}}}, {"id", kId}, {"ttl", kTtl}})},
+        {"ani_sound",
+         "Switches the focus sound (which: an id, or off); list: true returns the ids and titles.",
+         schema({{"which", {{"type", "string"}}}, {"list", {{"type", "boolean"}}}, {"id", kId}, {"ttl", kTtl}})},
+        {"ani_hold",
+         "Holds everything back from the page for some minutes (0 to 480; 0 ends a hold).",
+         schema({{"minutes", {{"type", "integer"}, {"minimum", 0}, {"maximum", 480}}}, {"id", kId}}, {"minutes"})},
         {"ani_history",
          "The latest messages of her chat, from every source.",
          schema({{"limit", {{"type", "integer"}, {"minimum", 1}, {"maximum", kListMax}}}})},
     };
     s.run = [owner, after](const std::string& name, const json& args, Reply done) {
         try {
-            if (name == "ani_say" || name == "ani_outfit" || name == "ani_act" || name == "ani_event") {
-                return done(command(owner, name.substr(4), args));
+            if ((name == "ani_wallpaper" || name == "ani_sound") && args.value("list", false) == true) {
+                return done(result("The ids to switch to.", choices(name.substr(4))));
+            }
+            static const std::set<std::string> commands = {"ani_say",
+                                                           "ani_outfit",
+                                                           "ani_act",
+                                                           "ani_event",
+                                                           "ani_mood",
+                                                           "ani_remind",
+                                                           "ani_ask",
+                                                           "ani_focus",
+                                                           "ani_card",
+                                                           "ani_wallpaper",
+                                                           "ani_sound",
+                                                           "ani_hold"};
+            if (commands.count(name)) {
+                json body = args;
+                body.erase("list");
+                return done(command(owner, name.substr(4), body));
             }
             if (name == "ani_presence") {
                 return done(presence(owner));

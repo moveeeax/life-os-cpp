@@ -8,8 +8,10 @@
 
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -163,4 +165,47 @@ TEST_F(AniMcpTools, ReplyLeavesNothingBehind) {
                [token, &answered](json) { answered = true; });
     EXPECT_TRUE(answered);
     EXPECT_EQ(token.use_count(), 1) << "the reply callback was not released";
+}
+
+TEST_F(AniMcpTools, NewCommandsQueue) {
+    const std::vector<std::pair<std::string, json>> calls = {
+        {"ani_mood", {{"level", 1}}},
+        {"ani_remind", {{"text", "Встань"}, {"in_seconds", 600}}},
+        {"ani_ask", {{"text", "Чай?"}}},
+        {"ani_focus", {{"action", "start"}, {"minutes", 25}}},
+        {"ani_card", {{"title", "CI"}, {"text", "зеленый"}}},
+        {"ani_wallpaper", json::object()},
+        {"ani_sound", {{"which", "off"}}},
+        {"ani_hold", {{"minutes", 0}}},
+    };
+    for (const auto& [name, args] : calls) {
+        const json r = call(name, args);
+        EXPECT_EQ(r["isError"], false) << name << ": " << text(r);
+    }
+    const json items = InboxRepository().items(kAnna, 20);
+    std::set<std::string> kinds;
+    for (const auto& i : items)
+        kinds.insert(i["kind"].get<std::string>());
+    for (const char* k : {"mood", "remind", "ask", "focus", "card", "wallpaper", "sound", "hold"})
+        EXPECT_TRUE(kinds.count(k)) << k;
+}
+
+TEST_F(AniMcpTools, AskAnswerVisible) {
+    const json r = call("ani_ask", {{"text", "Чай?"}, {"options", {"Да", "Нет"}}});
+    const std::string body = text(r);
+    const std::string id = json::parse(body.substr(body.find('{')))["id"];
+    ASSERT_EQ(Agent::Intake::answer(kAnna, id, "Да"), InboxRepository::Answer::Ok);
+    EXPECT_NE(text(call("ani_item", {{"id", id}})).find("\"answer\": \"Да\""), std::string::npos);
+}
+
+TEST_F(AniMcpTools, SoundListShowsIds) {
+    const json r = call("ani_sound", {{"list", true}});
+    EXPECT_EQ(r["isError"], false) << text(r);
+    EXPECT_NE(text(r).find('['), std::string::npos) << "a list, even an empty one";
+    EXPECT_TRUE(InboxRepository().items(kAnna, 5).empty()) << "listing changes nothing";
+}
+
+TEST_F(AniMcpTools, PresenceShowsHold) {
+    call("ani_hold", {{"minutes", 30}});
+    EXPECT_NE(text(call("ani_presence")).find("held_until"), std::string::npos);
 }

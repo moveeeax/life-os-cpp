@@ -548,7 +548,7 @@ TEST(HttpE2E, AniKeyOnlyReachesHerMcp) {
     list->addHeader("MCP-Protocol-Version", "2025-11-25");
     auto listed = send(list);
     ASSERT_EQ(listed->statusCode(), k200OK) << listed->getBody();
-    EXPECT_EQ(body_of(listed)["result"]["tools"].size(), 10u);
+    EXPECT_EQ(body_of(listed)["result"]["tools"].size(), 21u);
 }
 
 TEST(HttpE2E, IdempotencyKeyReplaysResponse) {
