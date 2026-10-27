@@ -287,3 +287,4 @@ core -> files/jobs
 mcp -> agent
 mcp -> jobs
 mcp -> repositories/agent
+api -> mcp
