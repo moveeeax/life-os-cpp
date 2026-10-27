@@ -171,6 +171,7 @@ repositories -> database
 repositories -> domain
 repositories -> utils
 repositories/agent -> database
+repositories/agent -> utils
 repositories/fitness -> database
 repositories/fitness -> domain/fitness
 repositories/fitness -> fitness/xiaomi
