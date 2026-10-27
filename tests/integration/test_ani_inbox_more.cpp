@@ -142,3 +142,31 @@ TEST_F(AniInboxMore, PrivateCallbackRefused) {
     EXPECT_EQ(std::get<Intake::Refused>(got).status, 400);
     EXPECT_EQ(std::get<Intake::Refused>(got).code, "bad_callback");
 }
+
+TEST_F(AniInboxMore, LateAnswerIsRefused) {
+    const std::string id = accepted({{"type", "ask"}, {"text", "?"}, {"callback", "https://example.com/cb"}});
+    sql("UPDATE ani_inbox SET expires_at = now() - interval '1 second' WHERE id::text = $1", id);
+    EXPECT_EQ(Intake::send_callbacks(), 1) << "the sender heard it ran out";
+    EXPECT_EQ(Intake::answer(kAnna, id, "Да"), InboxRepository::Answer::Expired) << "too late now";
+}
+
+TEST_F(AniInboxMore, ClaimedAskStaysOpenAWhile) {
+    const std::string id = accepted({{"type", "ask"}, {"text", "?"}, {"ttl", 60}});
+    ASSERT_EQ(inbox.claim(kAnna, 5).size(), 1u);
+    const bool open_long_enough = Database::get().execute_read([&](auto& txn) {
+        return txn
+            .exec_params("SELECT expires_at >= now() + interval '14 minutes' FROM ani_inbox WHERE id::text = $1",
+                         id)[0][0]
+            .template as<bool>();
+    });
+    EXPECT_TRUE(open_long_enough) << "shown on the page, it waits for the click";
+}
+
+TEST_F(AniInboxMore, ClaimOnlyFocus) {
+    accepted({{"type", "say"}, {"text", "Привет"}});
+    accepted({{"type", "focus"}, {"action", "stop"}});
+    const json got = inbox.claim(kAnna, 5, {"focus"});
+    ASSERT_EQ(got.size(), 1u);
+    EXPECT_EQ(got[0]["kind"], "focus");
+    EXPECT_EQ(inbox.claim(kAnna, 5).size(), 1u) << "the line still waits";
+}

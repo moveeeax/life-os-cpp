@@ -26,6 +26,7 @@ import { homeOf } from '@/shell/sections';
 import { useGlassNav } from '@/shell/useGlassNav';
 
 import { AniCorner } from './ani/AniCorner';
+import { useFocusInbox } from './ani/inbox';
 import { aniBase, useAni } from './ani/state';
 import { Corners } from './corners/Corners';
 import { FocusMode } from './focus/FocusMode';
@@ -137,6 +138,10 @@ function NowScreen() {
   const habitsOn = useHabitsEnabled(Boolean(me));
   const [picking, setPicking] = useState(false);
   const session = useFocusSession(me?.id ?? null);
+  // Her webhook or MCP can stop or replace a running focus session.
+  const onAniFocus = (action: 'start' | 'stop', minutes?: number) =>
+    action === 'start' && minutes ? session.start(minutes) : session.exit();
+  useFocusInbox(session.phase !== 'idle', onAniFocus);
   const player = useSoundPlayer(useSounds(me !== null).data ?? []);
   const data = today.data;
   const focus = data?.focus ?? null;
@@ -249,9 +254,7 @@ function NowScreen() {
           }}
           afterFocus={afterFocus}
           onAfterFocus={() => setAfterFocus(false)}
-          onFocus={(action, minutes) =>
-            action === 'start' && minutes ? session.start(minutes) : session.exit()
-          }
+          onFocus={onAniFocus}
           onWallpaper={(which) =>
             window.dispatchEvent(new CustomEvent(ANI_WALLPAPER_EVENT, { detail: { which } }))
           }

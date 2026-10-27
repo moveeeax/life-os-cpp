@@ -9,6 +9,7 @@
 #include <optional>
 #include <string>
 #include <variant>
+#include <vector>
 
 #include <drogon/drogon.h>
 #include <spdlog/spdlog.h>
@@ -91,7 +92,12 @@ void AniHookController::claim(const HttpRequestPtr& req, Callback&& callback) {
     API_REFUSE_API_KEY(req, callback);
     try {
         ::Agent::Presence::mark(owner);
-        auto r = Response::ok(json{{"data", InboxRepository().claim(owner, kClaimMax)}});
+        // ?kinds=focus: during a focus session the page takes only these.
+        std::vector<std::string> kinds;
+        if (const std::string only = req->getParameter("kinds"); only == "focus") {
+            kinds.push_back(only);
+        }
+        auto r = Response::ok(json{{"data", InboxRepository().claim(owner, kClaimMax, kinds)}});
         r->addHeader("Cache-Control", "no-store");
         callback(r);
     } catch (const std::exception& e) {
@@ -138,6 +144,9 @@ void AniHookController::answer(const HttpRequestPtr& req, Callback&& callback, c
                 return;
             case A::Answered:
                 callback(ErrorResponse::conflict("answered", "this question was answered already"));
+                return;
+            case A::Expired:
+                callback(ErrorResponse::conflict("expired", "this question ran out; its sender was told"));
                 return;
         }
     } catch (const std::exception& e) {

@@ -105,7 +105,12 @@ Repositories::Agent::InboxRepository::Answer answer(const std::string& owner,
                                                     const std::string& text) {
     const auto a = Repositories::Agent::InboxRepository().answer(owner, id, text);
     if (a == Repositories::Agent::InboxRepository::Answer::Ok) {
-        send_callbacks();
+        // The answer is kept whatever happens here; the hourly purge retries.
+        try {
+            send_callbacks();
+        } catch (const std::exception& e) {
+            spdlog::warn("ani.intake: queueing answer callbacks failed: {}", e.what());
+        }
     }
     return a;
 }
@@ -124,10 +129,15 @@ int send_callbacks() {
             body["reason"] = "expired";
         }
         // Signed with the user's webhook token, which the sender already holds.
-        const std::string secret = Repositories::Agent::HookRepository().ensure(c.owner);
-        Jobs::get().submit(Webhooks::kJobType,
-                           json{{"url", c.url}, {"event", "ani.answer"}, {"body", body}, {"secret", secret}});
-        ++sent;
+        try {
+            const std::string secret = Repositories::Agent::HookRepository().ensure(c.owner);
+            Jobs::get().submit(Webhooks::kJobType,
+                               json{{"url", c.url}, {"event", "ani.answer"}, {"body", body}, {"secret", secret}});
+            ++sent;
+        } catch (const std::exception& e) {
+            spdlog::warn("ani.intake: callback {} not queued, kept for the next try: {}", c.id, e.what());
+            Repositories::Agent::InboxRepository().unsend(c.id);
+        }
     }
     return sent;
 }

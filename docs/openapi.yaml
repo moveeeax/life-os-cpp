@@ -1241,7 +1241,7 @@ components:
             required: [id, kind, status, created_at]
             properties:
               id: { type: string, format: uuid }
-              kind: { type: string, enum: [say, outfit, act, event] }
+              kind: { type: string, enum: [say, outfit, act, event, mood, remind, ask, focus, card, wallpaper, sound, hold] }
               status: { type: string, enum: [queued, thinking, ready, delivered, expired, failed] }
               created_at: { type: string, format: date-time }
     AniHookItem:
@@ -1250,12 +1250,28 @@ components:
       description: >-
         say: text (1-200 characters). outfit: outfit (p1, p2, lingerie, or
         bare when the user turned it on). act: name (one of her moves).
-        event: text (1-2000), source and title (1-60 each). Any type may
+        event: text (1-2000), source and title (1-60 each). mood: level
+        (-1, 0, 1), seconds (60-3600). remind: text and in_seconds
+        (60-604800) or at (ISO-8601). ask: text, options (1-4 of 1-30
+        characters), callback (https; the answer is POSTed there). focus:
+        action (start with minutes 1-180, or stop). card: title (1-60), text
+        (up to 200), url (https), seconds (5-120). wallpaper, sound: which
+        (an id; sound also off). hold: minutes (0-480). Any type may
         carry id (the sender's id, a repeat within 24 hours is refused) and
         ttl (seconds to wait for the page; default 86400, at most 604800).
       properties:
-        type: { type: string, enum: [say, outfit, act, event] }
+        type: { type: string, enum: [say, outfit, act, event, mood, remind, ask, focus, card, wallpaper, sound, hold] }
         text: { type: string }
+        level: { type: integer, minimum: -1, maximum: 1 }
+        seconds: { type: integer }
+        in_seconds: { type: integer, minimum: 60, maximum: 604800 }
+        at: { type: string, format: date-time }
+        options: { type: array, minItems: 1, maxItems: 4, items: { type: string, minLength: 1, maxLength: 30 } }
+        callback: { type: string, format: uri }
+        action: { type: string, enum: [start, stop] }
+        minutes: { type: integer, minimum: 0, maximum: 480 }
+        url: { type: string, format: uri }
+        which: { type: string }
         outfit: { type: string, enum: [p1, p2, lingerie, bare] }
         name: { type: string }
         source: { type: string }
@@ -10199,9 +10215,13 @@ paths:
       description: >-
         Up to 5 ready items, oldest first; each is handed out once. The page
         does not call this while Hide numbers or a voice call is on, or while
-        Ani is off her ledge. Refused for API keys.
+        Ani is off her ledge; during a focus session it takes only focus
+        items (kinds=focus). A question handed out stays open at least 15
+        minutes for its answer. Refused for API keys.
       tags: [ani]
       security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: kinds, in: query, required: false, schema: { type: string, enum: [focus] }, description: Only these kinds }
       responses:
         '200':
           description: The items
@@ -10312,7 +10332,7 @@ paths:
         '400': { description: No answer in the body }
         '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
         '404': { description: No such item }
-        '409': { description: Answered already }
+        '409': { description: 'Answered already (answered), or it ran out and its sender was told (expired)' }
         '422': { description: 'Not a question, or not one of its options' }
   /api/v1/now/voice-session:
     post:

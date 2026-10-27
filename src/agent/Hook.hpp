@@ -68,10 +68,10 @@ struct Item {
     std::optional<std::string> source_id;
     int ttl = kTtlDefault;
     /// remind: in how many seconds, or at what time (ISO-8601); one of them.
-    std::optional<long long> delay_seconds;
-    std::optional<std::string> at;
+    std::optional<long long> delay_seconds{};
+    std::optional<std::string> at{};
     /// ask: where the answer goes (https); never in the payload.
-    std::optional<std::string> callback;
+    std::optional<std::string> callback{};
 };
 
 /// An HTTP status (400, 413, 415, 422) and an error code.

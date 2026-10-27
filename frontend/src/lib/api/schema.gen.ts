@@ -15791,11 +15791,14 @@ export interface paths {
         put?: never;
         /**
          * Webhook items for the Now page to play now
-         * @description Up to 5 ready items, oldest first; each is handed out once. The page does not call this while Hide numbers or a voice call is on, or while Ani is off her ledge. Refused for API keys.
+         * @description Up to 5 ready items, oldest first; each is handed out once. The page does not call this while Hide numbers or a voice call is on, or while Ani is off her ledge; during a focus session it takes only focus items (kinds=focus). A question handed out stays open at least 15 minutes for its answer. Refused for API keys.
          */
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Only these kinds */
+                    kinds?: "focus";
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -15910,7 +15913,7 @@ export interface paths {
         put?: never;
         /**
          * Ani's MCP endpoint
-         * @description Model Context Protocol over Streamable HTTP: one JSON-RPC request per POST, answered with plain JSON. Serves 2026-07-28 (per-request version in params._meta, server/discover) and 2025-11-25 / 2025-06-18 (initialize). Tools ani_say, ani_outfit, ani_act, ani_event, ani_presence, ani_items, ani_item, ani_chat, ani_reply, ani_history. Sign in with an API key of scope ani (or full) in Authorization; a read key gets 403. A notification gets 202 with no body; an unsupported version or a header that does not match the body gets 400; an unknown method 404. A page of another site (Origin) gets 403.
+         * @description Model Context Protocol over Streamable HTTP: one JSON-RPC request per POST, answered with plain JSON. Serves 2026-07-28 (per-request version in params._meta, server/discover) and 2025-11-25 / 2025-06-18 (initialize). Tools ani_say, ani_outfit, ani_act, ani_event, ani_mood, ani_remind, ani_ask, ani_focus, ani_card, ani_wallpaper, ani_sound, ani_hold, ani_presence, ani_items, ani_item, ani_chat, ani_reply, ani_history, ani_task, ani_habit, ani_note. Sign in with an API key of scope ani (or full) in Authorization; a read key gets 403. A notification gets 202 with no body; an unsupported version or a header that does not match the body gets 400; an unknown method 404. A page of another site (Origin) gets 403.
          */
         post: {
             parameters: {
@@ -16059,7 +16062,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Answered already */
+                /** @description Answered already (answered), or it ran out and its sender was told (expired) */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -23571,18 +23574,32 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 /** @enum {string} */
-                kind: "say" | "outfit" | "act" | "event";
+                kind: "say" | "outfit" | "act" | "event" | "mood" | "remind" | "ask" | "focus" | "card" | "wallpaper" | "sound" | "hold";
                 /** @enum {string} */
                 status: "queued" | "thinking" | "ready" | "delivered" | "expired" | "failed";
                 /** Format: date-time */
                 created_at: string;
             }[];
         };
-        /** @description say: text (1-200 characters). outfit: outfit (p1, p2, lingerie, or bare when the user turned it on). act: name (one of her moves). event: text (1-2000), source and title (1-60 each). Any type may carry id (the sender's id, a repeat within 24 hours is refused) and ttl (seconds to wait for the page; default 86400, at most 604800). */
+        /** @description say: text (1-200 characters). outfit: outfit (p1, p2, lingerie, or bare when the user turned it on). act: name (one of her moves). event: text (1-2000), source and title (1-60 each). mood: level (-1, 0, 1), seconds (60-3600). remind: text and in_seconds (60-604800) or at (ISO-8601). ask: text, options (1-4 of 1-30 characters), callback (https; the answer is POSTed there). focus: action (start with minutes 1-180, or stop). card: title (1-60), text (up to 200), url (https), seconds (5-120). wallpaper, sound: which (an id; sound also off). hold: minutes (0-480). Any type may carry id (the sender's id, a repeat within 24 hours is refused) and ttl (seconds to wait for the page; default 86400, at most 604800). */
         AniHookItem: {
             /** @enum {string} */
-            type: "say" | "outfit" | "act" | "event";
+            type: "say" | "outfit" | "act" | "event" | "mood" | "remind" | "ask" | "focus" | "card" | "wallpaper" | "sound" | "hold";
             text?: string;
+            level?: number;
+            seconds?: number;
+            in_seconds?: number;
+            /** Format: date-time */
+            at?: string;
+            options?: string[];
+            /** Format: uri */
+            callback?: string;
+            /** @enum {string} */
+            action?: "start" | "stop";
+            minutes?: number;
+            /** Format: uri */
+            url?: string;
+            which?: string;
             /** @enum {string} */
             outfit?: "p1" | "p2" | "lingerie" | "bare";
             name?: string;

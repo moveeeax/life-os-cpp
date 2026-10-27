@@ -21,6 +21,7 @@
 #include <nlohmann/json.hpp>
 
 #include "api/AniHookController.hpp"
+#include "api/AniSettingsController.hpp"
 #include "cache/Cache.hpp"
 #include "database/Database.hpp"
 #include "domain/Role.hpp"
@@ -52,6 +53,7 @@ Security::Auth::AuthPrincipal principal(const char* who) {
 class AniHookApi : public TestHelpers::CoreBackedTest {
 protected:
     Api::AniHookController c;
+    Api::AniSettingsController settings;
     std::string token;
     bool agent_on = true;
 
@@ -302,4 +304,9 @@ TEST_F(AniHookApi, AnswerRoute) {
     EXPECT_EQ(ok->statusCode(), k200OK) << std::string(ok->body());
     TestHelpers::expect_2xx_matches_schema(ok, Post, "/api/v1/ani/inbox/{id}/answer");
     EXPECT_EQ(answer({{"answer", "Нет"}}, principal(kAnna))->statusCode(), k409Conflict);
+
+    // The settings list shows the new kinds within its own schema.
+    auto w = session(
+        Get, [&](auto req, auto cb) { settings.webhook(req, std::move(cb)); }, "/api/v1/ani/webhook");
+    EXPECT_EQ(w->statusCode(), k200OK);
 }

@@ -41,7 +41,10 @@ public:
         std::optional<std::string> callback;
     };
 
-    enum class Answer { Ok, Unknown, NotAsk, Answered, BadOption };
+    enum class Answer { Ok, Unknown, NotAsk, Answered, BadOption, Expired };
+
+    /// A question shown on the page stays open at least this long for the click.
+    static constexpr int kAskShownSeconds = 15 * 60;
 
     /// An ask whose answer (or end unanswered) is to be sent to its callback.
     struct Callback {
@@ -119,21 +122,35 @@ public:
         return count_(owner, "('ready') AND (not_before IS NULL OR not_before <= now())");
     }
 
-    /// Up to @p limit ready items, oldest first, marked delivered.
-    nlohmann::json claim(const std::string& owner, int limit) {
+    /// Up to @p limit ready items, oldest first, marked delivered; only of
+    /// @p kinds when given. A question handed out stays open for its click
+    /// at least kAskShownSeconds.
+    nlohmann::json claim(const std::string& owner, int limit, const std::vector<std::string>& kinds = {}) {
+        std::optional<std::string> only;
+        if (!kinds.empty()) {
+            std::string list = "{";
+            for (const auto& k : kinds) {
+                list += (list.size() > 1 ? "," : "") + k;
+            }
+            only = list + "}";
+        }
         return Database::get().execute_write([&](auto& txn) {
             auto r = txn.exec_params(
                 "WITH c AS (SELECT id FROM ani_inbox WHERE owner_id = $1::uuid AND status = 'ready' AND expires_at > "
-                "now() AND (not_before IS NULL OR not_before <= now()) AND NOT EXISTS (SELECT 1 FROM ani_prefs p "
-                "WHERE p.owner_id = $1::uuid AND p.hold_until > now()) ORDER BY COALESCE(not_before, created_at), "
-                "id LIMIT $2 FOR UPDATE SKIP LOCKED), "
-                "u AS (UPDATE ani_inbox i SET status = 'delivered', delivered_at = now() FROM c WHERE i.id = c.id "
-                "RETURNING i.id, i.kind, i.say, i.payload, i.created_at) "
+                "now() AND (not_before IS NULL OR not_before <= now()) AND ($3::text[] IS NULL OR kind = "
+                "ANY($3::text[])) "
+                "AND NOT EXISTS (SELECT 1 FROM ani_prefs p WHERE p.owner_id = $1::uuid AND p.hold_until > now()) "
+                "ORDER BY COALESCE(not_before, created_at), id LIMIT $2 FOR UPDATE SKIP LOCKED), "
+                "u AS (UPDATE ani_inbox i SET status = 'delivered', delivered_at = now(), expires_at = CASE WHEN "
+                "i.kind = 'ask' THEN GREATEST(i.expires_at, now() + make_interval(secs => $4)) ELSE i.expires_at "
+                "END FROM c WHERE i.id = c.id RETURNING i.id, i.kind, i.say, i.payload, i.created_at) "
                 "SELECT COALESCE(json_agg(json_build_object('id', id::text, 'kind', kind, 'say', say, 'payload', "
                 "payload, 'created_at', " +
                     iso("created_at") + ") ORDER BY created_at, id), '[]'::json) FROM u",
                 owner,
-                limit);
+                limit,
+                only,
+                kAskShownSeconds);
             return nlohmann::json::parse(r[0][0].template as<std::string>());
         });
     }
@@ -247,8 +264,8 @@ public:
     Answer answer(const std::string& owner, const std::string& id, const std::string& text) {
         return Database::get().execute_write([&](auto& txn) {
             auto r = txn.exec_params(
-                "SELECT kind, answer IS NOT NULL, payload->'options' ? $3 FROM ani_inbox WHERE owner_id = $1::uuid "
-                "AND id::text = $2 FOR UPDATE",
+                "SELECT kind, answer IS NOT NULL, payload->'options' ? $3, expires_at <= now() OR callback_sent "
+                "FROM ani_inbox WHERE owner_id = $1::uuid AND id::text = $2 FOR UPDATE",
                 owner,
                 id,
                 text);
@@ -260,6 +277,9 @@ public:
             }
             if (r[0][1].template as<bool>()) {
                 return Answer::Answered;
+            }
+            if (r[0][3].template as<bool>()) {
+                return Answer::Expired;  // its sender was told it ran out
             }
             if (!r[0][2].template as<bool>()) {
                 return Answer::BadOption;
@@ -295,6 +315,14 @@ public:
                 out.push_back(std::move(c));
             }
             return out;
+        });
+    }
+
+    /// Puts a callback back to be sent again (its job could not be queued).
+    void unsend(const std::string& id) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params("UPDATE ani_inbox SET callback_sent = false WHERE id::text = $1", id);
+            return true;
         });
     }
 
