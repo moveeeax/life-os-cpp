@@ -41,6 +41,15 @@ json refusal(const std::string& line) {
     return tool_text(line, true);
 }
 
+/// Her moves as a JSON enum.
+json acts() {
+    json a = json::array();
+    for (const auto n : Agent::Hook::kActs) {
+        a.push_back(std::string(n));
+    }
+    return a;
+}
+
 json schema(json properties, json required = json::array()) {
     json s{{"type", "object"}, {"properties", std::move(properties)}, {"additionalProperties", false}};
     if (!required.empty()) {
