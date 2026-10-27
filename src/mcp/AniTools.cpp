@@ -15,6 +15,7 @@
 #include <drogon/drogon.h>
 #include <spdlog/spdlog.h>
 
+#include "agent/Actions.hpp"
 #include "agent/Hook.hpp"
 #include "agent/Intake.hpp"
 #include "agent/Presence.hpp"
@@ -206,6 +207,45 @@ json chat(const std::string& owner, const json& args) {
     return refusal("Her agent is not configured.");
 }
 
+/// The MCP's proposal tools and the write tools of her agent they stand for.
+const std::vector<std::pair<std::string, std::string>> kProposals = {
+    {"ani_task", "create_task"}, {"ani_habit", "check_habit"}, {"ani_note", "add_note"}};
+
+/// The input schema of one of her agent's write tools.
+json write_schema(const std::string& tool) {
+    for (const auto& t : Agent::Actions::definitions()) {
+        if (t["function"].value("name", "") == tool) {
+            return t["function"]["parameters"];
+        }
+    }
+    return schema(json::object());
+}
+
+json propose(const std::string& owner, const std::string& tool, const json& args) {
+    if (!Agent::enabled()) {
+        return refusal("Her agent is off.");
+    }
+    if (!Jobs::is_initialized()) {
+        return refusal("The job queue is not enabled.");
+    }
+    TurnRepository turns;
+    if (turns.count_since(owner, 3600) >= Agent::kTurnsPerHour) {
+        return refusal("At most " + std::to_string(Agent::kTurnsPerHour) + " messages an hour; try later.");
+    }
+    auto sent = Agent::propose(owner, tool, args);
+    switch (sent.status) {
+        case Agent::Send::Queued:
+            return result(
+                "Proposed. The user confirms it on Now; ani_reply with this turn_id shows the proposal "
+                "and later whether it was done.",
+                turn_view(owner, sent.turn));
+        case Agent::Send::Open:
+            return refusal("Your last MCP message is still open; wait for it with ani_reply.");
+        default:
+            return refusal("Proposals need the site's API, which is not configured.");
+    }
+}
+
 void reply(const std::string& owner, const json& args, const Scheduler& after, Reply done) {
     const std::string id = args.value("turn_id", "");
     const int wait = clamp_arg(args, "wait_seconds", 0, 0, kReplyWaitMax);
@@ -340,6 +380,13 @@ Server ani_server(const std::string& owner, Scheduler after) {
         {"ani_hold",
          "Holds everything back from the page for some minutes (0 to 480; 0 ends a hold).",
          schema({{"minutes", {{"type", "integer"}, {"minimum", 0}, {"maximum", 480}}}, {"id", kId}}, {"minutes"})},
+        {"ani_task",
+         "Proposes a new task; the user confirms it on Now before anything is written.",
+         write_schema("create_task")},
+        {"ani_habit",
+         "Proposes to tick a habit (today unless a date is given) or add an amount; confirmed by the user on Now.",
+         write_schema("check_habit")},
+        {"ani_note", "Proposes a note to the user's inbox; confirmed by the user on Now.", write_schema("add_note")},
         {"ani_history",
          "The latest messages of her chat, from every source.",
          schema({{"limit", {{"type", "integer"}, {"minimum", 1}, {"maximum", kListMax}}}})},
@@ -382,6 +429,11 @@ Server ani_server(const std::string& owner, Scheduler after) {
             }
             if (name == "ani_reply") {
                 return reply(owner, args, after, std::move(done));
+            }
+            for (const auto& [mcp_name, tool] : kProposals) {
+                if (name == mcp_name) {
+                    return done(propose(owner, tool, args));
+                }
             }
             if (name == "ani_history") {
                 json out = json::array();

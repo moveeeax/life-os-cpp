@@ -9,6 +9,7 @@
 #include <exception>
 #include <optional>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <spdlog/spdlog.h>
@@ -224,6 +225,54 @@ Sent send(const std::string& owner, const std::string& text, const std::string& 
     return {Send::Queued, std::move(*turn)};
 }
 
+Sent propose(const std::string& owner, const std::string& tool, const json& args) {
+    const auto s = read_settings();
+    if (!s || s->api_url.empty()) {
+        return {Send::Off, json()};
+    }
+    TurnRepository turns;
+    auto turn = turns.open(
+        owner, "[MCP] " + tool + " " + args.dump(), turns.last_tz(owner), "mcp", json{{"tool", tool}, {"args", args}});
+    if (!turn) {
+        return {Send::Open, json()};
+    }
+    Jobs::get().submit(kTurnJob, json{{"turn", (*turn)["id"]}});
+    return {Send::Queued, std::move(*turn)};
+}
+
+namespace {
+
+/// An MCP proposal: resolved with her agent's write tools as the user, no model.
+json run_proposal(TurnRepository& turns, const std::string& id, const std::string& owner, const json& turn) {
+    const auto s = read_settings();
+    if (!s || s->api_url.empty()) {
+        return ended(id, owner, "unavailable", "the site's API is not configured");
+    }
+    if (!turns.start(id)) {
+        throw Jobs::DeferJob("another turn of the user runs", 2000);
+    }
+    const json& proposal = turn["proposal"];
+    const std::string tz = turn.value("tz", "UTC");
+    const std::string local = turns.local_now(tz).value_or("");
+    const std::string token = Tools::access_token(owner).value_or("");
+    const auto got = Actions::propose(Net::Http::transport(),
+                                      s->api_url,
+                                      token,
+                                      tz,
+                                      local.size() >= 10 ? local.substr(0, 10) : "",
+                                      proposal.value("tool", ""),
+                                      proposal.value("args", json::object()));
+    if (const auto* p = std::get_if<Actions::Proposal>(&got)) {
+        ActionRepository().add(owner, id, p->kind, p->summary, p->request);
+        turns.finish(id, Actions::proposed_text(*p), json::array());
+    } else {
+        turns.finish(id, std::get<std::string>(got), json::array());
+    }
+    return json{{"status", "done"}, {"proposal", true}};
+}
+
+}  // namespace
+
 json process_turn(const json& payload) {
     const std::string id = payload.value("turn", std::string());
     if (id.empty()) {
@@ -242,6 +291,15 @@ json process_turn(const json& payload) {
     }
     if (status != "queued") {
         return json{{"status", "skipped"}, {"reason", status}};
+    }
+    if (turn->contains("proposal") && (*turn)["proposal"].is_object()) {
+        try {
+            return run_proposal(turns, id, owner, *turn);
+        } catch (const Jobs::DeferJob&) {
+            throw;
+        } catch (const std::exception& e) {
+            return ended(id, owner, "failed", e.what());
+        }
     }
 
     try {
