@@ -6,6 +6,15 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.46.0] - 2026-10-27
+
+### Added
+- Ani's bare outfit on Now, for adults who turn it on under Account → Ani (an 18+ confirmation; off by default). The model lives in the private part of the bucket and loads through two-minute signed links (`GET /api/v1/ani/bare`, `GET`/`PUT /api/v1/ani/prefs`). Bare, she answers taps shyly, covers herself and blushes, asks for "eyes up" when the cursor rests on her body, gets cold late in the evening and dresses; with Hide numbers on she is shown in her lingerie and Bare leaves the wardrobe.
+- A personal webhook for Ani: Account → Ani shows the URL with Copy and Replace. One POST from a bot, n8n or a script makes her say a line, change her outfit, play a move, or hand an event to her agent, which answers in her words or stays silent (SILENT); events that pile up go to the agent as one turn, and the chat marks them "From your webhook". Items wait for the Now page (a day by default, up to a week) and play when it is open; nothing plays while Hide numbers or a voice call is on or she is off her ledge, and a dot says something waits. 120 calls an hour and 50 waiting items per user; the token never reaches the logs.
+
+### Fixed
+- Ani no longer answers herself on a voice call: the microphone is off while her voice plays and for 0.6 s after the last of it, her status stays "speaking" until the voice ends rather than until the reply is generated, and her tap lines keep quiet from the moment the call starts. A tap on her during a call cuts her off.
+
 ## [1.45.0] - 2026-10-26
 
 ### Added
