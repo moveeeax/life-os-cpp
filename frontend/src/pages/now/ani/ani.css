@@ -506,6 +506,12 @@
   border-radius: 14px 14px 14px 4px;
   background: rgba(240, 169, 147, 0.16);
 }
+.ani-msg-from {
+  justify-self: end;
+  margin: 0 4px -4px 0;
+  font-size: 11px;
+  color: var(--g-ink-soft);
+}
 .ani-msg-wait {
   color: var(--g-ink-soft);
 }

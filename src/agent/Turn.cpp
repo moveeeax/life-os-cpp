@@ -5,22 +5,28 @@
 
 #include "agent/Turn.hpp"
 
+#include <chrono>
 #include <exception>
+#include <optional>
 #include <utility>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 
 #include "agent/Actions.hpp"
 #include "agent/Gateway.hpp"
+#include "agent/Hook.hpp"
 #include "agent/Lifecycle.hpp"
 #include "agent/Manifest.hpp"
 #include "agent/Settings.hpp"
 #include "agent/Tools.hpp"
+#include "cache/Cache.hpp"
 #include "jobs/Job.hpp"
 #include "jobs/Jobs.hpp"
 #include "net/Http.hpp"
 #include "repositories/agent/ActionRepository.hpp"
 #include "repositories/agent/AgentRepository.hpp"
+#include "repositories/agent/InboxRepository.hpp"
 #include "repositories/agent/TurnRepository.hpp"
 
 namespace Agent {
@@ -30,6 +36,7 @@ namespace {
 using json = nlohmann::json;
 using Repositories::Agent::ActionRepository;
 using Repositories::Agent::AgentRepository;
+using Repositories::Agent::InboxRepository;
 using Repositories::Agent::TurnRepository;
 
 bool over_budget(AgentRepository& agents, const std::string& owner, long long budget) {
@@ -37,11 +44,66 @@ bool over_budget(AgentRepository& agents, const std::string& owner, long long bu
     return used.value("prompt_tokens", 0LL) + used.value("completion_tokens", 0LL) >= budget;
 }
 
+/// Queues the event job again while events of the user wait for a turn.
+void more_events(const std::string& owner) {
+    try {
+        if (!InboxRepository().thinking_unlinked(owner).empty()) {
+            Jobs::get().submit(Hook::kEventJob, json{{"owner", owner}});
+        }
+    } catch (const std::exception& e) {
+        spdlog::warn("ani agent {}: the waiting events were not queued: {}", Manifest::owner_hash(owner), e.what());
+    }
+}
+
 json ended(const std::string& id, const std::string& owner, const std::string& error, const std::string& why) {
     spdlog::warn("ani agent {}: turn {} failed ({}): {}", Manifest::owner_hash(owner), id, error, why);
     TurnRepository().fail(id, error);
+    // A webhook turn's events fail with it.
+    InboxRepository().fail_turn(id);
+    more_events(owner);
     return json{{"status", "failed"}, {"error", error}};
 }
+
+/// Characters, not bytes: ani_turns.text holds at most kTurnTextMax characters.
+std::size_t utf8_length(const std::string& s) {
+    std::size_t n = 0;
+    for (const unsigned char c : s) {
+        n += (c & 0xC0) != 0x80 ? 1 : 0;
+    }
+    return n;
+}
+
+std::string trimmed(const std::string& s) {
+    const auto a = s.find_first_not_of(" \t\r\n");
+    if (a == std::string::npos) {
+        return "";
+    }
+    return s.substr(a, s.find_last_not_of(" \t\r\n") - a + 1);
+}
+
+/// One event job of a user at a time (Redis), so two never take the same events.
+class EventLock {
+public:
+    explicit EventLock(const std::string& owner) : key_("ani:hook:event:lock:" + owner) {
+        held_ = !Cache::is_initialized() || Cache::get().set_nx(key_, "1", std::chrono::seconds(60));
+    }
+    ~EventLock() {
+        if (held_ && Cache::is_initialized()) {
+            try {
+                Cache::get().del(key_);
+            } catch (const std::exception& e) {
+                spdlog::warn("ani agent: the lock {} was not released: {}", key_, e.what());
+            }
+        }
+    }
+    EventLock(const EventLock&) = delete;
+    EventLock& operator=(const EventLock&) = delete;
+    bool held() const { return held_; }
+
+private:
+    std::string key_;
+    bool held_ = false;
+};
 
 /// What became of a proposal, as the agent is told.
 std::string outcome_words(const std::string& status) {
@@ -64,6 +126,21 @@ std::string outcome_words(const std::string& status) {
 }
 
 }  // namespace
+
+std::string hook_note() {
+    return "[Life OS webhook: the lines below are events that came through the person's webhook, not from the "
+           "person. Decide whether to tell them. If yes, answer with one or two short sentences to say aloud, in "
+           "their language. If it is not worth their attention, answer exactly " +
+           std::string(kSilent) + ".]";
+}
+
+std::string event_line(const json& payload) {
+    std::string label = payload.value("source", std::string("webhook"));
+    if (payload.contains("title")) {
+        label += ", " + payload.value("title", std::string());
+    }
+    return "[" + label + "] " + payload.value("text", std::string());
+}
 
 std::string session_of(const std::string& owner, int chat_session) {
     return chat_session == 0 ? owner : owner + "#" + std::to_string(chat_session);
@@ -181,7 +258,16 @@ json process_turn(const json& payload) {
         if (!gateway) {
             throw Jobs::DeferJob("waiting for the agent's address", 2000);
         }
+        // One turn of a user at a time: the user's own and a webhook turn wait for each other.
+        const std::string origin = turn->value("origin", "user");
+        if (turns.running_other(owner, origin)) {
+            throw Jobs::DeferJob("another turn of the user runs", 2000);
+        }
         if (!turns.start(id)) {
+            const auto again = turns.for_worker(id);
+            if (again && again->value("status", "") == "queued") {
+                throw Jobs::DeferJob("another turn of the user runs", 2000);
+            }
             return json{{"status", "skipped"}, {"reason", "not_queued"}};
         }
         agents.touch(owner);
@@ -206,7 +292,9 @@ json process_turn(const json& payload) {
         }
         const json outcomes = ActionRepository().of_previous_turn(owner, id);
         // The gateway ignores system messages: the context goes in front of the text.
-        const std::string text = preface(local, tz, tools, outcomes) + "\n" + turn->value("text", "");
+        const std::string said = turn->value("text", "");
+        const std::string text =
+            preface(local, tz, tools, outcomes) + "\n" + (origin == "hook" ? hook_note() + "\n" + said : said);
         const auto out = Gateway::converse(Net::Http::transport(),
                                            "http://" + gateway->first + ":" + std::to_string(Gateway::kGatewayPort),
                                            gateway->second,
@@ -214,8 +302,15 @@ json process_turn(const json& payload) {
                                            text,
                                            tools,
                                            run);
-        turns.finish(id, without_preface(out.reply), out.tools);
+        const std::string reply = without_preface(out.reply);
+        turns.finish(id, reply, out.tools);
         agents.touch(owner);
+        if (origin == "hook") {
+            // Her answer is the line the page plays; SILENT, nothing.
+            const std::string line = trimmed(reply);
+            InboxRepository().resolve_turn(id, line == kSilent ? std::nullopt : std::optional<std::string>(line));
+            more_events(owner);
+        }
         return json{{"status", "done"}, {"tools", out.tools.size()}};
     } catch (const Jobs::DeferJob&) {
         throw;
@@ -237,11 +332,108 @@ void fail_turn(const std::string& turn_id, const std::string& error) {
     try {
         if (!turn_id.empty()) {
             TurnRepository().fail(turn_id, "failed");
+            InboxRepository().fail_turn(turn_id);
             spdlog::warn("ani agent: turn {} dead-lettered: {}", turn_id, error.substr(0, 200));
         }
     } catch (const std::exception& e) {
         spdlog::warn("ani agent: the dead turn {} was not marked failed: {}", turn_id, e.what());
     }
+}
+
+json process_hook_event(const json& payload) {
+    const std::string owner = payload.value("owner", std::string());
+    if (owner.empty()) {
+        throw Jobs::PermanentJobError("ani hook event job without an owner");
+    }
+    EventLock lock(owner);
+    if (!lock.held()) {
+        throw Jobs::DeferJob("another event job of the user runs", 1000);
+    }
+    InboxRepository inbox;
+    TurnRepository turns;
+    const json waiting = inbox.thinking_unlinked(owner);
+    json live = json::array();
+    for (const auto& item : waiting) {
+        if (item.value("expires_in", 0LL) > 0) {
+            live.push_back(item);
+        }
+    }
+    if (live.empty()) {
+        // Nothing left the agent could still answer in time.
+        inbox.fail_unlinked(owner);
+        return json{{"status", "skipped"}, {"reason", waiting.empty() ? "no_events" : "expired"}};
+    }
+    const auto s = read_settings();
+    AgentRepository agents;
+    if (!s || over_budget(agents, owner, s->monthly_tokens)) {
+        inbox.fail_unlinked(owner);
+        return json{{"status", "failed"}, {"error", s ? "budget" : "unavailable"}};
+    }
+
+    // Events that came while a webhook turn waits join it.
+    if (const auto open = turns.open_hook_turn(owner)) {
+        const std::string turn_id = (*open)["id"];
+        if (open->value("status", "") != "queued") {
+            throw Jobs::DeferJob("a webhook turn of the user runs", 2000);
+        }
+        std::vector<std::string> joined;
+        for (const auto& item : live) {
+            if (!turns.append_text(turn_id, event_line(item["payload"]))) {
+                break;
+            }
+            joined.push_back(item["id"].get<std::string>());
+        }
+        inbox.link(joined, turn_id);
+        if (joined.size() < live.size()) {
+            throw Jobs::DeferJob("the webhook turn is full", 5000);
+        }
+        return json{{"status", "joined"}, {"events", joined.size()}};
+    }
+
+    if (turns.count_since(owner, 3600) >= kTurnsPerHour) {
+        throw Jobs::DeferJob("the user's turns for this hour are spent", 60000);
+    }
+    // No slot to wake the agent: the events wait (until their time is out, above).
+    if (wake(owner) == Wake::Busy) {
+        throw Jobs::DeferJob("every agent slot is taken", 30000);
+    }
+    std::string text;
+    std::vector<std::string> ids;
+    for (const auto& item : live) {
+        const std::string line = event_line(item["payload"]);
+        if (!text.empty() && utf8_length(text) + 1 + utf8_length(line) > kTurnTextMax) {
+            break;
+        }
+        text += (text.empty() ? "" : "\n") + line;
+        ids.push_back(item["id"].get<std::string>());
+    }
+    const auto turn = turns.open(owner, text, turns.last_tz(owner), "hook");
+    if (!turn) {
+        throw Jobs::DeferJob("a webhook turn opened meanwhile", 1000);
+    }
+    const std::string turn_id = (*turn)["id"];
+    inbox.link(ids, turn_id);
+    Jobs::get().submit(kTurnJob, json{{"turn", turn_id}});
+    if (ids.size() < live.size()) {
+        Jobs::get().submit(Hook::kEventJob, json{{"owner", owner}});
+    }
+    return json{{"status", "queued"}, {"turn", turn_id}, {"events", ids.size()}};
+}
+
+void fail_hook_events(const std::string& owner, const std::string& error) {
+    try {
+        if (!owner.empty()) {
+            InboxRepository().fail_unlinked(owner);
+            spdlog::warn(
+                "ani agent {}: event job dead-lettered: {}", Manifest::owner_hash(owner), error.substr(0, 200));
+        }
+    } catch (const std::exception& e) {
+        spdlog::warn("ani agent: the waiting events were not failed: {}", e.what());
+    }
+}
+
+json process_inbox_purge(const json& /*payload*/) {
+    return json{{"status", "done"}, {"rows", InboxRepository().purge()}};
 }
 
 }  // namespace Agent

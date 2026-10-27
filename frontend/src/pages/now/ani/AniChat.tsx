@@ -305,8 +305,17 @@ export function AniChat({
                   ×
                 </button>
               )}
+              {t.origin === 'hook' ? (
+                <p className="ani-msg-from" data-num-ok>
+                  From your webhook
+                </p>
+              ) : null}
               <p className="ani-msg ani-msg-you num">{t.text}</p>
-              {t.status === 'done' ? (
+              {t.status === 'done' && t.origin === 'hook' && t.reply?.trim() === 'SILENT' ? (
+                <p className="ani-msg-fail" data-num-ok>
+                  She kept quiet: not worth your attention.
+                </p>
+              ) : t.status === 'done' ? (
                 <p className="ani-msg ani-msg-her num">{t.reply}</p>
               ) : t.status === 'failed' ? (
                 <p className="ani-msg ani-msg-fail">{failure(t.error)}</p>

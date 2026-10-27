@@ -41,6 +41,30 @@ afterEach(() => {
 });
 
 describe('AniChat', () => {
+  it('marks webhook turns and shows a silent answer as silence', async () => {
+    vi.mocked(chat.loadTurns).mockResolvedValue([
+      turn({
+        id: 'h1',
+        origin: 'hook',
+        status: 'done',
+        text: '[telegram] Реклама',
+        reply: 'SILENT',
+      }),
+      turn({
+        id: 'h2',
+        origin: 'hook',
+        status: 'done',
+        text: '[telegram] Маша: созвон?',
+        reply: 'Маша зовёт.',
+      }),
+    ]);
+    render(<AniChat tz="Asia/Almaty" onClose={() => {}} />);
+    expect(await screen.findByText('Маша зовёт.')).toBeTruthy();
+    expect(screen.getAllByText(/from your webhook/i)).toHaveLength(2);
+    expect(screen.queryByText('SILENT')).toBeNull();
+    expect(screen.getByText(/kept quiet/i)).toBeTruthy();
+  });
+
   it('wakes her agent and shows the chat so far', async () => {
     vi.mocked(chat.loadTurns).mockResolvedValue([turn({ status: 'done', reply: 'Спокойный.' })]);
     render(<AniChat tz="Asia/Almaty" onClose={() => {}} />);

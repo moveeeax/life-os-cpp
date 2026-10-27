@@ -107,14 +107,35 @@ public:
         });
     }
 
-    /// queued -> running. False when the turn is not queued (run already, or ended).
+    /// queued -> running. False when the turn is not queued (run already, or
+    /// ended), or while another turn of the user runs: a user runs one turn at
+    /// a time (a per-user lock makes the check and the change one step).
     bool start(const std::string& id) {
         return Database::get().execute_write([&](auto& txn) {
+            auto o = txn.exec_params("SELECT owner_id::text FROM ani_turns WHERE id::text = $1", id);
+            if (o.empty()) {
+                return false;
+            }
+            const std::string owner = o[0][0].template as<std::string>();
+            txn.exec_params("SELECT pg_advisory_xact_lock(hashtext('ani_turn_run:' || $1))", owner);
             return !txn.exec_params(
-                           "UPDATE ani_turns SET status = 'running' WHERE id::text = $1 AND status = 'queued' "
-                           "RETURNING id",
-                           id)
+                           "UPDATE ani_turns SET status = 'running' WHERE id::text = $1 AND status = 'queued' AND "
+                           "NOT EXISTS (SELECT 1 FROM ani_turns r WHERE r.owner_id = $2::uuid AND r.status = "
+                           "'running' AND r.id::text <> $1) RETURNING id",
+                           id,
+                           owner)
                         .empty();
+        });
+    }
+
+    /// The zone of the user's last turn they wrote (for a webhook turn); UTC without one.
+    std::string last_tz(const std::string& owner) {
+        return Database::get().execute_read([&](auto& txn) {
+            auto r = txn.exec_params(
+                "SELECT tz FROM ani_turns WHERE owner_id = $1::uuid AND origin = 'user' ORDER BY created_at DESC "
+                "LIMIT 1",
+                owner);
+            return r.empty() ? std::string("UTC") : r[0][0].template as<std::string>();
         });
     }
 

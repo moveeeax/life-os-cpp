@@ -27,6 +27,7 @@
 
 #include "agent/Lifecycle.hpp"
 #include "agent/Settings.hpp"
+#include "agent/Turn.hpp"
 #include "billing/PayPalClient.hpp"
 #include "cache/Cache.hpp"
 #include "database/Database.hpp"
@@ -741,6 +742,16 @@ void Application::register_ani_agents_schedule_() {
             Jobs::get().submit(Agent::kReconcileJob, nlohmann::json::object());
         } catch (const std::exception& e) {
             spdlog::warn("ani agents reconcile tick failed: {}", e.what());
+        }
+    });
+    // The webhook inbox: unplayed items past their time expire, old ended ones go.
+    Tasks::schedule_recurring("ani_inbox_purge_schedule", std::chrono::hours(1), [] {
+        if (!Jobs::is_initialized())
+            return;
+        try {
+            Jobs::get().submit(Agent::kInboxPurgeJob, nlohmann::json::object());
+        } catch (const std::exception& e) {
+            spdlog::warn("ani inbox purge tick failed: {}", e.what());
         }
     });
 }
