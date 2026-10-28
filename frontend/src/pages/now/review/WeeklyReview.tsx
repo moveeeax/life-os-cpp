@@ -1,7 +1,10 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router';
 
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { api } from '@/lib/api/client';
+import { qk } from '@/lib/api/queryKeys';
 import type { Today } from '@/lib/now/types';
 import { Group, Row, Sheet } from '@/shell/kit';
 
@@ -52,14 +55,26 @@ export function WeeklyReview({
   const late = g.late.filter((t) => !closed.includes(`task:${t.id}`));
   const behind = g.behind.filter((x) => !closed.includes(`goal:${x.id}`));
   const habits = g.habits.filter((h) => !closed.includes(`habit:${h.name}`));
+  const qc = useQueryClient();
+  const [failed, setFailed] = useState(false);
   const patch = (id: string, body: Record<string, unknown>) =>
-    api
-      .patchJson(`/api/v1/tasks/items/${id}`, { body, query: { tz } })
-      .then(() => close(`task:${id}`));
+    api.patchJson(`/api/v1/tasks/items/${id}`, { body, query: { tz } }).then(
+      () => {
+        setFailed(false);
+        close(`task:${id}`);
+        void qc.invalidateQueries({ queryKey: qk.now.today(date, tz) });
+      },
+      () => setFailed(true),
+    );
   const empty = late.length + behind.length + habits.length === 0;
 
   return (
     <Sheet title="Weekly review" onClose={onClose} width={520}>
+      {failed ? (
+        <Alert variant="destructive">
+          <AlertDescription>Could not change the task; try again in Tasks.</AlertDescription>
+        </Alert>
+      ) : null}
       {empty ? <p className="text-sm text-muted-foreground">Nothing left for this week.</p> : null}
       {late.length > 0 && (
         <Group label="Late tasks" tone="late">

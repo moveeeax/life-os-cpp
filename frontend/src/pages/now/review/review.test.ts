@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
+// @vitest-environment jsdom
+import { act, renderHook } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Today } from '@/lib/now/types';
 
-import { dueThisWeek, groupsOf, weekOf } from './review';
+import { dueThisWeek, groupsOf, REVIEW_EVENT, SEEN_KEY, useWeeklyReview, weekOf } from './review';
 
 describe('weekOf', () => {
   it('is the ISO week of a local day', () => {
@@ -72,5 +74,37 @@ describe('groupsOf', () => {
     expect(g.late.map((t) => t.id)).toEqual(['l']);
     expect(g.behind.map((x) => x.id)).toEqual(['g1']);
     expect(g.habits.map((h) => h.name)).toEqual(['Вода']);
+  });
+});
+
+describe('useWeeklyReview', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.useFakeTimers();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('opens by itself once Sunday reaches 10:00 on an open page, and says so', async () => {
+    vi.setSystemTime(new Date(2026, 10, 1, 9, 59));
+    const heard = vi.fn();
+    window.addEventListener(REVIEW_EVENT, heard);
+    const { result } = renderHook(() => useWeeklyReview('2026-11-01'));
+    expect(result.current.open).toBe(false);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(61_000);
+    });
+    expect(result.current.open).toBe(true);
+    expect(heard).toHaveBeenCalledTimes(1);
+    window.removeEventListener(REVIEW_EVENT, heard);
+  });
+
+  it('opened by hand on Monday still lets Sunday open it', () => {
+    vi.setSystemTime(new Date(2026, 9, 26, 12, 0));
+    const { result } = renderHook(() => useWeeklyReview('2026-10-26'));
+    act(() => {
+      window.dispatchEvent(new Event(REVIEW_EVENT));
+    });
+    expect(result.current.open).toBe(true);
+    expect(localStorage.getItem(SEEN_KEY)).toBeNull();
   });
 });

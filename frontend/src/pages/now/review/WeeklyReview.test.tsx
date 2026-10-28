@@ -88,4 +88,12 @@ describe('WeeklyReview', () => {
       }),
     );
   });
+
+  it('says so when a move fails', async () => {
+    vi.spyOn(api, 'patchJson').mockRejectedValue(new Error('offline'));
+    show();
+    fireEvent.click(screen.getByRole('button', { name: 'Tomorrow: Сдать отчет' }));
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(screen.getByText('Сдать отчет')).toBeTruthy();
+  });
 });

@@ -170,6 +170,7 @@ export function AniCorner({
   onFocus,
   onWallpaper,
   onSound,
+  onTasksMoved,
 }: {
   base: string;
   context: AniContext;
@@ -183,6 +184,8 @@ export function AniCorner({
   onWallpaper?: (which?: string) => void;
   /** ... switches the focus sound (an id, or off). */
   onSound?: (which?: string) => void;
+  /** Her evening offer moved tasks: the page loads its day again. */
+  onTasksMoved?: () => void;
 }) {
   const [ani, setAni] = useAni();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -405,7 +408,10 @@ export function AniCorner({
   // Hide numbers on); otherwise they wait on the server and a dot says so.
   // The weekly review opens: she says one line about it.
   useEffect(() => {
-    const onReview = () => answer.current({ text: 'Давай глянем неделю.' });
+    // Not during a voice call, and only while she is here.
+    const onReview = () => {
+      if (hereRef.current && !calling.current) answer.current({ text: 'Давай глянем неделю.' });
+    };
     window.addEventListener(REVIEW_EVENT, onReview);
     return () => window.removeEventListener(REVIEW_EVENT, onReview);
   }, []);
@@ -421,7 +427,10 @@ export function AniCorner({
         }),
       ),
     ).then(
-      () => answer.current({ text: 'Перенесла на завтра.' }),
+      () => {
+        pageRef.current.onTasksMoved?.();
+        answer.current({ text: 'Перенесла на завтра.' });
+      },
       () => answer.current({ text: 'Не получилось перенести, попробуй в задачах.' }),
     );
   };
@@ -441,8 +450,8 @@ export function AniCorner({
   }, [ask]);
   const cardTimer = useRef(0);
   const moodTimer = useRef(0);
-  const pageRef = useRef({ onFocus, onWallpaper, onSound });
-  pageRef.current = { onFocus, onWallpaper, onSound };
+  const pageRef = useRef({ onFocus, onWallpaper, onSound, onTasksMoved });
+  pageRef.current = { onFocus, onWallpaper, onSound, onTasksMoved };
   useEffect(
     () => () => {
       window.clearTimeout(cardTimer.current);

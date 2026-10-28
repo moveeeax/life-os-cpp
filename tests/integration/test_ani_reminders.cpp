@@ -101,14 +101,31 @@ TEST_F(AniReminders, DueAddsRemind) {
 TEST_F(AniReminders, CatchUpOnce) {
     const auto made = reminders.add(kAnna, "Разминка", "09:00", 127, "Asia/Almaty");
     ASSERT_TRUE(made.has_value());
-    sql("UPDATE ani_reminders SET next_at = now() - interval '5 days' WHERE id::text = $1", (*made)["id"]);
+    sql("UPDATE ani_reminders SET next_at = now() - interval '5 minutes' WHERE id::text = $1", (*made)["id"]);
     Agent::Reminders::process_due(json::object());
     Agent::Reminders::process_due(json::object());
-    EXPECT_EQ(InboxRepository().claim(kAnna, 10).size(), 1u) << "five missed days say it once";
+    EXPECT_EQ(InboxRepository().claim(kAnna, 10).size(), 1u) << "a few late minutes say it once";
 }
 
 TEST_F(AniReminders, AtMostTwenty) {
     for (int i = 0; i < ReminderRepository::kMaxPerUser; ++i)
         ASSERT_TRUE(reminders.add(kAnna, "r", "09:00", 1, "UTC").has_value());
     EXPECT_FALSE(reminders.add(kAnna, "r", "09:00", 1, "UTC").has_value());
+}
+
+TEST_F(AniReminders, StaleReminderSkipped) {
+    // The worker was down from 8 to 19: the 09:00 reminder is not said at 19:00,
+    // it only moves on to its next time.
+    const auto made = reminders.add(kAnna, "Выпей воды", "09:00", 127, "Asia/Almaty");
+    ASSERT_TRUE(made.has_value());
+    sql("UPDATE ani_reminders SET next_at = now() - interval '10 hours' WHERE id::text = $1", (*made)["id"]);
+    Agent::Reminders::process_due(json::object());
+    EXPECT_TRUE(InboxRepository().claim(kAnna, 5).empty());
+    const bool moved = Database::get().execute_read([&](auto& txn) {
+        return txn
+            .exec_params("SELECT next_at > now() FROM ani_reminders WHERE id::text = $1",
+                         (*made)["id"].get<std::string>())[0][0]
+            .template as<bool>();
+    });
+    EXPECT_TRUE(moved);
 }

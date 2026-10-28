@@ -86,21 +86,31 @@ public:
         });
     }
 
+    /// How late a reminder may still be said (a worker that was down longer
+    /// moves it on silently: a 09:00 reminder is not said at 19:00).
+    static constexpr int kLateSeconds = 15 * 60;
+
     /// Reminders due now, each moved on to its next time after now in the
-    /// same statement (so a long pause yields one item, and two workers never
-    /// take the same one).
+    /// same statement (so a long pause yields at most one item, and two
+    /// workers never take the same one); only those due within
+    /// kLateSeconds are returned to be said.
     std::vector<Due> take_due(int limit = 200) {
         return Database::get().execute_write([&](auto& txn) {
             auto r = txn.exec_params(
-                "UPDATE ani_reminders r SET next_at = " + next_sql("r.days", "r.at_time", "r.tz", "now()") +
-                    " WHERE r.id IN (SELECT id FROM ani_reminders WHERE next_at <= now() ORDER BY next_at LIMIT $1 "
-                    "FOR UPDATE SKIP LOCKED) RETURNING r.id::text, r.owner_id::text, r.text",
-                limit);
+                "WITH due AS (SELECT id, next_at AS was FROM ani_reminders WHERE next_at <= now() ORDER BY next_at "
+                "LIMIT $1 FOR UPDATE SKIP LOCKED) UPDATE ani_reminders r SET next_at = " +
+                    next_sql("r.days", "r.at_time", "r.tz", "now()") +
+                    " FROM due WHERE r.id = due.id RETURNING r.id::text, r.owner_id::text, r.text, due.was > now() - "
+                    "make_interval(secs => $2)",
+                limit,
+                kLateSeconds);
             std::vector<Due> out;
             for (const auto& row : r) {
-                out.push_back({row[0].template as<std::string>(),
-                               row[1].template as<std::string>(),
-                               row[2].template as<std::string>()});
+                if (row[3].template as<bool>()) {
+                    out.push_back({row[0].template as<std::string>(),
+                                   row[1].template as<std::string>(),
+                                   row[2].template as<std::string>()});
+                }
             }
             return out;
         });
