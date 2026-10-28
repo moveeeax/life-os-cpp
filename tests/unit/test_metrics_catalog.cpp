@@ -21,14 +21,15 @@ constexpr const char* kUuid = "0b0c3f6e-2a1d-4c55-9e1a-7d6f5b4a3c21";
 
 TEST(MetricsCatalog, CatalogHoldsEverySpecId) {
     const auto& all = Metrics::catalog();
-    // 31 fitness, 7 food, 2 habits, 6 tape, 4 workout, 1 tasks, 4 money, 2 practice.
-    EXPECT_EQ(all.size(), 57U);
+    // 31 fitness, 7 food, 2 habits, 6 tape, 4 workout, 1 tasks, 4 money, 2 practice, 4 leetcode.
+    EXPECT_EQ(all.size(), 61U);
     std::set<std::string> ids;
     for (const auto& d : all) {
         EXPECT_TRUE(ids.insert(std::string(d.id)).second) << "twice: " << d.id;
         EXPECT_EQ(std::string(d.id).substr(0, d.module.size() + 1), std::string(d.module) + ":") << d.id;
     }
-    for (const char* id : {"fitness:steps",
+    for (const char* id : {"leetcode:solved",
+                           "fitness:steps",
                            "fitness:sleep",
                            "fitness:weight",
                            "fitness:metabolic_age",
