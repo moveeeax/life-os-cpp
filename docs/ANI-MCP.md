@@ -30,6 +30,7 @@ Now page and chat with her agent.
 | `ani_wallpaper` / `ani_sound` | Switch the wallpaper (an id, or the next one) or the focus sound (an id, or `off`); `list: true` returns the ids (wallpapers per `device`: desktop or phone). |
 | `ani_hold` | Holds everything back from the page for 0-480 minutes (0 ends it). |
 | `ani_task` / `ani_habit` / `ani_note` | Proposes a task, a habit tick or a note; the user confirms it on Now. `ani_reply` with the turn_id shows the proposal. |
+| `ani_reminders` / `ani_reminder_add` / `ani_reminder_remove` | Recurring reminders: `text`, `time` (HH:MM, local), `days` (1-7, Monday = 1; default every day), `tz` (default the user's); at most 20. |
 | `ani_presence` | Whether the Now page is open (from the page's polls; a tab in the background may read as away). |
 | `ani_items` / `ani_item` | Items sent to her (MCP and webhook) and what became of them, with her reply to events. |
 | `ani_chat` | A message to her agent, as in the chat on Now; returns a `turn_id`. Works with the page closed. |

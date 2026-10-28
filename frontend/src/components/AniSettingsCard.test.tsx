@@ -17,9 +17,27 @@ const URL2 = 'https://life.test/api/v1/ani/hook/aniwh_' + 'b'.repeat(48);
 
 let bare = false;
 let keys: { id: string; name: string; prefix: string; scope: string; created_at: string }[] = [];
+let reminders: {
+  id: string;
+  text: string;
+  time: string;
+  days: number;
+  tz: string;
+  next_at: string;
+}[] = [];
 
 beforeEach(() => {
   bare = false;
+  reminders = [
+    {
+      id: 'r1',
+      text: 'Выпей воды',
+      time: '10:00',
+      days: 31,
+      tz: 'Asia/Almaty',
+      next_at: '2026-10-29T05:00:00Z',
+    },
+  ];
   keys = [
     {
       id: 'k1',
@@ -43,11 +61,20 @@ beforeEach(() => {
         data: {
           url: URL1,
           recent: [
-            { id: 'i1', kind: 'say', status: 'delivered', created_at: '2026-10-27T10:00:00Z' },
+            {
+              id: 'i1',
+              kind: 'ask',
+              status: 'delivered',
+              via: 'mcp',
+              say: 'Чай?',
+              answer: 'Да',
+              created_at: '2026-10-27T10:00:00Z',
+            },
           ],
         },
       };
     if (path === '/api/v1/account/api-keys') return { data: keys, total: keys.length };
+    if (path === '/api/v1/ani/reminders') return { data: reminders };
     throw new Error('unexpected ' + path);
   });
   vi.spyOn(api, 'putJson').mockImplementation(async (_p: string, opts?: { body?: unknown }) => {
@@ -55,6 +82,7 @@ beforeEach(() => {
     return { data: { bare } };
   });
   vi.spyOn(api, 'postJson').mockImplementation(async (path: string) => {
+    if (path === '/api/v1/ani/reminders') return { data: { id: 'r2' } };
     if (path === '/api/v1/account/api-keys')
       return {
         id: 'k3',
@@ -131,11 +159,10 @@ describe('AniSettingsCard', () => {
     await waitFor(() => expect(api.postJson).toHaveBeenCalledWith('/api/v1/ani/webhook/rotate'));
   });
 
-  it('lists recent calls without their text', async () => {
+  it('lists the log as calm rows, the text only once a row is opened', async () => {
     renderCard();
-    const row = (await screen.findByText(/delivered/)).closest('li')!;
-    expect(row.textContent).toMatch(/^say, delivered/);
-    expect(row.textContent).not.toMatch(/Сборка/);
+    expect(await screen.findByRole('button', { name: /ask/ })).toBeTruthy();
+    expect(screen.queryByText('Чай?')).toBeNull();
   });
 
   it('shows the MCP endpoint and lists only the ani keys', async () => {
@@ -162,5 +189,31 @@ describe('AniSettingsCard', () => {
     renderCard();
     fireEvent.click(await screen.findByRole('button', { name: /revoke cpk_ab12/i }));
     await waitFor(() => expect(api.deleteJson).toHaveBeenCalledWith('/api/v1/account/api-keys/k1'));
+  });
+
+  it('lists reminders, adds one with weekdays and removes one', async () => {
+    renderCard();
+    expect(await screen.findByText('Выпей воды')).toBeTruthy();
+    expect(screen.getByText(/10:00 · Mon–Fri/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Reminder text'), { target: { value: 'Разминка' } });
+    fireEvent.change(screen.getByLabelText('Reminder time'), { target: { value: '18:30' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sat' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sun' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add reminder' }));
+    await waitFor(() =>
+      expect(api.postJson).toHaveBeenCalledWith('/api/v1/ani/reminders', {
+        body: { text: 'Разминка', time: '18:30', days: [1, 2, 3, 4, 5], tz: expect.any(String) },
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Выпей воды' }));
+    await waitFor(() => expect(api.deleteJson).toHaveBeenCalledWith('/api/v1/ani/reminders/r1'));
+  });
+
+  it('opens a log row for who sent it, her line and the answer', async () => {
+    renderCard();
+    fireEvent.click(await screen.findByRole('button', { name: /ask/ }));
+    expect(screen.getByText('MCP, delivered')).toBeTruthy();
+    expect(screen.getByText('Чай?')).toBeTruthy();
+    expect(screen.getByText('Answer: Да')).toBeTruthy();
   });
 });
