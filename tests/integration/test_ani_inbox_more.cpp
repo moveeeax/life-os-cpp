@@ -200,7 +200,7 @@ TEST_F(AniInboxMore, AuditTrail) {
         auto r = txn.exec(
             "SELECT COALESCE(json_agg(json_build_object('a', action, 'actor', actor_id, 't', target_id, 'd', details) "
             "ORDER BY id), '[]'::json) FROM audit_log WHERE action LIKE 'ani.%'");
-        return json::parse(r[0][0].as<std::string>());
+        return json::parse(r[0][0].template as<std::string>());
     });
     ASSERT_EQ(rows.size(), 2u);
     EXPECT_EQ(rows[0]["a"], "ani.inbox.ask");
