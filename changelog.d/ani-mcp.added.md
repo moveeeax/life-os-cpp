@@ -1,1 +1,0 @@
-Ani's MCP server at `POST /api/v1/ani/mcp`: any MCP client signed in with a new API key scope `ani` (made in Account → Ani, works nowhere else) can make her speak, change outfit, play a move or pass an event to her agent, see whether the Now page is open and what became of each item, and chat with her agent; a short reply is said aloud on an open page. See `docs/ANI-MCP.md`.
