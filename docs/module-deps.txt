@@ -300,3 +300,4 @@ leetcode/jobs -> jobs
 leetcode/jobs -> leetcode
 repositories/leetcode -> database
 repositories/metrics -> repositories/leetcode
+mcp -> security
