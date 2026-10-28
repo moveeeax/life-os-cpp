@@ -57,6 +57,12 @@ struct Sent {
 /// as a turn of @p origin: "user" (the chat on Now) or "mcp" (her MCP).
 Sent send(const std::string& owner, const std::string& text, const std::string& tz, const std::string& origin = "user");
 
+/// Opens an MCP turn proposing a change with one of her agent's write tools
+/// (@p tool: create_task, check_habit or add_note; @p args as the tool takes
+/// them). The worker resolves it without the agent; the user confirms the
+/// proposal under the turn on Now.
+Sent propose(const std::string& owner, const std::string& tool, const nlohmann::json& args);
+
 /// The agent's session for the user's chat: the user id, then "#<n>" once the
 /// chat was cleared n times, so a cleared chat is a new conversation for it.
 std::string session_of(const std::string& owner, int chat_session);

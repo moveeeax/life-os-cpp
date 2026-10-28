@@ -152,9 +152,12 @@ function Webhook({ hook }: { hook: AniWebhook }) {
           <p>An event for her agent; she decides what to tell you, or stays silent:</p>
           <pre className="overflow-x-auto rounded-md bg-muted p-2 text-xs">{EVENT}</pre>
           <p>
-            Also: {'{"type":"outfit","outfit":"p2"}'}, {'{"type":"act","name":"wave"}'}. A Telegram
-            bot or an n8n flow can forward a message as an event. Items wait for your Now page for a
-            day.
+            Also: {'{"type":"outfit","outfit":"p2"}'}, {'{"type":"act","name":"wave"}'},{' '}
+            {'{"type":"remind","text":"Встань","in_seconds":1500}'},{' '}
+            {'{"type":"ask","text":"Подтвердить?","callback":"https://…"}'},{' '}
+            {'{"type":"card","title":"CI","text":"зеленый"}'}, mood, focus, wallpaper, sound and
+            hold. A Telegram bot or an n8n flow can forward a message as an event. Items wait for
+            your Now page for a day.
           </p>
         </div>
       </details>

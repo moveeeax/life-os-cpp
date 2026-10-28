@@ -72,7 +72,15 @@ const late: Today = {
   tasks: { late_count: 1, first_late: null, late: [], today: [], inbox_count: 0 },
 };
 
-async function mount(today: Today = base, props: { afterFocus?: boolean } = {}) {
+async function mount(
+  today: Today = base,
+  props: {
+    afterFocus?: boolean;
+    onFocus?: (action: 'start' | 'stop', minutes?: number) => void;
+    onWallpaper?: (which?: string) => void;
+    onSound?: (which?: string) => void;
+  } = {},
+) {
   render(
     <AniCorner
       base="https://s3.example.com/wallpapers/ani/"
@@ -283,6 +291,62 @@ describe('AniCorner', () => {
     ];
     await tick();
     expect(engine.ani!.setOutfit).toHaveBeenCalledWith('p2');
+  });
+
+  const hookItem = (kind: string, payload: Record<string, unknown>, say: string | null = null) => ({
+    id: 'x' + kind,
+    kind,
+    say,
+    payload,
+    created_at: new Date().toISOString(),
+  });
+
+  it('takes a mood from the webhook', async () => {
+    await mount();
+    await tick(20_000);
+    inbox.items = [hookItem('mood', { level: -1, seconds: 60 })];
+    await tick();
+    expect(engine.ani!.mood).toHaveBeenCalledWith(-1);
+  });
+
+  it('shows a card for its seconds', async () => {
+    await mount();
+    await tick(20_000);
+    inbox.items = [hookItem('card', { title: 'CI', text: 'зеленый', seconds: 5 })];
+    await tick();
+    expect(screen.getByRole('note', { name: 'CI' }).textContent).toContain('зеленый');
+    await tick(6000);
+    expect(screen.queryByRole('note', { name: 'CI' })).toBeNull();
+  });
+
+  it('asks with buttons and sends the answer', async () => {
+    await mount();
+    await tick(20_000);
+    inbox.items = [hookItem('ask', { text: 'Чай?', options: ['Да', 'Нет'] }, 'Чай?')];
+    await tick();
+    fireEvent.click(screen.getByRole('button', { name: 'Да' }));
+    expect(claimSpy).toHaveBeenCalledWith('/api/v1/ani/inbox/xask/answer', {
+      body: { answer: 'Да' },
+    });
+    await tick(100);
+    expect(screen.queryByRole('button', { name: 'Да' })).toBeNull();
+  });
+
+  it('hands focus, wallpaper and sound to the page', async () => {
+    const onFocus = vi.fn();
+    const onWallpaper = vi.fn();
+    const onSound = vi.fn();
+    await mount(base, { onFocus, onWallpaper, onSound });
+    await tick(20_000);
+    inbox.items = [
+      hookItem('focus', { action: 'start', minutes: 25 }),
+      hookItem('wallpaper', {}),
+      hookItem('sound', { which: 'off' }),
+    ];
+    await tick(10_000);
+    expect(onFocus).toHaveBeenCalledWith('start', 25);
+    expect(onWallpaper).toHaveBeenCalledWith(undefined);
+    expect(onSound).toHaveBeenCalledWith('off');
   });
 
   it('claims nothing while Hide numbers is on, and shows the dot', async () => {

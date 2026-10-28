@@ -72,6 +72,8 @@ protected:
         cfg["ani"]["agent"]["upstream_key"] = "sk-test";
         cfg["ani"]["agent"]["proxy_url"] = "http://worker.test/v1";
         cfg["ani"]["agent"]["max_running"] = 1;
+        // The site's API for proposals (a scripted transport answers it).
+        cfg["ani"]["agent"]["api_url"] = "http://api.test";
     }
 
     void SetUp() override {
@@ -294,4 +296,30 @@ TEST_F(AniHookEvents, McpTurnBesideUserTurn) {
     EXPECT_EQ(Agent::send(kAnna, "Из MCP", "UTC", "mcp").status, Agent::Send::Queued)
         << "an open user turn does not stop an MCP one";
     EXPECT_EQ(Agent::send(kAnna, "Еще из MCP", "UTC", "mcp").status, Agent::Send::Open);
+}
+
+TEST_F(AniHookEvents, McpProposalNeedsNoAgent) {
+    // No agent pod at all: a proposal is resolved by the worker alone.
+    const auto sent = Agent::propose(kAnna, "add_note", json{{"text", "Купить фильтр для воды"}});
+    ASSERT_EQ(sent.status, Agent::Send::Queued);
+    EXPECT_EQ(sent.turn["origin"], "mcp");
+    Agent::process_turn(json{{"turn", sent.turn["id"]}});
+    const json t = *turns.get(kAnna, sent.turn["id"].get<std::string>());
+    EXPECT_EQ(t["status"], "done");
+    ASSERT_EQ(t["actions"].size(), 1u);
+    EXPECT_EQ(t["actions"][0]["status"], "pending");
+    EXPECT_NE(t["reply"].get<std::string>().find("Купить фильтр"), std::string::npos) << t["reply"];
+    EXPECT_TRUE(gateway.texts.empty()) << "no model was asked";
+}
+
+TEST_F(AniHookEvents, McpProposalErrorIsReply) {
+    // The habit cannot be looked up (the API answers 404): the turn ends with
+    // the reason as its reply and no action.
+    const auto sent = Agent::propose(kAnna, "check_habit", json{{"habit", "Бег"}});
+    ASSERT_EQ(sent.status, Agent::Send::Queued);
+    Agent::process_turn(json{{"turn", sent.turn["id"]}});
+    const json t = *turns.get(kAnna, sent.turn["id"].get<std::string>());
+    EXPECT_EQ(t["status"], "done");
+    EXPECT_TRUE(t["actions"].empty());
+    EXPECT_FALSE(t["reply"].get<std::string>().empty());
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { deviceOf, pickWallpaper } from './wallpaper';
+import { deviceOf, pickWallpaper, switchWallpaper } from './wallpaper';
 import type { Wallpaper } from './types';
 
 const video: Wallpaper = {
@@ -43,6 +43,7 @@ describe('pickWallpaper', () => {
       kind: 'video',
       src: 'v.mp4',
       poster: 'v.jpg',
+      id: 'v',
     });
   });
 
@@ -56,6 +57,7 @@ describe('pickWallpaper', () => {
       kind: 'image',
       src: 'v.jpg',
       poster: null,
+      id: 'v',
     });
     expect(pickWallpaper([video], 'desktop', { reducedMotion: false, saveData: true }).kind).toBe(
       'image',
@@ -75,10 +77,24 @@ describe('pickWallpaper', () => {
       kind: 'image',
       src: 'i.jpg',
       poster: null,
+      id: 'i',
     });
   });
 
   it('falls back to nothing on an empty list', () => {
     expect(pickWallpaper([], 'desktop', calm)).toEqual({ kind: 'none', src: null, poster: null });
+  });
+});
+
+describe('switchWallpaper', () => {
+  const opts = { reducedMotion: false, saveData: false };
+  it('takes the asked one, or the next after the current', () => {
+    expect(switchWallpaper([video, video2], 'desktop', opts, 'v', 'w').id).toBe('w');
+    expect(switchWallpaper([video, video2], 'desktop', opts, 'v').id).toBe('w');
+    expect(switchWallpaper([video, video2], 'desktop', opts, 'w').id).toBe('v');
+    expect(switchWallpaper([video, video2], 'desktop', opts, null).id).toBe('v');
+  });
+  it('keeps the current one for an unknown id', () => {
+    expect(switchWallpaper([video, video2], 'desktop', opts, 'v', 'nope').id).toBe('v');
   });
 });

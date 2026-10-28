@@ -33,7 +33,8 @@ public:
     std::optional<nlohmann::json> open(const std::string& owner,
                                        const std::string& text,
                                        const std::string& tz,
-                                       const std::string& origin = "user") {
+                                       const std::string& origin = "user",
+                                       const std::optional<nlohmann::json>& proposal = std::nullopt) {
         return Database::get().execute_write([&](auto& txn) -> std::optional<nlohmann::json> {
             txn.exec_params(
                 "UPDATE ani_turns SET status = 'failed', error = 'timeout' WHERE owner_id = $1::uuid "
@@ -44,14 +45,16 @@ public:
                 origin);
             // The conflict target names the origin's own index (exactly its predicate).
             const std::string target = origin == "hook" ? "'hook'" : origin == "mcp" ? "'mcp'" : "'user'";
-            auto r = txn.exec_params("INSERT INTO ani_turns (owner_id, text, tz, origin) VALUES ($1::uuid, $2, $3, " +
-                                         target +
-                                         ") ON CONFLICT (owner_id) WHERE status IN ('queued', 'running') AND "
-                                         "origin = " +
-                                         target + " DO NOTHING RETURNING id::text",
-                                     owner,
-                                     text,
-                                     tz);
+            auto r = txn.exec_params(
+                "INSERT INTO ani_turns (owner_id, text, tz, proposal, origin) VALUES ($1::uuid, $2, $3, $4::jsonb, " +
+                    target +
+                    ") ON CONFLICT (owner_id) WHERE status IN ('queued', 'running') AND "
+                    "origin = " +
+                    target + " DO NOTHING RETURNING id::text",
+                owner,
+                text,
+                tz,
+                proposal ? std::optional<std::string>(proposal->dump()) : std::nullopt);
             if (r.empty()) {
                 return std::nullopt;
             }
@@ -98,8 +101,8 @@ public:
         return Database::get().execute_read([&](auto& txn) -> std::optional<nlohmann::json> {
             auto r = txn.exec_params(
                 "SELECT row_to_json(t) FROM (SELECT " + columns() +
-                    ", owner_id::text AS owner_id, tz, EXTRACT(EPOCH FROM now() - created_at)::bigint AS "
-                    "age_seconds FROM ani_turns WHERE id::text = $1) t",
+                    ", owner_id::text AS owner_id, tz, proposal, EXTRACT(EPOCH FROM now() - created_at)::bigint "
+                    "AS age_seconds FROM ani_turns WHERE id::text = $1) t",
                 id);
             if (r.empty()) {
                 return std::nullopt;

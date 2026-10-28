@@ -21,6 +21,7 @@
 #include <nlohmann/json.hpp>
 
 #include "api/AniHookController.hpp"
+#include "api/AniSettingsController.hpp"
 #include "cache/Cache.hpp"
 #include "database/Database.hpp"
 #include "domain/Role.hpp"
@@ -52,6 +53,7 @@ Security::Auth::AuthPrincipal principal(const char* who) {
 class AniHookApi : public TestHelpers::CoreBackedTest {
 protected:
     Api::AniHookController c;
+    Api::AniSettingsController settings;
     std::string token;
     bool agent_on = true;
 
@@ -276,4 +278,35 @@ TEST_F(AniHookApi, ClaimReturnsReadyOnlyAndMax5) {
     }
     EXPECT_EQ(claim().size(), 2u);
     EXPECT_EQ(waiting(), 0);
+}
+
+TEST_F(AniHookApi, AnswerRoute) {
+    auto made = hook(json{{"type", "ask"}, {"text", "Списать 2 790?"}, {"options", {"Да", "Нет"}}});
+    ASSERT_EQ(made->statusCode(), k202Accepted) << std::string(made->body());
+    const std::string id = body_of(made)["data"]["id"];
+    const auto asked = claim();
+    ASSERT_EQ(asked.size(), 1u);
+    EXPECT_EQ(asked[0]["payload"]["options"], json({"Да", "Нет"}));
+
+    const auto answer = [&](const json& body, const Security::Auth::AuthPrincipal& who) {
+        auto req = TestHelpers::authed_json(who, body, Post);
+        HttpResponsePtr captured;
+        c.answer(
+            req, [&](const HttpResponsePtr& r) { captured = r; }, id);
+        EXPECT_TRUE(captured);
+        return captured;
+    };
+    auto key = principal(kAnna);
+    key.via_api_key = true;
+    EXPECT_EQ(answer({{"answer", "Да"}}, key)->statusCode(), k401Unauthorized) << "the page's own route";
+    EXPECT_EQ(answer({{"answer", "Может"}}, principal(kAnna))->statusCode(), k422UnprocessableEntity);
+    const auto ok = answer({{"answer", "Да"}}, principal(kAnna));
+    EXPECT_EQ(ok->statusCode(), k200OK) << std::string(ok->body());
+    TestHelpers::expect_2xx_matches_schema(ok, Post, "/api/v1/ani/inbox/{id}/answer");
+    EXPECT_EQ(answer({{"answer", "Нет"}}, principal(kAnna))->statusCode(), k409Conflict);
+
+    // The settings list shows the new kinds within its own schema.
+    auto w = session(
+        Get, [&](auto req, auto cb) { settings.webhook(req, std::move(cb)); }, "/api/v1/ani/webhook");
+    EXPECT_EQ(w->statusCode(), k200OK);
 }

@@ -618,3 +618,49 @@
     animation: none;
   }
 }
+
+/* A card from her webhook or MCP, and her question's answers: above the ledge. */
+.ani-card,
+.ani-ask {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--ani-ledge-h, 64px) + 12px);
+  z-index: 3;
+}
+.ani-card {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgb(15 18 30 / 0.62);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  color: #fff;
+  font-size: 13px;
+}
+.ani-card-title {
+  font-weight: 600;
+}
+.ani-card-text {
+  opacity: 0.85;
+  margin-top: 2px;
+}
+.ani-card a {
+  display: inline-block;
+  margin-top: 6px;
+  color: #fff;
+  text-decoration: underline;
+}
+.ani-ask {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ani-ask button {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgb(15 18 30 / 0.62);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgb(255 255 255 / 0.18);
+  color: #fff;
+  font-size: 13px;
+}

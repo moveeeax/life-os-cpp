@@ -30,6 +30,30 @@ public:
     struct AddResult {
         std::string id;
         bool duplicate = false;
+        /// A reminder's time is past or more than a week ahead: nothing stored.
+        bool bad_time = false;
+    };
+
+    /// When a reminder is due (one of delay or at) and where an answer goes.
+    struct Extra {
+        std::optional<long long> delay_seconds;
+        std::optional<std::string> at;
+        std::optional<std::string> callback;
+    };
+
+    enum class Answer { Ok, Unknown, NotAsk, Answered, BadOption, Expired };
+
+    /// A question shown on the page stays open at least this long for the click.
+    static constexpr int kAskShownSeconds = 15 * 60;
+
+    /// An ask whose answer (or end unanswered) is to be sent to its callback.
+    struct Callback {
+        std::string id;
+        std::string owner;
+        std::optional<std::string> source_id;
+        std::string question;
+        std::optional<std::string> answer;
+        std::string url;
     };
 
     /// Stores an item (@p status "ready" or "thinking"). With @p source_id
@@ -39,7 +63,8 @@ public:
                   const nlohmann::json& payload,
                   const std::optional<std::string>& source_id,
                   int ttl_seconds,
-                  const std::string& status) {
+                  const std::string& status,
+                  const Extra& extra = {}) {
         return Database::get().execute_write([&](auto& txn) {
             // One writer per user at a time: the duplicate check holds.
             txn.exec_params("SELECT pg_advisory_xact_lock(hashtext('ani_inbox:' || $1))", owner);
@@ -54,19 +79,37 @@ public:
                     return AddResult{d[0][0].template as<std::string>(), true};
                 }
             }
+            const bool spoken = kind == "say" || kind == "remind" || kind == "ask";
             const std::optional<std::string> say =
-                kind == "say" ? std::optional<std::string>(payload.value("text", std::string())) : std::nullopt;
+                spoken ? std::optional<std::string>(payload.value("text", std::string())) : std::nullopt;
+            // A reminder is due in delay seconds or at a time, within a week from now.
+            std::optional<std::string> not_before;
+            if (extra.delay_seconds || extra.at) {
+                auto t = txn.exec_params(
+                    "SELECT CASE WHEN t BETWEEN now() - interval '1 minute' AND now() + interval '7 days 1 minute' "
+                    "THEN t::text END FROM (SELECT COALESCE(now() + make_interval(secs => $1::bigint), "
+                    "$2::timestamptz) AS t) x",
+                    extra.delay_seconds,
+                    extra.at);
+                if (t[0][0].is_null()) {
+                    return AddResult{"", false, true};
+                }
+                not_before = t[0][0].template as<std::string>();
+            }
             auto r = txn.exec_params(
-                "INSERT INTO ani_inbox (owner_id, kind, payload, source_id, status, say, ready_at, expires_at) "
-                "VALUES ($1::uuid, $2, $3::jsonb, $4, $5, $6, CASE WHEN $5 = 'ready' THEN now() END, now() + "
-                "make_interval(secs => $7)) RETURNING id::text",
+                "INSERT INTO ani_inbox (owner_id, kind, payload, source_id, status, say, ready_at, not_before, "
+                "callback, expires_at) VALUES ($1::uuid, $2, $3::jsonb, $4, $5, $6, CASE WHEN $5 = 'ready' THEN "
+                "now() END, $8::timestamptz, $9, COALESCE($8::timestamptz, now()) + make_interval(secs => $7)) "
+                "RETURNING id::text",
                 owner,
                 kind,
                 payload.dump(),
                 source_id,
                 status,
                 say,
-                ttl_seconds);
+                ttl_seconds,
+                not_before,
+                extra.callback);
             return AddResult{r[0][0].template as<std::string>(), false};
         });
     }
@@ -75,21 +118,39 @@ public:
     int pending_count(const std::string& owner) { return count_(owner, "('queued', 'thinking', 'ready')"); }
 
     /// Ready items the page has not claimed: the dot on her ledge.
-    int waiting(const std::string& owner) { return count_(owner, "('ready')"); }
+    int waiting(const std::string& owner) {
+        return count_(owner, "('ready') AND (not_before IS NULL OR not_before <= now())");
+    }
 
-    /// Up to @p limit ready items, oldest first, marked delivered.
-    nlohmann::json claim(const std::string& owner, int limit) {
+    /// Up to @p limit ready items, oldest first, marked delivered; only of
+    /// @p kinds when given. A question handed out stays open for its click
+    /// at least kAskShownSeconds.
+    nlohmann::json claim(const std::string& owner, int limit, const std::vector<std::string>& kinds = {}) {
+        std::optional<std::string> only;
+        if (!kinds.empty()) {
+            std::string list = "{";
+            for (const auto& k : kinds) {
+                list += (list.size() > 1 ? "," : "") + k;
+            }
+            only = list + "}";
+        }
         return Database::get().execute_write([&](auto& txn) {
             auto r = txn.exec_params(
                 "WITH c AS (SELECT id FROM ani_inbox WHERE owner_id = $1::uuid AND status = 'ready' AND expires_at > "
-                "now() ORDER BY created_at, id LIMIT $2 FOR UPDATE SKIP LOCKED), "
-                "u AS (UPDATE ani_inbox i SET status = 'delivered', delivered_at = now() FROM c WHERE i.id = c.id "
-                "RETURNING i.id, i.kind, i.say, i.payload, i.created_at) "
+                "now() AND (not_before IS NULL OR not_before <= now()) AND ($3::text[] IS NULL OR kind = "
+                "ANY($3::text[])) "
+                "AND NOT EXISTS (SELECT 1 FROM ani_prefs p WHERE p.owner_id = $1::uuid AND p.hold_until > now()) "
+                "ORDER BY COALESCE(not_before, created_at), id LIMIT $2 FOR UPDATE SKIP LOCKED), "
+                "u AS (UPDATE ani_inbox i SET status = 'delivered', delivered_at = now(), expires_at = CASE WHEN "
+                "i.kind = 'ask' THEN GREATEST(i.expires_at, now() + make_interval(secs => $4)) ELSE i.expires_at "
+                "END FROM c WHERE i.id = c.id RETURNING i.id, i.kind, i.say, i.payload, i.created_at) "
                 "SELECT COALESCE(json_agg(json_build_object('id', id::text, 'kind', kind, 'say', say, 'payload', "
                 "payload, 'created_at', " +
                     iso("created_at") + ") ORDER BY created_at, id), '[]'::json) FROM u",
                 owner,
-                limit);
+                limit,
+                only,
+                kAskShownSeconds);
             return nlohmann::json::parse(r[0][0].template as<std::string>());
         });
     }
@@ -199,6 +260,72 @@ public:
         });
     }
 
+    /// The user's answer to an ask: one of its options, once.
+    Answer answer(const std::string& owner, const std::string& id, const std::string& text) {
+        return Database::get().execute_write([&](auto& txn) {
+            auto r = txn.exec_params(
+                "SELECT kind, answer IS NOT NULL, payload->'options' ? $3, expires_at <= now() OR callback_sent "
+                "FROM ani_inbox WHERE owner_id = $1::uuid AND id::text = $2 FOR UPDATE",
+                owner,
+                id,
+                text);
+            if (r.empty()) {
+                return Answer::Unknown;
+            }
+            if (r[0][0].template as<std::string>() != "ask") {
+                return Answer::NotAsk;
+            }
+            if (r[0][1].template as<bool>()) {
+                return Answer::Answered;
+            }
+            if (r[0][3].template as<bool>()) {
+                return Answer::Expired;  // its sender was told it ran out
+            }
+            if (!r[0][2].template as<bool>()) {
+                return Answer::BadOption;
+            }
+            txn.exec_params("UPDATE ani_inbox SET answer = $2, answered_at = now() WHERE id::text = $1", id, text);
+            return Answer::Ok;
+        });
+    }
+
+    /// Asks with a callback that are answered or ran out unanswered and not
+    /// sent yet; marked sent as they are read, so each goes once.
+    std::vector<Callback> due_callbacks(int limit = 100) {
+        return Database::get().execute_write([&](auto& txn) {
+            auto r = txn.exec_params(
+                "UPDATE ani_inbox SET callback_sent = true WHERE id IN (SELECT id FROM ani_inbox WHERE kind = 'ask' "
+                "AND callback IS NOT NULL AND NOT callback_sent AND (answer IS NOT NULL OR expires_at <= now()) "
+                "ORDER BY created_at LIMIT $1 FOR UPDATE SKIP LOCKED) RETURNING id::text, owner_id::text, "
+                "source_id, payload->>'text', answer, callback",
+                limit);
+            std::vector<Callback> out;
+            for (const auto& row : r) {
+                Callback c;
+                c.id = row[0].template as<std::string>();
+                c.owner = row[1].template as<std::string>();
+                if (!row[2].is_null()) {
+                    c.source_id = row[2].template as<std::string>();
+                }
+                c.question = row[3].is_null() ? "" : row[3].template as<std::string>();
+                if (!row[4].is_null()) {
+                    c.answer = row[4].template as<std::string>();
+                }
+                c.url = row[5].template as<std::string>();
+                out.push_back(std::move(c));
+            }
+            return out;
+        });
+    }
+
+    /// Puts a callback back to be sent again (its job could not be queued).
+    void unsend(const std::string& id) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params("UPDATE ani_inbox SET callback_sent = false WHERE id::text = $1", id);
+            return true;
+        });
+    }
+
     /// Marks unplayed items past their time expired and deletes ended rows
     /// older than kKeepSeconds; returns how many rows changed or went.
     int purge() {
@@ -217,8 +344,8 @@ public:
 private:
     static std::string item_columns() {
         return "id::text AS id, kind, CASE WHEN status IN ('queued', 'thinking', 'ready') AND expires_at <= now() "
-               "THEN 'expired' ELSE status END AS status, say, payload, " +
-               iso("created_at") + " AS created_at";
+               "THEN 'expired' ELSE status END AS status, say, payload, answer, " +
+               iso("not_before") + " AS not_before, " + iso("created_at") + " AS created_at";
     }
 
     static std::string iso(const std::string& col) {

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api } from '@/lib/api/client';
 
-import { planBacklog, POLL_MS, useInbox, type InboxItem } from './inbox';
+import { planBacklog, POLL_MS, useFocusInbox, useInbox, type InboxItem } from './inbox';
 
 const NOW = Date.parse('2026-10-27T12:00:00Z');
 const at = (minutesAgo: number) => new Date(NOW - minutesAgo * 60_000).toISOString();
@@ -16,6 +16,120 @@ const item = (over: Partial<InboxItem>): InboxItem => ({
   payload: {},
   created_at: at(0),
   ...over,
+});
+
+describe('planBacklog, the newer kinds', () => {
+  it('plays reminders and questions as lines, and the rest as they are', () => {
+    expect(
+      planBacklog(
+        [
+          item({ kind: 'remind', say: 'Встань' }),
+          item({
+            id: 'q1',
+            kind: 'ask',
+            say: 'Чай?',
+            payload: { text: 'Чай?', options: ['Да', 'Нет'] },
+          }),
+          item({ kind: 'mood', say: null, payload: { level: 1, seconds: 600 } }),
+          item({ kind: 'card', say: null, payload: { title: 'CI', text: 'ok', seconds: 20 } }),
+          item({ kind: 'focus', say: null, payload: { action: 'start', minutes: 25 } }),
+          item({ kind: 'wallpaper', say: null, payload: {} }),
+          item({ kind: 'sound', say: null, payload: { which: 'off' } }),
+          item({ kind: 'hold', say: null, payload: { minutes: 30 } }),
+        ],
+        NOW,
+      ),
+    ).toEqual([
+      { kind: 'say', text: 'Встань' },
+      { kind: 'ask', id: 'q1', text: 'Чай?', options: ['Да', 'Нет'] },
+      { kind: 'mood', level: 1, seconds: 600 },
+      { kind: 'card', title: 'CI', text: 'ok', url: undefined, seconds: 20 },
+      { kind: 'focus', action: 'start', minutes: 25 },
+      { kind: 'wallpaper', which: undefined },
+      { kind: 'sound', which: 'off' },
+    ]);
+  });
+
+  it('keeps only the newest mood, focus, wallpaper and sound, and drops stale cards', () => {
+    const plan = planBacklog(
+      [
+        item({ kind: 'mood', say: null, payload: { level: -1, seconds: 600 } }),
+        item({
+          kind: 'card',
+          say: null,
+          payload: { title: 'old', seconds: 20 },
+          created_at: at(11),
+        }),
+        item({ kind: 'mood', say: null, payload: { level: 1, seconds: 600 } }),
+        item({ kind: 'focus', say: null, payload: { action: 'start', minutes: 25 } }),
+        item({ kind: 'focus', say: null, payload: { action: 'stop' } }),
+      ],
+      NOW,
+    );
+    expect(plan).toEqual([
+      { kind: 'mood', level: 1, seconds: 600 },
+      { kind: 'focus', action: 'stop', minutes: undefined },
+    ]);
+  });
+});
+
+describe('planBacklog, stale page actions', () => {
+  it('drops a mood, focus, wallpaper or sound older than 10 minutes', () => {
+    const old = at(11);
+    expect(
+      planBacklog(
+        [
+          item({ kind: 'mood', say: null, payload: { level: 1, seconds: 600 }, created_at: old }),
+          item({
+            kind: 'focus',
+            say: null,
+            payload: { action: 'start', minutes: 25 },
+            created_at: old,
+          }),
+          item({ kind: 'wallpaper', say: null, payload: {}, created_at: old }),
+          item({ kind: 'sound', say: null, payload: { which: 'off' }, created_at: old }),
+        ],
+        NOW,
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe('useFocusInbox', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('takes only focus items while a session runs, and applies the newest', async () => {
+    const post = vi.spyOn(api, 'postJson').mockResolvedValue({
+      data: [
+        item({ kind: 'focus', say: null, payload: { action: 'start', minutes: 50 } }),
+        item({ kind: 'focus', say: null, payload: { action: 'stop' } }),
+      ],
+    });
+    const onFocus = vi.fn();
+    renderHook(() => useFocusInbox(true, onFocus));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(post).toHaveBeenCalledWith('/api/v1/ani/inbox/claim?kinds=focus');
+    expect(onFocus).toHaveBeenCalledTimes(1);
+    expect(onFocus).toHaveBeenCalledWith('stop', undefined);
+  });
+
+  it('does nothing while idle', async () => {
+    const post = vi.spyOn(api, 'postJson').mockResolvedValue({ data: [] });
+    renderHook(() => useFocusInbox(false, vi.fn()));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_MS * 2);
+    });
+    expect(post).not.toHaveBeenCalled();
+  });
 });
 
 describe('planBacklog', () => {

@@ -140,3 +140,87 @@ TEST(AniHookParse, SilentAnswers) {
         EXPECT_FALSE(Hook::is_silent(s)) << s;
     }
 }
+
+TEST(AniHookParse, MoodLevelRange) {
+    const auto m = ok({{"type", "mood"}, {"level", -1}});
+    EXPECT_EQ(m.kind, "mood");
+    EXPECT_EQ(m.payload, json({{"level", -1}, {"seconds", 600}}));
+    EXPECT_EQ(ok({{"type", "mood"}, {"level", 1}, {"seconds", 60}}).payload["seconds"], 60);
+    EXPECT_EQ(bad(R"({"type":"mood","level":2})").code, "invalid_level");
+    EXPECT_EQ(bad(R"({"type":"mood","level":0,"seconds":30})").code, "invalid_seconds");
+    EXPECT_EQ(bad(R"({"type":"mood","level":0,"seconds":3601})").code, "invalid_seconds");
+}
+
+TEST(AniHookParse, RemindNeedsOneOfAtOrIn) {
+    const auto in = ok({{"type", "remind"}, {"text", "Встань"}, {"in_seconds", 1500}});
+    EXPECT_EQ(in.kind, "remind");
+    EXPECT_EQ(in.payload, json({{"text", "Встань"}}));
+    EXPECT_EQ(in.delay_seconds, 1500);
+    EXPECT_FALSE(in.at.has_value());
+    const auto at = ok({{"type", "remind"}, {"text", "Созвон"}, {"at", "2026-10-28T18:30:00+05:00"}});
+    EXPECT_EQ(at.at, "2026-10-28T18:30:00+05:00");
+    EXPECT_EQ(bad(R"({"type":"remind","text":"x"})").code, "invalid_when");
+    EXPECT_EQ(bad(R"({"type":"remind","text":"x","in_seconds":120,"at":"2026-10-28T18:30:00Z"})").code, "invalid_when");
+    EXPECT_EQ(bad(R"({"type":"remind","text":"x","in_seconds":59})").code, "invalid_when");
+    EXPECT_EQ(bad(R"({"type":"remind","text":"x","in_seconds":604801})").code, "invalid_when");
+    EXPECT_EQ(bad(R"({"type":"remind","text":"x","at":"tomorrow"})").code, "invalid_when");
+}
+
+TEST(AniHookParse, AskOptionsLimits) {
+    const auto a = ok({{"type", "ask"}, {"text", "Подтвердить?"}});
+    EXPECT_EQ(a.kind, "ask");
+    EXPECT_EQ(a.payload, json({{"text", "Подтвердить?"}, {"options", {"Да", "Нет"}}}));
+    EXPECT_EQ(a.ttl, 3600) << "an ask waits an hour by default";
+    EXPECT_EQ(ok({{"type", "ask"}, {"text", "?"}, {"ttl", 600}}).ttl, 600);
+    EXPECT_EQ(ok({{"type", "ask"}, {"text", "?"}, {"options", {"A", "B", "C", "D"}}}).payload["options"].size(), 4u);
+    EXPECT_EQ(bad(R"({"type":"ask","text":"?","options":["a","b","c","d","e"]})").code, "invalid_options");
+    EXPECT_EQ(bad(R"({"type":"ask","text":"?","options":[]})").code, "invalid_options");
+    EXPECT_EQ(bad(R"({"type":"ask","text":"?","options":["0123456789012345678901234567890"]})").code,
+              "invalid_options");
+}
+
+TEST(AniHookParse, CallbackMustBeHttps) {
+    const auto a = ok({{"type", "ask"}, {"text", "?"}, {"callback", "https://example.com/answer"}});
+    EXPECT_EQ(a.callback, "https://example.com/answer");
+    EXPECT_FALSE(a.payload.contains("callback")) << "the url is not shown to the page";
+    EXPECT_EQ(bad(R"({"type":"ask","text":"?","callback":"http://example.com/a"})").code, "invalid_callback");
+    EXPECT_EQ(bad(R"({"type":"ask","text":"?","callback":"ftp://x"})").code, "invalid_callback");
+}
+
+TEST(AniHookParse, FocusStartNeedsMinutes) {
+    EXPECT_EQ(ok({{"type", "focus"}, {"action", "start"}, {"minutes", 25}}).payload,
+              json({{"action", "start"}, {"minutes", 25}}));
+    EXPECT_EQ(ok({{"type", "focus"}, {"action", "stop"}}).payload, json({{"action", "stop"}}));
+    EXPECT_EQ(bad(R"({"type":"focus","action":"start"})").code, "invalid_minutes");
+    EXPECT_EQ(bad(R"({"type":"focus","action":"start","minutes":181})").code, "invalid_minutes");
+    EXPECT_EQ(bad(R"({"type":"focus","action":"pause"})").code, "invalid_action");
+}
+
+TEST(AniHookParse, CardLimits) {
+    const auto c = ok({{"type", "card"}, {"title", "CI"}, {"text", "green"}, {"url", "https://ci.test/1"}});
+    EXPECT_EQ(c.payload, json({{"title", "CI"}, {"text", "green"}, {"url", "https://ci.test/1"}, {"seconds", 20}}));
+    EXPECT_EQ(ok({{"type", "card"}, {"title", "x"}, {"seconds", 5}}).payload, json({{"title", "x"}, {"seconds", 5}}));
+    EXPECT_EQ(bad(R"({"type":"card"})").code, "invalid_title");
+    EXPECT_EQ(bad(R"({"type":"card","title":"x","url":"http://a.test"})").code, "invalid_url");
+    EXPECT_EQ(bad(R"({"type":"card","title":"x","seconds":121})").code, "invalid_seconds");
+}
+
+TEST(AniHookParse, WallpaperWhichIsUuid) {
+    EXPECT_EQ(ok({{"type", "wallpaper"}}).payload, json::object());
+    const std::string id = "560f0e81-7104-419e-a993-2494c52dc732";
+    EXPECT_EQ(ok({{"type", "wallpaper"}, {"which", id}}).payload, json({{"which", id}}));
+    EXPECT_EQ(bad(R"({"type":"wallpaper","which":"nope"})").code, "invalid_which");
+}
+
+TEST(AniHookParse, SoundOffOrUuid) {
+    EXPECT_EQ(ok({{"type", "sound"}, {"which", "off"}}).payload, json({{"which", "off"}}));
+    EXPECT_EQ(ok({{"type", "sound"}}).payload, json::object());
+    EXPECT_EQ(bad(R"({"type":"sound","which":"loud"})").code, "invalid_which");
+}
+
+TEST(AniHookParse, HoldRange) {
+    EXPECT_EQ(ok({{"type", "hold"}, {"minutes", 60}}).payload, json({{"minutes", 60}}));
+    EXPECT_EQ(ok({{"type", "hold"}, {"minutes", 0}}).payload, json({{"minutes", 0}}));
+    EXPECT_EQ(bad(R"({"type":"hold","minutes":481})").code, "invalid_minutes");
+    EXPECT_EQ(bad(R"({"type":"hold"})").code, "invalid_minutes");
+}

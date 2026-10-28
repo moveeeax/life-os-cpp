@@ -288,3 +288,5 @@ mcp -> agent
 mcp -> jobs
 mcp -> repositories/agent
 api -> mcp
+agent -> webhooks
+mcp -> repositories/now

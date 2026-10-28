@@ -12,6 +12,7 @@ import {
   useWeather,
 } from '@/hooks/useNow';
 import {
+  ANI_WALLPAPER_EVENT,
   CORNER_KEYS,
   FOCUS_LENGTHS,
   greeting,
@@ -25,6 +26,7 @@ import { homeOf } from '@/shell/sections';
 import { useGlassNav } from '@/shell/useGlassNav';
 
 import { AniCorner } from './ani/AniCorner';
+import { useFocusInbox } from './ani/inbox';
 import { aniBase, useAni } from './ani/state';
 import { Corners } from './corners/Corners';
 import { FocusMode } from './focus/FocusMode';
@@ -136,6 +138,10 @@ function NowScreen() {
   const habitsOn = useHabitsEnabled(Boolean(me));
   const [picking, setPicking] = useState(false);
   const session = useFocusSession(me?.id ?? null);
+  // Her webhook or MCP can stop or replace a running focus session.
+  const onAniFocus = (action: 'start' | 'stop', minutes?: number) =>
+    action === 'start' && minutes ? session.start(minutes) : session.exit();
+  useFocusInbox(session.phase !== 'idle', onAniFocus);
   const player = useSoundPlayer(useSounds(me !== null).data ?? []);
   const data = today.data;
   const focus = data?.focus ?? null;
@@ -248,6 +254,20 @@ function NowScreen() {
           }}
           afterFocus={afterFocus}
           onAfterFocus={() => setAfterFocus(false)}
+          onFocus={onAniFocus}
+          onWallpaper={(which) =>
+            window.dispatchEvent(new CustomEvent(ANI_WALLPAPER_EVENT, { detail: { which } }))
+          }
+          onSound={(which) => {
+            // A browser may refuse sound before the first click: then the
+            // choice stays and the next click starts it.
+            if (which === 'off') player.stop();
+            else if (which) {
+              player.choose(which);
+              if (player.state !== 'playing')
+                player.play(player.sounds.find((x) => x.id === which));
+            } else player.play();
+          }}
         />
       )}
       {session.phase !== 'idle' && (
