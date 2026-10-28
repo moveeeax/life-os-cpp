@@ -45,19 +45,18 @@ struct FakeLeetCode : Net::Http::Transport {
         last_body = body;
         if (url != "https://leetcode.com/graphql")
             return {404, ""};
-        return {200,
-                json{{"data",
-                      {{"matchedUser",
-                        {{"username", "moveeeax"},
-                         {"submitStatsGlobal",
-                          {{"acSubmissionNum",
-                            {{{"difficulty", "All"}, {"count", total}},
-                             {{"difficulty", "Easy"}, {"count", 208}},
-                             {{"difficulty", "Medium"}, {"count", 451}},
-                             {{"difficulty", "Hard"}, {"count", total - 659}}}}}}}}}}}}
-            .dump()
-    };
-}
+        json counts = json::array();
+        counts.push_back({{"difficulty", "All"}, {"count", total}});
+        counts.push_back({{"difficulty", "Easy"}, {"count", 208}});
+        counts.push_back({{"difficulty", "Medium"}, {"count", 451}});
+        counts.push_back({{"difficulty", "Hard"}, {"count", total - 659}});
+        json user = json::object();
+        user["username"] = "moveeeax";
+        user["submitStatsGlobal"]["acSubmissionNum"] = counts;
+        json answer = json::object();
+        answer["data"]["matchedUser"] = user;
+        return {200, answer.dump()};
+    }
 };
 
 /// LeetCode refusing (rate limit): no snapshot, the error kept.
