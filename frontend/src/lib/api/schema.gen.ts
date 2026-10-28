@@ -15545,6 +15545,133 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/leetcode/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's LeetCode profile
+         * @description The public username whose solved counts are pulled every 3 hours into the metrics catalog (leetcode:solved, leetcode:easy, leetcode:medium, leetcode:hard: a day's value is its growth over the previous pull), so a habit can take them as its source. data is null without a profile.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The profile, or null */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["LeetCodeProfile"] | null;
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Set the LeetCode username
+         * @description A new username drops the old snapshots; a pull is queued at once.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        username: string;
+                        /** @description IANA zone the days are counted in; default UTC */
+                        tz?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The profile */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["LeetCodeProfile"];
+                        };
+                    };
+                };
+                /** @description A wrong username or zone */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /** Remove the LeetCode profile and its snapshots */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Removed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No profile */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ani/reminders": {
         parameters: {
             query?: never;
@@ -22626,7 +22753,7 @@ export interface components {
              * @description The section the series comes from
              * @enum {string}
              */
-            module: "fitness" | "food" | "habits" | "tape" | "workout" | "tasks" | "money" | "practice";
+            module: "fitness" | "food" | "habits" | "tape" | "workout" | "tasks" | "money" | "practice" | "leetcode";
             label: string;
             /** @description kg, h, min, kcal, g, cm, bpm, %; the currency for money and practice; the habit's own unit; empty for a count without one */
             unit: string;
@@ -23739,6 +23866,19 @@ export interface components {
                 /** Format: date-time */
                 created_at: string;
             }[];
+        };
+        LeetCodeProfile: {
+            username: string;
+            tz: string;
+            /** Format: date-time */
+            synced_at?: string | null;
+            /** @description Why the last pull failed */
+            last_error?: string | null;
+            /** @description Solved in all */
+            total?: number | null;
+            easy?: number | null;
+            medium?: number | null;
+            hard?: number | null;
         };
         AniReminder: {
             /** Format: uuid */

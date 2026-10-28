@@ -30,7 +30,7 @@ enum class Reduce { Sum, Last, Avg, Min, Max, Count };
 enum class Param { None, Currency, CurrencyCategory, Habit };
 /// What the caller needs for the series: the module switch, and for Mi the
 /// fitness read permission and a linked Mi account.
-enum class Gate { Mi, Tape, Food, Habits, Workout, Tasks, Money, Practice };
+enum class Gate { Mi, Tape, Food, Habits, Workout, Tasks, Money, Practice, LeetCode };
 
 struct Def {
     std::string_view id;      // the template: "fitness:steps", "money:expense:{currency}"
@@ -110,6 +110,11 @@ inline const std::vector<Def>& catalog() {
         {"tape:arm", "tape", "Arm", "cm", Last, true, Param::None, Gate::Tape},
         {"tape:thigh", "tape", "Thigh", "cm", Last, true, Param::None, Gate::Tape},
         // Training, the finished sessions by their local end day.
+        // LeetCode: the day's growth of the public solved counts (leetcode_snapshots).
+        {"leetcode:solved", "leetcode", "LeetCode solved", "problems", Sum, false, Param::None, Gate::LeetCode},
+        {"leetcode:easy", "leetcode", "LeetCode easy solved", "problems", Sum, false, Param::None, Gate::LeetCode},
+        {"leetcode:medium", "leetcode", "LeetCode medium solved", "problems", Sum, false, Param::None, Gate::LeetCode},
+        {"leetcode:hard", "leetcode", "LeetCode hard solved", "problems", Sum, false, Param::None, Gate::LeetCode},
         {"workout:sessions", "workout", "Training sessions", "sessions", Count, true, Param::None, Gate::Workout},
         {"workout:minutes", "workout", "Training time", "min", Sum, false, Param::None, Gate::Workout},
         {"workout:volume", "workout", "Training volume", "kg", Sum, false, Param::None, Gate::Workout},

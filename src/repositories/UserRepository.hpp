@@ -344,6 +344,8 @@ public:
         "ani_hooks",
         "ani_prefs",
         "ani_reminders",
+        "leetcode_snapshots",
+        "leetcode_profiles",
     };
 
     /// The foreign keys of the billing tables (migration 007, ON DELETE

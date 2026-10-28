@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 
 import { AniSettingsCard } from '@/components/AniSettingsCard';
+import { LeetCodeCard } from '@/components/LeetCodeCard';
 import { MiAccountCard } from '@/components/MiAccountCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +34,7 @@ export function ProfilePage() {
         </CardContent>
       </Card>
       {userCan(user, Permission.FitnessSync) && <MiAccountCard />}
+      <LeetCodeCard />
       <AniSettingsCard />
       <div className="grid gap-3 sm:grid-cols-3">
         <Button variant="outline" asChild>

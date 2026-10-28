@@ -38,6 +38,7 @@
 #include "fitness/jobs/SyncJob.hpp"
 #include "jobs/Jobs.hpp"
 #include "jobs/Outbox.hpp"
+#include "leetcode/Sync.hpp"
 #include "money/jobs/AdvisorJob.hpp"
 #include "money/jobs/RatesJob.hpp"
 #include "now/jobs/MediaSweep.hpp"
@@ -593,6 +594,7 @@ void Application::init_jobs_(Config::AppConfig& cfg) {
     register_now_media_sweep_schedule_();
     register_files_sweep_schedule_();
     register_ani_agents_schedule_();
+    register_leetcode_schedule_();
 }
 
 void Application::register_fitness_sync_schedule_(Config::AppConfig& cfg) {
@@ -724,6 +726,22 @@ void Application::register_files_sweep_schedule_() {
             Jobs::get().submit(Jobs::FilesSweep::kJobType, nlohmann::json::object());
         } catch (const std::exception& e) {
             spdlog::warn("files sweep schedule tick failed: {}", e.what());
+        }
+    });
+}
+
+void Application::register_leetcode_schedule_() {
+    // LeetCode profiles: every 3 hours a tick queues leetcode_sync, the worker pulls each profile.
+    if (!Tasks::is_initialized() || !Database::is_initialized() || !Jobs::is_initialized())
+        return;
+    spdlog::info("leetcode sync enabled: every 3 hours");
+    Tasks::schedule_recurring("leetcode_sync_schedule", std::chrono::hours(3), [] {
+        if (!Jobs::is_initialized())
+            return;
+        try {
+            Jobs::get().submit(LeetCode::kSyncJob, nlohmann::json::object());
+        } catch (const std::exception& e) {
+            spdlog::warn("leetcode sync tick failed: {}", e.what());
         }
     });
 }

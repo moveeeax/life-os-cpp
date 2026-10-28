@@ -290,3 +290,13 @@ mcp -> repositories/agent
 api -> mcp
 agent -> webhooks
 mcp -> repositories/now
+api -> leetcode
+api -> repositories/leetcode
+core -> leetcode
+core -> leetcode/jobs
+leetcode -> net
+leetcode -> repositories/leetcode
+leetcode/jobs -> jobs
+leetcode/jobs -> leetcode
+repositories/leetcode -> database
+repositories/metrics -> repositories/leetcode
