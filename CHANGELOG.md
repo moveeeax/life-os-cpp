@@ -6,6 +6,12 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.47.0] - 2026-10-28
+
+### Added
+- Ani's webhook and MCP do more than talk: `mood`, `remind` (a line said later, up to a week ahead), `ask` (a question with answer buttons on Now; the answer, or that it ran out, is POSTed once to an https callback, signed with the webhook token), `focus` (start or stop the timer), `card` (a small card over her ledge), `wallpaper` and `sound`, and `hold` (nothing reaches the page for a while); the MCP can also propose a task, a habit tick or a note for the user to confirm on Now.
+- Ani's MCP server at `POST /api/v1/ani/mcp`: any MCP client signed in with a new API key scope `ani` (made in Account → Ani, works nowhere else) can make her speak, change outfit, play a move or pass an event to her agent, see whether the Now page is open and what became of each item, and chat with her agent; a short reply is said aloud on an open page. See `docs/ANI-MCP.md`.
+
 ## [1.46.0] - 2026-10-27
 
 ### Added
