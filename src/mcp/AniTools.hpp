@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <functional>
 #include <string>
 
@@ -21,6 +22,8 @@ inline constexpr int kReplyWaitMax = 25;
 inline constexpr int kItemsDefault = 10;
 inline constexpr int kHistoryDefault = 20;
 inline constexpr int kListMax = 50;
+/// The longest arguments of a proposal (task, habit, note), as JSON.
+inline constexpr std::size_t kProposalArgsMax = 2000;
 
 /// Runs @p fn after @p seconds (the Drogon loop's timer in production).
 using Scheduler = std::function<void(double seconds, std::function<void()> fn)>;

@@ -27,6 +27,8 @@ import { useGlassNav } from '@/shell/useGlassNav';
 
 import { AniCorner } from './ani/AniCorner';
 import { useFocusInbox } from './ani/inbox';
+import { useWeeklyReview } from './review/review';
+import { WeeklyReview } from './review/WeeklyReview';
 import { aniBase, useAni } from './ani/state';
 import { Corners } from './corners/Corners';
 import { FocusMode } from './focus/FocusMode';
@@ -133,6 +135,8 @@ function NowScreen() {
       ),
     ) % 24;
   const today = useToday(me?.id ?? null, date, tz);
+  // The weekly review: by itself on Sunday from 10:00 (once), or from the account menu.
+  const review = useWeeklyReview(date);
   const settings = useNowSettings(me?.id ?? null);
   const weather = useWeather(Boolean(settings.data?.city));
   const habitsOn = useHabitsEnabled(Boolean(me));
@@ -242,6 +246,9 @@ function NowScreen() {
           onReorder={raw ? reorder : undefined}
         />
       )}
+      {review.open && (
+        <WeeklyReview today={today.data} date={date} tz={tz} onClose={review.close} />
+      )}
       {showAni && base && (
         <AniCorner
           base={base}
@@ -255,6 +262,7 @@ function NowScreen() {
           afterFocus={afterFocus}
           onAfterFocus={() => setAfterFocus(false)}
           onFocus={onAniFocus}
+          onTasksMoved={() => void today.refetch()}
           onWallpaper={(which) =>
             window.dispatchEvent(new CustomEvent(ANI_WALLPAPER_EVENT, { detail: { which } }))
           }

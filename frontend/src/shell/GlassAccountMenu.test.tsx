@@ -85,3 +85,14 @@ describe('Ani in the account menu', () => {
     expect(localStorage.getItem('now:ani')).toBe('0');
   });
 });
+
+describe('Weekly review in the account menu', () => {
+  it('opens the review on Now', () => {
+    const seen = vi.fn();
+    window.addEventListener('now:review', seen);
+    mount('/now');
+    fireEvent.click(screen.getByRole('button', { name: 'Weekly review' }));
+    expect(seen).toHaveBeenCalled();
+    window.removeEventListener('now:review', seen);
+  });
+});

@@ -6,9 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import {
   useAniPrefs,
+  useAddAniReminder,
   useAniMcpKeys,
+  useAniReminders,
   useAniWebhook,
   useCreateAniMcpKey,
+  useRemoveAniReminder,
   useRevokeAniMcpKey,
   useRotateAniWebhook,
   useSaveAniPrefs,
@@ -162,26 +165,148 @@ function Webhook({ hook }: { hook: AniWebhook }) {
         </div>
       </details>
 
-      {hook.recent.length > 0 && (
-        <div className="space-y-1">
-          <div className="text-sm font-medium">Last calls</div>
-          <ul className="divide-y text-sm">
-            {hook.recent.map((r) => (
-              <li key={r.id} className="flex justify-between gap-4 py-1.5">
-                <span>
-                  {r.kind}, <span className="text-muted-foreground">{r.status}</span>
-                </span>
-                <span className="text-muted-foreground tabular-nums" data-num-ok>
-                  {when(r.created_at)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {hook.recent.length > 0 && <Log items={hook.recent} />}
       {rotate.error && (
         <Alert variant="destructive">
           <AlertDescription>{rotate.error}</AlertDescription>
+        </Alert>
+      )}
+    </div>
+  );
+}
+
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const VIA: Record<string, string> = { webhook: 'Webhook', mcp: 'MCP', schedule: 'Reminder' };
+
+/** "Mon–Fri", "Every day", "Mon, Wed" from the weekday mask (Mon = 1). */
+function daysWords(mask: number): string {
+  if (mask === 127) return 'Every day';
+  if (mask === 31) return 'Mon–Fri';
+  if (mask === 96) return 'Sat–Sun';
+  return DAY_NAMES.filter((_, i) => mask & (1 << i)).join(', ');
+}
+
+type LogItem = AniWebhook['recent'][number];
+
+/** What came through her webhook and MCP: kind and time; a click shows the rest. */
+function Log({ items }: { items: LogItem[] }) {
+  const [open, setOpen] = useState<string | null>(null);
+  return (
+    <div className="space-y-1">
+      <div className="text-sm font-medium">Log</div>
+      <ul className="divide-y text-sm">
+        {items.map((r) => (
+          <li key={r.id} className="py-1.5">
+            <button
+              type="button"
+              className="flex w-full justify-between gap-4 text-left"
+              aria-expanded={open === r.id}
+              onClick={() => setOpen(open === r.id ? null : r.id)}
+            >
+              <span>{r.kind}</span>
+              <span className="text-muted-foreground tabular-nums" data-num-ok>
+                {when(r.created_at)}
+              </span>
+            </button>
+            {open === r.id ? (
+              <div className="mt-1 space-y-0.5 text-muted-foreground">
+                <div data-num-ok>
+                  {VIA[r.via ?? ''] ?? 'Webhook'}, {r.status}
+                </div>
+                {r.say ? <div className="num">{r.say}</div> : null}
+                {r.answer ? <div className="num">Answer: {r.answer}</div> : null}
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Her recurring reminders: a list, and a form for a new one. */
+function Reminders() {
+  const list = useAniReminders();
+  const add = useAddAniReminder();
+  const remove = useRemoveAniReminder();
+  const [text, setText] = useState('');
+  const [time, setTime] = useState('09:00');
+  const [days, setDays] = useState<number[]>([1, 2, 3, 4, 5, 6, 7]);
+  const toggle = (d: number) =>
+    setDays((xs) => (xs.includes(d) ? xs.filter((x) => x !== d) : [...xs, d].sort()));
+  const submit = () => {
+    if (!text.trim() || days.length === 0) return;
+    add.mutate(
+      { text: text.trim(), time, days, tz: Intl.DateTimeFormat().resolvedOptions().timeZone },
+      { onSuccess: () => setText('') },
+    );
+  };
+  return (
+    <div className="space-y-3">
+      <div className="text-sm font-medium">Reminders</div>
+      {list.data && list.data.length > 0 && (
+        <ul className="divide-y text-sm">
+          {list.data.map((r) => (
+            <li key={r.id} className="flex items-center justify-between gap-4 py-1.5">
+              <span>
+                <span className="num">{r.text}</span>
+                <span className="block text-muted-foreground" data-num-ok>
+                  {r.time} · {daysWords(r.days)}
+                </span>
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={`Remove ${r.text}`}
+                disabled={remove.isPending}
+                onClick={() => remove.mutate(r.id)}
+              >
+                Remove
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          aria-label="Reminder text"
+          placeholder="Выпей воды"
+          maxLength={200}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          className="max-w-xs"
+        />
+        <Input
+          aria-label="Reminder time"
+          type="time"
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          className="w-28"
+        />
+      </div>
+      <div className="flex flex-wrap gap-1" role="group" aria-label="Days">
+        {DAY_NAMES.map((n, i) => (
+          <Button
+            key={n}
+            variant={days.includes(i + 1) ? 'default' : 'outline'}
+            size="sm"
+            aria-pressed={days.includes(i + 1)}
+            onClick={() => toggle(i + 1)}
+          >
+            {n}
+          </Button>
+        ))}
+      </div>
+      <Button
+        variant="outline"
+        disabled={add.isPending || !text.trim() || days.length === 0}
+        onClick={submit}
+      >
+        Add reminder
+      </Button>
+      {(add.error || remove.error) && (
+        <Alert variant="destructive">
+          <AlertDescription>{add.error || remove.error}</AlertDescription>
         </Alert>
       )}
     </div>
@@ -276,6 +401,7 @@ export function AniSettingsCard() {
       <CardContent className="space-y-6">
         <BareSwitch />
         {hook.data && <Webhook hook={hook.data} />}
+        <Reminders />
         <Mcp />
       </CardContent>
     </Card>

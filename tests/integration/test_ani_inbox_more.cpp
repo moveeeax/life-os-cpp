@@ -170,3 +170,21 @@ TEST_F(AniInboxMore, ClaimOnlyFocus) {
     EXPECT_EQ(got[0]["kind"], "focus");
     EXPECT_EQ(inbox.claim(kAnna, 5).size(), 1u) << "the line still waits";
 }
+
+TEST_F(AniInboxMore, FutureRemindersOutsideCap) {
+    for (int i = 0; i < Agent::Hook::kPendingMax; ++i)
+        accepted({{"type", "remind"}, {"text", "r" + std::to_string(i)}, {"in_seconds", 3600}});
+    EXPECT_EQ(inbox.pending_count(kAnna), 0) << "not due yet, not pending";
+    accepted({{"type", "say"}, {"text", "Привет"}});
+}
+
+TEST_F(AniInboxMore, RecentShowsWayAndAnswer) {
+    const std::string id = accepted({{"type", "ask"}, {"text", "Чай?"}});
+    ASSERT_EQ(Intake::answer(kAnna, id, "Да"), InboxRepository::Answer::Ok);
+    const json r = inbox.recent(kAnna, 20);
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_EQ(r[0]["via"], "webhook");
+    EXPECT_EQ(r[0]["say"], "Чай?");
+    EXPECT_EQ(r[0]["answer"], "Да");
+    EXPECT_FALSE(r[0].contains("payload"));
+}

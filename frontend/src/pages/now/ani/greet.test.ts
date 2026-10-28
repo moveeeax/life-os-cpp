@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { NowWeather, Today } from '@/lib/now/types';
 
-import { greeting, hourOf, plural } from './greet';
+import { brief, greeting, hourOf, plural } from './greet';
 
 const base: Today = {
   tasks: { late_count: 0, first_late: null, late: [], today: [], inbox_count: 0 },
@@ -62,8 +62,8 @@ describe('greeting', () => {
   });
 
   it('names late tasks first, without the count while numbers are hidden', () => {
-    expect(greeting(late(1), weather(61), 9, false).text).toBe(
-      'Доброе утро! Одна задача просрочена, глянешь?',
+    expect(greeting(late(1), weather(61), 14, false).text).toBe(
+      'Привет! Одна задача просрочена, глянешь?',
     );
     expect(greeting(late(3), undefined, 15, false).text).toBe(
       'Привет! 3 задачи просрочены, глянешь?',
@@ -88,13 +88,43 @@ describe('greeting', () => {
 
   it('speaks of the night in the morning only, and not while numbers are hidden', () => {
     const t = { ...base, health: health(412) };
-    expect(greeting(t, undefined, 8, false).text).toBe(
-      'Доброе утро! 6 часов 52 минуты сна. Береги себя сегодня.',
-    );
-    expect(greeting({ ...base, health: health(480) }, undefined, 8, false).text).toBe(
-      'Доброе утро! 8 часов сна. Бодрячком?',
-    );
+    expect(greeting(t, undefined, 8, false).text).toBe('Доброе утро! 6 часов 52 минуты сна.');
     expect(greeting(t, undefined, 15, false).recorded).toBe('day');
     expect(greeting(t, undefined, 8, true).recorded).toBe('morning');
+  });
+});
+
+describe('brief', () => {
+  const day: Today = {
+    ...base,
+    tasks: {
+      late_count: 1,
+      first_late: null,
+      late: [],
+      today: [
+        { id: 'a', title: 'A', status: 'open' },
+        { id: 'b', title: 'B', status: 'done' },
+        { id: 'c', title: 'C', status: 'in_progress' },
+      ],
+      inbox_count: 0,
+    },
+    habits: { done: 1, total: 3, left: ['Вода', 'Бег'], week: [] },
+    health: health(420),
+  };
+
+  it('says tasks, habits and weather first, at most three facts', () => {
+    expect(brief(day, weather(61), false)).toBe(
+      'На сегодня 2 задачи, одна просрочена. 2 привычки ждут. +8°, дождь, зонт не забудь.',
+    );
+  });
+
+  it('keeps numbers back while they are hidden', () => {
+    expect(brief(day, weather(3), true)).toBe('Задачи на сегодня ждут. Привычки ждут. +8°.');
+  });
+
+  it('is short enough to be said, and nothing with nothing to say', () => {
+    expect(brief(base, undefined, false)).toBeNull();
+    const many = { ...day, habits: { done: 0, total: 9, left: Array(9).fill('x'), week: [] } };
+    expect((brief(many, weather(3), false) ?? '').length).toBeLessThanOrEqual(185);
   });
 });

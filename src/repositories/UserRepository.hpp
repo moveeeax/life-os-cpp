@@ -343,6 +343,7 @@ public:
         "ani_inbox",
         "ani_hooks",
         "ani_prefs",
+        "ani_reminders",
     };
 
     /// The foreign keys of the billing tables (migration 007, ON DELETE

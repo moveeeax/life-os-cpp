@@ -8,6 +8,8 @@ import type { NowWeather, Today } from '@/lib/now/types';
 import { AniChat, SpeakerIcon } from './AniChat';
 import { soundOn, speechUrl, useSound } from './chat';
 import type { Ani } from './engine';
+import { REVIEW_EVENT } from '../review/review';
+import { evening, tomorrowOf } from './evening';
 import { greeting, HELLO, hourOf } from './greet';
 import { useInbox, type Play } from './inbox';
 import { moodLevel, moodOf, moveMood } from './mood';
@@ -124,6 +126,8 @@ const TALK_WORDS: Record<TalkState, string> = {
 // Cold while bare: from COLD_FROM to COLD_TO o'clock; the first shiver after
 // COLD_FIRST_MS bare, the next COLD_EVERY_MS later, then she dresses.
 const COLD_FROM = 21;
+/** How long a question's buttons stay (the server keeps it open as long). */
+const ASK_OPEN_MS = 15 * 60_000;
 const COLD_TO = 6;
 const COLD_FIRST_MS = 90_000;
 const COLD_EVERY_MS = 4 * 60_000;
@@ -166,6 +170,7 @@ export function AniCorner({
   onFocus,
   onWallpaper,
   onSound,
+  onTasksMoved,
 }: {
   base: string;
   context: AniContext;
@@ -179,6 +184,8 @@ export function AniCorner({
   onWallpaper?: (which?: string) => void;
   /** ... switches the focus sound (an id, or off). */
   onSound?: (which?: string) => void;
+  /** Her evening offer moved tasks: the page loads its day again. */
+  onTasksMoved?: () => void;
 }) {
   const [ani, setAni] = useAni();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -366,6 +373,13 @@ export function AniCorner({
         dayOf(EVENING_KEY) !== c.date
       ) {
         setDayOf(EVENING_KEY, c.date);
+        // The day's tasks first: done of all, and an offer to move the rest.
+        const sum = evening(c.today, document.documentElement.classList.contains('hide-numbers'));
+        if (sum) {
+          if (sum.move.length > 0) setMoveOffer({ ids: sum.move, due: tomorrowOf(c.date) });
+          answer.current({ text: sum.text });
+          return;
+        }
         const f = c.today?.focus;
         const line = f && !f.done ? say('focusOpen') : f?.done ? say('dayDone') : say('howWasDay');
         answer.current({ ...line, chat: true });
@@ -392,13 +406,52 @@ export function AniCorner({
 
   // Her webhook: items play while she may speak (here, no voice call, no
   // Hide numbers on); otherwise they wait on the server and a dot says so.
+  // The weekly review opens: she says one line about it.
+  useEffect(() => {
+    // Not during a voice call, and only while she is here.
+    const onReview = () => {
+      if (hereRef.current && !calling.current) answer.current({ text: 'Давай глянем неделю.' });
+    };
+    window.addEventListener(REVIEW_EVENT, onReview);
+    return () => window.removeEventListener(REVIEW_EVENT, onReview);
+  }, []);
+  // Her evening offer to move today's open tasks to tomorrow.
+  const [moveOffer, setMoveOffer] = useState<{ ids: string[]; due: string } | null>(null);
+  const moveTasks = (offer: { ids: string[]; due: string }) => {
+    setMoveOffer(null);
+    void Promise.all(
+      offer.ids.map((id) =>
+        api.patchJson(`/api/v1/tasks/items/${id}`, {
+          body: { due: offer.due },
+          query: { tz: context.tz },
+        }),
+      ),
+    ).then(
+      () => {
+        pageRef.current.onTasksMoved?.();
+        answer.current({ text: 'Перенесла на завтра.' });
+      },
+      () => answer.current({ text: 'Не получилось перенести, попробуй в задачах.' }),
+    );
+  };
   // A card over her ledge and a question with buttons, from the same inbox.
   const [card, setCard] = useState<{ title: string; text?: string; url?: string } | null>(null);
-  const [ask, setAsk] = useState<{ id: string; options: string[] } | null>(null);
+  // Her questions wait in line: one shows at a time, the next after an
+  // answer or once it closes (the server keeps it open 15 minutes).
+  const [asks, setAsks] = useState<{ id: string; options: string[]; until: number }[]>([]);
+  const ask = asks[0] ?? null;
+  useEffect(() => {
+    if (!ask) return;
+    const t = window.setTimeout(
+      () => setAsks((q) => q.filter((a) => a.id !== ask.id)),
+      Math.max(0, ask.until - Date.now()),
+    );
+    return () => window.clearTimeout(t);
+  }, [ask]);
   const cardTimer = useRef(0);
   const moodTimer = useRef(0);
-  const pageRef = useRef({ onFocus, onWallpaper, onSound });
-  pageRef.current = { onFocus, onWallpaper, onSound };
+  const pageRef = useRef({ onFocus, onWallpaper, onSound, onTasksMoved });
+  pageRef.current = { onFocus, onWallpaper, onSound, onTasksMoved };
   useEffect(
     () => () => {
       window.clearTimeout(cardTimer.current);
@@ -407,7 +460,7 @@ export function AniCorner({
     [],
   );
   const sendAnswer = (id: string, text: string) => {
-    setAsk(null);
+    setAsks((q) => q.filter((a) => a.id !== id));
     void api.postJson(`/api/v1/ani/inbox/${id}/answer`, { body: { answer: text } }).catch(() => {});
   };
   const { waiting } = useInbox(
@@ -418,7 +471,11 @@ export function AniCorner({
         case 'say':
           return answer.current({ text: p.text });
         case 'ask':
-          setAsk({ id: p.id, options: p.options });
+          setAsks((q) =>
+            q.some((a) => a.id === p.id)
+              ? q
+              : [...q, { id: p.id, options: p.options, until: Date.now() + ASK_OPEN_MS }],
+          );
           return answer.current({ text: p.text });
         case 'act':
           engine.current?.act(p.name);
@@ -735,6 +792,16 @@ export function AniCorner({
               Open
             </a>
           ) : null}
+        </div>
+      ) : null}
+      {moveOffer && !ask ? (
+        <div className="ani-ask" role="group" aria-label="Move to tomorrow">
+          <button type="button" onClick={() => moveTasks(moveOffer)}>
+            Перенести
+          </button>
+          <button type="button" onClick={() => setMoveOffer(null)}>
+            Нет
+          </button>
         </div>
       ) : null}
       {ask && !hideNums ? (

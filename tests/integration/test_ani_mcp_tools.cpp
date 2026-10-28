@@ -60,6 +60,7 @@ protected:
             txn.exec("DELETE FROM ani_actions");
             txn.exec("DELETE FROM ani_turns");
             txn.exec("DELETE FROM ani_agents");
+            txn.exec("DELETE FROM ani_reminders");
             return true;
         });
     }
@@ -208,4 +209,26 @@ TEST_F(AniMcpTools, SoundListShowsIds) {
 TEST_F(AniMcpTools, PresenceShowsHold) {
     call("ani_hold", {{"minutes", 30}});
     EXPECT_NE(text(call("ani_presence")).find("held_until"), std::string::npos);
+}
+
+TEST_F(AniMcpTools, ProposalArgsCapped) {
+    const json r = call("ani_note", {{"text", std::string(2500, 'n')}});
+    EXPECT_EQ(r["isError"], true);
+    EXPECT_NE(text(r).find("2000"), std::string::npos) << text(r);
+}
+
+TEST_F(AniMcpTools, WallpaperListTakesDevice) {
+    const json r = call("ani_wallpaper", {{"list", true}, {"device", "phone"}});
+    EXPECT_EQ(r["isError"], false) << text(r);
+}
+
+TEST_F(AniMcpTools, RemindersByMcp) {
+    const json added = call("ani_reminder_add", {{"text", "Выпей воды"}, {"time", "10:00"}, {"days", {1, 3, 5}}});
+    ASSERT_EQ(added["isError"], false) << text(added);
+    EXPECT_NE(text(call("ani_reminders")).find("Выпей воды"), std::string::npos);
+    EXPECT_EQ(call("ani_reminder_add", {{"text", "x"}, {"time", "25:00"}})["isError"], true);
+    const std::string body = text(added);
+    const std::string id = json::parse(body.substr(body.find('{')))["id"];
+    EXPECT_EQ(call("ani_reminder_remove", {{"id", id}})["isError"], false);
+    EXPECT_EQ(text(call("ani_reminders")).find("Выпей воды"), std::string::npos);
 }

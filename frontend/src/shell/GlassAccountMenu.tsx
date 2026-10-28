@@ -10,6 +10,8 @@ import { useWalletSummary } from '@/hooks/useWallet';
 import { Permission, userCan } from '@/lib/auth/permissions';
 import { useAni } from '@/pages/now/ani/state';
 
+import { REVIEW_EVENT } from '@/pages/now/review/review';
+
 import { ArrangeSheet } from './ArrangeSheet';
 
 /** The account on the right of the bar: Arrange and Ani (on Now), Account, Admin, Billing, Sign out. */
@@ -95,6 +97,17 @@ export function GlassAccountMenu() {
               }}
             >
               Arrange Now
+            </button>
+          )}
+          {onNow && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                window.dispatchEvent(new Event(REVIEW_EVENT));
+              }}
+            >
+              Weekly review
             </button>
           )}
           {onNow && (

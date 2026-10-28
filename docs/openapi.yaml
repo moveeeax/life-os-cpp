@@ -1235,7 +1235,7 @@ components:
         url: { type: string, description: 'The webhook URL; its last segment is the secret token' }
         recent:
           type: array
-          description: The last 10 calls, newest first
+          description: The last 20 items, newest first
           items:
             type: object
             required: [id, kind, status, created_at]
@@ -1243,7 +1243,20 @@ components:
               id: { type: string, format: uuid }
               kind: { type: string, enum: [say, outfit, act, event, mood, remind, ask, focus, card, wallpaper, sound, hold] }
               status: { type: string, enum: [queued, thinking, ready, delivered, expired, failed] }
+              via: { type: [string, 'null'], description: 'Who sent it: webhook, mcp or schedule' }
+              say: { type: [string, 'null'], description: Her line (or the part of her reply said aloud) }
+              answer: { type: [string, 'null'], description: "An ask's answer" }
               created_at: { type: string, format: date-time }
+    AniReminder:
+      type: object
+      required: [id, text, time, days, tz, next_at]
+      properties:
+        id: { type: string, format: uuid }
+        text: { type: string }
+        time: { type: string, description: 'HH:MM, local' }
+        days: { type: integer, minimum: 1, maximum: 127, description: Weekday bitmask, Monday = 1 .. Sunday = 64 }
+        tz: { type: string }
+        next_at: { type: string, format: date-time }
     AniHookItem:
       type: object
       required: [type]
@@ -10124,6 +10137,66 @@ paths:
                 properties:
                   data: { $ref: '#/components/schemas/AniWebhook' }
         '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+  /api/v1/ani/reminders:
+    get:
+      summary: Ani's recurring reminders
+      description: Each says its text at a local time on the given weekdays. Refused for API keys.
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The reminders, oldest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/AniReminder' } }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+    post:
+      summary: Add a recurring reminder
+      description: >-
+        text (one line, 1-200 characters), time (HH:MM, local), days (1-7,
+        Monday = 1; default every day), tz (IANA; default UTC). At most 20.
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text, time]
+              properties:
+                text: { type: string, minLength: 1, maxLength: 200 }
+                time: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$' }
+                days: { type: array, minItems: 1, maxItems: 7, items: { type: integer, minimum: 1, maximum: 7 } }
+                tz: { type: string }
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/AniReminder' }
+        '400': { description: 'A wrong text, time, day or zone (invalid_reminder)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '409': { description: At most 20 reminders (too_many) }
+  /api/v1/ani/reminders/{id}:
+    delete:
+      summary: Remove a recurring reminder
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Removed }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: No such reminder }
   /api/v1/ani/webhook/rotate:
     post:
       summary: Replace the caller's Ani webhook URL
@@ -10261,7 +10334,7 @@ paths:
         ani_event, ani_mood, ani_remind, ani_ask, ani_focus, ani_card,
         ani_wallpaper, ani_sound, ani_hold, ani_presence, ani_items,
         ani_item, ani_chat, ani_reply, ani_history, ani_task, ani_habit,
-        ani_note. Sign in with an API key of scope ani (or full) in
+        ani_note, ani_reminders, ani_reminder_add, ani_reminder_remove. Sign in with an API key of scope ani (or full) in
         Authorization; a read key gets 403. A notification gets 202 with no
         body; an unsupported version or a header that does not match the
         body gets 400; an unknown method 404. A page of another site

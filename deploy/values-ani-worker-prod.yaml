@@ -21,7 +21,7 @@
 fullnameOverride: life-os-ani-worker
 
 worker:
-  types: "ani_agent_start,ani_agent_stop,ani_agents_reconcile,ani_turn,ani_action,ani_hook_event,ani_inbox_purge,webhook.deliver"
+  types: "ani_agent_start,ani_agent_stop,ani_agents_reconcile,ani_turn,ani_action,ani_hook_event,ani_inbox_purge,webhook.deliver,ani_reminders_due"
   # A start, a stop or a turn waiting for its agent defers instead of
   # holding a thread; a turn talking to its agent holds one for its seconds
   # to a few minutes, so a few at once keep users from queueing behind one.

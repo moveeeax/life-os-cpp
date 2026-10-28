@@ -190,3 +190,23 @@ TEST_F(NowVoiceTest, NoAudioIsUnavailable) {
     t.fail = true;
     EXPECT_THROW(Now::Voice::speak(t, settings(), "Привет"), Now::Voice::Unavailable);
 }
+
+TEST(NowVoice, SpokenPartLimits) {
+    using Now::Voice::kLineCharsMax;
+    using Now::Voice::spoken_part;
+    EXPECT_EQ(spoken_part("Привет."), "Привет.");
+    EXPECT_EQ(spoken_part("Одна строка\nи вторая."), "Одна строка и вторая.") << "line breaks become spaces";
+    // Whole sentences that fit.
+    const std::string s1 = "Маша зовет на созвон через десять минут.";
+    std::string long_reply = s1 + " " + std::string(300, 'a') + ".";
+    EXPECT_EQ(spoken_part(long_reply), s1);
+    // A first sentence too long on its own is cut at a word, with an ellipsis.
+    std::string words;
+    while (words.size() < 900)
+        words += "слово ";
+    const std::string cut = spoken_part(words);
+    EXPECT_FALSE(cut.empty());
+    EXPECT_TRUE(Now::Voice::line_ok(cut)) << cut;
+    EXPECT_NE(cut.find("…"), std::string::npos);
+    EXPECT_EQ(spoken_part("   "), "");
+}
