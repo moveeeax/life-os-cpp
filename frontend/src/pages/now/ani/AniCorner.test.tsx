@@ -347,6 +347,33 @@ describe('AniCorner', () => {
     expect(screen.getByRole('button', { name: 'Кофе' })).toBeTruthy();
   });
 
+  it('offers to move the open tasks to tomorrow in the evening', async () => {
+    vi.setSystemTime(new Date(2026, 9, 26, 21, 30));
+    const patch = vi.spyOn(api, 'patchJson').mockResolvedValue({ data: {} });
+    const t: Today = {
+      ...base,
+      tasks: {
+        late_count: 0,
+        first_late: null,
+        late: [],
+        today: [
+          { id: 'a', title: 'A', status: 'done' },
+          { id: 'b', title: 'B', status: 'open' },
+        ],
+        inbox_count: 0,
+      },
+    };
+    await mount(t);
+    await tick(90_000);
+    expect(bubble()).toBe('Сделано 1 из 2. Перенести 1 на завтра?');
+    fireEvent.click(screen.getByRole('button', { name: 'Перенести' }));
+    await tick(100);
+    expect(patch).toHaveBeenCalledWith('/api/v1/tasks/items/b', {
+      body: { due: '2026-10-27' },
+      query: { tz: 'Asia/Almaty' },
+    });
+  });
+
   it('hands focus, wallpaper and sound to the page', async () => {
     const onFocus = vi.fn();
     const onWallpaper = vi.fn();

@@ -8,6 +8,7 @@ import type { NowWeather, Today } from '@/lib/now/types';
 import { AniChat, SpeakerIcon } from './AniChat';
 import { soundOn, speechUrl, useSound } from './chat';
 import type { Ani } from './engine';
+import { evening, tomorrowOf } from './evening';
 import { greeting, HELLO, hourOf } from './greet';
 import { useInbox, type Play } from './inbox';
 import { moodLevel, moodOf, moveMood } from './mood';
@@ -368,6 +369,13 @@ export function AniCorner({
         dayOf(EVENING_KEY) !== c.date
       ) {
         setDayOf(EVENING_KEY, c.date);
+        // The day's tasks first: done of all, and an offer to move the rest.
+        const sum = evening(c.today, document.documentElement.classList.contains('hide-numbers'));
+        if (sum) {
+          if (sum.move.length > 0) setMoveOffer({ ids: sum.move, due: tomorrowOf(c.date) });
+          answer.current({ text: sum.text });
+          return;
+        }
         const f = c.today?.focus;
         const line = f && !f.done ? say('focusOpen') : f?.done ? say('dayDone') : say('howWasDay');
         answer.current({ ...line, chat: true });
@@ -394,6 +402,22 @@ export function AniCorner({
 
   // Her webhook: items play while she may speak (here, no voice call, no
   // Hide numbers on); otherwise they wait on the server and a dot says so.
+  // Her evening offer to move today's open tasks to tomorrow.
+  const [moveOffer, setMoveOffer] = useState<{ ids: string[]; due: string } | null>(null);
+  const moveTasks = (offer: { ids: string[]; due: string }) => {
+    setMoveOffer(null);
+    void Promise.all(
+      offer.ids.map((id) =>
+        api.patchJson(`/api/v1/tasks/items/${id}`, {
+          body: { due: offer.due },
+          query: { tz: context.tz },
+        }),
+      ),
+    ).then(
+      () => answer.current({ text: 'Перенесла на завтра.' }),
+      () => answer.current({ text: 'Не получилось перенести, попробуй в задачах.' }),
+    );
+  };
   // A card over her ledge and a question with buttons, from the same inbox.
   const [card, setCard] = useState<{ title: string; text?: string; url?: string } | null>(null);
   // Her questions wait in line: one shows at a time, the next after an
@@ -752,6 +776,16 @@ export function AniCorner({
               Open
             </a>
           ) : null}
+        </div>
+      ) : null}
+      {moveOffer && !ask ? (
+        <div className="ani-ask" role="group" aria-label="Move to tomorrow">
+          <button type="button" onClick={() => moveTasks(moveOffer)}>
+            Перенести
+          </button>
+          <button type="button" onClick={() => setMoveOffer(null)}>
+            Нет
+          </button>
         </div>
       ) : null}
       {ask && !hideNums ? (
