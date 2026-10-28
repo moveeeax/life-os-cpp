@@ -117,9 +117,20 @@ export function useInbox(enabled: boolean, play: (p: Play) => Promise<void>) {
   const playRef = useRef(play);
   playRef.current = play;
   const busy = useRef(false);
+  // What was claimed but not played yet (Hide numbers came on mid-batch):
+  // played first when she may speak again.
+  const left = useRef<Play[]>([]);
 
   useEffect(() => {
     let gone = false;
+    const playLeft = async () => {
+      while (left.current.length > 0) {
+        if (gone) return;
+        const p = left.current.shift()!;
+        await playRef.current(p);
+        if (p.kind === 'say' && !gone) await wait(GAP_MS);
+      }
+    };
     const tick = async () => {
       if (busy.current || gone || document.visibilityState !== 'visible') return;
       busy.current = true;
@@ -129,14 +140,12 @@ export function useInbox(enabled: boolean, play: (p: Play) => Promise<void>) {
           if (!gone) setWaiting(r.data.waiting);
           return;
         }
-        const r = await api.postJson<{ data: InboxItem[] }>('/api/v1/ani/inbox/claim');
+        await playLeft();
         if (gone) return;
+        const r = await api.postJson<{ data: InboxItem[] }>('/api/v1/ani/inbox/claim');
         setWaiting(0);
-        for (const p of planBacklog(r.data, Date.now())) {
-          if (gone) return;
-          await playRef.current(p);
-          if (p.kind === 'say') await wait(GAP_MS);
-        }
+        left.current.push(...planBacklog(r.data, Date.now()));
+        await playLeft();
       } catch {
         // Offline or signed out: the next tick tries again.
       } finally {

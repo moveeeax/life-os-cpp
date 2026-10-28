@@ -332,6 +332,21 @@ describe('AniCorner', () => {
     expect(screen.queryByRole('button', { name: 'Да' })).toBeNull();
   });
 
+  it('asks one question at a time', async () => {
+    await mount();
+    await tick(20_000);
+    inbox.items = [
+      { ...hookItem('ask', { text: 'Чай?', options: ['Да', 'Нет'] }, 'Чай?'), id: 'q1' },
+      { ...hookItem('ask', { text: 'Кофе?', options: ['Кофе', 'Нет'] }, 'Кофе?'), id: 'q2' },
+    ];
+    await tick(20_000);
+    expect(screen.getByRole('button', { name: 'Да' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Кофе' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Да' }));
+    await tick(100);
+    expect(screen.getByRole('button', { name: 'Кофе' })).toBeTruthy();
+  });
+
   it('hands focus, wallpaper and sound to the page', async () => {
     const onFocus = vi.fn();
     const onWallpaper = vi.fn();

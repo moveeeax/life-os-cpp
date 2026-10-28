@@ -124,6 +124,8 @@ const TALK_WORDS: Record<TalkState, string> = {
 // Cold while bare: from COLD_FROM to COLD_TO o'clock; the first shiver after
 // COLD_FIRST_MS bare, the next COLD_EVERY_MS later, then she dresses.
 const COLD_FROM = 21;
+/** How long a question's buttons stay (the server keeps it open as long). */
+const ASK_OPEN_MS = 15 * 60_000;
 const COLD_TO = 6;
 const COLD_FIRST_MS = 90_000;
 const COLD_EVERY_MS = 4 * 60_000;
@@ -394,7 +396,18 @@ export function AniCorner({
   // Hide numbers on); otherwise they wait on the server and a dot says so.
   // A card over her ledge and a question with buttons, from the same inbox.
   const [card, setCard] = useState<{ title: string; text?: string; url?: string } | null>(null);
-  const [ask, setAsk] = useState<{ id: string; options: string[] } | null>(null);
+  // Her questions wait in line: one shows at a time, the next after an
+  // answer or once it closes (the server keeps it open 15 minutes).
+  const [asks, setAsks] = useState<{ id: string; options: string[]; until: number }[]>([]);
+  const ask = asks[0] ?? null;
+  useEffect(() => {
+    if (!ask) return;
+    const t = window.setTimeout(
+      () => setAsks((q) => q.filter((a) => a.id !== ask.id)),
+      Math.max(0, ask.until - Date.now()),
+    );
+    return () => window.clearTimeout(t);
+  }, [ask]);
   const cardTimer = useRef(0);
   const moodTimer = useRef(0);
   const pageRef = useRef({ onFocus, onWallpaper, onSound });
@@ -407,7 +420,7 @@ export function AniCorner({
     [],
   );
   const sendAnswer = (id: string, text: string) => {
-    setAsk(null);
+    setAsks((q) => q.filter((a) => a.id !== id));
     void api.postJson(`/api/v1/ani/inbox/${id}/answer`, { body: { answer: text } }).catch(() => {});
   };
   const { waiting } = useInbox(
@@ -418,7 +431,11 @@ export function AniCorner({
         case 'say':
           return answer.current({ text: p.text });
         case 'ask':
-          setAsk({ id: p.id, options: p.options });
+          setAsks((q) =>
+            q.some((a) => a.id === p.id)
+              ? q
+              : [...q, { id: p.id, options: p.options, until: Date.now() + ASK_OPEN_MS }],
+          );
           return answer.current({ text: p.text });
         case 'act':
           engine.current?.act(p.name);

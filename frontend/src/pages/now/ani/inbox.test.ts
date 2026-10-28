@@ -235,6 +235,35 @@ describe('useInbox', () => {
     expect(played).toEqual(['Раз', 'Два']);
   });
 
+  it('keeps the rest of a batch while held and plays it after', async () => {
+    vi.spyOn(api, 'postJson')
+      .mockResolvedValueOnce({
+        data: [item({ say: 'Раз' }), item({ say: 'Два' }), item({ say: 'Три' })],
+      })
+      .mockResolvedValue({ data: [] });
+    vi.spyOn(api, 'getJson').mockResolvedValue({ data: { waiting: 0 } });
+    const played: string[] = [];
+    const play = vi.fn(async (p: { kind: string; text?: string }) => {
+      played.push(p.text ?? p.kind);
+      await new Promise((ok) => setTimeout(ok, 1000));
+    });
+    const { rerender } = renderHook(({ on }) => useInbox(on, play), { initialProps: { on: true } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(played).toEqual(['Раз']);
+    rerender({ on: false });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(played).toEqual(['Раз']);
+    rerender({ on: true });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(played).toEqual(['Раз', 'Два', 'Три']);
+  });
+
   it('only counts while held, for the dot', async () => {
     const claim = vi.spyOn(api, 'postJson');
     vi.spyOn(api, 'getJson').mockResolvedValue({ data: { waiting: 2 } });
