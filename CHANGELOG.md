@@ -6,6 +6,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.48.0] - 2026-10-28
+
+### Added
+- Ani 1.48: recurring reminders (a local time on chosen weekdays, from Account → Ani or her MCP), a morning brief of the day, an evening summary that moves the open tasks to tomorrow, a weekly review on Sunday (or from the account menu on Now), a log of what came through her webhook and MCP, questions shown one at a time, long replies said by their first sentences, and items held under Hide numbers played later instead of dropped.
+
 ## [1.47.0] - 2026-10-28
 
 ### Added
