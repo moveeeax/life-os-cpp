@@ -8,6 +8,7 @@ import type { NowWeather, Today } from '@/lib/now/types';
 import { AniChat, SpeakerIcon } from './AniChat';
 import { soundOn, speechUrl, useSound } from './chat';
 import type { Ani } from './engine';
+import { REVIEW_EVENT } from '../review/review';
 import { evening, tomorrowOf } from './evening';
 import { greeting, HELLO, hourOf } from './greet';
 import { useInbox, type Play } from './inbox';
@@ -402,6 +403,12 @@ export function AniCorner({
 
   // Her webhook: items play while she may speak (here, no voice call, no
   // Hide numbers on); otherwise they wait on the server and a dot says so.
+  // The weekly review opens: she says one line about it.
+  useEffect(() => {
+    const onReview = () => answer.current({ text: 'Давай глянем неделю.' });
+    window.addEventListener(REVIEW_EVENT, onReview);
+    return () => window.removeEventListener(REVIEW_EVENT, onReview);
+  }, []);
   // Her evening offer to move today's open tasks to tomorrow.
   const [moveOffer, setMoveOffer] = useState<{ ids: string[]; due: string } | null>(null);
   const moveTasks = (offer: { ids: string[]; due: string }) => {

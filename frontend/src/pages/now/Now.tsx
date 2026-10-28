@@ -27,6 +27,8 @@ import { useGlassNav } from '@/shell/useGlassNav';
 
 import { AniCorner } from './ani/AniCorner';
 import { useFocusInbox } from './ani/inbox';
+import { dueThisWeek, REVIEW_EVENT, SEEN_KEY, weekOf } from './review/review';
+import { WeeklyReview } from './review/WeeklyReview';
 import { aniBase, useAni } from './ani/state';
 import { Corners } from './corners/Corners';
 import { FocusMode } from './focus/FocusMode';
@@ -133,6 +135,27 @@ function NowScreen() {
       ),
     ) % 24;
   const today = useToday(me?.id ?? null, date, tz);
+  // The weekly review: by itself on Sunday from 10:00 (once), or from the account menu.
+  const [reviewing, setReviewing] = useState(false);
+  useEffect(() => {
+    const open = () => {
+      setReviewing(true);
+      try {
+        localStorage.setItem(SEEN_KEY, weekOf(date));
+      } catch {
+        // Private mode: it may open again next time.
+      }
+    };
+    let seen: string | null = null;
+    try {
+      seen = localStorage.getItem(SEEN_KEY);
+    } catch {
+      seen = null;
+    }
+    if (dueThisWeek(date, new Date().getHours(), seen)) open();
+    window.addEventListener(REVIEW_EVENT, open);
+    return () => window.removeEventListener(REVIEW_EVENT, open);
+  }, [date]);
   const settings = useNowSettings(me?.id ?? null);
   const weather = useWeather(Boolean(settings.data?.city));
   const habitsOn = useHabitsEnabled(Boolean(me));
@@ -241,6 +264,9 @@ function NowScreen() {
           links={settings.data?.links ?? []}
           onReorder={raw ? reorder : undefined}
         />
+      )}
+      {reviewing && (
+        <WeeklyReview today={today.data} date={date} tz={tz} onClose={() => setReviewing(false)} />
       )}
       {showAni && base && (
         <AniCorner
