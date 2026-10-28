@@ -103,3 +103,12 @@ xAI API (Responses API, remote MCP tool):
 Claude Desktop has no direct HTTP transport; use the `mcp-remote` bridge
 with `--header "Authorization: Bearer cpk_…"`. The web connectors of
 claude.ai and ChatGPT accept OAuth only and are not supported.
+
+## Audit
+
+What comes through the webhook and the MCP is recorded in the admin audit
+log (Admin → Audit): `ani.inbox.<kind>` with how it came (`via`), answers to
+questions (`ani.ask.answer`), and reminders added, removed and said
+(`ani.reminder.*`). Texts are never recorded. Recurring reminders are managed
+through the API (`/api/v1/ani/reminders`) and the MCP only.
+
