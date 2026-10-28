@@ -1,1 +1,0 @@
-Ani's card on /account no longer shows a log or a reminders form: what comes through her webhook and MCP (kind, how it came, answers to questions, reminders added, removed and said; never texts) goes to the admin audit log, and recurring reminders are managed through the API and her MCP only.

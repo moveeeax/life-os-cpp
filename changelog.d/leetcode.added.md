@@ -1,1 +1,0 @@
-LeetCode in Life OS: set your public username in Account → LeetCode, and every 3 hours the solved counts are pulled into the metrics catalog (`leetcode:solved` and per difficulty, a day's value being its growth over the previous pull), so a habit with the source "LeetCode solved" ticks itself.

@@ -6,6 +6,14 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.49.0] - 2026-10-29
+
+### Added
+- LeetCode in Life OS: set your public username in Account → LeetCode, and every 3 hours the solved counts are pulled into the metrics catalog (`leetcode:solved` and per difficulty, a day's value being its growth over the previous pull), so a habit with the source "LeetCode solved" ticks itself.
+
+### Changed
+- Ani's card on /account no longer shows a log or a reminders form: what comes through her webhook and MCP (kind, how it came, answers to questions, reminders added, removed and said; never texts) goes to the admin audit log, and recurring reminders are managed through the API and her MCP only.
+
 ## [1.48.0] - 2026-10-28
 
 ### Added
