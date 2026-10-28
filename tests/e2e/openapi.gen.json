@@ -1134,7 +1134,8 @@
        "workout",
        "tasks",
        "money",
-       "practice"
+       "practice",
+       "leetcode"
       ],
       "description": "The section the series comes from"
      },
@@ -4851,6 +4852,61 @@
         }
        }
       }
+     }
+    }
+   },
+   "LeetCodeProfile": {
+    "type": "object",
+    "required": [
+     "username",
+     "tz"
+    ],
+    "properties": {
+     "username": {
+      "type": "string"
+     },
+     "tz": {
+      "type": "string"
+     },
+     "synced_at": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time"
+     },
+     "last_error": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Why the last pull failed"
+     },
+     "total": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "description": "Solved in all",
+      "at the last pull": null
+     },
+     "easy": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "medium": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "hard": {
+      "type": [
+       "integer",
+       "null"
+      ]
      }
     }
    },
@@ -29267,6 +29323,133 @@
     }
    }
   },
+  "/api/v1/leetcode/profile": {
+   "get": {
+    "summary": "The caller's LeetCode profile",
+    "description": "The public username whose solved counts are pulled every 3 hours into the metrics catalog (leetcode:solved, leetcode:easy, leetcode:medium, leetcode:hard: a day's value is its growth over the previous pull), so a habit can take them as its source. data is null without a profile.",
+    "tags": [
+     "leetcode"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The profile, or null",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "oneOf": [
+            {
+             "$ref": "#/components/schemas/LeetCodeProfile"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated"
+     }
+    }
+   },
+   "put": {
+    "summary": "Set the LeetCode username",
+    "description": "A new username drops the old snapshots; a pull is queued at once.",
+    "tags": [
+     "leetcode"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "username"
+        ],
+        "properties": {
+         "username": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]{1,30}$"
+         },
+         "tz": {
+          "type": "string",
+          "description": "IANA zone the days are counted in; default UTC"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The profile",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/LeetCodeProfile"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "A wrong username or zone"
+     },
+     "401": {
+      "description": "Not authenticated"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Remove the LeetCode profile and its snapshots",
+    "tags": [
+     "leetcode"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Removed"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "No profile"
+     }
+    }
+   }
+  },
   "/api/v1/ani/reminders": {
    "get": {
     "summary": "Ani's recurring reminders",
@@ -36669,7 +36852,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 552671,
-  "source_fnv1a64": "031f9bf86a575542"
+  "source_bytes": 555391,
+  "source_fnv1a64": "affc2fc5180efdfa"
  }
 }

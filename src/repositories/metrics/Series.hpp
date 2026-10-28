@@ -24,6 +24,7 @@
 #include "domain/Role.hpp"
 #include "habits/Habits.hpp"
 #include "metrics/Catalog.hpp"
+#include "repositories/leetcode/ProfileRepository.hpp"
 #include "repositories/money/SummaryRepository.hpp"
 #include "utils/Modules.hpp"
 
@@ -41,6 +42,8 @@ struct Access {
     bool tasks = false;
     bool money = false;
     bool practice = false;
+    /// A LeetCode username is set (leetcode_profiles).
+    bool leetcode = false;
     std::string xiaomi_id;
 };
 
@@ -60,6 +63,7 @@ inline Access access_of(const std::string& owner, std::uint32_t permissions) {
     a.tasks = Core::tasks_enabled();
     a.money = Core::money_enabled();
     a.practice = Core::practice_enabled();
+    a.leetcode = Repositories::LeetCode::ProfileRepository().exists(owner);
     if (a.fitness && a.mi_read) {
         a.xiaomi_id = Database::get().execute_read([&](auto& txn) {
             auto r = txn.exec_params("SELECT xiaomi_user_id FROM mi_accounts WHERE owner_id = $1::uuid", owner);
@@ -161,6 +165,8 @@ inline Why gate_available(const ::Metrics::Def& d, const Access& a) {
             return a.money ? Why::Ok : Why::ModuleOff;
         case Gate::Practice:
             return a.practice ? Why::Ok : Why::ModuleOff;
+        case Gate::LeetCode:
+            return a.leetcode ? Why::Ok : Why::NotLinked;
     }
     return Why::ModuleOff;
 }
@@ -388,6 +394,23 @@ inline std::string workout_sql(std::string_view m) {
            padded("s.finished_at") + " GROUP BY 1) t WHERE d BETWEEN $2::date AND $3::date ORDER BY d";
 }
 
+/// The statement of a LeetCode entry: $1 the owner, $2..$3 the days; a
+/// day's value is its snapshot over the previous one (the last before it).
+inline std::string leetcode_sql(std::string_view m) {
+    std::string col;
+    if (m == "solved") {
+        col = "total";
+    } else if (m == "easy" || m == "medium" || m == "hard") {
+        col = std::string(m);
+    } else {
+        return "";
+    }
+    return "SELECT day::text, v::float8 FROM (SELECT day, " + col + " - LAG(" + col +
+           ") OVER (ORDER BY day) AS v FROM leetcode_snapshots WHERE owner_id = $1::uuid AND day <= $3::date AND "
+           "day >= COALESCE((SELECT max(day) FROM leetcode_snapshots WHERE owner_id = $1::uuid AND day < $2::date), "
+           "$2::date)) t WHERE day BETWEEN $2::date AND $3::date AND v IS NOT NULL ORDER BY day";
+}
+
 template <typename Row>
 void put(::Habits::Values& out, const Row& row) {
     out[::Habits::day_of(row[0].template as<std::string>())] =
@@ -449,6 +472,11 @@ inline Series read(const std::string& owner,
                 break;
             case Gate::Workout:
                 for (const auto& row : txn.exec_params(detail::workout_sql(m), owner, lo, hi, tz)) {
+                    detail::put(out.values, row);
+                }
+                break;
+            case Gate::LeetCode:
+                for (const auto& row : txn.exec_params(detail::leetcode_sql(m), owner, lo, hi)) {
                     detail::put(out.values, row);
                 }
                 break;

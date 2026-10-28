@@ -17,6 +17,7 @@ export const MODULES: { key: MetricModule; label: string }[] = [
   { key: 'tasks', label: 'Tasks' },
   { key: 'money', label: 'Money' },
   { key: 'practice', label: 'Practice' },
+  { key: 'leetcode', label: 'LeetCode' },
 ];
 
 /** Why an entry cannot be read, in a few words. */
@@ -31,7 +32,8 @@ export const WHY_WORDS: Record<MetricWhy, string> = {
 export const WHY_NOTE: Record<MetricWhy, string> = {
   module_off: 'The section of this source is off, so only check-ins count.',
   no_permission: 'This account cannot read the source, so only check-ins count.',
-  not_linked: 'No Mi account is linked, so only check-ins count.',
+  not_linked:
+    'The source is not linked (a Mi account, a LeetCode username), so only check-ins count.',
   not_yours: 'The source is no longer yours, so only check-ins count.',
 };
 

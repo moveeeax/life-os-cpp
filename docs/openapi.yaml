@@ -321,7 +321,7 @@ components:
       required: [id, module, label, unit, reduce, presence, available, why]
       properties:
         id: { type: string, description: 'The catalog id with its parameters: fitness:steps, money:expense:KZT, money:expense:KZT:<category uuid>, habits:<habit uuid>' }
-        module: { type: string, enum: [fitness, food, habits, tape, workout, tasks, money, practice], description: The section the series comes from }
+        module: { type: string, enum: [fitness, food, habits, tape, workout, tasks, money, practice, leetcode], description: The section the series comes from }
         label: { type: string }
         unit: { type: string, description: 'kg, h, min, kcal, g, cm, bpm, %; the currency for money and practice; the habit''s own unit; empty for a count without one' }
         reduce: { type: string, enum: [sum, last, avg, min, max, count], description: How the rows of a day become its value }
@@ -1247,6 +1247,18 @@ components:
               say: { type: [string, 'null'], description: Her line (or the part of her reply said aloud) }
               answer: { type: [string, 'null'], description: "An ask's answer" }
               created_at: { type: string, format: date-time }
+    LeetCodeProfile:
+      type: object
+      required: [username, tz]
+      properties:
+        username: { type: string }
+        tz: { type: string }
+        synced_at: { type: [string, 'null'], format: date-time }
+        last_error: { type: [string, 'null'], description: Why the last pull failed }
+        total: { type: [integer, 'null'], description: Solved in all, at the last pull }
+        easy: { type: [integer, 'null'] }
+        medium: { type: [integer, 'null'] }
+        hard: { type: [integer, 'null'] }
     AniReminder:
       type: object
       required: [id, text, time, days, tz, next_at]
@@ -10137,6 +10149,65 @@ paths:
                 properties:
                   data: { $ref: '#/components/schemas/AniWebhook' }
         '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+  /api/v1/leetcode/profile:
+    get:
+      summary: The caller's LeetCode profile
+      description: >-
+        The public username whose solved counts are pulled every 3 hours into
+        the metrics catalog (leetcode:solved, leetcode:easy, leetcode:medium,
+        leetcode:hard: a day's value is its growth over the previous pull), so
+        a habit can take them as its source. data is null without a profile.
+      tags: [leetcode]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The profile, or null
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    oneOf:
+                      - { $ref: '#/components/schemas/LeetCodeProfile' }
+                      - { type: 'null' }
+        '401': { description: Not authenticated }
+    put:
+      summary: Set the LeetCode username
+      description: A new username drops the old snapshots; a pull is queued at once.
+      tags: [leetcode]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username: { type: string, pattern: '^[A-Za-z0-9_.-]{1,30}$' }
+                tz: { type: string, description: 'IANA zone the days are counted in; default UTC' }
+      responses:
+        '200':
+          description: The profile
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/LeetCodeProfile' }
+        '400': { description: 'A wrong username or zone' }
+        '401': { description: Not authenticated }
+    delete:
+      summary: Remove the LeetCode profile and its snapshots
+      tags: [leetcode]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204': { description: Removed }
+        '401': { description: Not authenticated }
+        '404': { description: No profile }
   /api/v1/ani/reminders:
     get:
       summary: Ani's recurring reminders
