@@ -26,6 +26,7 @@
 #include <nlohmann/json.hpp>
 
 #include "agent/Lifecycle.hpp"
+#include "agent/Reminders.hpp"
 #include "agent/Settings.hpp"
 #include "agent/Turn.hpp"
 #include "billing/PayPalClient.hpp"
@@ -752,6 +753,16 @@ void Application::register_ani_agents_schedule_() {
             Jobs::get().submit(Agent::kInboxPurgeJob, nlohmann::json::object());
         } catch (const std::exception& e) {
             spdlog::warn("ani inbox purge tick failed: {}", e.what());
+        }
+    });
+    // Her recurring reminders: the due ones become lines every minute.
+    Tasks::schedule_recurring("ani_reminders_due_schedule", std::chrono::minutes(1), [] {
+        if (!Jobs::is_initialized())
+            return;
+        try {
+            Jobs::get().submit(Agent::Reminders::kDueJob, nlohmann::json::object());
+        } catch (const std::exception& e) {
+            spdlog::warn("ani reminders tick failed: {}", e.what());
         }
     });
 }

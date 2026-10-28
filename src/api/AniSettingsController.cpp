@@ -7,17 +7,20 @@
 
 #include <exception>
 #include <string>
+#include <variant>
 
 #include <drogon/drogon.h>
 #include <spdlog/spdlog.h>
 
 #include <nlohmann/json.hpp>
 
+#include "agent/Reminders.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
 #include "repositories/agent/HookRepository.hpp"
 #include "repositories/agent/InboxRepository.hpp"
 #include "repositories/agent/PrefsRepository.hpp"
+#include "repositories/agent/ReminderRepository.hpp"
 #include "storage/ObjectStore.hpp"
 #include "utils/Config.hpp"
 #include "utils/ErrorResponse.hpp"
@@ -135,6 +138,54 @@ void AniSettingsController::rotateWebhook(const HttpRequestPtr& req, Callback&& 
         callback(resp);
     } catch (const std::exception& e) {
         spdlog::error("ani.webhook rotate failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
+void AniSettingsController::reminders(const HttpRequestPtr& req, Callback&& callback) {
+    ANI_SETTINGS_GUARD(req, callback, owner);
+    try {
+        callback(Response::ok(json{{"data", Repositories::Agent::ReminderRepository().list(owner)}}));
+    } catch (const std::exception& e) {
+        spdlog::error("ani.reminders failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
+void AniSettingsController::addReminder(const HttpRequestPtr& req, Callback&& callback) {
+    ANI_SETTINGS_GUARD(req, callback, owner);
+    const auto body = json::parse(req->body(), nullptr, false);
+    auto in = ::Agent::Reminders::parse(body.is_discarded() ? json() : body, "UTC");
+    if (const auto* err = std::get_if<std::string>(&in)) {
+        callback(ErrorResponse::bad_request("invalid_reminder", *err));
+        return;
+    }
+    const auto& r = std::get<::Agent::Reminders::Input>(in);
+    try {
+        const auto made = Repositories::Agent::ReminderRepository().add(owner, r.text, r.at, r.days, r.tz);
+        if (!made) {
+            callback(ErrorResponse::conflict("too_many", "at most 20 reminders"));
+            return;
+        }
+        auto resp = Response::ok(json{{"data", *made}});
+        resp->setStatusCode(k201Created);
+        callback(resp);
+    } catch (const std::exception& e) {
+        spdlog::error("ani.reminders add failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
+void AniSettingsController::removeReminder(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    ANI_SETTINGS_GUARD(req, callback, owner);
+    try {
+        if (!Repositories::Agent::ReminderRepository().remove(owner, id)) {
+            callback(ErrorResponse::not_found("not_found"));
+            return;
+        }
+        no_content(callback);
+    } catch (const std::exception& e) {
+        spdlog::error("ani.reminders remove failed: {}", e.what());
         callback(ErrorResponse::internal_error());
     }
 }

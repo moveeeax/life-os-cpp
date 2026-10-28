@@ -56,7 +56,7 @@ TEST_F(AniMcpApi, ToolsListOverHttp) {
     EXPECT_EQ(r->statusCode(), k200OK);
     EXPECT_EQ(r->getHeader("Cache-Control"), "no-store");
     const json tools = body_of(r)["result"]["tools"];
-    ASSERT_EQ(tools.size(), 21u);
+    ASSERT_EQ(tools.size(), 24u);
     EXPECT_EQ(tools[0]["name"], "ani_say");
 }
 

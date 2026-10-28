@@ -88,6 +88,7 @@ protected:
             txn.exec_params("DELETE FROM ani_prefs WHERE owner_id = $1::uuid", std::string(kAnna));
             txn.exec_params("DELETE FROM ani_hooks WHERE owner_id = $1::uuid", std::string(kAnna));
             txn.exec_params("DELETE FROM ani_inbox WHERE owner_id = $1::uuid", std::string(kAnna));
+            txn.exec_params("DELETE FROM ani_reminders WHERE owner_id = $1::uuid", std::string(kAnna));
             return true;
         });
         Storage::install_object_store_for_testing(&store);
@@ -201,4 +202,30 @@ TEST_F(AniSettingsApi, RotateChangesUrl) {
     const std::string after = body_of(r)["data"]["url"];
     EXPECT_NE(after, before);
     EXPECT_EQ(body_of(get_hook())["data"]["url"], after);
+}
+
+TEST_F(AniSettingsApi, RemindersRoute) {
+    const auto add = [&](const json& body) {
+        return call(
+            Post, body, [&](auto req, auto cb) { c.addReminder(req, std::move(cb)); }, "/api/v1/ani/reminders");
+    };
+    auto made = add({{"text", "Выпей воды"}, {"time", "10:00"}, {"days", {1, 2, 3, 4, 5}}, {"tz", "Asia/Almaty"}});
+    ASSERT_EQ(made->statusCode(), k201Created) << std::string(made->body());
+    EXPECT_EQ(body_of(made)["data"]["days"], 31);
+    EXPECT_EQ(body_of(made)["data"]["time"], "10:00");
+    EXPECT_EQ(add({{"text", "x"}, {"time", "9:00"}})->statusCode(), k400BadRequest);
+    EXPECT_EQ(add({{"text", "x"}, {"time", "09:00"}, {"days", {8}}})->statusCode(), k400BadRequest);
+    EXPECT_EQ(add({{"text", "x"}, {"time", "09:00"}, {"tz", "Mars/Base"}})->statusCode(), k400BadRequest);
+
+    auto list = call(
+        Get, json::object(), [&](auto req, auto cb) { c.reminders(req, std::move(cb)); }, "/api/v1/ani/reminders");
+    ASSERT_EQ(body_of(list)["data"].size(), 1u);
+    const std::string id = body_of(made)["data"]["id"];
+    auto gone = call(Delete, json::object(), [&](auto req, auto cb) { c.removeReminder(req, std::move(cb), id); });
+    EXPECT_EQ(gone->statusCode(), k204NoContent);
+    auto again = call(Delete, json::object(), [&](auto req, auto cb) { c.removeReminder(req, std::move(cb), id); });
+    EXPECT_EQ(again->statusCode(), k404NotFound);
+    auto key = call(
+        Get, json::object(), [&](auto req, auto cb) { c.reminders(req, std::move(cb)); }, nullptr, true);
+    EXPECT_EQ(key->statusCode(), k401Unauthorized);
 }

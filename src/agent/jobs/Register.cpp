@@ -12,6 +12,7 @@
 #include "agent/Actions.hpp"
 #include "agent/Hook.hpp"
 #include "agent/Lifecycle.hpp"
+#include "agent/Reminders.hpp"
 #include "agent/Turn.hpp"
 #include "jobs/Dispatcher.hpp"
 
@@ -24,6 +25,8 @@ void register_jobs(Jobs::Dispatcher& d) {
     d.register_handler(kTurnJob, [](const nlohmann::json& payload) { return process_turn(payload); });
     d.register_handler(Hook::kEventJob, [](const nlohmann::json& payload) { return process_hook_event(payload); });
     d.register_handler(kInboxPurgeJob, [](const nlohmann::json& payload) { return process_inbox_purge(payload); });
+    d.register_handler(Reminders::kDueJob,
+                       [](const nlohmann::json& payload) { return Reminders::process_due(payload); });
     d.register_handler(Actions::kActionJob,
                        [](const nlohmann::json& payload) { return Actions::process_action(payload); });
     // A start that dead-letters leaves its row starting; stop it, so the next wake can try again.

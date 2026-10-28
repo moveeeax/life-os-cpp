@@ -19,12 +19,14 @@
 #include "agent/Hook.hpp"
 #include "agent/Intake.hpp"
 #include "agent/Presence.hpp"
+#include "agent/Reminders.hpp"
 #include "agent/Settings.hpp"
 #include "agent/Turn.hpp"
 #include "jobs/Jobs.hpp"
 #include "repositories/agent/AgentRepository.hpp"
 #include "repositories/agent/InboxRepository.hpp"
 #include "repositories/agent/PrefsRepository.hpp"
+#include "repositories/agent/ReminderRepository.hpp"
 #include "repositories/agent/TurnRepository.hpp"
 #include "repositories/now/SoundRepository.hpp"
 #include "repositories/now/WallpaperRepository.hpp"
@@ -394,6 +396,20 @@ Server ani_server(const std::string& owner, Scheduler after) {
          "Proposes to tick a habit (today unless a date is given) or add an amount; confirmed by the user on Now.",
          write_schema("check_habit")},
         {"ani_note", "Proposes a note to the user's inbox; confirmed by the user on Now.", write_schema("add_note")},
+        {"ani_reminders", "Her recurring reminders: text, local time, weekdays.", schema(json::object())},
+        {"ani_reminder_add",
+         "A recurring reminder: she says the text at a local time on the given weekdays (Monday = 1; default every "
+         "day). At most 20.",
+         schema({{"text", {{"type", "string"}, {"minLength", 1}, {"maxLength", 200}}},
+                 {"time", {{"type", "string"}, {"description", "HH:MM, local"}}},
+                 {"days",
+                  {{"type", "array"},
+                   {"minItems", 1},
+                   {"maxItems", 7},
+                   {"items", {{"type", "integer"}, {"minimum", 1}, {"maximum", 7}}}}},
+                 {"tz", {{"type", "string"}, {"description", "IANA zone; default the user's"}}}},
+                {"text", "time"})},
+        {"ani_reminder_remove", "Removes a recurring reminder.", schema({{"id", {{"type", "string"}}}}, {"id"})},
         {"ani_history",
          "The latest messages of her chat, from every source.",
          schema({{"limit", {{"type", "integer"}, {"minimum", 1}, {"maximum", kListMax}}}})},
@@ -442,6 +458,23 @@ Server ani_server(const std::string& owner, Scheduler after) {
                 if (name == mcp_name) {
                     return done(propose(owner, tool, args));
                 }
+            }
+            if (name == "ani_reminders") {
+                return done(result("Her reminders.", Repositories::Agent::ReminderRepository().list(owner)));
+            }
+            if (name == "ani_reminder_add") {
+                auto in = Agent::Reminders::parse(args, TurnRepository().last_tz(owner));
+                if (const auto* err = std::get_if<std::string>(&in)) {
+                    return done(refusal(*err));
+                }
+                const auto& r = std::get<Agent::Reminders::Input>(in);
+                const auto made = Repositories::Agent::ReminderRepository().add(owner, r.text, r.at, r.days, r.tz);
+                return done(made ? result("Added.", *made) : refusal("At most 20 reminders."));
+            }
+            if (name == "ani_reminder_remove") {
+                return done(Repositories::Agent::ReminderRepository().remove(owner, args.value("id", ""))
+                                ? result("Removed.", json::object())
+                                : refusal("No such reminder."));
             }
             if (name == "ani_history") {
                 json out = json::array();

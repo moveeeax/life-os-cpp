@@ -15545,6 +15545,159 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ani/reminders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ani's recurring reminders
+         * @description Each says its text at a local time on the given weekdays. Refused for API keys.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The reminders, oldest first */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniReminder"][];
+                        };
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Add a recurring reminder
+         * @description text (one line, 1-200 characters), time (HH:MM, local), days (1-7, Monday = 1; default every day), tz (IANA; default UTC). At most 20.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        text: string;
+                        time: string;
+                        days?: number[];
+                        tz?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Added */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniReminder"];
+                        };
+                    };
+                };
+                /** @description A wrong text, time, day or zone (invalid_reminder) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description At most 20 reminders (too_many) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/reminders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a recurring reminder */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Removed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No such reminder */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ani/webhook/rotate": {
         parameters: {
             query?: never;
@@ -15913,7 +16066,7 @@ export interface paths {
         put?: never;
         /**
          * Ani's MCP endpoint
-         * @description Model Context Protocol over Streamable HTTP: one JSON-RPC request per POST, answered with plain JSON. Serves 2026-07-28 (per-request version in params._meta, server/discover) and 2025-11-25 / 2025-06-18 (initialize). Tools ani_say, ani_outfit, ani_act, ani_event, ani_mood, ani_remind, ani_ask, ani_focus, ani_card, ani_wallpaper, ani_sound, ani_hold, ani_presence, ani_items, ani_item, ani_chat, ani_reply, ani_history, ani_task, ani_habit, ani_note. Sign in with an API key of scope ani (or full) in Authorization; a read key gets 403. A notification gets 202 with no body; an unsupported version or a header that does not match the body gets 400; an unknown method 404. A page of another site (Origin) gets 403.
+         * @description Model Context Protocol over Streamable HTTP: one JSON-RPC request per POST, answered with plain JSON. Serves 2026-07-28 (per-request version in params._meta, server/discover) and 2025-11-25 / 2025-06-18 (initialize). Tools ani_say, ani_outfit, ani_act, ani_event, ani_mood, ani_remind, ani_ask, ani_focus, ani_card, ani_wallpaper, ani_sound, ani_hold, ani_presence, ani_items, ani_item, ani_chat, ani_reply, ani_history, ani_task, ani_habit, ani_note, ani_reminders, ani_reminder_add, ani_reminder_remove. Sign in with an API key of scope ani (or full) in Authorization; a read key gets 403. A notification gets 202 with no body; an unsupported version or a header that does not match the body gets 400; an unknown method 404. A page of another site (Origin) gets 403.
          */
         post: {
             parameters: {
@@ -23586,6 +23739,18 @@ export interface components {
                 /** Format: date-time */
                 created_at: string;
             }[];
+        };
+        AniReminder: {
+            /** Format: uuid */
+            id: string;
+            text: string;
+            /** @description HH:MM, local */
+            time: string;
+            /** @description Weekday bitmask */
+            days: number;
+            tz: string;
+            /** Format: date-time */
+            next_at: string;
         };
         /** @description say: text (1-200 characters). outfit: outfit (p1, p2, lingerie, or bare when the user turned it on). act: name (one of her moves). event: text (1-2000), source and title (1-60 each). mood: level (-1, 0, 1), seconds (60-3600). remind: text and in_seconds (60-604800) or at (ISO-8601). ask: text, options (1-4 of 1-30 characters), callback (https; the answer is POSTed there). focus: action (start with minutes 1-180, or stop). card: title (1-60), text (up to 200), url (https), seconds (5-120). wallpaper, sound: which (an id; sound also off). hold: minutes (0-480). Any type may carry id (the sender's id, a repeat within 24 hours is refused) and ttl (seconds to wait for the page; default 86400, at most 604800). */
         AniHookItem: {
