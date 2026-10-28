@@ -280,14 +280,29 @@ TEST_F(AniHookEvents, McpTurnReplySpokenOnPage) {
     EXPECT_EQ(items[0]["say"], "Привет!");
 }
 
-TEST_F(AniHookEvents, LongMcpReplyStaysInTheChat) {
+TEST_F(AniHookEvents, LongMcpReplySpokenInPart) {
     running(kAnna);
     const auto sent = Agent::send(kAnna, "Расскажи длинно", "UTC", "mcp");
     ASSERT_EQ(sent.status, Agent::Send::Queued);
-    gateway.reply = std::string(300, 'a');
+    gateway.reply = "Коротко: все хорошо. " + std::string(300, 'a') + ".";
     Agent::process_turn(json{{"turn", sent.turn["id"]}});
-    EXPECT_EQ((*turns.get(kAnna, sent.turn["id"].get<std::string>()))["status"], "done");
-    EXPECT_TRUE(inbox.claim(kAnna, 5).empty());
+    const json t = *turns.get(kAnna, sent.turn["id"].get<std::string>());
+    EXPECT_EQ(t["status"], "done");
+    EXPECT_EQ(t["reply"].get<std::string>().size(), gateway.reply.size()) << "whole in the chat";
+    const json items = inbox.claim(kAnna, 5);
+    ASSERT_EQ(items.size(), 1u);
+    EXPECT_EQ(items[0]["say"], "Коротко: все хорошо.");
+}
+
+TEST_F(AniHookEvents, LongHookReplySpokenInPart) {
+    running(kAnna);
+    event("Длинное событие");
+    run_event();
+    gateway.reply = "Пришло важное письмо. " + std::string(300, 'b') + ".";
+    Agent::process_turn(json{{"turn", hook_turn()}});
+    const json items = inbox.claim(kAnna, 5);
+    ASSERT_EQ(items.size(), 1u);
+    EXPECT_EQ(items[0]["say"], "Пришло важное письмо.");
 }
 
 TEST_F(AniHookEvents, McpTurnBesideUserTurn) {

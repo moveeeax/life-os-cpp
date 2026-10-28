@@ -1235,7 +1235,7 @@ components:
         url: { type: string, description: 'The webhook URL; its last segment is the secret token' }
         recent:
           type: array
-          description: The last 10 calls, newest first
+          description: The last 20 items, newest first
           items:
             type: object
             required: [id, kind, status, created_at]
@@ -1243,6 +1243,9 @@ components:
               id: { type: string, format: uuid }
               kind: { type: string, enum: [say, outfit, act, event, mood, remind, ask, focus, card, wallpaper, sound, hold] }
               status: { type: string, enum: [queued, thinking, ready, delivered, expired, failed] }
+              via: { type: [string, 'null'], description: 'Who sent it: webhook, mcp or schedule' }
+              say: { type: [string, 'null'], description: Her line (or the part of her reply said aloud) }
+              answer: { type: [string, 'null'], description: "An ask's answer" }
               created_at: { type: string, format: date-time }
     AniHookItem:
       type: object

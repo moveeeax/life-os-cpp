@@ -386,13 +386,15 @@ json process_turn(const json& payload) {
         agents.touch(owner);
         if (origin == "hook") {
             // Her answer is the line the page plays; SILENT, nothing.
+            // A long answer is said in part (whole sentences within a line); it is whole in the chat.
             const std::string line = trimmed(reply);
-            InboxRepository().resolve_turn(id, Hook::is_silent(line) ? std::nullopt : std::optional<std::string>(line));
+            InboxRepository().resolve_turn(
+                id, Hook::is_silent(line) ? std::nullopt : std::optional<std::string>(Now::Voice::spoken_part(line)));
             more_events(owner);
         } else if (origin == "mcp") {
-            // An open Now page says the reply aloud; a long one stays in the chat.
-            const std::string line = trimmed(reply);
-            if (Now::Voice::line_ok(line)) {
+            // An open Now page says the reply aloud, a long one in part; it is whole in the chat.
+            const std::string line = Now::Voice::spoken_part(reply);
+            if (!line.empty()) {
                 InboxRepository().add(
                     owner, "say", json{{"text", line}, {"via", "mcp"}}, std::nullopt, kMcpLineTtl, "ready");
             }

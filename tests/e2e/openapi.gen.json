@@ -4782,7 +4782,7 @@
      },
      "recent": {
       "type": "array",
-      "description": "The last 10 calls, newest first",
+      "description": "The last 20 items, newest first",
       "items": {
        "type": "object",
        "required": [
@@ -4823,6 +4823,27 @@
           "expired",
           "failed"
          ]
+        },
+        "via": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "Who sent it: webhook, mcp or schedule"
+        },
+        "say": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "Her line (or the part of her reply said aloud)"
+        },
+        "answer": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "An ask's answer"
         },
         "created_at": {
          "type": "string",
@@ -36456,7 +36477,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 549500,
-  "source_fnv1a64": "9b9b6856bd866cf9"
+  "source_bytes": 549788,
+  "source_fnv1a64": "f3a9dc7a3bd286bf"
  }
 }

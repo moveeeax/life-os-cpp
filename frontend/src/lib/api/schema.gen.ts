@@ -23569,7 +23569,7 @@ export interface components {
         AniWebhook: {
             /** @description The webhook URL; its last segment is the secret token */
             url: string;
-            /** @description The last 10 calls, newest first */
+            /** @description The last 20 items, newest first */
             recent: {
                 /** Format: uuid */
                 id: string;
@@ -23577,6 +23577,12 @@ export interface components {
                 kind: "say" | "outfit" | "act" | "event" | "mood" | "remind" | "ask" | "focus" | "card" | "wallpaper" | "sound" | "hold";
                 /** @enum {string} */
                 status: "queued" | "thinking" | "ready" | "delivered" | "expired" | "failed";
+                /** @description Who sent it: webhook, mcp or schedule */
+                via?: string | null;
+                /** @description Her line (or the part of her reply said aloud) */
+                say?: string | null;
+                /** @description An ask's answer */
+                answer?: string | null;
                 /** Format: date-time */
                 created_at: string;
             }[];

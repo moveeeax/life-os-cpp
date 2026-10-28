@@ -209,3 +209,14 @@ TEST_F(AniMcpTools, PresenceShowsHold) {
     call("ani_hold", {{"minutes", 30}});
     EXPECT_NE(text(call("ani_presence")).find("held_until"), std::string::npos);
 }
+
+TEST_F(AniMcpTools, ProposalArgsCapped) {
+    const json r = call("ani_note", {{"text", std::string(2500, 'n')}});
+    EXPECT_EQ(r["isError"], true);
+    EXPECT_NE(text(r).find("2000"), std::string::npos) << text(r);
+}
+
+TEST_F(AniMcpTools, WallpaperListTakesDevice) {
+    const json r = call("ani_wallpaper", {{"list", true}, {"device", "phone"}});
+    EXPECT_EQ(r["isError"], false) << text(r);
+}

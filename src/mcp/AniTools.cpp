@@ -130,10 +130,10 @@ json presence(const std::string& owner) {
 }
 
 /// The wallpapers or sounds the page can switch to: [{id, title or kind}].
-json choices(const std::string& what) {
+json choices(const std::string& what, const std::string& device) {
     json out = json::array();
     if (what == "wallpaper") {
-        for (const auto& w : Repositories::Now::WallpaperRepository().list_ready("desktop")) {
+        for (const auto& w : Repositories::Now::WallpaperRepository().list_ready(device)) {
             out.push_back(json{{"id", w.value("id", "")}, {"kind", w.value("kind", "")}});
         }
     } else {
@@ -222,6 +222,9 @@ json write_schema(const std::string& tool) {
 }
 
 json propose(const std::string& owner, const std::string& tool, const json& args) {
+    if (args.dump().size() > kProposalArgsMax) {
+        return refusal("A proposal takes at most " + std::to_string(kProposalArgsMax) + " characters of arguments.");
+    }
     if (!Agent::enabled()) {
         return refusal("Her agent is off.");
     }
@@ -373,7 +376,11 @@ Server ani_server(const std::string& owner, Scheduler after) {
                 {"title"})},
         {"ani_wallpaper",
          "Switches the wallpaper of Now (which: an id; none: the next one); list: true returns the ids.",
-         schema({{"which", {{"type", "string"}}}, {"list", {{"type", "boolean"}}}, {"id", kId}, {"ttl", kTtl}})},
+         schema({{"which", {{"type", "string"}}},
+                 {"list", {{"type", "boolean"}}},
+                 {"device", {{"type", "string"}, {"enum", {"desktop", "phone"}}}},
+                 {"id", kId},
+                 {"ttl", kTtl}})},
         {"ani_sound",
          "Switches the focus sound (which: an id, or off); list: true returns the ids and titles.",
          schema({{"which", {{"type", "string"}}}, {"list", {{"type", "boolean"}}}, {"id", kId}, {"ttl", kTtl}})},
@@ -394,7 +401,8 @@ Server ani_server(const std::string& owner, Scheduler after) {
     s.run = [owner, after](const std::string& name, const json& args, Reply done) {
         try {
             if ((name == "ani_wallpaper" || name == "ani_sound") && args.value("list", false) == true) {
-                return done(result("The ids to switch to.", choices(name.substr(4))));
+                const std::string device = args.value("device", "desktop") == "phone" ? "phone" : "desktop";
+                return done(result("The ids to switch to.", choices(name.substr(4), device)));
             }
             static const std::set<std::string> commands = {"ani_say",
                                                            "ani_outfit",

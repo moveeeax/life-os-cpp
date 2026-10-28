@@ -46,7 +46,7 @@ std::string base_url() {
 
 json hook_view(const std::string& owner, const std::string& token) {
     return json{{"url", base_url() + "/api/v1/ani/hook/" + token},
-                {"recent", Repositories::Agent::InboxRepository().recent(owner, 10)}};
+                {"recent", Repositories::Agent::InboxRepository().recent(owner, 20)}};
 }
 
 }  // namespace

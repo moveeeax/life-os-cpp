@@ -16,6 +16,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 #include <nlohmann/json.hpp>
 
@@ -70,6 +71,88 @@ inline bool line_ok(const std::string& text) {
         }
     }
     return seen && chars <= kLineCharsMax;
+}
+
+/// What of a longer reply is said aloud: line breaks and runs of spaces
+/// become one space; then whole sentences that fit in kLineCharsMax; a first
+/// sentence too long on its own is cut at a word with an ellipsis. Empty
+/// only for a blank reply.
+inline std::string spoken_part(const std::string& text) {
+    std::string flat;
+    for (const char ch : text) {
+        const auto c = static_cast<unsigned char>(ch);
+        const bool space = c < 0x20 || c == ' ' || c == 0x7F;
+        if (space) {
+            if (!flat.empty() && flat.back() != ' ') {
+                flat.push_back(' ');
+            }
+        } else {
+            flat.push_back(ch);
+        }
+    }
+    while (!flat.empty() && flat.back() == ' ') {
+        flat.pop_back();
+    }
+    if (flat.empty() || line_ok(flat)) {
+        return flat;
+    }
+    const auto chars_of = [](std::string_view s) {
+        std::size_t n = 0;
+        for (const char ch : s) {
+            n += (static_cast<unsigned char>(ch) & 0xC0) != 0x80 ? 1 : 0;
+        }
+        return n;
+    };
+    // The longest prefix of whole sentences within the limit.
+    std::size_t best = 0;
+    for (std::size_t i = 0; i < flat.size(); ++i) {
+        const char c = flat[i];
+        const bool ends =
+            c == '.' || c == '!' || c == '?' || (i + 2 < flat.size() && flat.compare(i, 3, "\xE2\x80\xA6") == 0);
+        if (!ends) {
+            continue;
+        }
+        const std::size_t end = c == '.' || c == '!' || c == '?' ? i + 1 : i + 3;
+        if (end < flat.size() && flat[end] != ' ') {
+            continue;
+        }
+        if (chars_of(std::string_view(flat).substr(0, end)) > kLineCharsMax) {
+            break;
+        }
+        best = end;
+    }
+    if (best > 0) {
+        return flat.substr(0, best);
+    }
+    // One long sentence: up to the last space that leaves room for the ellipsis.
+    std::size_t chars = 0;
+    std::size_t last_space = 0;
+    for (std::size_t i = 0; i < flat.size(); ++i) {
+        if ((static_cast<unsigned char>(flat[i]) & 0xC0) != 0x80) {
+            if (++chars > kLineCharsMax - 1) {
+                break;
+            }
+        }
+        if (flat[i] == ' ') {
+            last_space = i;
+        }
+    }
+    std::string cut = flat.substr(0, last_space > 0 ? last_space : 0);
+    if (cut.empty()) {
+        // No space at all: cut on a character boundary.
+        std::size_t n = 0;
+        std::size_t i = 0;
+        for (; i < flat.size(); ++i) {
+            if ((static_cast<unsigned char>(flat[i]) & 0xC0) != 0x80 && ++n > kLineCharsMax - 1) {
+                break;
+            }
+        }
+        cut = flat.substr(0, i);
+    }
+    while (!cut.empty() && (cut.back() == ' ' || cut.back() == ',')) {
+        cut.pop_back();
+    }
+    return cut + "\xE2\x80\xA6";
 }
 
 /// How the replies sound (the speech model takes a direction next to the text).

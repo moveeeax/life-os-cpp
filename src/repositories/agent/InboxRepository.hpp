@@ -115,7 +115,9 @@ public:
     }
 
     /// Items not played or ended yet (queued, thinking, ready, unexpired): the cap.
-    int pending_count(const std::string& owner) { return count_(owner, "('queued', 'thinking', 'ready')"); }
+    int pending_count(const std::string& owner) {
+        return count_(owner, "('queued', 'thinking', 'ready') AND (not_before IS NULL OR not_before <= now())");
+    }
 
     /// Ready items the page has not claimed: the dot on her ledge.
     int waiting(const std::string& owner) {
@@ -218,13 +220,14 @@ public:
         });
     }
 
-    /// The user's last @p limit calls for the settings list: time, kind,
-    /// status; never their text.
+    /// The user's last @p limit items for the log in her settings: time,
+    /// kind, status, who sent it (via), her line and an ask's answer.
     nlohmann::json recent(const std::string& owner, int limit) {
         return Database::get().execute_read([&](auto& txn) {
             auto r = txn.exec_params(
                 "SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT id::text AS id, kind, CASE WHEN status IN "
-                "('queued', 'thinking', 'ready') AND expires_at <= now() THEN 'expired' ELSE status END AS status, " +
+                "('queued', 'thinking', 'ready') AND expires_at <= now() THEN 'expired' ELSE status END AS status, "
+                "payload->>'via' AS via, say, answer, " +
                     iso("created_at") +
                     " AS created_at FROM ani_inbox WHERE owner_id = $1::uuid ORDER BY created_at DESC, id LIMIT $2) t",
                 owner,
