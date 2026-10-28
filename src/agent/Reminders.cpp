@@ -11,6 +11,7 @@
 #include "repositories/Zones.hpp"
 #include "repositories/agent/InboxRepository.hpp"
 #include "repositories/agent/ReminderRepository.hpp"
+#include "security/Audit.hpp"
 
 namespace Agent::Reminders {
 
@@ -61,6 +62,7 @@ nlohmann::json process_due(const nlohmann::json& /*payload*/) {
                   std::nullopt,
                   kLineTtl,
                   "ready");
+        Security::Audit::record(r.owner, "ani.reminder.said", "ani_reminder", r.id);
         ++said;
     }
     return nlohmann::json{{"status", "done"}, {"said", said}};

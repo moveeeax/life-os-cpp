@@ -30,6 +30,7 @@
 #include "repositories/agent/TurnRepository.hpp"
 #include "repositories/now/SoundRepository.hpp"
 #include "repositories/now/WallpaperRepository.hpp"
+#include "security/Audit.hpp"
 
 namespace Mcp {
 
@@ -469,12 +470,19 @@ Server ani_server(const std::string& owner, Scheduler after) {
                 }
                 const auto& r = std::get<Agent::Reminders::Input>(in);
                 const auto made = Repositories::Agent::ReminderRepository().add(owner, r.text, r.at, r.days, r.tz);
+                if (made) {
+                    Security::Audit::record(
+                        owner, "ani.reminder.add", "ani_reminder", (*made)["id"], json{{"via", "mcp"}});
+                }
                 return done(made ? result("Added.", *made) : refusal("At most 20 reminders."));
             }
             if (name == "ani_reminder_remove") {
-                return done(Repositories::Agent::ReminderRepository().remove(owner, args.value("id", ""))
-                                ? result("Removed.", json::object())
-                                : refusal("No such reminder."));
+                const std::string id = args.value("id", "");
+                if (!Repositories::Agent::ReminderRepository().remove(owner, id)) {
+                    return done(refusal("No such reminder."));
+                }
+                Security::Audit::record(owner, "ani.reminder.remove", "ani_reminder", id, json{{"via", "mcp"}});
+                return done(result("Removed.", json::object()));
             }
             if (name == "ani_history") {
                 json out = json::array();

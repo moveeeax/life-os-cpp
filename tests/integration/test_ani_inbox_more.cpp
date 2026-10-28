@@ -188,3 +188,25 @@ TEST_F(AniInboxMore, RecentShowsWayAndAnswer) {
     EXPECT_EQ(r[0]["answer"], "Да");
     EXPECT_FALSE(r[0].contains("payload"));
 }
+
+TEST_F(AniInboxMore, AuditTrail) {
+    Database::get().execute_write([](auto& txn) {
+        txn.exec("DELETE FROM audit_log WHERE action LIKE 'ani.%'");
+        return true;
+    });
+    const std::string id = accepted({{"type", "ask"}, {"text", "Секретный вопрос?"}});
+    ASSERT_EQ(Intake::answer(kAnna, id, "Да"), InboxRepository::Answer::Ok);
+    const json rows = Database::get().execute_read([](auto& txn) {
+        auto r = txn.exec(
+            "SELECT COALESCE(json_agg(json_build_object('a', action, 'actor', actor_id, 't', target_id, 'd', details) "
+            "ORDER BY id), '[]'::json) FROM audit_log WHERE action LIKE 'ani.%'");
+        return json::parse(r[0][0].as<std::string>());
+    });
+    ASSERT_EQ(rows.size(), 2u);
+    EXPECT_EQ(rows[0]["a"], "ani.inbox.ask");
+    EXPECT_EQ(rows[0]["actor"], kAnna);
+    EXPECT_EQ(rows[0]["t"], id);
+    EXPECT_EQ(rows[0]["d"]["via"], "webhook");
+    EXPECT_EQ(rows[1]["a"], "ani.ask.answer");
+    EXPECT_EQ(rows.dump().find("Секретный"), std::string::npos) << "no texts in the trail";
+}

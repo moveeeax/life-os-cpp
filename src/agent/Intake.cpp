@@ -16,6 +16,7 @@
 #include "repositories/agent/HookRepository.hpp"
 #include "repositories/agent/InboxRepository.hpp"
 #include "repositories/agent/PrefsRepository.hpp"
+#include "security/Audit.hpp"
 #include "webhooks/Webhooks.hpp"
 
 namespace Agent::Intake {
@@ -97,6 +98,9 @@ std::variant<Accepted, Refused> accept(const std::string& owner, Hook::Item item
     if (via == "webhook") {
         Repositories::Agent::HookRepository().touch(owner);
     }
+    // The admin's audit log: what came and how; never its text.
+    Security::Audit::record(
+        owner, "ani.inbox." + item.kind, "ani_inbox", added.id, json{{"via", via}, {"status", status}});
     return Accepted{added.id};
 }
 
@@ -105,6 +109,7 @@ Repositories::Agent::InboxRepository::Answer answer(const std::string& owner,
                                                     const std::string& text) {
     const auto a = Repositories::Agent::InboxRepository().answer(owner, id, text);
     if (a == Repositories::Agent::InboxRepository::Answer::Ok) {
+        Security::Audit::record(owner, "ani.ask.answer", "ani_inbox", id);
         // The answer is kept whatever happens here; the hourly purge retries.
         try {
             send_callbacks();

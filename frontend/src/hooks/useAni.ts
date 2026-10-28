@@ -14,9 +14,6 @@ export type ApiKeyCreated = components['schemas']['ApiKeyCreated'];
 const PREFS = '/api/v1/ani/prefs';
 const WEBHOOK = '/api/v1/ani/webhook';
 const KEYS = '/api/v1/account/api-keys';
-const REMINDERS = '/api/v1/ani/reminders';
-
-export type AniReminder = components['schemas']['AniReminder'];
 
 /** Ani's settings kept on the server (the bare outfit switch). */
 export function useAniPrefs(enabled = true) {
@@ -85,28 +82,5 @@ export function useCreateAniMcpKey() {
 export function useRevokeAniMcpKey() {
   return useApiMutation(async (id: string) => await api.deleteJson(`${KEYS}/${id}`), {
     invalidate: [qk.ani.mcpKeys()],
-  });
-}
-
-/** Her recurring reminders. */
-export function useAniReminders() {
-  return useQuery({
-    queryKey: qk.ani.reminders(),
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: AniReminder[] }>(REMINDERS, { signal })).data,
-  });
-}
-
-export function useAddAniReminder() {
-  return useApiMutation(
-    async (body: { text: string; time: string; days: number[]; tz: string }) =>
-      (await api.postJson<{ data: AniReminder }>(REMINDERS, { body })).data,
-    { invalidate: [qk.ani.reminders()] },
-  );
-}
-
-export function useRemoveAniReminder() {
-  return useApiMutation(async (id: string) => await api.deleteJson(`${REMINDERS}/${id}`), {
-    invalidate: [qk.ani.reminders()],
   });
 }

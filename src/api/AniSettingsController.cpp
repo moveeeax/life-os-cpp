@@ -21,6 +21,7 @@
 #include "repositories/agent/InboxRepository.hpp"
 #include "repositories/agent/PrefsRepository.hpp"
 #include "repositories/agent/ReminderRepository.hpp"
+#include "security/Audit.hpp"
 #include "storage/ObjectStore.hpp"
 #include "utils/Config.hpp"
 #include "utils/ErrorResponse.hpp"
@@ -167,6 +168,7 @@ void AniSettingsController::addReminder(const HttpRequestPtr& req, Callback&& ca
             callback(ErrorResponse::conflict("too_many", "at most 20 reminders"));
             return;
         }
+        Security::Audit::record(owner, "ani.reminder.add", "ani_reminder", (*made)["id"], json{{"via", "api"}});
         auto resp = Response::ok(json{{"data", *made}});
         resp->setStatusCode(k201Created);
         callback(resp);
@@ -183,6 +185,7 @@ void AniSettingsController::removeReminder(const HttpRequestPtr& req, Callback&&
             callback(ErrorResponse::not_found("not_found"));
             return;
         }
+        Security::Audit::record(owner, "ani.reminder.remove", "ani_reminder", id, json{{"via", "api"}});
         no_content(callback);
     } catch (const std::exception& e) {
         spdlog::error("ani.reminders remove failed: {}", e.what());

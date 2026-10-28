@@ -159,12 +159,6 @@ describe('AniSettingsCard', () => {
     await waitFor(() => expect(api.postJson).toHaveBeenCalledWith('/api/v1/ani/webhook/rotate'));
   });
 
-  it('lists the log as calm rows, the text only once a row is opened', async () => {
-    renderCard();
-    expect(await screen.findByRole('button', { name: /ask/ })).toBeTruthy();
-    expect(screen.queryByText('Чай?')).toBeNull();
-  });
-
   it('shows the MCP endpoint and lists only the ani keys', async () => {
     renderCard();
     expect(await screen.findByText(/\/api\/v1\/ani\/mcp/)).toBeTruthy();
@@ -190,30 +184,14 @@ describe('AniSettingsCard', () => {
     fireEvent.click(await screen.findByRole('button', { name: /revoke cpk_ab12/i }));
     await waitFor(() => expect(api.deleteJson).toHaveBeenCalledWith('/api/v1/account/api-keys/k1'));
   });
+});
 
-  it('lists reminders, adds one with weekdays and removes one', async () => {
+describe('AniSettingsCard, what it no longer shows', () => {
+  it('has no log and no reminders form (they live in the admin audit and the API)', async () => {
     renderCard();
-    expect(await screen.findByText('Выпей воды')).toBeTruthy();
-    expect(screen.getByText(/10:00 · Mon–Fri/)).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Reminder text'), { target: { value: 'Разминка' } });
-    fireEvent.change(screen.getByLabelText('Reminder time'), { target: { value: '18:30' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Sat' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Sun' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add reminder' }));
-    await waitFor(() =>
-      expect(api.postJson).toHaveBeenCalledWith('/api/v1/ani/reminders', {
-        body: { text: 'Разминка', time: '18:30', days: [1, 2, 3, 4, 5], tz: expect.any(String) },
-      }),
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Выпей воды' }));
-    await waitFor(() => expect(api.deleteJson).toHaveBeenCalledWith('/api/v1/ani/reminders/r1'));
-  });
-
-  it('opens a log row for who sent it, her line and the answer', async () => {
-    renderCard();
-    fireEvent.click(await screen.findByRole('button', { name: /ask/ }));
-    expect(screen.getByText('MCP, delivered')).toBeTruthy();
-    expect(screen.getByText('Чай?')).toBeTruthy();
-    expect(screen.getByText('Answer: Да')).toBeTruthy();
+    await screen.findByText(/webhook url/i);
+    expect(screen.queryByText('Log')).toBeNull();
+    expect(screen.queryByText('Reminders')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add reminder' })).toBeNull();
   });
 });
