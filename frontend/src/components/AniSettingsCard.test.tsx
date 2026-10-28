@@ -16,9 +16,26 @@ const URL1 = 'https://life.test/api/v1/ani/hook/aniwh_' + 'a'.repeat(48);
 const URL2 = 'https://life.test/api/v1/ani/hook/aniwh_' + 'b'.repeat(48);
 
 let bare = false;
+let keys: { id: string; name: string; prefix: string; scope: string; created_at: string }[] = [];
 
 beforeEach(() => {
   bare = false;
+  keys = [
+    {
+      id: 'k1',
+      name: 'Ani MCP',
+      prefix: 'cpk_ab12',
+      scope: 'ani',
+      created_at: '2026-10-27T10:00:00Z',
+    },
+    {
+      id: 'k2',
+      name: 'n8n',
+      prefix: 'cpk_cd34',
+      scope: 'full',
+      created_at: '2026-10-20T10:00:00Z',
+    },
+  ];
   vi.spyOn(api, 'getJson').mockImplementation(async (path: string) => {
     if (path === '/api/v1/ani/prefs') return { data: { bare } };
     if (path === '/api/v1/ani/webhook')
@@ -30,13 +47,26 @@ beforeEach(() => {
           ],
         },
       };
+    if (path === '/api/v1/account/api-keys') return { data: keys, total: keys.length };
     throw new Error('unexpected ' + path);
   });
   vi.spyOn(api, 'putJson').mockImplementation(async (_p: string, opts?: { body?: unknown }) => {
     bare = (opts?.body as { bare: boolean }).bare;
     return { data: { bare } };
   });
-  vi.spyOn(api, 'postJson').mockResolvedValue({ data: { url: URL2, recent: [] } });
+  vi.spyOn(api, 'postJson').mockImplementation(async (path: string) => {
+    if (path === '/api/v1/account/api-keys')
+      return {
+        id: 'k3',
+        name: 'Ani MCP',
+        prefix: 'cpk_ef56',
+        scope: 'ani',
+        created_at: '2026-10-28T10:00:00Z',
+        key: 'cpk_' + 'f'.repeat(64),
+      };
+    return { data: { url: URL2, recent: [] } };
+  });
+  vi.spyOn(api, 'deleteJson').mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -106,5 +136,31 @@ describe('AniSettingsCard', () => {
     const row = (await screen.findByText(/delivered/)).closest('li')!;
     expect(row.textContent).toMatch(/^say, delivered/);
     expect(row.textContent).not.toMatch(/Сборка/);
+  });
+
+  it('shows the MCP endpoint and lists only the ani keys', async () => {
+    renderCard();
+    expect(await screen.findByText(/\/api\/v1\/ani\/mcp/)).toBeTruthy();
+    expect(await screen.findByText('cpk_ab12')).toBeTruthy();
+    expect(screen.queryByText('cpk_cd34')).toBeNull();
+  });
+
+  it('makes an ani key and shows it once with the command', async () => {
+    renderCard();
+    fireEvent.click(await screen.findByRole('button', { name: /create key/i }));
+    await waitFor(() =>
+      expect(api.postJson).toHaveBeenCalledWith('/api/v1/account/api-keys', {
+        body: { name: 'Ani MCP', scope: 'ani' },
+      }),
+    );
+    const shown = await screen.findByText(/claude mcp add --transport http ani/);
+    expect(shown.textContent).toContain('Authorization: Bearer cpk_' + 'f'.repeat(64));
+    expect(shown.closest('.num')).toBeTruthy();
+  });
+
+  it('revokes an ani key', async () => {
+    renderCard();
+    fireEvent.click(await screen.findByRole('button', { name: /revoke cpk_ab12/i }));
+    await waitFor(() => expect(api.deleteJson).toHaveBeenCalledWith('/api/v1/account/api-keys/k1'));
   });
 });

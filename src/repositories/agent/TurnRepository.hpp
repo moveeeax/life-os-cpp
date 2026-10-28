@@ -27,7 +27,7 @@ public:
     /// An open turn older than this is taken for lost and failed as a timeout.
     static constexpr int kStaleSeconds = 900;
 
-    /// Queues a turn of @p origin ("user" or "hook"). nullopt while another
+    /// Queues a turn of @p origin ("user", "hook" or "mcp"). nullopt while another
     /// turn of the user from the same origin is open; an open turn older than
     /// kStaleSeconds is failed first, so a lost job cannot lock the chat.
     std::optional<nlohmann::json> open(const std::string& owner,
@@ -43,7 +43,7 @@ public:
                 kStaleSeconds,
                 origin);
             // The conflict target names the origin's own index (exactly its predicate).
-            const std::string target = origin == "hook" ? "'hook'" : "'user'";
+            const std::string target = origin == "hook" ? "'hook'" : origin == "mcp" ? "'mcp'" : "'user'";
             auto r = txn.exec_params("INSERT INTO ani_turns (owner_id, text, tz, origin) VALUES ($1::uuid, $2, $3, " +
                                          target +
                                          ") ON CONFLICT (owner_id) WHERE status IN ('queued', 'running') AND "

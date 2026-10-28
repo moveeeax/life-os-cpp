@@ -37,10 +37,11 @@ void ApiKeyController::create(const HttpRequestPtr& req, std::function<void(cons
     // require_string: a non-string "name" would reach get<std::string>()
     // below and throw type_error.302 → bare 500 instead of a 400.
     Validation::require_string(errs, body, "name");
-    // scope: "full" (the default, reads and writes) or "read" (GET, HEAD and
-    // OPTIONS only; the middleware answers 403 key_read_only to the rest).
+    // scope: "full" (the default, reads and writes), "read" (GET, HEAD and
+    // OPTIONS only; the middleware answers 403 key_read_only to the rest) or
+    // "ani" (Ani's MCP only; 403 key_scope anywhere else).
     if (body.contains("scope"))
-        Validation::one_of(errs, body, "scope", {"full", "read"});
+        Validation::one_of(errs, body, "scope", {"full", "read", "ani"});
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;

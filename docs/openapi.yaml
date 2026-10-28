@@ -1184,8 +1184,8 @@ components:
         status: { type: string, enum: [queued, running, done, failed] }
         origin:
           type: string
-          enum: [user, hook]
-          description: 'user: the user wrote it; hook: events that came through the webhook'
+          enum: [user, hook, mcp]
+          description: 'user: the user wrote it; hook: events that came through the webhook; mcp: a message sent through her MCP'
         text: { type: string, description: 'What the user wrote, or the events of a webhook turn' }
         reply: { type: [string, 'null'], description: 'Her answer, once done' }
         error:
@@ -1646,7 +1646,7 @@ components:
         id:           { type: string, format: uuid }
         name:         { type: string }
         prefix:       { type: string, description: The first characters of the key, to tell keys apart }
-        scope:        { type: string, enum: [full, read] }
+        scope:        { type: string, enum: [full, read, ani] }
         last_used_at: { type: ['string', 'null'] }
         revoked_at:   { type: ['string', 'null'] }
         created_at:   { type: string }
@@ -3789,7 +3789,7 @@ paths:
         '401': { description: Not authenticated }
     post:
       summary: Create an API key — the secret is returned ONCE in this response
-      description: "`scope` is `full` (the default: reads and writes the owner's data) or `read` (GET, HEAD and OPTIONS only; any other method with the key, and the GET of a Mi account link step, which completes the link, is answered 403 `key_read_only`). The key's metadata carries its `scope`."
+      description: "`scope` is `full` (the default: reads and writes the owner's data) or `read` (GET, HEAD and OPTIONS only; any other method with the key, and the GET of a Mi account link step, which completes the link, is answered 403 `key_read_only`) or `ani` (Ani's MCP at /api/v1/ani/mcp only; any other path is answered 403 `key_scope`). The key's metadata carries its `scope`."
       tags: [account]
       security: [{ BearerAuth: [] }]
       requestBody:
@@ -3801,7 +3801,7 @@ paths:
               required: [name]
               properties:
                 name: { type: string }
-                scope: { type: string, enum: [full, read], default: full }
+                scope: { type: string, enum: [full, read, ani], default: full }
       responses:
         '201':
           description: "Key created; `key` field holds the one-time secret, `scope` its scope"
@@ -10228,6 +10228,57 @@ paths:
                 properties:
                   data: { type: object, required: [waiting], properties: { waiting: { type: integer, minimum: 0 } } }
         '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+  /api/v1/ani/mcp:
+    post:
+      summary: Ani's MCP endpoint
+      description: >-
+        Model Context Protocol over Streamable HTTP: one JSON-RPC request per
+        POST, answered with plain JSON. Serves 2026-07-28 (per-request
+        version in params._meta, server/discover) and 2025-11-25 /
+        2025-06-18 (initialize). Tools ani_say, ani_outfit, ani_act,
+        ani_event, ani_presence, ani_items, ani_item, ani_chat, ani_reply,
+        ani_history. Sign in with an API key of scope ani (or full) in
+        Authorization; a read key gets 403. A notification gets 202 with no
+        body; an unsupported version or a header that does not match the
+        body gets 400; an unknown method 404. A page of another site
+        (Origin) gets 403.
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: MCP-Protocol-Version, in: header, required: false, schema: { type: string } }
+        - { name: Mcp-Method, in: header, required: false, schema: { type: string } }
+        - { name: Mcp-Name, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true, description: A JSON-RPC 2.0 request or notification }
+      responses:
+        '200':
+          description: The JSON-RPC response
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '202': { description: 'A notification, accepted' }
+        '400':
+          description: Not a JSON-RPC request, an unsupported protocol version, or a header that does not match the body
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { description: Not authenticated }
+        '403': { description: 'A read key (key_read_only), or a page of another site' }
+        '404':
+          description: Unknown method
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    get:
+      summary: No server stream on Ani's MCP endpoint
+      description: Always 405; the endpoint takes POST only.
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '405': { description: Use POST }
   /api/v1/now/voice-session:
     post:
       summary: A short-lived OpenAI Realtime client secret for talking with Ani on Now

@@ -24,6 +24,7 @@
 #include "jobs/Job.hpp"
 #include "jobs/Jobs.hpp"
 #include "net/Http.hpp"
+#include "now/Voice.hpp"
 #include "repositories/agent/ActionRepository.hpp"
 #include "repositories/agent/AgentRepository.hpp"
 #include "repositories/agent/InboxRepository.hpp"
@@ -201,7 +202,7 @@ std::string without_preface(const std::string& reply) {
     return rest == std::string::npos ? reply : reply.substr(rest);
 }
 
-Sent send(const std::string& owner, const std::string& text, const std::string& tz) {
+Sent send(const std::string& owner, const std::string& text, const std::string& tz, const std::string& origin) {
     const auto s = read_settings();
     if (!s) {
         return {Send::Off, json()};
@@ -214,7 +215,7 @@ Sent send(const std::string& owner, const std::string& text, const std::string& 
     if (wake(owner) == Wake::Busy) {
         return {Send::Busy, json()};
     }
-    auto turn = TurnRepository().open(owner, text, tz);
+    auto turn = TurnRepository().open(owner, text, tz, origin);
     if (!turn) {
         return {Send::Open, json()};
     }
@@ -323,6 +324,13 @@ json process_turn(const json& payload) {
             const std::string line = trimmed(reply);
             InboxRepository().resolve_turn(id, Hook::is_silent(line) ? std::nullopt : std::optional<std::string>(line));
             more_events(owner);
+        } else if (origin == "mcp") {
+            // An open Now page says the reply aloud; a long one stays in the chat.
+            const std::string line = trimmed(reply);
+            if (Now::Voice::line_ok(line)) {
+                InboxRepository().add(
+                    owner, "say", json{{"text", line}, {"via", "mcp"}}, std::nullopt, kMcpLineTtl, "ready");
+            }
         }
         return json{{"status", "done"}, {"tools", out.tools.size()}};
     } catch (const Jobs::DeferJob&) {

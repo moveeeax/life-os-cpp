@@ -284,3 +284,7 @@ files/jobs -> repositories/files
 files/jobs -> storage
 files/jobs -> utils
 core -> files/jobs
+mcp -> agent
+mcp -> jobs
+mcp -> repositories/agent
+api -> mcp

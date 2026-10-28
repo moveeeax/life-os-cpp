@@ -77,6 +77,9 @@ export function SpeakerIcon({ on }: { on: boolean }) {
  * conversation. Messages, replies and proposals are personal: Hide numbers
  * blurs them.
  */
+/** A turn the user typed here (not one from the webhook or the MCP). */
+const fromUser = (t: { origin?: string }) => t.origin !== 'hook' && t.origin !== 'mcp';
+
 /** Her answer to webhook events meaning "not worth telling" (SILENT, any case, bare punctuation). */
 const isSilent = (reply: string | null) => /^[\s\p{P}]*silent[\s\p{P}]*$/iu.test(reply ?? '');
 
@@ -116,8 +119,8 @@ export function AniChat({
     };
   }, []);
 
-  // Only the user's own open turn holds the box: a webhook turn runs beside it.
-  const mine = turns?.filter((t) => t.origin !== 'hook');
+  // Only the user's own open turn holds the box: a webhook or MCP turn runs beside it.
+  const mine = turns?.filter(fromUser);
   const last = mine?.[mine.length - 1];
   const waiting = last != null && isOpen(last);
   // The turn read again: the newest open one until it ends, or one whose
@@ -133,14 +136,9 @@ export function AniChat({
         .then((t) => {
           setTurns((all) => all?.map((x) => (x.id === t.id ? t : x)) ?? all);
           // Two reads in flight can both see it done: each reply is spoken once.
-          // A webhook turn's answer is played by her inbox (and kept back
-          // under Hide numbers), not here.
-          if (
-            t.status === 'done' &&
-            t.origin !== 'hook' &&
-            soundRef.current &&
-            !spoken.current.has(t.id)
-          ) {
+          // A webhook or MCP turn's answer is played by her inbox (and kept
+          // back under Hide numbers), not here.
+          if (t.status === 'done' && fromUser(t) && soundRef.current && !spoken.current.has(t.id)) {
             spoken.current.add(t.id);
             replyRef.current?.(t);
           }
@@ -320,6 +318,10 @@ export function AniChat({
               {t.origin === 'hook' ? (
                 <p className="ani-msg-from" data-num-ok>
                   From your webhook
+                </p>
+              ) : t.origin === 'mcp' ? (
+                <p className="ani-msg-from" data-num-ok>
+                  From MCP
                 </p>
               ) : null}
               <p className="ani-msg ani-msg-you num">{t.text}</p>

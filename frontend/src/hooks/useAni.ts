@@ -8,9 +8,12 @@ import type { components } from '@/lib/api/schema.gen';
 export type AniPrefs = components['schemas']['AniPrefs'];
 export type AniBare = components['schemas']['AniBare'];
 export type AniWebhook = components['schemas']['AniWebhook'];
+export type ApiKey = components['schemas']['ApiKey'];
+export type ApiKeyCreated = components['schemas']['ApiKeyCreated'];
 
 const PREFS = '/api/v1/ani/prefs';
 const WEBHOOK = '/api/v1/ani/webhook';
+const KEYS = '/api/v1/account/api-keys';
 
 /** Ani's settings kept on the server (the bare outfit switch). */
 export function useAniPrefs(enabled = true) {
@@ -54,4 +57,30 @@ export function useRotateAniWebhook() {
     async () => (await api.postJson<{ data: AniWebhook }>(`${WEBHOOK}/rotate`)).data,
     { invalidate: [qk.ani.webhook()] },
   );
+}
+
+/** The user's API keys that work only for Ani's MCP (scope ani). */
+export function useAniMcpKeys() {
+  return useQuery({
+    queryKey: qk.ani.mcpKeys(),
+    queryFn: async ({ signal }) =>
+      (await api.getJson<{ data: ApiKey[] }>(KEYS, { signal })).data.filter(
+        (k) => k.scope === 'ani' && !k.revoked_at,
+      ),
+  });
+}
+
+/** Makes a key for Ani's MCP; the plaintext key comes back only here. */
+export function useCreateAniMcpKey() {
+  return useApiMutation(
+    async () =>
+      await api.postJson<ApiKeyCreated>(KEYS, { body: { name: 'Ani MCP', scope: 'ani' } }),
+    { invalidate: [qk.ani.mcpKeys()] },
+  );
+}
+
+export function useRevokeAniMcpKey() {
+  return useApiMutation(async (id: string) => await api.deleteJson(`${KEYS}/${id}`), {
+    invalidate: [qk.ani.mcpKeys()],
+  });
 }

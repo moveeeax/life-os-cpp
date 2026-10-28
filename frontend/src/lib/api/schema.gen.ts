@@ -1012,7 +1012,7 @@ export interface paths {
         put?: never;
         /**
          * Create an API key — the secret is returned ONCE in this response
-         * @description `scope` is `full` (the default: reads and writes the owner's data) or `read` (GET, HEAD and OPTIONS only; any other method with the key, and the GET of a Mi account link step, which completes the link, is answered 403 `key_read_only`). The key's metadata carries its `scope`.
+         * @description `scope` is `full` (the default: reads and writes the owner's data) or `read` (GET, HEAD and OPTIONS only; any other method with the key, and the GET of a Mi account link step, which completes the link, is answered 403 `key_read_only`) or `ani` (Ani's MCP at /api/v1/ani/mcp only; any other path is answered 403 `key_scope`). The key's metadata carries its `scope`.
          */
         post: {
             parameters: {
@@ -1029,7 +1029,7 @@ export interface paths {
                          * @default full
                          * @enum {string}
                          */
-                        scope?: "full" | "read";
+                        scope?: "full" | "read" | "ani";
                     };
                 };
             };
@@ -15878,6 +15878,121 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ani/mcp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * No server stream on Ani's MCP endpoint
+         * @description Always 405; the endpoint takes POST only.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Use POST */
+                405: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Ani's MCP endpoint
+         * @description Model Context Protocol over Streamable HTTP: one JSON-RPC request per POST, answered with plain JSON. Serves 2026-07-28 (per-request version in params._meta, server/discover) and 2025-11-25 / 2025-06-18 (initialize). Tools ani_say, ani_outfit, ani_act, ani_event, ani_presence, ani_items, ani_item, ani_chat, ani_reply, ani_history. Sign in with an API key of scope ani (or full) in Authorization; a read key gets 403. A notification gets 202 with no body; an unsupported version or a header that does not match the body gets 400; an unknown method 404. A page of another site (Origin) gets 403.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    "MCP-Protocol-Version"?: string;
+                    "Mcp-Method"?: string;
+                    "Mcp-Name"?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            responses: {
+                /** @description The JSON-RPC response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description A notification, accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not a JSON-RPC request, an unsupported protocol version, or a header that does not match the body */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description A read key (key_read_only), or a page of another site */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unknown method */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/now/voice-session": {
         parameters: {
             query?: never;
@@ -23314,10 +23429,10 @@ export interface components {
             /** @enum {string} */
             status: "queued" | "running" | "done" | "failed";
             /**
-             * @description user: the user wrote it; hook: events that came through the webhook
+             * @description user: the user wrote it; hook: events that came through the webhook; mcp: a message sent through her MCP
              * @enum {string}
              */
-            origin?: "user" | "hook";
+            origin?: "user" | "hook" | "mcp";
             /** @description What the user wrote, or the events of a webhook turn */
             text: string;
             /** @description Her answer, once done */
@@ -23810,7 +23925,7 @@ export interface components {
             /** @description The first characters of the key */
             prefix: string;
             /** @enum {string} */
-            scope: "full" | "read";
+            scope: "full" | "read" | "ani";
             last_used_at: string | null;
             revoked_at: string | null;
             created_at: string;

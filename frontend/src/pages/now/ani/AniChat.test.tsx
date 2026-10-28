@@ -95,6 +95,28 @@ describe('AniChat', () => {
     expect(onReply).not.toHaveBeenCalled();
   });
 
+  it('marks MCP turns, takes a message beside one, and does not speak its reply', async () => {
+    vi.mocked(chat.loadTurns).mockResolvedValue([
+      turn({ id: 'm1', origin: 'mcp', status: 'running', text: 'Как дела?' }),
+    ]);
+    vi.mocked(chat.readTurn).mockResolvedValue(
+      turn({ id: 'm1', origin: 'mcp', status: 'done', text: 'Как дела?', reply: 'Хорошо.' }),
+    );
+    const onReply = vi.fn();
+    render(<AniChat tz="Asia/Almaty" onClose={() => {}} onReply={onReply} />);
+    const box = await screen.findByLabelText('Message to Ani');
+    expect(await screen.findByText(/from mcp/i)).toBeTruthy();
+    fireEvent.change(box, { target: { value: 'Привет' } });
+    expect((screen.getByRole('button', { name: /send/i }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(chat.POLL_MS);
+    });
+    expect(await screen.findByText('Хорошо.')).toBeTruthy();
+    expect(onReply).not.toHaveBeenCalled();
+  });
+
   it('wakes her agent and shows the chat so far', async () => {
     vi.mocked(chat.loadTurns).mockResolvedValue([turn({ status: 'done', reply: 'Спокойный.' })]);
     render(<AniChat tz="Asia/Almaty" onClose={() => {}} />);

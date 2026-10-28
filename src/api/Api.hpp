@@ -30,6 +30,7 @@
 #include "api/AdminController.hpp"
 #include "api/AniController.hpp"
 #include "api/AniHookController.hpp"
+#include "api/AniMcpController.hpp"
 #include "api/AniSettingsController.hpp"
 #include "api/ApiKeyController.hpp"
 #include "api/AuditController.hpp"

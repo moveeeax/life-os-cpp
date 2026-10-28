@@ -32,6 +32,8 @@ inline constexpr const char* kTurnJob = "ani_turn";
 inline constexpr int kTurnsPerHour = 60;
 /// The longest message.
 inline constexpr std::size_t kTurnTextMax = 4000;
+/// How long the line of a reply to an MCP message waits for the Now page.
+inline constexpr int kMcpLineTtl = 600;
 /// A turn still waiting for its agent after this long fails as a timeout.
 inline constexpr int kTurnWaitSeconds = 480;
 /// A first call refused for any reason is sent again while the turn is this
@@ -51,8 +53,9 @@ struct Sent {
     nlohmann::json turn;
 };
 
-/// Queues @p text (already checked: 1 to kTurnTextMax characters, a known zone).
-Sent send(const std::string& owner, const std::string& text, const std::string& tz);
+/// Queues @p text (already checked: 1 to kTurnTextMax characters, a known zone)
+/// as a turn of @p origin: "user" (the chat on Now) or "mcp" (her MCP).
+Sent send(const std::string& owner, const std::string& text, const std::string& tz, const std::string& origin = "user");
 
 /// The agent's session for the user's chat: the user id, then "#<n>" once the
 /// chat was cleared n times, so a cleared chat is a new conversation for it.

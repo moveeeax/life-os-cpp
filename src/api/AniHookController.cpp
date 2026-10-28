@@ -16,15 +16,12 @@
 #include <nlohmann/json.hpp>
 
 #include "agent/Hook.hpp"
-#include "agent/Settings.hpp"
+#include "agent/Intake.hpp"
+#include "agent/Presence.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
-#include "cache/Cache.hpp"
-#include "jobs/Jobs.hpp"
-#include "repositories/agent/AgentRepository.hpp"
 #include "repositories/agent/HookRepository.hpp"
 #include "repositories/agent/InboxRepository.hpp"
-#include "repositories/agent/PrefsRepository.hpp"
 #include "utils/ErrorResponse.hpp"
 
 namespace Api {
@@ -39,37 +36,6 @@ HttpResponsePtr error(HttpStatusCode status, const std::string& code, const std:
     return ErrorResponse::make({status, code, message, extra.is_object() ? extra : json::object()});
 }
 
-/// Counts the call; true while the user is within kCallsPerHour.
-bool within_rate(const std::string& owner) {
-    if (!Cache::is_initialized()) {
-        return true;
-    }
-    try {
-        const std::string key = "ani:hook:rate:" + owner;
-        const long long n = Cache::get().incr(key);
-        if (n == 1) {
-            Cache::get().expire(key, Hook::kWindowSeconds);
-        }
-        return n <= Hook::kCallsPerHour;
-    } catch (const std::exception& e) {
-        spdlog::warn("ani.hook: the rate counter failed: {}", e.what());
-        return true;
-    }
-}
-
-/// The refusal of an event the agent cannot take now; nullptr when it can.
-HttpResponsePtr agent_refusal(const std::string& owner) {
-    const auto s = ::Agent::read_settings();
-    if (!s) {
-        return error(k409Conflict, "agent_off", "her agent is off: send say, outfit or act");
-    }
-    const json used = Repositories::Agent::AgentRepository().month_usage(owner);
-    if (used.value("prompt_tokens", 0LL) + used.value("completion_tokens", 0LL) >= s->monthly_tokens) {
-        return error(k429TooManyRequests, "agent_budget", "her agent's tokens for this month are spent");
-    }
-    return nullptr;
-}
-
 void take(const HttpRequestPtr& req, AniHookController::Callback& callback, const std::string& token) {
     const std::string path = Hook::redact(req->path());
     std::optional<std::string> owner_opt;
@@ -81,7 +47,7 @@ void take(const HttpRequestPtr& req, AniHookController::Callback& callback, cons
         return;
     }
     const std::string& owner = *owner_opt;
-    if (!within_rate(owner)) {
+    if (!::Agent::Intake::within_rate(owner)) {
         callback(error(k429TooManyRequests,
                        "rate_limited",
                        "at most 120 calls an hour",
@@ -95,40 +61,13 @@ void take(const HttpRequestPtr& req, AniHookController::Callback& callback, cons
         callback(error(static_cast<HttpStatusCode>(e.status), e.code, e.message));
         return;
     }
-    const auto& item = std::get<Hook::Item>(parsed);
     try {
-        if (item.kind == "outfit" && item.payload.value("outfit", "") == "bare" &&
-            !Repositories::Agent::PrefsRepository().get(owner).value("bare", false)) {
-            callback(error(k422UnprocessableEntity, "bare_off", "the bare outfit is off in Ani's settings"));
+        auto got = ::Agent::Intake::accept(owner, std::get<Hook::Item>(std::move(parsed)), "webhook");
+        if (const auto* r = std::get_if<::Agent::Intake::Refused>(&got)) {
+            callback(error(static_cast<HttpStatusCode>(r->status), r->code, r->message, r->extra));
             return;
         }
-        const bool event = item.kind == "event";
-        if (event) {
-            if (auto refused = agent_refusal(owner)) {
-                callback(refused);
-                return;
-            }
-            if (!Jobs::is_initialized()) {
-                callback(ErrorResponse::service_unavailable("jobs_disabled", "Job queue not enabled"));
-                return;
-            }
-        }
-        InboxRepository inbox;
-        if (inbox.pending_count(owner) >= Hook::kPendingMax) {
-            callback(error(k429TooManyRequests, "backlog", "50 items wait for the page already"));
-            return;
-        }
-        const auto added =
-            inbox.add(owner, item.kind, item.payload, item.source_id, item.ttl, event ? "thinking" : "ready");
-        if (added.duplicate) {
-            callback(error(k409Conflict, "duplicate", "this id was sent in the last 24 hours", json{{"id", added.id}}));
-            return;
-        }
-        if (event) {
-            Jobs::get().submit(Hook::kEventJob, json{{"owner", owner}});
-        }
-        Repositories::Agent::HookRepository().touch(owner);
-        auto r = Response::ok(json{{"data", {{"id", added.id}}}});
+        auto r = Response::ok(json{{"data", {{"id", std::get<::Agent::Intake::Accepted>(got).id}}}});
         r->setStatusCode(k202Accepted);
         callback(r);
     } catch (const std::exception& e) {
@@ -151,6 +90,7 @@ void AniHookController::claim(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
     API_REFUSE_API_KEY(req, callback);
     try {
+        ::Agent::Presence::mark(owner);
         auto r = Response::ok(json{{"data", InboxRepository().claim(owner, kClaimMax)}});
         r->addHeader("Cache-Control", "no-store");
         callback(r);
@@ -164,6 +104,7 @@ void AniHookController::count(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
     API_REFUSE_API_KEY(req, callback);
     try {
+        ::Agent::Presence::mark(owner);
         auto r = Response::ok(json{{"data", {{"waiting", InboxRepository().waiting(owner)}}}});
         r->addHeader("Cache-Control", "no-store");
         callback(r);

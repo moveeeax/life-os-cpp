@@ -172,6 +172,33 @@ public:
         });
     }
 
+    /// The user's last @p limit items with what became of them, for her
+    /// MCP: [{id, kind, status, say, payload, created_at}], newest first.
+    nlohmann::json items(const std::string& owner, int limit) {
+        return Database::get().execute_read([&](auto& txn) {
+            auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + item_columns() +
+                                         " FROM ani_inbox WHERE owner_id = $1::uuid ORDER BY created_at DESC, id "
+                                         "LIMIT $2) t",
+                                     owner,
+                                     limit);
+            return nlohmann::json::parse(r[0][0].template as<std::string>());
+        });
+    }
+
+    /// One of the user's items as items() shows it.
+    std::optional<nlohmann::json> item(const std::string& owner, const std::string& id) {
+        return Database::get().execute_read([&](auto& txn) -> std::optional<nlohmann::json> {
+            auto r = txn.exec_params("SELECT row_to_json(t)::text FROM (SELECT " + item_columns() +
+                                         " FROM ani_inbox WHERE owner_id = $1::uuid AND id::text = $2) t",
+                                     owner,
+                                     id);
+            if (r.empty()) {
+                return std::nullopt;
+            }
+            return nlohmann::json::parse(r[0][0].template as<std::string>());
+        });
+    }
+
     /// Marks unplayed items past their time expired and deletes ended rows
     /// older than kKeepSeconds; returns how many rows changed or went.
     int purge() {
@@ -188,6 +215,12 @@ public:
     }
 
 private:
+    static std::string item_columns() {
+        return "id::text AS id, kind, CASE WHEN status IN ('queued', 'thinking', 'ready') AND expires_at <= now() "
+               "THEN 'expired' ELSE status END AS status, say, payload, " +
+               iso("created_at") + " AS created_at";
+    }
+
     static std::string iso(const std::string& col) {
         return "to_char(" + col + " AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')";
     }

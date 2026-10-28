@@ -428,6 +428,9 @@ void register_auth() {
             if (key_principal->key_read_only && !Security::ApiKeys::read_key_allows(req->method(), req->path()))
                 return short_circuit(
                     req, ErrorResponse::forbidden("key_read_only", "This API key may only read (GET, HEAD, OPTIONS)"));
+            if (key_principal->key_scope == "ani" && !Security::ApiKeys::ani_key_allows(req->path()))
+                return short_circuit(req,
+                                     ErrorResponse::forbidden("key_scope", "This API key works only for Ani's MCP"));
             req->attributes()->insert(Security::Auth::kPrincipalAttr, *key_principal);
             return {};
         }
