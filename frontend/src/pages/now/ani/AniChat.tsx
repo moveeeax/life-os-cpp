@@ -8,6 +8,7 @@ import {
   cancelAction,
   clearChat,
   confirmAction,
+  editable,
   deleteTurn,
   TEXT_MAX,
   failure,
@@ -163,7 +164,10 @@ export function AniChat({
 
   const [confirmClear, setConfirmClear] = useState(false);
 
-  const answer = async (turnId: string, a: Action, confirm: boolean) => {
+  // A Telegram proposal being reworded: its id and the words so far.
+  const [rewording, setRewording] = useState<{ id: string; text: string } | null>(null);
+
+  const answer = async (turnId: string, a: Action, confirm: boolean, text?: string) => {
     setProblem(null);
     const put = (next: Action) =>
       setTurns(
@@ -175,7 +179,14 @@ export function AniChat({
           ) ?? all,
       );
     try {
-      put(await (confirm ? confirmAction(a.id) : cancelAction(a.id)));
+      put(
+        await (confirm
+          ? text === undefined
+            ? confirmAction(a.id)
+            : confirmAction(a.id, text)
+          : cancelAction(a.id)),
+      );
+      setRewording(null);
     } catch (err) {
       if (err instanceof ApiClientError && err.code === 'action_expired') {
         put({ ...a, status: 'expired' });
@@ -343,14 +354,45 @@ export function AniChat({
                 ? null
                 : t.actions.map((a) => {
                     const state = actionState(a);
+                    const words = rewording?.id === a.id ? rewording.text : null;
                     return (
                       <div key={a.id} className="ani-act" data-status={a.status}>
-                        <span className="num">{a.summary}</span>
+                        {words != null ? (
+                          <textarea
+                            className="ani-act-text num"
+                            aria-label="The message"
+                            value={words}
+                            maxLength={4000}
+                            rows={3}
+                            onChange={(e) => setRewording({ id: a.id, text: e.target.value })}
+                          />
+                        ) : (
+                          <span className="num">{a.summary}</span>
+                        )}
                         {state == null ? (
                           <span className="ani-act-btns">
-                            <button type="button" onClick={() => void answer(t.id, a, true)}>
+                            <button
+                              type="button"
+                              disabled={words != null && words.trim() === ''}
+                              onClick={() =>
+                                void answer(
+                                  t.id,
+                                  a,
+                                  true,
+                                  words != null && words !== a.text ? words : undefined,
+                                )
+                              }
+                            >
                               Confirm
                             </button>
+                            {editable(a) && words == null && (
+                              <button
+                                type="button"
+                                onClick={() => setRewording({ id: a.id, text: a.text ?? '' })}
+                              >
+                                Edit
+                              </button>
+                            )}
                             <button type="button" onClick={() => void answer(t.id, a, false)}>
                               Cancel
                             </button>

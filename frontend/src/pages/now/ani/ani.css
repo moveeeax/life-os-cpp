@@ -480,6 +480,19 @@
   display: flex;
   gap: 6px;
 }
+.ani-act-text {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  color: var(--g-ink);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--g-glass-line);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.ani-act-btns button:disabled {
+  opacity: 0.5;
+}
 .ani-act-btns button {
   padding: 3px 10px;
   border-radius: 8px;

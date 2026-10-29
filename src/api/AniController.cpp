@@ -333,8 +333,26 @@ void AniController::confirmAction(const HttpRequestPtr& req, Callback&& callback
         callback(ErrorResponse::not_found("action_not_found"));
         return;
     }
+    // A Telegram proposal may come with the person's own words for the message.
+    std::string text;
+    if (!req->body().empty()) {
+        const auto body = json::parse(req->body(), nullptr, /*allow_exceptions=*/false);
+        if (!body.is_object() || (body.contains("text") && !body["text"].is_string())) {
+            callback(ErrorResponse::bad_request("invalid_body", "the body is {\"text\": \"...\"} or empty"));
+            return;
+        }
+        text = body.value("text", std::string());
+        if (body.contains("text") && (text.empty() || text.size() > 16000)) {
+            callback(ErrorResponse::bad_request("invalid_text", "text is 1 to 4000 characters"));
+            return;
+        }
+    }
     try {
         Repositories::Agent::ActionRepository actions;
+        if (!text.empty() && !actions.retext(owner, id, text)) {
+            callback(ErrorResponse::conflict("action_not_editable", "only a pending Telegram message takes a text"));
+            return;
+        }
         if (auto refused = unanswered(actions.answer(owner, id, /*confirm=*/true))) {
             callback(refused);
             return;

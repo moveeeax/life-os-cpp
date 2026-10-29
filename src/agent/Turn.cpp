@@ -21,6 +21,7 @@
 #include "agent/Lifecycle.hpp"
 #include "agent/Manifest.hpp"
 #include "agent/Settings.hpp"
+#include "agent/TelegramTools.hpp"
 #include "agent/Tools.hpp"
 #include "cache/Cache.hpp"
 #include "jobs/Job.hpp"
@@ -179,6 +180,9 @@ std::string preface(const std::string& local, const std::string& tz, const json&
             " Their Life OS data (day, tasks, goals, habits, sleep, money, food) is not in your memory: read it "
             "with the tools of this request (" +
             reads + ") every time it is asked about, never from memory.";
+    }
+    if (reads.find("tg_react") != std::string::npos) {
+        out += " The Telegram tools act on their real account: tg_react and tg_mark_read happen at once.";
     }
     if (!writes.empty()) {
         out += " Changes (" + writes +
@@ -359,10 +363,23 @@ json process_turn(const json& payload) {
             if (const auto token = Tools::access_token(owner)) {
                 tools = Tools::definitions();
                 run = Tools::runner(Net::Http::transport(), s->api_url, *token, tz);
+                // The owner's Telegram, for the one user it serves.
+                const bool telegram = TelegramTools::available(owner);
+                if (telegram) {
+                    for (const auto& t : TelegramTools::definitions()) {
+                        tools.push_back(t);
+                    }
+                    run = TelegramTools::runner(Net::Http::transport(), s->api_url, *token, std::move(run));
+                }
                 // Changes need the person's day (a habit is ticked for today or before).
                 if (local.size() >= 10) {
                     for (const auto& t : Actions::definitions()) {
                         tools.push_back(t);
+                    }
+                    if (telegram) {
+                        for (const auto& t : Actions::telegram_definitions()) {
+                            tools.push_back(t);
+                        }
                     }
                     run = Actions::runner(
                         Net::Http::transport(), s->api_url, *token, tz, local.substr(0, 10), owner, id, std::move(run));

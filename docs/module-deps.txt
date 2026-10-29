@@ -301,3 +301,11 @@ leetcode/jobs -> leetcode
 repositories/leetcode -> database
 repositories/metrics -> repositories/leetcode
 mcp -> security
+agent -> telegram
+agent -> repositories/telegram
+api -> telegram
+api -> repositories/telegram
+core -> telegram
+repositories/telegram -> database
+telegram -> net
+telegram -> utils

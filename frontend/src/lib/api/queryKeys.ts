@@ -35,6 +35,8 @@ export const qk = {
   leetcode: {
     profile: () => ['leetcode', 'profile'] as const,
   },
+  /** The owner's Telegram link (admin). */
+  telegram: () => ['telegram'] as const,
   /** Ani's settings on the server and her webhook. */
   ani: {
     prefs: () => ['ani', 'prefs'] as const,

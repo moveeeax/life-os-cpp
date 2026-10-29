@@ -89,6 +89,14 @@ describe('chat', () => {
     expect(api.postJson).toHaveBeenLastCalledWith('/api/v1/ani/actions/x/confirm');
   });
 
+  it('sends the own text of a Telegram confirm', async () => {
+    vi.mocked(api.postJson).mockResolvedValueOnce({ data: { id: 'x', status: 'confirmed' } });
+    await confirmAction('x', 'Буду в восемь');
+    expect(api.postJson).toHaveBeenLastCalledWith('/api/v1/ani/actions/x/confirm', {
+      body: { text: 'Буду в восемь' },
+    });
+  });
+
   it('asks her agent from the voice and waits for the reply', async () => {
     vi.mocked(api.postJson).mockResolvedValueOnce({ data: turn('q', 'queued') });
     vi.mocked(api.getJson)

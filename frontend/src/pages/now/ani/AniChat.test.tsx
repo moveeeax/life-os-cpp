@@ -248,6 +248,51 @@ describe('AniChat', () => {
     expect(screen.queryByText('Confirm')).toBeNull();
   });
 
+  it('lets the person reword a Telegram message before Confirm', async () => {
+    const pending = {
+      id: 'a3',
+      kind: 'tg_send' as const,
+      summary: 'Send to Anna: «Буду в семь»',
+      text: 'Буду в семь',
+      status: 'pending' as const,
+      error: null,
+    };
+    vi.mocked(chat.loadTurns).mockResolvedValue([
+      turn({ status: 'done', reply: 'Ответить Анне?', actions: [pending] }),
+    ]);
+    vi.mocked(chat.confirmAction).mockResolvedValue({ ...pending, status: 'confirmed' });
+    render(<AniChat tz="UTC" onClose={() => {}} />);
+    fireEvent.click(await screen.findByText('Edit'));
+    const box = screen.getByLabelText('The message');
+    expect((box as HTMLTextAreaElement).value).toBe('Буду в семь');
+    fireEvent.change(box, { target: { value: 'Буду в восемь' } });
+    fireEvent.click(screen.getByText('Confirm'));
+    expect(await screen.findByText('Doing it')).toBeTruthy();
+    expect(chat.confirmAction).toHaveBeenCalledWith('a3', 'Буду в восемь');
+  });
+
+  it('offers no Edit for other proposals', async () => {
+    vi.mocked(chat.loadTurns).mockResolvedValue([
+      turn({
+        status: 'done',
+        reply: 'Записать?',
+        actions: [
+          {
+            id: 'a4',
+            kind: 'add_note',
+            summary: 'Note to the inbox: «x»',
+            text: null,
+            status: 'pending',
+            error: null,
+          },
+        ],
+      }),
+    ]);
+    render(<AniChat tz="UTC" onClose={() => {}} />);
+    expect(await screen.findByText('Note to the inbox: «x»')).toBeTruthy();
+    expect(screen.queryByText('Edit')).toBeNull();
+  });
+
   it('cancels a proposal', async () => {
     const pending = {
       id: 'a2',

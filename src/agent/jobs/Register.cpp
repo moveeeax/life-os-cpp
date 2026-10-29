@@ -13,6 +13,7 @@
 #include "agent/Hook.hpp"
 #include "agent/Lifecycle.hpp"
 #include "agent/Reminders.hpp"
+#include "agent/TelegramPoll.hpp"
 #include "agent/Turn.hpp"
 #include "jobs/Dispatcher.hpp"
 
@@ -25,6 +26,8 @@ void register_jobs(Jobs::Dispatcher& d) {
     d.register_handler(kTurnJob, [](const nlohmann::json& payload) { return process_turn(payload); });
     d.register_handler(Hook::kEventJob, [](const nlohmann::json& payload) { return process_hook_event(payload); });
     d.register_handler(kInboxPurgeJob, [](const nlohmann::json& payload) { return process_inbox_purge(payload); });
+    d.register_handler(TelegramPoll::kPollJob,
+                       [](const nlohmann::json& payload) { return TelegramPoll::process_poll(payload); });
     d.register_handler(Reminders::kDueJob,
                        [](const nlohmann::json& payload) { return Reminders::process_due(payload); });
     d.register_handler(Actions::kActionJob,

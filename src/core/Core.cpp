@@ -28,6 +28,7 @@
 #include "agent/Lifecycle.hpp"
 #include "agent/Reminders.hpp"
 #include "agent/Settings.hpp"
+#include "agent/TelegramPoll.hpp"
 #include "agent/Turn.hpp"
 #include "billing/PayPalClient.hpp"
 #include "cache/Cache.hpp"
@@ -47,6 +48,7 @@
 #include "security/Idempotency.hpp"
 #include "security/RateLimit.hpp"
 #include "tasks/Tasks.hpp"
+#include "telegram/Gateway.hpp"
 #include "utils/Pg.hpp"
 #include "utils/Retry.hpp"
 #include "utils/Strings.hpp"
@@ -595,6 +597,7 @@ void Application::init_jobs_(Config::AppConfig& cfg) {
     register_files_sweep_schedule_();
     register_ani_agents_schedule_();
     register_leetcode_schedule_();
+    register_telegram_schedule_();
 }
 
 void Application::register_fitness_sync_schedule_(Config::AppConfig& cfg) {
@@ -743,6 +746,24 @@ void Application::register_leetcode_schedule_() {
             Jobs::get().submit(LeetCode::kSyncJob, nlohmann::json::object());
         } catch (const std::exception& e) {
             spdlog::warn("leetcode sync tick failed: {}", e.what());
+        }
+    });
+}
+
+void Application::register_telegram_schedule_() {
+    // The owner's Telegram: every minute a tick queues telegram_poll; the ani worker reads the new messages.
+    if (!Tasks::is_initialized() || !Database::is_initialized() || !Jobs::is_initialized() || !Telegram::settings()) {
+        return;
+    }
+    spdlog::info("telegram poll enabled: every minute");
+    Tasks::schedule_recurring("telegram_poll_schedule", std::chrono::minutes(1), [] {
+        if (!Jobs::is_initialized()) {
+            return;
+        }
+        try {
+            Jobs::get().submit(Agent::TelegramPoll::kPollJob, nlohmann::json::object());
+        } catch (const std::exception& e) {
+            spdlog::warn("telegram poll tick failed: {}", e.what());
         }
     });
 }

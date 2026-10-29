@@ -145,6 +145,7 @@ private:
     static void register_files_sweep_schedule_();
     static void register_ani_agents_schedule_();
     static void register_leetcode_schedule_();
+    static void register_telegram_schedule_();
 
     // Registers db_pool_active_connections + db_pool_size gauges, labeled by
     // pool (primary/replica). Saturation = active / size → 1.0 means acquire()
