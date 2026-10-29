@@ -13,6 +13,7 @@ import {
   useReport,
   useTransaction,
   useTransactions,
+  useTransfers,
   useUpdateTransaction,
 } from '@/hooks/useMoney';
 import {
@@ -33,6 +34,7 @@ import {
   type PeriodKind,
   type Transaction,
   type TransactionPatch,
+  type Transfer,
 } from '@/lib/ledger';
 import { parseAmount } from '@/lib/amounts';
 import { convertSum, groupByWeek, type Rates, type Week } from '@/lib/ledger/weeks';
@@ -51,7 +53,7 @@ import { AddForm } from './AddForm';
 import { Amount, CurrencyTotals, PeriodRow } from './bits';
 import { LoadError, MoneyFrame, Placeholder } from './frame';
 import { MonthStrip } from './MonthStrip';
-import { TransfersList } from './Transfers';
+import { TransferRow } from './Transfers';
 import './ledger.css';
 
 function TransactionEditor({
@@ -272,9 +274,26 @@ function categoryColor(c: Category): string {
   return CATEGORY_COLORS[Math.abs(c.position) % CATEGORY_COLORS.length];
 }
 
+type Item = { kind: 'row'; row: Transaction } | { kind: 'transfer'; transfer: Transfer };
+
+/** Rows (latest day first) with the transfers of the same span put in by their day. */
+function withTransfersByDay(rows: Transaction[], transfers: Transfer[]): Item[] {
+  const rest = [...transfers].sort((a, b) => b.date.localeCompare(a.date));
+  const out: Item[] = [];
+  for (const row of rows) {
+    while (rest.length > 0 && rest[0].date > row.date) {
+      out.push({ kind: 'transfer', transfer: rest.shift()! });
+    }
+    out.push({ kind: 'row', row });
+  }
+  for (const t of rest) out.push({ kind: 'transfer', transfer: t });
+  return out;
+}
+
 /** A week of the period: its dates, its row count and its spend in one currency; rows on click. */
 function WeekGroup({
   week,
+  count,
   open,
   current,
   onToggle,
@@ -284,6 +303,8 @@ function WeekGroup({
   children,
 }: {
   week: Week;
+  /** Rows and transfers of the week. */
+  count: number;
   open: boolean;
   current: boolean;
   onToggle: () => void;
@@ -321,7 +342,7 @@ function WeekGroup({
           {current && <span className="l-this"> · this week</span>}
         </span>
         <span className="l-week-meta" data-num-ok>
-          {week.rows.length}
+          {count}
           {sum ? (
             <span
               className="num"
@@ -600,9 +621,55 @@ export function MoneyLedgerPage() {
   useEffect(() => {
     if (byWeek && hasNextPage && !isFetchingNextPage && rows.length < 1000) void fetchNextPage();
   }, [byWeek, hasNextPage, isFetchingNextPage, fetchNextPage, rows.length]);
+  // Transfers and exchanges sit in the same list by date; a category, type or
+  // search filter leaves them out, since they have none of those.
+  const transferList = useTransfers(range.from, range.to, account || undefined);
+  const withTransfers = category === '' && type === '' && q === '';
+  const transfers = useMemo(
+    () => (withTransfers ? (transferList.data?.pages.flatMap((p) => p.data) ?? []) : []),
+    [withTransfers, transferList.data],
+  );
+  const {
+    hasNextPage: moreTransfers,
+    isFetchingNextPage: fetchingTransfers,
+    fetchNextPage: fetchTransfers,
+  } = transferList;
+  useEffect(() => {
+    if (withTransfers && moreTransfers && !fetchingTransfers && transfers.length < 1000)
+      void fetchTransfers();
+  }, [withTransfers, moreTransfers, fetchingTransfers, fetchTransfers, transfers.length]);
+  const transfersIn = (from: string, to: string) =>
+    transfers.filter((t) => t.date >= from && t.date <= to);
   const today = todayLocal();
   const [openWeeks, setOpenWeeks] = useState<Record<string, boolean>>({});
   const weekOpen = (w: Week) => openWeeks[w.from] ?? (today >= w.from && today <= w.to);
+  // A week period by day: the days with rows and those with only a transfer.
+  const dayList = useMemo(() => {
+    if (byWeek) return [];
+    const have = new Set(days.map((d) => d.date));
+    const extra = [...new Set(transfers.map((t) => t.date))]
+      .filter((d) => !have.has(d))
+      .map((date) => ({ date, rows: [] as Transaction[], totals: [] }));
+    return [...days, ...extra].sort((a, b) => b.date.localeCompare(a.date));
+  }, [byWeek, days, transfers]);
+  const renderItem = (it: Item) =>
+    it.kind === 'row' ? (
+      <LedgerRow
+        key={it.row.id}
+        row={it.row}
+        account={accountById.get(it.row.account_id)}
+        category={it.row.category_id ? categoryById.get(it.row.category_id) : undefined}
+        currencies={currencies}
+        onOpen={setEditing}
+      />
+    ) : (
+      <TransferRow
+        key={it.transfer.id}
+        transfer={it.transfer}
+        accounts={accounts}
+        currencies={currencies}
+      />
+    );
   const report = useReport(kind, date);
   const asIf = report.data?.as_if;
   const [byCurrency, setByCurrency] = useState(false);
@@ -777,15 +844,18 @@ export function MoneyLedgerPage() {
             <LoadError error={list.error} onRetry={() => void list.refetch()} />
           ) : (
             <>
-              {days.length === 0 && <p className="k-empty">Nothing in this period.</p>}
+              {days.length === 0 && transfers.length === 0 && (
+                <p className="k-empty">Nothing in this period.</p>
+              )}
               {byWeek
-                ? days.length > 0 &&
-                  weeks
-                    .filter((w) => w.rows.length > 0)
-                    .map((w) => (
+                ? weeks.map((w) => {
+                    const items = withTransfersByDay(w.rows, transfersIn(w.from, w.to));
+                    if (items.length === 0) return null;
+                    return (
                       <WeekGroup
                         key={w.from}
                         week={w}
+                        count={items.length}
                         open={weekOpen(w)}
                         current={today >= w.from && today <= w.to}
                         onToggle={() => setOpenWeeks((o) => ({ ...o, [w.from]: !weekOpen(w) }))}
@@ -793,43 +863,20 @@ export function MoneyLedgerPage() {
                         target={asIf?.currency ?? ''}
                         currencies={currencies}
                       >
-                        {w.rows.map((r) => (
-                          <LedgerRow
-                            key={r.id}
-                            row={r}
-                            account={accountById.get(r.account_id)}
-                            category={r.category_id ? categoryById.get(r.category_id) : undefined}
-                            currencies={currencies}
-                            onOpen={setEditing}
-                          />
-                        ))}
+                        {items.map(renderItem)}
                       </WeekGroup>
-                    ))
-                : days.map((d) => (
+                    );
+                  })
+                : dayList.map((d) => (
                     <Group
                       key={d.date}
                       label={formatDay(d.date)}
                       total={<CurrencyTotals totals={d.totals} currencies={currencies} />}
                     >
-                      {d.rows.map((r) => (
-                        <LedgerRow
-                          key={r.id}
-                          row={r}
-                          account={accountById.get(r.account_id)}
-                          category={r.category_id ? categoryById.get(r.category_id) : undefined}
-                          currencies={currencies}
-                          onOpen={setEditing}
-                        />
-                      ))}
+                      {withTransfersByDay(d.rows, transfersIn(d.date, d.date)).map(renderItem)}
                     </Group>
                   ))}
-              <TransfersList
-                from={range.from}
-                to={range.to}
-                account={account}
-                accounts={accounts}
-                currencies={currencies}
-              />
+
               {list.hasNextPage && (
                 <button
                   type="button"

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Modal } from '@/components/Modal';
-import { useDeleteTransfer, useTransfers, useUpdateTransfer } from '@/hooks/useMoney';
+import { useDeleteTransfer, useUpdateTransfer } from '@/hooks/useMoney';
 import {
   decimalsOf,
   formatDay,
@@ -15,7 +15,7 @@ import {
 } from '@/lib/ledger';
 import { parseAmount } from '@/lib/amounts';
 
-import { Group, Num, Row } from '@/shell/kit';
+import { Num, Row } from '@/shell/kit';
 import {
   dangerButton,
   inputClass,
@@ -165,7 +165,6 @@ function TransferEditor({ transfer, onClose }: { transfer: Transfer; onClose: ()
   );
 }
 
-/** The period's transfers and exchanges, each open for editing. */
 /** "Rate 520 KZT per USD": the cost rate turned over below 1, six significant digits. */
 function RateText({ rate, from, to }: { rate: number; from: string; to: string }) {
   const line = rateLine(rate, from, to);
@@ -177,72 +176,65 @@ function RateText({ rate, from, to }: { rate: number; from: string; to: string }
   );
 }
 
-export function TransfersList({
-  from,
-  to,
-  account,
+/**
+ * A transfer or an exchange as one line of the ledger: the accounts, the day and
+ * what moved; the rate, the fee and the editor on click.
+ */
+export function TransferRow({
+  transfer: t,
   accounts,
   currencies,
 }: {
-  from: string;
-  to: string;
-  account?: string;
+  transfer: Transfer;
   accounts: Account[];
   currencies?: Currency[];
 }) {
-  const transfers = useTransfers(from, to, account || undefined);
-  const [open, setOpen] = useState<Transfer | null>(null);
-  const rows = transfers.data?.pages.flatMap((p) => p.data) ?? [];
-  if (rows.length === 0) return null;
+  const [open, setOpen] = useState(false);
   const name = (id: string) => accounts.find((a) => a.id === id)?.name ?? '';
   const money = (n: number, c: string) => formatMoney(n, c, decimalsOf(currencies, c));
   return (
-    <Group label="Transfers and exchanges">
-      {rows.map((t) => (
-        <Row
-          key={t.id}
-          title={`${name(t.from_account_id)} → ${name(t.to_account_id)}`}
-          sub={
-            t.amount_received !== null ? (
+    <>
+      <Row
+        dot="transparent"
+        title={t.name || `${name(t.from_account_id)} → ${name(t.to_account_id)}`}
+        right={
+          <span className="l-right">
+            <span className="l-date" data-num-ok>
+              {formatDay(t.date, { weekday: false })}
+            </span>{' '}
+            · <Num>{money(t.amount_sent, t.from_currency)}</Num>
+            {t.amount_received !== null && (
               <>
-                {formatDay(t.date)} · received <Num>{money(t.amount_received, t.to_currency)}</Num>
+                {' → '}
+                <Num>{money(t.amount_received, t.to_currency)}</Num>
               </>
-            ) : (
-              formatDay(t.date)
-            )
-          }
-          right={<Num>{money(t.amount_sent, t.from_currency)}</Num>}
-        >
-          {t.cost_rate !== null && (
-            <RateText rate={t.cost_rate} from={t.from_currency} to={t.to_currency} />
-          )}
-          {t.fee !== null && t.fee > 0 && (
-            <span>
-              Fee <Num>{money(t.fee, t.from_currency)}</Num>
-            </span>
-          )}
-          <span className="k-actions">
-            <button type="button" className="k-link" onClick={() => setOpen(t)}>
-              Edit or delete
-            </button>
+            )}
           </span>
-        </Row>
-      ))}
-      {transfers.hasNextPage && (
-        <button
-          type="button"
-          onClick={() => void transfers.fetchNextPage()}
-          disabled={transfers.isFetchingNextPage}
-          className={secondaryButton}
-        >
-          {transfers.isFetchingNextPage ? 'Loading…' : 'Show more transfers'}
-        </button>
-      )}
+        }
+      >
+        <span>
+          {name(t.from_account_id)} → {name(t.to_account_id)}
+        </span>
+        {t.cost_rate !== null && (
+          <RateText rate={t.cost_rate} from={t.from_currency} to={t.to_currency} />
+        )}
+        {t.fee !== null && t.fee > 0 && (
+          <span>
+            Fee <Num>{money(t.fee, t.from_currency)}</Num>
+          </span>
+        )}
+        {t.note && <span>{t.note}</span>}
+        <span className="k-actions">
+          <button type="button" className="k-link" onClick={() => setOpen(true)}>
+            Edit or delete
+          </button>
+        </span>
+      </Row>
       {open && (
-        <Modal onClose={() => setOpen(null)} className="max-w-lg">
-          <TransferEditor transfer={open} onClose={() => setOpen(null)} />
+        <Modal onClose={() => setOpen(false)} className="max-w-lg">
+          <TransferEditor transfer={t} onClose={() => setOpen(false)} />
         </Modal>
       )}
-    </Group>
+    </>
   );
 }
