@@ -6,6 +6,14 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.51.0] - 2026-10-29
+
+### Added
+- Ani reads the owner's Telegram through their telegram-rest-gateway: an admin links it in Account → Telegram (the gateway token stays in server config), every minute new private messages and @mentions become one event for her, she reads chats and searches, reacts and marks messages read by herself, and proposes messages to send or edit, which the owner confirms on Now and may reword first.
+
+### Changed
+- Transfers and exchanges are lines of the ledger, in their week or day by date among the rows (accounts, day and what moved; rate, fee and the editor on click), instead of a block under the list.
+
 ## [1.50.0] - 2026-10-29
 
 ### Added
