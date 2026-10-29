@@ -348,6 +348,8 @@ public:
         "leetcode_profiles",
         "telegram_cursors",
         "telegram_link",
+        "telegram_waiting",
+        "telegram_quiet",
         "calendar_links",
         "calendar_states",
     };

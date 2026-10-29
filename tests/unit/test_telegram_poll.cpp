@@ -121,3 +121,13 @@ TEST(TelegramTools, RequestsOfTheTools) {
     EXPECT_FALSE(refusal.empty());
     EXPECT_FALSE(Agent::TelegramTools::is_telegram("tg_send")) << "sending is a proposal (Actions)";
 }
+
+TEST(TelegramPoll, WaitingIsAnIncomingMessageOverADayOld) {
+    const json dm = {{"id", "10"}, {"title", "Anna"}, {"type", "private"}};
+    const long long now = 2000000000;
+    EXPECT_EQ(waiting_since(dm, json{{"is_outgoing", false}, {"date", now - 90000}}, now), now - 90000);
+    EXPECT_EQ(waiting_since(dm, json{{"is_outgoing", false}, {"date", now - 3600}}, now), 0) << "less than a day";
+    EXPECT_EQ(waiting_since(dm, json{{"is_outgoing", true}, {"date", now - 90000}}, now), 0) << "the owner answered";
+    const json group = {{"id", "-1"}, {"type", "supergroup"}};
+    EXPECT_EQ(waiting_since(group, json{{"is_outgoing", false}, {"date", now - 90000}}, now), 0);
+}

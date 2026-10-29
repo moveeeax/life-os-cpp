@@ -24,19 +24,26 @@ public:
         std::string me_id;
         std::string username;
         bool primed = false;
+        bool review_to_self = false;
+        /// The waiting pass ran within the hour.
+        bool waiting_fresh = false;
     };
 
     /// The link, whoever it serves.
     std::optional<Link> current() {
         return Database::get().execute_read([&](auto& txn) -> std::optional<Link> {
-            auto r = txn.exec("SELECT owner_id::text, me_id, username, primed FROM telegram_link LIMIT 1");
+            auto r = txn.exec(
+                "SELECT owner_id::text, me_id, username, primed, review_to_self, COALESCE(waiting_at > now() - "
+                "interval '1 hour', false) FROM telegram_link LIMIT 1");
             if (r.empty()) {
                 return std::nullopt;
             }
             return Link{r[0][0].template as<std::string>(),
                         r[0][1].template as<std::string>(),
                         r[0][2].template as<std::string>(),
-                        r[0][3].template as<bool>()};
+                        r[0][3].template as<bool>(),
+                        r[0][4].template as<bool>(),
+                        r[0][5].template as<bool>()};
         });
     }
 
@@ -54,7 +61,8 @@ public:
         return Database::get().execute_read([&](auto& txn) -> std::optional<nlohmann::json> {
             auto r = txn.exec_params(
                 "SELECT json_build_object('me_id', me_id, 'username', username, 'polled_at', polled_at, "
-                "'last_error', last_error, 'created_at', created_at)::text FROM telegram_link WHERE owner_id = "
+                "'last_error', last_error, 'created_at', created_at, 'review_to_self', review_to_self)::text FROM "
+                "telegram_link WHERE owner_id = "
                 "$1::uuid",
                 owner);
             if (r.empty()) {
@@ -86,6 +94,7 @@ public:
     bool remove(const std::string& owner) {
         return Database::get().execute_write([&](auto& txn) {
             txn.exec_params("DELETE FROM telegram_cursors WHERE owner_id = $1::uuid", owner);
+            txn.exec_params("DELETE FROM telegram_waiting WHERE owner_id = $1::uuid", owner);
             return txn.exec_params("DELETE FROM telegram_link WHERE owner_id = $1::uuid", owner).affected_rows() > 0;
         });
     }
@@ -131,6 +140,84 @@ public:
             txn.exec_params(
                 "UPDATE telegram_link SET last_error = left($2, 200) WHERE owner_id = $1::uuid", owner, error);
             return true;
+        });
+    }
+
+    /// The private chats waiting for an answer, replaced as one set (the hourly pass).
+    void set_waiting(const std::string& owner, const nlohmann::json& chats) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params("DELETE FROM telegram_waiting WHERE owner_id = $1::uuid", owner);
+            for (const auto& c : chats) {
+                txn.exec_params(
+                    "INSERT INTO telegram_waiting (owner_id, chat_id, title, since) VALUES ($1::uuid, $2, left($3, "
+                    "200), to_timestamp($4)) ON CONFLICT DO NOTHING",
+                    owner,
+                    c.value("chat", std::string()),
+                    c.value("title", std::string()),
+                    c.value("since", 0LL));
+            }
+            txn.exec_params("UPDATE telegram_link SET waiting_at = now() WHERE owner_id = $1::uuid", owner);
+            return true;
+        });
+    }
+
+    /// [{chat, title, since}] oldest first, quiet chats left out.
+    nlohmann::json waiting(const std::string& owner) {
+        return Database::get().execute_read([&](auto& txn) {
+            return nlohmann::json::parse(
+                txn.exec_params(
+                       "SELECT COALESCE(json_agg(json_build_object('chat', w.chat_id, 'title', w.title, 'since', "
+                       "w.since) ORDER BY w.since), '[]'::json)::text FROM telegram_waiting w WHERE w.owner_id = "
+                       "$1::uuid AND NOT EXISTS (SELECT 1 FROM telegram_quiet q WHERE q.owner_id = w.owner_id AND "
+                       "q.chat_id = w.chat_id)",
+                       owner)[0][0]
+                    .template as<std::string>());
+        });
+    }
+
+    std::map<std::string, std::string> quiet(const std::string& owner) {
+        return Database::get().execute_read([&](auto& txn) {
+            std::map<std::string, std::string> out;
+            for (const auto& row :
+                 txn.exec_params("SELECT chat_id, title FROM telegram_quiet WHERE owner_id = $1::uuid", owner)) {
+                out[row[0].template as<std::string>()] = row[1].template as<std::string>();
+            }
+            return out;
+        });
+    }
+
+    void set_quiet(const std::string& owner, const std::string& chat, const std::string& title, bool on) {
+        Database::get().execute_write([&](auto& txn) {
+            if (on) {
+                txn.exec_params(
+                    "INSERT INTO telegram_quiet (owner_id, chat_id, title) VALUES ($1::uuid, $2, left($3, 200)) ON "
+                    "CONFLICT (owner_id, chat_id) DO UPDATE SET title = EXCLUDED.title",
+                    owner,
+                    chat,
+                    title);
+            } else {
+                txn.exec_params("DELETE FROM telegram_quiet WHERE owner_id = $1::uuid AND chat_id = $2", owner, chat);
+            }
+            return true;
+        });
+    }
+
+    void set_review_to_self(const std::string& owner, bool on) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params("UPDATE telegram_link SET review_to_self = $2 WHERE owner_id = $1::uuid", owner, on);
+            return true;
+        });
+    }
+
+    /// Marks @p week (ISO, "2026-W44") as sent; false when it went already.
+    bool claim_review_week(const std::string& owner, const std::string& week) {
+        return Database::get().execute_write([&](auto& txn) {
+            return txn.exec_params(
+                          "UPDATE telegram_link SET review_sent_week = $2 WHERE owner_id = $1::uuid AND "
+                          "review_to_self AND review_sent_week IS DISTINCT FROM $2",
+                          owner,
+                          week)
+                       .affected_rows() > 0;
         });
     }
 };

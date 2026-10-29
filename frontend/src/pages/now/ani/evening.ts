@@ -25,3 +25,34 @@ export function evening(
   const done = all.length - move.length;
   return { text: `Сделано ${done} из ${all.length}. Перенести ${move.length} на завтра?`, move };
 }
+
+export interface Waiting {
+  chat: string;
+  title: string;
+  since: string;
+}
+
+const SINCE_DAY = [
+  'воскресенья',
+  'понедельника',
+  'вторника',
+  'среды',
+  'четверга',
+  'пятницы',
+  'субботы',
+];
+
+/** Who waits for an answer in Telegram, in words: up to three names and since when; empty for none. */
+export function waitingWords(list: Waiting[], now: Date): string {
+  const people = list.filter((w) => w.title.trim() !== '').slice(0, 3);
+  if (people.length === 0) return '';
+  const oldest = new Date(people[0].since);
+  const days = Math.floor((now.getTime() - oldest.getTime()) / 86_400_000);
+  const when =
+    days <= 1 ? 'со вчера' : days < 7 ? `с ${SINCE_DAY[oldest.getDay()]}` : 'больше недели';
+  const names = people.map((w) => w.title.trim());
+  const who =
+    names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} и ${names[names.length - 1]}`;
+  const more = list.length > people.length ? ` и еще ${list.length - people.length}` : '';
+  return `${who}${more} ${names.length === 1 && !more ? 'ждет' : 'ждут'} ответа в Telegram ${when}.`;
+}

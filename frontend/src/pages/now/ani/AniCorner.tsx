@@ -9,7 +9,7 @@ import { AniChat, SpeakerIcon } from './AniChat';
 import { soundOn, speechUrl, useSound } from './chat';
 import type { Ani } from './engine';
 import { REVIEW_EVENT } from '../review/review';
-import { evening, tomorrowOf } from './evening';
+import { evening, tomorrowOf, waitingWords, type Waiting } from './evening';
 import { greeting, HELLO, hourOf } from './greet';
 import { useInbox, type Play } from './inbox';
 import { moodLevel, moodOf, moveMood } from './mood';
@@ -373,16 +373,32 @@ export function AniCorner({
         dayOf(EVENING_KEY) !== c.date
       ) {
         setDayOf(EVENING_KEY, c.date);
-        // The day's tasks first: done of all, and an offer to move the rest.
-        const sum = evening(c.today, document.documentElement.classList.contains('hide-numbers'));
-        if (sum) {
-          if (sum.move.length > 0) setMoveOffer({ ids: sum.move, due: tomorrowOf(c.date) });
-          answer.current({ text: sum.text });
-          return;
-        }
-        const f = c.today?.focus;
-        const line = f && !f.done ? say('focusOpen') : f?.done ? say('dayDone') : say('howWasDay');
-        answer.current({ ...line, chat: true });
+        // Telegram answers still owed go after the day's line (none without Telegram).
+        void api
+          .getJson<{ data: Waiting[] }>('/api/v1/telegram/waiting')
+          .then((r) => (Array.isArray(r.data) ? r.data : []))
+          .catch(() => [] as Waiting[])
+          .then((waiting) => {
+            const owed = waitingWords(waiting, new Date());
+            // The day's tasks first: done of all, and an offer to move the rest.
+            const sum = evening(
+              c.today,
+              document.documentElement.classList.contains('hide-numbers'),
+            );
+            if (sum) {
+              if (sum.move.length > 0) setMoveOffer({ ids: sum.move, due: tomorrowOf(c.date) });
+              answer.current({ text: owed ? `${sum.text} ${owed}` : sum.text });
+              return;
+            }
+            if (owed) {
+              answer.current({ text: owed });
+              return;
+            }
+            const f = c.today?.focus;
+            const line =
+              f && !f.done ? say('focusOpen') : f?.done ? say('dayDone') : say('howWasDay');
+            answer.current({ ...line, chat: true });
+          });
         return;
       }
       if (now - active < 60_000 && now - streak >= STRETCH_MS && now - stretched >= STRETCH_MS) {

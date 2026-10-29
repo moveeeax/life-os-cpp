@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -9,7 +9,7 @@ import type { Today } from '@/lib/now/types';
 import { Group, Row, Sheet } from '@/shell/kit';
 
 import { tomorrowOf } from '../ani/evening';
-import { closedKey, groupsOf, weekOf } from './review';
+import { closedKey, groupsOf, reviewText, weekOf } from './review';
 
 function readClosed(week: string): string[] {
   try {
@@ -57,6 +57,17 @@ export function WeeklyReview({
   const habits = g.habits.filter((h) => !closed.includes(`habit:${h.name}`));
   const qc = useQueryClient();
   const [failed, setFailed] = useState(false);
+  // On Sunday it also goes to Saved Messages when the owner turned that on;
+  // the server keeps it to once a week and answers 404 without Telegram.
+  const sunday = new Date(`${date}T12:00:00Z`).getUTCDay() === 0;
+  useEffect(() => {
+    if (!sunday || !today) return;
+    void api
+      .postJson('/api/v1/telegram/self', { body: { text: reviewText(today, week), week } })
+      .catch(() => {});
+    // Once per opening: the text of the moment it opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sunday, week, today === undefined]);
   const patch = (id: string, body: Record<string, unknown>) =>
     api.patchJson(`/api/v1/tasks/items/${id}`, { body, query: { tz } }).then(
       () => {
