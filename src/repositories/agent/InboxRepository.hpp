@@ -192,7 +192,10 @@ public:
                 "UPDATE ani_inbox i SET status = CASE WHEN $2::text IS NOT NULL AND i.id IN (SELECT id FROM f) THEN "
                 "'ready' ELSE 'delivered' END, say = CASE WHEN i.id IN (SELECT id FROM f) THEN $2::text END, "
                 "ready_at = now(), delivered_at = CASE WHEN $2::text IS NOT NULL AND i.id IN (SELECT id FROM f) "
-                "THEN NULL ELSE now() END WHERE i.turn_id = $1::uuid AND i.status = 'thinking'",
+                "THEN NULL ELSE now() END, "
+                // The spoken item names its turn: the page shows the turn's proposals as buttons.
+                "payload = CASE WHEN i.id IN (SELECT id FROM f) THEN i.payload || jsonb_build_object('turn', "
+                "$1::text) ELSE i.payload END WHERE i.turn_id = $1::uuid AND i.status = 'thinking'",
                 turn_id,
                 say);
             return true;

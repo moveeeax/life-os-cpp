@@ -7,25 +7,13 @@ import { Input } from '@/components/ui/input';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema.gen';
+import { HOLD_KEY, LINE_KINDS } from '@/pages/now/ani/lines';
 
 type Fact = components['schemas']['AniFact'];
 type Prefs = components['schemas']['AniPrefs'];
 
 const KEY = ['ani', 'facts'] as const;
 const PREFS = ['ani', 'prefs'] as const;
-
-/** Her mutable kinds of lines, as the page names them. */
-export const LINE_KINDS: Record<string, string> = {
-  brief: 'Morning brief',
-  evening: 'Evening word',
-  break: 'Break after focus',
-  stretch: 'Stretch reminders',
-  hello: 'Hellos',
-  telegram: 'Telegram news',
-  webhook: 'Webhook events',
-  reminder: 'Reminders',
-  calendar: 'Calendar news',
-};
 
 function FactRow({ fact }: { fact: Fact }) {
   const [text, setText] = useState<string | null>(null);
@@ -106,10 +94,33 @@ export function AniFacts() {
   );
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
+  const [hold, setHold] = useState(() => {
+    try {
+      return localStorage.getItem(HOLD_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
   const list = Array.isArray(facts.data) ? facts.data : [];
   const muted = Array.isArray(prefs.data?.muted) ? prefs.data.muted : [];
   return (
     <div className="space-y-3">
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={hold}
+          onChange={(e) => {
+            setHold(e.target.checked);
+            try {
+              if (e.target.checked) localStorage.setItem(HOLD_KEY, '1');
+              else localStorage.removeItem(HOLD_KEY);
+            } catch {
+              // Kept in this browser only.
+            }
+          }}
+        />
+        Hold to talk: on a call the mic listens while you hold it or the space bar
+      </label>
       <button
         type="button"
         className="text-sm font-medium"

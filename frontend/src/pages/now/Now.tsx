@@ -1,7 +1,9 @@
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router';
 
 import { useHabitsEnabled } from '@/hooks/useHabits';
+import { api } from '@/lib/api/client';
 import { useMe } from '@/hooks/useMe';
 import {
   useNowSettings,
@@ -111,6 +113,16 @@ function NowScreen() {
   const habitsOn = useHabitsEnabled(Boolean(me));
   const [picking, setPicking] = useState(false);
   const session = useFocusSession(me?.id ?? null);
+  // While a session runs Ani keeps quiet; the page still counts what waits for her.
+  const aniWaiting = useQuery({
+    queryKey: ['ani', 'inbox', 'count'],
+    enabled: session.phase === 'running' || session.phase === 'paused',
+    refetchInterval: 15_000,
+    retry: false,
+    queryFn: async ({ signal }) =>
+      (await api.getJson<{ data: { waiting: number } }>('/api/v1/ani/inbox/count', { signal })).data
+        .waiting,
+  });
   // Her webhook or MCP can stop or replace a running focus session.
   const onAniFocus = (action: 'start' | 'stop', minutes?: number) =>
     action === 'start' && minutes ? session.start(minutes) : session.exit();
@@ -238,6 +250,7 @@ function NowScreen() {
             date,
             today: today.data,
             weather: weather.data ?? undefined,
+            day: nowDay.data,
           }}
           afterFocus={afterFocus}
           onAfterFocus={() => setAfterFocus(false)}
@@ -260,6 +273,7 @@ function NowScreen() {
       )}
       {session.phase !== 'idle' && (
         <FocusMode
+          waiting={aniWaiting.data ?? 0}
           phase={session.phase}
           left={session.left}
           focus={focus && focus.date === session.focusDate ? focus : null}

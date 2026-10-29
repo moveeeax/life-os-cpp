@@ -357,6 +357,8 @@ void AniController::confirmAction(const HttpRequestPtr& req, Callback&& callback
             callback(refused);
             return;
         }
+        // Picking one of her drafted replies drops the other drafts to that chat.
+        actions.cancel_sibling_drafts(owner, id);
         Jobs::get().submit(::Agent::Actions::kActionJob, json{{"action", id}});
         callback(accepted(json{{"data", actions.get(owner, id).value_or(json::object())}}));
     } catch (const std::exception& e) {

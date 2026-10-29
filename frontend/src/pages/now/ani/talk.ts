@@ -30,12 +30,21 @@ export interface TalkOptions {
   onState(s: TalkState): void;
   /** The call ended on its own (silence, or the connection dropped). */
   onEnd(): void;
+  /**
+   * Hold to talk: the mic is open only while press() holds it and release()
+   * sends what was said; without it the server hears the end of a phrase.
+   */
+  hold?: boolean;
 }
 
 export interface Talk {
   /** Cuts her off mid-sentence (a tap on her while she talks). */
   interrupt(): void;
   stop(): void;
+  /** Hold to talk: the mic opens. */
+  press(): void;
+  /** Hold to talk: the mic closes and she answers what was said. */
+  release(): void;
 }
 
 // The data channel sometimes never opens on a call that did connect; such a
@@ -56,6 +65,8 @@ export async function startTalk(o: TalkOptions): Promise<Talk> {
   let pc: RTCPeerConnection | null = null;
   let mic: MediaStream | null = null;
   let stopped = false;
+  let holding = false;
+  let listenRef: (on: boolean) => void = () => {};
   let quiet = 0;
   let tail = 0;
   // Sends a client event on the current call.
@@ -108,8 +119,11 @@ export async function startTalk(o: TalkOptions): Promise<Talk> {
     let speaking = false;
     let audible = false;
     const listen = (on: boolean) => {
-      for (const t of mic?.getAudioTracks() ?? []) t.enabled = on;
+      // Holding to talk, only press() opens the mic.
+      const open = on && (!o.hold || holding);
+      for (const t of mic?.getAudioTracks() ?? []) t.enabled = open;
     };
+    listenRef = listen;
     const quietDown = (wait: number) => {
       audible = false;
       clearTimeout(tail);
@@ -219,6 +233,8 @@ export async function startTalk(o: TalkOptions): Promise<Talk> {
           parameters: t.parameters,
         })),
         tool_choice: 'auto',
+        // Holding to talk the page says when a phrase ends.
+        ...(o.hold ? { audio: { input: { turn_detection: null } } } : {}),
       },
     });
     o.onState('listening');
@@ -250,5 +266,22 @@ export async function startTalk(o: TalkOptions): Promise<Talk> {
       send({ type: 'output_audio_buffer.clear' });
     },
     stop,
+    press: () => {
+      if (!o.hold || holding) return;
+      holding = true;
+      // Talking over her cuts her off, as on a phone.
+      send({ type: 'response.cancel' });
+      send({ type: 'output_audio_buffer.clear' });
+      send({ type: 'input_audio_buffer.clear' });
+      listenRef(true);
+      o.onState('listening');
+    },
+    release: () => {
+      if (!o.hold || !holding) return;
+      holding = false;
+      listenRef(false);
+      send({ type: 'input_audio_buffer.commit' });
+      send({ type: 'response.create' });
+    },
   };
 }

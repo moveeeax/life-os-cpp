@@ -53,7 +53,7 @@ std::vector<Incoming> addressed(const nlohmann::json& chat,
 /// incoming and older than a day: the unix time of that message, else 0.
 long long waiting_since(const nlohmann::json& chat, const nlohmann::json& newest, long long now);
 
-/// The event's text: up to kMessagesPerEvent lines "<chat>: <text>" (each
+/// The event's text: up to kMessagesPerEvent lines "<chat> [chat <id>]: <text>" (each
 /// cut to 300 characters), "and N more" for the rest; at most 2000 characters.
 std::string event_text(const std::vector<Incoming>& all);
 

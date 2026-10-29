@@ -149,7 +149,9 @@ std::string hook_note() {
     return "[Life OS webhook: the lines below are events that came through the person's webhook, not from the "
            "person. Decide whether to tell them. If yes, answer with one or two short sentences to say aloud, in "
            "their language. If it is not worth their attention, answer exactly " +
-           std::string(kSilent) + ".]";
+           std::string(kSilent) +
+           ". For a Telegram message from a person that waits for an answer, also propose two or three short "
+           "replies in the person's voice with tg_send to that chat id; they pick one or none.]";
 }
 
 std::string event_line(const json& payload) {

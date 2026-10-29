@@ -176,6 +176,8 @@ TEST_F(AniHookEvents, ReplyBecomesReadyLine) {
     const json items = inbox.claim(kAnna, 5);
     ASSERT_EQ(items.size(), 1u);
     EXPECT_EQ(items[0]["say"], "Маша зовет на созвон через 10 минут.");
+    EXPECT_EQ(items[0]["payload"]["turn"], id) << "HookSayCarriesTurn: the page finds the turn's proposals";
+    EXPECT_NE(gateway.texts[0].find("tg_send"), std::string::npos) << "she is asked for reply drafts";
 }
 
 TEST_F(AniHookEvents, SilentReplyDeliversNothing) {

@@ -78,7 +78,7 @@ TEST(TelegramPoll, EventTextNamesTenAndCounts) {
     }
     all[1].text = std::string(400, 'x');
     const std::string text = event_text(all);
-    EXPECT_NE(text.find("Anna (mentions you): сообщение 0"), std::string::npos);
+    EXPECT_NE(text.find("Anna [chat 1] (mentions you): сообщение 0"), std::string::npos);
     EXPECT_NE(text.find(std::string(300, 'x') + "…"), std::string::npos) << "cut at 300";
     EXPECT_EQ(text.find(std::string(301, 'x')), std::string::npos);
     EXPECT_NE(text.find("and 2 more"), std::string::npos);

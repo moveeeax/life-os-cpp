@@ -57,6 +57,11 @@
   text-transform: uppercase;
   color: var(--g-ink-faint);
 }
+.f-waiting {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--g-ink-faint);
+}
 .f-done {
   font-size: clamp(48px, 8vw, 96px);
   font-weight: 300;
