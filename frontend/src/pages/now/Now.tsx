@@ -36,6 +36,9 @@ import { useSoundPlayer } from './focus/useSoundPlayer';
 import { FocusLine } from './FocusLine';
 import { FocusPicker } from './FocusPicker';
 import { FocusStart } from './FocusStart';
+import { ModeCards } from './modes/ModeCards';
+import { Board } from './widgets/Board';
+import { useNowDay } from './ribbon/layout';
 import { Ribbon } from './ribbon/Ribbon';
 import './now.css';
 
@@ -100,6 +103,7 @@ function NowScreen() {
       ),
     ) % 24;
   const today = useToday(me?.id ?? null, date, tz);
+  const nowDay = useNowDay(date, tz);
   // The weekly review: by itself on Sunday from 10:00 (once), or from the account menu.
   const review = useWeeklyReview(date);
   const settings = useNowSettings(me?.id ?? null);
@@ -204,6 +208,8 @@ function NowScreen() {
             player.play();
           }}
         />
+        <ModeCards now={now} date={date} today={data} day={nowDay.data} />
+        <Board widgets={settings.data?.widgets ?? []} today={data} date={date} tz={tz} />
         {today.isError && (
           <span className="n-note">
             {data ? 'Offline: showing the last answer' : 'Could not load the day'}

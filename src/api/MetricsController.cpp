@@ -66,7 +66,8 @@ json entry(const ::Metrics::Ref& r, const std::string& label, const std::string&
 }  // namespace
 
 void MetricsController::list(const HttpRequestPtr& req, Callback&& callback) {
-    API_MODULE_USER_GUARD(Core::goals_enabled() || Core::habits_enabled(), "metrics", req, callback, owner);
+    API_MODULE_USER_GUARD(
+        Core::goals_enabled() || Core::habits_enabled() || Core::now_enabled(), "metrics", req, callback, owner);
     const std::uint32_t permissions = permissions_of(req);
     with_repo_errors(callback, "metrics.list", [&] {
         const auto access = Repositories::Metrics::access_of(owner, permissions);
@@ -113,7 +114,8 @@ void MetricsController::list(const HttpRequestPtr& req, Callback&& callback) {
 }
 
 void MetricsController::series(const HttpRequestPtr& req, Callback&& callback) {
-    API_MODULE_USER_GUARD(Core::goals_enabled() || Core::habits_enabled(), "metrics", req, callback, owner);
+    API_MODULE_USER_GUARD(
+        Core::goals_enabled() || Core::habits_enabled() || Core::now_enabled(), "metrics", req, callback, owner);
     const auto ref = ::Metrics::parse(req->getParameter("source"));
     if (!ref) {
         callback(ErrorResponse::bad_request("invalid_query", "source must be an id of the metrics catalog"));

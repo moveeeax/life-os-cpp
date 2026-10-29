@@ -25786,8 +25786,18 @@ export interface components {
             corners: components["schemas"]["NowCorners"];
             /** @description The quick links of the Links corner, in order */
             links: components["schemas"]["NowLink"][];
+            /** @description The widget board of Now, in order */
+            widgets?: components["schemas"]["NowWidget"][];
+        };
+        NowWidget: {
+            /** @enum {string} */
+            kind: "series" | "calendar_week" | "habits" | "spend" | "telegram" | "trip";
+            /** @description A metrics catalog id, for series only */
+            source?: string;
         };
         NowSettingsInput: {
+            /** @description The widget board; series takes a catalog id as source, each widget once */
+            widgets?: components["schemas"]["NowWidget"][];
             /** @description Geocoded with Open-Meteo; null clears the city */
             city?: string | null;
             corners?: components["schemas"]["NowCorners"];

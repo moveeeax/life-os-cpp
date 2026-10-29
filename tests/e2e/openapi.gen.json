@@ -4520,12 +4520,51 @@
       "items": {
        "$ref": "#/components/schemas/NowLink"
       }
+     },
+     "widgets": {
+      "type": "array",
+      "maxItems": 6,
+      "description": "The widget board of Now, in order",
+      "items": {
+       "$ref": "#/components/schemas/NowWidget"
+      }
+     }
+    }
+   },
+   "NowWidget": {
+    "type": "object",
+    "required": [
+     "kind"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "series",
+       "calendar_week",
+       "habits",
+       "spend",
+       "telegram",
+       "trip"
+      ]
+     },
+     "source": {
+      "type": "string",
+      "description": "A metrics catalog id, for series only"
      }
     }
    },
    "NowSettingsInput": {
     "type": "object",
     "properties": {
+     "widgets": {
+      "type": "array",
+      "maxItems": 6,
+      "description": "The widget board; series takes a catalog id as source, each widget once",
+      "items": {
+       "$ref": "#/components/schemas/NowWidget"
+      }
+     },
      "city": {
       "type": [
        "string",
@@ -39176,7 +39215,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 591822,
-  "source_fnv1a64": "e75c64cbc1f1ba29"
+  "source_bytes": 592473,
+  "source_fnv1a64": "b320c2e3597b2863"
  }
 }

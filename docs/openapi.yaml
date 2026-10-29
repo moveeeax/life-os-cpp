@@ -1151,9 +1151,25 @@ components:
           maxItems: 8
           description: The quick links of the Links corner, in order
           items: { $ref: '#/components/schemas/NowLink' }
+        widgets:
+          type: array
+          maxItems: 6
+          description: The widget board of Now, in order
+          items: { $ref: '#/components/schemas/NowWidget' }
+    NowWidget:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [series, calendar_week, habits, spend, telegram, trip] }
+        source: { type: string, description: 'A metrics catalog id, for series only' }
     NowSettingsInput:
       type: object
       properties:
+        widgets:
+          type: array
+          maxItems: 6
+          description: 'The widget board; series takes a catalog id as source, each widget once'
+          items: { $ref: '#/components/schemas/NowWidget' }
         city: { type: [string, 'null'], minLength: 1, maxLength: 120, description: 'Geocoded with Open-Meteo; null clears the city' }
         corners: { $ref: '#/components/schemas/NowCorners' }
         links:

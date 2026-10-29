@@ -1,7 +1,11 @@
 import { useRef, useState, type FormEvent } from 'react';
 
 import { useHabitsEnabled } from '@/hooks/useHabits';
+import { MetricPicker } from '@/components/MetricPicker';
 import { useSaveNowSettings } from '@/hooks/useNow';
+import { useMetrics } from '@/hooks/useMetrics';
+import { MODE_KEY } from '@/pages/now/modes/modes';
+import { FIXED, WIDGETS_MAX, widgetKey, type Widget } from '@/pages/now/widgets/widgets';
 import {
   CHIP_LABEL,
   CORNER_KEYS,
@@ -54,6 +58,31 @@ export function ArrangeSheet({
   const halfRow = (l: NowLink) => (l.title.trim() === '') !== (l.url.trim() === '');
   const linksOk = links.every((l) => !badUrl(l) && !halfRow(l));
   const save = useSaveNowSettings(onClose);
+  const [widgets, setWidgets] = useState<Widget[]>(() => settings.widgets ?? []);
+  const [series, setSeries] = useState<string | null>(null);
+  const catalog = useMetrics();
+  const nameOf = (w: Widget) =>
+    w.kind === 'series'
+      ? (catalog.data?.find((m) => m.id === w.source)?.label ?? w.source ?? '')
+      : FIXED[w.kind];
+  const addWidget = (w: Widget) => {
+    if (widgets.length >= WIDGETS_MAX || widgets.some((x) => widgetKey(x) === widgetKey(w))) return;
+    setWidgets([...widgets, w]);
+  };
+  const moveWidget = (i: number, by: number) => {
+    const j = i + by;
+    if (j < 0 || j >= widgets.length) return;
+    const next = [...widgets];
+    [next[i], next[j]] = [next[j], next[i]];
+    setWidgets(next);
+  };
+  const [modesOn, setModesOn] = useState(() => {
+    try {
+      return localStorage.getItem(MODE_KEY) !== 'off';
+    } catch {
+      return true;
+    }
+  });
   // Picking a chip already in another corner moves it: that corner turns empty.
   const pick = (corner: (typeof CORNER_KEYS)[number], value: string) => {
     const chip = value === '' ? null : (value as Chip['key']);
@@ -69,7 +98,15 @@ export function ArrangeSheet({
     const cityChanged = typed !== (settings.city ?? '');
     const clean = cleanLinks(links.map(({ title, url }) => ({ title, url })));
     const linksChanged = JSON.stringify(clean) !== JSON.stringify(settings.links ?? []);
+    const widgetsChanged = JSON.stringify(widgets) !== JSON.stringify(settings.widgets ?? []);
+    try {
+      if (modesOn) localStorage.removeItem(MODE_KEY);
+      else localStorage.setItem(MODE_KEY, 'off');
+    } catch {
+      // A convenience of this browser.
+    }
     save.mutate({
+      ...(widgetsChanged ? { widgets } : {}),
       corners,
       ...(cityChanged ? { city: typed === '' ? null : typed } : {}),
       ...(linksChanged ? { links: clean } : {}),
@@ -146,6 +183,70 @@ export function ArrangeSheet({
             Add a link
           </button>
         )}
+        <p className="k-sub">Widgets: up to six on Now, in this order.</p>
+        {widgets.map((w, i) => (
+          <div key={widgetKey(w)} className="k-tools k-tools-tight">
+            <span className="k-grow">{nameOf(w)}</span>
+            <button
+              type="button"
+              className="k-link"
+              aria-label={`Move ${nameOf(w)} up`}
+              onClick={() => moveWidget(i, -1)}
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              className="k-link"
+              aria-label={`Move ${nameOf(w)} down`}
+              onClick={() => moveWidget(i, 1)}
+            >
+              ↓
+            </button>
+            <button
+              type="button"
+              className="k-link"
+              onClick={() => setWidgets(widgets.filter((_, j) => j !== i))}
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        {widgets.length < WIDGETS_MAX && (
+          <>
+            <label className="k-field">
+              <span>Add a widget</span>
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) addWidget({ kind: e.target.value as Widget['kind'] });
+                }}
+              >
+                <option value="">Choose…</option>
+                {(Object.keys(FIXED) as (keyof typeof FIXED)[]).map((k) => (
+                  <option key={k} value={k} disabled={widgets.some((w) => w.kind === k)}>
+                    {FIXED[k]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="k-field">
+              <span>Or a graph of any series</span>
+              <MetricPicker
+                value={series}
+                manual="Choose a series…"
+                onChange={(src) => {
+                  setSeries(null);
+                  if (src) addWidget({ kind: 'series', source: src });
+                }}
+              />
+            </label>
+          </>
+        )}
+        <label className="k-check">
+          <input type="checkbox" checked={modesOn} onChange={(e) => setModesOn(e.target.checked)} />
+          Cards for the moment (morning, flight day, a new country, evening)
+        </label>
         {save.error && (
           <p role="alert" className="k-error">
             {save.error}
