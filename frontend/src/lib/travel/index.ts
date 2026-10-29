@@ -139,3 +139,13 @@ export function documentWarningLine(w: TravelDocumentWarning, today: string): st
     ? `${w.holder}'s ${kind} is valid until ${until}, less than six months after the trip`
     : `${w.holder}'s ${kind} ends on ${until}, before the trip does`;
 }
+
+export {
+  daysWords,
+  tripDays,
+  tripsOfYear,
+  tripYears,
+  yearPct,
+  yearSummary,
+  type TripDays,
+} from './year';

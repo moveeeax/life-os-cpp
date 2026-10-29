@@ -1,0 +1,157 @@
+/* Trips: the year as a strip, then its trips as a table or a map. */
+.t-ctl {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.t-nowtxt {
+  color: var(--g-brand);
+}
+
+.t-strip-wrap {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.t-strip {
+  min-width: 560px;
+  display: grid;
+  gap: 6px;
+}
+.t-bar {
+  position: relative;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.t-seg {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  background: rgba(165, 180, 252, 0.35);
+  color: var(--g-ink);
+  font: inherit;
+  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 0 6px;
+  text-align: left;
+}
+.t-seg:hover,
+.t-seg[aria-pressed='true'] {
+  background: rgba(199, 210, 254, 0.85);
+  color: #111;
+}
+.t-seg.t-now {
+  box-shadow: inset 0 0 0 1px var(--g-brand);
+}
+.t-today {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--g-brand);
+  pointer-events: none;
+}
+.t-axis {
+  position: relative;
+  height: 16px;
+  font-size: 11px;
+  color: var(--g-ink-faint);
+}
+.t-axis span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.t-picked {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px 12px;
+  font-size: 14px;
+  color: var(--g-ink-faint);
+}
+.t-picked-name {
+  font-size: 16px;
+  color: var(--g-ink);
+}
+a.t-picked-name:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.t-map-wrap {
+  overflow-x: auto;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  scrollbar-width: thin;
+}
+.t-map-wrap svg {
+  display: block;
+  width: 100%;
+  min-width: 640px;
+  height: auto;
+}
+.t-map-ph {
+  aspect-ratio: 1000 / 480;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.t-land {
+  fill: rgba(255, 255, 255, 0.08);
+}
+.t-land.t-been {
+  fill: rgba(165, 180, 252, 0.2);
+  stroke: rgba(165, 180, 252, 0.35);
+  stroke-width: 0.6;
+}
+.t-pt {
+  cursor: pointer;
+  outline: none;
+}
+.t-pt .t-hit {
+  fill: transparent;
+}
+.t-pt .t-fill {
+  fill: rgba(165, 180, 252, 0.5);
+  stroke: var(--g-brand);
+  stroke-width: 1.2;
+}
+.t-pt .t-plan {
+  fill: none;
+  stroke: var(--g-brand);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 3;
+}
+.t-pt text {
+  fill: var(--g-ink-soft);
+  font-size: 15px;
+  paint-order: stroke;
+  stroke: #121834;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.t-pt text tspan {
+  fill: var(--g-ink-faint);
+}
+.t-pt:hover .t-fill,
+.t-pt[aria-pressed='true'] .t-fill {
+  fill: rgba(199, 210, 254, 0.95);
+}
+.t-pt[aria-pressed='true'] text {
+  fill: var(--g-ink);
+}
+.t-pt:focus-visible .t-fill {
+  stroke-width: 3;
+}
+.t-legend {
+  font-size: 12px;
+  color: var(--g-ink-faint);
+}

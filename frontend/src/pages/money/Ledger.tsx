@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -35,6 +35,8 @@ import {
   type TransactionPatch,
 } from '@/lib/ledger';
 import { parseAmount } from '@/lib/amounts';
+import { convertSum, groupByWeek, type Rates, type Week } from '@/lib/ledger/weeks';
+import { formatTotal } from '@/lib/networth';
 
 import { Banner, Filters, Group, Row as KitRow } from '@/shell/kit';
 import {
@@ -48,7 +50,9 @@ import {
 import { AddForm } from './AddForm';
 import { Amount, CurrencyTotals, PeriodRow } from './bits';
 import { LoadError, MoneyFrame, Placeholder } from './frame';
+import { MonthStrip } from './MonthStrip';
 import { TransfersList } from './Transfers';
+import './ledger.css';
 
 function TransactionEditor({
   row,
@@ -253,6 +257,95 @@ function TransactionEditor({
  * on the page (a filter, the editor) does not render every row again. Its
  * props are the cached row, lookups from id maps and a stable onOpen.
  */
+// Categories have no colour of their own: a calm one by their position.
+const CATEGORY_COLORS = [
+  '#6ee7b7',
+  '#f0abfc',
+  '#fcd34d',
+  '#7dd3fc',
+  '#fca5a5',
+  '#c4b5fd',
+  '#94a3b8',
+  '#fdba74',
+];
+function categoryColor(c: Category): string {
+  return CATEGORY_COLORS[Math.abs(c.position) % CATEGORY_COLORS.length];
+}
+
+/** A week of the period: its dates, its row count and its spend in one currency; rows on click. */
+function WeekGroup({
+  week,
+  open,
+  current,
+  onToggle,
+  rates,
+  target,
+  currencies,
+  children,
+}: {
+  week: Week;
+  open: boolean;
+  current: boolean;
+  onToggle: () => void;
+  rates: Rates | null;
+  target: string;
+  currencies: ReturnType<typeof useCurrencies>['data'];
+  children: ReactNode;
+}) {
+  const label =
+    week.from === week.to
+      ? formatDay(week.from, { weekday: false })
+      : `${formatDay(week.from, { weekday: false })} – ${week.to.slice(8).replace(/^0/, '')}`;
+  const conv = (pick: 'expense' | 'income') =>
+    rates
+      ? convertSum(
+          week.totals.map((t) => ({ currency: t.currency, amount: t[pick] })),
+          rates,
+          target,
+        )
+      : null;
+  const spent = conv('expense');
+  const came = conv('income');
+  // The week's spend; a week of income only shows that instead.
+  const sum =
+    spent && spent.amount > 0
+      ? { sign: '−', ...spent }
+      : came && came.amount > 0
+        ? { sign: '+', ...came }
+        : null;
+  return (
+    <section className="l-week" data-open={open ? '' : undefined}>
+      <button type="button" className="l-week-head" aria-expanded={open} onClick={onToggle}>
+        <span className="l-week-name" data-num-ok>
+          {label}
+          {current && <span className="l-this"> · this week</span>}
+        </span>
+        <span className="l-week-meta" data-num-ok>
+          {week.rows.length}
+          {sum ? (
+            <span
+              className="num"
+              title={sum.partial ? 'Some currencies have no rate and are left out' : undefined}
+            >
+              {' · '}≈ {sum.sign}
+              {formatTotal(sum.amount)} {target}
+              {sum.partial ? '*' : ''}
+            </span>
+          ) : (
+            !rates && (
+              <>
+                {' · '}
+                <CurrencyTotals totals={week.totals} currencies={currencies} />
+              </>
+            )
+          )}
+        </span>
+      </button>
+      {open && <div className="k-group-rows">{children}</div>}
+    </section>
+  );
+}
+
 const LedgerRow = memo(function LedgerRow({
   row,
   account,
@@ -267,12 +360,21 @@ const LedgerRow = memo(function LedgerRow({
   currencies: ReturnType<typeof useCurrencies>['data'];
 }) {
   const adjustment = row.type === 'fx_adjustment';
+  const where = [category?.name, account?.name].filter(Boolean).join(' · ');
   return (
     <KitRow
+      dot={category ? categoryColor(category) : 'transparent'}
       title={adjustment ? 'Bank recalculation' : row.name}
-      sub={[category?.name, account?.name].filter(Boolean).join(' · ')}
-      right={<Amount row={row} currencies={currencies} />}
+      right={
+        <span className="l-right">
+          <span className="l-date" data-num-ok>
+            {formatDay(row.date, { weekday: false })}
+          </span>{' '}
+          · <Amount row={row} currencies={currencies} />
+        </span>
+      }
     >
+      {where && <span>{where}</span>}
       {row.merchant && row.merchant !== row.name && <span>Merchant {row.merchant}</span>}
       {row.receipt_amount !== null && (
         <span>
@@ -487,7 +589,23 @@ export function MoneyLedgerPage() {
   });
   const rows = useMemo(() => list.data?.pages.flatMap((p) => p.data) ?? [], [list.data]);
   const days = useMemo(() => groupByDay(rows), [rows]);
+  // A month or a quarter reads by week; a week keeps its days.
+  const byWeek = kind !== 'week';
+  const weeks = useMemo(
+    () => (byWeek ? groupByWeek(rows, range.from, range.to) : []),
+    [byWeek, rows, range.from, range.to],
+  );
+  // The weeks count and sum every row of the period: load it all (up to 1,000 rows).
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = list;
+  useEffect(() => {
+    if (byWeek && hasNextPage && !isFetchingNextPage && rows.length < 1000) void fetchNextPage();
+  }, [byWeek, hasNextPage, isFetchingNextPage, fetchNextPage, rows.length]);
+  const today = todayLocal();
+  const [openWeeks, setOpenWeeks] = useState<Record<string, boolean>>({});
+  const weekOpen = (w: Week) => openWeeks[w.from] ?? (today >= w.from && today <= w.to);
   const report = useReport(kind, date);
+  const asIf = report.data?.as_if;
+  const [byCurrency, setByCurrency] = useState(false);
   const filtered = account !== '' || category !== '' || type !== '' || q !== '';
   const periodTotals = filtered
     ? totalsByCurrency(rows)
@@ -610,7 +728,42 @@ export function MoneyLedgerPage() {
               in Inbox
             </Banner>
           )}
-          {periodTotals.length > 0 && (
+          <MonthStrip
+            year={Number(range.from.slice(0, 4))}
+            month={kind === 'month' ? Number(range.from.slice(5, 7)) : null}
+            today={today}
+            onPick={(d) => setPeriod('month', d)}
+          />
+          {!filtered && asIf && (asIf.expense > 0 || asIf.income > 0) && (
+            <div className="l-sum">
+              <span>
+                <span className="l-k">Spent</span>{' '}
+                <span className="l-v num">
+                  ≈ {formatTotal(asIf.expense)} {asIf.currency}
+                </span>
+              </span>
+              {asIf.income > 0 && (
+                <span>
+                  <span className="l-k">In</span>{' '}
+                  <span className="l-v l-in num">
+                    ≈ {formatTotal(asIf.income)} {asIf.currency}
+                  </span>
+                </span>
+              )}
+              {periodTotals.length > 1 && (
+                <button
+                  type="button"
+                  className="l-why"
+                  aria-expanded={byCurrency}
+                  onClick={() => setByCurrency(!byCurrency)}
+                  data-num-ok
+                >
+                  {periodTotals.length} currencies
+                </button>
+              )}
+            </div>
+          )}
+          {periodTotals.length > 0 && (filtered || !asIf || byCurrency) && (
             <div className="k-sub">
               {filtered
                 ? `Shown rows${list.hasNextPage ? ' (more to load)' : ''}: `
@@ -625,24 +778,51 @@ export function MoneyLedgerPage() {
           ) : (
             <>
               {days.length === 0 && <p className="k-empty">Nothing in this period.</p>}
-              {days.map((d) => (
-                <Group
-                  key={d.date}
-                  label={formatDay(d.date)}
-                  total={<CurrencyTotals totals={d.totals} currencies={currencies} />}
-                >
-                  {d.rows.map((r) => (
-                    <LedgerRow
-                      key={r.id}
-                      row={r}
-                      account={accountById.get(r.account_id)}
-                      category={r.category_id ? categoryById.get(r.category_id) : undefined}
-                      currencies={currencies}
-                      onOpen={setEditing}
-                    />
+              {byWeek
+                ? days.length > 0 &&
+                  weeks
+                    .filter((w) => w.rows.length > 0)
+                    .map((w) => (
+                      <WeekGroup
+                        key={w.from}
+                        week={w}
+                        open={weekOpen(w)}
+                        current={today >= w.from && today <= w.to}
+                        onToggle={() => setOpenWeeks((o) => ({ ...o, [w.from]: !weekOpen(w) }))}
+                        rates={(asIf?.rates as Rates | undefined) ?? null}
+                        target={asIf?.currency ?? ''}
+                        currencies={currencies}
+                      >
+                        {w.rows.map((r) => (
+                          <LedgerRow
+                            key={r.id}
+                            row={r}
+                            account={accountById.get(r.account_id)}
+                            category={r.category_id ? categoryById.get(r.category_id) : undefined}
+                            currencies={currencies}
+                            onOpen={setEditing}
+                          />
+                        ))}
+                      </WeekGroup>
+                    ))
+                : days.map((d) => (
+                    <Group
+                      key={d.date}
+                      label={formatDay(d.date)}
+                      total={<CurrencyTotals totals={d.totals} currencies={currencies} />}
+                    >
+                      {d.rows.map((r) => (
+                        <LedgerRow
+                          key={r.id}
+                          row={r}
+                          account={accountById.get(r.account_id)}
+                          category={r.category_id ? categoryById.get(r.category_id) : undefined}
+                          currencies={currencies}
+                          onOpen={setEditing}
+                        />
+                      ))}
+                    </Group>
                   ))}
-                </Group>
-              ))}
               <TransfersList
                 from={range.from}
                 to={range.to}

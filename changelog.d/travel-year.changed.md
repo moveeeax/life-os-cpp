@@ -1,0 +1,1 @@
+Travel Trips shows one year at a time: a strip of its trips from January to December with a line for today, then the trips as a one-line table or as a world map where each city (read from the trip name, else its country) is a dot sized by days, the running trip with its plan as a dashed ring.
