@@ -94,3 +94,12 @@ TEST_F(PublicPathsTest, ExtraEntriesMatchLikeAnyPublicPath) {
     EXPECT_TRUE(Utils::Strings::path_is_public(set, "/webhooks/paypal"));
     EXPECT_FALSE(Utils::Strings::path_is_public(set, "/webhook"));
 }
+
+TEST_F(PublicPathsTest, GoogleReturnsToTheCalendarCallbackWithoutAToken) {
+    // Prod renders its config without api.public_paths, so the built-in default decides; the consent's
+    // return carries a one-time state, not a bearer token.
+    auto set = Utils::Strings::split_csv_set(Utils::Strings::kDefaultPublicPathsCsv);
+    EXPECT_TRUE(Utils::Strings::path_is_public(set, "/api/v1/calendar/oauth/callback"));
+    EXPECT_FALSE(Utils::Strings::path_is_public(set, "/api/v1/calendar/connect"));
+    EXPECT_FALSE(Utils::Strings::path_is_public(set, "/api/v1/calendar/events"));
+}
