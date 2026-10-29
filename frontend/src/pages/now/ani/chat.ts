@@ -152,10 +152,19 @@ export function actionState(a: Action): string | null {
   }
 }
 
-export async function confirmAction(id: string): Promise<Action> {
+/** Confirms a proposal; a Telegram message may go with the person's own @p text. */
+export async function confirmAction(id: string, text?: string): Promise<Action> {
+  const path = `/api/v1/ani/actions/${encodeURIComponent(id)}/confirm`;
   return (
-    await api.postJson<{ data: Action }>(`/api/v1/ani/actions/${encodeURIComponent(id)}/confirm`)
+    text === undefined
+      ? await api.postJson<{ data: Action }>(path)
+      : await api.postJson<{ data: Action }>(path, { body: { text } })
   ).data;
+}
+
+/** Whether the person may change the words of a proposal before Confirm (a Telegram message). */
+export function editable(a: Action): boolean {
+  return (a.kind === 'tg_send' || a.kind === 'tg_edit') && a.status === 'pending' && a.text != null;
 }
 
 export async function cancelAction(id: string): Promise<Action> {
