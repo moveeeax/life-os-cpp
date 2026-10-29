@@ -36,6 +36,7 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
   const [area, setArea] = useState<Area>(task.area);
   const [effort, setEffort] = useState<Effort | ''>(task.effort ?? '');
   const [due, setDue] = useState(task.due ?? '');
+  const [dueTime, setDueTime] = useState(task.due_time ?? '');
   const [next, setNext] = useState(task.next_step);
   const [note, setNote] = useState(task.note);
   const [status, setStatus] = useState<Task['status']>(task.status);
@@ -68,6 +69,7 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
       area,
       effort: effort ?? '',
       due,
+      dueTime,
       next,
       note,
       status,
@@ -149,6 +151,20 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
               className={inputClass}
             />
           </div>
+          {due && (
+            <div>
+              <label htmlFor="task-due-time" className={labelClass}>
+                Time (shows on the day ribbon)
+              </label>
+              <input
+                id="task-due-time"
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+          )}
           <div>
             <label htmlFor="task-next" className={labelClass}>
               Next step

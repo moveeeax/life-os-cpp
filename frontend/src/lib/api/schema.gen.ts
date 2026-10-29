@@ -15559,6 +15559,152 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/now/day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The day ribbon on Now
+         * @description One call for the ribbon: the calendar's events and free slots of the local day (when Google Calendar is linked), focus sessions, workouts and tasks with a time on that day.
+         */
+        get: {
+            parameters: {
+                query: {
+                    date: string;
+                    /** @description The caller's IANA zone (UTC when not one) */
+                    tz?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The day */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["NowDay"];
+                        };
+                    };
+                };
+                /** @description invalid_date */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now is off (now) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/now/focus-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a finished focus session
+         * @description The page's timer stays the timer; this keeps what was done for the ribbon.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        started_at: string;
+                        /**
+                         * Format: date-time
+                         * @description After started_at, 4 hours at most, within the last 2 days
+                         */
+                        ended_at: string;
+                        /** @description Time in focus without pauses; the span when left out */
+                        minutes?: number;
+                        label?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Recorded */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** Format: uuid */
+                                id?: string;
+                            };
+                        };
+                    };
+                };
+                /** @description invalid_time, invalid_minutes */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now is off (now) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar": {
         parameters: {
             query?: never;
@@ -24733,6 +24879,8 @@ export interface components {
             effort: components["schemas"]["TaskEffort"];
             /** Format: date */
             due: string | null;
+            /** @description HH:MM in the person's zone, with a due day only */
+            due_time?: string | null;
             next_step: string;
             note: string;
             /** @enum {string} */
@@ -24788,6 +24936,8 @@ export interface components {
             effort?: components["schemas"]["TaskEffort"];
             /** Format: date */
             due?: string | null;
+            /** @description HH:MM; kept only with a due day, cleared with it */
+            due_time?: string | null;
             next_step?: string;
             note?: string;
             /** @enum {string} */
@@ -24830,6 +24980,8 @@ export interface components {
             effort?: components["schemas"]["TaskEffort"];
             /** Format: date */
             due?: string | null;
+            /** @description HH:MM; kept only with a due day, cleared with it */
+            due_time?: string | null;
             next_step?: string;
             note?: string;
             /** @enum {string} */
@@ -25203,6 +25355,44 @@ export interface components {
                 answer?: string | null;
                 /** Format: date-time */
                 created_at: string;
+            }[];
+        };
+        NowDay: {
+            /** Format: date */
+            date: string;
+            /**
+             * @description Why events may be empty
+             * @enum {string}
+             */
+            calendar: "ok" | "off" | "not_linked" | "disconnected" | "unavailable";
+            events: components["schemas"]["CalendarEvent"][];
+            /** @description 30 minutes or more between 08:00 and 22:00 local */
+            free: components["schemas"]["CalendarSlot"][];
+            focus: {
+                /** Format: date-time */
+                start?: string;
+                /** Format: date-time */
+                end?: string;
+                minutes?: number;
+                label?: string;
+            }[];
+            workouts: {
+                /** Format: date-time */
+                start?: string;
+                /**
+                 * Format: date-time
+                 * @description Null while it runs
+                 */
+                end?: string | null;
+                name?: string;
+            }[];
+            tasks: {
+                /** Format: uuid */
+                id?: string;
+                title?: string;
+                /** @description HH:MM local */
+                time?: string;
+                status?: string;
             }[];
         };
         CalendarStatus: {

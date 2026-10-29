@@ -45,6 +45,7 @@
 #include "api/JobsController.hpp"
 #include "api/CalendarController.hpp"
 #include "api/LeetCodeController.hpp"
+#include "api/NowDayController.hpp"
 #include "api/MeasurementsController.hpp"
 #include "api/MedicalController.hpp"
 #include "api/MetricsController.hpp"

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { api } from '@/lib/api/client';
 import {
   focusKey,
+  focusRecord,
   pauseSession,
   readCache,
   resumeSession,
@@ -40,6 +42,14 @@ export function useFocusSession(userId: string | null) {
     return () => window.removeEventListener('storage', onStorage);
   }, [key]);
 
+  // A finished session is kept on the server once, for the day ribbon.
+  const record = useCallback((s: Session | null, at: number) => {
+    const r = focusRecord(s, at);
+    if (!r) return false;
+    void api.postJson('/api/v1/now/focus-sessions', { body: r }).catch(() => {});
+    return true;
+  }, []);
+
   const save = useCallback(
     (s: Session | null) => {
       setSession(s);
@@ -49,6 +59,14 @@ export function useFocusSession(userId: string | null) {
     [key],
   );
 
+  useEffect(() => {
+    if (state.phase === 'done' && session && record(session, Date.now())) {
+      const kept = { ...session, recorded: true };
+      setSession(kept);
+      if (key) writeCache(key, kept);
+    }
+  }, [state.phase, session, record, key]);
+
   return {
     ...state,
     /** The day of the focus this session is for, so Done only ticks that one. */
@@ -57,6 +75,10 @@ export function useFocusSession(userId: string | null) {
       save(startSession(minutes, Date.now(), focusDate)),
     pause: () => session && save(pauseSession(session, Date.now())),
     resume: () => session && save(resumeSession(session, Date.now())),
-    exit: () => save(null),
+    exit: () => {
+      // Left early: what was done still counts (five minutes or more).
+      if (state.phase === 'running' || state.phase === 'paused') record(session, Date.now());
+      save(null);
+    },
   };
 }

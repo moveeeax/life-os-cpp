@@ -3330,6 +3330,13 @@
       ],
       "format": "date"
      },
+     "due_time": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "HH:MM in the person's zone, with a due day only"
+     },
      "next_step": {
       "type": "string"
      },
@@ -3499,6 +3506,14 @@
       ],
       "format": "date"
      },
+     "due_time": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+      "description": "HH:MM; kept only with a due day, cleared with it"
+     },
      "next_step": {
       "type": "string",
       "maxLength": 300
@@ -3611,6 +3626,14 @@
        "null"
       ],
       "format": "date"
+     },
+     "due_time": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+      "description": "HH:MM; kept only with a due day, cleared with it"
      },
      "next_step": {
       "type": "string",
@@ -4861,6 +4884,115 @@
         "created_at": {
          "type": "string",
          "format": "date-time"
+        }
+       }
+      }
+     }
+    }
+   },
+   "NowDay": {
+    "type": "object",
+    "required": [
+     "date",
+     "calendar",
+     "events",
+     "free",
+     "focus",
+     "workouts",
+     "tasks"
+    ],
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "calendar": {
+      "type": "string",
+      "enum": [
+       "ok",
+       false,
+       "not_linked",
+       "disconnected",
+       "unavailable"
+      ],
+      "description": "Why events may be empty"
+     },
+     "events": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/CalendarEvent"
+      }
+     },
+     "free": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/CalendarSlot"
+      },
+      "description": "30 minutes or more between 08:00 and 22:00 local"
+     },
+     "focus": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "start": {
+         "type": "string",
+         "format": "date-time"
+        },
+        "end": {
+         "type": "string",
+         "format": "date-time"
+        },
+        "minutes": {
+         "type": "integer"
+        },
+        "label": {
+         "type": "string"
+        }
+       }
+      }
+     },
+     "workouts": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "start": {
+         "type": "string",
+         "format": "date-time"
+        },
+        "end": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "format": "date-time",
+         "description": "Null while it runs"
+        },
+        "name": {
+         "type": "string"
+        }
+       }
+      }
+     },
+     "tasks": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string",
+         "format": "uuid"
+        },
+        "title": {
+         "type": "string"
+        },
+        "time": {
+         "type": "string",
+         "description": "HH:MM local"
+        },
+        "status": {
+         "type": "string"
         }
        }
       }
@@ -29563,6 +29695,150 @@
     }
    }
   },
+  "/api/v1/now/day": {
+   "get": {
+    "summary": "The day ribbon on Now",
+    "description": "One call for the ribbon: the calendar's events and free slots of the local day (when Google Calendar is linked), focus sessions, workouts and tasks with a time on that day.",
+    "tags": [
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "date",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "description": "The caller's IANA zone (UTC when not one)",
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The day",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/NowDay"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "invalid_date"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Now is off (now)"
+     }
+    }
+   }
+  },
+  "/api/v1/now/focus-sessions": {
+   "post": {
+    "summary": "Record a finished focus session",
+    "description": "The page's timer stays the timer; this keeps what was done for the ribbon.",
+    "tags": [
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "started_at",
+         "ended_at"
+        ],
+        "properties": {
+         "started_at": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "ended_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "After started_at, 4 hours at most, within the last 2 days"
+         },
+         "minutes": {
+          "type": "integer",
+          "description": "Time in focus without pauses; the span when left out"
+         },
+         "label": {
+          "type": "string",
+          "maxLength": 200
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Recorded",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "string",
+             "format": "uuid"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "invalid_time, invalid_minutes"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Now is off (now)"
+     }
+    }
+   }
+  },
   "/api/v1/calendar": {
    "get": {
     "summary": "The caller's Google Calendar link",
@@ -38336,7 +38612,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 579698,
-  "source_fnv1a64": "94d6f1e6329a382e"
+  "source_bytes": 583819,
+  "source_fnv1a64": "9e662f3e048ec4e0"
  }
 }

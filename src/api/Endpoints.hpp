@@ -330,6 +330,8 @@ inline const std::vector<EndpointInfo>& get_endpoints() {
         {"GET", "/api/v1/leetcode/profile", "LeetCode: the caller's profile (username, last pull, solved counts)"},
         {"PUT", "/api/v1/leetcode/profile", "LeetCode: set the username whose solved counts are pulled"},
         {"DELETE", "/api/v1/leetcode/profile", "LeetCode: remove the profile and its snapshots"},
+        {"GET", "/api/v1/now/day", "Now: the day ribbon (calendar events and free slots, focus, workouts, timed tasks)"},
+        {"POST", "/api/v1/now/focus-sessions", "Now: record a finished focus session"},
         {"GET", "/api/v1/calendar", "Calendar: whether Google Calendar is set up and linked for the caller"},
         {"POST", "/api/v1/calendar/connect", "Calendar: the Google consent URL to link the caller's calendar"},
         {"GET", "/api/v1/calendar/oauth/callback", "Calendar: Google's consent comes back here (public, one-time state)"},

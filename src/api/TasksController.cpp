@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <regex>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -101,6 +102,12 @@ void task_fields(Validation::Errors& errs, const json& body, bool creating) {
     nullable_one_of(errs, body, "effort", kEfforts);
     if (body.contains("due") && !body["due"].is_null()) {
         date_field(errs, body, "due");
+    }
+    if (body.contains("due_time") && !body["due_time"].is_null()) {
+        static const std::regex kTime("^([01]\\d|2[0-3]):[0-5]\\d$");
+        if (!body["due_time"].is_string() || !std::regex_match(body["due_time"].get<std::string>(), kTime)) {
+            errs.add("due_time", "bad_format", "expected HH:MM");
+        }
     }
     text_length(errs, body, "next_step", 0, ::Tasks::Fields::kNextStepMax);
     text_length(errs, body, "note", 0, ::Tasks::Fields::kNoteMax);
@@ -241,6 +248,7 @@ Repo::TaskRepository::Input task_input(const json& body) {
     in.area = body["area"].get<std::string>();
     in.effort = Validation::opt_string(body, "effort");
     in.due = Validation::opt_string(body, "due");
+    in.due_time = Validation::opt_string(body, "due_time");
     in.next_step = Validation::opt_string(body, "next_step").value_or("");
     in.note = Validation::opt_string(body, "note").value_or("");
     in.source_kind = Validation::opt_string(body, "source_kind");
@@ -389,6 +397,7 @@ void TasksController::updateItem(const HttpRequestPtr& req, Callback&& callback,
     p.area = Validation::opt_string(body, "area");
     p.effort = nullable(body, "effort");
     p.due = nullable(body, "due");
+    p.due_time = nullable(body, "due_time");
     p.next_step = Validation::opt_string(body, "next_step");
     p.note = Validation::opt_string(body, "note");
     p.status = Validation::opt_string(body, "status");

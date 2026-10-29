@@ -105,3 +105,36 @@ describe('captureBody', () => {
     expect(captureBody('Buy milk')).not.toHaveProperty('due');
   });
 });
+
+describe('taskPatch due_time', () => {
+  const task = {
+    title: 'T',
+    area: 'finance',
+    effort: null,
+    due: '2026-10-29',
+    due_time: null,
+    next_step: '',
+    note: '',
+    status: 'open',
+    goal_id: null,
+    goal_section_id: null,
+  } as const;
+  const draft = {
+    title: 'T',
+    area: 'finance',
+    effort: '',
+    due: '2026-10-29',
+    next: '',
+    note: '',
+    status: 'open',
+    goalId: '',
+    sectionId: '',
+  };
+  it('sends a time only with a day', () => {
+    expect(taskPatch(task as never, { ...draft, dueTime: '13:00' })).toEqual({ due_time: '13:00' });
+    expect(taskPatch(task as never, { ...draft, due: '', dueTime: '13:00' })).toEqual({
+      due: null,
+    });
+    expect(taskPatch(task as never, draft)).toEqual({});
+  });
+});
