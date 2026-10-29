@@ -129,7 +129,7 @@ export function Ribbon({
               title={`${b.title}, ${hhmm(b.start, tz)}–${hhmm(b.end, tz)}`}
               data-event={b.id}
             >
-              {b.kind !== 'free' && b.width > 7 ? b.title : ''}
+              {b.kind !== 'free' && b.width > 4.5 ? b.title : ''}
             </div>
           ))}
           {pins.map((p) => (

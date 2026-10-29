@@ -190,7 +190,11 @@ export function ModeCards({
           )
         }
       />,
-      <Card key="t" k="Today" v={<span className="num">{tasks.length} tasks</span>} />,
+      <Card
+        key="t"
+        k="Today"
+        v={<span className="num">{tasks.length === 1 ? '1 task' : `${tasks.length} tasks`}</span>}
+      />,
     ];
   } else if (mode === 'evening') {
     const owed = Array.isArray(waiting.data) ? waiting.data : [];

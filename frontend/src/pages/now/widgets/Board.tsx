@@ -10,6 +10,12 @@ import type { Today } from '@/lib/now/types';
 import { FIXED, sparkPoints, trendWords, weekRange, widgetKey, type Widget } from './widgets';
 import './widgets.css';
 
+function seriesNumber(v: number): string {
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: Math.abs(v) >= 100 ? 0 : 1,
+  }).format(v);
+}
+
 function Spark({ values, color }: { values: (number | null)[]; color: string }) {
   const pts = sparkPoints(values);
   if (!pts) return <div className="w-spark-empty" />;
@@ -72,7 +78,7 @@ function SeriesWidget({ source, date, tz }: { source: string; date: string; tz: 
       k={entry?.label ?? source}
       v={
         <span className="num">
-          {last == null ? '—' : `${formatTotal(last)}${unit ? ` ${unit}` : ''}`}
+          {last == null ? '—' : `${seriesNumber(last)}${unit ? ` ${unit}` : ''}`}
         </span>
       }
       s={<span className="num">{trendWords(values, unit)}</span>}
