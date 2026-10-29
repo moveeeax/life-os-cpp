@@ -27,6 +27,7 @@ const fetchAniBare = vi.fn(() => Promise.resolve(bareLinks));
 vi.mock('@/hooks/useAni', () => ({
   useAniPrefs: () => ({ data: { ...prefs }, isPending: false, isSuccess: true }),
   fetchAniBare: () => fetchAniBare(),
+  useMuteKind: () => () => {},
 }));
 
 // The engine draws with WebGL; here it is a stand-in that is ready at once

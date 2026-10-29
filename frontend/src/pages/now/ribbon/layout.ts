@@ -78,7 +78,13 @@ function span(
 }
 
 /** The day's blocks: free slots under, then events, focus done and workouts (one still running ends now). */
-export function blocksOf(day: NowDay | undefined, tz: string, now: number): Block[] {
+export function blocksOf(
+  day: NowDay | undefined,
+  tz: string,
+  now: number,
+  /** The start of the focus running now, drawn up to `now`. */
+  focusFrom: number | null = null,
+): Block[] {
   if (!day) return [];
   const out: Block[] = [];
   const date = day.date;
@@ -133,6 +139,10 @@ export function blocksOf(day: NowDay | undefined, tz: string, now: number): Bloc
       date,
       tz,
     );
+    if (b) out.push(b);
+  }
+  if (focusFrom && focusFrom < now) {
+    const b = span('did', 'focus:running', 'Focus', focusFrom, now, date, tz);
     if (b) out.push(b);
   }
   return out;

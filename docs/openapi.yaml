@@ -10523,6 +10523,34 @@ paths:
         '409': { description: 'Google refused the token (calendar_disconnected): connect again' }
         '502': { description: Google did not answer (calendar_unavailable) }
   /api/v1/calendar/events/{id}:
+    get:
+      summary: One event, with its times on the caller's clock
+      tags: [calendar]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: tz, in: query, description: The caller's IANA zone (UTC when not one), schema: { type: string } }
+      responses:
+        '200':
+          description: The event
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/CalendarEvent'
+                      - type: object
+                        required: [start_local, end_local]
+                        properties:
+                          start_local: { type: string, description: 'RFC 3339 with the zone''s offset at that instant; a date for an all-day event' }
+                          end_local: { type: string }
+        '401': { description: Not authenticated }
+        '404': { description: 'Not in the calendar (calendar_event_not_found), calendar not set up (calendar_not_configured) or not linked (calendar_not_linked)' }
+        '409': { description: 'Google refused the token (calendar_disconnected): connect again' }
+        '502': { description: Google did not answer (calendar_unavailable) }
     patch:
       summary: Move or rename an event
       tags: [calendar]

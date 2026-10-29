@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api } from '@/lib/api/client';
@@ -43,12 +44,19 @@ export function useFocusSession(userId: string | null) {
   }, [key]);
 
   // A finished session is kept on the server once, for the day ribbon.
-  const record = useCallback((s: Session | null, at: number) => {
-    const r = focusRecord(s, at);
-    if (!r) return false;
-    void api.postJson('/api/v1/now/focus-sessions', { body: r }).catch(() => {});
-    return true;
-  }, []);
+  const qc = useQueryClient();
+  const record = useCallback(
+    (s: Session | null, at: number) => {
+      const r = focusRecord(s, at);
+      if (!r) return false;
+      void api
+        .postJson('/api/v1/now/focus-sessions', { body: r })
+        .then(() => qc.invalidateQueries({ queryKey: ['now', 'day'] }))
+        .catch(() => {});
+      return true;
+    },
+    [qc],
+  );
 
   const save = useCallback(
     (s: Session | null) => {
@@ -71,6 +79,9 @@ export function useFocusSession(userId: string | null) {
     ...state,
     /** The day of the focus this session is for, so Done only ticks that one. */
     focusDate: session?.focusDate ?? null,
+    /** When the running (or paused) focus started, for the day ribbon. */
+    startedAt:
+      state.phase === 'running' || state.phase === 'paused' ? (session?.startedAt ?? null) : null,
     start: (minutes: number, focusDate: string | null = null) =>
       save(startSession(minutes, Date.now(), focusDate)),
     pause: () => session && save(pauseSession(session, Date.now())),

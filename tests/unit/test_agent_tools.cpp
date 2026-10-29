@@ -399,18 +399,30 @@ TEST(AgentActions, CalendarChangesAreProposalsInThePersonsTime) {
     EXPECT_EQ(add.summary, "Add «Focus» to the calendar, 2026-10-29 14:00–15:30");
     EXPECT_EQ(add.request["method"], "POST");
     EXPECT_EQ(add.request["path"], "/api/v1/calendar/events");
+    EXPECT_TRUE(site.sent.empty()) << "adding reads nothing";
+    // Moving and removing name the event as the calendar has it, in the person's time, whatever Ani called it.
+    site.answers = {
+        {kApi + "/api/v1/calendar/events/abc_123",
+         {200,
+          R"({"data":{"id":"abc_123","title":"Lunch","start":"2026-10-30T08:00:00Z","end":"2026-10-30T09:00:00Z",)"
+          R"("all_day":false,"location":"","start_local":"2026-10-30T13:00:00+05:00","end_local":"2026-10-30T14:00:00+05:00"}})"}}};
     auto move = std::get<A::Proposal>(propose(site,
                                               "calendar_move",
                                               json{{"event", "abc_123"},
                                                    {"title", "Call"},
-                                                   {"start", "2026-10-30T09:00:00+05:00"},
-                                                   {"end", "2026-10-30T10:00:00+05:00"}}));
-    EXPECT_EQ(move.summary, "Move «Call» to 2026-10-30 09:00–10:00");
+                                                   {"start", "2026-10-30T04:00:00Z"},
+                                                   {"end", "2026-10-30T05:00:00Z"}}));
+    EXPECT_EQ(move.summary, "Move «Lunch» (2026-10-30 13:00–14:00) to 2026-10-30 09:00–10:00");
     EXPECT_EQ(move.request["path"], "/api/v1/calendar/events/abc_123");
     auto remove =
         std::get<A::Proposal>(propose(site, "calendar_remove", json{{"event", "abc_123"}, {"title", "Call"}}));
+    EXPECT_EQ(remove.summary, "Remove «Lunch» (2026-10-30 13:00–14:00) from the calendar");
     EXPECT_EQ(remove.request["method"], "DELETE");
-    EXPECT_TRUE(site.sent.empty()) << "nothing is read or written to propose";
+    for (const auto& r : site.sent) {
+        EXPECT_EQ(r.method, "GET") << "proposing only reads";
+    }
+    EXPECT_EQ(refused(propose(site, "calendar_remove", json{{"event", "gone_1"}}))["error"], "not_available")
+        << "an event the calendar does not have";
 
     EXPECT_EQ(
         refused(propose(site,

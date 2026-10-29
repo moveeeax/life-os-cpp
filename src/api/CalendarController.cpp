@@ -9,6 +9,7 @@
 #include <exception>
 #include <optional>
 #include <regex>
+#include <vector>
 
 #include <drogon/drogon.h>
 #include <spdlog/spdlog.h>
@@ -24,6 +25,9 @@
 #include "repositories/Zones.hpp"
 #include "repositories/calendar/LinkRepository.hpp"
 #include "security/Audit.hpp"
+#include "security/Auth.hpp"
+#include "security/SessionCookies.hpp"
+#include "security/SessionStore.hpp"
 #include "utils/ErrorResponse.hpp"
 #include "utils/Seal.hpp"
 
@@ -71,6 +75,30 @@ std::optional<std::pair<std::string, std::string>> span_of(const json& body,
     return std::make_pair(start, end);
 }
 
+/// The user signed in on this browser (the access cookie; SameSite=Lax rides the top-level return from
+/// Google), or "" when there is none. The callback path is public, so the middleware did not resolve it.
+std::string session_of(const HttpRequestPtr& req) {
+    if (!Security::Auth::is_initialized()) {
+        return "";
+    }
+    const auto& auth = Security::Auth::get();
+    const auto& cfg = auth.config();
+    const std::string token = Security::Auth::extract_access_token(req, cfg.cookies);
+    if (token.empty()) {
+        return "";
+    }
+    try {
+        std::string err;
+        const auto p = auth.verify_jwt(token, err);
+        if (!p || p->subject.empty() || Security::Sessions::access_revoked(cfg.cookies, p->subject, p->raw_claims)) {
+            return "";
+        }
+        return p->subject;
+    } catch (const std::exception&) {
+        return "";
+    }
+}
+
 void redirect(const CalendarController::Callback& callback, const std::string& outcome) {
     callback(drogon::HttpResponse::newRedirectionResponse("/account?calendar=" + outcome));
 }
@@ -107,7 +135,7 @@ void CalendarController::connect(const HttpRequestPtr& req, Callback&& callback)
 }
 
 void CalendarController::oauthCallback(const HttpRequestPtr& req, Callback&& callback) {
-    // Public: Google sends the browser here; the one-time state names the user.
+    // Public: Google sends the browser here; the one-time state names the user, who must be the one signed in.
     const auto s = Calendar::settings();
     if (!s) {
         redirect(callback, "error");
@@ -115,7 +143,7 @@ void CalendarController::oauthCallback(const HttpRequestPtr& req, Callback&& cal
     }
     try {
         LinkRepository links;
-        const auto owner = links.take_state(req->getParameter("state"));
+        const auto owner = links.take_state(req->getParameter("state"), session_of(req));
         if (!owner) {
             redirect(callback, "expired");
             return;
@@ -270,6 +298,44 @@ void CalendarController::add(const HttpRequestPtr& req, Callback&& callback) {
     Security::Audit::record(owner, "calendar.add", "calendar_event", r.body.value("id", std::string()));
     const auto parsed = Calendar::parse_events(json{{"items", json::array({r.body})}}, nullptr);
     callback(Response::created(json{{"data", parsed.empty() ? json::object() : Calendar::event_view(parsed[0])}}));
+}
+
+void CalendarController::one(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    API_REQUIRE_USER(req, callback, owner);
+    if (!event_id_ok(id)) {
+        callback(ErrorResponse::not_found("calendar_event_not_found"));
+        return;
+    }
+    const std::string tz = tz_of(req);
+    try {
+        auto token = Calendar::access(Net::Http::transport(), owner);
+        if (auto* p = std::get_if<Calendar::Problem>(&token)) {
+            callback(problem(*p));
+            return;
+        }
+        const auto r = Calendar::api(
+            Net::Http::transport(), std::get<std::string>(token), "GET", "/calendars/primary/events/" + id);
+        const auto parsed = r.ok() && r.body.is_object()
+                                ? Calendar::parse_events(json{{"items", json::array({r.body})}}, nullptr)
+                                : std::vector<Calendar::Event>{};
+        if (r.status == 404 || r.status == 410 || (r.ok() && parsed.empty())) {
+            callback(ErrorResponse::not_found("calendar_event_not_found"));
+            return;
+        }
+        if (!r.ok()) {
+            callback(ErrorResponse::make({drogon::k502BadGateway, "calendar_unavailable", "Google did not answer"}));
+            return;
+        }
+        const auto& e = parsed[0];
+        json view = Calendar::event_view(e);
+        LinkRepository links;
+        view["start_local"] = e.all_day ? e.start_text : links.local_rfc3339(e.start, tz);
+        view["end_local"] = e.all_day ? e.end_text : links.local_rfc3339(e.end, tz);
+        callback(Response::ok(json{{"data", view}}));
+    } catch (const std::exception& ex) {
+        spdlog::error("calendar.event failed: {}", ex.what());
+        callback(ErrorResponse::internal_error());
+    }
 }
 
 void CalendarController::move(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {

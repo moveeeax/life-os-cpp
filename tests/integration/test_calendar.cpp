@@ -109,6 +109,24 @@ TEST_F(CalendarLink, StateIsOneUseAndBound) {
     EXPECT_FALSE(links.take_state(old).has_value()) << "ten minutes at most";
 }
 
+TEST_F(CalendarLink, StateNeedsTheSameSignedInUser) {
+    // A consent link sent to someone else must not attach their calendar to the sender.
+    const std::string state = links.new_state(kAnna);
+    EXPECT_FALSE(links.take_state(state, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbb0ca1").has_value());
+    EXPECT_FALSE(links.take_state(state, kAnna).has_value()) << "a refused state is spent";
+    const std::string next = links.new_state(kAnna);
+    EXPECT_FALSE(links.take_state(next, "").has_value()) << "no session, no link";
+    const std::string mine = links.new_state(kAnna);
+    EXPECT_EQ(links.take_state(mine, kAnna), kAnna);
+}
+
+TEST_F(CalendarLink, LocalTimeOnTheZonesClock) {
+    // 2026-10-29T10:00:00Z.
+    EXPECT_EQ(links.local_rfc3339(1793268000, "Asia/Tashkent"), "2026-10-29T15:00:00+05:00");
+    EXPECT_EQ(links.local_rfc3339(1793268000, "America/New_York"), "2026-10-29T06:00:00-04:00");
+    EXPECT_EQ(links.local_rfc3339(1793268000, "Asia/Kolkata"), "2026-10-29T15:30:00+05:30");
+}
+
 TEST_F(CalendarLink, ConnectStoresSealedToken) {
     linked();
     const std::string raw = Database::get().execute_read(

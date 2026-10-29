@@ -16231,7 +16231,66 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** One event, with its times on the caller's clock */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The caller's IANA zone (UTC when not one) */
+                    tz?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The event */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["CalendarEvent"] & {
+                                /** @description RFC 3339 with the zone's offset at that instant; a date for an all-day event */
+                                start_local: string;
+                                end_local: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not in the calendar (calendar_event_not_found), calendar not set up (calendar_not_configured) or not linked (calendar_not_linked) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google refused the token (calendar_disconnected): connect again */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google did not answer (calendar_unavailable) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         put?: never;
         post?: never;
         /** Remove an event */

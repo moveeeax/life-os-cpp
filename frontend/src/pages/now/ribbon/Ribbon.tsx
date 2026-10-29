@@ -30,15 +30,21 @@ export function Ribbon({
   date,
   tz,
   now,
+  focusFrom = null,
   onFocus,
 }: {
   date: string;
   tz: string;
   now: number;
+  /** When the running focus started; null while none runs. */
+  focusFrom?: number | null;
   onFocus: (minutes: number) => void;
 }) {
   const day = useNowDay(date, tz);
-  const blocks = useMemo(() => blocksOf(day.data, tz, now), [day.data, tz, now]);
+  const blocks = useMemo(
+    () => blocksOf(day.data, tz, now, focusFrom),
+    [day.data, tz, now, focusFrom],
+  );
   const pins = useMemo(() => pinsOf(day.data), [day.data]);
   const next = nextEvent(day.data, now);
   const nextLine = next

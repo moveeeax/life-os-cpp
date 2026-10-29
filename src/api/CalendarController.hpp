@@ -27,6 +27,7 @@ public:
     ADD_METHOD_TO(CalendarController::disconnect, "/api/v1/calendar", Delete);
     ADD_METHOD_TO(CalendarController::events, "/api/v1/calendar/events", Get);
     ADD_METHOD_TO(CalendarController::add, "/api/v1/calendar/events", Post);
+    ADD_METHOD_TO(CalendarController::one, "/api/v1/calendar/events/{id}", Get);
     ADD_METHOD_TO(CalendarController::move, "/api/v1/calendar/events/{id}", Patch);
     ADD_METHOD_TO(CalendarController::remove, "/api/v1/calendar/events/{id}", Delete);
     ADD_METHOD_TO(CalendarController::freeSlots, "/api/v1/calendar/free", Get);
@@ -40,6 +41,7 @@ public:
     void disconnect(const HttpRequestPtr& req, Callback&& callback);
     void events(const HttpRequestPtr& req, Callback&& callback);
     void add(const HttpRequestPtr& req, Callback&& callback);
+    void one(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void move(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void remove(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void freeSlots(const HttpRequestPtr& req, Callback&& callback);

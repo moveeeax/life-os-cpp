@@ -37,6 +37,7 @@ export const qk = {
   },
   /** The owner's Telegram link (admin). */
   telegram: () => ['telegram'] as const,
+  calendar: () => ['calendar'] as const,
   /** Ani's settings on the server and her webhook. */
   ani: {
     prefs: () => ['ani', 'prefs'] as const,

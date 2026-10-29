@@ -353,6 +353,7 @@ public:
         "telegram_quiet",
         "calendar_links",
         "calendar_states",
+        "focus_sessions",
     };
 
     /// The foreign keys of the billing tables (migration 007, ON DELETE

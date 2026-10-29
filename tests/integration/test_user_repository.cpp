@@ -143,6 +143,28 @@ TEST_F(UserRepositoryRemoveTest, AnotherForeignKeyIsNotReportedAsBillingHistory)
     }
 }
 
+TEST_F(UserRepositoryRemoveTest, EveryTableWithAnOwnerIsCleared) {
+    // A table with owner_id and no foreign key leaves rows behind unless kOwnedTables names it;
+    // mi_accounts cascades from users.
+    const auto missing = Database::get().execute_read([](auto& txn) {
+        std::string out;
+        for (const auto& row : txn.exec(
+                 "SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = "
+                 "'owner_id' AND table_name <> 'mi_accounts' ORDER BY 1")) {
+            const auto name = row[0].template as<std::string>();
+            bool listed = false;
+            for (const char* t : Repositories::UserRepository::kOwnedTables) {
+                listed = listed || name == t;
+            }
+            if (!listed) {
+                out += name + " ";
+            }
+        }
+        return out;
+    });
+    EXPECT_EQ(missing, "") << "add these to kOwnedTables";
+}
+
 TEST(UserRepositoryBilling, OnlyTheBillingConstraintsCount) {
     using Repositories::UserRepository;
     EXPECT_TRUE(UserRepository::is_billing_violation(

@@ -54,6 +54,15 @@ public:
         });
     }
 
+    /// take_state, and only for @p session (the user signed in on the browser that came back); spent either way.
+    std::optional<std::string> take_state(const std::string& state, const std::string& session) {
+        auto owner = take_state(state);
+        if (!owner || session.empty() || *owner != session) {
+            return std::nullopt;
+        }
+        return owner;
+    }
+
     std::optional<Link> get(const std::string& owner) {
         return Database::get().execute_read([&](auto& txn) -> std::optional<Link> {
             auto r = txn.exec_params(
@@ -81,6 +90,22 @@ public:
                 return std::nullopt;
             }
             return nlohmann::json::parse(r[0][0].template as<std::string>());
+        });
+    }
+
+    /// The instant @p t as RFC 3339 on the clock of @p tz at that instant ("2026-10-29T15:00:00+05:00").
+    std::string local_rfc3339(long long t, const std::string& tz) {
+        return Database::get().execute_read([&](auto& txn) {
+            return txn
+                .exec_params(
+                    "SELECT to_char(to_timestamp($1) AT TIME ZONE $2, 'YYYY-MM-DD\"T\"HH24:MI:SS') || CASE WHEN off < "
+                    "0 "
+                    "THEN '-' ELSE '+' END || to_char(abs(off) / 3600, 'FM00') || ':' || to_char((abs(off) % 3600) / "
+                    "60, 'FM00') FROM (SELECT extract(epoch FROM (to_timestamp($1) AT TIME ZONE $2) - "
+                    "(to_timestamp($1) AT TIME ZONE 'UTC'))::int AS off) o",
+                    t,
+                    tz)[0][0]
+                .template as<std::string>();
         });
     }
 

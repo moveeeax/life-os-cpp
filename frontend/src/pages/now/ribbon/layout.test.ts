@@ -67,6 +67,16 @@ describe('ribbon', () => {
     expect(pinsOf(day)[0].left).toBeCloseTo(pctOf(13 * 60));
   });
 
+  it('RibbonOpenEnds: a running focus is drawn from its start to now', () => {
+    const now = Date.parse('2026-10-29T10:00:00Z'); // 15:00 local
+    const running = blocksOf(day, TZ, now, Date.parse('2026-10-29T09:20:00Z'));
+    const live = running.find((b) => b.key === 'focus:running')!;
+    expect(live.kind).toBe('did');
+    expect(live.end).toBe(now);
+    expect(live.left).toBeCloseTo(pctOf(14 * 60 + 20));
+    expect(blocksOf(day, TZ, now).some((b) => b.key === 'focus:running')).toBe(false);
+  });
+
   it('NextEventLine: the next one, the running one, then a time past an hour', () => {
     expect(nextEvent(day, Date.parse('2026-10-29T05:35:00Z'))).toEqual({
       title: 'Call with Anna',

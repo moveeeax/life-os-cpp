@@ -215,6 +215,7 @@ function NowScreen() {
           date={date}
           tz={tz}
           now={now.getTime()}
+          focusFrom={session.startedAt}
           onFocus={(m) => {
             session.start(m, focus?.date ?? null);
             player.play();

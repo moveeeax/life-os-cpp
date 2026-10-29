@@ -342,6 +342,7 @@ inline const std::vector<EndpointInfo>& get_endpoints() {
         {"DELETE", "/api/v1/calendar", "Calendar: unlink and revoke the caller's calendar"},
         {"GET", "/api/v1/calendar/events", "Calendar: events of a range of days (at most 31)"},
         {"POST", "/api/v1/calendar/events", "Calendar: add an event"},
+        {"GET", "/api/v1/calendar/events/{id}", "Calendar: one event, in the zone"},
         {"PATCH", "/api/v1/calendar/events/{id}", "Calendar: move or rename an event"},
         {"DELETE", "/api/v1/calendar/events/{id}", "Calendar: remove an event"},
         {"GET", "/api/v1/calendar/free", "Calendar: free slots of a day between 08:00 and 22:00 local"},

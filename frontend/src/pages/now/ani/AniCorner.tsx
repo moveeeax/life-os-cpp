@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
 
-import { fetchAniBare, useAniPrefs } from '@/hooks/useAni';
+import { fetchAniBare, useAniPrefs, useMuteKind } from '@/hooks/useAni';
 import type { NowWeather, Today } from '@/lib/now/types';
 
 import { AniChat, SpeakerIcon } from './AniChat';
@@ -337,6 +337,7 @@ export function AniCorner({
   const [offersTurn, setOffersTurn] = useState<string | null>(null);
   const mutedRef = useRef<string[]>([]);
   mutedRef.current = prefs.data?.muted ?? [];
+  const muteKind = useMuteKind();
   /**
    * Her answer to a tap, in the bubble while she says it: a recorded line
    * from the bucket, one with the day in it read by the server, or a silent
@@ -856,9 +857,8 @@ export function AniCorner({
           <button
             type="button"
             onClick={() => {
-              const next = [...new Set([...mutedRef.current, saidKind])];
-              void api.putJson('/api/v1/ani/prefs', { body: { muted: next } }).catch(() => {});
-              mutedRef.current = next;
+              muteKind(saidKind);
+              mutedRef.current = [...new Set([...mutedRef.current, saidKind])];
               engine.current?.hush();
               setSaid(null);
             }}

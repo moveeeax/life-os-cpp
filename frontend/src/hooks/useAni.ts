@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
@@ -23,6 +24,26 @@ export function useAniPrefs(enabled = true) {
     staleTime: 60_000,
     queryFn: async ({ signal }) => (await api.getJson<{ data: AniPrefs }>(PREFS, { signal })).data,
   });
+}
+
+/**
+ * "Not about this": mutes a kind of Ani's lines. The prefs cache is
+ * updated first, so a second mute before the refetch keeps the first.
+ */
+export function useMuteKind() {
+  const qc = useQueryClient();
+  return useCallback(
+    (kind: NonNullable<AniPrefs['muted']>[number]) => {
+      const prefs = qc.getQueryData<AniPrefs>(qk.ani.prefs());
+      const muted = [...new Set([...(prefs?.muted ?? []), kind])] as AniPrefs['muted'];
+      if (prefs) qc.setQueryData<AniPrefs>(qk.ani.prefs(), { ...prefs, muted });
+      void api
+        .putJson(PREFS, { body: { muted } })
+        .then(() => qc.invalidateQueries({ queryKey: qk.ani.prefs() }))
+        .catch(() => {});
+    },
+    [qc],
+  );
 }
 
 /** Turns bare on (with the user's 18+ word) or off. */
