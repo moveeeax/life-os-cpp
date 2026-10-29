@@ -33,6 +33,10 @@ nlohmann::json definitions();
 /// Telegram serves (agent/TelegramTools.hpp).
 nlohmann::json telegram_definitions();
 
+/// The calendar write tools (calendar_add, calendar_move, calendar_remove),
+/// given while the person's calendar is linked (agent/CalendarTools.hpp).
+nlohmann::json calendar_definitions();
+
 /// Whether @p name is one of the write tools.
 bool is_write(const std::string& name);
 

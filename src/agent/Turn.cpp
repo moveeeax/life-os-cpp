@@ -15,6 +15,7 @@
 #include <spdlog/spdlog.h>
 
 #include "agent/Actions.hpp"
+#include "agent/CalendarTools.hpp"
 #include "agent/Gateway.hpp"
 #include "agent/Hook.hpp"
 #include "agent/Intake.hpp"
@@ -371,6 +372,13 @@ json process_turn(const json& payload) {
                     }
                     run = TelegramTools::runner(Net::Http::transport(), s->api_url, *token, std::move(run));
                 }
+                const bool calendar = CalendarTools::available(owner);
+                if (calendar) {
+                    for (const auto& t : CalendarTools::definitions()) {
+                        tools.push_back(t);
+                    }
+                    run = CalendarTools::runner(Net::Http::transport(), s->api_url, *token, tz, std::move(run));
+                }
                 // Changes need the person's day (a habit is ticked for today or before).
                 if (local.size() >= 10) {
                     for (const auto& t : Actions::definitions()) {
@@ -378,6 +386,11 @@ json process_turn(const json& payload) {
                     }
                     if (telegram) {
                         for (const auto& t : Actions::telegram_definitions()) {
+                            tools.push_back(t);
+                        }
+                    }
+                    if (calendar) {
+                        for (const auto& t : Actions::calendar_definitions()) {
                             tools.push_back(t);
                         }
                     }
@@ -389,8 +402,10 @@ json process_turn(const json& payload) {
         const json outcomes = ActionRepository().of_previous_turn(owner, id);
         // The gateway ignores system messages: the context goes in front of the text.
         const std::string said = (started ? *started : *turn).value("text", "");
+        // The offset goes with the zone: times she writes for the calendar carry it.
+        const std::string zone = tz + (turns.utc_offset(tz) ? " (UTC" + *turns.utc_offset(tz) + ")" : std::string());
         const std::string text =
-            preface(local, tz, tools, outcomes) + "\n" + (origin == "hook" ? hook_note() + "\n" + said : said);
+            preface(local, zone, tools, outcomes) + "\n" + (origin == "hook" ? hook_note() + "\n" + said : said);
         const auto out = Gateway::converse(Net::Http::transport(),
                                            "http://" + gateway->first + ":" + std::to_string(Gateway::kGatewayPort),
                                            gateway->second,

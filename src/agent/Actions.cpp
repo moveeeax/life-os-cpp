@@ -17,6 +17,7 @@
 
 #include "agent/Settings.hpp"
 #include "agent/Tools.hpp"
+#include "calendar/Google.hpp"
 #include "jobs/Job.hpp"
 #include "repositories/agent/ActionRepository.hpp"
 #include "storage/S3Presign.hpp"
@@ -352,6 +353,72 @@ Proposed tg_edit(Net::Http::Transport& transport,
                          {"label", label}}};
 }
 
+/// An RFC 3339 time with its offset ("2026-10-29T14:00:00+05:00"); empty when it is not one.
+std::string time_arg(const json& args, const char* key) {
+    const std::string v = text_arg(args, key);
+    return ::Calendar::parse_time(v) ? v : std::string();
+}
+
+/// "2026-10-29 14:00–15:30" from two times written in the person's offset.
+std::string span_words(const std::string& start, const std::string& end) {
+    const std::string day = start.substr(0, 10);
+    const std::string to = end.substr(0, 10) == day ? end.substr(11, 5) : end.substr(0, 10) + " " + end.substr(11, 5);
+    return day + " " + start.substr(11, 5) + "–" + to;
+}
+
+std::string event_id(const json& args) {
+    static const std::regex kId("^[A-Za-z0-9_-]{1,1024}$");
+    const std::string v = text_arg(args, "event");
+    return std::regex_match(v, kId) ? v : std::string();
+}
+
+Proposed calendar_add(const json& args) {
+    const std::string title = text_arg(args, "title");
+    const std::string start = time_arg(args, "start");
+    const std::string end = time_arg(args, "end");
+    if (title.empty() || length(title) > 300) {
+        return refusal("invalid", "the title is 1 to 300 characters");
+    }
+    if (start.empty() || end.empty() || *::Calendar::parse_time(end) <= *::Calendar::parse_time(start)) {
+        return refusal("invalid", "start and end are RFC 3339 times with the person's offset, end after start");
+    }
+    return Proposal{"calendar_add",
+                    "Add «" + cut(title, 120) + "» to the calendar, " + span_words(start, end),
+                    json{{"method", "POST"},
+                         {"path", "/api/v1/calendar/events"},
+                         {"body", {{"title", title}, {"start", start}, {"end", end}}}}};
+}
+
+Proposed calendar_move(const json& args) {
+    const std::string id = event_id(args);
+    const std::string title = text_arg(args, "title");
+    const std::string start = time_arg(args, "start");
+    const std::string end = time_arg(args, "end");
+    if (id.empty()) {
+        return refusal("invalid", "event is an id from calendar_events");
+    }
+    if (start.empty() || end.empty() || *::Calendar::parse_time(end) <= *::Calendar::parse_time(start)) {
+        return refusal("invalid", "start and end are RFC 3339 times with the person's offset, end after start");
+    }
+    return Proposal{
+        "calendar_move",
+        "Move «" + cut(title.empty() ? std::string("the event") : title, 120) + "» to " + span_words(start, end),
+        json{{"method", "PATCH"},
+             {"path", "/api/v1/calendar/events/" + id},
+             {"body", {{"start", start}, {"end", end}}}}};
+}
+
+Proposed calendar_remove(const json& args) {
+    const std::string id = event_id(args);
+    const std::string title = text_arg(args, "title");
+    if (id.empty()) {
+        return refusal("invalid", "event is an id from calendar_events");
+    }
+    return Proposal{"calendar_remove",
+                    "Remove «" + cut(title.empty() ? std::string("the event") : title, 120) + "» from the calendar",
+                    json{{"method", "DELETE"}, {"path", "/api/v1/calendar/events/" + id}}};
+}
+
 }  // namespace
 
 json definitions() {
@@ -399,9 +466,29 @@ json telegram_definitions() {
     });
 }
 
+json calendar_definitions() {
+    const json time = {{"type", "string"},
+                       {"description", "RFC 3339 with the person's offset, like 2026-10-29T14:00:00+05:00"}};
+    const json event = {{"type", "string"}, {"description", "The event's id from calendar_events"}};
+    const json title = {{"type", "string"}, {"description", "The event's title"}};
+    return json::array({
+        tool("calendar_add",
+             "Propose a new event in the person's Google Calendar. Nothing is added until they confirm it.",
+             object({{"title", title}, {"start", time}, {"end", time}}, json::array({"title", "start", "end"}))),
+        tool("calendar_move",
+             "Propose a new time for an event of the person's calendar. Nothing changes until they confirm it.",
+             object({{"event", event}, {"title", title}, {"start", time}, {"end", time}},
+                    json::array({"event", "start", "end"}))),
+        tool("calendar_remove",
+             "Propose to remove an event from the person's calendar. Nothing changes until they confirm it.",
+             object({{"event", event}, {"title", title}}, json::array({"event"}))),
+    });
+}
+
 bool is_write(const std::string& name) {
     return name == "create_task" || name == "complete_task" || name == "check_habit" || name == "add_note" ||
-           name == "tg_send" || name == "tg_edit";
+           name == "tg_send" || name == "tg_edit" || name == "calendar_add" || name == "calendar_move" ||
+           name == "calendar_remove";
 }
 
 Proposed propose(Net::Http::Transport& transport,
@@ -424,6 +511,15 @@ Proposed propose(Net::Http::Transport& transport,
         }
         if (name == "add_note") {
             return add_note(args);
+        }
+        if (name == "calendar_add") {
+            return calendar_add(args);
+        }
+        if (name == "calendar_move") {
+            return calendar_move(args);
+        }
+        if (name == "calendar_remove") {
+            return calendar_remove(args);
         }
         if (name == "tg_send") {
             return tg_send(transport, api_url, access_token, args);

@@ -4709,7 +4709,10 @@
        "check_habit",
        "add_note",
        "tg_send",
-       "tg_edit"
+       "tg_edit",
+       "calendar_add",
+       "calendar_move",
+       "calendar_remove"
       ]
      },
      "summary": {
@@ -38333,7 +38336,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 579652,
-  "source_fnv1a64": "0c60fc2c3712d2a9"
+  "source_bytes": 579698,
+  "source_fnv1a64": "94d6f1e6329a382e"
  }
 }

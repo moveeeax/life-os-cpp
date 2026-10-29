@@ -1206,7 +1206,7 @@ components:
       required: [id, kind, summary, status, error]
       properties:
         id: { type: string, format: uuid }
-        kind: { type: string, enum: [create_task, complete_task, check_habit, add_note, tg_send, tg_edit] }
+        kind: { type: string, enum: [create_task, complete_task, check_habit, add_note, tg_send, tg_edit, calendar_add, calendar_move, calendar_remove] }
         summary: { type: string, description: 'What the user confirms, in words' }
         text: { type: [string, 'null'], description: 'The message of a Telegram proposal (tg_send, tg_edit), which the user may change on Confirm; null for the other kinds' }
         status:

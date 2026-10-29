@@ -25159,7 +25159,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "create_task" | "complete_task" | "check_habit" | "add_note" | "tg_send" | "tg_edit";
+            kind: "create_task" | "complete_task" | "check_habit" | "add_note" | "tg_send" | "tg_edit" | "calendar_add" | "calendar_move" | "calendar_remove";
             /** @description What the user confirms, in words */
             summary: string;
             /** @description The message of a Telegram proposal (tg_send, tg_edit), which the user may change on Confirm; null for the other kinds */
