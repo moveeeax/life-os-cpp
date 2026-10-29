@@ -731,11 +731,12 @@ void Application::register_files_sweep_schedule_() {
 }
 
 void Application::register_leetcode_schedule_() {
-    // LeetCode profiles: every 3 hours a tick queues leetcode_sync, the worker pulls each profile.
+    // LeetCode profiles: every hour a tick queues leetcode_sync, the worker pulls each profile, so a
+    // late solve lands on its own day unless it is within the last hour.
     if (!Tasks::is_initialized() || !Database::is_initialized() || !Jobs::is_initialized())
         return;
-    spdlog::info("leetcode sync enabled: every 3 hours");
-    Tasks::schedule_recurring("leetcode_sync_schedule", std::chrono::hours(3), [] {
+    spdlog::info("leetcode sync enabled: every hour");
+    Tasks::schedule_recurring("leetcode_sync_schedule", std::chrono::hours(1), [] {
         if (!Jobs::is_initialized())
             return;
         try {

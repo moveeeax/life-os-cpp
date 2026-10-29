@@ -29326,7 +29326,7 @@
   "/api/v1/leetcode/profile": {
    "get": {
     "summary": "The caller's LeetCode profile",
-    "description": "The public username whose solved counts are pulled every 3 hours into the metrics catalog (leetcode:solved, leetcode:easy, leetcode:medium, leetcode:hard: a day's value is its growth over the previous pull), so a habit can take them as its source. data is null without a profile.",
+    "description": "The public username whose solved counts are pulled every hour into the metrics catalog (leetcode:solved, leetcode:easy, leetcode:medium, leetcode:hard: a day's value is its growth over the last pull of an earlier day, so the day of linking has none), so a habit can take them as its source. data is null without a profile.",
     "tags": [
      "leetcode"
     ],
@@ -36852,7 +36852,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 555391,
-  "source_fnv1a64": "7f50291b64738fc9"
+  "source_bytes": 555442,
+  "source_fnv1a64": "7a1f1c9291c44e2e"
  }
 }

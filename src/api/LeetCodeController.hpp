@@ -1,7 +1,7 @@
 /**
  * @file LeetCodeController.hpp
  * @brief The caller's LeetCode profile: the public username whose solved
- *        counts are pulled every 3 hours (leetcode/Sync.hpp) into the
+ *        counts are pulled every hour (leetcode/Sync.hpp) into the
  *        metrics catalog (leetcode:solved and per difficulty), so a habit
  *        can take them as its source. Setting it queues a pull at once.
  */
