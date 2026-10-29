@@ -134,7 +134,7 @@ protected:
 TEST_F(AniSettingsApi, PrefsDefaultOff) {
     auto r = get_prefs();
     ASSERT_EQ(r->statusCode(), k200OK) << std::string(r->body());
-    EXPECT_EQ(body_of(r)["data"], json({{"bare", false}}));
+    EXPECT_EQ(body_of(r)["data"], json({{"bare", false}, {"muted", json::array()}}));
 }
 
 TEST_F(AniSettingsApi, BareNeedsAdult) {

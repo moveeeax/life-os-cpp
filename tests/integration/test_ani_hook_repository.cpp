@@ -231,10 +231,10 @@ TEST_F(AniHookRepository, AppendTextWhileQueued) {
 
 TEST_F(AniHookRepository, BareSwitch) {
     PrefsRepository prefs;
-    EXPECT_EQ(prefs.get(kAnna), json({{"bare", false}}));
+    EXPECT_EQ(prefs.get(kAnna), json({{"bare", false}, {"muted", json::array()}}));
     prefs.set_bare(kAnna, true);
-    EXPECT_EQ(prefs.get(kAnna), json({{"bare", true}}));
-    EXPECT_EQ(prefs.get(kBoris), json({{"bare", false}}));
+    EXPECT_EQ(prefs.get(kAnna), json({{"bare", true}, {"muted", json::array()}}));
+    EXPECT_EQ(prefs.get(kBoris), json({{"bare", false}, {"muted", json::array()}}));
     prefs.set_bare(kAnna, false);
-    EXPECT_EQ(prefs.get(kAnna), json({{"bare", false}}));
+    EXPECT_EQ(prefs.get(kAnna), json({{"bare", false}, {"muted", json::array()}}));
 }
