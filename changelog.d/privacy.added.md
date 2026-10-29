@@ -1,1 +1,0 @@
-A public /privacy page (linked in the footer) says what Life OS keeps, how it uses Google Calendar and Telegram, who to write to, and carries Google's Limited Use statement, so the Google project can be published.

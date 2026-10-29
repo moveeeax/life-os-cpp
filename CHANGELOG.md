@@ -6,6 +6,17 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.52.0] - 2026-10-30
+
+### Added
+- Ani keeps facts about you in Life OS: she remembers and forgets them in a chat, you see, edit, add and delete them in Account → Ani, and kinds of her lines muted on Now are listed there to turn back on.
+- Ani on Now acts without the chat: what her answer proposes shows as buttons by her bubble (Telegram reply drafts to pick or reword, changes with Yes and No, Accept all), her lines about a meeting light it on the day ribbon, her own lines can be put off for an hour or muted, she counts what waits during a focus session, and a call can be held to talk.
+- Google Calendar in Life OS: connect it in Account; Ani reads the events and free slots of your days and proposes events to add, move or remove, which you confirm; Life OS asks to connect again when Google drops the access.
+- Now fits the moment and your own board: cards for the morning, a flight day, the first days in a new country and the evening, and up to six widgets you put on it in Arrange (a graph of any series, the calendar week, habits, spending, Telegram, the next trip).
+- Now shows the day as a ribbon under the clock: calendar meetings, free time, tasks with a time, focus and workouts done, a line for now and the next meeting, and a tap on free time starts a focus or adds a focus block to the calendar.
+- A public /privacy page (linked in the footer) says what Life OS keeps, how it uses Google Calendar and Telegram, who to write to, and carries Google's Limited Use statement, so the Google project can be published.
+- Telegram for Ani: in the evening she names private chats waiting a day or more for your answer, chats can be made quiet for her in Account, and the Sunday review can go to your Saved Messages (a switch, off by default).
+
 ## [1.51.0] - 2026-10-29
 
 ### Added

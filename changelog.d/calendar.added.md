@@ -1,1 +1,0 @@
-Google Calendar in Life OS: connect it in Account; Ani reads the events and free slots of your days and proposes events to add, move or remove, which you confirm; Life OS asks to connect again when Google drops the access.

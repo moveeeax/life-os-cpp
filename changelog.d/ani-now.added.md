@@ -1,1 +1,0 @@
-Ani on Now acts without the chat: what her answer proposes shows as buttons by her bubble (Telegram reply drafts to pick or reword, changes with Yes and No, Accept all), her lines about a meeting light it on the day ribbon, her own lines can be put off for an hour or muted, she counts what waits during a focus session, and a call can be held to talk.

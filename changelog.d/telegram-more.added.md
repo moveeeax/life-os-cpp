@@ -1,1 +1,0 @@
-Telegram for Ani: in the evening she names private chats waiting a day or more for your answer, chats can be made quiet for her in Account, and the Sunday review can go to your Saved Messages (a switch, off by default).
