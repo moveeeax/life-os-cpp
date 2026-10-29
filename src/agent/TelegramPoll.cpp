@@ -227,8 +227,8 @@ json process_poll(const json&) {
             }
             const auto top = ::Telegram::call(transport, *s, "GET", "/v1/chats/" + id + "/messages", {{"limit", "1"}});
             const json list = top.ok() ? list_of(top) : json::array();
-            if (const long long since = list.empty() ? 0 : waiting_since(chat, list[0], now); since > 0) {
-                waiting.push_back({{"chat", id}, {"title", chat.value("title", std::string())}, {"since", since}});
+            if (const long long at = list.empty() ? 0 : waiting_since(chat, list[0], now); at > 0) {
+                waiting.push_back({{"chat", id}, {"title", chat.value("title", std::string())}, {"since", at}});
             }
         }
         links.set_waiting(link->owner, waiting);
