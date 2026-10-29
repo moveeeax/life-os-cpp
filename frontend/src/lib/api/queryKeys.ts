@@ -30,10 +30,12 @@ export const qk = {
   mi: {
     account: () => ['mi', 'account'] as const,
   },
-  /** Ani's settings on the server and her webhook. */
+  /** The caller's API keys for scripts and agents (scopes full and read). */
+  apiKeys: () => ['account', 'api-keys'] as const,
   leetcode: {
     profile: () => ['leetcode', 'profile'] as const,
   },
+  /** Ani's settings on the server and her webhook. */
   ani: {
     prefs: () => ['ani', 'prefs'] as const,
     webhook: () => ['ani', 'webhook'] as const,

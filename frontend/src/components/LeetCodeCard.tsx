@@ -14,7 +14,7 @@ type Profile = components['schemas']['LeetCodeProfile'];
 const PATH = '/api/v1/leetcode/profile';
 
 /**
- * The LeetCode username whose solved counts are pulled every 3 hours; a
+ * The LeetCode username whose solved counts are pulled every hour; a
  * habit takes "LeetCode solved" as its source to tick itself.
  */
 export function LeetCodeCard() {
@@ -43,7 +43,8 @@ export function LeetCodeCard() {
       <CardHeader>
         <CardTitle>LeetCode</CardTitle>
         <CardDescription>
-          Your public profile; a habit with the source “LeetCode solved” ticks itself.
+          Your public profile, pulled every hour; a habit with the source “LeetCode solved” ticks
+          itself. Counting starts the day after you link it: the first pull is the baseline.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

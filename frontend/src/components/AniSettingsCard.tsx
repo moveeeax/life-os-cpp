@@ -52,7 +52,7 @@ function BareSwitch() {
           }`}
         >
           <span
-            className={`absolute top-0.5 size-4.5 rounded-full bg-background shadow transition-transform ${
+            className={`absolute top-0.5 left-0 size-4.5 rounded-full bg-white shadow transition-transform ${
               on ? 'translate-x-5.5' : 'translate-x-0.5'
             }`}
           />

@@ -16,6 +16,8 @@
   --g-warn: #fcd34d;
   --g-late: #fca5a5;
   --g-brand: #a5b4fc;
+  /* The bar's bottom edge: its top offset plus the 38px pills and a hair. */
+  --g-top: calc(max(14px, env(safe-area-inset-top, 0px)) + 42px);
   position: relative;
   min-height: 100vh;
   /* The small viewport: a phone's address bar does not push Now into a scroll. */
@@ -217,9 +219,22 @@
   min-height: 100svh;
 }
 .g-page {
+  /* The sheets scroll in their own layer that fades out at the bar's bottom
+     edge, so nothing scrolls under the pills; the picture stays whole. */
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent var(--g-top),
+    #000 calc(var(--g-top) + 16px)
+  );
+  mask-image: linear-gradient(to bottom, transparent var(--g-top), #000 calc(var(--g-top) + 16px));
   padding: 84px 16px 80px;
   display: grid;
   justify-items: center;
+  align-content: start;
 }
 .g-col {
   width: min(760px, 100%);

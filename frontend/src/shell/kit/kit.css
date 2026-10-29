@@ -913,7 +913,8 @@ select.k-input option {
 /* Training session: the facts stay on screen while scrolling; the rest timer sits at the bottom. */
 .k-sticky {
   position: sticky;
-  top: 64px;
+  /* Just under the fade at the bar's edge (glass.css .g-page). */
+  top: calc(var(--g-top) + 16px);
   z-index: 5;
   padding: 8px 0 6px;
   margin: -4px 0 4px;

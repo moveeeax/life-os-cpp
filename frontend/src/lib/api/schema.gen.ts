@@ -15554,7 +15554,7 @@ export interface paths {
         };
         /**
          * The caller's LeetCode profile
-         * @description The public username whose solved counts are pulled every 3 hours into the metrics catalog (leetcode:solved, leetcode:easy, leetcode:medium, leetcode:hard: a day's value is its growth over the previous pull), so a habit can take them as its source. data is null without a profile.
+         * @description The public username whose solved counts are pulled every hour into the metrics catalog (leetcode:solved, leetcode:easy, leetcode:medium, leetcode:hard: a day's value is its growth over the last pull of an earlier day, so the day of linking has none), so a habit can take them as its source. data is null without a profile.
          */
         get: {
             parameters: {

@@ -98,31 +98,6 @@
   font-size: 14px;
   color: var(--g-warn);
 }
-.n-picks {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  max-width: 640px;
-}
-.n-pick {
-  font-size: 14px;
-  color: var(--g-ink-soft);
-  border: 1px solid var(--g-glass-line);
-  background: var(--g-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 999px;
-  padding: 6px 14px;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-shadow: none;
-}
-.n-pick:hover {
-  color: var(--g-ink);
-}
 .n-input {
   width: min(520px, 100%);
   background: none;
@@ -150,6 +125,7 @@
   display: flex;
   gap: 18px;
   justify-content: center;
+  align-items: center;
 }
 .n-start {
   font-size: 15px;
@@ -162,17 +138,31 @@
 }
 .n-lengths {
   display: inline-flex;
-  gap: 4px;
   align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--g-glass-line);
+  background: var(--g-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  text-shadow: none;
 }
 .n-lengths button {
   font-size: 13px;
-  color: var(--g-ink-faint);
-  padding: 4px 8px;
+  color: var(--g-ink-soft);
+  padding: 3px 10px;
   border-radius: 999px;
+  transition:
+    background-color 150ms,
+    color 150ms;
+}
+.n-lengths button:hover {
+  color: var(--g-ink);
 }
 .n-lengths button[aria-pressed='true'] {
-  color: var(--g-ink);
+  background: rgba(255, 255, 255, 0.92);
+  color: #111;
 }
 /* Room for the fixed dock at the bottom; on a phone the dock is in the flow
    (corners.css), so only the Hide numbers pill needs room, and the screen is
