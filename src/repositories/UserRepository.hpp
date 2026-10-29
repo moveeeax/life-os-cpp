@@ -348,6 +348,8 @@ public:
         "leetcode_profiles",
         "telegram_cursors",
         "telegram_link",
+        "calendar_links",
+        "calendar_states",
     };
 
     /// The foreign keys of the billing tables (migration 007, ON DELETE

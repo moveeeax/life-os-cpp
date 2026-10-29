@@ -1248,6 +1248,34 @@ components:
               say: { type: [string, 'null'], description: Her line (or the part of her reply said aloud) }
               answer: { type: [string, 'null'], description: "An ask's answer" }
               created_at: { type: string, format: date-time }
+    CalendarStatus:
+      type: object
+      required: [configured, link]
+      properties:
+        configured: { type: boolean, description: The server has a Google OAuth client and a seal key }
+        link:
+          type: [object, 'null']
+          properties:
+            email: { type: string, description: The Google account linked }
+            broken: { type: boolean, description: 'Google refused the token: connect again' }
+            created_at: { type: string, format: date-time }
+    CalendarEvent:
+      type: object
+      required: [id, title, start, end, all_day, location]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        start: { type: string, description: 'RFC 3339 in UTC, or YYYY-MM-DD for an all-day event' }
+        end: { type: string }
+        all_day: { type: boolean }
+        location: { type: string }
+    CalendarSlot:
+      type: object
+      required: [start, end, minutes]
+      properties:
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        minutes: { type: integer }
     TelegramStatus:
       type: object
       required: [configured, linked, elsewhere, link]
@@ -10194,6 +10222,195 @@ paths:
                 properties:
                   data: { $ref: '#/components/schemas/AniWebhook' }
         '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+  /api/v1/calendar:
+    get:
+      summary: The caller's Google Calendar link
+      tags: [calendar]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/CalendarStatus' }
+        '401': { description: Not authenticated }
+    delete:
+      summary: Unlink the caller's calendar
+      description: Revokes the token at Google (best effort) and deletes it. Refused for API keys.
+      tags: [calendar]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204': { description: Unlinked }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: Not linked (calendar_not_linked) }
+  /api/v1/calendar/connect:
+    post:
+      summary: Start linking Google Calendar
+      description: >-
+        The Google consent URL with a one-time state (ten minutes, bound to
+        the caller). The browser goes there; Google comes back to the
+        callback. Refused for API keys.
+      tags: [calendar]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Where to send the browser
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: object, required: [url], properties: { url: { type: string } } }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: Not set up on the server (calendar_not_configured) }
+  /api/v1/calendar/oauth/callback:
+    get:
+      summary: Google's consent comes back here
+      description: >-
+        Public: the one-time state names the user. Exchanges the code, seals
+        the refresh token, and redirects to /account?calendar=ok, denied,
+        expired or error.
+      tags: [calendar]
+      security: []
+      parameters:
+        - { name: state, in: query, schema: { type: string } }
+        - { name: code, in: query, schema: { type: string } }
+        - { name: error, in: query, schema: { type: string } }
+      responses:
+        '302': { description: To /account with the outcome }
+  /api/v1/calendar/events:
+    get:
+      summary: Events of a range of days
+      description: The primary calendar's events overlapping the local days from..to (at most 31), recurrences expanded.
+      tags: [calendar]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date } }
+        - { name: tz, in: query, description: The caller's IANA zone (UTC when not one), schema: { type: string } }
+      responses:
+        '200':
+          description: The events, by start
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/CalendarEvent' } }
+        '400': { description: 'invalid_range' }
+        '401': { description: Not authenticated }
+        '404': { description: 'Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked)' }
+        '409': { description: 'Google refused the token (calendar_disconnected): connect again' }
+        '502': { description: Google did not answer (calendar_unavailable) }
+    post:
+      summary: Add an event
+      description: What a confirmed calendar_add proposal of Ani calls; the caller may call it too.
+      tags: [calendar]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [start, end]
+              properties:
+                title: { type: string, minLength: 1, maxLength: 300 }
+                start: { type: string, description: RFC 3339 with an offset }
+                end: { type: string, description: 'RFC 3339, after start, a day at most' }
+                description: { type: string, maxLength: 2000 }
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/CalendarEvent' }
+        '400': { description: 'invalid_title, invalid_time' }
+        '401': { description: Not authenticated }
+        '404': { description: 'Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked)' }
+        '409': { description: 'Google refused the token (calendar_disconnected): connect again' }
+        '502': { description: Google did not answer (calendar_unavailable) }
+  /api/v1/calendar/events/{id}:
+    patch:
+      summary: Move or rename an event
+      tags: [calendar]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [start, end]
+              properties:
+                title: { type: string, minLength: 1, maxLength: 300 }
+                start: { type: string, description: RFC 3339 with an offset }
+                end: { type: string, description: 'RFC 3339, after start, a day at most' }
+                description: { type: string, maxLength: 2000 }
+      responses:
+        '200':
+          description: Moved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: object }
+        '400': { description: invalid_time }
+        '401': { description: Not authenticated }
+        '404': { description: 'Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked)' }
+        '409': { description: 'Google refused the token (calendar_disconnected): connect again' }
+        '502': { description: Google did not answer (calendar_unavailable) }
+    delete:
+      summary: Remove an event
+      tags: [calendar]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Removed }
+        '401': { description: Not authenticated }
+        '404': { description: 'Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked)' }
+        '409': { description: 'Google refused the token (calendar_disconnected): connect again' }
+        '502': { description: Google did not answer (calendar_unavailable) }
+  /api/v1/calendar/free:
+    get:
+      summary: Free slots of a day
+      description: Between 08:00 and 22:00 local, around busy events (all-day and free events do not block).
+      tags: [calendar]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: min, in: query, description: 'Shortest slot in minutes, 5 to 480', schema: { type: integer, default: 30 } }
+        - { name: tz, in: query, description: The caller's IANA zone (UTC when not one), schema: { type: string } }
+      responses:
+        '200':
+          description: The slots
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/CalendarSlot' } }
+        '400': { description: invalid_date }
+        '401': { description: Not authenticated }
+        '404': { description: 'Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked)' }
+        '409': { description: 'Google refused the token (calendar_disconnected): connect again' }
+        '502': { description: Google did not answer (calendar_unavailable) }
   /api/v1/telegram:
     get:
       summary: The owner's Telegram link

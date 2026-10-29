@@ -309,3 +309,10 @@ core -> telegram
 repositories/telegram -> database
 telegram -> net
 telegram -> utils
+api -> calendar
+api -> repositories/calendar
+calendar -> net
+calendar -> repositories/calendar
+calendar -> utils
+repositories/calendar -> database
+repositories/calendar -> utils

@@ -43,6 +43,7 @@
 #include "api/HabitsController.hpp"
 #include "api/HealthController.hpp"
 #include "api/JobsController.hpp"
+#include "api/CalendarController.hpp"
 #include "api/LeetCodeController.hpp"
 #include "api/MeasurementsController.hpp"
 #include "api/MedicalController.hpp"
