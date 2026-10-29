@@ -173,8 +173,17 @@ void TelegramController::link(const HttpRequestPtr& req, Callback&& callback) {
             callback(refusal(me));
             return;
         }
+        const std::string me_id = user.value("id", std::string());
+        // /v1/me carries no username; the user card does (the poll spots @mentions by it).
+        std::string username = user.value("username", std::string());
+        if (username.empty() && Telegram::valid_id(me_id)) {
+            const auto card = Telegram::call(Net::Http::transport(), *s, "GET", "/v1/users/" + me_id);
+            if (card.ok() && card.data().is_object()) {
+                username = card.data().value("username", std::string());
+            }
+        }
         LinkRepository links;
-        if (!links.set(owner, user.value("id", std::string()), user.value("username", std::string()))) {
+        if (!links.set(owner, me_id, username)) {
             callback(ErrorResponse::conflict("telegram_linked_elsewhere", "the account serves another user"));
             return;
         }

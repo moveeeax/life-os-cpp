@@ -29,6 +29,10 @@ CREATE TABLE IF NOT EXISTS telegram_cursors (
     PRIMARY KEY (owner_id, chat_id)
 );
 
+DROP TRIGGER IF EXISTS telegram_cursors_touch_updated_at ON telegram_cursors;
+CREATE TRIGGER telegram_cursors_touch_updated_at BEFORE UPDATE ON telegram_cursors
+    FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
 ALTER TABLE ani_actions DROP CONSTRAINT IF EXISTS ani_actions_kind_check;
 ALTER TABLE ani_actions ADD CONSTRAINT ani_actions_kind_check
     CHECK (kind IN ('create_task', 'complete_task', 'check_habit', 'add_note', 'tg_send', 'tg_edit'));
