@@ -6,6 +6,21 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.50.0] - 2026-10-29
+
+### Added
+- Account has an API keys card again for scripts and agents: name a key, pick full or read-only access, copy it once, and revoke it after a confirm; Ani's MCP keys stay in her card.
+
+### Changed
+- The Money ledger reads a month by week: a strip of the year's months coloured by spend against the median of the closed ones, the period as Spent and In in one currency at the report rates (the per-currency line one click away), weeks from Monday to Sunday with the current one open, and one line per row with its date beside the amount.
+- LeetCode is pulled every hour instead of every 3 hours, so a late solve lands on its own day, and the Account card says counting starts the day after linking, because the first pull is the baseline.
+- Now asks for the main focus with the input alone, without the suggested tasks and goals under it, and the focus length is a segmented pill where the chosen 25, 50 or 90 min is filled.
+- Travel Trips shows one year at a time: a strip of its trips from January to December with a line for today, then the trips as a one-line table or as a world map where each city (read from the trip name, else its country) is a dot sized by days, the running trip with its plan as a dashed ring.
+
+### Fixed
+- The Bare outfit switch in Account keeps its knob inside the track: it sat past the right edge and was dark on the dark theme.
+- Sections other than Now scroll in their own layer that fades out at the bottom edge of the menu, so sheets no longer slide under the menu pills.
+
 ## [1.49.0] - 2026-10-29
 
 ### Added

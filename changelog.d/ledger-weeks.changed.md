@@ -1,1 +1,0 @@
-The Money ledger reads a month by week: a strip of the year's months coloured by spend against the median of the closed ones, the period as Spent and In in one currency at the report rates (the per-currency line one click away), weeks from Monday to Sunday with the current one open, and one line per row with its date beside the amount.
