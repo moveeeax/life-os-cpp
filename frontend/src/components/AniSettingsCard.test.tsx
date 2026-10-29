@@ -55,7 +55,8 @@ beforeEach(() => {
     },
   ];
   vi.spyOn(api, 'getJson').mockImplementation(async (path: string) => {
-    if (path === '/api/v1/ani/prefs') return { data: { bare } };
+    if (path === '/api/v1/ani/prefs') return { data: { bare, muted: [] } };
+    if (path === '/api/v1/ani/facts') return { data: [] };
     if (path === '/api/v1/ani/webhook')
       return {
         data: {

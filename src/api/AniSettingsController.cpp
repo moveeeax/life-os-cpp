@@ -6,8 +6,11 @@
 #include "api/AniSettingsController.hpp"
 
 #include <exception>
+#include <optional>
+#include <set>
 #include <string>
 #include <variant>
+#include <vector>
 
 #include <drogon/drogon.h>
 #include <spdlog/spdlog.h>
@@ -17,6 +20,8 @@
 #include "agent/Reminders.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
+#include "api/PathNormalize.hpp"
+#include "repositories/agent/FactRepository.hpp"
 #include "repositories/agent/HookRepository.hpp"
 #include "repositories/agent/InboxRepository.hpp"
 #include "repositories/agent/PrefsRepository.hpp"
@@ -72,22 +77,132 @@ void AniSettingsController::savePrefs(const HttpRequestPtr& req, Callback&& call
         return;
     }
     const auto bare_it = body.find("bare");
-    if (bare_it == body.end() || !bare_it->is_boolean()) {
-        callback(ErrorResponse::bad_request("invalid_body", "bare must be true or false"));
+    const auto muted_it = body.find("muted");
+    if ((bare_it == body.end() && muted_it == body.end()) || (bare_it != body.end() && !bare_it->is_boolean())) {
+        callback(ErrorResponse::bad_request("invalid_body", "bare must be true or false, or muted a list"));
         return;
     }
-    const bool on = bare_it->get<bool>();
-    const auto adult_it = body.find("adult");
-    if (on && !(adult_it != body.end() && adult_it->is_boolean() && adult_it->get<bool>())) {
-        callback(ErrorResponse::unprocessable("adult_required", "the bare outfit is only for adults"));
-        return;
+    // The kinds of her own lines the page can mute ("Not about this" on Now).
+    static const std::set<std::string> kKinds = {
+        "brief", "evening", "break", "stretch", "hello", "telegram", "webhook", "reminder", "calendar"};
+    std::vector<std::string> muted;
+    if (muted_it != body.end()) {
+        if (!muted_it->is_array() || muted_it->size() > kKinds.size()) {
+            callback(ErrorResponse::bad_request("invalid_muted", "muted is a list of line kinds"));
+            return;
+        }
+        for (const auto& k : *muted_it) {
+            if (!k.is_string() || kKinds.count(k.get<std::string>()) == 0) {
+                callback(ErrorResponse::bad_request("invalid_muted", "muted is a list of line kinds"));
+                return;
+            }
+            muted.push_back(k.get<std::string>());
+        }
+    }
+    if (bare_it != body.end() && bare_it->get<bool>()) {
+        const auto adult_it = body.find("adult");
+        if (!(adult_it != body.end() && adult_it->is_boolean() && adult_it->get<bool>())) {
+            callback(ErrorResponse::unprocessable("adult_required", "the bare outfit is only for adults"));
+            return;
+        }
     }
     try {
         Repositories::Agent::PrefsRepository repo;
-        repo.set_bare(owner, on);
+        if (bare_it != body.end()) {
+            repo.set_bare(owner, bare_it->get<bool>());
+        }
+        if (muted_it != body.end()) {
+            repo.set_muted(owner, muted);
+        }
         callback(Response::ok(json{{"data", repo.get(owner)}}));
     } catch (const std::exception& e) {
         spdlog::error("ani.prefs save failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
+namespace {
+
+std::optional<std::string> fact_text(const json& body, const AniSettingsController::Callback& callback) {
+    const std::string text = body.value("text", std::string());
+    std::size_t n = 0;
+    for (const unsigned char c : text) {
+        n += (c & 0xC0) != 0x80 ? 1 : 0;
+    }
+    if (n < 1 || n > 200) {
+        callback(ErrorResponse::bad_request("invalid_text", "a fact is 1 to 200 characters"));
+        return std::nullopt;
+    }
+    return text;
+}
+
+}  // namespace
+
+void AniSettingsController::facts(const HttpRequestPtr& req, Callback&& callback) {
+    ANI_SETTINGS_GUARD(req, callback, owner);
+    try {
+        callback(Response::ok(json{{"data", Repositories::Agent::FactRepository().list(owner)}}));
+    } catch (const std::exception& e) {
+        spdlog::error("ani.facts failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
+void AniSettingsController::addFact(const HttpRequestPtr& req, Callback&& callback) {
+    ANI_SETTINGS_GUARD(req, callback, owner);
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    const auto text = fact_text(body, callback);
+    if (!text) {
+        return;
+    }
+    try {
+        const auto id = Repositories::Agent::FactRepository().add(owner, *text, "page");
+        if (!id) {
+            callback(ErrorResponse::conflict("too_many_facts", "50 facts at most"));
+            return;
+        }
+        callback(Response::created(json{{"data", {{"id", *id}}}}));
+    } catch (const std::exception& e) {
+        spdlog::error("ani.facts add failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
+void AniSettingsController::editFact(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    ANI_SETTINGS_GUARD(req, callback, owner);
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    const auto text = fact_text(body, callback);
+    if (!text) {
+        return;
+    }
+    try {
+        if (!is_valid_uuid(id) || !Repositories::Agent::FactRepository().update(owner, id, *text)) {
+            callback(ErrorResponse::not_found("fact_not_found"));
+            return;
+        }
+        no_content(callback);
+    } catch (const std::exception& e) {
+        spdlog::error("ani.facts edit failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
+void AniSettingsController::removeFact(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    ANI_SETTINGS_GUARD(req, callback, owner);
+    try {
+        if (!is_valid_uuid(id) || !Repositories::Agent::FactRepository().remove(owner, id)) {
+            callback(ErrorResponse::not_found("fact_not_found"));
+            return;
+        }
+        no_content(callback);
+    } catch (const std::exception& e) {
+        spdlog::error("ani.facts remove failed: {}", e.what());
         callback(ErrorResponse::internal_error());
     }
 }

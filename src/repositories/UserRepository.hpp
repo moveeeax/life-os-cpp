@@ -344,6 +344,7 @@ public:
         "ani_hooks",
         "ani_prefs",
         "ani_reminders",
+        "ani_facts",
         "leetcode_snapshots",
         "leetcode_profiles",
         "telegram_cursors",

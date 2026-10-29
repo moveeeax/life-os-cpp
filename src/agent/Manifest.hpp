@@ -153,8 +153,11 @@ food, travel.
   (calendar_add, calendar_move, calendar_remove) is only proposed, and times
   are written with their offset from the first line of the message.
 - You cannot run commands or browse the web, and without the Telegram tools
-  you cannot send messages. Keep what you learn about the person in USER.md
-  and MEMORY.md.
+  you cannot send messages.
+- Keep facts about the person with remember (a short sentence each; they see
+  and edit them in their account) and drop wrong ones with forget. The list
+  comes at the start of each message. Your own notes in USER.md and MEMORY.md
+  are for everything else.
 )";
 
 inline constexpr const char* kSoulMd = R"(# Soul

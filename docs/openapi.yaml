@@ -1225,6 +1225,18 @@ components:
       required: [bare]
       properties:
         bare: { type: boolean, description: The bare outfit is on }
+        muted:
+          type: array
+          items: { type: string, enum: [brief, evening, break, stretch, hello, telegram, webhook, reminder, calendar] }
+          description: Kinds of her own lines the user muted on Now
+    AniFact:
+      type: object
+      required: [id, text, source, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        text: { type: string }
+        source: { type: string, enum: [chat, page], description: 'chat: she remembered it; page: the user wrote it' }
+        created_at: { type: string, format: date-time }
     AniBare:
       type: object
       required: [model_url, texture_url, expires_in]
@@ -10199,10 +10211,13 @@ paths:
           application/json:
             schema:
               type: object
-              required: [bare]
               properties:
                 bare: { type: boolean }
                 adult: { type: boolean, description: 'Required (true) to turn bare on' }
+                muted:
+                  type: array
+                  items: { type: string, enum: [brief, evening, break, stretch, hello, telegram, webhook, reminder, calendar] }
+                  description: 'The kinds of her lines to mute (replaces the list); bare or muted, or both'
       responses:
         '200':
           description: The settings after the change
@@ -10216,6 +10231,63 @@ paths:
         '400': { description: bare is missing or not a boolean }
         '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
         '422': { description: 'adult_required: bare on without "adult": true' }
+  /api/v1/ani/facts:
+    get:
+      summary: What Ani keeps about the caller
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The facts, oldest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/AniFact' } }
+        '401': { description: Not authenticated }
+    post:
+      summary: Add a fact for Ani to keep
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 200 } } }
+      responses:
+        '201': { description: Added }
+        '400': { description: invalid_text }
+        '401': { description: Not authenticated }
+        '409': { description: 50 facts already (too_many_facts) }
+  /api/v1/ani/facts/{id}:
+    patch:
+      summary: Change a fact Ani keeps
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 200 } } }
+      responses:
+        '204': { description: Changed }
+        '400': { description: invalid_text }
+        '401': { description: Not authenticated }
+        '404': { description: fact_not_found }
+    delete:
+      summary: Delete a fact Ani keeps
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Deleted }
+        '401': { description: Not authenticated }
+        '404': { description: fact_not_found }
   /api/v1/ani/bare:
     get:
       summary: Short signed links to the bare outfit's model
