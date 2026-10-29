@@ -1,5 +1,6 @@
 import {
   useInfiniteQuery,
+  useQueries,
   useQuery,
   useQueryClient,
   type InfiniteData,
@@ -277,6 +278,26 @@ export function useReport(
           signal,
         })
       ).data,
+  });
+}
+
+/** The month reports of a year up to `months` (January is 1), for the ledger's month strip. */
+export function useMonthReports(year: number, months: number, asIf?: string) {
+  return useQueries({
+    queries: Array.from({ length: months }, (_, i) => {
+      const date = `${year}-${String(i + 1).padStart(2, '0')}-01`;
+      return {
+        queryKey: qk.money.report('month', date, asIf ?? ''),
+        queryFn: async ({ signal }: { signal: AbortSignal }) =>
+          (
+            await api.getJson<{ data: Report }>(`${BASE}/reports/period`, {
+              query: { kind: 'month', date, as_if: asIf || undefined },
+              signal,
+            })
+          ).data,
+        staleTime: 5 * 60_000,
+      };
+    }),
   });
 }
 
