@@ -1206,8 +1206,9 @@ components:
       required: [id, kind, summary, status, error]
       properties:
         id: { type: string, format: uuid }
-        kind: { type: string, enum: [create_task, complete_task, check_habit, add_note] }
+        kind: { type: string, enum: [create_task, complete_task, check_habit, add_note, tg_send, tg_edit] }
         summary: { type: string, description: 'What the user confirms, in words' }
+        text: { type: [string, 'null'], description: 'The message of a Telegram proposal (tg_send, tg_edit), which the user may change on Confirm; null for the other kinds' }
         status:
           type: string
           enum: [pending, confirmed, running, done, failed, cancelled, expired]
@@ -1247,6 +1248,39 @@ components:
               say: { type: [string, 'null'], description: Her line (or the part of her reply said aloud) }
               answer: { type: [string, 'null'], description: "An ask's answer" }
               created_at: { type: string, format: date-time }
+    TelegramStatus:
+      type: object
+      required: [configured, linked, elsewhere, link]
+      properties:
+        configured: { type: boolean, description: The server has a gateway token }
+        linked: { type: boolean, description: The account serves the caller }
+        elsewhere: { type: boolean, description: The account serves another user }
+        link:
+          type: [object, 'null']
+          properties:
+            me_id: { type: string, description: The account's Telegram user id }
+            username: { type: string, description: 'Its @username without the @, empty when it has none' }
+            polled_at: { type: [string, 'null'], format: date-time }
+            last_error: { type: [string, 'null'] }
+            created_at: { type: string, format: date-time }
+    TelegramChat:
+      type: object
+      required: [id, title, type, unread_count]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        type: { type: string, enum: [private, group, supergroup, channel, secret, other] }
+        unread_count: { type: integer }
+    TelegramMessage:
+      type: object
+      required: [id, at, outgoing, kind, text]
+      properties:
+        id: { type: string }
+        at: { type: string, format: date-time }
+        outgoing: { type: boolean, description: "The owner's own message" }
+        kind: { type: string, description: 'text, photo, voice, document and the like' }
+        text: { type: string, description: 'The text or caption; "[voice]" and such for media without words' }
+        chat: { type: string, description: The chat id (search results only) }
     LeetCodeProfile:
       type: object
       required: [username, tz]
@@ -10018,11 +10052,21 @@ paths:
         The agent's write tools (a new task, closing a task, ticking a habit,
         a note to the inbox) only propose; this queues the change for the
         worker, which makes it as the caller through this API. The turn shows
-        the action's status. Refused for API keys.
+        the action's status. A Telegram message (tg_send, tg_edit) may come
+        with the caller's own text, which replaces the proposed one. Refused
+        for API keys.
       tags: [ani]
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text: { type: string, minLength: 1, description: 'The message to send instead (tg_send, tg_edit only; else 409 action_not_editable)' }
       responses:
         '202':
           description: Confirmed and queued
@@ -10035,7 +10079,8 @@ paths:
                   data: { $ref: '#/components/schemas/AniAction' }
         '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
         '404': { description: 'The agent is switched off, or no such action of the caller (action_not_found)' }
-        '409': { description: 'Confirmed or cancelled already (action_answered), or older than an hour (action_expired)' }
+        '400': { description: 'A body that is not {text} (invalid_body, invalid_text)' }
+        '409': { description: 'Confirmed or cancelled already (action_answered), older than an hour (action_expired), or a text for an action that is not a pending Telegram message (action_not_editable)' }
         '503': { description: The job queue is not ready (jobs_disabled) }
   /api/v1/ani/actions/{id}/cancel:
     post:
@@ -10149,6 +10194,286 @@ paths:
                 properties:
                   data: { $ref: '#/components/schemas/AniWebhook' }
         '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+  /api/v1/telegram:
+    get:
+      summary: The owner's Telegram link
+      description: >-
+        Whether the server has the gateway token of the owner's Telegram
+        account and whom it serves. Admin only.
+      tags: [telegram]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/TelegramStatus' }
+        '401': { description: Not authenticated }
+        '403': { description: Not an admin }
+    put:
+      summary: Link the owner's Telegram account to the caller
+      description: >-
+        Reads the account (its id and @username) from the gateway and links it
+        to the caller; Ani then gets Telegram tools and a minutely poll turns
+        new private messages and @mentions into her events. One user at most.
+        Admin only; refused for API keys.
+      tags: [telegram]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Linked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: object }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '403': { description: Not an admin }
+        '404': { description: No gateway token on the server (telegram_not_configured) }
+        '409': { description: The account serves another user (telegram_linked_elsewhere) }
+        '502': { description: The gateway did not answer (telegram_unavailable) }
+    delete:
+      summary: Unlink the owner's Telegram account
+      description: Drops the link and the poll's cursors. Admin only; refused for API keys.
+      tags: [telegram]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204': { description: Unlinked }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '403': { description: Not an admin }
+        '404': { description: Not linked to the caller (telegram_not_linked) }
+  /api/v1/telegram/chats:
+    get:
+      summary: Recent Telegram chats
+      description: The linked user's chats, latest first, with their unread counts.
+      tags: [telegram]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200':
+          description: The chats
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/TelegramChat' } }
+        '401': { description: Not authenticated }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '429': { description: The gateway is rate limited }
+        '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
+  /api/v1/telegram/chats/{id}:
+    get:
+      summary: One Telegram chat
+      tags: [telegram]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The chat
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/TelegramChat' }
+        '401': { description: Not authenticated }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '429': { description: The gateway is rate limited }
+        '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
+  /api/v1/telegram/chats/{id}/messages:
+    get:
+      summary: Messages of a Telegram chat
+      description: >-
+        Newest first. A message in a group has no author: the gateway gives
+        only whether it is the owner's own.
+      tags: [telegram]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 30, default: 20 } }
+        - { name: before, in: query, description: Only messages older than this message id, schema: { type: string } }
+      responses:
+        '200':
+          description: The messages
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/TelegramMessage' } }
+        '400': { description: 'before is not a message id (invalid_before)' }
+        '401': { description: Not authenticated }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '429': { description: The gateway is rate limited }
+        '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
+    post:
+      summary: Send a Telegram message
+      description: >-
+        What a confirmed tg_send proposal of Ani calls; the owner may call it
+        too. key, when given, makes a retry send once (Idempotency-Key).
+      tags: [telegram]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, minLength: 1, maxLength: 4096 }
+                reply_to: { type: string, description: A message id to reply to }
+                key: { type: string, maxLength: 80 }
+      responses:
+        '200':
+          description: Sent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: object }
+        '400': { description: 'invalid_text, invalid_reply_to, or a body that is not JSON' }
+        '401': { description: Not authenticated }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '429': { description: The gateway is rate limited }
+        '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
+  /api/v1/telegram/chats/{id}/messages/{mid}:
+    patch:
+      summary: Edit the owner's Telegram message
+      tags: [telegram]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: mid, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, minLength: 1, maxLength: 4096 }
+      responses:
+        '200':
+          description: Edited
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: object }
+        '400': { description: invalid_text }
+        '401': { description: Not authenticated }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '429': { description: The gateway is rate limited }
+        '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
+  /api/v1/telegram/chats/{id}/messages/{mid}/reactions:
+    post:
+      summary: Set or remove a reaction on a Telegram message
+      tags: [telegram]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: mid, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [emoji]
+              properties:
+                emoji: { type: string }
+                remove: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: object }
+        '400': { description: invalid_emoji }
+        '401': { description: Not authenticated }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '429': { description: The gateway is rate limited }
+        '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
+  /api/v1/telegram/chats/{id}/read:
+    post:
+      summary: Mark Telegram messages read
+      tags: [telegram]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message_ids]
+              properties:
+                message_ids: { type: array, minItems: 1, maxItems: 100, items: { type: string } }
+      responses:
+        '200':
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: object }
+        '400': { description: invalid_message_ids }
+        '401': { description: Not authenticated }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '429': { description: The gateway is rate limited }
+        '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
+  /api/v1/telegram/search:
+    get:
+      summary: Search Telegram messages
+      description: In all of the linked user's chats, or in one.
+      tags: [telegram]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1, maxLength: 200 } }
+        - { name: chat, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 20, default: 10 } }
+      responses:
+        '200':
+          description: The messages found
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/TelegramMessage' } }
+        '400': { description: 'invalid_q, invalid_chat' }
+        '401': { description: Not authenticated }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '429': { description: The gateway is rate limited }
+        '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
   /api/v1/leetcode/profile:
     get:
       summary: The caller's LeetCode profile

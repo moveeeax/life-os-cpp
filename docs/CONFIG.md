@@ -347,6 +347,8 @@ the API and the worker.
 | `ANI_AGENT_PROXY_URL` | `ani.agent.proxy_url` | string | empty | The proxy as the pods reach it, ending in `/v1`, e.g. `http://life-os-cpp-worker.life-os.svc.cluster.local:9091/ani/llm/v1`. Empty: not configured. |
 | `ANI_AGENT_API_URL` | `ani.agent.api_url` | string | empty | The site's API as the worker reaches it, e.g. `http://life-os-cpp.life-os.svc.cluster.local:8080`: the agent's tools read the user's data there with a five-minute token of the user. Empty: the agent chats without tools. |
 | `ANI_AGENT_MONTHLY_TOKENS` | `ani.agent.monthly_tokens` | int | `20000000` | Prompt plus completion tokens per user and calendar month (UTC); past it the proxy answers 429 `insufficient_quota`. |
+| `ANI_TELEGRAM_URL` | `ani.telegram.url` | string | `https://tg.tarassov.me` | The owner's telegram-rest-gateway (REST), which Ani's Telegram tools and the minutely poll call (src/telegram/). |
+| `ANI_TELEGRAM_TOKEN` | `ani.telegram.token` | string | empty | The gateway client token of the owner's account (`<accountId>.<secret>`, scopes read and write), kept in the Secret `life-os-ani-agent`; Life OS never hands it to the agent. Empty: Telegram is off everywhere. |
 
 ## Storage (S3)
 

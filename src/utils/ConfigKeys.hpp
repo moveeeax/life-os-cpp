@@ -203,6 +203,8 @@ inline constexpr ConfigKey ani_agent_upstream_key{"ani.agent.upstream_key", "ANI
 inline constexpr ConfigKey ani_agent_proxy_url{"ani.agent.proxy_url", "ANI_AGENT_PROXY_URL"};
 inline constexpr ConfigKey ani_agent_api_url{"ani.agent.api_url", "ANI_AGENT_API_URL"};
 inline constexpr ConfigKey ani_agent_monthly_tokens{"ani.agent.monthly_tokens", "ANI_AGENT_MONTHLY_TOKENS"};
+inline constexpr ConfigKey ani_telegram_url{"ani.telegram.url", "ANI_TELEGRAM_URL"};
+inline constexpr ConfigKey ani_telegram_token{"ani.telegram.token", "ANI_TELEGRAM_TOKEN"};
 
 // --- now ---
 inline constexpr ConfigKey now_enabled{"now.enabled", "NOW_ENABLED"};

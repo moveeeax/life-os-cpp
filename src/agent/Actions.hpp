@@ -29,6 +29,10 @@ inline constexpr int kMaxPerTurn = 3;
 /// The write tools as the gateway takes them.
 nlohmann::json definitions();
 
+/// The Telegram write tools (tg_send, tg_edit), given only to the user
+/// Telegram serves (agent/TelegramTools.hpp).
+nlohmann::json telegram_definitions();
+
 /// Whether @p name is one of the write tools.
 bool is_write(const std::string& name);
 

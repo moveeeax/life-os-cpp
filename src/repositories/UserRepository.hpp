@@ -346,6 +346,8 @@ public:
         "ani_reminders",
         "leetcode_snapshots",
         "leetcode_profiles",
+        "telegram_cursors",
+        "telegram_link",
     };
 
     /// The foreign keys of the billing tables (migration 007, ON DELETE

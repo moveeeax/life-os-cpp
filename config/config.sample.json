@@ -258,6 +258,10 @@
       "proxy_url": "${ANI_AGENT_PROXY_URL:-}",
       "api_url": "${ANI_AGENT_API_URL:-}",
       "monthly_tokens": "${ANI_AGENT_MONTHLY_TOKENS:-20000000}"
+    },
+    "telegram": {
+      "url": "${ANI_TELEGRAM_URL:-https://tg.tarassov.me}",
+      "token": "${ANI_TELEGRAM_TOKEN:-}"
     }
   },
   "now": {

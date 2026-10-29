@@ -355,3 +355,33 @@ TEST(AgentTools, AClearedChatIsANewSession) {
     EXPECT_EQ(Agent::session_of("u-1", 0), "u-1") << "the key before any clear stays as it was";
     EXPECT_EQ(Agent::session_of("u-1", 2), "u-1#2");
 }
+
+TEST(AgentActions, TelegramMessagesAreProposalsWithTheChatTitle) {
+    for (const auto& d : A::telegram_definitions()) {
+        EXPECT_TRUE(A::is_write(d["function"]["name"].get<std::string>()));
+    }
+    Site site;
+    site.answers.emplace_back(kApi + "/api/v1/telegram/chats/10",
+                              Net::Http::Response{200, R"({"data":{"id":"10","title":"Anna","type":"private"}})"});
+    auto send = std::get<A::Proposal>(
+        propose(site, "tg_send", json{{"chat", "10"}, {"text", "Буду в семь"}, {"reply_to", 55}}));
+    EXPECT_EQ(send.kind, "tg_send");
+    EXPECT_EQ(send.summary, "Send to Anna: «Буду в семь»");
+    EXPECT_EQ(send.request["method"], "POST");
+    EXPECT_EQ(send.request["path"], "/api/v1/telegram/chats/10/messages");
+    EXPECT_EQ(send.request["body"]["reply_to"], "55");
+    EXPECT_EQ(send.request["label"], "Send to Anna: ");
+    EXPECT_EQ(send.request["body"]["key"].get<std::string>().rfind("ani-", 0), 0u) << "a retry sends once";
+    EXPECT_EQ(site.sent.size(), 1u) << "only the chat was read; nothing sent";
+
+    auto edit = std::get<A::Proposal>(
+        propose(site, "tg_edit", json{{"chat", "10"}, {"message", "77"}, {"text", "Буду в восемь"}}));
+    EXPECT_EQ(edit.request["method"], "PATCH");
+    EXPECT_EQ(edit.request["path"], "/api/v1/telegram/chats/10/messages/77");
+    EXPECT_EQ(edit.summary, "Edit your message in Anna to «Буду в восемь»");
+
+    EXPECT_EQ(refused(propose(site, "tg_send", json{{"chat", "20"}, {"text", "x"}}))["error"], "not_available")
+        << "an unknown chat, or Telegram not the person's";
+    EXPECT_EQ(refused(propose(site, "tg_send", json{{"chat", "../x"}, {"text", "x"}}))["error"], "invalid");
+    EXPECT_EQ(refused(propose(site, "tg_send", json{{"chat", "10"}, {"text", " "}}))["error"], "invalid");
+}

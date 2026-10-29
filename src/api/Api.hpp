@@ -54,6 +54,7 @@
 #include "api/ProjectsController.hpp"
 #include "api/SoundsController.hpp"
 #include "api/TasksController.hpp"
+#include "api/TelegramController.hpp"
 #include "api/TodayController.hpp"
 #include "api/TravelController.hpp"
 #include "api/WallpapersController.hpp"

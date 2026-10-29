@@ -51,6 +51,22 @@ public:
         });
     }
 
+    /// A new text for a pending Telegram proposal of the user (tg_send, tg_edit),
+    /// changed before Confirm; false for any other action.
+    bool retext(const std::string& owner, const std::string& id, const std::string& text) {
+        return Database::get().execute_write([&](auto& txn) {
+            return txn.exec_params(
+                          "UPDATE ani_actions SET request = jsonb_set(request, '{body,text}', to_jsonb($3::text)), "
+                          "summary = left(coalesce(request->>'label', '') || '«' || left($3, 300) || '»', 600), "
+                          "updated_at = now() WHERE id::text = $1 AND owner_id = $2::uuid AND status = "
+                          "'pending' AND kind IN ('tg_send', 'tg_edit')",
+                          id,
+                          owner,
+                          text)
+                       .affected_rows() > 0;
+        });
+    }
+
     enum class Answer { Done, NotPending, Expired, Missing };
 
     /// pending -> confirmed (when @p confirm) or cancelled, for the user's own action.
@@ -80,11 +96,12 @@ public:
     /// One action of the user, as the panel shows it.
     std::optional<nlohmann::json> get(const std::string& owner, const std::string& id) {
         return Database::get().execute_read([&](auto& txn) -> std::optional<nlohmann::json> {
-            auto r = txn.exec_params(
-                "SELECT row_to_json(t) FROM (SELECT a.id::text AS id, a.kind, a.summary, a.error, " + shown_status() +
-                    " AS status FROM ani_actions a WHERE a.id::text = $1 AND a.owner_id = $2::uuid) t",
-                id,
-                owner);
+            auto r =
+                txn.exec_params("SELECT row_to_json(t) FROM (SELECT a.id::text AS id, a.kind, a.summary, a.error, " +
+                                    message_sql() + " AS text, " + shown_status() +
+                                    " AS status FROM ani_actions a WHERE a.id::text = $1 AND a.owner_id = $2::uuid) t",
+                                id,
+                                owner);
             if (r.empty()) {
                 return std::nullopt;
             }
@@ -150,13 +167,19 @@ public:
                " seconds' THEN 'expired' ELSE a.status END";
     }
 
+    /// The message of a Telegram proposal, which the person may change before
+    /// Confirm; null for the other kinds.
+    static std::string message_sql() {
+        return "(CASE WHEN a.kind IN ('tg_send', 'tg_edit') THEN a.request #>> '{body,text}' END)";
+    }
+
     /// The actions of a turn as a JSON array, for the turn's view; the outer
     /// query reads its turn from ani_turns.
     static std::string of_turn_sql() {
         return "(SELECT COALESCE(json_agg(json_build_object('id', a.id::text, 'kind', a.kind, 'summary', "
                "a.summary, 'status', " +
-               shown_status() +
-               ", 'error', a.error) ORDER BY a.created_at), '[]'::json) FROM ani_actions a WHERE a.turn_id = "
+               shown_status() + ", 'error', a.error, 'text', " + message_sql() +
+               ") ORDER BY a.created_at), '[]'::json) FROM ani_actions a WHERE a.turn_id = "
                "ani_turns.id) AS actions";
     }
 };

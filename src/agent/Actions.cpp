@@ -20,6 +20,7 @@
 #include "jobs/Job.hpp"
 #include "repositories/agent/ActionRepository.hpp"
 #include "storage/S3Presign.hpp"
+#include "utils/Crypto.hpp"
 
 namespace Agent::Actions {
 
@@ -269,6 +270,88 @@ Proposed add_note(const json& args) {
                     json{{"method", "POST"}, {"path", "/api/v1/tasks/notes"}, {"body", {{"text", text}}}}};
 }
 
+/// A Telegram chat or message id argument (digits, a minus for a group); empty when it is not one.
+std::string tg_id(const json& args, const char* key) {
+    static const std::regex kIdRe("^-?\\d{1,20}$");
+    std::string v = text_arg(args, key);
+    if (v.empty()) {
+        if (const auto it = args.find(key); it != args.end() && it->is_number_integer()) {
+            v = std::to_string(it->get<long long>());
+        }
+    }
+    return std::regex_match(v, kIdRe) ? v : std::string();
+}
+
+/// The title of the person's chat, or a refusal when Telegram is not theirs or the chat is unknown.
+std::variant<std::string, Proposed> chat_title(Net::Http::Transport& transport,
+                                               const std::string& api_url,
+                                               const std::string& token,
+                                               const std::string& chat) {
+    const auto data = read(transport, api_url, token, "/api/v1/telegram/chats/" + chat, json::array());
+    if (!data || !data->is_object()) {
+        return Proposed{refusal("not_available", "this chat is not known or Telegram is off for the person")};
+    }
+    const std::string title = data->value("title", std::string());
+    return title.empty() ? std::string("a chat") : title;
+}
+
+Proposed tg_send(Net::Http::Transport& transport,
+                 const std::string& api_url,
+                 const std::string& token,
+                 const json& args) {
+    const std::string chat = tg_id(args, "chat");
+    const std::string text = text_arg(args, "text");
+    if (chat.empty()) {
+        return refusal("invalid", "chat is the id from tg_chats");
+    }
+    if (text.empty() || length(text) > 4000) {
+        return refusal("invalid", "the message is 1 to 4000 characters");
+    }
+    auto title = chat_title(transport, api_url, token, chat);
+    if (auto* p = std::get_if<Proposed>(&title)) {
+        return std::move(*p);
+    }
+    json body{{"text", text}, {"key", "ani-" + Utils::Crypto::random_hex(12)}};
+    const std::string reply_to = tg_id(args, "reply_to");
+    if (!reply_to.empty()) {
+        body["reply_to"] = reply_to;
+    }
+    // The label is the summary before the text: a new text from the person keeps it (retext).
+    const std::string label = "Send to " + cut(std::get<std::string>(title), 60) + ": ";
+    return Proposal{"tg_send",
+                    label + "«" + cut(text, 300) + "»",
+                    json{{"method", "POST"},
+                         {"path", "/api/v1/telegram/chats/" + chat + "/messages"},
+                         {"body", body},
+                         {"label", label}}};
+}
+
+Proposed tg_edit(Net::Http::Transport& transport,
+                 const std::string& api_url,
+                 const std::string& token,
+                 const json& args) {
+    const std::string chat = tg_id(args, "chat");
+    const std::string message = tg_id(args, "message");
+    const std::string text = text_arg(args, "text");
+    if (chat.empty() || message.empty()) {
+        return refusal("invalid", "chat and message are ids from tg_chats and tg_history");
+    }
+    if (text.empty() || length(text) > 4000) {
+        return refusal("invalid", "the message is 1 to 4000 characters");
+    }
+    auto title = chat_title(transport, api_url, token, chat);
+    if (auto* p = std::get_if<Proposed>(&title)) {
+        return std::move(*p);
+    }
+    const std::string label = "Edit your message in " + cut(std::get<std::string>(title), 60) + " to ";
+    return Proposal{"tg_edit",
+                    label + "«" + cut(text, 300) + "»",
+                    json{{"method", "PATCH"},
+                         {"path", "/api/v1/telegram/chats/" + chat + "/messages/" + message},
+                         {"body", {{"text", text}}},
+                         {"label", label}}};
+}
+
 }  // namespace
 
 json definitions() {
@@ -298,8 +381,27 @@ json definitions() {
     });
 }
 
+json telegram_definitions() {
+    const json id = {{"type", "string"}, {"description", "An id as tg_chats and tg_history give it"}};
+    return json::array({
+        tool("tg_send",
+             "Propose a Telegram message from the person to a chat, as a reply to a message if given. Nothing is "
+             "sent until they confirm it; they may change the text first.",
+             object({{"chat", id},
+                     {"text", {{"type", "string"}, {"description", "The message, in the person's voice"}}},
+                     {"reply_to", id}},
+                    json::array({"chat", "text"}))),
+        tool("tg_edit",
+             "Propose a new text for one of the person's own Telegram messages. Nothing changes until they "
+             "confirm it.",
+             object({{"chat", id}, {"message", id}, {"text", {{"type", "string"}, {"description", "The new text"}}}},
+                    json::array({"chat", "message", "text"}))),
+    });
+}
+
 bool is_write(const std::string& name) {
-    return name == "create_task" || name == "complete_task" || name == "check_habit" || name == "add_note";
+    return name == "create_task" || name == "complete_task" || name == "check_habit" || name == "add_note" ||
+           name == "tg_send" || name == "tg_edit";
 }
 
 Proposed propose(Net::Http::Transport& transport,
@@ -322,6 +424,12 @@ Proposed propose(Net::Http::Transport& transport,
         }
         if (name == "add_note") {
             return add_note(args);
+        }
+        if (name == "tg_send") {
+            return tg_send(transport, api_url, access_token, args);
+        }
+        if (name == "tg_edit") {
+            return tg_edit(transport, api_url, access_token, args);
         }
     } catch (const Net::Http::TransportError& e) {
         spdlog::warn("ani agent: the tool {} got no answer: {}", name, e.what());
