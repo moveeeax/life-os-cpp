@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { Outlet } from 'react-router';
+import { Link, Outlet } from 'react-router';
 
 import { Nav } from './Nav';
 import { useMe } from '@/hooks/useMe';
@@ -27,6 +27,11 @@ export function Layout() {
           <Outlet />
         </Suspense>
       </main>
+      <footer className="container mx-auto flex gap-4 py-6 text-xs text-muted-foreground">
+        <Link to="/privacy" className="hover:underline">
+          Privacy
+        </Link>
+      </footer>
     </div>
   );
 }
