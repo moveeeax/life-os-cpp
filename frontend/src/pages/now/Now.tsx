@@ -36,6 +36,7 @@ import { useSoundPlayer } from './focus/useSoundPlayer';
 import { FocusLine } from './FocusLine';
 import { FocusPicker } from './FocusPicker';
 import { FocusStart } from './FocusStart';
+import { Ribbon } from './ribbon/Ribbon';
 import './now.css';
 
 /** True while the window is at least this wide. */
@@ -190,6 +191,15 @@ function NowScreen() {
         </div>
         <FocusStart
           onStart={(m) => {
+            session.start(m, focus?.date ?? null);
+            player.play();
+          }}
+        />
+        <Ribbon
+          date={date}
+          tz={tz}
+          now={now.getTime()}
+          onFocus={(m) => {
             session.start(m, focus?.date ?? null);
             player.play();
           }}

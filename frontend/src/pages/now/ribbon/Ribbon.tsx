@@ -1,0 +1,192 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
+
+import { api } from '@/lib/api/client';
+import { qk } from '@/lib/api/queryKeys';
+
+import {
+  RIBBON_FROM,
+  RIBBON_TO,
+  SOON_MINUTES,
+  blocksOf,
+  freeAt,
+  nextEvent,
+  nextWords,
+  pctOf,
+  pinsOf,
+  type Block,
+  RIBBON_POINT,
+  hhmm,
+  useNowDay,
+} from './layout';
+import './ribbon.css';
+
+/**
+ * The day ribbon under the clock: the calendar's events, free slots, what was
+ * done (focus, workouts), timed tasks and now. A tap on a free slot offers a
+ * focus until its end or a focus block in the calendar.
+ */
+export function Ribbon({
+  date,
+  tz,
+  now,
+  onFocus,
+}: {
+  date: string;
+  tz: string;
+  now: number;
+  onFocus: (minutes: number) => void;
+}) {
+  const day = useNowDay(date, tz);
+  const blocks = useMemo(() => blocksOf(day.data, tz, now), [day.data, tz, now]);
+  const pins = useMemo(() => pinsOf(day.data), [day.data]);
+  const next = nextEvent(day.data, now);
+  const nextLine = next
+    ? nextWords(next, hhmm(Date.parse(day.data!.events.find((e) => e.id === next.id)!.start), tz))
+    : null;
+  const [lit, setLit] = useState<string | null>(null);
+  const [slot, setSlot] = useState<Block | null>(null);
+  const timer = useRef<number | undefined>(undefined);
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    const onPoint = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      setLit(id);
+      window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => setLit(null), 6000);
+    };
+    window.addEventListener(RIBBON_POINT, onPoint);
+    return () => {
+      window.removeEventListener(RIBBON_POINT, onPoint);
+      window.clearTimeout(timer.current);
+    };
+  }, []);
+
+  if (!day.data) return null;
+  const today = date === new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date(now));
+  const nowPct = today
+    ? pctOf(Number(hhmm(now, tz).slice(0, 2)) * 60 + Number(hhmm(now, tz).slice(3)))
+    : null;
+  const hours = [];
+  for (let h = RIBBON_FROM; h <= RIBBON_TO; h += 2) hours.push(h);
+  const freeMinutes = blocks
+    .filter((b) => b.kind === 'free')
+    .reduce((s, b) => s + (b.end - b.start) / 60_000, 0);
+  const calendarNote =
+    day.data.calendar === 'disconnected'
+      ? 'Google Calendar dropped the access: connect it again in Account'
+      : day.data.calendar === 'not_linked'
+        ? 'Connect Google Calendar in Account to see meetings here'
+        : null;
+
+  const addBlock = async (b: Block) => {
+    const start = Math.max(b.start, now);
+    const end = Math.min(b.end, start + 90 * 60_000);
+    await api
+      .postJson('/api/v1/calendar/events', {
+        body: {
+          title: 'Focus',
+          start: new Date(start).toISOString(),
+          end: new Date(end).toISOString(),
+        },
+      })
+      .catch(() => {});
+    setSlot(null);
+    void qc.invalidateQueries({ queryKey: qk.now.day(date, tz) });
+  };
+
+  return (
+    <div className="r-wrap">
+      <div className="r-ribbon" role="group" aria-label="Your day">
+        <div className="r-top">
+          <span
+            className={
+              next && next.minutes <= SOON_MINUTES && next.minutes > 0 ? 'r-next r-soon' : 'r-next'
+            }
+          >
+            {nextLine ?? calendarNote ?? 'Nothing else in the calendar today'}
+          </span>
+          {freeMinutes > 0 && (
+            <span className="r-freetext num">
+              free {Math.floor(freeMinutes / 60)} h {Math.round(freeMinutes % 60)} min
+            </span>
+          )}
+        </div>
+        <div
+          className="r-track"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            const b = freeAt(blocks, ((e.clientX - r.left) / r.width) * 100);
+            if (b && b.end > now) setSlot(b);
+          }}
+        >
+          {blocks.map((b) => (
+            <div
+              key={b.key}
+              className={`r-b r-${b.kind}${b.id && b.id === lit ? ' r-lit' : ''}`}
+              style={{ left: `${b.left}%`, width: `${b.width}%` }}
+              title={`${b.title}, ${hhmm(b.start, tz)}–${hhmm(b.end, tz)}`}
+              data-event={b.id}
+            >
+              {b.kind !== 'free' && b.width > 7 ? b.title : ''}
+            </div>
+          ))}
+          {pins.map((p) => (
+            <div
+              key={p.key}
+              className={p.done ? 'r-pin r-pin-done' : 'r-pin'}
+              style={{ left: `${p.left}%` }}
+              title={p.title}
+            >
+              <span>{p.title}</span>
+            </div>
+          ))}
+          {nowPct !== null && nowPct > 0 && nowPct < 100 && (
+            <div
+              className="r-now"
+              style={{ left: `${nowPct}%` }}
+              aria-label={`Now ${hhmm(now, tz)}`}
+            />
+          )}
+        </div>
+        <div className="r-hours" aria-hidden="true">
+          {hours.map((h) => (
+            <span key={h} style={{ left: `${pctOf(h * 60)}%` }}>
+              {String(h).padStart(2, '0')}
+            </span>
+          ))}
+        </div>
+        {slot && (
+          <div className="r-menu" role="dialog" aria-label="Free time">
+            <span>
+              Free {hhmm(Math.max(slot.start, now), tz)}–{hhmm(slot.end, tz)}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                onFocus(
+                  Math.max(
+                    5,
+                    Math.min(90, Math.round((slot.end - Math.max(slot.start, now)) / 60_000)),
+                  ),
+                );
+                setSlot(null);
+              }}
+            >
+              Focus until {hhmm(Math.min(slot.end, Math.max(slot.start, now) + 90 * 60_000), tz)}
+            </button>
+            {day.data.calendar === 'ok' && (
+              <button type="button" onClick={() => void addBlock(slot)}>
+                Add a focus block
+              </button>
+            )}
+            <button type="button" onClick={() => setSlot(null)}>
+              Close
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
