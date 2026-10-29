@@ -38,6 +38,26 @@ export function groupsOf(today: Today | undefined) {
   };
 }
 
+/** The review as text for Saved Messages in Telegram. */
+export function reviewText(today: Today | undefined, week: string): string {
+  const g = groupsOf(today);
+  const lines = [`Обзор недели ${week}`];
+  if (g.late.length > 0)
+    lines.push(
+      `Просрочено: ${g.late
+        .map((t) => t.title)
+        .slice(0, 10)
+        .join('; ')}`,
+    );
+  if (g.behind.length > 0) lines.push(`Цели отстают: ${g.behind.map((x) => x.title).join('; ')}`);
+  if (g.habits.length > 0)
+    lines.push(
+      `Привычки недобраны: ${g.habits.map((h) => `${h.name} ${h.done} из ${h.per_week}`).join('; ')}`,
+    );
+  if (lines.length === 1) lines.push('Хвостов нет: задачи, цели и привычки в порядке.');
+  return lines.join('\n').slice(0, 4000);
+}
+
 /** Reads the week the review last opened by itself (null when unknown). */
 function seenWeek(): string | null {
   try {

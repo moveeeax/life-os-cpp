@@ -33,6 +33,12 @@ public:
     ADD_METHOD_TO(TelegramController::react, "/api/v1/telegram/chats/{id}/messages/{mid}/reactions", Post);
     ADD_METHOD_TO(TelegramController::read, "/api/v1/telegram/chats/{id}/read", Post);
     ADD_METHOD_TO(TelegramController::search, "/api/v1/telegram/search", Get);
+    ADD_METHOD_TO(TelegramController::waiting, "/api/v1/telegram/waiting", Get);
+    ADD_METHOD_TO(TelegramController::quietList, "/api/v1/telegram/quiet", Get);
+    ADD_METHOD_TO(TelegramController::quietOn, "/api/v1/telegram/quiet/{id}", Put);
+    ADD_METHOD_TO(TelegramController::quietOff, "/api/v1/telegram/quiet/{id}", Delete);
+    ADD_METHOD_TO(TelegramController::settings, "/api/v1/telegram/settings", Put);
+    ADD_METHOD_TO(TelegramController::toSelf, "/api/v1/telegram/self", Post);
     METHOD_LIST_END
 
     using Callback = std::function<void(const HttpResponsePtr&)>;
@@ -48,6 +54,12 @@ public:
     void react(const HttpRequestPtr& req, Callback&& callback, const std::string& id, const std::string& mid);
     void read(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void search(const HttpRequestPtr& req, Callback&& callback);
+    void waiting(const HttpRequestPtr& req, Callback&& callback);
+    void quietList(const HttpRequestPtr& req, Callback&& callback);
+    void quietOn(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void quietOff(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void settings(const HttpRequestPtr& req, Callback&& callback);
+    void toSelf(const HttpRequestPtr& req, Callback&& callback);
 };
 
 }  // namespace Api

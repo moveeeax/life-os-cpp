@@ -104,3 +104,26 @@ describe('sessionFromStorage', () => {
     expect(sessionFromStorage({ key, newValue: '{oops' }, key)).toBeUndefined();
   });
 });
+
+describe('focusRecord', () => {
+  const t0 = Date.parse('2026-10-29T03:30:00Z');
+  it('keeps a finished session once', async () => {
+    const { focusRecord, startSession } = await import('./focus');
+    const s = startSession(25, t0);
+    expect(focusRecord(s, t0 + 26 * 60_000)).toEqual({
+      started_at: '2026-10-29T03:30:00Z',
+      ended_at: '2026-10-29T03:55:00Z',
+      minutes: 25,
+    });
+    expect(focusRecord({ ...s, recorded: true }, t0 + 26 * 60_000)).toBeNull();
+  });
+  it('keeps a session left early only past five minutes, without its pause', async () => {
+    const { focusRecord, pauseSession, startSession } = await import('./focus');
+    const s = startSession(50, t0);
+    expect(focusRecord(s, t0 + 3 * 60_000)).toBeNull();
+    const paused = pauseSession(s, t0 + 20 * 60_000);
+    const r = focusRecord(paused, t0 + 40 * 60_000);
+    expect(r?.minutes).toBe(20);
+    expect(r?.ended_at).toBe('2026-10-29T04:10:00Z');
+  });
+});

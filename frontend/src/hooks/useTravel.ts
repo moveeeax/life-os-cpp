@@ -132,6 +132,7 @@ export function useTrips(currency = 'USD') {
 export function useTrip(id: string, currency = 'USD') {
   return useQuery({
     queryKey: qk.travel.trip(id, currency),
+    enabled: id !== '',
     queryFn: async ({ signal }) =>
       (
         await api.getJson<{ data: TravelTrip }>(`${BASE}/trips/${id}`, {

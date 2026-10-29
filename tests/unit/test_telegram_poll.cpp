@@ -78,7 +78,7 @@ TEST(TelegramPoll, EventTextNamesTenAndCounts) {
     }
     all[1].text = std::string(400, 'x');
     const std::string text = event_text(all);
-    EXPECT_NE(text.find("Anna (mentions you): сообщение 0"), std::string::npos);
+    EXPECT_NE(text.find("Anna [chat 1] (mentions you): сообщение 0"), std::string::npos);
     EXPECT_NE(text.find(std::string(300, 'x') + "…"), std::string::npos) << "cut at 300";
     EXPECT_EQ(text.find(std::string(301, 'x')), std::string::npos);
     EXPECT_NE(text.find("and 2 more"), std::string::npos);
@@ -120,4 +120,14 @@ TEST(TelegramTools, RequestsOfTheTools) {
     Agent::TelegramTools::request_of("tg_mark_read", json{{"chat", "10"}, {"messages", json::array()}}, refusal);
     EXPECT_FALSE(refusal.empty());
     EXPECT_FALSE(Agent::TelegramTools::is_telegram("tg_send")) << "sending is a proposal (Actions)";
+}
+
+TEST(TelegramPoll, WaitingIsAnIncomingMessageOverADayOld) {
+    const json dm = {{"id", "10"}, {"title", "Anna"}, {"type", "private"}};
+    const long long now = 2000000000;
+    EXPECT_EQ(waiting_since(dm, json{{"is_outgoing", false}, {"date", now - 90000}}, now), now - 90000);
+    EXPECT_EQ(waiting_since(dm, json{{"is_outgoing", false}, {"date", now - 3600}}, now), 0) << "less than a day";
+    EXPECT_EQ(waiting_since(dm, json{{"is_outgoing", true}, {"date", now - 90000}}, now), 0) << "the owner answered";
+    const json group = {{"id", "-1"}, {"type", "supergroup"}};
+    EXPECT_EQ(waiting_since(group, json{{"is_outgoing", false}, {"date", now - 90000}}, now), 0);
 }

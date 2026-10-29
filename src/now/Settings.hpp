@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstddef>
@@ -14,6 +15,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -127,6 +129,49 @@ inline std::optional<std::string> links_problem(const nlohmann::json& links, nlo
             return "a link url is a path of this app or an http(s) URL";
         }
         clean.push_back({{"title", title}, {"url", url}});
+    }
+    return std::nullopt;
+}
+
+inline constexpr std::size_t kWidgetsMax = 6;
+inline constexpr std::array<std::string_view, 6> kWidgetKinds = {
+    "series", "calendar_week", "habits", "spend", "telegram", "trip"};
+
+/// What is wrong with a widget list, or nullopt; @p clean then holds what to
+/// store: at most six {kind} or {kind: "series", source: <catalog id>}, no
+/// widget twice.
+inline std::optional<std::string> widgets_problem(const nlohmann::json& widgets, nlohmann::json& clean) {
+    if (!widgets.is_array()) {
+        return "widgets must be an array";
+    }
+    if (widgets.size() > kWidgetsMax) {
+        return "at most 6 widgets";
+    }
+    clean = nlohmann::json::array();
+    std::vector<std::string> seen;
+    for (const auto& w : widgets) {
+        if (!w.is_object() || !w.contains("kind") || !w["kind"].is_string()) {
+            return "a widget is {kind} or {kind: series, source}";
+        }
+        const std::string kind = w["kind"].get<std::string>();
+        if (std::find(kWidgetKinds.begin(), kWidgetKinds.end(), kind) == kWidgetKinds.end()) {
+            return "unknown widget kind " + kind;
+        }
+        nlohmann::json one{{"kind", kind}};
+        std::string key = kind;
+        if (kind == "series") {
+            const std::string source = w.value("source", std::string());
+            if (source.empty() || source.size() > 120 || source.find(':') == std::string::npos) {
+                return "a series widget takes a catalog id as its source";
+            }
+            one["source"] = source;
+            key += ":" + source;
+        }
+        if (std::find(seen.begin(), seen.end(), key) != seen.end()) {
+            return "a widget is on the board once";
+        }
+        seen.push_back(key);
+        clean.push_back(one);
     }
     return std::nullopt;
 }

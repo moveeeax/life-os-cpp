@@ -334,6 +334,12 @@ void TodayController::putSettings(const HttpRequestPtr& req, Callback&& callback
             errs.add("links", "invalid", *problem);
         }
     }
+    json widgets;
+    if (body.contains("widgets")) {
+        if (const auto problem = ::Now::Settings::widgets_problem(body["widgets"], widgets)) {
+            errs.add("widgets", "invalid", *problem);
+        }
+    }
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;
@@ -370,6 +376,9 @@ void TodayController::putSettings(const HttpRequestPtr& req, Callback&& callback
         }
         if (body.contains("links")) {
             repo.put_links(owner, links);
+        }
+        if (body.contains("widgets")) {
+            repo.put_widgets(owner, widgets);
         }
         callback(Response::ok(json{{"data", repo.get(owner)}}));
     });

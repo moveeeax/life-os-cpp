@@ -10,6 +10,7 @@ import { LoginRedirect, RootPage } from '@/pages/Root';
 // and react-hook-form, which a signed-in visit to a section never needs.
 // Layout wraps their Outlet in a <Suspense> boundary.
 const AboutPage = lazy(() => import('@/pages/About').then((m) => ({ default: m.AboutPage })));
+const PrivacyPage = lazy(() => import('@/pages/Privacy').then((m) => ({ default: m.PrivacyPage })));
 const RegisterPage = lazy(() =>
   import('@/pages/Register').then((m) => ({ default: m.RegisterPage })),
 );
@@ -267,6 +268,7 @@ export const routes: RouteEntry[] = [
   // still has a way back to the dashboard.
   { path: '/', element: <RootPage />, guard: 'public', navLabel: 'Home', layout: 'bare' },
   { path: '/about', element: <AboutPage />, guard: 'public', navLabel: 'About' },
+  { path: '/privacy', element: <PrivacyPage />, guard: 'public' },
   { path: '/login', element: <LoginRedirect />, guard: 'public', layout: 'bare' },
   { path: '/register', element: <RegisterPage />, guard: 'public' },
   { path: '/account/check-email', element: <CheckEmailPage />, guard: 'public' },

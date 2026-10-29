@@ -10,6 +10,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -22,8 +23,13 @@ public:
     /// {"bare": bool}; a user without a row has everything off.
     nlohmann::json get(const std::string& owner) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params("SELECT bare_on_at IS NOT NULL FROM ani_prefs WHERE owner_id = $1::uuid", owner);
-            return nlohmann::json{{"bare", !r.empty() && r[0][0].template as<bool>()}};
+            auto r = txn.exec_params(
+                "SELECT bare_on_at IS NOT NULL, array_to_json(muted)::text FROM ani_prefs WHERE owner_id = $1::uuid",
+                owner);
+            return nlohmann::json{
+                {"bare", !r.empty() && r[0][0].template as<bool>()},
+                {"muted",
+                 r.empty() ? nlohmann::json::array() : nlohmann::json::parse(r[0][1].template as<std::string>())}};
         });
     }
 
@@ -35,6 +41,19 @@ public:
                 "now()) END",
                 owner,
                 on);
+            return true;
+        });
+    }
+
+    /// The kinds of her lines the person muted (Now's "Not about this").
+    void set_muted(const std::string& owner, const std::vector<std::string>& kinds) {
+        Database::get().execute_write([&](auto& txn) {
+            nlohmann::json list = kinds;
+            txn.exec_params(
+                "INSERT INTO ani_prefs (owner_id, muted) VALUES ($1::uuid, ARRAY(SELECT "
+                "jsonb_array_elements_text($2::jsonb))) ON CONFLICT (owner_id) DO UPDATE SET muted = EXCLUDED.muted",
+                owner,
+                list.dump());
             return true;
         });
     }

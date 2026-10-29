@@ -40,7 +40,7 @@ describe('planBacklog, the newer kinds', () => {
         NOW,
       ),
     ).toEqual([
-      { kind: 'say', text: 'Встань' },
+      { kind: 'say', text: 'Встань', line: 'reminder' },
       { kind: 'ask', id: 'q1', text: 'Чай?', options: ['Да', 'Нет'] },
       { kind: 'mood', level: 1, seconds: 600 },
       { kind: 'card', title: 'CI', text: 'ok', url: undefined, seconds: 20 },
@@ -145,10 +145,10 @@ describe('planBacklog', () => {
         NOW,
       ),
     ).toEqual([
-      { kind: 'say', text: 'Сборка прошла.' },
+      { kind: 'say', text: 'Сборка прошла.', line: 'webhook' },
       { kind: 'act', name: 'wave' },
       { kind: 'outfit', outfit: 'p2' },
-      { kind: 'say', text: 'Маша зовёт.' },
+      { kind: 'say', text: 'Маша зовёт.', line: 'webhook' },
     ]);
   });
 
@@ -176,7 +176,7 @@ describe('planBacklog', () => {
       ),
     ).toEqual([
       { kind: 'outfit', outfit: 'lingerie' },
-      { kind: 'say', text: 'Ок' },
+      { kind: 'say', text: 'Ок', line: 'webhook' },
     ]);
   });
 
@@ -190,7 +190,11 @@ describe('planBacklog', () => {
       kind: 'say',
       text: 'Пока тебя не было, пришло 5 сообщений',
     });
-    expect(planBacklog(four.slice(0, 3), NOW)[0]).toEqual({ kind: 'say', text: 'строка 1' });
+    expect(planBacklog(four.slice(0, 3), NOW)[0]).toEqual({
+      kind: 'say',
+      text: 'строка 1',
+      line: 'webhook',
+    });
   });
 
   it('drops an event without a line and an unknown outfit', () => {
@@ -273,5 +277,15 @@ describe('useInbox', () => {
     });
     expect(claim).not.toHaveBeenCalled();
     expect(result.current.waiting).toBe(2);
+  });
+});
+
+describe('planBacklog turn', () => {
+  it('a spoken answer names its turn and an event from Telegram its kind', () => {
+    const p = planBacklog(
+      [item({ kind: 'event', say: 'Анна пишет', payload: { source: 'telegram', turn: 't9' } })],
+      NOW,
+    );
+    expect(p[0]).toEqual({ kind: 'say', text: 'Анна пишет', turn: 't9', line: 'telegram' });
   });
 });

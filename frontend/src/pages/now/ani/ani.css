@@ -677,3 +677,68 @@
   color: #fff;
   font-size: 13px;
 }
+
+/* "Later" and "Not about this" under one of her own lines: small, a step aside. */
+.ani-kind {
+  bottom: calc(var(--ani-ledge-h, 64px) + 52px);
+}
+.ani-kind button {
+  padding: 3px 10px;
+  font-size: 12px;
+  color: rgb(255 255 255 / 0.75);
+}
+
+/* What her answer proposes: reply drafts as choices, changes with Yes and No. */
+.ani-offers {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--ani-ledge-h, 64px) + 12px);
+  z-index: 3;
+  display: grid;
+  gap: 6px;
+}
+.ani-offer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.ani-offers button {
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgb(15 18 30 / 0.62);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgb(255 255 255 / 0.18);
+  color: #fff;
+  font-size: 12.5px;
+  text-align: left;
+}
+.ani-offers button.ani-offer-main {
+  background: #f0a993;
+  border-color: #f0a993;
+  color: #1a1020;
+}
+.ani-offers button:disabled {
+  opacity: 0.5;
+}
+.ani-offer-text {
+  font-size: 12.5px;
+  color: #fff;
+  text-shadow: 0 1px 4px rgb(0 0 0 / 0.5);
+}
+.ani-offer-edit {
+  display: grid;
+  gap: 6px;
+}
+.ani-offer-edit textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  color: #fff;
+  background: rgb(15 18 30 / 0.72);
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 10px;
+  padding: 6px 8px;
+  resize: vertical;
+}

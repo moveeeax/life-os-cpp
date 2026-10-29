@@ -24,6 +24,10 @@ public:
     METHOD_LIST_BEGIN
     ADD_METHOD_TO(AniSettingsController::prefs, "/api/v1/ani/prefs", Get);
     ADD_METHOD_TO(AniSettingsController::savePrefs, "/api/v1/ani/prefs", Put);
+    ADD_METHOD_TO(AniSettingsController::facts, "/api/v1/ani/facts", Get);
+    ADD_METHOD_TO(AniSettingsController::addFact, "/api/v1/ani/facts", Post);
+    ADD_METHOD_TO(AniSettingsController::editFact, "/api/v1/ani/facts/{id}", Patch);
+    ADD_METHOD_TO(AniSettingsController::removeFact, "/api/v1/ani/facts/{id}", Delete);
     ADD_METHOD_TO(AniSettingsController::bare, "/api/v1/ani/bare", Get);
     ADD_METHOD_TO(AniSettingsController::webhook, "/api/v1/ani/webhook", Get);
     ADD_METHOD_TO(AniSettingsController::rotateWebhook, "/api/v1/ani/webhook/rotate", Post);
@@ -45,6 +49,10 @@ public:
     void addReminder(const HttpRequestPtr& req, Callback&& callback);
     void removeReminder(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void savePrefs(const HttpRequestPtr& req, Callback&& callback);
+    void facts(const HttpRequestPtr& req, Callback&& callback);
+    void addFact(const HttpRequestPtr& req, Callback&& callback);
+    void editFact(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
+    void removeFact(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void bare(const HttpRequestPtr& req, Callback&& callback);
     void webhook(const HttpRequestPtr& req, Callback&& callback);
     void rotateWebhook(const HttpRequestPtr& req, Callback&& callback);

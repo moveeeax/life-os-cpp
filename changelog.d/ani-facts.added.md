@@ -1,0 +1,1 @@
+Ani keeps facts about you in Life OS: she remembers and forgets them in a chat, you see, edit, add and delete them in Account → Ani, and kinds of her lines muted on Now are listed there to turn back on.

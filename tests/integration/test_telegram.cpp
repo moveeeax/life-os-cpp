@@ -88,6 +88,8 @@ protected:
             return;
         Database::get().execute_write([](auto& txn) {
             txn.exec("DELETE FROM telegram_cursors");
+            txn.exec("DELETE FROM telegram_waiting");
+            txn.exec("DELETE FROM telegram_quiet");
             txn.exec("DELETE FROM telegram_link");
             txn.exec("DELETE FROM ani_inbox");
             txn.exec("DELETE FROM ani_actions");
@@ -169,9 +171,9 @@ TEST_F(TelegramPollDb, NewDmsAndMentionsBecomeOneEvent) {
     EXPECT_EQ(e["source"], "telegram");
     EXPECT_EQ(e["via"], "telegram");
     const std::string text = e["text"];
-    EXPECT_NE(text.find("Anna: привет"), std::string::npos);
-    EXPECT_NE(text.find("Anna: ты где?"), std::string::npos);
-    EXPECT_NE(text.find("Work (mentions you): @moveeeax глянь PR"), std::string::npos);
+    EXPECT_NE(text.find("Anna [chat 10]: привет"), std::string::npos);
+    EXPECT_NE(text.find("Anna [chat 10]: ты где?"), std::string::npos);
+    EXPECT_NE(text.find("Work [chat -100] (mentions you): @moveeeax глянь PR"), std::string::npos);
     EXPECT_EQ(text.find("обед"), std::string::npos) << "a group message without the name";
     EXPECT_EQ(text.find("моё"), std::string::npos) << "the owner's own message";
     EXPECT_EQ(links.cursors(kAnna).at("10"), 103);
@@ -208,4 +210,61 @@ TEST_F(TelegramPollDb, OnlyATelegramProposalTakesANewText) {
     EXPECT_FALSE(actions.retext("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbb7e1e", send, "y")) << "not theirs";
     ASSERT_EQ(actions.answer(kAnna, send, /*confirm=*/true), Repositories::Agent::ActionRepository::Answer::Done);
     EXPECT_FALSE(actions.retext(kAnna, send, "поздно")) << "confirmed already";
+}
+
+TEST_F(TelegramPollDb, QuietChatsDropped) {
+    ASSERT_TRUE(links.set(kAnna, "1389231240", "moveeeax"));
+    Agent::TelegramPoll::process_poll(json::object());
+    links.set_quiet(kAnna, "10", "Anna", true);
+    telegram.chats[0]["unread_count"] = 1;
+    telegram.history["10"] = json::array({message(101, "привет"), message(100, "старое")});
+    Agent::TelegramPoll::process_poll(json::object());
+    EXPECT_EQ(events(), 0) << "a quiet chat tells nothing";
+    EXPECT_EQ(links.cursors(kAnna).at("10"), 101) << "but its cursor moves";
+}
+
+TEST_F(TelegramPollDb, WaitingAfterADay) {
+    ASSERT_TRUE(links.set(kAnna, "1389231240", "moveeeax"));
+    Agent::TelegramPoll::process_poll(json::object());
+    json old = message(100, "ты где?");
+    old["date"] = 1000000000;
+    telegram.history["10"] = json::array({old});
+    Agent::TelegramPoll::process_poll(json::object());
+    auto w = links.waiting(kAnna);
+    ASSERT_EQ(w.size(), 1u);
+    EXPECT_EQ(w[0]["title"], "Anna");
+    links.set_quiet(kAnna, "10", "Anna", true);
+    EXPECT_TRUE(links.waiting(kAnna).empty()) << "a quiet chat is not listed";
+}
+
+TEST_F(TelegramPollDb, SelfOncePerWeek) {
+    ASSERT_TRUE(links.set(kAnna, "1389231240", "moveeeax"));
+    EXPECT_FALSE(links.claim_review_week(kAnna, "2026-W44")) << "the switch is off";
+    links.set_review_to_self(kAnna, true);
+    EXPECT_TRUE(links.claim_review_week(kAnna, "2026-W44"));
+    EXPECT_FALSE(links.claim_review_week(kAnna, "2026-W44")) << "once per week";
+    EXPECT_TRUE(links.claim_review_week(kAnna, "2026-W45"));
+}
+
+TEST_F(TelegramPollDb, ConfirmCancelsSiblingDrafts) {
+    Repositories::Agent::TurnRepository turns;
+    const std::string turn = (*turns.open(kAnna, "event", "UTC"))["id"].get<std::string>();
+    Repositories::Agent::ActionRepository actions;
+    auto draft = [&](const std::string& chat, const std::string& text) {
+        return actions.add(kAnna,
+                           turn,
+                           "tg_send",
+                           "Send to X: «" + text + "»",
+                           json{{"method", "POST"},
+                                {"path", "/api/v1/telegram/chats/" + chat + "/messages"},
+                                {"body", {{"text", text}}}});
+    };
+    const std::string a = draft("10", "Буду через 10 минут");
+    const std::string b = draft("10", "Опаздываю, начинайте");
+    const std::string other = draft("20", "Ок");
+    ASSERT_EQ(actions.answer(kAnna, a, /*confirm=*/true), Repositories::Agent::ActionRepository::Answer::Done);
+    EXPECT_EQ(actions.cancel_sibling_drafts(kAnna, a), 1);
+    EXPECT_EQ((*actions.get(kAnna, b))["status"], "cancelled");
+    EXPECT_EQ((*actions.get(kAnna, other))["status"], "pending") << "another chat keeps its draft";
+    EXPECT_EQ(actions.cancel_sibling_drafts("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbb7e1e", other), 0) << "not theirs";
 }

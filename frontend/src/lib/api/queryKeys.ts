@@ -37,6 +37,7 @@ export const qk = {
   },
   /** The owner's Telegram link (admin). */
   telegram: () => ['telegram'] as const,
+  calendar: () => ['calendar'] as const,
   /** Ani's settings on the server and her webhook. */
   ani: {
     prefs: () => ['ani', 'prefs'] as const,
@@ -129,6 +130,7 @@ export const qk = {
     all: () => ['now'] as const,
     days: () => ['now', 'today'] as const,
     today: (date: string, tz: string) => ['now', 'today', date, tz] as const,
+    day: (date: string, tz: string) => ['now', 'day', date, tz] as const,
     wallpapers: (device: string) => ['now', 'wallpapers', device] as const,
     adminWallpapers: () => ['now', 'admin-wallpapers'] as const,
     sounds: () => ['now', 'sounds'] as const,

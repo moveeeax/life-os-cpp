@@ -205,6 +205,11 @@ inline constexpr ConfigKey ani_agent_api_url{"ani.agent.api_url", "ANI_AGENT_API
 inline constexpr ConfigKey ani_agent_monthly_tokens{"ani.agent.monthly_tokens", "ANI_AGENT_MONTHLY_TOKENS"};
 inline constexpr ConfigKey ani_telegram_url{"ani.telegram.url", "ANI_TELEGRAM_URL"};
 inline constexpr ConfigKey ani_telegram_token{"ani.telegram.token", "ANI_TELEGRAM_TOKEN"};
+inline constexpr ConfigKey calendar_google_client_id{"calendar.google.client_id", "GOOGLE_CALENDAR_CLIENT_ID"};
+inline constexpr ConfigKey calendar_google_client_secret{"calendar.google.client_secret",
+                                                         "GOOGLE_CALENDAR_CLIENT_SECRET"};
+inline constexpr ConfigKey calendar_google_redirect_url{"calendar.google.redirect_url", "GOOGLE_CALENDAR_REDIRECT_URL"};
+inline constexpr ConfigKey calendar_google_token_key{"calendar.google.token_key", "CALENDAR_TOKEN_KEY"};
 
 // --- now ---
 inline constexpr ConfigKey now_enabled{"now.enabled", "NOW_ENABLED"};

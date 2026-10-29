@@ -108,3 +108,20 @@ describe('useWeeklyReview', () => {
     expect(localStorage.getItem(SEEN_KEY)).toBeNull();
   });
 });
+
+describe('reviewText', () => {
+  it('lists what is left and says so when nothing is', async () => {
+    const { reviewText } = await import('./review');
+    expect(reviewText(undefined, '2026-W44')).toBe(
+      'Обзор недели 2026-W44\nХвостов нет: задачи, цели и привычки в порядке.',
+    );
+    const today = {
+      tasks: { late: [{ id: '1', title: 'Паспорт' }] },
+      goals: [{ id: 'g', title: 'Подушка', pace: 'behind' }],
+      habits: { week: [{ name: 'Плавание', done: 1, per_week: 3 }] },
+    } as never;
+    expect(reviewText(today, '2026-W44')).toBe(
+      'Обзор недели 2026-W44\nПросрочено: Паспорт\nЦели отстают: Подушка\nПривычки недобраны: Плавание 1 из 3',
+    );
+  });
+});

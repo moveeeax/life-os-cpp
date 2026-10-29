@@ -1,0 +1,140 @@
+/* The day ribbon under the clock (Now). */
+.r-wrap {
+  width: min(860px, 100%);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.r-ribbon {
+  position: relative;
+  min-width: 600px;
+  display: grid;
+  gap: 6px;
+  padding: 10px 14px 8px;
+  border-radius: 16px;
+  border: 1px solid var(--g-glass-line);
+  background: var(--g-glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  text-shadow: none;
+  text-align: left;
+}
+.r-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--g-ink-soft);
+}
+.r-next.r-soon {
+  color: var(--g-late);
+}
+.r-freetext {
+  color: var(--g-ink-faint);
+}
+.r-track {
+  position: relative;
+  height: 42px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+.r-b {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  border-radius: 8px;
+  padding: 0 7px;
+  font-size: 11.5px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--g-ink);
+}
+.r-b.r-free {
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(110, 231, 183, 0.13) 0 6px,
+    transparent 6px 12px
+  );
+}
+.r-b.r-meet {
+  background: rgba(165, 180, 252, 0.42);
+}
+.r-b.r-did {
+  background: rgba(110, 231, 183, 0.38);
+}
+.r-b.r-gym {
+  background: rgba(252, 211, 77, 0.32);
+}
+.r-b.r-lit {
+  background: rgba(199, 210, 254, 0.95);
+  color: #141832;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.7),
+    0 0 24px rgba(199, 210, 254, 0.7);
+  transition: background 0.3s;
+}
+.r-pin {
+  position: absolute;
+  top: -6px;
+  width: 2px;
+  height: 54px;
+  background: var(--g-warn);
+}
+.r-pin span {
+  position: absolute;
+  top: -16px;
+  left: -4px;
+  font-size: 10.5px;
+  color: var(--g-warn);
+  white-space: nowrap;
+}
+.r-pin-done {
+  opacity: 0.45;
+}
+.r-now {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--g-late);
+  pointer-events: none;
+}
+.r-hours {
+  position: relative;
+  height: 14px;
+  font-size: 10.5px;
+  color: var(--g-ink-faint);
+}
+.r-hours span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+.r-menu {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--g-ink-soft);
+}
+.r-menu button {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--g-ink);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--g-glass-line);
+  border-radius: 999px;
+  padding: 3px 11px;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .r-b.r-lit {
+    transition: none;
+  }
+}

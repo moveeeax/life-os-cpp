@@ -344,10 +344,16 @@ public:
         "ani_hooks",
         "ani_prefs",
         "ani_reminders",
+        "ani_facts",
         "leetcode_snapshots",
         "leetcode_profiles",
         "telegram_cursors",
         "telegram_link",
+        "telegram_waiting",
+        "telegram_quiet",
+        "calendar_links",
+        "calendar_states",
+        "focus_sessions",
     };
 
     /// The foreign keys of the billing tables (migration 007, ON DELETE

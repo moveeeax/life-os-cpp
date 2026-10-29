@@ -29,6 +29,10 @@ export interface Answer {
   mood?: number;
   /** A tap on the bubble opens the chat with her agent. */
   chat?: boolean;
+  /** What kind of her own line it is: "Later" and "Not about this" act on it. */
+  kind?: import('./lines').LineKind;
+  /** The agent's turn it answers: its proposals show as buttons in the bubble. */
+  turn?: string;
 }
 
 /** Her fixed lines, recorded ahead (OpenAI TTS, marin) as v2/voice/touch/<id>.mp3. */

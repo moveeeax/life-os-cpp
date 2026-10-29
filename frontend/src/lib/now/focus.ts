@@ -14,6 +14,10 @@ export interface Session {
   minutes: number;
   /** The day of the focus this session worked on; Tick only applies to it. */
   focusDate?: string | null;
+  /** When it started (ms); the day ribbon draws it from here. */
+  startedAt?: number;
+  /** Sent to the server already (POST /now/focus-sessions), so a reload does not send it twice. */
+  recorded?: boolean;
 }
 
 export type Phase = 'idle' | 'running' | 'paused' | 'done';
@@ -46,7 +50,31 @@ export function startSession(
   now: number,
   focusDate: string | null = null,
 ): Session {
-  return { endAt: now + minutes * 60_000, pausedLeft: null, minutes, focusDate };
+  return { endAt: now + minutes * 60_000, pausedLeft: null, minutes, focusDate, startedAt: now };
+}
+
+/** A session cut short this early is not kept. */
+export const FOCUS_RECORD_MIN_MINUTES = 5;
+
+/**
+ * What the server keeps of @p s at @p now, ended (done) or left early: its
+ * start, its end and the minutes in focus (pauses left out); null when it is
+ * kept already, too short, or has no start.
+ */
+export function focusRecord(
+  s: Session | null,
+  now: number,
+): { started_at: string; ended_at: string; minutes: number } | null {
+  if (!s || s.recorded || !s.startedAt) return null;
+  const state = sessionState(s, now);
+  const end = state.phase === 'done' && s.endAt !== null ? s.endAt : now;
+  const focused = Math.round((s.minutes * 60 - (state.phase === 'done' ? 0 : state.left)) / 60);
+  if (focused < FOCUS_RECORD_MIN_MINUTES || end <= s.startedAt) return null;
+  return {
+    started_at: new Date(s.startedAt).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+    ended_at: new Date(end).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+    minutes: Math.min(focused, Math.ceil((end - s.startedAt) / 60_000)),
+  };
 }
 
 export function sessionState(

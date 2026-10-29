@@ -7,6 +7,8 @@ export interface TaskDraft {
   area: string;
   effort: string;
   due: string;
+  /** HH:MM on the due day, empty for none; left out, the task keeps its own. */
+  dueTime?: string;
   next: string;
   note: string;
   status: string;
@@ -29,7 +31,7 @@ type TaskFields = Pick<
   | 'status'
   | 'goal_id'
   | 'goal_section_id'
-> & { project_id?: string | null; repeat?: TaskRepeat | null };
+> & { project_id?: string | null; repeat?: TaskRepeat | null; due_time?: string | null };
 
 /** Only the fields that changed; a section travels with its goal (the API checks the pair). */
 export function taskPatch(task: TaskFields, d: TaskDraft): TaskPatch {
@@ -38,6 +40,9 @@ export function taskPatch(task: TaskFields, d: TaskDraft): TaskPatch {
   if (d.area !== task.area) patch.area = d.area as TaskPatch['area'];
   if ((d.effort || null) !== task.effort) patch.effort = (d.effort || null) as TaskPatch['effort'];
   if ((d.due || null) !== task.due) patch.due = d.due || null;
+  if (d.dueTime !== undefined && d.due && (d.dueTime || null) !== (task.due_time ?? null)) {
+    patch.due_time = d.dueTime || null;
+  }
   if (d.next.trim() !== task.next_step) patch.next_step = d.next.trim();
   if (d.note !== task.note) patch.note = d.note;
   if (d.status !== task.status) patch.status = d.status as TaskPatch['status'];

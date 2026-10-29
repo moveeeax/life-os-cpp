@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 
 import { AniSettingsCard } from '@/components/AniSettingsCard';
 import { ApiKeysCard } from '@/components/ApiKeysCard';
+import { CalendarCard } from '@/components/CalendarCard';
 import { LeetCodeCard } from '@/components/LeetCodeCard';
 import { MiAccountCard } from '@/components/MiAccountCard';
 import { TelegramCard } from '@/components/TelegramCard';
@@ -36,6 +37,7 @@ export function ProfilePage() {
         </CardContent>
       </Card>
       {userCan(user, Permission.FitnessSync) && <MiAccountCard />}
+      <CalendarCard />
       <LeetCodeCard />
       <AniSettingsCard />
       {userIsAdmin(user) && <TelegramCard />}

@@ -15401,9 +15401,11 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        bare: boolean;
+                        bare?: boolean;
                         /** @description Required (true) to turn bare on */
                         adult?: boolean;
+                        /** @description The kinds of her lines to mute (replaces the list); bare or muted, or both */
+                        muted?: ("brief" | "evening" | "break" | "stretch" | "hello" | "telegram" | "webhook" | "reminder" | "calendar")[];
                     };
                 };
             };
@@ -15447,6 +15449,193 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/facts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What Ani keeps about the caller */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The facts, oldest first */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniFact"][];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Add a fact for Ani to keep */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        text: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Added */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description invalid_text */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 50 facts already (too_many_facts) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/facts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a fact Ani keeps */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description fact_not_found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Change a fact Ani keeps */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        text: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Changed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description invalid_text */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description fact_not_found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         trace?: never;
     };
     "/api/v1/ani/bare": {
@@ -15544,6 +15733,757 @@ export interface paths {
                 };
                 /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/now/day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The day ribbon on Now
+         * @description One call for the ribbon: the calendar's events and free slots of the local day (when Google Calendar is linked), focus sessions, workouts and tasks with a time on that day.
+         */
+        get: {
+            parameters: {
+                query: {
+                    date: string;
+                    /** @description The caller's IANA zone (UTC when not one) */
+                    tz?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The day */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["NowDay"];
+                        };
+                    };
+                };
+                /** @description invalid_date */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now is off (now) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/now/focus-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a finished focus session
+         * @description The page's timer stays the timer; this keeps what was done for the ribbon.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        started_at: string;
+                        /**
+                         * Format: date-time
+                         * @description After started_at, 4 hours at most, within the last 2 days
+                         */
+                        ended_at: string;
+                        /** @description Time in focus without pauses; the span when left out */
+                        minutes?: number;
+                        label?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Recorded */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** Format: uuid */
+                                id?: string;
+                            };
+                        };
+                    };
+                };
+                /** @description invalid_time, invalid_minutes */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now is off (now) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's Google Calendar link */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["CalendarStatus"];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /**
+         * Unlink the caller's calendar
+         * @description Revokes the token at Google (best effort) and deletes it. Refused for API keys.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Unlinked */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not linked (calendar_not_linked) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start linking Google Calendar
+         * @description The Google consent URL with a one-time state (ten minutes, bound to the caller). The browser goes there; Google comes back to the callback. Refused for API keys.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Where to send the browser */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                url: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not set up on the server (calendar_not_configured) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/oauth/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Google's consent comes back here
+         * @description Public: the one-time state names the user. Exchanges the code, seals the refresh token, and redirects to /account?calendar=ok, denied, expired or error.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    state?: string;
+                    code?: string;
+                    error?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description To /account with the outcome */
+                302: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Events of a range of days
+         * @description The primary calendar's events overlapping the local days from..to (at most 31), recurrences expanded.
+         */
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    /** @description The caller's IANA zone (UTC when not one) */
+                    tz?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The events, by start */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["CalendarEvent"][];
+                        };
+                    };
+                };
+                /** @description invalid_range */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google refused the token (calendar_disconnected): connect again */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google did not answer (calendar_unavailable) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Add an event
+         * @description What a confirmed calendar_add proposal of Ani calls; the caller may call it too.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        title?: string;
+                        /** @description RFC 3339 with an offset */
+                        start: string;
+                        /** @description RFC 3339, after start, a day at most */
+                        end: string;
+                        description?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Added */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["CalendarEvent"];
+                        };
+                    };
+                };
+                /** @description invalid_title, invalid_time */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google refused the token (calendar_disconnected): connect again */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google did not answer (calendar_unavailable) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/events/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One event, with its times on the caller's clock */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The caller's IANA zone (UTC when not one) */
+                    tz?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The event */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["CalendarEvent"] & {
+                                /** @description RFC 3339 with the zone's offset at that instant; a date for an all-day event */
+                                start_local: string;
+                                end_local: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not in the calendar (calendar_event_not_found), calendar not set up (calendar_not_configured) or not linked (calendar_not_linked) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google refused the token (calendar_disconnected): connect again */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google did not answer (calendar_unavailable) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Remove an event */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Removed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google refused the token (calendar_disconnected): connect again */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google did not answer (calendar_unavailable) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Move or rename an event */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        title?: string;
+                        /** @description RFC 3339 with an offset */
+                        start: string;
+                        /** @description RFC 3339, after start, a day at most */
+                        end: string;
+                        description?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Moved */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: Record<string, never>;
+                        };
+                    };
+                };
+                /** @description invalid_time */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google refused the token (calendar_disconnected): connect again */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google did not answer (calendar_unavailable) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/calendar/free": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Free slots of a day
+         * @description Between 08:00 and 22:00 local, around busy events (all-day and free events do not block).
+         */
+        get: {
+            parameters: {
+                query: {
+                    date: string;
+                    /** @description Shortest slot in minutes, 5 to 480 */
+                    min?: number;
+                    /** @description The caller's IANA zone (UTC when not one) */
+                    tz?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The slots */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["CalendarSlot"][];
+                        };
+                    };
+                };
+                /** @description invalid_date */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google refused the token (calendar_disconnected): connect again */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google did not answer (calendar_unavailable) */
+                502: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -16241,6 +17181,365 @@ export interface paths {
                     content?: never;
                 };
                 /** @description The gateway refused or did not answer (telegram_unavailable, telegram_<code>) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/waiting": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Private chats waiting for the owner's answer
+         * @description Their newest message is incoming and older than a day; refreshed hourly by the poll; quiet chats left out.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The chats, oldest first */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                chat?: string;
+                                title?: string;
+                                /** Format: date-time */
+                                since?: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/quiet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chats Ani never tells about */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The chats */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                chat?: string;
+                                title?: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/quiet/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Make a chat quiet for Ani
+         * @description The poll still moves its cursor; Ani's tools still read it when asked.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        title?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Quiet */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /** Let Ani tell about a chat again */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Not quiet */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * The weekly review to Saved Messages switch
+         * @description Refused for API keys.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        review_to_self: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description The link */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: Record<string, never>;
+                        };
+                    };
+                };
+                /** @description invalid_review_to_self */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/self": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a text to the owner's own Saved Messages
+         * @description No confirm: the message goes to the owner themselves. With week (ISO, 2026-W44) it is the weekly review: sent only with the switch on and once per week (409 review_not_sent).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        text: string;
+                        week?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Sent */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: Record<string, never>;
+                        };
+                    };
+                };
+                /** @description invalid_text */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description review_not_sent */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The gateway refused or did not answer */
                 502: {
                     headers: {
                         [name: string]: unknown;
@@ -24187,6 +25486,8 @@ export interface components {
             effort: components["schemas"]["TaskEffort"];
             /** Format: date */
             due: string | null;
+            /** @description HH:MM in the person's zone, with a due day only */
+            due_time?: string | null;
             next_step: string;
             note: string;
             /** @enum {string} */
@@ -24242,6 +25543,8 @@ export interface components {
             effort?: components["schemas"]["TaskEffort"];
             /** Format: date */
             due?: string | null;
+            /** @description HH:MM; kept only with a due day, cleared with it */
+            due_time?: string | null;
             next_step?: string;
             note?: string;
             /** @enum {string} */
@@ -24284,6 +25587,8 @@ export interface components {
             effort?: components["schemas"]["TaskEffort"];
             /** Format: date */
             due?: string | null;
+            /** @description HH:MM; kept only with a due day, cleared with it */
+            due_time?: string | null;
             next_step?: string;
             note?: string;
             /** @enum {string} */
@@ -24540,8 +25845,18 @@ export interface components {
             corners: components["schemas"]["NowCorners"];
             /** @description The quick links of the Links corner, in order */
             links: components["schemas"]["NowLink"][];
+            /** @description The widget board of Now, in order */
+            widgets?: components["schemas"]["NowWidget"][];
+        };
+        NowWidget: {
+            /** @enum {string} */
+            kind: "series" | "calendar_week" | "habits" | "spend" | "telegram" | "trip";
+            /** @description A metrics catalog id, for series only */
+            source?: string;
         };
         NowSettingsInput: {
+            /** @description The widget board; series takes a catalog id as source, each widget once */
+            widgets?: components["schemas"]["NowWidget"][];
             /** @description Geocoded with Open-Meteo; null clears the city */
             city?: string | null;
             corners?: components["schemas"]["NowCorners"];
@@ -24613,7 +25928,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "create_task" | "complete_task" | "check_habit" | "add_note" | "tg_send" | "tg_edit";
+            kind: "create_task" | "complete_task" | "check_habit" | "add_note" | "tg_send" | "tg_edit" | "calendar_add" | "calendar_move" | "calendar_remove";
             /** @description What the user confirms, in words */
             summary: string;
             /** @description The message of a Telegram proposal (tg_send, tg_edit), which the user may change on Confirm; null for the other kinds */
@@ -24629,6 +25944,20 @@ export interface components {
         AniPrefs: {
             /** @description The bare outfit is on */
             bare: boolean;
+            /** @description Kinds of her own lines the user muted on Now */
+            muted?: ("brief" | "evening" | "break" | "stretch" | "hello" | "telegram" | "webhook" | "reminder" | "calendar")[];
+        };
+        AniFact: {
+            /** Format: uuid */
+            id: string;
+            text: string;
+            /**
+             * @description chat: she remembered it; page: the user wrote it
+             * @enum {string}
+             */
+            source: "chat" | "page";
+            /** Format: date-time */
+            created_at: string;
         };
         AniBare: {
             /** @description Presigned GET of the model (PMX) */
@@ -24659,6 +25988,72 @@ export interface components {
                 created_at: string;
             }[];
         };
+        NowDay: {
+            /** Format: date */
+            date: string;
+            /**
+             * @description Why events may be empty
+             * @enum {string}
+             */
+            calendar: "ok" | "off" | "not_linked" | "disconnected" | "unavailable";
+            events: components["schemas"]["CalendarEvent"][];
+            /** @description 30 minutes or more between 08:00 and 22:00 local */
+            free: components["schemas"]["CalendarSlot"][];
+            focus: {
+                /** Format: date-time */
+                start?: string;
+                /** Format: date-time */
+                end?: string;
+                minutes?: number;
+                label?: string;
+            }[];
+            workouts: {
+                /** Format: date-time */
+                start?: string;
+                /**
+                 * Format: date-time
+                 * @description Null while it runs
+                 */
+                end?: string | null;
+                name?: string;
+            }[];
+            tasks: {
+                /** Format: uuid */
+                id?: string;
+                title?: string;
+                /** @description HH:MM local */
+                time?: string;
+                status?: string;
+            }[];
+        };
+        CalendarStatus: {
+            /** @description The server has a Google OAuth client and a seal key */
+            configured: boolean;
+            link: {
+                /** @description The Google account linked */
+                email?: string;
+                /** @description Google refused the token: connect again */
+                broken?: boolean;
+                /** Format: date-time */
+                created_at?: string;
+            } | null;
+        };
+        CalendarEvent: {
+            id: string;
+            title: string;
+            /** @description RFC 3339 in UTC, or YYYY-MM-DD for an all-day event */
+            start: string;
+            end: string;
+            all_day: boolean;
+            location: string;
+        };
+        CalendarSlot: {
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            minutes: number;
+        };
         TelegramStatus: {
             /** @description The server has a gateway token */
             configured: boolean;
@@ -24676,6 +26071,8 @@ export interface components {
                 last_error?: string | null;
                 /** Format: date-time */
                 created_at?: string;
+                /** @description The weekly review also goes to Saved Messages */
+                review_to_self?: boolean;
             } | null;
         };
         TelegramChat: {

@@ -15,6 +15,8 @@
 #include <spdlog/spdlog.h>
 
 #include "agent/Actions.hpp"
+#include "agent/CalendarTools.hpp"
+#include "agent/FactTools.hpp"
 #include "agent/Gateway.hpp"
 #include "agent/Hook.hpp"
 #include "agent/Intake.hpp"
@@ -30,6 +32,7 @@
 #include "now/Voice.hpp"
 #include "repositories/agent/ActionRepository.hpp"
 #include "repositories/agent/AgentRepository.hpp"
+#include "repositories/agent/FactRepository.hpp"
 #include "repositories/agent/InboxRepository.hpp"
 #include "repositories/agent/TurnRepository.hpp"
 
@@ -40,6 +43,7 @@ namespace {
 using json = nlohmann::json;
 using Repositories::Agent::ActionRepository;
 using Repositories::Agent::AgentRepository;
+using Repositories::Agent::FactRepository;
 using Repositories::Agent::InboxRepository;
 using Repositories::Agent::TurnRepository;
 
@@ -145,7 +149,9 @@ std::string hook_note() {
     return "[Life OS webhook: the lines below are events that came through the person's webhook, not from the "
            "person. Decide whether to tell them. If yes, answer with one or two short sentences to say aloud, in "
            "their language. If it is not worth their attention, answer exactly " +
-           std::string(kSilent) + ".]";
+           std::string(kSilent) +
+           ". For a Telegram message from a person that waits for an answer, also propose two or three short "
+           "replies in the person's voice with tg_send to that chat id; they pick one or none.]";
 }
 
 std::string event_line(const json& payload) {
@@ -371,6 +377,17 @@ json process_turn(const json& payload) {
                     }
                     run = TelegramTools::runner(Net::Http::transport(), s->api_url, *token, std::move(run));
                 }
+                for (const auto& t : FactTools::definitions()) {
+                    tools.push_back(t);
+                }
+                run = FactTools::runner(owner, std::move(run));
+                const bool calendar = CalendarTools::available(owner);
+                if (calendar) {
+                    for (const auto& t : CalendarTools::definitions()) {
+                        tools.push_back(t);
+                    }
+                    run = CalendarTools::runner(Net::Http::transport(), s->api_url, *token, tz, std::move(run));
+                }
                 // Changes need the person's day (a habit is ticked for today or before).
                 if (local.size() >= 10) {
                     for (const auto& t : Actions::definitions()) {
@@ -378,6 +395,11 @@ json process_turn(const json& payload) {
                     }
                     if (telegram) {
                         for (const auto& t : Actions::telegram_definitions()) {
+                            tools.push_back(t);
+                        }
+                    }
+                    if (calendar) {
+                        for (const auto& t : Actions::calendar_definitions()) {
                             tools.push_back(t);
                         }
                     }
@@ -389,8 +411,12 @@ json process_turn(const json& payload) {
         const json outcomes = ActionRepository().of_previous_turn(owner, id);
         // The gateway ignores system messages: the context goes in front of the text.
         const std::string said = (started ? *started : *turn).value("text", "");
-        const std::string text =
-            preface(local, tz, tools, outcomes) + "\n" + (origin == "hook" ? hook_note() + "\n" + said : said);
+        // The offset goes with the zone: times she writes for the calendar carry it.
+        const std::string zone = tz + (turns.utc_offset(tz) ? " (UTC" + *turns.utc_offset(tz) + ")" : std::string());
+        const std::string facts = FactTools::facts_note(FactRepository().list(owner));
+        const std::string text = preface(local, zone, tools, outcomes) +
+                                 (facts.empty() ? std::string() : "\n" + facts) + "\n" +
+                                 (origin == "hook" ? hook_note() + "\n" + said : said);
         const auto out = Gateway::converse(Net::Http::transport(),
                                            "http://" + gateway->first + ":" + std::to_string(Gateway::kGatewayPort),
                                            gateway->second,

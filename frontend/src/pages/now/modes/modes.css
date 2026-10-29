@@ -1,0 +1,48 @@
+/* Now by the situation: a row of small cards under the ribbon. */
+.m-cards {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: min(860px, 100%);
+}
+.m-card {
+  flex: 1 1 200px;
+  max-width: 280px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--g-glass-line);
+  background: var(--g-glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  text-align: left;
+  text-shadow: none;
+}
+.m-k {
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--g-ink-faint);
+}
+.m-v {
+  font-size: 17px;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-s {
+  font-size: 12.5px;
+  color: var(--g-ink-soft);
+  margin-top: 2px;
+}
+.m-hide {
+  align-self: center;
+  font: inherit;
+  font-size: 12px;
+  color: var(--g-ink-faint);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}

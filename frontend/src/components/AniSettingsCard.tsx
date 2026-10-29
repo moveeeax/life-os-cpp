@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { AniFacts } from '@/components/AniFacts';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -260,6 +261,7 @@ export function AniSettingsCard() {
         <BareSwitch />
         {hook.data && <Webhook hook={hook.data} />}
         <Mcp />
+        <AniFacts />
       </CardContent>
     </Card>
   );

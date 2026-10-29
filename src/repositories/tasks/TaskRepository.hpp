@@ -32,6 +32,8 @@ public:
         std::string area;
         std::optional<std::string> effort;
         std::optional<std::string> due;
+        /// HH:MM in the person's zone, only with a due day (the day ribbon pins it).
+        std::optional<std::string> due_time;
         std::string next_step;
         std::string note;
         std::optional<std::string> source_kind;
@@ -51,6 +53,7 @@ public:
         std::optional<std::string> area;
         std::optional<std::optional<std::string>> effort;  // outer: given; inner: null clears
         std::optional<std::optional<std::string>> due;
+        std::optional<std::optional<std::string>> due_time;
         std::optional<std::string> next_step;
         std::optional<std::string> note;
         std::optional<std::string> status;
@@ -93,9 +96,10 @@ public:
     static std::string create_in(Txn& txn, const std::string& owner, const Input& in) {
         auto r = txn.exec_params(
             "INSERT INTO task_items (owner_id, title, area, effort, due, next_step, note, status, completed_at, "
-            " source_kind, source_ref, external_id, goal_id, goal_section_id, trip_id, project_id, repeat, deal_id) "
+            " source_kind, source_ref, external_id, goal_id, goal_section_id, trip_id, project_id, repeat, deal_id, "
+            "due_time) "
             "VALUES ($1::uuid, $2, $3, $4, $5::date, $6, $7, $8, CASE WHEN $8 = 'done' THEN now() END, $9, $10, $11, "
-            " $12::uuid, $13::uuid, $14::uuid, $15::uuid, $16::jsonb, $17::uuid) "
+            " $12::uuid, $13::uuid, $14::uuid, $15::uuid, $16::jsonb, $17::uuid, $18::time) "
             "RETURNING id::text",
             owner,
             in.title,
@@ -113,7 +117,8 @@ public:
             in.trip_id,
             in.project_id,
             in.repeat,
-            in.deal_id);
+            in.deal_id,
+            in.due ? in.due_time : std::optional<std::string>());
         return r[0][0].template as<std::string>();
     }
 
@@ -159,7 +164,10 @@ public:
             " trip_id = CASE WHEN $20::boolean THEN $21::uuid ELSE trip_id END, "
             " project_id = CASE WHEN $22::boolean THEN $23::uuid ELSE project_id END, "
             " repeat = CASE WHEN $24::boolean THEN $25::jsonb ELSE repeat END, "
-            " deal_id = CASE WHEN $26::boolean THEN $27::uuid ELSE deal_id END "
+            " deal_id = CASE WHEN $26::boolean THEN $27::uuid ELSE deal_id END, "
+            // A time without a day means nothing: clearing the day clears it.
+            " due_time = CASE WHEN $7::boolean AND $8::date IS NULL THEN NULL "
+            "   WHEN $28::boolean THEN $29::time ELSE due_time END "
             "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
             owner,
             id,
@@ -187,7 +195,9 @@ public:
             p.repeat.has_value(),
             p.repeat.has_value() ? *p.repeat : std::optional<std::string>(),
             p.deal_id.has_value(),
-            p.deal_id.has_value() ? *p.deal_id : std::optional<std::string>());
+            p.deal_id.has_value() ? *p.deal_id : std::optional<std::string>(),
+            p.due_time.has_value(),
+            p.due_time.has_value() ? *p.due_time : std::optional<std::string>());
         if (r.empty()) {
             throw NotFound("task");
         }
@@ -221,9 +231,9 @@ public:
         const std::string next = ::Tasks::Repeat::next_due(rule, due, done_day);
         auto made = txn.exec_params(
             "INSERT INTO task_items (owner_id, title, area, effort, due, next_step, note, status, source_kind, "
-            " source_ref, goal_id, goal_section_id, trip_id, project_id, repeat, deal_id) "
+            " source_ref, goal_id, goal_section_id, trip_id, project_id, repeat, deal_id, due_time) "
             "SELECT owner_id, title, area, effort, $3::date, next_step, note, 'open', source_kind, source_ref, "
-            " goal_id, goal_section_id, trip_id, project_id, repeat, deal_id "
+            " goal_id, goal_section_id, trip_id, project_id, repeat, deal_id, due_time "
             "FROM task_items WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id::text",
             owner,
             id,
@@ -352,7 +362,8 @@ public:
     }
 
     static constexpr const char* kColumns =
-        "id, title, area, effort, to_char(due, 'YYYY-MM-DD') AS due, next_step, note, status, "
+        "id, title, area, effort, to_char(due, 'YYYY-MM-DD') AS due, to_char(due_time, 'HH24:MI') AS due_time, "
+        " next_step, note, status, "
         " " SQL_ISO_UTC("completed_at") " AS completed_at, "
         " source_kind, source_ref, external_id, goal_id, goal_section_id, trip_id, project_id, "
         " repeat, recur_next_id AS next_id, deal_id, "

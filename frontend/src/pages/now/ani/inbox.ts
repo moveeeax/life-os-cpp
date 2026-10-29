@@ -4,6 +4,7 @@ import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema.gen';
 
 import { plural } from './greet';
+import { inboxKind, type LineKind } from './lines';
 import type { AniOutfit } from './state';
 
 /*
@@ -17,7 +18,7 @@ import type { AniOutfit } from './state';
 export type InboxItem = components['schemas']['AniInboxItem'];
 
 export type Play =
-  | { kind: 'say'; text: string }
+  | { kind: 'say'; text: string; turn?: string; line?: LineKind }
   | { kind: 'outfit'; outfit: AniOutfit }
   | { kind: 'act'; name: string }
   | { kind: 'mood'; level: -1 | 0 | 1; seconds: number }
@@ -63,7 +64,13 @@ export function planBacklog(items: InboxItem[], now: number): Play[] {
   items.forEach((it, i) => {
     const p = it.payload;
     if (it.kind === 'say' || it.kind === 'event' || it.kind === 'remind') {
-      if (it.say) plan.push({ kind: 'say', text: it.say });
+      if (it.say)
+        plan.push({
+          kind: 'say',
+          text: it.say,
+          turn: str(p.turn) || undefined,
+          line: inboxKind(it.kind, p.source),
+        });
     } else if (it.kind === 'ask') {
       const options = Array.isArray(p.options) ? p.options.map(String) : [];
       if (it.say && options.length > 0)

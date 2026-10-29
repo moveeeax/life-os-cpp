@@ -290,6 +290,21 @@ public:
         });
     }
 
+    /// The zone's offset from UTC now, as "+05:00" (for times Ani writes); nullopt for an unknown zone.
+    std::optional<std::string> utc_offset(const std::string& tz) {
+        return Database::get().execute_read([&](auto& txn) -> std::optional<std::string> {
+            auto r = txn.exec_params(
+                "SELECT CASE WHEN utc_offset < interval '0' THEN '-' ELSE '+' END || to_char(abs(extract(epoch "
+                "FROM utc_offset))::int / 3600, 'FM00') || ':' || to_char((abs(extract(epoch FROM utc_offset))::int "
+                "% 3600) / 60, 'FM00') FROM pg_timezone_names WHERE name = $1",
+                tz);
+            if (r.empty()) {
+                return std::nullopt;
+            }
+            return r[0][0].template as<std::string>();
+        });
+    }
+
 private:
     /// The turn as the panel shows it, with the actions it proposed.
     static std::string columns() {

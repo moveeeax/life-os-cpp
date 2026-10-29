@@ -349,6 +349,10 @@ the API and the worker.
 | `ANI_AGENT_MONTHLY_TOKENS` | `ani.agent.monthly_tokens` | int | `20000000` | Prompt plus completion tokens per user and calendar month (UTC); past it the proxy answers 429 `insufficient_quota`. |
 | `ANI_TELEGRAM_URL` | `ani.telegram.url` | string | `https://tg.tarassov.me` | The owner's telegram-rest-gateway (REST), which Ani's Telegram tools and the minutely poll call (src/telegram/). |
 | `ANI_TELEGRAM_TOKEN` | `ani.telegram.token` | string | empty | The gateway client token of the owner's account (`<accountId>.<secret>`, scopes read and write), kept in the Secret `life-os-ani-agent`; Life OS never hands it to the agent. Empty: Telegram is off everywhere. |
+| `GOOGLE_CALENDAR_CLIENT_ID` | `calendar.google.client_id` | string | empty | The Google OAuth Web client of the site (Secret `life-os-app`). Empty: Google Calendar is off. |
+| `GOOGLE_CALENDAR_CLIENT_SECRET` | `calendar.google.client_secret` | string | empty | Its secret (Secret `life-os-app`). |
+| `GOOGLE_CALENDAR_REDIRECT_URL` | `calendar.google.redirect_url` | string | `https://life-os.tarassov.me/api/v1/calendar/oauth/callback` | Where Google's consent comes back; must match the client's authorized redirect exactly. |
+| `CALENDAR_TOKEN_KEY` | `calendar.google.token_key` | string | empty | 32 random bytes, base64url without padding, that seal the users' refresh tokens (utils/Seal.hpp). Changing it disconnects every calendar. |
 
 ## Storage (S3)
 

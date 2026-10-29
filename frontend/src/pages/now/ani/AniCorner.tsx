@@ -2,21 +2,32 @@ import { useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
 
-import { fetchAniBare, useAniPrefs } from '@/hooks/useAni';
+import { fetchAniBare, useAniPrefs, useMuteKind } from '@/hooks/useAni';
 import type { NowWeather, Today } from '@/lib/now/types';
 
 import { AniChat, SpeakerIcon } from './AniChat';
 import { soundOn, speechUrl, useSound } from './chat';
 import type { Ani } from './engine';
 import { REVIEW_EVENT } from '../review/review';
-import { evening, tomorrowOf } from './evening';
+import { evening, tomorrowOf, waitingWords, type Waiting } from './evening';
 import { greeting, HELLO, hourOf } from './greet';
 import { useInbox, type Play } from './inbox';
 import { moodLevel, moodOf, moveMood } from './mood';
 import type { Talk, TalkState } from './talk';
 import { useAni, type AniOutfit } from './state';
 import { createToucher, say, type Answer } from './touch';
+import { AniOffers } from './AniOffers';
+import { HOLD_KEY, eventOfLine, quietKind, snooze, type LineKind } from './lines';
+import { RIBBON_POINT, type NowDay } from '../ribbon/layout';
 import './ani.css';
+
+function holdToTalk(): boolean {
+  try {
+    return localStorage.getItem(HOLD_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 /** A hanger: opens the outfits in place of the ledge's state. */
 function HangerIcon() {
@@ -146,6 +157,8 @@ export interface AniContext {
   date: string;
   today?: Today;
   weather?: NowWeather;
+  /** The day ribbon's data: a line about an event points at it. */
+  day?: NowDay;
 }
 
 /**
@@ -266,6 +279,7 @@ export function AniCorner({
         onText: (t) => setSaid(t),
         onState: (st) => setTalk(st),
         onEnd: () => stopTalk(),
+        hold: holdToTalk(),
       });
       // Hung up while it was connecting.
       if (!calling.current) t.stop();
@@ -275,6 +289,26 @@ export function AniCorner({
       setSaid('Не получилось подключиться. Попробуй ещё раз чуть позже.');
     }
   };
+  // Holding to talk, the space bar works as the mic button (outside text fields).
+  useEffect(() => {
+    if (!talk || !holdToTalk()) return;
+    const typing = (e: KeyboardEvent) =>
+      e.target instanceof HTMLElement && ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || e.repeat || typing(e)) return;
+      e.preventDefault();
+      talkRef.current?.press();
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !typing(e)) talkRef.current?.release();
+    };
+    addEventListener('keydown', down);
+    addEventListener('keyup', up);
+    return () => {
+      removeEventListener('keydown', down);
+      removeEventListener('keyup', up);
+    };
+  }, [talk]);
   useEffect(
     () => () => {
       calling.current = false;
@@ -298,6 +332,12 @@ export function AniCorner({
   const lastSaidAt = useRef(0);
   // The bubble opens the chat (her evening word).
   const [saidChat, setSaidChat] = useState(false);
+  // The kind of the line on screen ("Later", "Not about this") and the turn whose proposals show.
+  const [saidKind, setSaidKind] = useState<LineKind | null>(null);
+  const [offersTurn, setOffersTurn] = useState<string | null>(null);
+  const mutedRef = useRef<string[]>([]);
+  mutedRef.current = prefs.data?.muted ?? [];
+  const muteKind = useMuteKind();
   /**
    * Her answer to a tap, in the bubble while she says it: a recorded line
    * from the bucket, one with the day in it read by the server, or a silent
@@ -312,12 +352,19 @@ export function AniCorner({
     new Promise<void>((finished) => {
       const e = engine.current;
       if (!e || calling.current) return finished();
+      // A kind the person muted or put off keeps quiet.
+      if (quietKind(a.kind, mutedRef.current)) return finished();
       lineEnds.current?.();
       lineEnds.current = finished;
       if (a.mood) e.mood(moodLevel(moveMood(contextRef.current.date, a.mood)));
       lastSaidAt.current = Date.now();
       setSaidChat(Boolean(a.chat));
       setSaid(a.text);
+      setSaidKind(a.kind ?? null);
+      if (a.turn) setOffersTurn(a.turn);
+      // A line about an event of the day lights it on the ribbon.
+      const ev = eventOfLine(a.text, contextRef.current.day, contextRef.current.tz);
+      if (ev) window.dispatchEvent(new CustomEvent(RIBBON_POINT, { detail: ev }));
       clearTimeout(sayTimer.current);
       const done = () => {
         setSaid((v) => (v === a.text ? null : v));
@@ -373,23 +420,39 @@ export function AniCorner({
         dayOf(EVENING_KEY) !== c.date
       ) {
         setDayOf(EVENING_KEY, c.date);
-        // The day's tasks first: done of all, and an offer to move the rest.
-        const sum = evening(c.today, document.documentElement.classList.contains('hide-numbers'));
-        if (sum) {
-          if (sum.move.length > 0) setMoveOffer({ ids: sum.move, due: tomorrowOf(c.date) });
-          answer.current({ text: sum.text });
-          return;
-        }
-        const f = c.today?.focus;
-        const line = f && !f.done ? say('focusOpen') : f?.done ? say('dayDone') : say('howWasDay');
-        answer.current({ ...line, chat: true });
+        // Telegram answers still owed go after the day's line (none without Telegram).
+        void api
+          .getJson<{ data: Waiting[] }>('/api/v1/telegram/waiting')
+          .then((r) => (Array.isArray(r.data) ? r.data : []))
+          .catch(() => [] as Waiting[])
+          .then((waiting) => {
+            const owed = waitingWords(waiting, new Date());
+            // The day's tasks first: done of all, and an offer to move the rest.
+            const sum = evening(
+              c.today,
+              document.documentElement.classList.contains('hide-numbers'),
+            );
+            if (sum) {
+              if (sum.move.length > 0) setMoveOffer({ ids: sum.move, due: tomorrowOf(c.date) });
+              answer.current({ text: owed ? `${sum.text} ${owed}` : sum.text, kind: 'evening' });
+              return;
+            }
+            if (owed) {
+              answer.current({ text: owed, kind: 'telegram' });
+              return;
+            }
+            const f = c.today?.focus;
+            const line =
+              f && !f.done ? say('focusOpen') : f?.done ? say('dayDone') : say('howWasDay');
+            answer.current({ ...line, chat: true });
+          });
         return;
       }
       if (now - active < 60_000 && now - streak >= STRETCH_MS && now - stretched >= STRETCH_MS) {
         stretched = now;
         streak = now;
         engine.current?.act('idle_happy');
-        answer.current(say('stretch'));
+        answer.current({ ...say('stretch'), kind: 'stretch' });
       }
     }, 30_000);
     return () => {
@@ -469,7 +532,7 @@ export function AniCorner({
       const pause = (ms: number) => new Promise<void>((ok) => window.setTimeout(ok, ms));
       switch (p.kind) {
         case 'say':
-          return answer.current({ text: p.text });
+          return answer.current({ text: p.text, kind: p.line, turn: p.turn });
         case 'ask':
           setAsks((q) =>
             q.some((a) => a.id === p.id)
@@ -555,7 +618,7 @@ export function AniCorner({
     if (!ready || !ani.here || (!afterFocus && !hasToday)) return;
     let line: Answer;
     if (afterFocus) {
-      line = say('breakTime');
+      line = { ...say('breakTime'), kind: 'break' };
       onAfterFocus?.();
       engine.current?.feel('happy', 3);
       engine.current?.act('peace');
@@ -564,7 +627,10 @@ export function AniCorner({
       setHelloDay(contextRef.current.date);
       const c = contextRef.current;
       const hidden = document.documentElement.classList.contains('hide-numbers');
-      line = greeting(c.today, c.weather, new Date().getHours(), hidden);
+      line = {
+        ...greeting(c.today, c.weather, new Date().getHours(), hidden),
+        kind: new Date().getHours() < 12 ? 'brief' : 'hello',
+      };
     }
     if (navigator.userActivation?.hasBeenActive !== false) {
       answer.current(line);
@@ -776,6 +842,34 @@ export function AniCorner({
           </div>
         )
       ) : null}
+      {said && ani.here && !chat && saidKind ? (
+        <div className="ani-ask ani-kind" role="group" aria-label="About this kind of line">
+          <button
+            type="button"
+            onClick={() => {
+              snooze(saidKind);
+              engine.current?.hush();
+              setSaid(null);
+            }}
+          >
+            Потом
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              muteKind(saidKind);
+              mutedRef.current = [...new Set([...mutedRef.current, saidKind])];
+              engine.current?.hush();
+              setSaid(null);
+            }}
+          >
+            Не про это
+          </button>
+        </div>
+      ) : null}
+      {offersTurn && ani.here && !chat ? (
+        <AniOffers key={offersTurn} turn={offersTurn} onDone={() => setOffersTurn(null)} />
+      ) : null}
       <div
         ref={hitRef}
         className="ani-hit"
@@ -893,6 +987,10 @@ export function AniCorner({
             data-state={talk ?? undefined}
             disabled={!ready || !ani.here}
             onClick={() => (talk ? stopTalk() : void startTalking())}
+            // Holding to talk, a press on a call opens the mic and letting go sends.
+            onPointerDown={() => talk && holdToTalk() && talkRef.current?.press()}
+            onPointerUp={() => talkRef.current?.release()}
+            onPointerLeave={() => talkRef.current?.release()}
           >
             <MicIcon />
           </button>

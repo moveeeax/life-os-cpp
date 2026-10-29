@@ -67,6 +67,21 @@ public:
         });
     }
 
+    /// The other pending replies she drafted to the same chat in the same turn,
+    /// once the person picked @p id (tg_send only); how many went.
+    int cancel_sibling_drafts(const std::string& owner, const std::string& id) {
+        return Database::get().execute_write([&](auto& txn) {
+            return static_cast<int>(
+                txn.exec_params(
+                       "UPDATE ani_actions a SET status = 'cancelled' FROM ani_actions me WHERE me.id::text = $1 AND "
+                       "me.owner_id = $2::uuid AND me.kind = 'tg_send' AND a.turn_id = me.turn_id AND a.id <> me.id "
+                       "AND a.kind = 'tg_send' AND a.status = 'pending' AND a.request->>'path' = me.request->>'path'",
+                       id,
+                       owner)
+                    .affected_rows());
+        });
+    }
+
     enum class Answer { Done, NotPending, Expired, Missing };
 
     /// pending -> confirmed (when @p confirm) or cancelled, for the user's own action.

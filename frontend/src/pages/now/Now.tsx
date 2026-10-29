@@ -1,7 +1,9 @@
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router';
 
 import { useHabitsEnabled } from '@/hooks/useHabits';
+import { api } from '@/lib/api/client';
 import { useMe } from '@/hooks/useMe';
 import {
   useNowSettings,
@@ -36,6 +38,10 @@ import { useSoundPlayer } from './focus/useSoundPlayer';
 import { FocusLine } from './FocusLine';
 import { FocusPicker } from './FocusPicker';
 import { FocusStart } from './FocusStart';
+import { ModeCards } from './modes/ModeCards';
+import { Board } from './widgets/Board';
+import { useNowDay } from './ribbon/layout';
+import { Ribbon } from './ribbon/Ribbon';
 import './now.css';
 
 /** True while the window is at least this wide. */
@@ -99,6 +105,7 @@ function NowScreen() {
       ),
     ) % 24;
   const today = useToday(me?.id ?? null, date, tz);
+  const nowDay = useNowDay(date, tz);
   // The weekly review: by itself on Sunday from 10:00 (once), or from the account menu.
   const review = useWeeklyReview(date);
   const settings = useNowSettings(me?.id ?? null);
@@ -106,6 +113,16 @@ function NowScreen() {
   const habitsOn = useHabitsEnabled(Boolean(me));
   const [picking, setPicking] = useState(false);
   const session = useFocusSession(me?.id ?? null);
+  // While a session runs Ani keeps quiet; the page still counts what waits for her.
+  const aniWaiting = useQuery({
+    queryKey: ['ani', 'inbox', 'count'],
+    enabled: session.phase === 'running' || session.phase === 'paused',
+    refetchInterval: 15_000,
+    retry: false,
+    queryFn: async ({ signal }) =>
+      (await api.getJson<{ data: { waiting: number } }>('/api/v1/ani/inbox/count', { signal })).data
+        .waiting,
+  });
   // Her webhook or MCP can stop or replace a running focus session.
   const onAniFocus = (action: 'start' | 'stop', minutes?: number) =>
     action === 'start' && minutes ? session.start(minutes) : session.exit();
@@ -194,6 +211,18 @@ function NowScreen() {
             player.play();
           }}
         />
+        <Ribbon
+          date={date}
+          tz={tz}
+          now={now.getTime()}
+          focusFrom={session.startedAt}
+          onFocus={(m) => {
+            session.start(m, focus?.date ?? null);
+            player.play();
+          }}
+        />
+        <ModeCards now={now} date={date} today={data} day={nowDay.data} />
+        <Board widgets={settings.data?.widgets ?? []} today={data} date={date} tz={tz} />
         {today.isError && (
           <span className="n-note">
             {data ? 'Offline: showing the last answer' : 'Could not load the day'}
@@ -222,6 +251,7 @@ function NowScreen() {
             date,
             today: today.data,
             weather: weather.data ?? undefined,
+            day: nowDay.data,
           }}
           afterFocus={afterFocus}
           onAfterFocus={() => setAfterFocus(false)}
@@ -244,6 +274,7 @@ function NowScreen() {
       )}
       {session.phase !== 'idle' && (
         <FocusMode
+          waiting={aniWaiting.data ?? 0}
           phase={session.phase}
           left={session.left}
           focus={focus && focus.date === session.focusDate ? focus : null}

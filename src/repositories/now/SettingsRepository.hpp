@@ -24,7 +24,8 @@ public:
     nlohmann::json get(const std::string& owner) {
         return Database::get().execute_read([&](auto& txn) {
             auto r = txn.exec_params(
-                "SELECT row_to_json(t) FROM (SELECT city, country_code, latitude, longitude, timezone, corners, links "
+                "SELECT row_to_json(t) FROM (SELECT city, country_code, latitude, longitude, timezone, corners, links, "
+                "widgets "
                 "FROM now_settings WHERE owner_id = $1::uuid) t",
                 owner);
             nlohmann::json out = {{"city", nullptr},
@@ -33,12 +34,16 @@ public:
                                   {"longitude", nullptr},
                                   {"timezone", nullptr},
                                   {"corners", nullptr},
-                                  {"links", nullptr}};
+                                  {"links", nullptr},
+                                  {"widgets", nullptr}};
             if (!r.empty()) {
                 out = nlohmann::json::parse(r[0][0].template as<std::string>());
             }
             if (out["corners"].is_null()) {
                 out["corners"] = ::Now::Settings::default_corners();
+            }
+            if (out["widgets"].is_null()) {
+                out["widgets"] = nlohmann::json::array();
             }
             if (out["links"].is_null()) {
                 out["links"] = nlohmann::json::array();
@@ -74,6 +79,18 @@ public:
                 "ON CONFLICT (owner_id) DO UPDATE SET corners = EXCLUDED.corners",
                 owner,
                 corners.dump());
+            return true;
+        });
+    }
+
+    /// Stores a board already checked with Now::Settings::widgets_problem.
+    void put_widgets(const std::string& owner, const nlohmann::json& widgets) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params(
+                "INSERT INTO now_settings (owner_id, widgets) VALUES ($1::uuid, $2::jsonb) "
+                "ON CONFLICT (owner_id) DO UPDATE SET widgets = EXCLUDED.widgets",
+                owner,
+                widgets.dump());
             return true;
         });
     }

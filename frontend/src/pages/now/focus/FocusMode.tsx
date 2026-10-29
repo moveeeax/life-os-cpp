@@ -21,6 +21,8 @@ interface Props {
   onResume: () => void;
   onExit: () => void;
   onAgain: () => void;
+  /** Lines of Ani waiting until the session ends (she keeps quiet meanwhile). */
+  waiting?: number;
 }
 
 /**
@@ -37,6 +39,7 @@ export function FocusMode({
   onResume,
   onExit,
   onAgain,
+  waiting = 0,
 }: Props) {
   const [awake, setAwake] = useState(true);
   const timer = useRef<number | null>(null);
@@ -119,6 +122,11 @@ export function FocusMode({
             </div>
             {focus && <div className="f-text">{focus.text}</div>}
             {phase === 'paused' && <div className="f-paused">Paused</div>}
+            {waiting > 0 && (
+              <div className="f-waiting" title="Ani tells you after the session">
+                Ani · <span className="num">{waiting}</span> after this
+              </div>
+            )}
           </>
         )}
       </div>

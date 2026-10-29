@@ -132,12 +132,21 @@ std::vector<Incoming> addressed(
     return out;
 }
 
+long long waiting_since(const json& chat, const json& newest, long long now) {
+    if (chat.value("type", "") != "private" || !newest.is_object() || newest.value("is_outgoing", true)) {
+        return 0;
+    }
+    const long long date = newest.value("date", 0LL);
+    return date > 0 && date < now - 86400 ? date : 0;
+}
+
 std::string event_text(const std::vector<Incoming>& all) {
     std::string out;
     const std::size_t shown = std::min<std::size_t>(all.size(), kMessagesPerEvent);
     for (std::size_t i = 0; i < shown; ++i) {
         const auto& m = all[i];
-        std::string line = (m.chat_title.empty() ? "A chat" : m.chat_title) +
+        // The chat id goes with the name: a reply she proposes needs it.
+        std::string line = (m.chat_title.empty() ? "A chat" : m.chat_title) + " [chat " + m.chat_id + "]" +
                            (m.kind == "mention" ? " (mentions you): " : ": ") +
                            (m.text.empty() ? "[a message]" : cut(m.text, 300));
         out += (out.empty() ? "" : "\n") + line;
@@ -165,6 +174,7 @@ json process_poll(const json&) {
         return json{{"status", "failed"}, {"error", "chats"}};
     }
     const auto cursors = links.cursors(link->owner);
+    const auto quiet = links.quiet(link->owner);
     const long long since = now_unix() - kNewChatSeconds;
     std::vector<Incoming> found;
     int read = 0;
@@ -192,7 +202,8 @@ json process_poll(const json&) {
             continue;
         }
         const json messages = list_of(history);
-        if (link->primed) {
+        // A quiet chat moves its cursor but tells nothing.
+        if (link->primed && quiet.count(id) == 0) {
             const auto mine =
                 addressed(chat, messages, known == cursors.end() ? 0 : known->second, link->username, since);
             found.insert(found.end(), mine.begin(), mine.end());
@@ -200,6 +211,27 @@ json process_poll(const json&) {
         if (const long long top = newest(messages); top > 0) {
             links.set_cursor(link->owner, id, top);
         }
+    }
+    // Once an hour: the private chats whose newest message waits for the owner.
+    if (link->primed && !link->waiting_fresh) {
+        json waiting = json::array();
+        int looked = 0;
+        const long long now = now_unix();
+        for (const auto& chat : list_of(chats)) {
+            const std::string id = chat.value("id", std::string());
+            if (chat.value("type", "") != "private" || !::Telegram::valid_id(id) || quiet.count(id) > 0) {
+                continue;
+            }
+            if (++looked > kChatsPerPoll) {
+                break;
+            }
+            const auto top = ::Telegram::call(transport, *s, "GET", "/v1/chats/" + id + "/messages", {{"limit", "1"}});
+            const json list = top.ok() ? list_of(top) : json::array();
+            if (const long long at = list.empty() ? 0 : waiting_since(chat, list[0], now); at > 0) {
+                waiting.push_back({{"chat", id}, {"title", chat.value("title", std::string())}, {"since", at}});
+            }
+        }
+        links.set_waiting(link->owner, waiting);
     }
     links.polled(link->owner);
     if (found.empty()) {

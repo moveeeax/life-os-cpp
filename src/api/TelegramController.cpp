@@ -434,4 +434,99 @@ void TelegramController::search(const HttpRequestPtr& req, Callback&& callback) 
     callback(Response::ok(json{{"data", out}}));
 }
 
+void TelegramController::waiting(const HttpRequestPtr& req, Callback&& callback) {
+    API_REQUIRE_USER(req, callback, owner);
+    if (!served(owner, callback)) {
+        return;
+    }
+    callback(Response::ok(json{{"data", LinkRepository().waiting(owner)}}));
+}
+
+void TelegramController::quietList(const HttpRequestPtr& req, Callback&& callback) {
+    API_REQUIRE_USER(req, callback, owner);
+    if (!served(owner, callback)) {
+        return;
+    }
+    json out = json::array();
+    for (const auto& [chat, title] : LinkRepository().quiet(owner)) {
+        out.push_back({{"chat", chat}, {"title", title}});
+    }
+    callback(Response::ok(json{{"data", out}}));
+}
+
+void TelegramController::quietOn(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    API_REQUIRE_USER(req, callback, owner);
+    if (!served(owner, callback) || !ids_ok(id, callback)) {
+        return;
+    }
+    json body = json::object();
+    if (!req->body().empty() && !parse_object(req, body, callback)) {
+        return;
+    }
+    LinkRepository().set_quiet(owner, id, body.value("title", std::string()), true);
+    no_content(callback);
+}
+
+void TelegramController::quietOff(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    API_REQUIRE_USER(req, callback, owner);
+    if (!served(owner, callback) || !ids_ok(id, callback)) {
+        return;
+    }
+    LinkRepository().set_quiet(owner, id, "", false);
+    no_content(callback);
+}
+
+void TelegramController::settings(const HttpRequestPtr& req, Callback&& callback) {
+    API_REQUIRE_USER(req, callback, owner);
+    API_REFUSE_API_KEY(req, callback);
+    if (!served(owner, callback)) {
+        return;
+    }
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    const auto on = body.find("review_to_self");
+    if (on == body.end() || !on->is_boolean()) {
+        callback(ErrorResponse::bad_request("invalid_review_to_self", "review_to_self is true or false"));
+        return;
+    }
+    LinkRepository links;
+    links.set_review_to_self(owner, on->get<bool>());
+    callback(Response::ok(json{{"data", links.status(owner).value_or(json::object())}}));
+}
+
+void TelegramController::toSelf(const HttpRequestPtr& req, Callback&& callback) {
+    API_REQUIRE_USER(req, callback, owner);
+    const auto s = served(owner, callback);
+    if (!s) {
+        return;
+    }
+    json body;
+    if (!parse_object(req, body, callback)) {
+        return;
+    }
+    const auto text = text_field(body, callback);
+    if (!text) {
+        return;
+    }
+    LinkRepository links;
+    const auto link = links.of(owner);
+    // The weekly review goes once per ISO week and only with the switch on.
+    const std::string week = body.value("week", std::string()).substr(0, 10);
+    if (!week.empty() && !links.claim_review_week(owner, week)) {
+        callback(ErrorResponse::conflict("review_not_sent", "the switch is off, or this week's review went already"));
+        return;
+    }
+    // Saved Messages is the chat with oneself: its id is the account's own.
+    const auto r = Telegram::call(
+        Net::Http::transport(), *s, "POST", "/v1/chats/" + link->me_id + "/messages", {}, json{{"text", *text}});
+    if (!r.ok()) {
+        callback(refusal(r));
+        return;
+    }
+    Security::Audit::record(owner, "telegram.send", "telegram_chat", link->me_id, json{{"self", true}});
+    callback(Response::ok(json{{"data", json{{"sent", true}}}}));
+}
+
 }  // namespace Api
