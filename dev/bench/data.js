@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793270147381,
+  "lastUpdate": 1793270150885,
   "repoUrl": "https://github.com/moveeeax/life-os-cpp",
   "entries": {
     "Throughput": [
@@ -1101,6 +1101,63 @@ window.BENCHMARK_DATA = {
           {
             "name": "idle RSS",
             "value": 5.1,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Michael Tarassov",
+            "username": "moveeeax",
+            "email": "michael@tarassov.me"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "23b2b4c9eef39af5882d27f6c29c3d41be0a34c7",
+          "message": "Merge pull request #206 from moveeeax/release/1.50.0\n\nchore(release): 1.50.0, Travel and Ledger by year, API keys, UI fixes",
+          "timestamp": "2026-10-29T07:03:13Z",
+          "url": "https://github.com/moveeeax/life-os-cpp/commit/23b2b4c9eef39af5882d27f6c29c3d41be0a34c7"
+        },
+        "date": 1793270150558,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "healthz p50",
+            "value": 4.58,
+            "unit": "ms"
+          },
+          {
+            "name": "healthz p99",
+            "value": 20.23,
+            "unit": "ms"
+          },
+          {
+            "name": "jobs p50",
+            "value": 24.25,
+            "unit": "ms"
+          },
+          {
+            "name": "jobs p99",
+            "value": 49.5,
+            "unit": "ms"
+          },
+          {
+            "name": "runtime image size",
+            "value": 116.8,
+            "unit": "MB"
+          },
+          {
+            "name": "cold start to /ready",
+            "value": 968,
+            "unit": "ms"
+          },
+          {
+            "name": "idle RSS",
+            "value": 4.9,
             "unit": "MB"
           }
         ]
