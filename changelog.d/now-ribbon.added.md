@@ -1,1 +1,0 @@
-Now shows the day as a ribbon under the clock: calendar meetings, free time, tasks with a time, focus and workouts done, a line for now and the next meeting, and a tap on free time starts a focus or adds a focus block to the calendar.

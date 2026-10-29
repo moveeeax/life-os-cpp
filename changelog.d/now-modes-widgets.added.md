@@ -1,1 +1,0 @@
-Now fits the moment and your own board: cards for the morning, a flight day, the first days in a new country and the evening, and up to six widgets you put on it in Arrange (a graph of any series, the calendar week, habits, spending, Telegram, the next trip).
