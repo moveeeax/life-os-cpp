@@ -33,7 +33,8 @@ struct Settings {
 /// The settings; nullopt while the client id, secret or key is missing.
 std::optional<Settings> settings();
 
-inline constexpr const char* kScope = "https://www.googleapis.com/auth/calendar openid email";
+/// Events only: the site reads and changes events of the primary calendar, never calendars or sharing.
+inline constexpr const char* kScope = "https://www.googleapis.com/auth/calendar.events openid email";
 
 /// The consent URL for @p state (offline access, consent every time so a refresh token comes back).
 std::string auth_url(const Settings& s, const std::string& state);
