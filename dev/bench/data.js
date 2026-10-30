@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793270150885,
+  "lastUpdate": 1793356243280,
   "repoUrl": "https://github.com/moveeeax/life-os-cpp",
   "entries": {
     "Throughput": [
@@ -415,6 +415,38 @@ window.BENCHMARK_DATA = {
           {
             "name": "jobs req/s",
             "value": 8143.37,
+            "unit": "req/s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Michael Tarassov",
+            "username": "moveeeax",
+            "email": "michael@tarassov.me"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "41f9f72836c48e3f5050a45300df9fa77f5b10ed",
+          "message": "feat(ani): proposals in a thought bubble at her head (#216)",
+          "timestamp": "2026-10-30T10:15:45Z",
+          "url": "https://github.com/moveeeax/life-os-cpp/commit/41f9f72836c48e3f5050a45300df9fa77f5b10ed"
+        },
+        "date": 1793356242452,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "healthz req/s",
+            "value": 82335.27,
+            "unit": "req/s"
+          },
+          {
+            "name": "jobs req/s",
+            "value": 18032.1,
             "unit": "req/s"
           }
         ]
