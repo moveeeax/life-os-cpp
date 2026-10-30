@@ -678,9 +678,16 @@
   font-size: 13px;
 }
 
-/* "Later" and "Not about this" under one of her own lines: small, a step aside. */
-.ani-kind {
-  bottom: calc(var(--ani-ledge-h, 64px) + 52px);
+/* "Later" and "Not about this" for one of her own lines: small, just above
+   her speech bubble, so they never sit on the ledge. */
+.ani-ask.ani-kind {
+  position: fixed;
+  z-index: 21;
+  left: calc(var(--ani-hx, 110px) + 40px);
+  right: auto;
+  bottom: auto;
+  top: calc(var(--ani-hy, 50vh) - 96px);
+  gap: 6px;
 }
 .ani-kind button {
   padding: 3px 10px;
@@ -689,37 +696,167 @@
 }
 
 /* What her answer proposes: reply drafts as choices, changes with Yes and No. */
-.ani-offers {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: calc(var(--ani-ledge-h, 64px) + 12px);
-  z-index: 3;
+/* What she proposes: a thought bubble above her head (beside it when the
+   room under the nav is short), two puffs leading down to her. */
+.ani-think {
+  position: fixed;
+  z-index: 21;
+  left: calc(var(--ani-hx, 110px) + 20px);
+  bottom: calc(100vh - var(--ani-hy, 50vh) + 40px);
+  width: min(340px, calc(100vw - var(--ani-hx, 110px) - 40px));
+  max-height: calc(var(--ani-hy, 50vh) - 120px);
+  overflow-y: auto;
+  padding: 12px 13px;
+  border-radius: 20px;
+  border: 1px solid var(--g-glass-line);
+  background: rgb(14 18 32 / 0.84);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  color: var(--g-ink);
+  font-size: 13.5px;
+  line-height: 1.38;
   display: grid;
-  gap: 6px;
+  gap: 8px;
+  animation: ani-say-in 0.25s ease-out;
 }
-.ani-offer-row {
+.ani-think[data-beside] {
+  bottom: auto;
+  top: max(96px, calc(var(--ani-hy, 50vh) - 140px));
+  left: calc(var(--ani-hx, 110px) + 64px);
+  max-height: calc(100vh - 200px);
+}
+@media (max-width: 1100px) {
+  .ani-think {
+    width: min(260px, calc(100vw - var(--ani-hx, 110px) - 40px));
+  }
+}
+.ani-think-puffs {
+  position: fixed;
+  z-index: 21;
+  left: calc(var(--ani-hx, 110px) + 4px);
+  top: calc(var(--ani-hy, 50vh) - 34px);
+  pointer-events: none;
+}
+.ani-think-puffs i {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid var(--g-glass-line);
+  background: var(--g-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.ani-think-puffs i:first-child {
+  width: 9px;
+  height: 9px;
+  left: 0;
+  top: 18px;
+}
+.ani-think-puffs i:last-child {
+  width: 15px;
+  height: 15px;
+  left: 12px;
+  top: 0;
+}
+.ani-think-puffs[data-beside] {
+  top: calc(var(--ani-hy, 50vh) - 22px);
+  left: calc(var(--ani-hx, 110px) + 26px);
+}
+.ani-think-puffs[data-beside] i:last-child {
+  left: 20px;
+  top: -6px;
+}
+.ani-think-line {
+  margin: 0;
+  font-size: 14px;
+}
+.ani-think-drafts {
+  display: grid;
+  gap: 5px;
+}
+.ani-think-draft {
+  display: grid;
+  grid-template-columns: 1fr 16px;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: rgb(255 255 255 / 0.07);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ani-think-draft svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: rgb(255 255 255 / 0.55);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ani-think-draft:hover,
+.ani-think-draft:focus-visible {
+  background: rgb(255 255 255 / 0.13);
+  border-color: rgb(240 169 147 / 0.5);
+}
+.ani-think-draft:hover svg,
+.ani-think-draft:focus-visible svg {
+  stroke: #f0a993;
+}
+.ani-think-draft:disabled {
+  opacity: 0.5;
+}
+.ani-think-sent {
+  bottom: calc(100vh - var(--ani-hy, 50vh) + 40px);
+  width: auto;
+  max-width: 260px;
+}
+.ani-think-puff {
+  position: fixed;
+  z-index: 21;
+  left: calc(var(--ani-hx, 110px) - 8px);
+  top: calc(var(--ani-hy, 50vh) - 104px);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid #f0a993;
+  background: #f0a993;
+  color: #1a1020;
+  font: 600 14px/1 inherit;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.25);
+  animation: ani-say-in 0.25s ease-out;
+}
+.ani-think .ani-offer-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
-.ani-offers button {
-  padding: 5px 11px;
+.ani-think .ani-offer-row button {
+  padding: 4px 11px;
   border-radius: 999px;
-  background: rgb(15 18 30 / 0.62);
-  backdrop-filter: blur(14px);
-  border: 1px solid rgb(255 255 255 / 0.18);
-  color: #fff;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  color: inherit;
+  font: inherit;
   font-size: 12.5px;
-  text-align: left;
+  cursor: pointer;
 }
-.ani-offers button.ani-offer-main {
+.ani-think .ani-offer-row button.ani-offer-main {
   background: #f0a993;
   border-color: #f0a993;
   color: #1a1020;
 }
-.ani-offers button:disabled {
+.ani-think .ani-offer-row button.ani-think-later {
+  border-color: transparent;
+  opacity: 0.75;
+}
+.ani-think .ani-offer-row button:disabled {
   opacity: 0.5;
 }
 .ani-offer-text {

@@ -68,4 +68,34 @@ describe('AniOffers', () => {
     render(<AniOffers turn="t1" onDone={done} />);
     await waitFor(() => expect(done).toHaveBeenCalled());
   });
+
+  it('ThoughtBubble: her line on top, Later folds into the chat letter, a tap opens it again', async () => {
+    turnWith([act('a', 'tg_send', 'Send to Анна: «Ок»', 'Ок')]);
+    render(<AniOffers turn="t1" line="Анна спрашивает про Mailcow" onDone={() => {}} />);
+    expect(await screen.findByText('Анна спрашивает про Mailcow')).toBeTruthy();
+    fireEvent.click(screen.getByText('Later'));
+    expect(screen.queryByText('Ок')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Reply to Анна' }));
+    expect(await screen.findByText('Ок')).toBeTruthy();
+  });
+
+  it('own reply starts empty, and a sent reply says where it went', async () => {
+    const done = vi.fn();
+    turnWith([act('a', 'tg_send', 'Send to Анна: «Ок»', 'Ок')]);
+    render(<AniOffers turn="t1" onDone={done} />);
+    fireEvent.click(await screen.findByText('Own reply…'));
+    expect((screen.getByLabelText('The message') as HTMLTextAreaElement).value).toBe('');
+    fireEvent.click(screen.getByText('Back'));
+    fireEvent.click(screen.getByText('Ок'));
+    expect(await screen.findByText('Sent to Анна')).toBeTruthy();
+    await waitFor(() => expect(done).toHaveBeenCalled(), { timeout: 3000 });
+  });
+
+  it('folds while she says another line, unless the person is writing', async () => {
+    turnWith([act('a', 'tg_send', 'Send to Анна: «Ок»', 'Ок')]);
+    const { rerender } = render(<AniOffers turn="t1" onDone={() => {}} hushed />);
+    expect(await screen.findByRole('button', { name: 'Reply to Анна' })).toBeTruthy();
+    rerender(<AniOffers turn="t1" onDone={() => {}} hushed={false} />);
+    expect(await screen.findByText('Ок')).toBeTruthy();
+  });
 });

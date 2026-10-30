@@ -193,3 +193,9 @@ export async function askAgent(
   }
   return t;
 }
+
+/** The chat a Telegram proposal is for, from its summary ("Send to Анна: «…»"); null for other kinds. */
+export function chatOf(summary: string): string | null {
+  const m = /^Send to (.+?): «/.exec(summary) ?? /^Edit your message in (.+?) to «/.exec(summary);
+  return m ? m[1] : null;
+}

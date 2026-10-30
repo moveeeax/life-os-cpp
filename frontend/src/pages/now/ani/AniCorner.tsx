@@ -335,6 +335,9 @@ export function AniCorner({
   // The kind of the line on screen ("Later", "Not about this") and the turn whose proposals show.
   const [saidKind, setSaidKind] = useState<LineKind | null>(null);
   const [offersTurn, setOffersTurn] = useState<string | null>(null);
+  // The line that brought the proposals stays in their bubble; writing an own reply keeps it open.
+  const [offerLine, setOfferLine] = useState<string | null>(null);
+  const [writing, setWriting] = useState(false);
   const mutedRef = useRef<string[]>([]);
   mutedRef.current = prefs.data?.muted ?? [];
   const muteKind = useMuteKind();
@@ -361,7 +364,10 @@ export function AniCorner({
       setSaidChat(Boolean(a.chat));
       setSaid(a.text);
       setSaidKind(a.kind ?? null);
-      if (a.turn) setOffersTurn(a.turn);
+      if (a.turn) {
+        setOffersTurn(a.turn);
+        setOfferLine(a.text);
+      }
       // A line about an event of the day lights it on the ribbon.
       const ev = eventOfLine(a.text, contextRef.current.day, contextRef.current.tz);
       if (ev) window.dispatchEvent(new CustomEvent(RIBBON_POINT, { detail: ev }));
@@ -821,7 +827,7 @@ export function AniCorner({
   return (
     <div ref={cornerRef} className="ani-corner" data-ready={ready ? '' : undefined}>
       <canvas ref={canvasRef} className="ani-canvas" aria-hidden="true" />
-      {said && ani.here && !chat ? (
+      {said && ani.here && !chat && !(offersTurn && (said === offerLine || writing)) ? (
         saidChat ? (
           <button
             type="button"
@@ -842,7 +848,7 @@ export function AniCorner({
           </div>
         )
       ) : null}
-      {said && ani.here && !chat && saidKind ? (
+      {said && ani.here && !chat && saidKind && !(offersTurn && said === offerLine) ? (
         <div className="ani-ask ani-kind" role="group" aria-label="About this kind of line">
           <button
             type="button"
@@ -868,7 +874,18 @@ export function AniCorner({
         </div>
       ) : null}
       {offersTurn && ani.here && !chat ? (
-        <AniOffers key={offersTurn} turn={offersTurn} onDone={() => setOffersTurn(null)} />
+        <AniOffers
+          key={offersTurn}
+          turn={offersTurn}
+          line={offerLine}
+          hushed={said !== null && said !== offerLine}
+          onWriting={setWriting}
+          onDone={() => {
+            setOffersTurn(null);
+            setOfferLine(null);
+            setWriting(false);
+          }}
+        />
       ) : null}
       <div
         ref={hitRef}
