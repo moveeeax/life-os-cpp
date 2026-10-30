@@ -6,6 +6,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.52.3] - 2026-10-30
+
+### Changed
+- Ani's proposals sit in a thought bubble at her head with the line that brought them: Telegram reply drafts in full with a send arrow, an empty field for an own reply, Later folds the bubble into a puff with the chat's letter, and a sent reply says where it went; her other lines fold it while she speaks. Later and Not about this for her other lines moved above her speech bubble, off the corner cards.
+
 ## [1.52.2] - 2026-10-30
 
 ### Changed
