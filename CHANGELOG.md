@@ -6,6 +6,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.52.2] - 2026-10-30
+
+### Changed
+- The About page is the public home page of Life OS: what it does, what it does with Google Calendar, links to the privacy policy and to sign in, and a plain-HTML summary for crawlers without JavaScript; the footer links it.
+
 ## [1.52.1] - 2026-10-30
 
 ### Fixed
