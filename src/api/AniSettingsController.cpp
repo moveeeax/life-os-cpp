@@ -124,7 +124,8 @@ void AniSettingsController::savePrefs(const HttpRequestPtr& req, Callback&& call
 namespace {
 
 std::optional<std::string> fact_text(const json& body, const AniSettingsController::Callback& callback) {
-    const std::string text = body.value("text", std::string());
+    const std::string text =
+        body.contains("text") && body["text"].is_string() ? body["text"].get<std::string>() : std::string();
     std::size_t n = 0;
     for (const unsigned char c : text) {
         n += (c & 0xC0) != 0x80 ? 1 : 0;

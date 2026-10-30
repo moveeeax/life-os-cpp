@@ -87,6 +87,28 @@ public:
     /// pending -> confirmed (when @p confirm) or cancelled, for the user's own action.
     Answer answer(const std::string& owner, const std::string& id, bool confirm) {
         return Database::get().execute_write([&](auto& txn) {
+            // Reply drafts of one turn to one chat: one of them goes. The drafts are locked in id order
+            // so two confirms at once (two tabs, the page and Telegram) take turns, and the second sees
+            // the first.
+            if (confirm) {
+                auto me = txn.exec_params(
+                    "SELECT turn_id::text, request->>'path' FROM ani_actions WHERE id::text = $1 AND owner_id = "
+                    "$2::uuid AND kind = 'tg_send'",
+                    id,
+                    owner);
+                if (!me.empty() && !me[0][0].is_null()) {
+                    auto drafts = txn.exec_params(
+                        "SELECT id::text, status FROM ani_actions WHERE turn_id::text = $1 AND kind = 'tg_send' AND "
+                        "request->>'path' IS NOT DISTINCT FROM $2 ORDER BY id FOR UPDATE",
+                        me[0][0].template as<std::string>(),
+                        me[0][1].is_null() ? std::optional<std::string>() : me[0][1].template as<std::string>());
+                    for (const auto& d : drafts) {
+                        if (d[0].template as<std::string>() != id && d[1].template as<std::string>() == "confirmed") {
+                            return Answer::NotPending;
+                        }
+                    }
+                }
+            }
             auto r = txn.exec_params(
                 "WITH a AS (SELECT status, created_at > now() - make_interval(secs => $4) AS fresh FROM ani_actions "
                 "WHERE id::text = $1 AND owner_id = $2::uuid), "

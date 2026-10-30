@@ -216,6 +216,7 @@ json process_poll(const json&) {
     if (link->primed && !link->waiting_fresh) {
         json waiting = json::array();
         int looked = 0;
+        int answered = 0;
         const long long now = now_unix();
         for (const auto& chat : list_of(chats)) {
             const std::string id = chat.value("id", std::string());
@@ -226,12 +227,16 @@ json process_poll(const json&) {
                 break;
             }
             const auto top = ::Telegram::call(transport, *s, "GET", "/v1/chats/" + id + "/messages", {{"limit", "1"}});
+            answered += top.ok() ? 1 : 0;
             const json list = top.ok() ? list_of(top) : json::array();
             if (const long long at = list.empty() ? 0 : waiting_since(chat, list[0], now); at > 0) {
                 waiting.push_back({{"chat", id}, {"title", chat.value("title", std::string())}, {"since", at}});
             }
         }
-        links.set_waiting(link->owner, waiting);
+        // A Telegram outage keeps the last set instead of emptying it for an hour.
+        if (answered > 0 || looked == 0) {
+            links.set_waiting(link->owner, waiting);
+        }
     }
     links.polled(link->owner);
     if (found.empty()) {

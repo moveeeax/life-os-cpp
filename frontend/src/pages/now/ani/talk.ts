@@ -12,6 +12,14 @@ import { api } from '@/lib/api/client';
 
 export type TalkState = 'connecting' | 'listening' | 'hearing' | 'thinking' | 'speaking';
 
+/** A press shorter than this is a tap: nothing was said, so nothing is sent. */
+export const HOLD_MIN_MS = 300;
+
+/** Whether a hold from @p pressedAt to @p releasedAt carried speech worth sending. */
+export function heldLongEnough(pressedAt: number, releasedAt: number): boolean {
+  return releasedAt - pressedAt >= HOLD_MIN_MS;
+}
+
 export interface Tool {
   name: string;
   description: string;
@@ -66,6 +74,7 @@ export async function startTalk(o: TalkOptions): Promise<Talk> {
   let mic: MediaStream | null = null;
   let stopped = false;
   let holding = false;
+  let pressedAt = 0;
   let listenRef: (on: boolean) => void = () => {};
   let quiet = 0;
   let tail = 0;
@@ -269,6 +278,7 @@ export async function startTalk(o: TalkOptions): Promise<Talk> {
     press: () => {
       if (!o.hold || holding) return;
       holding = true;
+      pressedAt = Date.now();
       // Talking over her cuts her off, as on a phone.
       send({ type: 'response.cancel' });
       send({ type: 'output_audio_buffer.clear' });
@@ -280,6 +290,11 @@ export async function startTalk(o: TalkOptions): Promise<Talk> {
       if (!o.hold || !holding) return;
       holding = false;
       listenRef(false);
+      // A quick tap has an empty buffer, and Realtime answers an empty commit with an error.
+      if (!heldLongEnough(pressedAt, Date.now())) {
+        send({ type: 'input_audio_buffer.clear' });
+        return;
+      }
       send({ type: 'input_audio_buffer.commit' });
       send({ type: 'response.create' });
     },

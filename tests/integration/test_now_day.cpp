@@ -5,6 +5,7 @@
  *        no end), tasks with a time on that day, in the person's zone.
  */
 
+#include <optional>
 #include <string>
 
 #include <gtest/gtest.h>
@@ -13,6 +14,7 @@
 
 #include "database/Database.hpp"
 #include "repositories/now/DayRepository.hpp"
+#include "repositories/tasks/TaskRepository.hpp"
 #include "test_helpers.hpp"
 
 namespace {
@@ -77,6 +79,36 @@ TEST_F(NowDay, RibbonOpenEnds) {
 TEST_F(NowDay, FocusSessionValidates) {
     EXPECT_ANY_THROW(day.add_focus(kAnna, "2026-10-29T04:00:00Z", "2026-10-29T03:30:00Z", 30, ""));
     EXPECT_ANY_THROW(day.add_focus(kAnna, "2026-10-29T03:00:00Z", "2026-10-29T08:00:00Z", 300, ""));
+}
+
+TEST_F(NowDay, FocusSessionOnceFromTwoTabs) {
+    const auto a = day.add_focus(kAnna, "2026-10-29T03:00:00Z", "2026-10-29T03:25:00Z", 25, "");
+    const auto b = day.add_focus(kAnna, "2026-10-29T03:00:00Z", "2026-10-29T03:25:00Z", 25, "");
+    EXPECT_EQ(a, b);
+    const auto n = Database::get().execute_read([](auto& txn) {
+        return txn.exec("SELECT count(*) FROM focus_sessions WHERE started_at = '2026-10-29T03:00:00Z'")[0][0]
+            .template as<int>();
+    });
+    EXPECT_EQ(n, 1);
+}
+
+TEST_F(NowDay, NoTimeOnATaskWithoutADay) {
+    const std::string id = Database::get().execute_write([](auto& txn) {
+        return txn
+            .exec_params(
+                "INSERT INTO task_items (owner_id, title, area) VALUES ($1::uuid, 'Undated', 'finance') RETURNING "
+                "id::text",
+                std::string(kAnna))[0][0]
+            .template as<std::string>();
+    });
+    Repositories::Tasks::TaskRepository::Patch p;
+    p.due_time = std::optional<std::string>("10:00");
+    Repositories::Tasks::TaskRepository().update(kAnna, id, p);
+    const bool none = Database::get().execute_read([&](auto& txn) {
+        return txn.exec_params("SELECT due_time IS NULL FROM task_items WHERE id = $1::uuid", id)[0][0]
+            .template as<bool>();
+    });
+    EXPECT_TRUE(none) << "a time alone does not stick to a task without a day";
 }
 
 TEST_F(NowDay, TaskTimeGoesWithItsDay) {

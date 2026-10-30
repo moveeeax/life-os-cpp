@@ -16426,7 +16426,7 @@ export interface paths {
         };
         /**
          * Free slots of a day
-         * @description Between 08:00 and 22:00 local, around busy events (all-day and free events do not block).
+         * @description Between 08:00 and 22:00 local and not before now, around busy events (free events and birthdays do not block).
          */
         get: {
             parameters: {

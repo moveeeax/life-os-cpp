@@ -56,3 +56,13 @@ export function minutesUntil(time: string | null | undefined, now: Date): number
   const [h, m] = time.split(':').map(Number);
   return h * 60 + m - (now.getHours() * 60 + now.getMinutes());
 }
+
+/** The hour (0-23) of @p now on the clock of @p tz, the profile's zone rather than the browser's. */
+export function hourIn(now: Date, tz: string): number {
+  const h = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    hourCycle: 'h23',
+    timeZone: tz,
+  }).format(now);
+  return Number(h) % 24;
+}

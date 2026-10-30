@@ -22,6 +22,8 @@ namespace {
 
 struct Cached {
     std::string token;
+    /// The sealed refresh token it came from: a link replaced or removed on another replica no longer matches.
+    std::string sealed;
     std::chrono::steady_clock::time_point until;
 };
 
@@ -47,20 +49,21 @@ std::variant<std::string, Problem> access(Net::Http::Transport& t, const std::st
     if (!s) {
         return Problem{404, "calendar_not_configured"};
     }
+    // The link is read every time (one row): the cache is per process, and a Disconnect or a new
+    // Connect may have gone through another replica.
+    Repositories::Calendar::LinkRepository links;
+    const auto link = links.get(owner);
+    if (!link || link->broken) {
+        forget(owner);
+        return link ? Problem{409, "calendar_disconnected"} : Problem{404, "calendar_not_linked"};
+    }
     {
         std::lock_guard<std::mutex> g(lock());
         const auto it = cache().find(owner);
-        if (it != cache().end() && it->second.until > std::chrono::steady_clock::now()) {
+        if (it != cache().end() && it->second.sealed == link->sealed &&
+            it->second.until > std::chrono::steady_clock::now()) {
             return it->second.token;
         }
-    }
-    Repositories::Calendar::LinkRepository links;
-    const auto link = links.get(owner);
-    if (!link) {
-        return Problem{404, "calendar_not_linked"};
-    }
-    if (link->broken) {
-        return Problem{409, "calendar_disconnected"};
     }
     std::string refresh_token;
     try {
@@ -82,7 +85,8 @@ std::variant<std::string, Problem> access(Net::Http::Transport& t, const std::st
     }
     const long long life = tokens.expires_in > 120 ? tokens.expires_in - 60 : 60;
     std::lock_guard<std::mutex> g(lock());
-    cache()[owner] = Cached{tokens.access_token, std::chrono::steady_clock::now() + std::chrono::seconds(life)};
+    cache()[owner] =
+        Cached{tokens.access_token, link->sealed, std::chrono::steady_clock::now() + std::chrono::seconds(life)};
     return tokens.access_token;
 }
 

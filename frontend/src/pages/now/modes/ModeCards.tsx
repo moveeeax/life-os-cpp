@@ -8,8 +8,8 @@ import type { Today } from '@/lib/now/types';
 import { CURRENCY_OF } from '@/lib/now/currency';
 import { countryName } from '@/lib/travel';
 
-import type { NowDay } from '../ribbon/layout';
-import { MODE_KEY, arrival, flightsToday, minutesUntil, modeOf, type Mode } from './modes';
+import { hhmm, type NowDay } from '../ribbon/layout';
+import { MODE_KEY, arrival, flightsToday, hourIn, minutesUntil, modeOf, type Mode } from './modes';
 import './modes.css';
 
 function readPin(): string | null {
@@ -43,9 +43,11 @@ export function ModeCards({
   date,
   today,
   day,
+  tz,
 }: {
   now: Date;
   date: string;
+  tz: string;
   today: Today | undefined;
   day: NowDay | undefined;
 }) {
@@ -80,7 +82,7 @@ export function ModeCards({
         .data,
   });
 
-  const mode: Mode | null = modeOf(now.getHours(), flights.length > 0, !!arrived, pin);
+  const mode: Mode | null = modeOf(hourIn(now, tz), flights.length > 0, !!arrived, pin);
   if (!mode) return null;
   const hide = () => {
     try {
@@ -92,7 +94,7 @@ export function ModeCards({
   };
   const nowMs = now.getTime();
   const firstEvent = (day?.events ?? []).find((e) => !e.all_day && Date.parse(e.end) > nowMs);
-  const at = (iso: string) => new Date(iso).toTimeString().slice(0, 5);
+  const at = (iso: string) => hhmm(Date.parse(iso), tz);
   const tasks = today?.tasks?.today ?? [];
   const done = tasks.filter((t) => t.status === 'done').length;
   let cards: React.ReactNode[] = [];
@@ -142,7 +144,7 @@ export function ModeCards({
       <Card
         key="w"
         k={countryName(arrived.to_country)}
-        v={<span className="num">{now.toTimeString().slice(0, 5)}</span>}
+        v={<span className="num">{hhmm(now.getTime(), tz)}</span>}
         s={`since ${arrived.date}${arrived.from_country ? `, from ${countryName(arrived.from_country)}` : ''}`}
       />,
       <Card

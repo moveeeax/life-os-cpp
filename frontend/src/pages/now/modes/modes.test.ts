@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { arrival, flightsToday, minutesUntil, modeOf } from './modes';
+import { arrival, flightsToday, hourIn, minutesUntil, modeOf } from './modes';
 
 describe('modes', () => {
   it('ModeOfEachSituation', () => {
@@ -29,5 +29,14 @@ describe('modes', () => {
     expect(arrival(crossings, '2026-10-26')?.to_country).toBe('UZ');
     expect(arrival(crossings, '2026-10-29')).toBeNull();
     expect(minutesUntil('06:05', new Date('2026-11-20T05:10:00'))).toBe(55);
+  });
+});
+
+describe('hourIn', () => {
+  it('ModeInTheProfileZone: the hour of the profile zone, not the browser', () => {
+    const at = new Date('2026-10-30T05:30:00Z');
+    expect(hourIn(at, 'Asia/Tashkent')).toBe(10);
+    expect(hourIn(at, 'America/New_York')).toBe(1);
+    expect(hourIn(new Date('2026-10-30T19:00:00Z'), 'Asia/Tashkent')).toBe(0);
   });
 });
