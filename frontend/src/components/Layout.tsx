@@ -28,6 +28,9 @@ export function Layout() {
         </Suspense>
       </main>
       <footer className="container mx-auto flex gap-4 py-6 text-xs text-muted-foreground">
+        <Link to="/about" className="hover:underline">
+          About
+        </Link>
         <Link to="/privacy" className="hover:underline">
           Privacy
         </Link>
