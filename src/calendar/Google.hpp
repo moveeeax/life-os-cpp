@@ -61,7 +61,7 @@ struct Event {
     long long start = 0;
     long long end = 0;
     bool all_day = false;
-    /// Free time per Google (transparency "transparent"), or an all-day event.
+    /// Free time per Google (transparency "transparent"), or a birthday.
     bool free = false;
     std::string location;
     /// The start and end as Google wrote them (dateTime with offset, or a date).

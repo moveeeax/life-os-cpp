@@ -230,7 +230,8 @@ std::vector<Event> parse_events(const json& list, const std::function<long long(
             e.end_text = end.value("dateTime", "");
         } else if (start.contains("date")) {
             e.all_day = true;
-            e.free = true;
+            // Busy unless Google says free; a birthday never blocks a day.
+            e.free = e.free || item.value("eventType", "") == "birthday";
             e.start_text = start.value("date", "");
             e.end_text = end.value("date", e.start_text);
             e.start = day_start ? day_start(e.start_text) : 0;

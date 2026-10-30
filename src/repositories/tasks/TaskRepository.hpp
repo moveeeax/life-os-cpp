@@ -165,8 +165,8 @@ public:
             " project_id = CASE WHEN $22::boolean THEN $23::uuid ELSE project_id END, "
             " repeat = CASE WHEN $24::boolean THEN $25::jsonb ELSE repeat END, "
             " deal_id = CASE WHEN $26::boolean THEN $27::uuid ELSE deal_id END, "
-            // A time without a day means nothing: clearing the day clears it.
-            " due_time = CASE WHEN $7::boolean AND $8::date IS NULL THEN NULL "
+            // A time without a day means nothing: no day after the patch, no time.
+            " due_time = CASE WHEN (CASE WHEN $7::boolean THEN $8::date ELSE due END) IS NULL THEN NULL "
             "   WHEN $28::boolean THEN $29::time ELSE due_time END "
             "WHERE owner_id = $1::uuid AND id = $2::uuid RETURNING id",
             owner,

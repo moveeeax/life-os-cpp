@@ -244,6 +244,8 @@ TEST_F(TelegramPollDb, SelfOncePerWeek) {
     EXPECT_TRUE(links.claim_review_week(kAnna, "2026-W44"));
     EXPECT_FALSE(links.claim_review_week(kAnna, "2026-W44")) << "once per week";
     EXPECT_TRUE(links.claim_review_week(kAnna, "2026-W45"));
+    links.release_review_week(kAnna, "2026-W45");
+    EXPECT_TRUE(links.claim_review_week(kAnna, "2026-W45")) << "a refused send gives the week back";
 }
 
 TEST_F(TelegramPollDb, ConfirmCancelsSiblingDrafts) {
@@ -267,4 +269,28 @@ TEST_F(TelegramPollDb, ConfirmCancelsSiblingDrafts) {
     EXPECT_EQ((*actions.get(kAnna, b))["status"], "cancelled");
     EXPECT_EQ((*actions.get(kAnna, other))["status"], "pending") << "another chat keeps its draft";
     EXPECT_EQ(actions.cancel_sibling_drafts("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbb7e1e", other), 0) << "not theirs";
+}
+
+TEST_F(TelegramPollDb, OneDraftPerChatGoesEvenWithTwoConfirms) {
+    // Two confirms at once: the second comes before the first one's siblings are cancelled.
+    Repositories::Agent::TurnRepository turns;
+    const std::string turn = (*turns.open(kAnna, "event", "UTC"))["id"].get<std::string>();
+    Repositories::Agent::ActionRepository actions;
+    auto draft = [&](const std::string& chat, const std::string& text) {
+        return actions.add(kAnna,
+                           turn,
+                           "tg_send",
+                           "Send to X: «" + text + "»",
+                           json{{"method", "POST"},
+                                {"path", "/api/v1/telegram/chats/" + chat + "/messages"},
+                                {"body", {{"text", text}}}});
+    };
+    const std::string a = draft("10", "Да");
+    const std::string b = draft("10", "Нет");
+    const std::string other = draft("20", "Ок");
+    using Answer = Repositories::Agent::ActionRepository::Answer;
+    ASSERT_EQ(actions.answer(kAnna, a, /*confirm=*/true), Answer::Done);
+    EXPECT_EQ(actions.answer(kAnna, b, /*confirm=*/true), Answer::NotPending) << "a sibling went already";
+    EXPECT_EQ((*actions.get(kAnna, b))["status"], "pending") << "left for cancel_sibling_drafts";
+    EXPECT_EQ(actions.answer(kAnna, other, /*confirm=*/true), Answer::Done) << "another chat is its own";
 }

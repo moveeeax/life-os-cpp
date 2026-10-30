@@ -139,6 +139,19 @@ TEST_F(CalendarLink, ConnectStoresSealedToken) {
     EXPECT_EQ(google.refreshes, 1) << "the access token is kept in memory";
 }
 
+TEST_F(CalendarLink, ALinkChangedElsewhereIsNotServedFromTheCache) {
+    // Another replica disconnects or connects again; this one's cache must not outlive it.
+    linked();
+    ASSERT_TRUE(std::holds_alternative<std::string>(Calendar::access(google, kAnna)));
+    links.remove(kAnna);
+    auto gone = Calendar::access(google, kAnna);
+    ASSERT_TRUE(std::holds_alternative<Calendar::Problem>(gone));
+    EXPECT_EQ(std::get<Calendar::Problem>(gone).code, "calendar_not_linked");
+    linked();
+    ASSERT_TRUE(std::holds_alternative<std::string>(Calendar::access(google, kAnna)));
+    EXPECT_EQ(google.refreshes, 2) << "a new link gets a new access token";
+}
+
 TEST_F(CalendarLink, RefreshRefusedMarksBroken) {
     linked();
     google.refuse = true;

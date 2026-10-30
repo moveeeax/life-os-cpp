@@ -36,6 +36,8 @@ export function AniOffers({
   // The corner passes new callbacks on every render; the timers keep the latest.
   const done = useRef(onDone);
   done.current = onDone;
+  const left = useRef(0);
+  left.current = actions?.length ?? 0;
   useEffect(() => {
     let live = true;
     readTurn(turn)
@@ -50,7 +52,11 @@ export function AniOffers({
   }, [actions, sent]);
   useEffect(() => {
     if (!sent) return;
-    const t = window.setTimeout(() => done.current(), SENT_MS);
+    // Drafts to another chat of the same turn come back after "Sent"; with none left the bubble goes.
+    const t = window.setTimeout(() => {
+      if (left.current > 0) setSent(null);
+      else done.current();
+    }, SENT_MS);
     return () => clearTimeout(t);
   }, [sent]);
   useEffect(() => onWriting?.(editing !== null), [editing, onWriting]);
@@ -87,8 +93,13 @@ export function AniOffers({
     run(async () => {
       await (text === undefined ? confirmAction(a.id) : confirmAction(a.id, text));
       // A reply was picked: the other drafts to that chat are gone on the server too.
+      const chatOfA = a.kind === 'tg_send' ? chatOf(a.summary) : null;
       setActions((all) =>
-        (all ?? []).filter((x) => x.id !== a.id && !(a.kind === 'tg_send' && x.kind === 'tg_send')),
+        (all ?? []).filter(
+          (x) =>
+            x.id !== a.id &&
+            !(a.kind === 'tg_send' && x.kind === 'tg_send' && chatOf(x.summary) === chatOfA),
+        ),
       );
       setEditing(null);
       if (a.kind === 'tg_send') setSent(chatOf(a.summary) ?? 'the chat');

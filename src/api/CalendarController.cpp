@@ -6,6 +6,7 @@
 #include "api/CalendarController.hpp"
 
 #include <algorithm>
+#include <ctime>
 #include <exception>
 #include <optional>
 #include <regex>
@@ -63,8 +64,11 @@ bool event_id_ok(const std::string& id) {
 /// {start, end} of a body as RFC 3339 instants, end after start, at most 24 hours; a 400 otherwise.
 std::optional<std::pair<std::string, std::string>> span_of(const json& body,
                                                            const CalendarController::Callback& callback) {
-    const std::string start = body.value("start", std::string());
-    const std::string end = body.value("end", std::string());
+    const auto text = [&](const char* k) {
+        return body.contains(k) && body[k].is_string() ? body[k].get<std::string>() : std::string();
+    };
+    const std::string start = text("start");
+    const std::string end = text("end");
     const auto a = Calendar::parse_time(start);
     const auto b = Calendar::parse_time(end);
     if (!a || !b || *b <= *a || *b - *a > 24 * 3600) {
@@ -247,7 +251,8 @@ void CalendarController::freeSlots(const HttpRequestPtr& req, Callback&& callbac
     const std::string tz = tz_of(req);
     try {
         LinkRepository links;
-        const long long a = links.local_instant(date, 8, tz);
+        // Time already gone today is not free; a past day has none.
+        const long long a = std::max(links.local_instant(date, 8, tz), static_cast<long long>(std::time(nullptr)));
         const long long b = links.local_instant(date, 22, tz);
         auto out = Calendar::events(Net::Http::transport(), owner, a, b, tz);
         if (auto* p = std::get_if<Calendar::Problem>(&out)) {
@@ -267,37 +272,42 @@ void CalendarController::freeSlots(const HttpRequestPtr& req, Callback&& callbac
 
 void CalendarController::add(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
-    json body;
-    if (!parse_object(req, body, callback)) {
-        return;
+    try {
+        json body;
+        if (!parse_object(req, body, callback)) {
+            return;
+        }
+        const std::string title = body.value("title", std::string());
+        if (title.empty() || title.size() > 300) {
+            callback(ErrorResponse::bad_request("invalid_title", "title is 1 to 300 characters"));
+            return;
+        }
+        const auto span = span_of(body, callback);
+        if (!span) {
+            return;
+        }
+        auto token = Calendar::access(Net::Http::transport(), owner);
+        if (auto* p = std::get_if<Calendar::Problem>(&token)) {
+            callback(problem(*p));
+            return;
+        }
+        json event{{"summary", title}, {"start", {{"dateTime", span->first}}}, {"end", {{"dateTime", span->second}}}};
+        if (body.value("description", json()).is_string()) {
+            event["description"] = body["description"].get<std::string>().substr(0, 2000);
+        }
+        const auto r = Calendar::api(
+            Net::Http::transport(), std::get<std::string>(token), "POST", "/calendars/primary/events", {}, event);
+        if (!r.ok() || !r.body.is_object()) {
+            callback(ErrorResponse::make({drogon::k502BadGateway, "calendar_unavailable", "Google did not take it"}));
+            return;
+        }
+        Security::Audit::record(owner, "calendar.add", "calendar_event", r.body.value("id", std::string()));
+        const auto parsed = Calendar::parse_events(json{{"items", json::array({r.body})}}, nullptr);
+        callback(Response::created(json{{"data", parsed.empty() ? json::object() : Calendar::event_view(parsed[0])}}));
+    } catch (const std::exception& e) {
+        spdlog::error("calendar.add failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
     }
-    const std::string title = body.value("title", std::string());
-    if (title.empty() || title.size() > 300) {
-        callback(ErrorResponse::bad_request("invalid_title", "title is 1 to 300 characters"));
-        return;
-    }
-    const auto span = span_of(body, callback);
-    if (!span) {
-        return;
-    }
-    auto token = Calendar::access(Net::Http::transport(), owner);
-    if (auto* p = std::get_if<Calendar::Problem>(&token)) {
-        callback(problem(*p));
-        return;
-    }
-    json event{{"summary", title}, {"start", {{"dateTime", span->first}}}, {"end", {{"dateTime", span->second}}}};
-    if (body.value("description", json()).is_string()) {
-        event["description"] = body["description"].get<std::string>().substr(0, 2000);
-    }
-    const auto r = Calendar::api(
-        Net::Http::transport(), std::get<std::string>(token), "POST", "/calendars/primary/events", {}, event);
-    if (!r.ok() || !r.body.is_object()) {
-        callback(ErrorResponse::make({drogon::k502BadGateway, "calendar_unavailable", "Google did not take it"}));
-        return;
-    }
-    Security::Audit::record(owner, "calendar.add", "calendar_event", r.body.value("id", std::string()));
-    const auto parsed = Calendar::parse_events(json{{"items", json::array({r.body})}}, nullptr);
-    callback(Response::created(json{{"data", parsed.empty() ? json::object() : Calendar::event_view(parsed[0])}}));
 }
 
 void CalendarController::one(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
@@ -340,64 +350,78 @@ void CalendarController::one(const HttpRequestPtr& req, Callback&& callback, con
 
 void CalendarController::move(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_REQUIRE_USER(req, callback, owner);
-    if (!event_id_ok(id)) {
-        callback(ErrorResponse::not_found("calendar_event_not_found"));
-        return;
+    try {
+        if (!event_id_ok(id)) {
+            callback(ErrorResponse::not_found("calendar_event_not_found"));
+            return;
+        }
+        json body;
+        if (!parse_object(req, body, callback)) {
+            return;
+        }
+        const auto span = span_of(body, callback);
+        if (!span) {
+            return;
+        }
+        auto token = Calendar::access(Net::Http::transport(), owner);
+        if (auto* p = std::get_if<Calendar::Problem>(&token)) {
+            callback(problem(*p));
+            return;
+        }
+        json patch{{"start", {{"dateTime", span->first}}}, {"end", {{"dateTime", span->second}}}};
+        if (body.value("title", json()).is_string() && !body["title"].get<std::string>().empty()) {
+            patch["summary"] = body["title"].get<std::string>().substr(0, 300);
+        }
+        const auto r = Calendar::api(Net::Http::transport(),
+                                     std::get<std::string>(token),
+                                     "PATCH",
+                                     "/calendars/primary/events/" + id,
+                                     {},
+                                     patch);
+        if (r.status == 404 || r.status == 410) {
+            callback(ErrorResponse::not_found("calendar_event_not_found"));
+            return;
+        }
+        if (!r.ok()) {
+            callback(ErrorResponse::make({drogon::k502BadGateway, "calendar_unavailable", "Google did not take it"}));
+            return;
+        }
+        Security::Audit::record(owner, "calendar.move", "calendar_event", id);
+        callback(Response::ok(json{{"data", {{"moved", true}}}}));
+    } catch (const std::exception& e) {
+        spdlog::error("calendar.move failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
     }
-    json body;
-    if (!parse_object(req, body, callback)) {
-        return;
-    }
-    const auto span = span_of(body, callback);
-    if (!span) {
-        return;
-    }
-    auto token = Calendar::access(Net::Http::transport(), owner);
-    if (auto* p = std::get_if<Calendar::Problem>(&token)) {
-        callback(problem(*p));
-        return;
-    }
-    json patch{{"start", {{"dateTime", span->first}}}, {"end", {{"dateTime", span->second}}}};
-    if (body.value("title", json()).is_string() && !body["title"].get<std::string>().empty()) {
-        patch["summary"] = body["title"].get<std::string>().substr(0, 300);
-    }
-    const auto r = Calendar::api(
-        Net::Http::transport(), std::get<std::string>(token), "PATCH", "/calendars/primary/events/" + id, {}, patch);
-    if (r.status == 404 || r.status == 410) {
-        callback(ErrorResponse::not_found("calendar_event_not_found"));
-        return;
-    }
-    if (!r.ok()) {
-        callback(ErrorResponse::make({drogon::k502BadGateway, "calendar_unavailable", "Google did not take it"}));
-        return;
-    }
-    Security::Audit::record(owner, "calendar.move", "calendar_event", id);
-    callback(Response::ok(json{{"data", {{"moved", true}}}}));
 }
 
 void CalendarController::remove(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_REQUIRE_USER(req, callback, owner);
-    if (!event_id_ok(id)) {
-        callback(ErrorResponse::not_found("calendar_event_not_found"));
-        return;
+    try {
+        if (!event_id_ok(id)) {
+            callback(ErrorResponse::not_found("calendar_event_not_found"));
+            return;
+        }
+        auto token = Calendar::access(Net::Http::transport(), owner);
+        if (auto* p = std::get_if<Calendar::Problem>(&token)) {
+            callback(problem(*p));
+            return;
+        }
+        const auto r = Calendar::api(
+            Net::Http::transport(), std::get<std::string>(token), "DELETE", "/calendars/primary/events/" + id);
+        if (r.status == 404 || r.status == 410) {
+            callback(ErrorResponse::not_found("calendar_event_not_found"));
+            return;
+        }
+        if (!r.ok()) {
+            callback(ErrorResponse::make({drogon::k502BadGateway, "calendar_unavailable", "Google did not take it"}));
+            return;
+        }
+        Security::Audit::record(owner, "calendar.remove", "calendar_event", id);
+        no_content(callback);
+    } catch (const std::exception& e) {
+        spdlog::error("calendar.remove failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
     }
-    auto token = Calendar::access(Net::Http::transport(), owner);
-    if (auto* p = std::get_if<Calendar::Problem>(&token)) {
-        callback(problem(*p));
-        return;
-    }
-    const auto r = Calendar::api(
-        Net::Http::transport(), std::get<std::string>(token), "DELETE", "/calendars/primary/events/" + id);
-    if (r.status == 404 || r.status == 410) {
-        callback(ErrorResponse::not_found("calendar_event_not_found"));
-        return;
-    }
-    if (!r.ok()) {
-        callback(ErrorResponse::make({drogon::k502BadGateway, "calendar_unavailable", "Google did not take it"}));
-        return;
-    }
-    Security::Audit::record(owner, "calendar.remove", "calendar_event", id);
-    no_content(callback);
 }
 
 }  // namespace Api

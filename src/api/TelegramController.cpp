@@ -30,6 +30,12 @@ namespace {
 using json = nlohmann::json;
 using Repositories::Telegram::LinkRepository;
 
+/// A string field of a body, "" when it is missing or not a string.
+std::string str_of(const json& body, const char* key) {
+    const auto it = body.find(key);
+    return it != body.end() && it->is_string() ? it->get<std::string>() : std::string();
+}
+
 constexpr std::size_t kTextMax = 4096;
 
 /// The gateway settings, or a 404 for a site without Telegram.
@@ -463,7 +469,7 @@ void TelegramController::quietOn(const HttpRequestPtr& req, Callback&& callback,
     if (!req->body().empty() && !parse_object(req, body, callback)) {
         return;
     }
-    LinkRepository().set_quiet(owner, id, body.value("title", std::string()), true);
+    LinkRepository().set_quiet(owner, id, str_of(body, "title"), true);
     no_content(callback);
 }
 
@@ -513,7 +519,7 @@ void TelegramController::toSelf(const HttpRequestPtr& req, Callback&& callback) 
     LinkRepository links;
     const auto link = links.of(owner);
     // The weekly review goes once per ISO week and only with the switch on.
-    const std::string week = body.value("week", std::string()).substr(0, 10);
+    const std::string week = str_of(body, "week").substr(0, 10);
     if (!week.empty() && !links.claim_review_week(owner, week)) {
         callback(ErrorResponse::conflict("review_not_sent", "the switch is off, or this week's review went already"));
         return;
@@ -522,6 +528,9 @@ void TelegramController::toSelf(const HttpRequestPtr& req, Callback&& callback) 
     const auto r = Telegram::call(
         Net::Http::transport(), *s, "POST", "/v1/chats/" + link->me_id + "/messages", {}, json{{"text", *text}});
     if (!r.ok()) {
+        if (!week.empty()) {
+            links.release_review_week(owner, week);
+        }
         callback(refusal(r));
         return;
     }

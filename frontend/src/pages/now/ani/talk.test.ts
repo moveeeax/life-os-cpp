@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { startTalk, type TalkState } from './talk';
+import { HOLD_MIN_MS, heldLongEnough, startTalk, type TalkState } from './talk';
 
 vi.mock('@/lib/api/client', () => ({
   api: { postJson: vi.fn(() => Promise.resolve({ data: { value: 'ek_test' } })) },
@@ -113,5 +113,12 @@ describe('startTalk', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(track.enabled).toBe(true);
     talk.stop();
+  });
+});
+
+describe('hold to talk', () => {
+  it('HoldToTalkTapSendsNothing: a tap is not a question', () => {
+    expect(heldLongEnough(1000, 1000 + HOLD_MIN_MS - 1)).toBe(false);
+    expect(heldLongEnough(1000, 1000 + HOLD_MIN_MS)).toBe(true);
   });
 });

@@ -98,4 +98,17 @@ describe('AniOffers', () => {
     rerender(<AniOffers turn="t1" onDone={() => {}} hushed={false} />);
     expect(await screen.findByText('Ок')).toBeTruthy();
   });
+
+  it('a reply to one chat keeps the drafts to another', async () => {
+    turnWith([
+      act('a', 'tg_send', 'Send to Анна: «Да»', 'Да'),
+      act('b', 'tg_send', 'Send to Анна: «Нет»', 'Нет'),
+      act('c', 'tg_send', 'Send to Work: «Ок»', 'Ок'),
+    ]);
+    render(<AniOffers turn="t1" onDone={() => {}} />);
+    fireEvent.click(await screen.findByText('Да'));
+    expect(await screen.findByText('Sent to Анна')).toBeTruthy();
+    expect(await screen.findByText('Ок', {}, { timeout: 3000 })).toBeTruthy();
+    expect(screen.queryByText('Нет')).toBeNull();
+  });
 });

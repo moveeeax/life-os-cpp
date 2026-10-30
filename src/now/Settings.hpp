@@ -160,7 +160,8 @@ inline std::optional<std::string> widgets_problem(const nlohmann::json& widgets,
         nlohmann::json one{{"kind", kind}};
         std::string key = kind;
         if (kind == "series") {
-            const std::string source = w.value("source", std::string());
+            const std::string source =
+                w.contains("source") && w["source"].is_string() ? w["source"].get<std::string>() : std::string();
             if (source.empty() || source.size() > 120 || source.find(':') == std::string::npos) {
                 return "a series widget takes a catalog id as its source";
             }

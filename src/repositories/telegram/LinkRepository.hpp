@@ -220,6 +220,17 @@ public:
                        .affected_rows() > 0;
         });
     }
+
+    /// Gives @p week back after Telegram refused the review, so the next try can send it.
+    void release_review_week(const std::string& owner, const std::string& week) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params(
+                "UPDATE telegram_link SET review_sent_week = NULL WHERE owner_id = $1::uuid AND review_sent_week = $2",
+                owner,
+                week);
+            return true;
+        });
+    }
 };
 
 }  // namespace Repositories::Telegram

@@ -17,7 +17,8 @@ namespace Repositories::Now {
 
 class DayRepository {
 public:
-    /// Records a finished session; @p minutes is the time in focus (pauses left out).
+    /// Records a finished session once per start (a second tab gets the same id); @p minutes is the time in
+    /// focus (pauses left out).
     std::string add_focus(const std::string& owner,
                           const std::string& started_at,
                           const std::string& ended_at,
@@ -27,7 +28,9 @@ public:
             return txn
                 .exec_params(
                     "INSERT INTO focus_sessions (owner_id, started_at, ended_at, minutes, label) VALUES ($1::uuid, "
-                    "$2::timestamptz, $3::timestamptz, $4, $5) RETURNING id::text",
+                    "$2::timestamptz, $3::timestamptz, $4, $5) ON CONFLICT (owner_id, started_at) DO UPDATE SET "
+                    "started_at = "
+                    "EXCLUDED.started_at RETURNING id::text",
                     owner,
                     started_at,
                     ended_at,

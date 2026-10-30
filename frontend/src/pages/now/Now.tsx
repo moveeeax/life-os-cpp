@@ -221,7 +221,7 @@ function NowScreen() {
             player.play();
           }}
         />
-        <ModeCards now={now} date={date} today={data} day={nowDay.data} />
+        <ModeCards now={now} date={date} today={data} day={nowDay.data} tz={tz} />
         <Board widgets={settings.data?.widgets ?? []} today={data} date={date} tz={tz} />
         {today.isError && (
           <span className="n-note">

@@ -85,13 +85,19 @@
   height: 54px;
   background: var(--g-warn);
 }
+/* The task's title sits inside the track, right of its pin, so it never runs
+   into the line above the ribbon. */
 .r-pin span {
   position: absolute;
-  top: -16px;
-  left: -4px;
+  top: 8px;
+  left: 5px;
+  max-width: 9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 10.5px;
   color: var(--g-warn);
   white-space: nowrap;
+  pointer-events: none;
 }
 .r-pin-done {
   opacity: 0.45;

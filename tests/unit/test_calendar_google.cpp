@@ -48,20 +48,34 @@ TEST(CalendarGoogle, ParsesRfc3339) {
 TEST(CalendarGoogle, EventViewAllDay) {
     const json list = json::parse(R"({"items":[
       {"id":"b","summary":"Call","start":{"dateTime":"2026-10-29T11:00:00+05:00"},"end":{"dateTime":"2026-10-29T12:00:00+05:00"}},
-      {"id":"a","summary":"Birthday","start":{"date":"2026-10-29"},"end":{"date":"2026-10-30"}},
+      {"id":"a","summary":"Birthday","eventType":"birthday","start":{"date":"2026-10-29"},"end":{"date":"2026-10-30"}},
+      {"id":"v","summary":"Vacation","start":{"date":"2026-10-30"},"end":{"date":"2026-10-31"}},
+      {"id":"s","summary":"Stay","transparency":"transparent","start":{"date":"2026-10-30"},"end":{"date":"2026-10-31"}},
       {"id":"c","status":"cancelled","start":{"dateTime":"2026-10-29T09:00:00Z"},"end":{"dateTime":"2026-10-29T10:00:00Z"}},
       {"id":"d","summary":"Hold","transparency":"transparent","start":{"dateTime":"2026-10-29T13:00:00Z"},"end":{"dateTime":"2026-10-29T14:00:00Z"}}
     ]})");
     const auto events =
         Calendar::parse_events(list, [](const std::string& d) { return d == "2026-10-29" ? 100LL : 200LL; });
-    ASSERT_EQ(events.size(), 3u) << "a cancelled one is dropped";
+    ASSERT_EQ(events.size(), 5u) << "a cancelled one is dropped";
     EXPECT_EQ(events[0].id, "a") << "sorted by start";
     EXPECT_TRUE(events[0].all_day);
-    EXPECT_TRUE(events[0].free) << "an all-day event does not block the day";
+    EXPECT_TRUE(events[0].free) << "a birthday does not block the day";
     EXPECT_EQ(events[0].start, 100);
     EXPECT_EQ(Calendar::event_view(events[0])["start"], "2026-10-29");
-    EXPECT_EQ(Calendar::event_view(events[1])["start"], "2026-10-29T06:00:00Z");
-    EXPECT_TRUE(events[2].free) << "transparent is free";
+    for (const auto& e : events) {
+        if (e.id == "b") {
+            EXPECT_EQ(Calendar::event_view(e)["start"], "2026-10-29T06:00:00Z");
+        }
+        if (e.id == "d") {
+            EXPECT_TRUE(e.free) << "transparent is free";
+        }
+        if (e.id == "v") {
+            EXPECT_FALSE(e.free) << "an all-day event marked busy blocks the day";
+        }
+        if (e.id == "s") {
+            EXPECT_TRUE(e.free) << "an all-day event marked free does not";
+        }
+    }
 }
 
 TEST(CalendarGoogle, FreeSlotsInZone) {
