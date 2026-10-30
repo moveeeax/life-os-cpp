@@ -6,6 +6,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.52.4] - 2026-10-30
+
+### Changed
+- Google Calendar asks only for the events scope (calendar.events) instead of full calendar access: Life OS reads and changes events of the primary calendar and never touches calendars or sharing.
+
 ## [1.52.3] - 2026-10-30
 
 ### Changed
