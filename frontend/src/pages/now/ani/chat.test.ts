@@ -4,6 +4,7 @@ import { ApiClientError, api } from '@/lib/api/client';
 
 import {
   actionState,
+  chatOf,
   askAgent,
   confirmAction,
   failure,
@@ -107,5 +108,13 @@ describe('chat', () => {
     expect(t.reply).toBe('Добавить молоко?');
     expect(wait).toHaveBeenCalledTimes(2);
     expect(api.getJson).toHaveBeenLastCalledWith('/api/v1/ani/turns/q');
+  });
+});
+
+describe('chatOf', () => {
+  it('reads the chat from a Telegram proposal', () => {
+    expect(chatOf('Send to Анна: «Ок»')).toBe('Анна');
+    expect(chatOf('Edit your message in Work chat to «x»')).toBe('Work chat');
+    expect(chatOf('Add the task «Паспорт»')).toBeNull();
   });
 });
