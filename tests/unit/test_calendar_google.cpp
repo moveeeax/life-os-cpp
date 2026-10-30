@@ -30,7 +30,8 @@ TEST(CalendarGoogle, AuthUrlHasOfflineConsentState) {
     EXPECT_NE(url.find("state=abc123"), std::string::npos);
     EXPECT_NE(url.find("redirect_uri=https%3A%2F%2Flife.test%2Fapi%2Fv1%2Fcalendar%2Foauth%2Fcallback"),
               std::string::npos);
-    EXPECT_NE(url.find("scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar%20openid%20email"), std::string::npos);
+    EXPECT_NE(url.find("scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar.events%20openid%20email"),
+              std::string::npos);
     EXPECT_EQ(url.find("sec"), std::string::npos) << "the secret never goes to the browser";
 }
 
