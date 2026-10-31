@@ -25,6 +25,7 @@ const bareLinks = {
 };
 const fetchAniBare = vi.fn(() => Promise.resolve(bareLinks));
 vi.mock('./useLife', () => ({ useLife: () => {} }));
+vi.mock('./Shelf', () => ({ Shelf: () => null }));
 vi.mock('./useLife2', () => ({
   // The test reaches her own lines through the say the corner hands over.
   useLife2: (o: { say: (a: unknown) => void }) => {
@@ -221,6 +222,35 @@ describe('AniCorner', () => {
     await mount();
     act(() => engine.opts!.onDoubleTap?.());
     expect(document.querySelector('.ani-chat')).not.toBeNull();
+  });
+
+  it('GiveToAni: dropped text gets her buttons to keep it or put it in the inbox', async () => {
+    await mount();
+    const hit = document.querySelector('.ani-hit')!;
+    const data: Record<string, string> = { 'text/plain': 'Анна любит пионы' };
+    await act(async () => {
+      fireEvent.drop(hit, { dataTransfer: { getData: (t: string) => data[t] ?? '' } });
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(screen.getByRole('button', { name: 'Запомнить' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Во входящие' })).toBeTruthy();
+  });
+
+  it('ReactsToActs: a closed goal on the site gets her word', async () => {
+    await mount();
+    // Her hello goes first; a reaction waits until her line is over.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent('life:act', {
+          detail: { kind: 'goal_done', title: 'AWS', at: Date.now() },
+        }),
+      );
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(bubble()).toMatch(/«AWS» закрыта/);
   });
 
   it('LineChips: her own line with buttons runs the one tapped and closes', async () => {

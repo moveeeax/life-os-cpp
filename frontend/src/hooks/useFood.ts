@@ -19,6 +19,7 @@ import type {
   FoodWeek,
   OffProduct,
 } from '@/lib/food/types';
+import { act } from '@/lib/now/act';
 
 // Paths with an id go through the client's untyped overload (it does not fill
 // path templates); the response types come from the same OpenAPI schemas.
@@ -114,8 +115,11 @@ const DIARY = FOOD_DIARY_WRITES;
 
 export function useCreateEntry(onSuccess?: (entry: FoodEntry) => void) {
   return useApiMutation(
-    async (body: FoodEntryInput) =>
-      (await api.postJson<{ data: FoodEntry }>(`${BASE}/entries`, { body })).data,
+    async (body: FoodEntryInput) => {
+      const entry = (await api.postJson<{ data: FoodEntry }>(`${BASE}/entries`, { body })).data;
+      act({ kind: 'food_added', name: entry.name });
+      return entry;
+    },
     { invalidate: DIARY, onSuccess },
   );
 }

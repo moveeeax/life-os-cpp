@@ -923,3 +923,48 @@
   font-size: 13px;
   padding: 4px 11px;
 }
+
+/* Something is dragged on the page: her figure takes it (lib/now/drag). */
+.ani-hit[data-taking] {
+  border-radius: 24px;
+  outline: 2px dashed rgb(240 169 147 / 0.75);
+  outline-offset: 4px;
+  background: rgb(240 169 147 / 0.08);
+}
+.ani-hit[data-taking]::after {
+  content: 'Отдай мне';
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 12px;
+  color: #f0a993;
+}
+
+/* Her shelf: what the person earned, standing on the top edge of her ledge. */
+.ani-shelf {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 100%;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  pointer-events: auto;
+}
+.ani-shelf button {
+  display: grid;
+  place-items: end center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  line-height: 1;
+}
+.ani-shelf button:hover {
+  transform: translateY(-2px);
+}
+.ani-shelf-flag {
+  font-size: 17px;
+}

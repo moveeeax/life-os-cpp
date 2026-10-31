@@ -21,6 +21,7 @@ import {
   type QuestInput,
 } from './life';
 import type { Answer } from './touch';
+import { useWarm } from './warm';
 
 /** How often the corner looks at the day for a line of hers. */
 const TICK_MS = 60_000;
@@ -88,9 +89,12 @@ export function useLife({
   onSeed: (text: string | null) => void;
 }) {
   const { tz, date } = context;
+  const warmDeals = useWarm(on, 0);
+  const warmFocus = useWarm(on, 1);
+  const warmWater = useWarm(on, 2);
   const deals = useQuery({
     queryKey: ['ani', 'deals', tz],
-    enabled: on,
+    enabled: warmDeals,
     retry: false,
     staleTime: 10 * 60_000,
     queryFn: async ({ signal }) =>
@@ -99,7 +103,7 @@ export function useLife({
   });
   const focus = useQuery({
     queryKey: ['now', 'focus-stats', tz],
-    enabled: on,
+    enabled: warmFocus,
     retry: false,
     staleTime: 10 * 60_000,
     queryFn: async ({ signal }) =>
@@ -112,7 +116,7 @@ export function useLife({
   });
   const water = useQuery({
     queryKey: ['food', 'water', date],
-    enabled: on,
+    enabled: warmWater,
     retry: false,
     staleTime: 60_000,
     queryFn: async ({ signal }) =>

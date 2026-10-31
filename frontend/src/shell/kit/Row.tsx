@@ -1,5 +1,7 @@
 import { useId, useState, type ReactNode } from 'react';
 
+import { giveProps, type Give } from '@/lib/now/drag';
+
 interface RowProps {
   title: ReactNode;
   sub?: ReactNode;
@@ -13,10 +15,23 @@ interface RowProps {
   id?: string;
   /** A control beside the row (a tick), outside the button that opens it. */
   action?: ReactNode;
+  /** What the row hands to Ani when it is dragged onto her (lib/now/drag). */
+  give?: Give;
 }
 
 /** One calm row: title and one value; the rest behind a click. */
-export function Row({ title, sub, right, dot, children, open, onToggle, id, action }: RowProps) {
+export function Row({
+  title,
+  sub,
+  right,
+  dot,
+  children,
+  open,
+  onToggle,
+  id,
+  action,
+  give,
+}: RowProps) {
   const [own, setOwn] = useState(false);
   const isOpen = open ?? own;
   const detailsId = useId();
@@ -37,7 +52,12 @@ export function Row({ title, sub, right, dot, children, open, onToggle, id, acti
     </>
   );
   return (
-    <div className="k-row" id={id} data-open={isOpen ? '' : undefined}>
+    <div
+      className="k-row"
+      id={id}
+      data-open={isOpen ? '' : undefined}
+      {...(give ? giveProps(give) : {})}
+    >
       <div className="k-row-line">
         {expandable ? (
           <button

@@ -13,6 +13,7 @@ import type {
   MoodCheckin,
   MoodInput,
 } from '@/lib/habits';
+import { act } from '@/lib/now/act';
 
 const BASE = '/api/v1/habits';
 
@@ -92,12 +93,14 @@ export function useTickHabit(onSuccess?: () => void) {
     async ({ id, date, on, value }: { id: string; date: string; on: boolean; value?: number }) => {
       const path = `${BASE}/${id}/checks/${date}`;
       if (!on) return api.deleteJson<unknown>(path);
-      return (
+      const check = (
         await api.putJson<{ data: HabitCheck }>(path, {
           query: { tz: habitsZone() },
           body: value === undefined ? {} : { value },
         })
       ).data;
+      act({ kind: 'habit_ticked' });
+      return check;
     },
     { invalidate: HABIT_WRITES, onSuccess },
   );

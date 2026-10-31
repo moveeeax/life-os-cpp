@@ -19,6 +19,11 @@ import { createToucher, say, type Answer } from './touch';
 import { AniOffers } from './AniOffers';
 import { useLife } from './useLife';
 import { useLife2 } from './useLife2';
+import { Shelf } from './Shelf';
+import { ACT_EVENT, type Act } from '@/lib/now/act';
+import { readGive } from '@/lib/now/drag';
+import { FACT_MAX, firstFreeSlot, topCategory } from './give';
+import { reactionTo, ReactionGate } from './reactions';
 import { HOLD_KEY, eventOfLine, quietKind, snooze, type LineKind } from './lines';
 import { RIBBON_POINT, type NowDay } from '../ribbon/layout';
 import './ani.css';
@@ -693,6 +698,145 @@ export function AniCorner({
     onSeed: setSeed,
   });
 
+  // What the person does on the site (lib/now/act): an instant reaction from reactions.ts, one per
+  // three minutes and twelve a day, only while she is free.
+  const gate = useRef(new ReactionGate());
+  const acts = useRef<Act[]>([]);
+  useEffect(() => {
+    const on = (e: Event) => {
+      const a = (e as CustomEvent<Act>).detail;
+      const today = new Date().toDateString();
+      acts.current = acts.current.filter((x) => new Date(x.at).toDateString() === today);
+      const before = acts.current;
+      acts.current = [...before, a].slice(-100);
+      if (quietRef.current || calling.current) return;
+      const r = reactionTo(a, { hour: new Date().getHours(), today: before });
+      if (!r || !gate.current.allow(Date.now())) return;
+      if (r.feel) engine.current?.feel(r.feel, 2.5);
+      if (r.clip) engine.current?.act(r.clip);
+      void answer.current({ text: r.text, kind: 'hello' });
+    };
+    window.addEventListener(ACT_EVENT, on);
+    return () => window.removeEventListener(ACT_EVENT, on);
+  }, []);
+
+  // Something dropped on her (lib/now/drag): her proposal with buttons; nothing changes before a tap.
+  const [taking, setTaking] = useState(false);
+  const onGive = async (dt: DataTransfer) => {
+    setTaking(false);
+    const g = readGive(dt);
+    if (!g || !ani.here) return;
+    const e = engine.current;
+    e?.act('peace');
+    const said = (text: string, chipsOf?: Answer['chips']) =>
+      void answer.current({ text, kind: 'hello', chips: chipsOf });
+    const done = (text: string) => said(text);
+    const c = contextRef.current;
+    if (g.kind === 'task') {
+      const slot = firstFreeSlot(c.day?.free ?? [], Date.now(), c.tz);
+      const patch = (due: string, time: string, words: string) =>
+        void api
+          .patchJson(`/api/v1/tasks/items/${g.id}`, { body: { due, due_time: time } })
+          .then(() => done(words))
+          .catch(() => done('Не получилось, попробуй еще раз.'));
+      said(
+        slot
+          ? `Поставлю «${g.title}» на ${slot.at}? Там свободное окно.`
+          : `Когда сделаем «${g.title}»?`,
+        [
+          ...(slot
+            ? [
+                {
+                  label: `Да, на ${slot.at}`,
+                  run: () => patch(c.date, slot.at, `Поставила на ${slot.at}.`),
+                },
+              ]
+            : []),
+          { label: 'Сегодня в 19:00', run: () => patch(c.date, '19:00', 'Поставила на вечер.') },
+          { label: 'Отмена', run: () => undefined },
+        ],
+      );
+      return;
+    }
+    if (g.kind === 'transaction') {
+      try {
+        const q = g.merchant || g.name;
+        const [rows, cats] = await Promise.all([
+          api.getJson<{ data: { id: string; category_id: string | null }[] }>(
+            '/api/v1/money/transactions',
+            {
+              query: { q, limit: 50 },
+            },
+          ),
+          api.getJson<{ data: { id: string; name: string }[] }>('/api/v1/money/categories'),
+        ]);
+        const top = topCategory(rows.data.filter((r) => r.id !== g.id));
+        const cat = top ? cats.data.find((x) => x.id === top.id) : undefined;
+        if (!top || !cat) {
+          said(`Для «${q}» у меня нет похожих записей с категорией. Выбери ее в строке.`);
+          return;
+        }
+        said(`«${q}»: похоже на «${cat.name}», как ${top.count} прошлых записей. Так и запишем?`, [
+          {
+            label: `Да, ${cat.name}`,
+            run: () =>
+              void api
+                .patchJson(`/api/v1/money/transactions/${g.id}`, { body: { category_id: cat.id } })
+                .then(() => done(`Записала в «${cat.name}».`))
+                .catch(() => done('Не получилось, попробуй еще раз.')),
+          },
+          { label: 'Отмена', run: () => undefined },
+        ]);
+      } catch {
+        said('Деньги сейчас не отвечают. Попробуем позже.');
+      }
+      return;
+    }
+    if (g.kind === 'note') {
+      setChatSeed(`Устрой квиз из трех вопросов по моей заметке «${g.title}».`);
+      setChat(true);
+      return;
+    }
+    if (g.kind === 'event') {
+      setChatSeed(`Помоги подготовиться к встрече «${g.title}»: `);
+      setChat(true);
+      return;
+    }
+    const text = g.text.slice(0, FACT_MAX);
+    said(`«${text.length > 60 ? `${text.slice(0, 60)}…` : text}». Что с этим сделать?`, [
+      {
+        label: 'Запомнить',
+        run: () =>
+          void api
+            .postJson('/api/v1/ani/facts', { body: { text } })
+            .then(() => done('Запомнила.'))
+            .catch(() => done('Не получилось запомнить.')),
+      },
+      {
+        label: 'Во входящие',
+        run: () =>
+          void api
+            .postJson('/api/v1/tasks/notes', { body: { text: g.text } })
+            .then(() => done('Положила во входящие задач.'))
+            .catch(() => done('Не получилось.')),
+      },
+      { label: 'Отмена', run: () => undefined },
+    ]);
+  };
+  // Lit while something is dragged anywhere on the page.
+  useEffect(() => {
+    const start = () => setTaking(true);
+    const stop = () => setTaking(false);
+    window.addEventListener('dragstart', start);
+    window.addEventListener('dragend', stop);
+    window.addEventListener('drop', stop);
+    return () => {
+      window.removeEventListener('dragstart', start);
+      window.removeEventListener('dragend', stop);
+      window.removeEventListener('drop', stop);
+    };
+  }, []);
+
   // A focus ticked while she watches: she cheers.
   const focus = context.today?.focus;
   const focusKey = focus ? `${focus.date}|${focus.kind}|${focus.ref_id ?? focus.text}` : null;
@@ -960,6 +1104,17 @@ export function AniCorner({
         ref={hitRef}
         className="ani-hit"
         data-away={ani.here ? undefined : ''}
+        data-taking={taking && ani.here ? '' : undefined}
+        onDragOver={(e) => {
+          if (!ani.here) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+        }}
+        onDragEnter={() => engine.current?.act('show')}
+        onDrop={(e) => {
+          e.preventDefault();
+          void onGive(e.dataTransfer);
+        }}
         role="img"
         aria-label="Ani. Drag to turn her, tap her to see what she says."
       />
@@ -994,6 +1149,12 @@ export function AniCorner({
         </div>
       ) : null}
       <div ref={ledgeRef} className="ani-ledge" data-wardrobe={wardrobe ? '' : undefined}>
+        <Shelf
+          on={ready && ani.here}
+          date={context.date}
+          sleepMinutes={context.today?.health?.sleep_minutes}
+          hour={new Date().getHours()}
+        />
         {waiting > 0 ? (
           <span
             className="ani-inbox"

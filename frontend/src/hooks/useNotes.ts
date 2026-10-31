@@ -6,6 +6,7 @@ import { useModuleOn } from '@/hooks/useModuleProbe';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import type { Note, NoteFacet, NoteInput } from '@/lib/notes';
+import { act } from '@/lib/now/act';
 
 const BASE = '/api/v1/notes';
 
@@ -44,8 +45,11 @@ export function useNoteList(filter: NoteFilter, enabled = true) {
 export function useNote(id: string) {
   return useQuery({
     queryKey: qk.notes.one(id),
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: Note }>(`${BASE}/${id}`, { signal })).data,
+    queryFn: async ({ signal }) => {
+      const note = (await api.getJson<{ data: Note }>(`${BASE}/${id}`, { signal })).data;
+      act({ kind: 'note_opened', title: note.title });
+      return note;
+    },
   });
 }
 

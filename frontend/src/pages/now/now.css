@@ -214,3 +214,27 @@
 .n-now[data-away] .n-where {
   display: none;
 }
+
+/* A panel of the dock or a corner is open: the centre (the clock, the focus,
+   the ribbon, the cards) fades away so the panel reads on the picture alone,
+   and comes back when the panel closes. */
+.n-center,
+.n-where {
+  transition:
+    opacity 0.25s ease,
+    visibility 0s;
+}
+.n-now:has(.c-panel) .n-center,
+.n-now:has(.c-panel) .n-where {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.25s ease,
+    visibility 0s 0.25s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .n-center,
+  .n-where {
+    transition: none;
+  }
+}

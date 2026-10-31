@@ -19,6 +19,7 @@ import {
   hhmm,
   useNowDay,
 } from './layout';
+import { giveProps } from '@/lib/now/drag';
 import './ribbon.css';
 
 /**
@@ -134,6 +135,9 @@ export function Ribbon({
               style={{ left: `${b.left}%`, width: `${b.width}%` }}
               title={`${b.title}, ${hhmm(b.start, tz)}–${hhmm(b.end, tz)}`}
               data-event={b.id}
+              {...(b.kind === 'meet' && b.id
+                ? giveProps({ kind: 'event', id: b.id, title: b.title })
+                : {})}
             >
               {b.kind !== 'free' && b.width > 4.5 ? b.title : ''}
             </div>

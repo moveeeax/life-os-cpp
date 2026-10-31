@@ -12,6 +12,7 @@ function NoteRow({ n }: { n: Note }) {
   const date = noteDay(n).day;
   return (
     <Row
+      give={{ kind: 'note', id: n.id, title: n.title }}
       dot={
         n.project_kind === 'course'
           ? 'var(--g-ok)'

@@ -34,6 +34,7 @@ import type {
   WorkoutSet,
   WorkoutSetInput,
 } from '@/lib/workout/types';
+import { act } from '@/lib/now/act';
 
 const BASE = '/api/v1/workout';
 
@@ -166,12 +167,15 @@ export function useExercise(id: string, enabled: boolean) {
 export function useStartSession(onStarted: (session: WorkoutSession) => void) {
   const qc = useQueryClient();
   return useApiMutation(
-    async (routineId: string | null) =>
-      (
+    async (routineId: string | null) => {
+      const session = (
         await api.postJson<{ data: WorkoutSession }>(`${BASE}/sessions`, {
           body: routineId ? { routine_id: routineId } : {},
         })
-      ).data,
+      ).data;
+      act({ kind: 'workout_started' });
+      return session;
+    },
     {
       onSuccess: (session) => {
         cacheSession(qc, session);
