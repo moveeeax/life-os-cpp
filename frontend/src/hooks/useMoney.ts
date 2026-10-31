@@ -40,6 +40,7 @@ import type {
   TransferInput,
   TransferPatch,
 } from '@/lib/ledger/types';
+import { act } from '@/lib/now/act';
 
 // Paths with an id go through the client's untyped overload (it does not fill
 // path templates); the response types come from the same OpenAPI schemas.
@@ -317,8 +318,18 @@ export function useMoneySettings() {
 
 export function useCreateTransaction(onSuccess?: (row: Transaction) => void) {
   return useMoneyWrite(
-    async (body: TransactionInput) =>
-      (await api.postJson<{ data: Transaction }>(`${BASE}/transactions`, { body })).data,
+    async (body: TransactionInput) => {
+      const row = (await api.postJson<{ data: Transaction }>(`${BASE}/transactions`, { body }))
+        .data;
+      act({
+        kind: 'money_added',
+        name: row.name ?? '',
+        merchant: row.merchant ?? null,
+        amount: Number(row.amount),
+        currency: row.currency,
+      });
+      return row;
+    },
     ROW_WRITES,
     onSuccess,
   );

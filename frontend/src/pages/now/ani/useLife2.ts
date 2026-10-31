@@ -1,9 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 
-import { useGoals } from '@/hooks/useGoals';
-import { useMoneySettings, useReport } from '@/hooks/useMoney';
+import { useMoneySettings } from '@/hooks/useMoney';
 import { useCrossings } from '@/hooks/useTravel';
 import { api } from '@/lib/api/client';
 import { CURRENCY_OF } from '@/lib/now/currency';
@@ -32,6 +31,7 @@ import {
   type Meal,
 } from './life2';
 import { arrival } from '../modes/modes';
+import { useWarm } from './warm';
 import { addMoment } from './life';
 import type { Answer } from './touch';
 
@@ -69,6 +69,8 @@ function clockOf(tz: string) {
   };
 }
 
+let reads = 0;
+
 /** One GET of the site for her lines: quiet when the module is off (404) or the call fails. */
 function useRead<T>(
   key: unknown[],
@@ -77,9 +79,12 @@ function useRead<T>(
   on: boolean,
   stale = 10 * 60_000,
 ) {
+  // Each read takes its own step after the page has settled (warm.ts), not one burst at load.
+  const [step] = useState(() => reads++ % 16);
+  const warm = useWarm(on, 3 + step);
   return useQuery({
     queryKey: ['ani', 'life', ...key],
-    enabled: on,
+    enabled: warm,
     retry: false,
     staleTime: stale,
     queryFn: async ({ signal }) => (await api.getJson<{ data: T }>(path, { query, signal })).data,
@@ -181,8 +186,22 @@ export function useLife2({
     on && !!local && local !== view,
     60 * 60_000,
   );
-  const report = useReport('month', date);
-  const goals = useGoals('active', date);
+  const report = {
+    data: useRead<{ as_if?: { expense: number; currency: string } | null }>(
+      ['report', date],
+      '/api/v1/money/reports/period',
+      { kind: 'month', date },
+      on,
+    ).data,
+  };
+  const goals = {
+    data: useRead<{ title: string; progress?: { pace?: string } | null }[]>(
+      ['goals', date],
+      '/api/v1/goals',
+      { status: 'active', date, tz },
+      on,
+    ).data,
+  };
 
   const live = useRef({
     context,
@@ -204,7 +223,9 @@ export function useLife2({
     spent: report.data?.as_if
       ? { amount: report.data.as_if.expense, currency: report.data.as_if.currency }
       : null,
-    stalled: (goals.data ?? []).find((g) => g.progress?.pace === 'behind')?.title ?? null,
+    stalled:
+      (Array.isArray(goals.data) ? goals.data : []).find((g) => g.progress?.pace === 'behind')
+        ?.title ?? null,
   });
   live.current = {
     context,
@@ -226,7 +247,9 @@ export function useLife2({
     spent: report.data?.as_if
       ? { amount: report.data.as_if.expense, currency: report.data.as_if.currency }
       : null,
-    stalled: (goals.data ?? []).find((g) => g.progress?.pace === 'behind')?.title ?? null,
+    stalled:
+      (Array.isArray(goals.data) ? goals.data : []).find((g) => g.progress?.pace === 'behind')
+        ?.title ?? null,
   };
   const sayRef = useRef(say);
   sayRef.current = say;

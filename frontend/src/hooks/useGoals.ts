@@ -13,6 +13,7 @@ import type {
   GoalPatch,
   GoalSection,
 } from '@/lib/goals';
+import { act } from '@/lib/now/act';
 
 // Paths with an id go through the client's untyped overload (it does not fill
 // path templates); the response types come from the same OpenAPI schemas.
@@ -74,10 +75,18 @@ export function useGoal(id: string | null, date: string) {
 }
 
 export function useSaveGoal(id: string | null, onSuccess?: () => void) {
-  return useApiMutation((body: GoalInput | GoalPatch) => saveGoal(id, body, localZone()), {
-    invalidate: ALL,
-    onSuccess,
-  });
+  return useApiMutation(
+    async (body: GoalInput | GoalPatch) => {
+      const goal = await saveGoal(id, body, localZone());
+      if ('status' in body && body.status === 'done')
+        act({ kind: 'goal_done', title: (goal as { title?: string })?.title ?? body.title ?? '' });
+      return goal;
+    },
+    {
+      invalidate: ALL,
+      onSuccess,
+    },
+  );
 }
 
 export function useDeleteGoal(onSuccess?: () => void) {

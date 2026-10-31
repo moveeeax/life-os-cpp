@@ -384,6 +384,7 @@ const LedgerRow = memo(function LedgerRow({
   const where = [category?.name, account?.name].filter(Boolean).join(' · ');
   return (
     <KitRow
+      give={{ kind: 'transaction', id: row.id, name: row.name, merchant: row.merchant ?? null }}
       dot={category ? categoryColor(category) : 'transparent'}
       title={adjustment ? 'Bank recalculation' : row.name}
       right={

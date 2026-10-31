@@ -13,6 +13,7 @@ import {
   safeLink,
   type Task,
 } from '@/lib/tasks';
+import { giveProps } from '@/lib/now/drag';
 import { cn } from '@/lib/utils';
 
 import { NoteSheet } from '../notes/NoteSheet';
@@ -47,7 +48,7 @@ export function TaskRow({
   const link = task.source_kind === 'url' ? safeLink(task.source_ref) : null;
   const repeats = repeatLabel(task.repeat);
   return (
-    <li data-task={task.id}>
+    <li data-task={task.id} {...giveProps({ kind: 'task', id: task.id, title: task.title })}>
       <div className="grid grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-3.5 py-2.5">
         <button
           type="button"

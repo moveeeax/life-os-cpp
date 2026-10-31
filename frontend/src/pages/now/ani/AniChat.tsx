@@ -87,6 +87,8 @@ const isSilent = (reply: string | null) => /^[\s\p{P}]*silent[\s\p{P}]*$/iu.test
 /** What the chat's two buttons ask her for. */
 export const QUIZ_ASK = 'Устрой мне квиз на пять минут по моим заметкам.';
 export const DIARY_ASK = 'Давай запишем мой день в дневник.';
+export const STYLE_ASK =
+  'Как ты пишешь от моего имени в Телеграме? Опиши мой стиль коротко и дай три примера.';
 
 export function AniChat({
   tz,
@@ -323,6 +325,13 @@ export function AniChat({
           onClick={() => void send(undefined, DIARY_ASK)}
         >
           Дневник
+        </button>
+        <button
+          type="button"
+          disabled={sending || waiting}
+          onClick={() => void send(undefined, STYLE_ASK)}
+        >
+          Мой стиль
         </button>
       </div>
       {confirmClear ? (

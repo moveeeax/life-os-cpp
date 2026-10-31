@@ -16,6 +16,7 @@ import {
   type TaskParseLine,
   type TaskPatch,
 } from '@/lib/tasks';
+import { act } from '@/lib/now/act';
 
 // Paths with an id go through the client's untyped overload (it does not fill
 // path templates); the response types come from the same OpenAPI schemas.
@@ -83,14 +84,17 @@ export function useCreateTasks(onSuccess?: () => void) {
 
 export function useUpdateTask(id: string, onSuccess?: () => void) {
   return useApiMutation(
-    async (body: TaskPatch) =>
+    async (body: TaskPatch) => {
       // tz: the day a repeating task is closed on, which its next occurrence counts from.
-      (
+      const task = (
         await api.patchJson<{ data: Task }>(`${BASE}/items/${id}`, {
           body,
           query: { tz: localZone() },
         })
-      ).data,
+      ).data;
+      if (body.status === 'done') act({ kind: 'task_done', title: task.title });
+      return task;
+    },
     { invalidate: ALL, onSuccess },
   );
 }
