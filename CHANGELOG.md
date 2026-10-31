@@ -6,6 +6,14 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.55.0] - 2026-10-31
+
+### Added
+- More of Ani's own day on Now: a question of the day answered in the chat (kept as a fact after you agree), a follow-up the day after a plan she kept with its date, a wish she asks about a month later, her album of moments in Account, a softer day after a low mood check-in, a wind-down word half an hour before your usual bedtime and a morning comparison, a lighter version of a habit after a broken streak, records of the month (sleep, steps), two meal options at each meal time with a one-tap add to the food diary, a question about an unusually large spend (marked a one-off on the ledger row), a hello in the local language with a price in your currency when you arrive in a new country, a guess of yesterday's steps, a birthday greeting, waiting Telegram chats at noon, and one word for the open tab (the task inbox, the month's spending, a goal behind).
+
+### Changed
+- On a wide screen with Now on, the other tabs keep Now: only its centre (the clock, the focus, the ribbon, the modes and widgets) gives way to the section, which opens as a sheet between Ani's corner and the right edge, above the corners row, and scrolls inside; the corners, the left dock, the task line and Ani (with a running focus and its sound) stay and carry on across tabs, and the picture is only lightly dimmed. Under 1024 px nothing changes.
+
 ## [1.54.0] - 2026-10-31
 
 ### Added
