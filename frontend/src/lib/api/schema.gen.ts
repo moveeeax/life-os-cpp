@@ -15838,6 +15838,107 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/v1/ani/deals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * This week's promises to Ani, with their progress
+         * @description The week runs Monday to Sunday on the caller's clock (tz). Ani keeps a promise with her promise tool.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The caller's IANA zone (UTC when not one) */
+                    tz?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The promises, oldest first */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniDeal"][];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/deals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Drop a promise */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Dropped */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description deal_not_found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ani/bare": {
         parameters: {
             query?: never;
@@ -16088,6 +16189,61 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/now/focus-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Focus by the caller's clock */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The caller's IANA zone (UTC when not one) */
+                    tz?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description This week, the last seven days, the hours of the day over 28 days */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FocusStats"];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Now module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -17612,8 +17768,8 @@ export interface paths {
         };
         get?: never;
         /**
-         * The weekly review to Saved Messages switch
-         * @description Refused for API keys.
+         * The switches of what goes to Saved Messages
+         * @description Refused for API keys. At least one switch is given.
          */
         put: {
             parameters: {
@@ -17625,7 +17781,10 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        review_to_self: boolean;
+                        /** @description The weekly review on Sunday */
+                        review_to_self?: boolean;
+                        /** @description Ani's morning (08:00) and evening (21:00) line as a voice message */
+                        voice_to_self?: boolean;
                     };
                 };
             };
@@ -17641,7 +17800,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description invalid_review_to_self */
+                /** @description invalid_settings */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -26048,6 +26207,36 @@ export interface components {
             /** @description The widget board of Now, in order */
             widgets?: components["schemas"]["NowWidget"][];
         };
+        AniDeal: {
+            /** Format: uuid */
+            id: string;
+            text: string;
+            /** @enum {string} */
+            kind: "workouts" | "focus_minutes" | "habit";
+            /** @description The habit's name */
+            habit: string | null;
+            target: number;
+            /** @description Finished workouts, focus minutes or ticks of the habit this week */
+            done: number;
+            /** Format: date */
+            week_start: string;
+        };
+        FocusStats: {
+            /** @description Since Monday */
+            week_minutes: number;
+            /** @description The last seven days, today last */
+            days: {
+                /** Format: date */
+                date: string;
+                minutes: number;
+            }[];
+            /** @description Minutes started in each hour 0-23, last 28 days */
+            hours: number[];
+            /** @description Last 28 days */
+            longest_minutes: number;
+            /** @description Last 28 days */
+            sessions: number;
+        };
         NowWidget: {
             /** @enum {string} */
             kind: "series" | "calendar_week" | "habits" | "spend" | "telegram" | "trip" | "water" | "protein";
@@ -26128,7 +26317,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "create_task" | "complete_task" | "check_habit" | "add_note" | "tg_send" | "tg_edit" | "calendar_add" | "calendar_move" | "calendar_remove";
+            kind: "create_task" | "complete_task" | "check_habit" | "add_note" | "tg_send" | "tg_edit" | "calendar_add" | "calendar_move" | "calendar_remove" | "journal_note";
             /** @description What the user confirms, in words */
             summary: string;
             /** @description The message of a Telegram proposal (tg_send, tg_edit), which the user may change on Confirm; null for the other kinds */
@@ -26273,6 +26462,8 @@ export interface components {
                 created_at?: string;
                 /** @description The weekly review also goes to Saved Messages */
                 review_to_self?: boolean;
+                /** @description Ani's morning and evening line goes to Saved Messages as a voice message */
+                voice_to_self?: boolean;
             } | null;
         };
         TelegramChat: {

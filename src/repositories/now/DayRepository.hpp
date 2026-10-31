@@ -40,6 +40,31 @@ public:
         });
     }
 
+    /// Focus by the person's clock: minutes of this week (Monday on), each of the last seven days, each
+    /// hour of the day over the last 28 days, the longest session of those 28 days and how many there were.
+    nlohmann::json focus_stats(const std::string& owner, const std::string& tz) {
+        return Database::get().execute_read([&](auto& txn) {
+            return nlohmann::json::parse(
+                txn.exec_params(
+                       "WITH t AS (SELECT (now() AT TIME ZONE $2)::date AS d), "
+                       "f AS (SELECT (started_at AT TIME ZONE $2) AS at, minutes FROM focus_sessions WHERE owner_id = "
+                       "$1::uuid AND started_at > now() - interval '29 days') "
+                       "SELECT json_build_object("
+                       "'week_minutes', (SELECT COALESCE(sum(minutes), 0) FROM f, t WHERE at::date >= "
+                       "date_trunc('week', t.d)::date), "
+                       "'days', (SELECT json_agg(json_build_object('date', g::date, 'minutes', (SELECT "
+                       "COALESCE(sum(minutes), 0) FROM f WHERE at::date = g::date)) ORDER BY g) FROM t, "
+                       "generate_series(t.d - 6, t.d, interval '1 day') g), "
+                       "'hours', (SELECT json_agg((SELECT COALESCE(sum(minutes), 0) FROM f, t WHERE at::date > t.d - "
+                       "28 AND extract(hour FROM at) = h) ORDER BY h) FROM generate_series(0, 23) h), "
+                       "'longest_minutes', (SELECT COALESCE(max(minutes), 0) FROM f, t WHERE at::date > t.d - 28), "
+                       "'sessions', (SELECT count(*) FROM f, t WHERE at::date > t.d - 28))::text",
+                       owner,
+                       tz)[0][0]
+                    .template as<std::string>());
+        });
+    }
+
     /// {focus, workouts, tasks} of the local @p date in @p tz.
     nlohmann::json day(const std::string& owner, const std::string& date, const std::string& tz) {
         return Database::get().execute_read([&](auto& txn) {

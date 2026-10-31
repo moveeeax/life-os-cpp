@@ -86,6 +86,18 @@ void NowDayController::day(const HttpRequestPtr& req, Callback&& callback) {
     }
 }
 
+void NowDayController::focusStats(const HttpRequestPtr& req, Callback&& callback) {
+    API_MODULE_USER_GUARD(Core::now_enabled(), "now", req, callback, owner);
+    const std::string tz_in = req->getParameter("tz");
+    const std::string tz = Repositories::Zones::is_zone(tz_in) ? tz_in : "UTC";
+    try {
+        callback(Response::ok(json{{"data", Repositories::Now::DayRepository().focus_stats(owner, tz)}}));
+    } catch (const std::exception& e) {
+        spdlog::error("now.focusStats failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
 void NowDayController::addFocus(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::now_enabled(), "now", req, callback, owner);
     json body;

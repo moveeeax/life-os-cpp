@@ -273,6 +273,25 @@ Proposed add_note(const json& args) {
                     json{{"method", "POST"}, {"path", "/api/v1/tasks/notes"}, {"body", {{"text", text}}}}};
 }
 
+/// The evening diary she writes from a talk: a note under the topic journal for @p today.
+Proposed journal_note(const json& args, const std::string& today) {
+    const std::string title = text_arg(args, "title");
+    const std::string body = text_arg(args, "body");
+    if (title.empty() || length(title) > 120) {
+        return refusal("invalid", "the title is 1 to 120 characters");
+    }
+    if (body.empty() || length(body) > 4000) {
+        return refusal("invalid", "the entry is 1 to 4000 characters");
+    }
+    json note{{"title", title}, {"body", body}, {"topic", "journal"}};
+    if (today.size() == 10) {
+        note["date"] = today;
+    }
+    return Proposal{"journal_note",
+                    "Diary entry «" + cut(title, 80) + "»: «" + cut(body, 200) + "»",
+                    json{{"method", "POST"}, {"path", "/api/v1/notes"}, {"body", note}}};
+}
+
 /// A Telegram chat or message id argument (digits, a minus for a group); empty when it is not one.
 std::string tg_id(const json& args, const char* key) {
     static const std::regex kIdRe("^-?\\d{1,20}$");
@@ -522,6 +541,12 @@ json definitions() {
         tool("add_note",
              "Propose a note to the person's inbox, to sort later. Nothing is written until they confirm it.",
              object({{"text", {{"type", "string"}, {"description", "The note"}}}}, json::array({"text"}))),
+        tool("journal_note",
+             "Propose today's diary entry, written from what the person told you about their day, in their words "
+             "and first person. Nothing is written until they confirm it.",
+             object({{"title", {{"type", "string"}, {"description", "A few words for the day"}}},
+                     {"body", {{"type", "string"}, {"description", "The entry, a few short paragraphs"}}}},
+                    json::array({"title", "body"}))),
     });
 }
 
@@ -564,8 +589,8 @@ json calendar_definitions() {
 
 bool is_write(const std::string& name) {
     return name == "create_task" || name == "complete_task" || name == "check_habit" || name == "add_note" ||
-           name == "tg_send" || name == "tg_edit" || name == "calendar_add" || name == "calendar_move" ||
-           name == "calendar_remove";
+           name == "journal_note" || name == "tg_send" || name == "tg_edit" || name == "calendar_add" ||
+           name == "calendar_move" || name == "calendar_remove";
 }
 
 Proposed propose(Net::Http::Transport& transport,
@@ -588,6 +613,9 @@ Proposed propose(Net::Http::Transport& transport,
         }
         if (name == "add_note") {
             return add_note(args);
+        }
+        if (name == "journal_note") {
+            return journal_note(args, today);
         }
         if (name == "calendar_add") {
             return calendar_add(args);

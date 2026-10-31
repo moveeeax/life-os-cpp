@@ -21,6 +21,8 @@
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
 #include "api/PathNormalize.hpp"
+#include "repositories/Zones.hpp"
+#include "repositories/agent/DealRepository.hpp"
 #include "repositories/agent/FactRepository.hpp"
 #include "repositories/agent/HookRepository.hpp"
 #include "repositories/agent/InboxRepository.hpp"
@@ -204,6 +206,33 @@ void AniSettingsController::removeFact(const HttpRequestPtr& req, Callback&& cal
         no_content(callback);
     } catch (const std::exception& e) {
         spdlog::error("ani.facts remove failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
+void AniSettingsController::deals(const HttpRequestPtr& req, Callback&& callback) {
+    ANI_SETTINGS_GUARD(req, callback, owner);
+    const std::string tz = req->getParameter("tz");
+    try {
+        callback(Response::ok(json{{"data",
+                                    Repositories::Agent::DealRepository().week(
+                                        owner, Repositories::Zones::is_zone(tz) ? tz : std::string("UTC"))}}));
+    } catch (const std::exception& e) {
+        spdlog::error("ani.deals failed: {}", e.what());
+        callback(ErrorResponse::internal_error());
+    }
+}
+
+void AniSettingsController::removeDeal(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
+    ANI_SETTINGS_GUARD(req, callback, owner);
+    try {
+        if (!is_valid_uuid(id) || !Repositories::Agent::DealRepository().remove(owner, id)) {
+            callback(ErrorResponse::not_found("deal_not_found"));
+            return;
+        }
+        no_content(callback);
+    } catch (const std::exception& e) {
+        spdlog::error("ani.deals remove failed: {}", e.what());
         callback(ErrorResponse::internal_error());
     }
 }

@@ -27,6 +27,8 @@ public:
         bool review_to_self = false;
         /// The waiting pass ran within the hour.
         bool waiting_fresh = false;
+        /// The morning and evening line go as a voice message to Saved Messages.
+        bool voice_to_self = false;
     };
 
     /// The link, whoever it serves.
@@ -34,7 +36,7 @@ public:
         return Database::get().execute_read([&](auto& txn) -> std::optional<Link> {
             auto r = txn.exec(
                 "SELECT owner_id::text, me_id, username, primed, review_to_self, COALESCE(waiting_at > now() - "
-                "interval '1 hour', false) FROM telegram_link LIMIT 1");
+                "interval '1 hour', false), voice_to_self FROM telegram_link LIMIT 1");
             if (r.empty()) {
                 return std::nullopt;
             }
@@ -43,7 +45,8 @@ public:
                         r[0][2].template as<std::string>(),
                         r[0][3].template as<bool>(),
                         r[0][4].template as<bool>(),
-                        r[0][5].template as<bool>()};
+                        r[0][5].template as<bool>(),
+                        r[0][6].template as<bool>()};
         });
     }
 
@@ -61,7 +64,9 @@ public:
         return Database::get().execute_read([&](auto& txn) -> std::optional<nlohmann::json> {
             auto r = txn.exec_params(
                 "SELECT json_build_object('me_id', me_id, 'username', username, 'polled_at', polled_at, "
-                "'last_error', last_error, 'created_at', created_at, 'review_to_self', review_to_self)::text FROM "
+                "'last_error', last_error, 'created_at', created_at, 'review_to_self', review_to_self, "
+                "'voice_to_self', "
+                "voice_to_self)::text FROM "
                 "telegram_link WHERE owner_id = "
                 "$1::uuid",
                 owner);
@@ -217,6 +222,27 @@ public:
                           "review_to_self AND review_sent_week IS DISTINCT FROM $2",
                           owner,
                           week)
+                       .affected_rows() > 0;
+        });
+    }
+
+    void set_voice_to_self(const std::string& owner, bool on) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params("UPDATE telegram_link SET voice_to_self = $2 WHERE owner_id = $1::uuid", owner, on);
+            return true;
+        });
+    }
+
+    /// Marks the @p kind line ("morning", "evening") of @p day as sent; false when it went already or the
+    /// switch is off.
+    bool claim_voice(const std::string& owner, const std::string& kind, const std::string& day) {
+        return Database::get().execute_write([&](auto& txn) {
+            return txn.exec_params(
+                          "UPDATE telegram_link SET voice_sent = voice_sent || jsonb_build_object($2::text, $3::text) "
+                          "WHERE owner_id = $1::uuid AND voice_to_self AND (voice_sent->>$2) IS DISTINCT FROM $3",
+                          owner,
+                          kind,
+                          day)
                        .affected_rows() > 0;
         });
     }

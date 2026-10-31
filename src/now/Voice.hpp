@@ -211,10 +211,12 @@ inline Session mint(Net::Http::Transport& transport, const Settings& s) {
     return {parsed["value"].get<std::string>(), parsed["expires_at"].get<long long>(), s.model, s.voice};
 }
 
-/// @p text read aloud in the voice of @p s, as MP3 bytes. A text longer than
-/// kSpeechTextMax is cut on a character boundary. @throws Unavailable when no
-/// audio came back.
-inline std::string speak(Net::Http::Transport& transport, const Settings& s, std::string text) {
+/// @p text read aloud in the voice of @p s, as MP3 bytes (or @p format: "opus" for a Telegram voice note). A text
+/// longer than kSpeechTextMax is cut on a character boundary. @throws Unavailable when no audio came back.
+inline std::string speak(Net::Http::Transport& transport,
+                         const Settings& s,
+                         std::string text,
+                         const std::string& format = "mp3") {
     if (text.size() > kSpeechTextMax) {
         std::size_t end = kSpeechTextMax;
         while (end > 0 && (static_cast<unsigned char>(text[end]) & 0xC0) == 0x80) {
@@ -226,7 +228,7 @@ inline std::string speak(Net::Http::Transport& transport, const Settings& s, std
                               {"voice", s.voice},
                               {"input", text},
                               {"instructions", kSpeechInstructions},
-                              {"response_format", "mp3"}};
+                              {"response_format", format}};
     Net::Http::Response r;
     try {
         r = transport.post_json(kSpeechUrl, body.dump(), {{"Authorization", "Bearer " + s.api_key}}, 30);

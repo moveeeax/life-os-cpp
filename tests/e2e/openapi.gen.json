@@ -4531,6 +4531,105 @@
      }
     }
    },
+   "AniDeal": {
+    "type": "object",
+    "required": [
+     "id",
+     "text",
+     "kind",
+     "habit",
+     "target",
+     "done",
+     "week_start"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "text": {
+      "type": "string"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "workouts",
+       "focus_minutes",
+       "habit"
+      ]
+     },
+     "habit": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "The habit's name",
+      "for kind habit": null
+     },
+     "target": {
+      "type": "integer"
+     },
+     "done": {
+      "type": "integer",
+      "description": "Finished workouts, focus minutes or ticks of the habit this week"
+     },
+     "week_start": {
+      "type": "string",
+      "format": "date"
+     }
+    }
+   },
+   "FocusStats": {
+    "type": "object",
+    "required": [
+     "week_minutes",
+     "days",
+     "hours",
+     "longest_minutes",
+     "sessions"
+    ],
+    "properties": {
+     "week_minutes": {
+      "type": "integer",
+      "description": "Since Monday"
+     },
+     "days": {
+      "type": "array",
+      "description": "The last seven days, today last",
+      "items": {
+       "type": "object",
+       "required": [
+        "date",
+        "minutes"
+       ],
+       "properties": {
+        "date": {
+         "type": "string",
+         "format": "date"
+        },
+        "minutes": {
+         "type": "integer"
+        }
+       }
+      }
+     },
+     "hours": {
+      "type": "array",
+      "items": {
+       "type": "integer"
+      },
+      "description": "Minutes started in each hour 0-23, last 28 days"
+     },
+     "longest_minutes": {
+      "type": "integer",
+      "description": "Last 28 days"
+     },
+     "sessions": {
+      "type": "integer",
+      "description": "Last 28 days"
+     }
+    }
+   },
    "NowWidget": {
     "type": "object",
     "required": [
@@ -4776,7 +4875,8 @@
        "tg_edit",
        "calendar_add",
        "calendar_move",
-       "calendar_remove"
+       "calendar_remove",
+       "journal_note"
       ]
      },
      "summary": {
@@ -5229,6 +5329,10 @@
        "review_to_self": {
         "type": "boolean",
         "description": "The weekly review also goes to Saved Messages"
+       },
+       "voice_to_self": {
+        "type": "boolean",
+        "description": "Ani's morning and evening line goes to Saved Messages as a voice message"
        }
       }
      }
@@ -30185,6 +30289,91 @@
     }
    }
   },
+  "/api/v1/ani/deals": {
+   "get": {
+    "summary": "This week's promises to Ani, with their progress",
+    "description": "The week runs Monday to Sunday on the caller's clock (tz). Ani keeps a promise with her promise tool.",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "description": "The caller's IANA zone (UTC when not one)",
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The promises, oldest first",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/AniDeal"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated"
+     }
+    }
+   }
+  },
+  "/api/v1/ani/deals/{id}": {
+   "delete": {
+    "summary": "Drop a promise",
+    "tags": [
+     "ani"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Dropped"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "deal_not_found"
+     }
+    }
+   }
+  },
   "/api/v1/ani/bare": {
    "get": {
     "summary": "Short signed links to the bare outfit's model",
@@ -30405,6 +30594,55 @@
      },
      "404": {
       "description": "Now is off (now)"
+     }
+    }
+   }
+  },
+  "/api/v1/now/focus-stats": {
+   "get": {
+    "summary": "Focus by the caller's clock",
+    "tags": [
+     "now"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "tz",
+      "in": "query",
+      "description": "The caller's IANA zone (UTC when not one)",
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "This week, the last seven days, the hours of the day over 28 days",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/FocusStats"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "404": {
+      "description": "Now module disabled"
      }
     }
    }
@@ -31843,8 +32081,8 @@
   },
   "/api/v1/telegram/settings": {
    "put": {
-    "summary": "The weekly review to Saved Messages switch",
-    "description": "Refused for API keys.",
+    "summary": "The switches of what goes to Saved Messages",
+    "description": "Refused for API keys. At least one switch is given.",
     "tags": [
      "telegram"
     ],
@@ -31859,12 +32097,14 @@
       "application/json": {
        "schema": {
         "type": "object",
-        "required": [
-         "review_to_self"
-        ],
         "properties": {
          "review_to_self": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "The weekly review on Sunday"
+         },
+         "voice_to_self": {
+          "type": "boolean",
+          "description": "Ani's morning (08:00) and evening (21:00) line as a voice message"
          }
         }
        }
@@ -31891,7 +32131,7 @@
       }
      },
      "400": {
-      "description": "invalid_review_to_self"
+      "description": "invalid_settings"
      },
      "401": {
       "description": "Not authenticated"
@@ -39585,7 +39825,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 598020,
-  "source_fnv1a64": "98a2a4c45fe7a7d0"
+  "source_bytes": 601532,
+  "source_fnv1a64": "86f4d62459bbd327"
  }
 }

@@ -16,6 +16,7 @@
 
 #include "agent/Actions.hpp"
 #include "agent/CalendarTools.hpp"
+#include "agent/DealTools.hpp"
 #include "agent/FactTools.hpp"
 #include "agent/Gateway.hpp"
 #include "agent/Hook.hpp"
@@ -32,6 +33,7 @@
 #include "now/Voice.hpp"
 #include "repositories/agent/ActionRepository.hpp"
 #include "repositories/agent/AgentRepository.hpp"
+#include "repositories/agent/DealRepository.hpp"
 #include "repositories/agent/FactRepository.hpp"
 #include "repositories/agent/InboxRepository.hpp"
 #include "repositories/agent/TurnRepository.hpp"
@@ -43,6 +45,7 @@ namespace {
 using json = nlohmann::json;
 using Repositories::Agent::ActionRepository;
 using Repositories::Agent::AgentRepository;
+using Repositories::Agent::DealRepository;
 using Repositories::Agent::FactRepository;
 using Repositories::Agent::InboxRepository;
 using Repositories::Agent::TurnRepository;
@@ -382,6 +385,10 @@ json process_turn(const json& payload) {
                     tools.push_back(t);
                 }
                 run = FactTools::runner(owner, std::move(run));
+                for (const auto& t : DealTools::definitions()) {
+                    tools.push_back(t);
+                }
+                run = DealTools::runner(owner, tz, std::move(run));
                 const bool calendar = CalendarTools::available(owner);
                 if (calendar) {
                     for (const auto& t : CalendarTools::definitions()) {
@@ -415,8 +422,10 @@ json process_turn(const json& payload) {
         // The offset goes with the zone: times she writes for the calendar carry it.
         const std::string zone = tz + (turns.utc_offset(tz) ? " (UTC" + *turns.utc_offset(tz) + ")" : std::string());
         const std::string facts = FactTools::facts_note(FactRepository().list(owner));
+        const std::string deals = DealTools::deals_note(DealRepository().week(owner, tz));
         const std::string text = preface(local, zone, tools, outcomes) +
-                                 (facts.empty() ? std::string() : "\n" + facts) + "\n" +
+                                 (facts.empty() ? std::string() : "\n" + facts) +
+                                 (deals.empty() ? std::string() : "\n" + deals) + "\n" +
                                  (origin == "hook" ? hook_note() + "\n" + said : said);
         const auto out = Gateway::converse(Net::Http::transport(),
                                            "http://" + gateway->first + ":" + std::to_string(Gateway::kGatewayPort),
