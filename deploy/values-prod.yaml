@@ -108,6 +108,10 @@ auth:
 # cluster (values-frontend-prod.yaml), so there is no third proxy.
 rateLimit:
   enabled: true
+  # Since 1.55.0 Now (Ani, the widgets, her lines) stays loaded under every
+  # tab, so opening a section sends its requests on top of Now's; the chart's
+  # 60 a minute per user answered 429 to a Money page open (2026-11-01).
+  requests: 240
   trustProxy: true
   trustedProxyCount: 2
   # Redis down → refuse rather than let the login go unthrottled; sessions live
