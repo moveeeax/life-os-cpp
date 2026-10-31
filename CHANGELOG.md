@@ -6,6 +6,14 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.54.0] - 2026-10-31
+
+### Added
+- Ani lives her own day on Now: after a short night she says to keep the hard things for after lunch (and yawns), after a good one she cheers; one small quest a day (an overdue task, two glasses of water before noon or twenty minutes of focus) that she praises when it is done; anniversaries of border crossings; a question after a calendar meeting ends, which opens the chat; promises for the week ("three workouts") kept with her new promise tool and checked against workouts, focus minutes or a habit's ticks, with a nudge on Wednesday and the result on Sunday evening, listed in Account; achievements she celebrates (ten hours of focus in a week, a session over ninety minutes, a kept promise); during a focus session she stays on screen and keeps quiet; the chat gains Quiz (questions from the person's notes through a new notes tool) and Diary (two questions, then a journal note to confirm, also offered at 21:30); and her morning and evening word can come as a voice message to Telegram's Saved Messages (a switch on the Telegram card). GET /api/v1/now/focus-stats gives focus by week, day and hour.
+
+### Fixed
+- Ani speaks of herself in the feminine and to the person with «ты» in Russian, Telegram lines included (they came out as «Я предлагаю отправить… Подтвердите, чтобы я отправил»), and her read-aloud voice is asked for as a young woman's.
+
 ## [1.53.0] - 2026-10-31
 
 ### Added

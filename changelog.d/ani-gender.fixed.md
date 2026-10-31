@@ -1,1 +1,0 @@
-Ani speaks of herself in the feminine and to the person with «ты» in Russian, Telegram lines included (they came out as «Я предлагаю отправить… Подтвердите, чтобы я отправил»), and her read-aloud voice is asked for as a young woman's.
