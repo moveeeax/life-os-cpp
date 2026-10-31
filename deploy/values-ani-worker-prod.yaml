@@ -34,6 +34,11 @@ extraEnvFrom:
       name: life-os-app
   - secretRef:
       name: life-os-ani-agent
+  # Her voice (ANI_VOICE_API_KEY) for the morning and evening voice message
+  # to Telegram's Saved Messages; without it the line is not sent.
+  - secretRef:
+      name: life-os-ani-voice
+      optional: true
 
 aniAgents:
   enabled: true

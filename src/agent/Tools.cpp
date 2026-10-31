@@ -73,6 +73,11 @@ json definitions() {
              "Goals with their progress; active ones unless a status is given.",
              object({{"status", {{"type", "string"}, {"enum", {"active", "done", "dropped"}}}}})),
         tool("habits", "The person's habits in their order.", object(json::object())),
+        tool("notes",
+             "The person's notes (course notes, solved problems, knowledge, the diary) by words or a topic, newest "
+             "first: for a quiz from what they learn, or to recall what they wrote.",
+             object({{"query", {{"type", "string"}, {"description", "Words of the title, summary or body"}}},
+                     {"topic", {{"type", "string"}, {"description", "A topic such as leetcode, course or journal"}}}})),
         tool("sleep",
              "Sleep sessions from the person's watch between two days (both included).",
              object({{"from", {{"type", "string"}, {"description", "First day, YYYY-MM-DD"}}},
@@ -108,6 +113,11 @@ std::optional<Call> route(const std::string& name, const json& raw, const std::s
         put(c, "status", status.empty() ? "active" : status);
     } else if (name == "habits") {
         c.path = "/api/v1/habits";
+    } else if (name == "notes") {
+        c.path = "/api/v1/notes";
+        put(c, "q", text_arg(args, "query"));
+        put(c, "topic", text_arg(args, "topic"));
+        c.query.emplace_back("limit", "10");
     } else if (name == "sleep") {
         c.path = "/api/v1/fitness/sleep";
         put(c, "from", day_arg(args, "from"));

@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AniChat } from './AniChat';
+import { AniChat, DIARY_ASK, QUIZ_ASK } from './AniChat';
 import * as chat from './chat';
 import type { Turn } from './chat';
 
@@ -309,5 +309,30 @@ describe('AniChat', () => {
     fireEvent.click(await screen.findByText('Cancel'));
     expect(await screen.findByText('Cancelled')).toBeTruthy();
     expect(chat.readTurn).not.toHaveBeenCalled();
+  });
+
+  it('QuizAndDiaryAsks: the two buttons send her asks', async () => {
+    vi.mocked(chat.loadTurns).mockResolvedValue([]);
+    vi.mocked(chat.sendMessage).mockResolvedValue(turn({ id: 'q1', text: QUIZ_ASK }));
+    render(<AniChat tz="UTC" onClose={() => {}} />);
+    fireEvent.click(await screen.findByText('Квиз'));
+    await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith(QUIZ_ASK, 'UTC'));
+  });
+
+  it('a seed from her line is sent, or waits in the field when it ends with a colon', async () => {
+    vi.mocked(chat.loadTurns).mockResolvedValue([]);
+    vi.mocked(chat.sendMessage).mockResolvedValue(turn({ id: 'd1', text: DIARY_ASK }));
+    render(<AniChat tz="UTC" seed={DIARY_ASK} onClose={() => {}} />);
+    await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith(DIARY_ASK, 'UTC'));
+    cleanup();
+    vi.mocked(chat.sendMessage).mockClear();
+    render(<AniChat tz="UTC" seed="После встречи «Sync» есть задачи: " onClose={() => {}} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    expect(((await screen.findByRole('textbox')) as HTMLTextAreaElement).value).toBe(
+      'После встречи «Sync» есть задачи: ',
+    );
+    expect(chat.sendMessage).not.toHaveBeenCalled();
   });
 });

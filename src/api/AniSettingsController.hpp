@@ -28,6 +28,8 @@ public:
     ADD_METHOD_TO(AniSettingsController::addFact, "/api/v1/ani/facts", Post);
     ADD_METHOD_TO(AniSettingsController::editFact, "/api/v1/ani/facts/{id}", Patch);
     ADD_METHOD_TO(AniSettingsController::removeFact, "/api/v1/ani/facts/{id}", Delete);
+    ADD_METHOD_TO(AniSettingsController::deals, "/api/v1/ani/deals", Get);
+    ADD_METHOD_TO(AniSettingsController::removeDeal, "/api/v1/ani/deals/{id}", Delete);
     ADD_METHOD_TO(AniSettingsController::bare, "/api/v1/ani/bare", Get);
     ADD_METHOD_TO(AniSettingsController::webhook, "/api/v1/ani/webhook", Get);
     ADD_METHOD_TO(AniSettingsController::rotateWebhook, "/api/v1/ani/webhook/rotate", Post);
@@ -49,6 +51,9 @@ public:
     void addReminder(const HttpRequestPtr& req, Callback&& callback);
     void removeReminder(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void savePrefs(const HttpRequestPtr& req, Callback&& callback);
+    /// This week's promises to Ani with their progress, and dropping one.
+    void deals(const HttpRequestPtr& req, Callback&& callback);
+    void removeDeal(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void facts(const HttpRequestPtr& req, Callback&& callback);
     void addFact(const HttpRequestPtr& req, Callback&& callback);
     void editFact(const HttpRequestPtr& req, Callback&& callback, const std::string& id);

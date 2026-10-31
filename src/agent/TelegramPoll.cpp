@@ -14,6 +14,7 @@
 
 #include "agent/Hook.hpp"
 #include "agent/Intake.hpp"
+#include "agent/VoiceBrief.hpp"
 #include "repositories/telegram/LinkRepository.hpp"
 #include "telegram/Gateway.hpp"
 
@@ -239,6 +240,10 @@ json process_poll(const json&) {
         }
     }
     links.polled(link->owner);
+    // The morning and evening line as a voice message, once a day each (the switch is in Account).
+    if (link->voice_to_self) {
+        VoiceBrief::send_due(transport, link->owner, link->me_id);
+    }
     if (found.empty()) {
         return json{{"status", "done"}, {"new", 0}};
     }

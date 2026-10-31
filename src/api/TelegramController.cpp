@@ -493,12 +493,20 @@ void TelegramController::settings(const HttpRequestPtr& req, Callback&& callback
         return;
     }
     const auto on = body.find("review_to_self");
-    if (on == body.end() || !on->is_boolean()) {
-        callback(ErrorResponse::bad_request("invalid_review_to_self", "review_to_self is true or false"));
+    const auto voice = body.find("voice_to_self");
+    const bool review_ok = on != body.end() && on->is_boolean();
+    const bool voice_ok = voice != body.end() && voice->is_boolean();
+    if ((on != body.end() && !review_ok) || (voice != body.end() && !voice_ok) || (!review_ok && !voice_ok)) {
+        callback(ErrorResponse::bad_request("invalid_settings", "review_to_self and voice_to_self are true or false"));
         return;
     }
     LinkRepository links;
-    links.set_review_to_self(owner, on->get<bool>());
+    if (review_ok) {
+        links.set_review_to_self(owner, on->get<bool>());
+    }
+    if (voice_ok) {
+        links.set_voice_to_self(owner, voice->get<bool>());
+    }
     callback(Response::ok(json{{"data", links.status(owner).value_or(json::object())}}));
 }
 

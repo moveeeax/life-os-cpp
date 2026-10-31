@@ -81,6 +81,23 @@ TEST_F(NowDay, FocusSessionValidates) {
     EXPECT_ANY_THROW(day.add_focus(kAnna, "2026-10-29T03:00:00Z", "2026-10-29T08:00:00Z", 300, ""));
 }
 
+TEST_F(NowDay, FocusStatsByTheClock) {
+    Database::get().execute_write([](auto& txn) {
+        txn.exec_params(
+            "INSERT INTO focus_sessions (owner_id, started_at, ended_at, minutes) VALUES ($1::uuid, now() - interval "
+            "'30 seconds', now(), 25), ($1::uuid, now() - interval '40 days', now() - interval '40 days' + interval "
+            "'50 minutes', 50)",
+            std::string(kAnna));
+        return true;
+    });
+    const json s = day.focus_stats(kAnna, "UTC");
+    EXPECT_EQ(s["days"].size(), 7u);
+    EXPECT_EQ(s["days"][6]["minutes"], 25) << "today is last";
+    EXPECT_EQ(s["hours"].size(), 24u);
+    EXPECT_EQ(s["longest_minutes"], 25) << "40 days ago is out of the window";
+    EXPECT_EQ(s["sessions"], 1);
+}
+
 TEST_F(NowDay, FocusSessionOnceFromTwoTabs) {
     const auto a = day.add_focus(kAnna, "2026-10-29T03:00:00Z", "2026-10-29T03:25:00Z", 25, "");
     const auto b = day.add_focus(kAnna, "2026-10-29T03:00:00Z", "2026-10-29T03:25:00Z", 25, "");

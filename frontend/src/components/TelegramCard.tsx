@@ -91,7 +91,8 @@ export function TelegramCard() {
   });
   const [sure, setSure] = useState(false);
   const review = useApiMutation(
-    async (on: boolean) => await api.putJson(`${PATH}/settings`, { body: { review_to_self: on } }),
+    async (body: { review_to_self?: boolean; voice_to_self?: boolean }) =>
+      await api.putJson(`${PATH}/settings`, { body }),
     { invalidate: [qk.telegram()] },
   );
   const s = status.data;
@@ -131,9 +132,18 @@ export function TelegramCard() {
                 type="checkbox"
                 checked={l?.review_to_self ?? false}
                 disabled={review.isPending}
-                onChange={(e) => review.mutate(e.target.checked)}
+                onChange={(e) => review.mutate({ review_to_self: e.target.checked })}
               />
               Weekly review to Saved Messages
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={l?.voice_to_self ?? false}
+                disabled={review.isPending}
+                onChange={(e) => review.mutate({ voice_to_self: e.target.checked })}
+              />
+              Ani&apos;s morning and evening word as a voice message to Saved Messages
             </label>
             <QuietChats />
             {l?.last_error && (

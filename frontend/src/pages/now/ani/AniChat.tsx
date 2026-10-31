@@ -84,12 +84,19 @@ const fromUser = (t: { origin?: string }) => t.origin !== 'hook' && t.origin !==
 /** Her answer to webhook events meaning "not worth telling" (SILENT, any case, bare punctuation). */
 const isSilent = (reply: string | null) => /^[\s\p{P}]*silent[\s\p{P}]*$/iu.test(reply ?? '');
 
+/** What the chat's two buttons ask her for. */
+export const QUIZ_ASK = 'Устрой мне квиз на пять минут по моим заметкам.';
+export const DIARY_ASK = 'Давай запишем мой день в дневник.';
+
 export function AniChat({
   tz,
+  seed,
   onClose,
   onReply,
 }: {
   tz: string;
+  /** Text from her line that opened the chat: ending in ": " it waits in the field, else it is sent. */
+  seed?: string | null;
   onClose(): void;
   /** A reply just arrived and the sound is on. */
   onReply?(turn: Turn): void;
@@ -228,16 +235,16 @@ export function AniChat({
     }
   };
 
-  const send = async (e?: FormEvent) => {
+  const send = async (e?: FormEvent, said?: string) => {
     e?.preventDefault();
-    const t = text.trim();
+    const t = (said ?? text).trim();
     if (!t || sending || waiting) return;
     setSending(true);
     setProblem(null);
     try {
       const turn = await sendMessage(t, tz);
       setTurns((all) => [...(all ?? []), turn]);
-      setText('');
+      if (said === undefined) setText('');
     } catch (err) {
       setProblem(refusal(err));
     } finally {
@@ -245,6 +252,17 @@ export function AniChat({
       inputRef.current?.focus();
     }
   };
+
+  // Her line's seed: once the chat has loaded.
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (!seed || seeded.current || turns === null) return;
+    seeded.current = true;
+    if (seed.endsWith(': ')) setText(seed);
+    else void send(undefined, seed);
+    // Once, when the turns are in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turns, seed]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -291,6 +309,22 @@ export function AniChat({
           ×
         </button>
       </header>
+      <div className="ani-chat-asks" role="group" aria-label="Ask her for">
+        <button
+          type="button"
+          disabled={sending || waiting}
+          onClick={() => void send(undefined, QUIZ_ASK)}
+        >
+          Квиз
+        </button>
+        <button
+          type="button"
+          disabled={sending || waiting}
+          onClick={() => void send(undefined, DIARY_ASK)}
+        >
+          Дневник
+        </button>
+      </div>
       {confirmClear ? (
         <div className="ani-chat-confirm" role="alertdialog" aria-label="Clear the chat">
           <span>Clear the chat? She starts a new conversation.</span>

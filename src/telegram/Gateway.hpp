@@ -51,6 +51,16 @@ Reply call(Net::Http::Transport& transport,
            const nlohmann::json& body = nullptr,
            const std::string& idempotency_key = "");
 
+/// Sends @p bytes as a file of @p type (voice, audio, document...) to @p chat, named @p file_name, with
+/// an optional @p caption: POST /v1/chats/{chat}/files with the raw body.
+Reply upload(Net::Http::Transport& transport,
+             const Settings& s,
+             const std::string& chat,
+             const std::string& bytes,
+             const std::string& type,
+             const std::string& file_name,
+             const std::string& caption = "");
+
 /// Whether @p id is a Telegram chat or message id as the gateway writes it
 /// (an optional minus and 1 to 20 digits).
 bool valid_id(const std::string& id);

@@ -124,4 +124,35 @@ Reply call(Net::Http::Transport& transport,
     return out;
 }
 
+Reply upload(Net::Http::Transport& transport,
+             const Settings& s,
+             const std::string& chat,
+             const std::string& bytes,
+             const std::string& type,
+             const std::string& file_name,
+             const std::string& caption) {
+    Net::Http::Request r;
+    r.method = "POST";
+    r.url = s.url + "/v1/chats/" + chat + "/files?type=" + encode(type) + "&file_name=" + encode(file_name);
+    if (!caption.empty()) {
+        r.url += "&caption=" + encode(caption);
+    }
+    r.headers = {{"Authorization", "Bearer " + s.token}, {"Accept", "application/json"}};
+    r.body = bytes;
+    r.content_type = "application/octet-stream";
+    r.timeout_seconds = 30;
+    Reply out;
+    try {
+        const auto res = transport.send(r);
+        out.status = res.status;
+        out.body = json::parse(res.body, nullptr, /*allow_exceptions=*/false);
+        if (out.body.is_discarded()) {
+            out.body = nullptr;
+        }
+    } catch (const Net::Http::TransportError&) {
+        out.status = 0;
+    }
+    return out;
+}
+
 }  // namespace Telegram

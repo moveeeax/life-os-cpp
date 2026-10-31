@@ -71,4 +71,25 @@ describe('TelegramCard', () => {
     fireEvent.click(screen.getByText('Unlink'));
     await waitFor(() => expect(api.deleteJson).toHaveBeenCalledWith('/api/v1/telegram'));
   });
+
+  it('turns on her voice messages to Saved Messages', async () => {
+    mount({
+      configured: true,
+      linked: true,
+      elsewhere: false,
+      link: {
+        me_id: '1389231240',
+        username: 'moveeeax',
+        polled_at: null,
+        last_error: null,
+        created_at: '2026-10-29T10:00:00Z',
+      },
+    });
+    fireEvent.click(await screen.findByLabelText(/voice message to Saved Messages/));
+    await waitFor(() =>
+      expect(api.putJson).toHaveBeenCalledWith('/api/v1/telegram/settings', {
+        body: { voice_to_self: true },
+      }),
+    );
+  });
 });

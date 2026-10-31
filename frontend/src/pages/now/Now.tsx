@@ -141,12 +141,13 @@ function NowScreen() {
     for (const k of CORNER_KEYS) if (next[k] == null && raw[k]) next[k] = raw[k];
     saveOrder(next);
   };
-  // Ani: on a desktop wide enough for her ledge left of the dock, out of the
-  // way during a focus session. Her files sit next to the wallpapers.
+  // Ani: on a desktop wide enough for her ledge left of the dock; during a
+  // focus session she stays, quiet, above the focus screen. Her files sit
+  // next to the wallpapers.
   const [ani] = useAni();
   const wide = useWide(1024);
   const base = aniBase(useWallpapers('desktop', ani.on && wide).data?.[0]?.url);
-  const showAni = ani.on && wide && base !== null && session.phase === 'idle';
+  const showAni = ani.on && wide && base !== null;
   // A session that reached its end (not one left early) sends her back
   // with a word about a break.
   const [afterFocus, setAfterFocus] = useState(false);
@@ -254,6 +255,7 @@ function NowScreen() {
             day: nowDay.data,
           }}
           afterFocus={afterFocus}
+          focusing={session.phase !== 'idle'}
           onAfterFocus={() => setAfterFocus(false)}
           onFocus={onAniFocus}
           onTasksMoved={() => void today.refetch()}

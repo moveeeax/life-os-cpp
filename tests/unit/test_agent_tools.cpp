@@ -67,9 +67,9 @@ TEST(AgentTools, EveryDefinedToolHasARoute) {
         EXPECT_EQ(d["function"]["parameters"]["type"], "object") << name;
         EXPECT_TRUE(T::route(name, json::object(), "UTC").has_value()) << name;
     }
-    EXPECT_EQ(
-        names,
-        (std::set<std::string>{"today", "tasks_of_day", "find_tasks", "goals", "habits", "sleep", "money", "food"}));
+    EXPECT_EQ(names,
+              (std::set<std::string>{
+                  "today", "tasks_of_day", "find_tasks", "goals", "habits", "notes", "sleep", "money", "food"}));
     EXPECT_FALSE(T::route("delete_everything", json::object(), "UTC").has_value());
 }
 
@@ -172,7 +172,7 @@ TEST(AgentTools, ThePrefaceSendsTheModelToTheTools) {
     const auto p = Agent::preface("2026-10-26 00:05, Mon", "Asia/Almaty", T::definitions());
     EXPECT_EQ(p.rfind("[Life OS: the person's local time is 2026-10-26 00:05, Mon, Asia/Almaty. ", 0), 0U);
     EXPECT_NE(p.find("one or two short spoken sentences"), std::string::npos);
-    EXPECT_NE(p.find("(today, tasks_of_day, find_tasks, goals, habits, sleep, money, food)"), std::string::npos);
+    EXPECT_NE(p.find("(today, tasks_of_day, find_tasks, goals, habits, notes, sleep, money, food)"), std::string::npos);
     EXPECT_NE(p.find("never from memory"), std::string::npos);
     EXPECT_EQ(p.back(), ']');
 
@@ -188,9 +188,9 @@ TEST(AgentTools, ThePrefaceTellsOfProposalsAndWhatBecameOfThem) {
     const auto p = Agent::preface(
         "2026-10-26 00:05, Mon", "UTC", tools, json::parse(R"([{"summary":"Add the task «Молоко»","status":"done"},
                                                   {"summary":"Tick «Зарядка» for today","status":"cancelled"}])"));
-    EXPECT_NE(p.find("(today, tasks_of_day, find_tasks, goals, habits, sleep, money, food)"), std::string::npos)
+    EXPECT_NE(p.find("(today, tasks_of_day, find_tasks, goals, habits, notes, sleep, money, food)"), std::string::npos)
         << "the write tools are not in the read list";
-    EXPECT_NE(p.find("Changes (create_task, complete_task, check_habit, add_note) are only proposed"),
+    EXPECT_NE(p.find("Changes (create_task, complete_task, check_habit, add_note, journal_note) are only proposed"),
               std::string::npos);
     EXPECT_NE(p.find("Add the task «Молоко»: done. Tick «Зарядка» for today: cancelled by the person."),
               std::string::npos);
@@ -244,7 +244,8 @@ TEST(AgentActions, EveryWriteToolIsKnown) {
         names.insert(d["function"]["name"].get<std::string>());
         EXPECT_FALSE(d["function"]["parameters"]["required"].empty());
     }
-    EXPECT_EQ(names, (std::set<std::string>{"create_task", "complete_task", "check_habit", "add_note"}));
+    EXPECT_EQ(names,
+              (std::set<std::string>{"create_task", "complete_task", "check_habit", "add_note", "journal_note"}));
     for (const auto& n : names) {
         EXPECT_TRUE(A::is_write(n)) << n;
     }
@@ -385,6 +386,18 @@ TEST(AgentActions, TelegramMessagesAreProposalsWithTheChatTitle) {
         << "an unknown chat, or Telegram not the person's";
     EXPECT_EQ(refused(propose(site, "tg_send", json{{"chat", "../x"}, {"text", "x"}}))["error"], "invalid");
     EXPECT_EQ(refused(propose(site, "tg_send", json{{"chat", "10"}, {"text", " "}}))["error"], "invalid");
+}
+
+TEST(AgentActions, TheDiaryIsAJournalNoteOfTheDay) {
+    Site site;
+    auto entry = std::get<A::Proposal>(
+        propose(site, "journal_note", json{{"title", "Тихий день"}, {"body", "Сходил в зал, закрыл визу."}}));
+    EXPECT_EQ(entry.kind, "journal_note");
+    EXPECT_EQ(entry.request["path"], "/api/v1/notes");
+    EXPECT_EQ(entry.request["body"]["topic"], "journal");
+    EXPECT_EQ(entry.request["body"]["date"], "2026-10-26");
+    EXPECT_TRUE(site.sent.empty());
+    EXPECT_EQ(refused(propose(site, "journal_note", json{{"title", "x"}}))["error"], "invalid");
 }
 
 TEST(AgentActions, CalendarChangesAreProposalsInThePersonsTime) {

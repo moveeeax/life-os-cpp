@@ -22,6 +22,8 @@ beforeEach(() => {
           },
         ],
       };
+    if (path === '/api/v1/ani/deals')
+      return { data: [{ id: 'd1', text: 'Зал три раза', kind: 'workouts', target: 3, done: 1 }] };
     return { data: { bare: false, muted: ['stretch', 'brief'] } };
   });
   vi.spyOn(api, 'postJson').mockResolvedValue({ data: { id: 'f2' } });
@@ -78,5 +80,13 @@ describe('AniFacts', () => {
     await waitFor(() =>
       expect(api.putJson).toHaveBeenCalledWith('/api/v1/ani/prefs', { body: { muted: ['brief'] } }),
     );
+  });
+
+  it('PromisesOfTheWeek: listed with their progress and dropped', async () => {
+    mount();
+    expect(await screen.findByText('Зал три раза')).toBeTruthy();
+    expect(screen.getByText('1 of 3')).toBeTruthy();
+    fireEvent.click(screen.getByText('Drop'));
+    await waitFor(() => expect(api.deleteJson).toHaveBeenCalledWith('/api/v1/ani/deals/d1'));
   });
 });
