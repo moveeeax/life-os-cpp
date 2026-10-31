@@ -879,3 +879,40 @@
   padding: 6px 8px;
   resize: vertical;
 }
+
+/* The chat's two asks: a quiz from the notes, the evening diary. */
+.ani-chat-asks {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px 6px;
+}
+.ani-chat-asks button {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  background: rgb(255 255 255 / 0.06);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ani-chat-asks button:disabled {
+  opacity: 0.5;
+}
+
+/* With you in a focus session: above the focus screen, her ledge and words
+   away, she only keeps you company. */
+.ani-corner[data-focusing] {
+  z-index: 41;
+}
+.ani-corner[data-focusing] .ani-ledge,
+.ani-corner[data-focusing] .ani-say,
+.ani-corner[data-focusing] .ani-ask,
+.ani-corner[data-focusing] .ani-think,
+.ani-corner[data-focusing] .ani-think-puff,
+.ani-corner[data-focusing] .ani-think-puffs {
+  display: none;
+}
+.ani-corner[data-focusing] .ani-hit {
+  pointer-events: none;
+}

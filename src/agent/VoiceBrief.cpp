@@ -54,7 +54,7 @@ std::string brief_words(const std::string& kind, const Counts& c) {
         return out + " Я рядом, если что.";
     }
     std::string out = "Вечер. ";
-    out += c.done_today > 0 ? "Сегодня ты закрыл задач: " + std::to_string(c.done_today) + "."
+    out += c.done_today > 0 ? "Сегодня закрыто задач: " + std::to_string(c.done_today) + "."
                             : "Сегодня без закрытых задач, бывает.";
     if (c.habits > 0) {
         out += " Привычки: " + std::to_string(c.habits_done) + " из " + std::to_string(c.habits) + ".";

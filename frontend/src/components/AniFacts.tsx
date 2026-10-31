@@ -70,6 +70,60 @@ function FactRow({ fact }: { fact: Fact }) {
 }
 
 /** What Ani keeps about the user, and the kinds of her lines they muted on Now. */
+type Deal = { id: string; text: string; kind: string; target: number; done: number };
+const DEALS = ['ani', 'deals'] as const;
+
+/** This week's promises to Ani with how far each is; dropping one. */
+function Deals() {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const deals = useQuery({
+    queryKey: [...DEALS, tz],
+    retry: false,
+    queryFn: async ({ signal }) =>
+      (await api.getJson<{ data: Deal[] }>('/api/v1/ani/deals', { query: { tz }, signal })).data,
+  });
+  const drop = useApiMutation(
+    async (id: string) => await api.deleteJson(`/api/v1/ani/deals/${id}`),
+    {
+      invalidate: [DEALS],
+    },
+  );
+  const list = Array.isArray(deals.data) ? deals.data : [];
+  return (
+    <div className="space-y-1">
+      <div className="text-sm font-medium">Promises this week</div>
+      {list.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Tell her by voice or in the chat: “three workouts this week”. She checks it against your
+          data and holds you to it.
+        </p>
+      ) : (
+        <ul className="text-sm">
+          {list.map((d) => (
+            <li key={d.id} className="flex items-center justify-between gap-2 py-1">
+              <span>
+                {d.text}{' '}
+                <span className="num text-muted-foreground">
+                  {d.done} of {d.target}
+                </span>
+                {d.done >= d.target ? ' ✓' : ''}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={drop.isPending}
+                onClick={() => drop.mutate(d.id)}
+              >
+                Drop
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function AniFacts() {
   const facts = useQuery({
     queryKey: KEY,
@@ -121,6 +175,7 @@ export function AniFacts() {
         />
         Hold to talk: on a call the mic listens while you hold it or the space bar
       </label>
+      <Deals />
       <button
         type="button"
         className="text-sm font-medium"

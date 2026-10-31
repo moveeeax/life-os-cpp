@@ -24,6 +24,8 @@ const bareLinks = {
   expires_in: 120,
 };
 const fetchAniBare = vi.fn(() => Promise.resolve(bareLinks));
+vi.mock('./useLife', () => ({ useLife: () => {} }));
+
 vi.mock('@/hooks/useAni', () => ({
   useAniPrefs: () => ({ data: { ...prefs }, isPending: false, isSuccess: true }),
   fetchAniBare: () => fetchAniBare(),

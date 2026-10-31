@@ -17,6 +17,7 @@ import type { Talk, TalkState } from './talk';
 import { useAni, type AniOutfit } from './state';
 import { createToucher, say, type Answer } from './touch';
 import { AniOffers } from './AniOffers';
+import { useLife } from './useLife';
 import { HOLD_KEY, eventOfLine, quietKind, snooze, type LineKind } from './lines';
 import { RIBBON_POINT, type NowDay } from '../ribbon/layout';
 import './ani.css';
@@ -184,9 +185,12 @@ export function AniCorner({
   onWallpaper,
   onSound,
   onTasksMoved,
+  focusing = false,
 }: {
   base: string;
   context: AniContext;
+  /** A focus session runs: she stays, quiet, and keeps the person company. */
+  focusing?: boolean;
   /** She comes back after a focus session that ran to its end. */
   afterFocus?: boolean;
   /** Her word about a break is said (once). */
@@ -335,6 +339,11 @@ export function AniCorner({
   // The kind of the line on screen ("Later", "Not about this") and the turn whose proposals show.
   const [saidKind, setSaidKind] = useState<LineKind | null>(null);
   const [offersTurn, setOffersTurn] = useState<string | null>(null);
+  // What the chat sends (or holds) when her line opens it, and what this opening carries.
+  const [seed, setSeed] = useState<string | null>(null);
+  const [chatSeed, setChatSeed] = useState<string | null>(null);
+  const focusingRef = useRef(focusing);
+  focusingRef.current = focusing;
   // The line that brought the proposals stays in their bubble; writing an own reply keeps it open.
   const [offerLine, setOfferLine] = useState<string | null>(null);
   const [writing, setWriting] = useState(false);
@@ -354,7 +363,7 @@ export function AniCorner({
   answer.current = (a: Answer) =>
     new Promise<void>((finished) => {
       const e = engine.current;
-      if (!e || calling.current) return finished();
+      if (!e || calling.current || focusingRef.current) return finished();
       // A kind the person muted or put off keeps quiet.
       if (quietKind(a.kind, mutedRef.current)) return finished();
       lineEnds.current?.();
@@ -362,6 +371,7 @@ export function AniCorner({
       if (a.mood) e.mood(moodLevel(moveMood(contextRef.current.date, a.mood)));
       lastSaidAt.current = Date.now();
       setSaidChat(Boolean(a.chat));
+      if (!a.chat) setSeed(null);
       setSaid(a.text);
       setSaidKind(a.kind ?? null);
       if (a.turn) {
@@ -649,6 +659,19 @@ export function AniCorner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, hasToday]);
 
+  // Her own lines through the day (useLife): energy, the quest, anniversaries, meetings, promises,
+  // achievements and the evening diary; never over another line, the chat, a call or a focus.
+  const quietRef = useRef(true);
+  quietRef.current = !ready || !ani.here || said !== null || chat || focusing || busy !== null;
+  useLife({
+    on: ready,
+    context,
+    engine,
+    quiet: () => quietRef.current || calling.current,
+    say: (a) => void answer.current(a),
+    onSeed: setSeed,
+  });
+
   // A focus ticked while she watches: she cheers.
   const focus = context.today?.focus;
   const focusKey = focus ? `${focus.date}|${focus.kind}|${focus.ref_id ?? focus.text}` : null;
@@ -825,7 +848,12 @@ export function AniCorner({
         : ['Away', 'Call her back'];
 
   return (
-    <div ref={cornerRef} className="ani-corner" data-ready={ready ? '' : undefined}>
+    <div
+      ref={cornerRef}
+      className="ani-corner"
+      data-ready={ready ? '' : undefined}
+      data-focusing={focusing ? '' : undefined}
+    >
       <canvas ref={canvasRef} className="ani-canvas" aria-hidden="true" />
       {said && ani.here && !chat && !(offersTurn && (said === offerLine || writing)) ? (
         saidChat ? (
@@ -837,6 +865,8 @@ export function AniCorner({
             onClick={() => {
               engine.current?.hush();
               setSaid(null);
+              setChatSeed(seed);
+              setSeed(null);
               setChat(true);
             }}
           >
@@ -1029,7 +1059,11 @@ export function AniCorner({
         <AniChat
           key={chatKey}
           tz={context.tz}
-          onClose={() => setChat(false)}
+          seed={chatSeed}
+          onClose={() => {
+            setChat(false);
+            setChatSeed(null);
+          }}
           onReply={(t) => {
             // She speaks only when she is on screen and not in a voice call.
             if (engine.current && ani.here && !calling.current) {
