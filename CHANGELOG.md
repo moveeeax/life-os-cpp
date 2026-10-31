@@ -6,6 +6,12 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.53.0] - 2026-10-31
+
+### Added
+- Search of the whole site: Cmd+K (Ctrl+K) or the nav's search button finds tasks, notes, ledger rows, goals, habits, trips and pages; arrows move, Enter opens the hit, a task opens on Today or Later.
+- Water and protein on Now: a Water widget adds a glass (250 ml) in one tap toward the day's goal (2000 ml until set, PUT /api/v1/food/water/goal), a Protein widget shows the day's protein against the goal and adds one of the two richest recent products in one tap; the food day carries water_ml, so Ani sees it too.
+
 ## [1.52.5] - 2026-10-30
 
 ### Fixed
