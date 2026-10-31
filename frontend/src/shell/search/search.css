@@ -1,0 +1,95 @@
+/* The site search: a glass box over a dim veil, the hits in groups, one row a
+   title and a day. */
+.s-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: calc(env(safe-area-inset-top, 0px) + 12vh) 16px 16px;
+  background: rgb(6 9 18 / 0.5);
+}
+.s-box {
+  width: min(640px, 100%);
+  max-height: 70vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border-radius: 18px;
+  border: 1px solid var(--g-glass-line);
+  background: rgb(14 18 32 / 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 0.45);
+  overflow: hidden;
+  color: var(--g-ink);
+}
+.s-input {
+  width: 100%;
+  padding: 16px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--g-glass-line);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 17px;
+  outline: none;
+  box-shadow: none;
+}
+.s-input:focus,
+.s-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border-bottom-color: var(--g-glass-line);
+}
+.s-input::placeholder {
+  color: var(--g-ink-faint);
+}
+.s-results {
+  overflow-y: auto;
+  padding: 6px 8px 10px;
+}
+.s-group-name {
+  padding: 10px 10px 4px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--g-ink-faint);
+}
+.s-hit {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.s-hit[data-on] {
+  background: rgb(255 255 255 / 0.1);
+}
+.s-hit-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.s-hit-when {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--g-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.s-empty {
+  margin: 0;
+  padding: 18px;
+  color: var(--g-ink-faint);
+  font-size: 14px;
+}

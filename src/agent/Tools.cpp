@@ -82,7 +82,9 @@ json definitions() {
              "Income, spending and the categories of a week, month or quarter, per currency.",
              object({{"period", {{"type", "string"}, {"enum", {"week", "month", "quarter"}}}},
                      {"date", {{"type", "string"}, {"description", "A day inside the period; today when left out"}}}})),
-        tool("food", "The food diary of a day with its totals and targets.", object({{"date", kDay}})),
+        tool("food",
+             "The food diary of a day with its totals, targets and the water drunk (ml).",
+             object({{"date", kDay}})),
     });
 }
 

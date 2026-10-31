@@ -7,6 +7,7 @@ import { Backdrop } from './Backdrop';
 import { GlassAccountMenu } from './GlassAccountMenu';
 import { GlassNav } from './GlassNav';
 import { HideNumbersButton } from './HideNumbersButton';
+import { SEARCH_OPEN, SearchPalette } from './search/SearchPalette';
 import './glass.css';
 import './kit/kit.css';
 
@@ -30,6 +31,27 @@ export function GlassShell() {
       <div className="g-shade" />
       <div className="g-bar">
         <GlassNav />
+        <div className="g-account">
+          <button
+            type="button"
+            className="g-pill"
+            aria-label="Search (⌘K)"
+            title="Search (⌘K)"
+            onClick={() => window.dispatchEvent(new Event(SEARCH_OPEN))}
+          >
+            <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true">
+              <circle
+                cx="8.5"
+                cy="8.5"
+                r="5.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+              />
+              <path d="m13 13 4 4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
         <GlassAccountMenu />
       </div>
       <main id="main-content" className="g-main">
@@ -45,6 +67,7 @@ export function GlassShell() {
       </main>
       {/* Dialogs land here: inside .glass, outside the sheets and their filters. */}
       <div id="g-portal" />
+      <SearchPalette />
       <HideNumbersButton />
     </div>
   );

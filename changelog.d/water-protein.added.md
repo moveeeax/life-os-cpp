@@ -1,0 +1,1 @@
+Water and protein on Now: a Water widget adds a glass (250 ml) in one tap toward the day's goal (2000 ml until set, PUT /api/v1/food/water/goal), a Protein widget shows the day's protein against the goal and adds one of the two richest recent products in one tap; the food day carries water_ml, so Ani sees it too.

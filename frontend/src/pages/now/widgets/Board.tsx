@@ -1,13 +1,27 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 
 import { useMetrics } from '@/hooks/useMetrics';
+import { useCreateEntry, useFoodDay, useFoodRecent } from '@/hooks/useFood';
 import { useReport } from '@/hooks/useMoney';
 import { api } from '@/lib/api/client';
 import { shiftDays } from '@/lib/dates';
+import { qk } from '@/lib/api/queryKeys';
 import { formatTotal } from '@/lib/networth';
 import type { Today } from '@/lib/now/types';
 
-import { FIXED, sparkPoints, trendWords, weekRange, widgetKey, type Widget } from './widgets';
+import { hourIn } from '../modes/modes';
+import {
+  FIXED,
+  GLASS_ML,
+  mealAt,
+  quickFoods,
+  sparkPoints,
+  trendWords,
+  weekRange,
+  widgetKey,
+  type Widget,
+} from './widgets';
 import './widgets.css';
 
 function seriesNumber(v: number): string {
@@ -151,6 +165,115 @@ function Spend({ date }: { date: string }) {
   );
 }
 
+type Water = { date: string; ml: number; goal_ml: number };
+
+const litres = (ml: number) =>
+  new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(ml / 1000);
+
+/** Water of the day: a glass in one tap, and one back if it was a slip. */
+function WaterWidget({ date }: { date: string }) {
+  const qc = useQueryClient();
+  const water = useQuery({
+    queryKey: qk.food.water(date),
+    retry: false,
+    queryFn: async ({ signal }) =>
+      (await api.getJson<{ data: Water }>('/api/v1/food/water', { query: { date }, signal })).data,
+  });
+  const [busy, setBusy] = useState(false);
+  const add = async (ml: number) => {
+    setBusy(true);
+    try {
+      const r = await api.postJson<{ data: Water }>('/api/v1/food/water', {
+        body: { date, add_ml: ml },
+      });
+      qc.setQueryData(qk.food.water(date), r.data);
+    } catch {
+      // The number stays as it was; the next tap tries again.
+    }
+    setBusy(false);
+  };
+  const w = water.data;
+  return (
+    <Frame
+      k={FIXED.water}
+      v={
+        w ? (
+          <span className="num">
+            {litres(w.ml)} of {litres(w.goal_ml)} l
+          </span>
+        ) : (
+          '—'
+        )
+      }
+    >
+      <div className="w-taps">
+        <button type="button" disabled={busy || !w} onClick={() => void add(GLASS_ML)}>
+          + {GLASS_ML} ml
+        </button>
+        {w && w.ml > 0 && (
+          <button
+            type="button"
+            className="w-tap-quiet"
+            disabled={busy}
+            aria-label={`Take back ${GLASS_ML} ml`}
+            onClick={() => void add(-GLASS_ML)}
+          >
+            −
+          </button>
+        )}
+      </div>
+    </Frame>
+  );
+}
+
+/** Protein of the day against the goal, and the two richest recent products in one tap. */
+function ProteinWidget({ date, tz }: { date: string; tz: string }) {
+  const day = useFoodDay(date);
+  const recent = useFoodRecent();
+  const create = useCreateEntry();
+  const eaten = day.data?.totals.protein_g;
+  const goal = day.data?.targets?.protein_g;
+  const quick = quickFoods(recent.data ?? []);
+  return (
+    <Frame
+      k={FIXED.protein}
+      v={
+        eaten == null ? (
+          '—'
+        ) : (
+          <span className="num">
+            {Math.round(eaten)}
+            {goal ? ` of ${goal}` : ''} g
+          </span>
+        )
+      }
+    >
+      {quick.length > 0 && (
+        <div className="w-taps">
+          {quick.map(({ item, grams }) => (
+            <button
+              key={item.id}
+              type="button"
+              disabled={create.isPending}
+              title={`${item.name}, ${grams} g`}
+              onClick={() =>
+                create.mutate({
+                  date,
+                  meal: mealAt(hourIn(new Date(), tz)),
+                  item_id: item.id,
+                  grams,
+                })
+              }
+            >
+              + {item.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </Frame>
+  );
+}
+
 function TelegramWidget() {
   const waiting = useQuery({
     queryKey: ['telegram', 'waiting'],
@@ -200,6 +323,8 @@ export function Board({
         if (w.kind === 'calendar_week') return <CalendarWeek key={key} date={date} tz={tz} />;
         if (w.kind === 'spend') return <Spend key={key} date={date} />;
         if (w.kind === 'telegram') return <TelegramWidget key={key} />;
+        if (w.kind === 'water') return <WaterWidget key={key} date={date} />;
+        if (w.kind === 'protein') return <ProteinWidget key={key} date={date} tz={tz} />;
         if (w.kind === 'habits') {
           const h = today?.habits;
           return (

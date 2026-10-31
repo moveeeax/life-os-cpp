@@ -18,6 +18,7 @@
 #include "repositories/food/EntryRepository.hpp"
 #include "repositories/food/GoalsRepository.hpp"
 #include "repositories/food/ItemRepository.hpp"
+#include "repositories/food/WaterRepository.hpp"
 #include "test_helpers.hpp"
 
 using json = nlohmann::json;
@@ -380,4 +381,22 @@ TEST_F(FoodRepositoriesTest, UpdatedAtMovesByTheTriggerAlone) {
     touch.brand = "Fresh";
     items.update(kAnna, item["id"], touch);
     EXPECT_GT(updated_at_of(sql, item["id"]), before) << "food_items_touch_updated_at";
+}
+
+TEST_F(FoodRepositoriesTest, WaterAddsUpPerDayAndOwner) {
+    Repositories::WaterRepository water;
+    Database::get().execute_write([](auto& txn) {
+        txn.exec("DELETE FROM food_water");
+        return true;
+    });
+    EXPECT_EQ(water.day(kAnna, "2026-10-31"), json({{"date", "2026-10-31"}, {"ml", 0}, {"goal_ml", 2000}}));
+    water.add(kAnna, "2026-10-31", 250);
+    EXPECT_EQ(water.add(kAnna, "2026-10-31", 250)["ml"], 500);
+    EXPECT_EQ(water.add(kAnna, "2026-10-31", -1000)["ml"], 0) << "never below zero";
+    EXPECT_EQ(water.day(kBoris, "2026-10-31")["ml"], 0) << "another owner";
+    water.add(kAnna, "2026-10-30", 300);
+    EXPECT_EQ(water.day(kAnna, "2026-10-31")["ml"], 0) << "another day";
+    water.set_goal(kAnna, 2500);
+    EXPECT_EQ(water.day(kAnna, "2026-10-31")["goal_ml"], 2500);
+    EXPECT_EQ(water.day(kBoris, "2026-10-31")["goal_ml"], 2000);
 }

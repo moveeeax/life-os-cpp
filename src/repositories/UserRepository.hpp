@@ -354,6 +354,7 @@ public:
         "calendar_links",
         "calendar_states",
         "focus_sessions",
+        "food_water",
     };
 
     /// The foreign keys of the billing tables (migration 007, ON DELETE

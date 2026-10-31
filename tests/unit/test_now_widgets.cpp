@@ -25,6 +25,8 @@ TEST(NowWidgets, WidgetsValidate) {
     EXPECT_TRUE(widgets_problem(json::object(), clean));
     EXPECT_TRUE(widgets_problem(json::array({{{"kind", "weather"}}}), clean)) << "unknown kind";
     EXPECT_TRUE(widgets_problem(json::array({{{"kind", "series"}}}), clean)) << "a series needs a source";
+    EXPECT_FALSE(widgets_problem(json::array({{{"kind", "water"}}, {{"kind", "protein"}}}), clean))
+        << "water and protein are kinds";
     EXPECT_TRUE(widgets_problem(json::array({{{"kind", "series"}, {"source", 42}}}), clean))
         << "a source of the wrong type is a problem, not a throw";
     EXPECT_TRUE(widgets_problem(json::array({{{"kind", "habits"}}, {{"kind", "habits"}}}), clean)) << "once";

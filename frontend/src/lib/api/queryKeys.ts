@@ -73,6 +73,7 @@ export const qk = {
         ? (['food', 'items'] as const)
         : (['food', 'items', q, archived ? 'all' : 'active'] as const),
     recent: () => ['food', 'recent'] as const,
+    water: (date: string) => ['food', 'water', date] as const,
     offSearch: (q: string) => ['food', 'off', q] as const,
     /** Whether the module answers at all (it is 404 while switched off). */
     enabled: () => ['food-enabled'] as const,
