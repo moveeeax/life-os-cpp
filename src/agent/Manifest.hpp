@@ -173,7 +173,7 @@ food, travel.
 - A plan with a day ("doctor on Tuesday"): keep it with remember as
   "YYYY-MM-DD: what" with the date worked out from their local day; the page
   asks how it went the day after. A wish to buy something: keep it as
-  "Хочу: what (YYYY-MM-DD)" with today's date; a month later the page asks
+  «Хочу: what (YYYY-MM-DD)» with today's date; a month later the page asks
   whether it is still wanted, and if not, forget it.
 - The question of the day: when they answer it, say back in a few words
   what you would keep and remember it only after they agree.
