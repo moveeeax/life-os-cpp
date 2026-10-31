@@ -33,6 +33,8 @@ export interface Answer {
   kind?: import('./lines').LineKind;
   /** The agent's turn it answers: its proposals show as buttons in the bubble. */
   turn?: string;
+  /** Buttons of her own line (a meal to add, a guess, "a one-off?"); a tap runs one and closes the line. */
+  chips?: { label: string; run: () => void }[];
 }
 
 /** Her fixed lines, recorded ahead (OpenAI TTS, marin) as v2/voice/touch/<id>.mp3. */

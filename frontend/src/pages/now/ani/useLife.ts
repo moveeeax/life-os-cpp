@@ -8,6 +8,7 @@ import type { Ani } from './engine';
 import type { AniContext } from './AniCorner';
 import {
   achievementsOf,
+  addMoment,
   anniversaryOf,
   dealLine,
   energyLine,
@@ -179,7 +180,18 @@ export function useLife({
       }
 
       // The quest of the day: given once, praised once when it is done.
-      if (age >= AFTER_S.quest && hour >= 7 && hour < 20 && once('quest')) {
+      // A low mood checked in today (useLife2 marks it): no quest that day, she does not push.
+      const lowMood = (() => {
+        try {
+          return (
+            (JSON.parse(localStorage.getItem('now:ani:life2') ?? '{}') as Record<string, string>)
+              .mood === day
+          );
+        } catch {
+          return false;
+        }
+      })();
+      if (!lowMood && age >= AFTER_S.quest && hour >= 7 && hour < 20 && once('quest')) {
         const q = questOf(input);
         mark('quest', day);
         mark('questOf', JSON.stringify({ day, q, start: input }));
@@ -204,6 +216,7 @@ export function useLife({
         questDone(given.q, input, given.start)
       ) {
         mark('questDone', day);
+        addMoment(day, 'Задание дня выполнено');
         e?.feel('happy', 3);
         e?.act('peace');
         sayRef.current({ text: 'Задание дня выполнено! Умница.', mood: 1, kind: 'hello' });
@@ -214,6 +227,7 @@ export function useLife({
       const anniversary = anniversaryOf(day, x ?? []);
       if (anniversary && age >= AFTER_S.anniversary && once('anniversary')) {
         mark('anniversary', day);
+        addMoment(day, anniversary);
         e?.feel('happy', 3);
         sayRef.current({ text: anniversary, kind: 'hello' });
         return;
@@ -239,6 +253,7 @@ export function useLife({
         mark(`deal${weekday}`, day);
         const kept = weekday === 0 && (d ?? [])[0] && d![0].done >= d![0].target;
         if (kept) {
+          addMoment(day, `Уговор выполнен: ${d![0].text}`);
           e?.feel('happy', 3);
           e?.act('spin');
         }
@@ -251,6 +266,7 @@ export function useLife({
       const fresh = achievementsOf(f ?? null, d ?? []).find((a) => !got.includes(a.id));
       if (fresh) {
         mark('achievements', [...got, fresh.id].slice(-50).join(','));
+        addMoment(day, fresh.title);
         e?.feel('happy', 4);
         e?.act('spin');
         sayRef.current({ text: `Новое достижение: ${fresh.title}!`, mood: 1, kind: 'hello' });

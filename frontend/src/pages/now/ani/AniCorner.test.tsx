@@ -25,6 +25,12 @@ const bareLinks = {
 };
 const fetchAniBare = vi.fn(() => Promise.resolve(bareLinks));
 vi.mock('./useLife', () => ({ useLife: () => {} }));
+vi.mock('./useLife2', () => ({
+  // The test reaches her own lines through the say the corner hands over.
+  useLife2: (o: { say: (a: unknown) => void }) => {
+    (globalThis as { aniSay?: (a: unknown) => void }).aniSay = o.say;
+  },
+}));
 
 vi.mock('@/hooks/useAni', () => ({
   useAniPrefs: () => ({ data: { ...prefs }, isPending: false, isSuccess: true }),
@@ -215,6 +221,24 @@ describe('AniCorner', () => {
     await mount();
     act(() => engine.opts!.onDoubleTap?.());
     expect(document.querySelector('.ani-chat')).not.toBeNull();
+  });
+
+  it('LineChips: her own line with buttons runs the one tapped and closes', async () => {
+    await mount();
+    const run = vi.fn();
+    await act(async () => {
+      (globalThis as { aniSay?: (a: unknown) => void }).aniSay?.({
+        text: 'Угадай, сколько шагов было вчера?',
+        chips: [
+          { label: '4 тыс', run: () => undefined },
+          { label: '7 тыс', run },
+        ],
+      });
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    fireEvent.click(screen.getByRole('button', { name: '7 тыс' }));
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: '4 тыс' })).toBeNull();
   });
 
   it('only shows her lines while she is muted', async () => {

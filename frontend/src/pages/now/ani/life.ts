@@ -139,3 +139,27 @@ export function achievementsOf(
     if (d.done >= d.target) out.push({ id: `deal:${d.id}`, title: `Уговор выполнен: ${d.text}` });
   return out;
 }
+
+const ALBUM_KEY = 'now:ani:album';
+export type Moment = { date: string; title: string };
+
+/** The moments of her album in this browser, newest first. */
+export function readAlbum(): Moment[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(ALBUM_KEY) ?? '[]') as Moment[];
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Keeps a moment (an achievement, a kept promise, an anniversary, a record) once per title and day. */
+export function addMoment(date: string, title: string): void {
+  try {
+    const all = readAlbum();
+    if (all.some((m) => m.date === date && m.title === title)) return;
+    localStorage.setItem(ALBUM_KEY, JSON.stringify([{ date, title }, ...all].slice(0, 200)));
+  } catch {
+    // The album is a convenience of this browser.
+  }
+}
