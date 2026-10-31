@@ -4545,7 +4545,9 @@
        "habits",
        "spend",
        "telegram",
-       "trip"
+       "trip",
+       "water",
+       "protein"
       ]
      },
      "source": {
@@ -10630,6 +10632,33 @@
      },
      "targets": {
       "$ref": "#/components/schemas/FoodTargets"
+     },
+     "water_ml": {
+      "type": "integer",
+      "description": "Water drunk that day"
+     }
+    }
+   },
+   "FoodWater": {
+    "type": "object",
+    "required": [
+     "date",
+     "ml",
+     "goal_ml"
+    ],
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "ml": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 20000
+     },
+     "goal_ml": {
+      "type": "integer",
+      "description": "2000 until the person sets one"
      }
     }
    },
@@ -20259,6 +20288,266 @@
      },
      "404": {
       "description": "Food module disabled, or the job is not the caller's (parse_job)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/food/water": {
+   "get": {
+    "summary": "Water drunk on a day and the day's goal",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "date",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "The local day; today in tz by default"
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The day's water",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/FoodWater"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "invalid_date",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "summary": "Add water to a day, or take some back",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "date",
+         "add_ml"
+        ],
+        "properties": {
+         "date": {
+          "type": "string",
+          "format": "date"
+         },
+         "add_ml": {
+          "type": "integer",
+          "minimum": -5000,
+          "maximum": 5000,
+          "description": "Not 0; the day stays between 0 and 20000 ml"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "The day after it",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/FoodWater"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "invalid_date or invalid_add_ml",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/food/water/goal": {
+   "put": {
+    "summary": "The day's water goal",
+    "tags": [
+     "food"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "ml"
+        ],
+        "properties": {
+         "ml": {
+          "type": "integer",
+          "minimum": 500,
+          "maximum": 8000
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Saved",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "goal_ml"
+           ],
+           "properties": {
+            "goal_ml": {
+             "type": "integer"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "invalid_ml",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Food module disabled",
       "content": {
        "application/json": {
         "schema": {
@@ -39296,7 +39585,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 593904,
-  "source_fnv1a64": "392b673e76cb327d"
+  "source_bytes": 598020,
+  "source_fnv1a64": "4ebef13206f27d30"
  }
 }

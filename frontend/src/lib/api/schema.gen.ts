@@ -7196,6 +7196,206 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/food/water": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Water drunk on a day and the day's goal */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The local day; today in tz by default */
+                    date?: string;
+                    tz?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The day's water */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FoodWater"];
+                        };
+                    };
+                };
+                /** @description invalid_date */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Add water to a day, or take some back */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        date: string;
+                        /** @description Not 0; the day stays between 0 and 20000 ml */
+                        add_ml: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description The day after it */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FoodWater"];
+                        };
+                    };
+                };
+                /** @description invalid_date or invalid_add_ml */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/water/goal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** The day's water goal */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        ml: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Saved */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                goal_ml: number;
+                            };
+                        };
+                    };
+                };
+                /** @description invalid_ml */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/money/currencies": {
         parameters: {
             query?: never;
@@ -25850,7 +26050,7 @@ export interface components {
         };
         NowWidget: {
             /** @enum {string} */
-            kind: "series" | "calendar_week" | "habits" | "spend" | "telegram" | "trip";
+            kind: "series" | "calendar_week" | "habits" | "spend" | "telegram" | "trip" | "water" | "protein";
             /** @description A metrics catalog id, for series only */
             source?: string;
         };
@@ -27598,6 +27798,15 @@ export interface components {
             /** @description Active kcal the band counted that day, when a Mi account is linked */
             active_kcal: number | null;
             targets: components["schemas"]["FoodTargets"];
+            /** @description Water drunk that day */
+            water_ml?: number;
+        };
+        FoodWater: {
+            /** Format: date */
+            date: string;
+            ml: number;
+            /** @description 2000 until the person sets one */
+            goal_ml: number;
         };
         FoodWeek: {
             /** Format: date */

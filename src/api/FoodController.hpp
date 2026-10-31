@@ -41,6 +41,9 @@ public:
     ADD_METHOD_TO(FoodController::deleteEntry, "/api/v1/food/entries/{id}", Delete);
     ADD_METHOD_TO(FoodController::parseStart, "/api/v1/food/parse", Post);
     ADD_METHOD_TO(FoodController::parseStatus, "/api/v1/food/parse/{id}", Get);
+    ADD_METHOD_TO(FoodController::water, "/api/v1/food/water", Get);
+    ADD_METHOD_TO(FoodController::addWater, "/api/v1/food/water", Post);
+    ADD_METHOD_TO(FoodController::waterGoal, "/api/v1/food/water/goal", Put);
     METHOD_LIST_END
 
     using Callback = std::function<void(const HttpResponsePtr&)>;
@@ -57,6 +60,11 @@ public:
     void offSearch(const HttpRequestPtr& req, Callback&& callback);
 
     void day(const HttpRequestPtr& req, Callback&& callback);
+
+    /// Water of a day ({date, ml, goal_ml}), a glass added or taken back, and the day's goal.
+    void water(const HttpRequestPtr& req, Callback&& callback);
+    void addWater(const HttpRequestPtr& req, Callback&& callback);
+    void waterGoal(const HttpRequestPtr& req, Callback&& callback);
     void week(const HttpRequestPtr& req, Callback&& callback);
     void createEntry(const HttpRequestPtr& req, Callback&& callback);
     void createEntries(const HttpRequestPtr& req, Callback&& callback);

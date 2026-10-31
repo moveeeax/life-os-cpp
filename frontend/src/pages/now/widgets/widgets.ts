@@ -10,6 +10,8 @@ export const FIXED: Record<Exclude<Widget['kind'], 'series'>, string> = {
   spend: 'Spending this month',
   telegram: 'Telegram',
   trip: 'Next trip',
+  water: 'Water today',
+  protein: 'Protein today',
 };
 
 export const widgetKey = (w: Widget) => (w.kind === 'series' ? `series:${w.source}` : w.kind);
@@ -60,4 +62,29 @@ export function weekRange(date: string): { from: string; to: string; days: strin
     d.setUTCDate(d.getUTCDate() + 1);
   }
   return { from: days[0], to: days[6], days };
+}
+
+/** One glass, the step of the water widget. */
+export const GLASS_ML = 250;
+
+/** The least protein (per 100 g or 100 ml) a product needs to be offered in one tap. */
+const QUICK_MIN_PROTEIN = 5;
+
+/**
+ * The products the protein widget offers in one tap: the two richest in
+ * protein among the recent ones, each with its first serving or 100 g.
+ */
+export function quickFoods<
+  T extends { id: string; protein_g: number; servings: { grams: number }[] },
+>(recent: readonly T[]): { item: T; grams: number }[] {
+  return [...recent]
+    .filter((i) => i.protein_g >= QUICK_MIN_PROTEIN)
+    .sort((a, b) => b.protein_g - a.protein_g)
+    .slice(0, 2)
+    .map((item) => ({ item, grams: item.servings[0]?.grams ?? 100 }));
+}
+
+/** The meal a one-tap entry goes to by the local hour. */
+export function mealAt(hour: number): 'breakfast' | 'lunch' | 'dinner' | 'snack' {
+  return hour < 11 ? 'breakfast' : hour < 16 ? 'lunch' : hour < 22 ? 'dinner' : 'snack';
 }

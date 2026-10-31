@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router';
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
 
 import { Modal } from '@/components/Modal';
 import { useUpdateTask } from '@/hooks/useTasks';
@@ -47,7 +47,7 @@ export function TaskRow({
   const link = task.source_kind === 'url' ? safeLink(task.source_ref) : null;
   const repeats = repeatLabel(task.repeat);
   return (
-    <li>
+    <li data-task={task.id}>
       <div className="grid grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-3.5 py-2.5">
         <button
           type="button"
@@ -273,7 +273,17 @@ export function TaskList({
   today: string;
   hideProject?: boolean;
 }) {
-  const [open, setOpen] = useState<string | null>(null);
+  // ?task=<id> (the site search) opens that task and brings it into view.
+  const [params] = useSearchParams();
+  const linked = params.get('task');
+  const [open, setOpen] = useState<string | null>(linked);
+  useEffect(() => {
+    if (!linked || !tasks.some((t) => t.id === linked)) return;
+    setOpen(linked);
+    document
+      .querySelector(`[data-task="${CSS.escape(linked)}"]`)
+      ?.scrollIntoView({ block: 'center' });
+  }, [linked, tasks]);
   return (
     <ul className="k-divide">
       {tasks.map((t) => (

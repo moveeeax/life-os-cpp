@@ -42,6 +42,7 @@
 #include "repositories/food/GoalsRepository.hpp"
 #include "repositories/food/ItemRepository.hpp"
 #include "repositories/food/ParseJobRepository.hpp"
+#include "repositories/food/WaterRepository.hpp"
 #include "utils/ErrorResponse.hpp"
 #include "utils/Modules.hpp"
 #include "utils/Utf8.hpp"
@@ -542,7 +543,62 @@ void FoodController::day(const HttpRequestPtr& req, Callback&& callback) {
         const auto active = Repositories::GoalsRepository().active_kcal(owner, date);
         out["active_kcal"] = active ? json(*active) : json();
         out["targets"] = Repositories::food_goals_body(owner, today)["targets"];
+        out["water_ml"] = Repositories::WaterRepository().day(owner, date)["ml"];
         callback(Response::ok(json{{"data", out}}));
+    });
+}
+
+void FoodController::water(const HttpRequestPtr& req, Callback&& callback) {
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
+    const std::string today = local_today(req, &Repositories::Zones::today_in, today_utc());
+    const std::string date = req->getParameter("date").empty() ? today : req->getParameter("date");
+    if (!is_calendar_date(date)) {
+        callback(ErrorResponse::bad_request("invalid_date", "date must be a calendar day as YYYY-MM-DD"));
+        return;
+    }
+    with_repo_errors(callback, "food.water", [&] {
+        callback(Response::ok(json{{"data", Repositories::WaterRepository().day(owner, date)}}));
+    });
+}
+
+void FoodController::addWater(const HttpRequestPtr& req, Callback&& callback) {
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    const std::string date =
+        body.contains("date") && body["date"].is_string() ? body["date"].get<std::string>() : std::string();
+    if (!is_calendar_date(date)) {
+        callback(ErrorResponse::bad_request("invalid_date", "date must be a calendar day as YYYY-MM-DD"));
+        return;
+    }
+    const auto ml = body.find("add_ml");
+    if (ml == body.end() || !ml->is_number_integer() || ml->get<long long>() == 0 || ml->get<long long>() < -5000 ||
+        ml->get<long long>() > 5000) {
+        callback(ErrorResponse::bad_request("invalid_add_ml", "add_ml is a whole number of ml, -5000 to 5000, not 0"));
+        return;
+    }
+    with_repo_errors(callback, "food.addWater", [&] {
+        callback(Response::ok(
+            json{{"data", Repositories::WaterRepository().add(owner, date, static_cast<int>(ml->get<long long>()))}}));
+    });
+}
+
+void FoodController::waterGoal(const HttpRequestPtr& req, Callback&& callback) {
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    const auto ml = body.find("ml");
+    if (ml == body.end() || !ml->is_number_integer() || ml->get<long long>() < 500 || ml->get<long long>() > 8000) {
+        callback(ErrorResponse::bad_request("invalid_ml", "ml is a whole number from 500 to 8000"));
+        return;
+    }
+    with_repo_errors(callback, "food.waterGoal", [&] {
+        Repositories::WaterRepository().set_goal(owner, static_cast<int>(ml->get<long long>()));
+        callback(Response::ok(json{{"data", {{"goal_ml", ml->get<long long>()}}}}));
     });
 }
 
