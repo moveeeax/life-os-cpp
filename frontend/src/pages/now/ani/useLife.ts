@@ -183,7 +183,10 @@ export function useLife({
       // A low mood checked in today (useLife2 marks it): no quest that day, she does not push.
       const lowMood = (() => {
         try {
-          return (JSON.parse(localStorage.getItem('now:ani:life2') ?? '{}') as Record<string, string>).mood === day;
+          return (
+            (JSON.parse(localStorage.getItem('now:ani:life2') ?? '{}') as Record<string, string>)
+              .mood === day
+          );
         } catch {
           return false;
         }
