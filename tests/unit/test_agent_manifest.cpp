@@ -15,6 +15,7 @@
 
 #include "agent/Manifest.hpp"
 #include "agent/Settings.hpp"
+#include "agent/Turn.hpp"
 
 namespace {
 
@@ -151,4 +152,15 @@ TEST(AgentManifest, NoNodeLabelNoAffinity) {
     auto s = settings();
     s.node_label.clear();
     EXPECT_FALSE(M::pod(s, run())["spec"].contains("affinity"));
+}
+
+TEST(AgentManifest, SheSpeaksAsAWomanOnFirstNameTerms) {
+    // Her Telegram lines came out as «Я предлагаю отправить… Подтвердите, чтобы я отправил».
+    const std::string agents = Agent::Manifest::kAgentsMd;
+    EXPECT_NE(agents.find("feminine"), std::string::npos);
+    EXPECT_NE(agents.find("«ты»"), std::string::npos);
+    EXPECT_NE(agents.find("Подтвердите"), std::string::npos) << "named as the form to avoid";
+    const std::string hook = Agent::hook_note();
+    EXPECT_NE(hook.find("feminine"), std::string::npos);
+    EXPECT_NE(hook.find("«ты»"), std::string::npos);
 }

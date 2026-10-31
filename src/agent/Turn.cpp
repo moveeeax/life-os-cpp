@@ -151,7 +151,8 @@ std::string hook_note() {
            "their language. If it is not worth their attention, answer exactly " +
            std::string(kSilent) +
            ". For a Telegram message from a person that waits for an answer, also propose two or three short "
-           "replies in the person's voice with tg_send to that chat id; they pick one or none.]";
+           "replies in the person's voice with tg_send to that chat id; they pick one or none. What you say "
+           "aloud is yours: about yourself in the feminine, to the person with «ты».]";
 }
 
 std::string event_line(const json& payload) {
