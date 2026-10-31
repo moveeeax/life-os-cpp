@@ -172,7 +172,7 @@ TEST(AgentTools, ThePrefaceSendsTheModelToTheTools) {
     const auto p = Agent::preface("2026-10-26 00:05, Mon", "Asia/Almaty", T::definitions());
     EXPECT_EQ(p.rfind("[Life OS: the person's local time is 2026-10-26 00:05, Mon, Asia/Almaty. ", 0), 0U);
     EXPECT_NE(p.find("one or two short spoken sentences"), std::string::npos);
-    EXPECT_NE(p.find("(today, tasks_of_day, find_tasks, goals, habits, sleep, money, food)"), std::string::npos);
+    EXPECT_NE(p.find("(today, tasks_of_day, find_tasks, goals, habits, notes, sleep, money, food)"), std::string::npos);
     EXPECT_NE(p.find("never from memory"), std::string::npos);
     EXPECT_EQ(p.back(), ']');
 
@@ -188,9 +188,9 @@ TEST(AgentTools, ThePrefaceTellsOfProposalsAndWhatBecameOfThem) {
     const auto p = Agent::preface(
         "2026-10-26 00:05, Mon", "UTC", tools, json::parse(R"([{"summary":"Add the task «Молоко»","status":"done"},
                                                   {"summary":"Tick «Зарядка» for today","status":"cancelled"}])"));
-    EXPECT_NE(p.find("(today, tasks_of_day, find_tasks, goals, habits, sleep, money, food)"), std::string::npos)
+    EXPECT_NE(p.find("(today, tasks_of_day, find_tasks, goals, habits, notes, sleep, money, food)"), std::string::npos)
         << "the write tools are not in the read list";
-    EXPECT_NE(p.find("Changes (create_task, complete_task, check_habit, add_note) are only proposed"),
+    EXPECT_NE(p.find("Changes (create_task, complete_task, check_habit, add_note, journal_note) are only proposed"),
               std::string::npos);
     EXPECT_NE(p.find("Add the task «Молоко»: done. Tick «Зарядка» for today: cancelled by the person."),
               std::string::npos);
