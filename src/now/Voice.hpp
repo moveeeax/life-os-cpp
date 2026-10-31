@@ -158,7 +158,7 @@ inline std::string spoken_part(const std::string& text) {
 /// How the replies sound (the speech model takes a direction next to the text).
 inline constexpr const char* kSpeechInstructions =
     "Speak Russian like a native speaker, with Russian stress and intonation and no English accent. "
-    "Warm and a little playful, with a smile in the voice, like a close friend.";
+    "A young woman's voice, warm and a little playful, with a smile in it, like a close friend.";
 
 /// The voice settings; nullopt while no API key is set (the feature is off).
 inline std::optional<Settings> read_settings() {
