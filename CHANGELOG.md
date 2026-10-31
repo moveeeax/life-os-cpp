@@ -6,6 +6,15 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.56.0] - 2026-11-01
+
+### Added
+- Ani reacts to what you do on the site (a task done in the morning, a third taxi in a day, a closed goal, a late dinner, a workout started), at most once per three minutes and twelve times a day; tasks, ledger rows, notes, ribbon events and selected text can be dragged onto her for a time on the ribbon, a category from similar rows, a quiz, help before a meeting, or a fact; her shelf on the ledge shows a plant by the longest habit streak, books by finished courses, cups by kept promises, the morning coffee and a postcard of the last country; her Telegram drafts follow your own way of writing to that person, and the chat has a Мой стиль button; opening a panel of the dock hides Now's centre until it closes.
+
+### Fixed
+- Ani's own lines read their data a minute after Now opens and one read every five seconds, instead of all at once (the 429 of 2026-11-01).
+- The per-user request limit of production is 240 a minute instead of 60: since Now stays under every tab, opening a section on top of it answered 429.
+
 ## [1.55.0] - 2026-10-31
 
 ### Added
