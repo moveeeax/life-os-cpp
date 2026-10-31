@@ -916,3 +916,10 @@
 .ani-corner[data-focusing] .ani-hit {
   pointer-events: none;
 }
+
+/* Buttons of her own line: a meal to add, a guess, "a one-off?". */
+.ani-ask.ani-chips button {
+  color: #fff;
+  font-size: 13px;
+  padding: 4px 11px;
+}

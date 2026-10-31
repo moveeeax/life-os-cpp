@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router';
 
 import '@fontsource-variable/outfit';
@@ -6,9 +6,14 @@ import '@fontsource-variable/outfit';
 import { Backdrop } from './Backdrop';
 import { GlassAccountMenu } from './GlassAccountMenu';
 import { GlassNav } from './GlassNav';
+import { useGlassNav } from './useGlassNav';
 import { HideNumbersButton } from './HideNumbersButton';
 import { SEARCH_OPEN, SearchPalette } from './search/SearchPalette';
 import './glass.css';
+
+// Now kept under every tab on a wide screen (pages/now/Now.tsx), loaded like the Now route.
+const NowKept = lazy(() => import('@/pages/now/Now').then((m) => ({ default: m.NowKept })));
+const KEEP_QUERY = '(min-width: 1024px)';
 import './kit/kit.css';
 
 /**
@@ -16,11 +21,31 @@ import './kit/kit.css';
  * elsewhere), the glass pill nav, and the screen. Each section renders its
  * own calm sheet in the centred column (shell/kit).
  */
+/** Whether the window matches @p query, kept current. */
+function useMatch(query: string): boolean {
+  const [on, setOn] = useState(() => typeof matchMedia === 'function' && matchMedia(query).matches);
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return;
+    const m = matchMedia(query);
+    const change = () => setOn(m.matches);
+    m.addEventListener('change', change);
+    return () => m.removeEventListener('change', change);
+  }, [query]);
+  return on;
+}
+
 export function GlassShell() {
   const { pathname } = useLocation();
   const onNow = pathname === '/now';
+  const nowOn = useGlassNav().nowOn === true;
+  const wide = useMatch(KEEP_QUERY);
+  const keep = nowOn && wide;
   return (
-    <div className="glass dark font-outfit" data-open={onNow ? '' : undefined}>
+    <div
+      className="glass dark font-outfit"
+      data-open={onNow ? '' : undefined}
+      data-keep={keep ? '' : undefined}
+    >
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:inset-s-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-gray-800"
@@ -54,6 +79,11 @@ export function GlassShell() {
         </div>
         <GlassAccountMenu />
       </div>
+      {keep && (
+        <Suspense fallback={null}>
+          <NowKept away={!onNow} />
+        </Suspense>
+      )}
       <main id="main-content" className="g-main">
         <Suspense fallback={null}>
           {onNow ? (

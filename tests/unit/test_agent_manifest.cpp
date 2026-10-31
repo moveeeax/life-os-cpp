@@ -160,6 +160,8 @@ TEST(AgentManifest, SheSpeaksAsAWomanOnFirstNameTerms) {
     EXPECT_NE(agents.find("feminine"), std::string::npos);
     EXPECT_NE(agents.find("«ты»"), std::string::npos);
     EXPECT_NE(agents.find("Подтвердите"), std::string::npos) << "named as the form to avoid";
+    EXPECT_NE(agents.find("\"YYYY-MM-DD: what\""), std::string::npos) << "dated plans the page follows up";
+    EXPECT_NE(agents.find("\"Хочу: what (YYYY-MM-DD)\""), std::string::npos) << "wishes the page asks about";
     const std::string hook = Agent::hook_note();
     EXPECT_NE(hook.find("feminine"), std::string::npos);
     EXPECT_NE(hook.find("«ты»"), std::string::npos);

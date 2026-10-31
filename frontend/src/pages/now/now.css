@@ -196,3 +196,21 @@
   font-size: 13px;
   line-height: 1;
 }
+
+/* Under another tab (the shell keeps Now on a wide screen): the centre and
+   the weather go, the fixed parts (corners, dock, the left tools, Ani) stay. */
+.n-now {
+  position: relative;
+  z-index: 1;
+}
+.n-now[data-away] {
+  /* Above the section's sheet: Ani's bubble and the corners' panels stay on top. */
+  z-index: 2;
+  min-height: 0;
+  height: 0;
+  padding: 0;
+}
+.n-now[data-away] .n-center,
+.n-now[data-away] .n-where {
+  display: none;
+}

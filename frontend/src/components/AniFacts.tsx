@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
+import { formatDay } from '@/lib/dates';
 import type { components } from '@/lib/api/schema.gen';
+import { readAlbum } from '@/pages/now/ani/life';
 import { HOLD_KEY, LINE_KINDS } from '@/pages/now/ani/lines';
 
 type Fact = components['schemas']['AniFact'];
@@ -124,6 +126,41 @@ function Deals() {
   );
 }
 
+/** Her album: the moments she marked (achievements, kept promises, anniversaries, records), in this browser. */
+function Album() {
+  const [open, setOpen] = useState(false);
+  const moments = readAlbum();
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        className="text-sm font-medium"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        Her album ({moments.length})
+      </button>
+      {open &&
+        (moments.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            Achievements, kept promises and anniversaries land here as she marks them on Now.
+          </p>
+        ) : (
+          <ul className="divide-y text-sm">
+            {moments.map((m) => (
+              <li key={`${m.date}|${m.title}`} className="flex justify-between gap-3 py-1.5">
+                <span>{m.title}</span>
+                <span className="num shrink-0 text-muted-foreground">
+                  {formatDay(m.date, { weekday: false })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ))}
+    </div>
+  );
+}
+
 export function AniFacts() {
   const facts = useQuery({
     queryKey: KEY,
@@ -176,6 +213,7 @@ export function AniFacts() {
         Hold to talk: on a call the mic listens while you hold it or the space bar
       </label>
       <Deals />
+      <Album />
       <button
         type="button"
         className="text-sm font-medium"

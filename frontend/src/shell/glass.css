@@ -260,3 +260,31 @@
     }
   }
 }
+
+/* Now kept under every tab (a wide screen with Now on): the section opens in
+   the middle, between Ani's corner on the left and the right edge, above the
+   corners row, and scrolls inside; the picture is only lightly dimmed. */
+.glass[data-keep] .g-shade {
+  background: rgba(8, 10, 24, 0.18);
+}
+.glass[data-keep][data-open] .g-main {
+  min-height: 0;
+}
+.glass[data-keep] .g-page {
+  inset: 0 200px 150px 230px;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent var(--g-top),
+    #000 calc(var(--g-top) + 16px),
+    #000 calc(100% - 24px),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent var(--g-top),
+    #000 calc(var(--g-top) + 16px),
+    #000 calc(100% - 24px),
+    transparent
+  );
+  padding-bottom: 32px;
+}

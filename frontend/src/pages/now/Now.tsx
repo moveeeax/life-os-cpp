@@ -42,23 +42,8 @@ import { ModeCards } from './modes/ModeCards';
 import { Board } from './widgets/Board';
 import { useNowDay } from './ribbon/layout';
 import { Ribbon } from './ribbon/Ribbon';
+import { KEEP_FROM, useWide } from './wide';
 import './now.css';
-
-/** True while the window is at least this wide. */
-function useWide(px: number): boolean {
-  const query = `(min-width: ${px}px)`;
-  const [wide, setWide] = useState(
-    () => typeof matchMedia === 'function' && matchMedia(query).matches,
-  );
-  useEffect(() => {
-    if (typeof matchMedia !== 'function') return;
-    const m = matchMedia(query);
-    const on = () => setWide(m.matches);
-    m.addEventListener('change', on);
-    return () => m.removeEventListener('change', on);
-  }, [query]);
-  return wide;
-}
 
 /** The current time, updated on the minute. */
 function useMinute(): Date {
@@ -87,13 +72,26 @@ function useMinute(): Date {
  */
 export function NowPage() {
   const nav = useGlassNav();
+  const kept = useWide(KEEP_FROM);
   // Now is off: go to the first section that is on, once every probe has
   // answered (a module still asking would count as on and win the redirect).
   if (nav.nowOn === false) return nav.settled ? <Navigate to={homeOf(nav.items)} replace /> : null;
+  // On a wide screen the shell keeps Now on every tab (NowKept): the route itself draws nothing.
+  if (kept && nav.nowOn) return null;
   return <NowScreen />;
 }
 
-function NowScreen() {
+/**
+ * Now under every tab of a wide screen: the corners, the dock, the left
+ * tools and Ani stay while another section opens in the middle; on Now
+ * itself the centre shows. Mounted once by the shell, so a focus session,
+ * its sound and Ani carry on across tabs.
+ */
+export function NowKept({ away }: { away: boolean }) {
+  return <NowScreen away={away} />;
+}
+
+function NowScreen({ away = false }: { away?: boolean }) {
   const me = useMe().data ?? null;
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const now = useMinute();
@@ -164,7 +162,7 @@ function NowScreen() {
   }).format(now);
 
   return (
-    <div className="n-now" data-ani={showAni ? '' : undefined}>
+    <div className="n-now" data-ani={showAni ? '' : undefined} data-away={away ? '' : undefined}>
       <div className="n-where">
         {weather.data ? (
           // The weather takes the place of the zone: the city says where.

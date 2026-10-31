@@ -18,6 +18,7 @@ import { useAni, type AniOutfit } from './state';
 import { createToucher, say, type Answer } from './touch';
 import { AniOffers } from './AniOffers';
 import { useLife } from './useLife';
+import { useLife2 } from './useLife2';
 import { HOLD_KEY, eventOfLine, quietKind, snooze, type LineKind } from './lines';
 import { RIBBON_POINT, type NowDay } from '../ribbon/layout';
 import './ani.css';
@@ -64,6 +65,8 @@ function hello(): Answer {
 // The day her first hello and her evening word were said in this browser
 // (YYYY-MM-DD).
 const HELLO_KEY = 'now:ani:hello';
+/** How long a line of hers with buttons stays up for a tap. */
+const CHIPS_HOLD_MS = 25_000;
 const EVENING_KEY = 'now:ani:evening';
 function dayOf(key: string): string | null {
   try {
@@ -342,6 +345,8 @@ export function AniCorner({
   // What the chat sends (or holds) when her line opens it, and what this opening carries.
   const [seed, setSeed] = useState<string | null>(null);
   const [chatSeed, setChatSeed] = useState<string | null>(null);
+  // Buttons of her own line (a meal, a guess, "a one-off?").
+  const [chips, setChips] = useState<Answer['chips'] | null>(null);
   const focusingRef = useRef(focusing);
   focusingRef.current = focusing;
   // The line that brought the proposals stays in their bubble; writing an own reply keeps it open.
@@ -372,6 +377,7 @@ export function AniCorner({
       lastSaidAt.current = Date.now();
       setSaidChat(Boolean(a.chat));
       if (!a.chat) setSeed(null);
+      setChips(a.chips && a.chips.length > 0 ? a.chips : null);
       setSaid(a.text);
       setSaidKind(a.kind ?? null);
       if (a.turn) {
@@ -388,7 +394,12 @@ export function AniCorner({
         finished();
       };
       if (a.silent || !soundOn()) {
-        sayTimer.current = window.setTimeout(done, a.silent ? 1500 : 1500 + a.text.length * 50);
+        // A line with buttons waits for a tap a while longer.
+        const hold = a.chips?.length ? CHIPS_HOLD_MS : 0;
+        sayTimer.current = window.setTimeout(
+          done,
+          Math.max(hold, a.silent ? 1500 : 1500 + a.text.length * 50),
+        );
         return;
       }
       const url = a.recorded
@@ -397,7 +408,9 @@ export function AniCorner({
       // No voice (offline, the limit): the line still stays up for a while.
       const started = Date.now();
       void e.say(url).then(() => {
-        const left = 1200 + a.text.length * 40 - (Date.now() - started);
+        const left =
+          Math.max(a.chips?.length ? CHIPS_HOLD_MS : 0, 1200 + a.text.length * 40) -
+          (Date.now() - started);
         if (left > 0) sayTimer.current = window.setTimeout(done, left);
         else done();
       });
@@ -671,6 +684,14 @@ export function AniCorner({
     say: (a) => void answer.current(a),
     onSeed: setSeed,
   });
+  useLife2({
+    on: ready,
+    context,
+    engine,
+    quiet: () => quietRef.current || calling.current,
+    say: (a) => void answer.current(a),
+    onSeed: setSeed,
+  });
 
   // A focus ticked while she watches: she cheers.
   const focus = context.today?.focus;
@@ -878,7 +899,25 @@ export function AniCorner({
           </div>
         )
       ) : null}
-      {said && ani.here && !chat && saidKind && !(offersTurn && said === offerLine) ? (
+      {said && ani.here && !chat && chips ? (
+        <div className="ani-ask ani-kind ani-chips" role="group" aria-label="Her choices">
+          {chips.map((c) => (
+            <button
+              key={c.label}
+              type="button"
+              onClick={() => {
+                engine.current?.hush();
+                setChips(null);
+                setSaid(null);
+                c.run();
+              }}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {said && ani.here && !chat && !chips && saidKind && !(offersTurn && said === offerLine) ? (
         <div className="ani-ask ani-kind" role="group" aria-label="About this kind of line">
           <button
             type="button"
