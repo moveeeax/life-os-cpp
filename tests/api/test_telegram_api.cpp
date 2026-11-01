@@ -116,8 +116,10 @@ protected:
         for (const auto& [k, v] : params) {
             req->setParameter(k, v);
         }
-        HttpResponsePtr captured;
-        fn(req, [&](const HttpResponsePtr& r) { captured = r; });
+        // The Telegram routes answer from the outbound pool, so the answer may come from another thread.
+        TestHelpers::AwaitedResponse answer;
+        fn(req, answer.callback());
+        const auto captured = answer.get();
         EXPECT_TRUE(captured);
         return captured;
     }
@@ -142,7 +144,7 @@ protected:
         for (const auto& [route, r] : answers) {
             ASSERT_TRUE(r) << route;
             EXPECT_EQ(r->statusCode(), k404NotFound) << route << ": " << std::string(r->body());
-            EXPECT_EQ(body_of(r)["error"], "telegram_not_linked") << route;
+            EXPECT_EQ(body_of(r)["message"], "telegram_not_linked not found") << route;
         }
     }
 };

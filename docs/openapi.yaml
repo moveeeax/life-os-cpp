@@ -1313,7 +1313,7 @@ components:
       required: [date, calendar, events, free, focus, workouts, tasks]
       properties:
         date: { type: string, format: date }
-        calendar: { type: string, enum: [ok, off, not_linked, disconnected, unavailable], description: 'Why events may be empty' }
+        calendar: { type: string, enum: [ok, "off", not_linked, disconnected, unavailable], description: 'Why events may be empty' }
         events: { type: array, items: { $ref: '#/components/schemas/CalendarEvent' } }
         free: { type: array, items: { $ref: '#/components/schemas/CalendarSlot' }, description: '30 minutes or more between 08:00 and 22:00 local' }
         focus:

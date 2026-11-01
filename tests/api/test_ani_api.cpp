@@ -74,8 +74,10 @@ protected:
                                 const json& body,
                                 const Handler& fn) {
         auto req = TestHelpers::authed_json(who, body, method);
-        HttpResponsePtr captured;
-        fn(req, [&](const HttpResponsePtr& r) { captured = r; });
+        // A handler may answer from another thread (the outbound pool).
+        TestHelpers::AwaitedResponse answer;
+        fn(req, answer.callback());
+        const auto captured = answer.get();
         EXPECT_TRUE(captured);
         return captured;
     }
@@ -127,7 +129,7 @@ TEST_F(AniApi, AnotherUsersTurnIsNotFound) {
     const auto boris = TestHelpers::user(kBoris);
     const auto read = call(boris, Get, json::object(), [&](auto req, auto cb) { c.turn(req, std::move(cb), id); });
     EXPECT_EQ(read->statusCode(), k404NotFound) << std::string(read->body());
-    EXPECT_EQ(body_of(read)["error"], "turn_not_found");
+    EXPECT_EQ(body_of(read)["message"], "turn_not_found not found");
     const auto voiced = call(boris, Get, json::object(), [&](auto req, auto cb) { c.speech(req, std::move(cb), id); });
     EXPECT_EQ(voiced->statusCode(), k404NotFound) << std::string(voiced->body());
     const auto removed =
@@ -156,7 +158,7 @@ TEST_F(AniApi, AnotherUsersActionCannotBeConfirmedOrCancelled) {
     const auto confirmed =
         call(boris, Post, json::object(), [&](auto req, auto cb) { c.confirmAction(req, std::move(cb), a); });
     EXPECT_EQ(confirmed->statusCode(), k404NotFound) << std::string(confirmed->body());
-    EXPECT_EQ(body_of(confirmed)["error"], "action_not_found");
+    EXPECT_EQ(body_of(confirmed)["message"], "action_not_found not found");
     const auto cancelled =
         call(boris, Post, json::object(), [&](auto req, auto cb) { c.cancelAction(req, std::move(cb), a); });
     EXPECT_EQ(cancelled->statusCode(), k404NotFound) << std::string(cancelled->body());

@@ -5099,7 +5099,7 @@
       "type": "string",
       "enum": [
        "ok",
-       false,
+       "off",
        "not_linked",
        "disconnected",
        "unavailable"
@@ -40033,7 +40033,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 607071,
-  "source_fnv1a64": "cd64934b26cb23e4"
+  "source_bytes": 607073,
+  "source_fnv1a64": "a5b270e634c518e6"
  }
 }
