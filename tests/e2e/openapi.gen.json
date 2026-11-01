@@ -31482,7 +31482,7 @@
       }
      },
      "401": {
-      "description": "Not authenticated"
+      "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "403": {
       "description": "Not an admin"
@@ -31610,10 +31610,10 @@
       }
      },
      "401": {
-      "description": "Not authenticated"
+      "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "404": {
-      "description": "Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)"
+      "description": "Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)"
      },
      "429": {
       "description": "The gateway is rate limited"
@@ -31665,10 +31665,10 @@
       }
      },
      "401": {
-      "description": "Not authenticated"
+      "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "404": {
-      "description": "Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)"
+      "description": "Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)"
      },
      "429": {
       "description": "The gateway is rate limited"
@@ -31745,10 +31745,10 @@
       "description": "before is not a message id (invalid_before)"
      },
      "401": {
-      "description": "Not authenticated"
+      "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "404": {
-      "description": "Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)"
+      "description": "Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)"
      },
      "429": {
       "description": "The gateway is rate limited"
@@ -31830,10 +31830,10 @@
       "description": "invalid_text, invalid_reply_to, invalid_body (reply_to or key not text), or a body that is not JSON"
      },
      "401": {
-      "description": "Not authenticated"
+      "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "404": {
-      "description": "Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)"
+      "description": "Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)"
      },
      "429": {
       "description": "The gateway is rate limited"
@@ -31916,10 +31916,10 @@
       "description": "invalid_text"
      },
      "401": {
-      "description": "Not authenticated"
+      "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "404": {
-      "description": "Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)"
+      "description": "Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)"
      },
      "429": {
       "description": "The gateway is rate limited"
@@ -32004,10 +32004,10 @@
       "description": "invalid_emoji, invalid_remove (not true or false)"
      },
      "401": {
-      "description": "Not authenticated"
+      "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "404": {
-      "description": "Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)"
+      "description": "Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)"
      },
      "429": {
       "description": "The gateway is rate limited"
@@ -32085,10 +32085,10 @@
       "description": "invalid_message_ids"
      },
      "401": {
-      "description": "Not authenticated"
+      "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "404": {
-      "description": "Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)"
+      "description": "Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)"
      },
      "429": {
       "description": "The gateway is rate limited"
@@ -32146,10 +32146,10 @@
       }
      },
      "401": {
-      "description": "Not authenticated"
+      "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "404": {
-      "description": "Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)"
+      "description": "Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)"
      }
     }
    }
@@ -32196,10 +32196,10 @@
       }
      },
      "401": {
-      "description": "Not authenticated"
+      "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "404": {
-      "description": "Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)"
+      "description": "Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)"
      }
     }
    }
@@ -32247,10 +32247,10 @@
       "description": "Quiet"
      },
      "401": {
-      "description": "Not authenticated"
+      "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "404": {
-      "description": "Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)"
+      "description": "Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)"
      }
     }
    },
@@ -32279,10 +32279,10 @@
       "description": "Not quiet"
      },
      "401": {
-      "description": "Not authenticated"
+      "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "404": {
-      "description": "Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)"
+      "description": "Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)"
      }
     }
    }
@@ -32342,10 +32342,10 @@
       "description": "invalid_settings"
      },
      "401": {
-      "description": "Not authenticated"
+      "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "404": {
-      "description": "Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)"
+      "description": "Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)"
      }
     }
    }
@@ -32412,10 +32412,10 @@
       "description": "review_not_sent"
      },
      "401": {
-      "description": "Not authenticated"
+      "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "404": {
-      "description": "Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)"
+      "description": "Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)"
      },
      "502": {
       "description": "The gateway refused or did not answer"
@@ -32490,10 +32490,10 @@
       "description": "invalid_q, invalid_chat"
      },
      "401": {
-      "description": "Not authenticated"
+      "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "404": {
-      "description": "Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)"
+      "description": "Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)"
      },
      "429": {
       "description": "The gateway is rate limited"
@@ -40033,7 +40033,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 606013,
-  "source_fnv1a64": "43993cc38281fea2"
+  "source_bytes": 607071,
+  "source_fnv1a64": "cd64934b26cb23e4"
  }
 }

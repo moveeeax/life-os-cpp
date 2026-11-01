@@ -10,6 +10,10 @@ Now page and chat with her agent.
 - Key: make one in Account → Ani → MCP → Create key. It has the scope
   `ani` and works only on this endpoint (403 `key_scope` anywhere else).
   It is shown once. A `full` key works too; a `read` key does not.
+- No key reaches the owner's Telegram: the `/api/v1/telegram` routes answer
+  401 `key_not_allowed` to any API key, and a chat message sent with
+  `ani_chat` runs without her Telegram tools (she can neither read nor
+  propose a Telegram message in it). Telegram stays in the chat on Now.
 - Send it as `Authorization: Bearer cpk_…`.
 - Protocol versions: `2026-07-28` (stateless, `server/discover`) and
   `2025-11-25`, `2025-06-18` (`initialize`).

@@ -137,10 +137,11 @@ std::string event_text(const std::vector<Incoming>& all) {
     const std::size_t shown = std::min<std::size_t>(all.size(), kMessagesPerEvent);
     for (std::size_t i = 0; i < shown; ++i) {
         const auto& m = all[i];
-        // The chat id goes with the name: a reply she proposes needs it.
-        std::string line = (m.chat_title.empty() ? "A chat" : m.chat_title) + " [chat " + m.chat_id + "]" +
-                           (m.kind == "mention" ? " (mentions you): " : ": ") +
-                           (m.text.empty() ? "[a message]" : Utils::Utf8::clip(m.text, 300));
+        // The chat id goes with the name: a reply she proposes needs it. The
+        // name and the text are the sender's: they cannot fake a label.
+        std::string line = (m.chat_title.empty() ? "A chat" : Hook::defanged(m.chat_title)) + " [chat " + m.chat_id +
+                           "]" + (m.kind == "mention" ? " (mentions you): " : ": ") +
+                           (m.text.empty() ? "[a message]" : Hook::defanged(Utils::Utf8::clip(m.text, 300)));
         out += (out.empty() ? "" : "\n") + line;
     }
     if (all.size() > shown) {
