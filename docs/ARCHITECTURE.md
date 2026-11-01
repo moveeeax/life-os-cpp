@@ -39,6 +39,34 @@ rules are hard-coded in the gate: `utils/` includes nothing outside itself,
 never includes `email`. The directory graph is a DAG: `core/` is the
 composition root and may name every module, a module never names `core/`.
 
+### Ani's agent
+
+`src/agent/` runs an OpenClaw pod per user. The worker binary owns the pods:
+in production that is a second release of the worker chart,
+`life-os-ani-worker`, which pulls only the agent's jobs (`ani_*`,
+`telegram_poll`) and is the one workload with Kubernetes rights (a Role on
+pods and secrets in the namespace `life-os-agents`). `Lifecycle` runs the
+start, stop and reconcile jobs, `Manifest` builds the pod, `Kube` is the
+client of the Kubernetes API. The API never calls Kubernetes: its handlers
+(`src/api/AniController.cpp`) change the row in `ani_agents` and queue jobs.
+
+A chat message (`POST /api/v1/ani/messages`) is a row in `ani_turns` and an
+`ani_turn` job. The worker wakes the agent, calls its gateway (`Gateway`,
+`Turn`), and the agent's tools (`Tools`, `CalendarTools`, `TelegramTools`,
+`DealTools`, `FactTools`) read the user's data through this API with a
+five-minute token of that user. Write tools only propose: a proposal is a
+row in `ani_actions`, the user confirms it on Now, and the `ani_action` job
+(`Actions`) makes the change through the API as the user. The pods reach
+the model only through the worker's proxy (`Proxy`, `ProxyRoute`, on the
+worker's health port), which holds the upstream key and counts the tokens.
+
+Outside callers enter through the webhook (`src/api/AniHookController.cpp`,
+`Hook`, `Intake`) and the MCP server (`src/mcp/`, docs/ANI-MCP.md); their
+events reach the agent as `ani_hook_event` jobs. `src/telegram/` is the
+client of the owner's Telegram gateway (the Telegram routes and the
+`telegram_poll` job), `src/calendar/` the Google Calendar link with the
+refresh tokens sealed in `calendar_links`.
+
 ## 2. HTTP layer
 
 The API runs on Drogon: an event-loop server with a controller-class routing

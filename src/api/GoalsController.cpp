@@ -259,7 +259,9 @@ void GoalsController::createGoal(const HttpRequestPtr& req, Callback&& callback)
     if (!errs.any() && kind == "count" && !opt_int(body, "target_count")) {
         errs.add("target_count", "missing", "a count goal needs target_count");
     }
-    const std::string start = Validation::opt_string(body, "start_date").value_or(today_utc());
+    // The caller's own today (?tz=), as for a check-in: from midnight to 05:00 in Almaty, UTC is still on yesterday.
+    const std::string start = Validation::opt_string(body, "start_date")
+                                  .value_or(local_today(req, &Repositories::Zones::today_in, today_utc()));
     if (!errs.any() && body["due"].get<std::string>() <= start) {
         errs.add("due", "before_start", "due must be after start_date");
     }

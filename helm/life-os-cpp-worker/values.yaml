@@ -124,7 +124,7 @@ externalSecrets:
 # ---------------------------------------------------------------
 # Worker settings
 # Env vars set: WORKER_ID, WORKER_TYPES, WORKER_CONCURRENCY,
-#               WORKER_HEALTH_PORT, WORKER_BRPOP_TIMEOUT
+#               WORKER_PRIORITY_TYPES, WORKER_HEALTH_PORT, WORKER_BRPOP_TIMEOUT
 # ---------------------------------------------------------------
 worker:
   # WORKER_ID names the Redis processing list a job sits in while this
@@ -141,6 +141,10 @@ worker:
   # silently leaves those jobs to pile up in Redis and no mail is ever sent.
   types: "account_email,email.send,webhook.deliver,fitness_sync,leetcode_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,now_media_sweep,files_sweep"
   concurrency: 2
+  # Comma-separated types that also get one thread of their own beside the
+  # `concurrency` shared ones (WORKER_PRIORITY_TYPES): jobs a user waits for
+  # on screen, so a long job of another type cannot hold them. Empty: none.
+  priorityTypes: ""
   healthPort: 9091
   brpopTimeout: 5
 
@@ -397,7 +401,8 @@ aniAgents:
   namespace: life-os-agents
   # Must match ANI_AGENT_MAX_RUNNING: the quota is a backstop, not the limit.
   maxPods: 8
-  # Per pod, as Manifest.hpp sets them (gateway + restore + keeper).
+  # Per pod, as Manifest.hpp sets them (gateway + restore + keeper), in Mi
+  # or Gi; any other unit fails the render.
   podMemoryRequest: 1600Mi
   podMemoryLimit: 2400Mi
   # The pods reach this worker's proxy on its health port, and the bucket
@@ -405,7 +410,13 @@ aniAgents:
   s3Cidrs: []
   prepull:
     enabled: true
+    # Must equal ANI_AGENT_IMAGE (config/config.json, ani.agent.image);
+    # scripts/check-config-sync.sh fails when the two drift.
     image: ghcr.io/openclaw/openclaw:2026.10.7-slim
+    # Nodes the pre-puller runs on: the quota adds one pod, 32Mi of
+    # requests and 128Mi of limits per node, so its pods do not take the
+    # agents' share. Raise it when the cluster grows.
+    nodes: 6
     # The node label key the agent pods require (ANI_AGENT_NODE_LABEL).
     nodeLabel: node-role.kubernetes.io/worker
 

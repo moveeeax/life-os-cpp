@@ -178,6 +178,16 @@ bool CacheManager::set_nx(const std::string& key, const std::string& value, std:
         key);
 }
 
+bool CacheManager::del_if_equals(const std::string& key, const std::string& value) {
+    static constexpr const char* kCompareAndDelete =
+        "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end";
+    return guarded_(
+        false,
+        [&] { return redis_client->eval<long long>(kCompareAndDelete, {key}, {value}) > 0; },
+        "Failed to release key '{}': {}",
+        key);
+}
+
 std::optional<std::string> CacheManager::get(const std::string& key) {
     return guarded_(
         std::optional<std::string>{},

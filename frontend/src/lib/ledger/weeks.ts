@@ -92,3 +92,24 @@ export function toneColor(t: number): { background: string; dark: boolean } {
   const c = t < 0.5 ? mix(LO, MID, t * 2) : mix(MID, HI, (t - 0.5) * 2);
   return { background: `rgb(${c.join(', ')})`, dark: t < 0.55 };
 }
+
+/** One month of GET /money/reports/months, as the month strip reads it. */
+export interface MonthTotal {
+  month: string;
+  as_if: { expense: number } | null;
+}
+
+/**
+ * What each month of @p year up to @p last spent "as if" in one currency,
+ * January first; null where the month has no total yet.
+ */
+export function monthSpent(
+  totals: readonly MonthTotal[] | undefined,
+  year: number,
+  last: number,
+): (number | null)[] {
+  return Array.from({ length: last }, (_, i) => {
+    const key = `${year}-${String(i + 1).padStart(2, '0')}`;
+    return totals?.find((t) => t.month === key)?.as_if?.expense ?? null;
+  });
+}

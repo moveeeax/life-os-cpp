@@ -23,7 +23,10 @@
 #include "jobs/Job.hpp"
 #include "repositories/agent/ActionRepository.hpp"
 #include "storage/S3Presign.hpp"
+#include "telegram/Gateway.hpp"
 #include "utils/Crypto.hpp"
+#include "utils/Date.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Agent::Actions {
 
@@ -33,6 +36,9 @@ using json = nlohmann::json;
 using Repositories::Agent::ActionRepository;
 
 const json kAreas = {"finance", "health", "travel", "growth", "relationships", "projects"};
+
+/// The longest event the calendar route takes (api/CalendarController.cpp, span_of).
+constexpr long long kMaxEventSeconds = 24 * 3600;
 
 json object(json properties, json required) {
     return json{{"type", "object"},
@@ -59,30 +65,17 @@ std::string text_arg(const json& args, const char* key) {
     return v.substr(first, v.find_last_not_of(" \t\r\n") - first + 1);
 }
 
-/// A day argument; anything that is not YYYY-MM-DD is dropped.
+/// A day argument; anything that is not a real YYYY-MM-DD day is dropped.
 std::string day_arg(const json& args, const char* key) {
-    static const std::regex kDayRe("^\\d{4}-\\d{2}-\\d{2}$");
     const std::string v = text_arg(args, key);
-    return std::regex_match(v, kDayRe) ? v : std::string();
+    return Utils::Date::is_ymd(v) ? v : std::string();
 }
 
-std::size_t length(const std::string& s) {
-    std::size_t n = 0;
-    for (const unsigned char c : s) {
-        n += (c & 0xC0) != 0x80 ? 1 : 0;
-    }
-    return n;
-}
+using Utils::Utf8::length;
 
 /// The first @p max characters of @p s, with an ellipsis when it was longer.
 std::string cut(const std::string& s, std::size_t max) {
-    std::size_t n = 0;
-    for (std::size_t i = 0; i < s.size(); ++i) {
-        if ((static_cast<unsigned char>(s[i]) & 0xC0) != 0x80 && n++ == max) {
-            return s.substr(0, i) + "…";
-        }
-    }
-    return s;
+    return Utils::Utf8::clip(s, max);
 }
 
 std::string refusal(const char* error, const std::string& message, json extra = json::object()) {
@@ -326,8 +319,9 @@ Proposed tg_send(Net::Http::Transport& transport,
     if (chat.empty()) {
         return refusal("invalid", "chat is the id from tg_chats");
     }
-    if (text.empty() || length(text) > 4000) {
-        return refusal("invalid", "the message is 1 to 4000 characters");
+    // Bytes, as the Telegram route counts them: 4000 characters of Cyrillic passed here and failed there.
+    if (text.empty() || text.size() > ::Telegram::kTextMaxBytes) {
+        return refusal("invalid", "the message is 1 to 4096 bytes (about 2000 Cyrillic or 4000 Latin letters)");
     }
     auto title = chat_title(transport, api_url, token, chat);
     if (auto* p = std::get_if<Proposed>(&title)) {
@@ -358,8 +352,9 @@ Proposed tg_edit(Net::Http::Transport& transport,
     if (chat.empty() || message.empty()) {
         return refusal("invalid", "chat and message are ids from tg_chats and tg_history");
     }
-    if (text.empty() || length(text) > 4000) {
-        return refusal("invalid", "the message is 1 to 4000 characters");
+    // Bytes, as the Telegram route counts them: 4000 characters of Cyrillic passed here and failed there.
+    if (text.empty() || text.size() > ::Telegram::kTextMaxBytes) {
+        return refusal("invalid", "the message is 1 to 4096 bytes (about 2000 Cyrillic or 4000 Latin letters)");
     }
     auto title = chat_title(transport, api_url, token, chat);
     if (auto* p = std::get_if<Proposed>(&title)) {
@@ -403,11 +398,20 @@ Proposed calendar_add(const json& args) {
     if (start.empty() || end.empty() || *::Calendar::parse_time(end) <= *::Calendar::parse_time(start)) {
         return refusal("invalid", "start and end are RFC 3339 times with the person's offset, end after start");
     }
-    return Proposal{"calendar_add",
-                    "Add «" + cut(title, 120) + "» to the calendar, " + span_words(start, end),
-                    json{{"method", "POST"},
-                         {"path", "/api/v1/calendar/events"},
-                         {"body", {{"title", title}, {"start", start}, {"end", end}}}}};
+    // The calendar route takes a day at most: a longer one would be confirmed and then refused.
+    if (*::Calendar::parse_time(end) - *::Calendar::parse_time(start) > kMaxEventSeconds) {
+        return refusal("invalid", "an event lasts 24 hours at most");
+    }
+    // The event's id is chosen here: a retried add finds the event its first try made (Google refuses
+    // a second insert with the id) instead of adding it twice.
+    return Proposal{
+        "calendar_add",
+        "Add «" + cut(title, 120) + "» to the calendar, " + span_words(start, end),
+        json{{"method", "POST"},
+             {"path", "/api/v1/calendar/events"},
+             {"retry", true},
+             {"body",
+              {{"title", title}, {"start", start}, {"end", end}, {"id", "ani" + Utils::Crypto::random_hex(16)}}}}};
 }
 
 /// The UTC offset in seconds an RFC 3339 time is written with ("+05:00" is 18000, "Z" is 0); nullopt when none.
@@ -478,6 +482,10 @@ Proposed calendar_move(Net::Http::Transport& transport,
     }
     if (start.empty() || end.empty() || *::Calendar::parse_time(end) <= *::Calendar::parse_time(start)) {
         return refusal("invalid", "start and end are RFC 3339 times with the person's offset, end after start");
+    }
+    // The calendar route takes a day at most: a longer one would be confirmed and then refused.
+    if (*::Calendar::parse_time(end) - *::Calendar::parse_time(start) > kMaxEventSeconds) {
+        return refusal("invalid", "an event lasts 24 hours at most");
     }
     auto event = calendar_event(transport, api_url, token, tz, id);
     if (auto* p = std::get_if<Proposed>(&event)) {
@@ -652,11 +660,19 @@ std::string execute(Net::Http::Transport& transport,
                     const std::string& access_token,
                     const json& request) {
     Net::Http::Response res;
-    try {
-        res = transport.send(request_of(api_url, access_token, request));
-    } catch (const Net::Http::TransportError& e) {
-        spdlog::warn("ani agent: an action got no answer: {}", e.what());
-        return "unavailable";
+    // An idempotent request (a calendar add with its own event id) is sent once more after no
+    // answer: the API may have spent longer on Google than this call waits and made the change.
+    const int attempts = request.value("retry", false) ? 2 : 1;
+    for (int attempt = 1;; ++attempt) {
+        try {
+            res = transport.send(request_of(api_url, access_token, request));
+            break;
+        } catch (const Net::Http::TransportError& e) {
+            spdlog::warn("ani agent: an action got no answer (try {} of {}): {}", attempt, attempts, e.what());
+            if (attempt >= attempts) {
+                return "unavailable";
+            }
+        }
     }
     if (res.status >= 200 && res.status < 300) {
         return {};

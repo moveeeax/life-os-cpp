@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { useParseJob } from '@/hooks/useParseJob';
 import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
+import { NOW_DIGEST, qk } from '@/lib/api/queryKeys';
 import type {
   FoodDay,
   FoodEntry,
@@ -109,7 +109,7 @@ export const FOOD_DIARY_WRITES = [
   qk.food.diary(),
   qk.food.weeks(),
   qk.food.recent(),
-  qk.now.all(),
+  ...NOW_DIGEST,
 ] as const;
 const DIARY = FOOD_DIARY_WRITES;
 

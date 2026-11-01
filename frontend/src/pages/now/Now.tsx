@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router';
 
 import { useHabitsEnabled } from '@/hooks/useHabits';
@@ -26,7 +26,6 @@ import {
 import { homeOf } from '@/shell/sections';
 import { useGlassNav } from '@/shell/useGlassNav';
 
-import { AniCorner } from './ani/AniCorner';
 import { useFocusInbox } from './ani/inbox';
 import { useWeeklyReview } from './review/review';
 import { WeeklyReview } from './review/WeeklyReview';
@@ -42,8 +41,12 @@ import { ModeCards } from './modes/ModeCards';
 import { Board } from './widgets/Board';
 import { useNowDay } from './ribbon/layout';
 import { Ribbon } from './ribbon/Ribbon';
-import { KEEP_FROM, useWide } from './wide';
+import { KEEP_FROM, keepsNow, useWide } from './wide';
 import './now.css';
+
+// Ani's corner (her chat, shelf, life and the engine import) only comes with
+// her: a wide screen with Ani on. A phone never loads it.
+const AniCorner = lazy(() => import('./ani/AniCorner').then((m) => ({ default: m.AniCorner })));
 
 /** The current time, updated on the minute. */
 function useMinute(): Date {
@@ -77,7 +80,7 @@ export function NowPage() {
   // answered (a module still asking would count as on and win the redirect).
   if (nav.nowOn === false) return nav.settled ? <Navigate to={homeOf(nav.items)} replace /> : null;
   // On a wide screen the shell keeps Now on every tab (NowKept): the route itself draws nothing.
-  if (kept && nav.nowOn) return null;
+  if (keepsNow(kept, nav.nowOn)) return null;
   return <NowScreen />;
 }
 
@@ -220,7 +223,14 @@ function NowScreen({ away = false }: { away?: boolean }) {
             player.play();
           }}
         />
-        <ModeCards now={now} date={date} today={data} day={nowDay.data} tz={tz} />
+        <ModeCards
+          now={now}
+          date={date}
+          today={data}
+          day={nowDay.data}
+          tz={tz}
+          shareCrossings={showAni}
+        />
         <Board widgets={settings.data?.widgets ?? []} today={data} date={date} tz={tz} />
         {today.isError && (
           <span className="n-note">
@@ -242,35 +252,37 @@ function NowScreen({ away = false }: { away?: boolean }) {
         <WeeklyReview today={today.data} date={date} tz={tz} onClose={review.close} />
       )}
       {showAni && base && (
-        <AniCorner
-          base={base}
-          context={{
-            name: me?.first_name ?? undefined,
-            tz,
-            date,
-            today: today.data,
-            weather: weather.data ?? undefined,
-            day: nowDay.data,
-          }}
-          afterFocus={afterFocus}
-          focusing={session.phase !== 'idle'}
-          onAfterFocus={() => setAfterFocus(false)}
-          onFocus={onAniFocus}
-          onTasksMoved={() => void today.refetch()}
-          onWallpaper={(which) =>
-            window.dispatchEvent(new CustomEvent(ANI_WALLPAPER_EVENT, { detail: { which } }))
-          }
-          onSound={(which) => {
-            // A browser may refuse sound before the first click: then the
-            // choice stays and the next click starts it.
-            if (which === 'off') player.stop();
-            else if (which) {
-              player.choose(which);
-              if (player.state !== 'playing')
-                player.play(player.sounds.find((x) => x.id === which));
-            } else player.play();
-          }}
-        />
+        <Suspense fallback={null}>
+          <AniCorner
+            base={base}
+            context={{
+              name: me?.first_name ?? undefined,
+              tz,
+              date,
+              today: today.data,
+              weather: weather.data ?? undefined,
+              day: nowDay.data,
+            }}
+            afterFocus={afterFocus}
+            focusing={session.phase !== 'idle'}
+            onAfterFocus={() => setAfterFocus(false)}
+            onFocus={onAniFocus}
+            onTasksMoved={() => void today.refetch()}
+            onWallpaper={(which) =>
+              window.dispatchEvent(new CustomEvent(ANI_WALLPAPER_EVENT, { detail: { which } }))
+            }
+            onSound={(which) => {
+              // A browser may refuse sound before the first click: then the
+              // choice stays and the next click starts it.
+              if (which === 'off') player.stop();
+              else if (which) {
+                player.choose(which);
+                if (player.state !== 'playing')
+                  player.play(player.sounds.find((x) => x.id === which));
+              } else player.play();
+            }}
+          />
+        </Suspense>
       )}
       {session.phase !== 'idle' && (
         <FocusMode

@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <utility>
@@ -40,6 +41,12 @@ struct Reply {
 };
 
 using Query = std::vector<std::pair<std::string, std::string>>;
+
+/// The longest message text the site's Telegram routes send or edit, in
+/// bytes of UTF-8 (about 2000 Cyrillic letters). Ani's proposals and the
+/// confirm with the person's own text check the same unit, so a text that
+/// passes there is never refused at sending.
+inline constexpr std::size_t kTextMaxBytes = 4096;
 
 /// One call: @p method on @p path (from /v1/...) with @p query and an
 /// optional JSON @p body; @p idempotency_key goes in Idempotency-Key.

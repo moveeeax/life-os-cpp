@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
+import { NOW_DIGEST, qk } from '@/lib/api/queryKeys';
 import type { Task } from '@/lib/tasks';
 import type {
   TravelCounter,
@@ -27,7 +27,7 @@ import { todayLocal } from '@/lib/travel';
 const BASE = '/api/v1/travel';
 
 /** A travel write moves the section and Now's digest (the countdown and the thresholds). */
-export const TRAVEL_WRITES = [qk.travel.all(), qk.now.all()] as const;
+export const TRAVEL_WRITES = [qk.travel.all(), ...NOW_DIGEST] as const;
 
 export function useTravelSettings() {
   return useQuery({
@@ -46,13 +46,36 @@ export function useSaveTravelSettings(onSuccess?: () => void) {
   );
 }
 
-export function useCrossings() {
+export function useCrossings(enabled = true) {
   return useQuery({
     queryKey: qk.travel.crossings(),
+    enabled,
     queryFn: async ({ signal }) =>
       (
         await api.getJson<{ data: TravelCrossing[] }>(`${BASE}/crossings`, {
           query: { limit: 500 },
+          signal,
+        })
+      ).data,
+  });
+}
+
+/** How many of the newest crossings Now reads to find an arrival (two days back at most). */
+export const RECENT_CROSSINGS = 20;
+
+/**
+ * The newest crossings only, for Now's arrival card: the API lists them
+ * newest first, so a short page finds the last one without the whole history.
+ */
+export function useRecentCrossings(enabled = true) {
+  return useQuery({
+    queryKey: [...qk.travel.crossings(), 'recent', RECENT_CROSSINGS] as const,
+    enabled,
+    staleTime: 10 * 60_000,
+    queryFn: async ({ signal }) =>
+      (
+        await api.getJson<{ data: TravelCrossing[] }>(`${BASE}/crossings`, {
+          query: { limit: RECENT_CROSSINGS },
           signal,
         })
       ).data,
@@ -109,9 +132,10 @@ export function useDeleteRule(onSuccess?: () => void) {
   });
 }
 
-export function useCounters(date: string) {
+export function useCounters(date: string, enabled = true) {
   return useQuery({
     queryKey: qk.travel.counters(date),
+    enabled,
     queryFn: async ({ signal }) =>
       await api.getJson<{ data: TravelCounter[]; date: string; current_country: string[] | null }>(
         `${BASE}/counters`,
@@ -120,9 +144,10 @@ export function useCounters(date: string) {
   });
 }
 
-export function useTrips(currency = 'USD') {
+export function useTrips(currency = 'USD', enabled = true) {
   return useQuery({
     queryKey: qk.travel.trips(currency),
+    enabled,
     queryFn: async ({ signal }) =>
       (await api.getJson<{ data: TravelTrip[] }>(`${BASE}/trips`, { query: { currency }, signal }))
         .data,

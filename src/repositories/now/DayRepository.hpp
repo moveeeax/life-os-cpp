@@ -65,7 +65,8 @@ public:
         });
     }
 
-    /// {focus, workouts, tasks} of the local @p date in @p tz.
+    /// {focus, workouts, tasks} of the local @p date in @p tz. A workout never finished
+    /// is on the day it started and on today, not on the days between.
     nlohmann::json day(const std::string& owner, const std::string& date, const std::string& tz) {
         return Database::get().execute_read([&](auto& txn) {
             // The local day as two instants: its midnight and the next.
@@ -90,8 +91,12 @@ public:
                     "'UTC', " +
                     kIso +
                     ") END, 'name', name) ORDER BY started_at), '[]'::json)::text FROM workout_sessions WHERE "
-                    "owner_id = $1::uuid AND COALESCE(finished_at, now()) > " +
-                    kLo + " AND started_at < " + kHi,
+                    "owner_id = $1::uuid AND started_at < " +
+                    kHi + " AND (finished_at > " + kLo +
+                    // A session never finished shows on the day it started, and on today while
+                    // it may still run; not on every day in between.
+                    " OR (finished_at IS NULL AND (started_at >= " + kLo + " OR (now() >= " + kLo + " AND now() < " +
+                    kHi + "))))",
                 owner,
                 date,
                 tz);

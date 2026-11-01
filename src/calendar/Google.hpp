@@ -82,6 +82,11 @@ std::vector<std::pair<long long, long long>> free_slots(const std::vector<Event>
                                                         long long to,
                                                         int min_minutes);
 
+/// Whether @p id may name a new event: Google takes a caller's id of 5 to
+/// 1024 characters of base32hex (a-v, 0-9) on insert and refuses a second
+/// insert with it (409), which makes a retried add idempotent.
+bool client_event_id_ok(const std::string& id);
+
 /// The view of an event for the site and Ani.
 nlohmann::json event_view(const Event& e);
 

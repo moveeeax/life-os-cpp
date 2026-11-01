@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
+import { NOW_DIGEST, qk } from '@/lib/api/queryKeys';
 import { localZone } from '@/lib/tasks';
 import type {
   Goal,
@@ -20,7 +20,7 @@ import { act } from '@/lib/now/act';
 const BASE = '/api/v1/goals';
 
 /** A goal write moves its tasks too (and a task write moves its goal), and Now's digest. */
-export const GOAL_WRITES = [qk.goals.all(), qk.tasks.all(), qk.now.all()] as const;
+export const GOAL_WRITES = [qk.goals.all(), qk.tasks.all(), ...NOW_DIGEST] as const;
 const ALL = GOAL_WRITES;
 
 // The goals routes count a goal's default day and the days of its source in

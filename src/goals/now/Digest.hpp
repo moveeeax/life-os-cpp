@@ -7,20 +7,24 @@
 
 #pragma once
 
-#include <cstdint>
 #include <string>
 
 #include <nlohmann/json_fwd.hpp>
+
+namespace Repositories::Metrics {
+struct Access;
+}
 
 namespace Goals {
 
 /// The active goals of @p owner with their progress on @p day, behind first
 /// (the shape of Now::Today::goals_block); passed and failed goals are left out.
 /// A goal with a source reads its days in @p tz (an IANA zone the caller checked)
-/// with the caller's @p permissions (Domain::Permission bits).
+/// as far as @p access lets the caller (Repositories::Metrics::access_of; /today
+/// builds it once for this part and the habits part).
 nlohmann::json digest(const std::string& owner,
                       const std::string& day,
                       const std::string& tz,
-                      std::uint32_t permissions);
+                      const Repositories::Metrics::Access& access);
 
 }  // namespace Goals

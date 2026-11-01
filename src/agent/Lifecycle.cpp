@@ -17,7 +17,7 @@
 #include "agent/Kube.hpp"
 #include "agent/Manifest.hpp"
 #include "agent/Settings.hpp"
-#include "cache/Cache.hpp"
+#include "cache/Lock.hpp"
 #include "jobs/Job.hpp"
 #include "jobs/Jobs.hpp"
 #include "net/Http.hpp"
@@ -36,31 +36,11 @@ using Repositories::Agent::AgentRepository;
 constexpr long kMaxPresignSeconds = 7L * 24 * 3600;
 
 /// One job per user at a time: start, stop and reconcile never race on a pod.
-class OwnerLock {
+/// Released only by its holder (Cache::Lock), so a job that outlived the TTL
+/// does not free the lock of the next one.
+class OwnerLock : public Cache::Lock {
 public:
-    explicit OwnerLock(const std::string& owner) : key_("ani:agent:lock:" + owner) {
-        if (!Cache::is_initialized()) {
-            held_ = true;
-            return;
-        }
-        held_ = Cache::get().set_nx(key_, "1", std::chrono::seconds(120));
-    }
-    ~OwnerLock() {
-        if (held_ && Cache::is_initialized()) {
-            try {
-                Cache::get().del(key_);
-            } catch (const std::exception& e) {
-                spdlog::warn("ani agent: the lock {} was not released: {}", key_, e.what());
-            }
-        }
-    }
-    OwnerLock(const OwnerLock&) = delete;
-    OwnerLock& operator=(const OwnerLock&) = delete;
-    bool held() const { return held_; }
-
-private:
-    std::string key_;
-    bool held_ = false;
+    explicit OwnerLock(const std::string& owner) : Cache::Lock("ani:agent:lock:" + owner, std::chrono::seconds(120)) {}
 };
 
 std::string owner_of(const json& payload) {
@@ -164,7 +144,7 @@ json process_start(const json& payload) {
         return json{{"status", "skipped"}, {"reason", "not_starting"}};
     }
     const auto s = read_settings();
-    if (!s) {
+    if (!s || !serves_models(*s)) {
         return fail(owner, "the agent is not configured");
     }
     auto client = kube();

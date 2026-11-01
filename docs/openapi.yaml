@@ -38,7 +38,8 @@ components:
     # API keys (cpk_..., in X-API-Key or as the Bearer token) authenticate
     # like BearerAuth on data routes, with the owner's permissions minus the
     # admin bit. /api/v1/account/* (including the api-keys routes) and
-    # /api/v1/admin/* answer 401 key_not_allowed to a key. A key with
+    # /api/v1/admin/* and /api/v1/telegram/* answer 401 key_not_allowed to
+    # a key. A key with
     # scope `read` is answered 403 key_read_only on any method other than
     # GET, HEAD and OPTIONS.
     # Browser-SPA session: the access JWT travels in an HttpOnly
@@ -114,7 +115,7 @@ components:
         target_value: { type: [number, 'null'] }
         target_count: { type: [integer, 'null'] }
         result: { type: [string, 'null'], enum: [pass, fail, null] }
-        source: { type: [string, 'null'], description: 'A number goal only: the id of the metrics catalog series it follows (GET /api/v1/metrics), null when fed by check-ins alone' }
+        source: { type: [string, 'null'], description: 'A number goal only: the id of the metrics catalog series it follows (GET /api/v1/metrics), null when fed by check-ins alone. A series that adds up by day (reduce sum or count: steps, income, tasks done) counts as its running total from start_date on top of start_value; any other series counts its day value' }
         source_why:
           type: [string, 'null']
           enum: [module_off, no_permission, not_linked, not_yours, null]
@@ -129,7 +130,7 @@ components:
           required: [checkins, points, sections, tasks, milestones]
           properties:
             checkins: { type: array, items: { $ref: '#/components/schemas/GoalCheckin' } }
-            points: { type: array, items: { $ref: '#/components/schemas/GoalPoint' }, description: 'A number goal: the days of its source from start_date to the date asked for, merged with its check-ins (a check-in wins on its date), oldest first; empty for the other kinds' }
+            points: { type: array, items: { $ref: '#/components/schemas/GoalPoint' }, description: 'A number goal: the days of its source from start_date to the date asked for (no later than tomorrow), merged with its check-ins (a check-in wins on its date), oldest first; for a source that adds up by day each point is the running total; empty for the other kinds' }
             sections: { type: array, items: { allOf: [ { $ref: '#/components/schemas/GoalSection' }, { type: object, required: [tasks], properties: { tasks: { type: array, items: { $ref: '#/components/schemas/Task' } } } } ] } }
             tasks: { type: array, items: { $ref: '#/components/schemas/Task' }, description: The goal's tasks without a section }
             milestones: { type: array, items: { $ref: '#/components/schemas/GoalMilestone' } }
@@ -1312,7 +1313,7 @@ components:
       required: [date, calendar, events, free, focus, workouts, tasks]
       properties:
         date: { type: string, format: date }
-        calendar: { type: string, enum: [ok, off, not_linked, disconnected, unavailable], description: 'Why events may be empty' }
+        calendar: { type: string, enum: [ok, "off", not_linked, disconnected, unavailable], description: 'Why events may be empty' }
         events: { type: array, items: { $ref: '#/components/schemas/CalendarEvent' } }
         free: { type: array, items: { $ref: '#/components/schemas/CalendarSlot' }, description: '30 minutes or more between 08:00 and 22:00 local' }
         focus:
@@ -3547,6 +3548,24 @@ components:
         unconverted: { type: integer, description: Currency blocks without a rate on or before the day }
         rates: { type: object }
         source: { type: string }
+    MoneyMonthTotals:
+      type: object
+      required: [month, from, to, as_if]
+      properties:
+        month: { type: string, description: 'YYYY-MM' }
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        as_if:
+          description: The month's totals converted into the as_if currency, as in the period report; null with no as_if currency
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [currency, income, expense, partial]
+              properties:
+                currency: { type: string }
+                income: { type: number }
+                expense: { type: number }
+                partial: { type: boolean, description: Some currency had no rate }
     MoneyReport:
       type: object
       required: [period, blocks, recurring, new_merchants]
@@ -7998,6 +8017,49 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /api/v1/money/reports/months:
+    get:
+      summary: The months of a year with their "as if" totals, one call for the month strip
+      description: Every month of a past year, this year's months up to the running one (in tz), none of a coming year. Each month's as_if block holds the totals that the period report gives for that month; it is null when there is no as_if currency.
+      tags: [money]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: year, in: query, schema: { type: string, pattern: '^[0-9]{4}$' }, description: 'The year; this year in tz by default' }
+        - { name: as_if, in: query, schema: { type: string, pattern: '^[A-Z]{3}$' }, description: Defaults to the settings' view_currency }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: this year and this month are counted there; a name that is not a zone answers 400 invalid_query' }
+      responses:
+        '200':
+          description: The months, January first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/MoneyMonthTotals' }
+        '400':
+          description: A bad year, currency or zone
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Money module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /api/v1/money/reports/balances:
     get:
       summary: Accounts and balances grouped by currency
@@ -9445,7 +9507,7 @@ paths:
     post:
       summary: Create a goal
       description: >-
-        number needs start_value and target_value (different); count needs target_count; unit is for number only; start_date defaults to today; due must be after it.
+        number needs start_value and target_value (different); count needs target_count; unit is for number only; start_date defaults to today in ?tz= (UTC without it); due must be after it.
       tags: [goals]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -10426,7 +10488,19 @@ paths:
           application/json:
             schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 200 } } }
       responses:
-        '201': { description: Added }
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [id]
+                    properties:
+                      id: { type: string, format: uuid }
         '400': { description: invalid_text }
         '401': { description: Not authenticated }
         '409': { description: 50 facts already (too_many_facts) }
@@ -10544,7 +10618,7 @@ paths:
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: date, in: query, required: true, schema: { type: string, format: date } }
-        - { name: tz, in: query, description: The caller's IANA zone (UTC when not one), schema: { type: string } }
+        - { name: tz, in: query, description: 'The caller''s IANA zone; UTC when absent, 400 invalid_query when it names no zone', schema: { type: string } }
       responses:
         '200':
           description: The day
@@ -10555,7 +10629,7 @@ paths:
                 required: [data]
                 properties:
                   data: { $ref: '#/components/schemas/NowDay' }
-        '400': { description: invalid_date }
+        '400': { description: 'invalid_date, invalid_query (tz names no zone)' }
         '401': { description: Not authenticated }
         '404': { description: Now is off (now) }
   /api/v1/now/focus-sessions:
@@ -10575,7 +10649,7 @@ paths:
                 started_at: { type: string, format: date-time }
                 ended_at: { type: string, format: date-time, description: 'After started_at, 4 hours at most, within the last 2 days' }
                 minutes: { type: integer, description: Time in focus without pauses; the span when left out }
-                label: { type: string, maxLength: 200 }
+                label: { type: [string, 'null'], maxLength: 200, description: 'Kept to its first 200 characters; null is no label' }
       responses:
         '201':
           description: Recorded
@@ -10586,7 +10660,7 @@ paths:
                 required: [data]
                 properties:
                   data: { type: object, properties: { id: { type: string, format: uuid } } }
-        '400': { description: 'invalid_time, invalid_minutes' }
+        '400': { description: 'invalid_time, invalid_minutes, invalid_label (not text)' }
         '401': { description: Not authenticated }
         '404': { description: Now is off (now) }
   /api/v1/now/focus-stats:
@@ -10595,7 +10669,7 @@ paths:
       tags: [now]
       security: [{ BearerAuth: [] }]
       parameters:
-        - { name: tz, in: query, description: The caller's IANA zone (UTC when not one), schema: { type: string } }
+        - { name: tz, in: query, description: 'The caller''s IANA zone; UTC when absent, 400 invalid_query when it names no zone', schema: { type: string } }
       responses:
         '200':
           description: This week, the last seven days, the hours of the day over 28 days
@@ -10606,6 +10680,7 @@ paths:
                 required: [data]
                 properties:
                   data: { $ref: '#/components/schemas/FocusStats' }
+        '400': { description: invalid_query (tz names no zone) }
         '401': { description: Not authenticated }
         '404': { description: Now module disabled }
   /api/v1/calendar:
@@ -10711,9 +10786,15 @@ paths:
                 start: { type: string, description: RFC 3339 with an offset }
                 end: { type: string, description: 'RFC 3339, after start, a day at most' }
                 description: { type: string, maxLength: 2000 }
+                id:
+                  type: string
+                  pattern: '^[a-v0-9]{5,1024}$'
+                  description: >-
+                    The event's id, chosen by the caller (base32hex as Google takes it). An add sent again with
+                    the same id answers the event the first one made instead of adding a second.
       responses:
         '201':
-          description: Added
+          description: Added (or, with an id already taken, the event the earlier add made)
           content:
             application/json:
               schema:
@@ -10721,11 +10802,11 @@ paths:
                 required: [data]
                 properties:
                   data: { $ref: '#/components/schemas/CalendarEvent' }
-        '400': { description: 'invalid_title, invalid_time' }
+        '400': { description: 'invalid_title, invalid_time, invalid_id' }
         '401': { description: Not authenticated }
         '404': { description: 'Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked)' }
         '409': { description: 'Google refused the token (calendar_disconnected): connect again' }
-        '502': { description: Google did not answer (calendar_unavailable) }
+        '502': { description: 'Google did not answer, or its answer could not be read and the event may exist (calendar_unavailable)' }
   /api/v1/calendar/events/{id}:
     get:
       summary: One event, with its times on the caller's clock
@@ -10782,10 +10863,14 @@ paths:
                 type: object
                 required: [data]
                 properties:
-                  data: { type: object }
+                  data:
+                    type: object
+                    required: [moved]
+                    properties:
+                      moved: { type: boolean, enum: [true] }
         '400': { description: invalid_time }
         '401': { description: Not authenticated }
-        '404': { description: 'Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked)' }
+        '404': { description: 'Not in the calendar (calendar_event_not_found), calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked)' }
         '409': { description: 'Google refused the token (calendar_disconnected): connect again' }
         '502': { description: Google did not answer (calendar_unavailable) }
     delete:
@@ -10843,7 +10928,7 @@ paths:
                 required: [data]
                 properties:
                   data: { $ref: '#/components/schemas/TelegramStatus' }
-        '401': { description: Not authenticated }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
         '403': { description: Not an admin }
     put:
       summary: Link the owner's Telegram account to the caller
@@ -10897,8 +10982,8 @@ paths:
                 required: [data]
                 properties:
                   data: { type: array, items: { $ref: '#/components/schemas/TelegramChat' } }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
         '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
   /api/v1/telegram/chats/{id}:
@@ -10918,8 +11003,8 @@ paths:
                 required: [data]
                 properties:
                   data: { $ref: '#/components/schemas/TelegramChat' }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
         '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
   /api/v1/telegram/chats/{id}/messages:
@@ -10945,8 +11030,8 @@ paths:
                 properties:
                   data: { type: array, items: { $ref: '#/components/schemas/TelegramMessage' } }
         '400': { description: 'before is not a message id (invalid_before)' }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
         '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
     post:
@@ -10979,9 +11064,9 @@ paths:
                 required: [data]
                 properties:
                   data: { type: object }
-        '400': { description: 'invalid_text, invalid_reply_to, or a body that is not JSON' }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '400': { description: 'invalid_text, invalid_reply_to, invalid_body (reply_to or key not text), or a body that is not JSON' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
         '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
   /api/v1/telegram/chats/{id}/messages/{mid}:
@@ -11012,8 +11097,8 @@ paths:
                 properties:
                   data: { type: object }
         '400': { description: invalid_text }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
         '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
   /api/v1/telegram/chats/{id}/messages/{mid}/reactions:
@@ -11044,9 +11129,9 @@ paths:
                 required: [data]
                 properties:
                   data: { type: object }
-        '400': { description: invalid_emoji }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '400': { description: 'invalid_emoji, invalid_remove (not true or false)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
         '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
   /api/v1/telegram/chats/{id}/read:
@@ -11076,8 +11161,8 @@ paths:
                 properties:
                   data: { type: object }
         '400': { description: invalid_message_ids }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
         '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
   /api/v1/telegram/waiting:
@@ -11096,8 +11181,8 @@ paths:
                 required: [data]
                 properties:
                   data: { type: array, items: { type: object, properties: { chat: { type: string }, title: { type: string }, since: { type: string, format: date-time } } } }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)' }
   /api/v1/telegram/quiet:
     get:
       summary: Chats Ani never tells about
@@ -11113,8 +11198,8 @@ paths:
                 required: [data]
                 properties:
                   data: { type: array, items: { type: object, properties: { chat: { type: string }, title: { type: string } } } }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)' }
   /api/v1/telegram/quiet/{id}:
     put:
       summary: Make a chat quiet for Ani
@@ -11130,8 +11215,8 @@ paths:
             schema: { type: object, properties: { title: { type: string, maxLength: 200 } } }
       responses:
         '204': { description: Quiet }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)' }
     delete:
       summary: Let Ani tell about a chat again
       tags: [telegram]
@@ -11140,8 +11225,8 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string } }
       responses:
         '204': { description: Not quiet }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)' }
   /api/v1/telegram/settings:
     put:
       summary: The switches of what goes to Saved Messages
@@ -11168,8 +11253,8 @@ paths:
                 properties:
                   data: { type: object }
         '400': { description: invalid_settings }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)' }
   /api/v1/telegram/self:
     post:
       summary: Send a text to the owner's own Saved Messages
@@ -11201,8 +11286,8 @@ paths:
                   data: { type: object }
         '400': { description: invalid_text }
         '409': { description: review_not_sent }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)' }
         '502': { description: The gateway refused or did not answer }
   /api/v1/telegram/search:
     get:
@@ -11225,8 +11310,8 @@ paths:
                 properties:
                   data: { type: array, items: { $ref: '#/components/schemas/TelegramMessage' } }
         '400': { description: 'invalid_q, invalid_chat' }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
         '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
   /api/v1/leetcode/profile:

@@ -110,29 +110,25 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
             callback(ErrorResponse::bad_request("invalid_query", "tz must be an IANA zone like Asia/Almaty"));
             return;
         }
+        // What the caller may read of the metrics catalog (two queries), built once for the goals
+        // and the habits parts, by the first part that needs it, so a failure stays that part's.
+        std::optional<Repositories::Metrics::Access> access;
+        const auto access_once = [&]() -> const Repositories::Metrics::Access& {
+            if (!access) {
+                access = Repositories::Metrics::access_of(owner, fitness_read ? Domain::Permission::kFitnessRead : 0U);
+            }
+            return *access;
+        };
         // Each module hands its part over through its digest facade; a part
         // that throws lands in "errors" (Now::Today::assemble), never fails the whole.
         const std::vector<::Now::Today::Part> parts = {
             {"tasks", Core::tasks_enabled(), [&] { return ::Tasks::digest(owner, date, tz); }},
-            {"goals",
-             Core::goals_enabled(),
-             [&] {
-                 return ::Goals::digest(
-                     owner, date, tz, fitness_read ? Domain::Permission::kFitnessRead : std::uint32_t{0});
-             }},
+            {"goals", Core::goals_enabled(), [&] { return ::Goals::digest(owner, date, tz, access_once()); }},
             {"food", Core::food_enabled(), [&] { return ::Food::digest(owner, date); }},
             {"money", Core::money_enabled(), [&] { return ::Money::digest(owner, date); }},
             {"health", Core::fitness_enabled() && fitness_read, [&] { return ::Fitness::digest(owner, date); }},
             {"travel", Core::travel_enabled(), [&] { return ::Travel::digest(owner, date); }},
-            {"habits",
-             Core::habits_enabled(),
-             [&] {
-                 return ::Habits::digest(
-                     owner,
-                     date,
-                     tz,
-                     Repositories::Metrics::access_of(owner, fitness_read ? Domain::Permission::kFitnessRead : 0U));
-             }},
+            {"habits", Core::habits_enabled(), [&] { return ::Habits::digest(owner, date, tz, access_once()); }},
         };
         const auto focus = FocusRepository().get(owner, date);
         json data = ::Now::Today::assemble(parts, focus ? focus_out(owner, *focus) : json());

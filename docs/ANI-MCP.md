@@ -10,6 +10,10 @@ Now page and chat with her agent.
 - Key: make one in Account → Ani → MCP → Create key. It has the scope
   `ani` and works only on this endpoint (403 `key_scope` anywhere else).
   It is shown once. A `full` key works too; a `read` key does not.
+- No key reaches the owner's Telegram: the `/api/v1/telegram` routes answer
+  401 `key_not_allowed` to any API key, and a chat message sent with
+  `ani_chat` runs without her Telegram tools (she can neither read nor
+  propose a Telegram message in it). Telegram stays in the chat on Now.
 - Send it as `Authorization: Bearer cpk_…`.
 - Protocol versions: `2026-07-28` (stateless, `server/discover`) and
   `2025-11-25`, `2025-06-18` (`initialize`).
@@ -37,7 +41,9 @@ Now page and chat with her agent.
 | `ani_reply` | The answer to a chat turn; `wait_seconds` (up to 25) waits for it. |
 | `ani_history` | The latest messages of her chat, from every source. |
 
-The four commands share the webhook's rules: they wait for the open page
+The twelve page commands (`ani_say`, `ani_outfit`, `ani_act`, `ani_event`,
+`ani_mood`, `ani_remind`, `ani_ask`, `ani_focus`, `ani_card`, `ani_wallpaper`,
+`ani_sound`, `ani_hold`; src/mcp/AniTools.cpp) share the webhook's rules: they wait for the open page
 (a day by default, `ttl` up to a week), an `id` is taken once in 24 hours,
 120 commands an hour together with the webhook, at most 50 waiting. Chat
 messages count in the chat's own limit (60 an hour). A short chat reply is

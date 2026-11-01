@@ -39,6 +39,7 @@
 #include "fitness/jobs/SyncJob.hpp"
 #include "jobs/Jobs.hpp"
 #include "jobs/Outbox.hpp"
+#include "jobs/Tick.hpp"
 #include "leetcode/Sync.hpp"
 #include "money/jobs/AdvisorJob.hpp"
 #include "money/jobs/RatesJob.hpp"
@@ -60,6 +61,8 @@ namespace {
 // The one startup run of the scheduled ticks (fitness sync, money rates,
 // money advisor): late enough for the event loop and the pools to be up.
 constexpr std::chrono::milliseconds kScheduleFirstRun{std::chrono::seconds(30)};
+// How long the marker of a minute's tick job lives (jobs/Tick.hpp): a lost job holds its type this long.
+constexpr long kMinuteTickMarkerSeconds = 600;
 }  // namespace
 
 void check_password_value(const std::string& password) {
@@ -618,11 +621,14 @@ void Application::register_fitness_sync_schedule_(Config::AppConfig& cfg) {
     Tasks::schedule_recurring(
         "fitness_sync_schedule",
         std::chrono::hours(hours),
-        [window] {
+        [window, hours] {
             if (!Database::is_initialized() || !Jobs::is_initialized())
                 return;
             try {
-                Jobs::FitnessSync::enqueue_recent_for_all(window, static_cast<long long>(::time(nullptr)));
+                // An account synced in the last half interval is left alone: the tick after each API start
+                // would otherwise queue a round per deploy, ahead of the parse jobs on the same worker.
+                Jobs::FitnessSync::enqueue_recent_for_all(
+                    window, static_cast<long long>(::time(nullptr)), static_cast<long>(hours) * 3600 / 2);
             } catch (const std::exception& e) {
                 // Database or queue is down: the tick is skipped, the next one retries.
                 spdlog::warn("fitness sync schedule tick failed: {}", e.what());
@@ -761,7 +767,8 @@ void Application::register_telegram_schedule_() {
             return;
         }
         try {
-            Jobs::get().submit(Agent::TelegramPoll::kPollJob, nlohmann::json::object());
+            // One poll queued or running at a time (jobs/Tick.hpp): ticks of a worker that is down do not pile up.
+            Jobs::Tick::submit(Agent::TelegramPoll::kPollJob, nlohmann::json::object(), kMinuteTickMarkerSeconds);
         } catch (const std::exception& e) {
             spdlog::warn("telegram poll tick failed: {}", e.what());
         }
@@ -780,7 +787,7 @@ void Application::register_ani_agents_schedule_() {
         if (!Jobs::is_initialized())
             return;
         try {
-            Jobs::get().submit(Agent::kReconcileJob, nlohmann::json::object());
+            Jobs::Tick::submit(Agent::kReconcileJob, nlohmann::json::object(), kMinuteTickMarkerSeconds);
         } catch (const std::exception& e) {
             spdlog::warn("ani agents reconcile tick failed: {}", e.what());
         }
@@ -800,7 +807,7 @@ void Application::register_ani_agents_schedule_() {
         if (!Jobs::is_initialized())
             return;
         try {
-            Jobs::get().submit(Agent::Reminders::kDueJob, nlohmann::json::object());
+            Jobs::Tick::submit(Agent::Reminders::kDueJob, nlohmann::json::object(), kMinuteTickMarkerSeconds);
         } catch (const std::exception& e) {
             spdlog::warn("ani reminders tick failed: {}", e.what());
         }

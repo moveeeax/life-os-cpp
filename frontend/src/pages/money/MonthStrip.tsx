@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 
 import { useHideNumbers } from '@/hooks/useHideNumbers';
-import { useMonthReports } from '@/hooks/useMoney';
+import { useMonthTotals } from '@/hooks/useMoney';
 import { formatTotal } from '@/lib/networth';
-import { median, tone, toneColor } from '@/lib/ledger/weeks';
+import { median, monthSpent, tone, toneColor } from '@/lib/ledger/weeks';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const NAMES = [
@@ -41,10 +41,10 @@ export function MonthStrip({
   const running = year === thisYear;
   // The last month with a report: December of a past year, this month of this one.
   const last = year < thisYear ? 12 : running ? Number(today.slice(5, 7)) : 0;
-  const reports = useMonthReports(year, last);
+  const totals = useMonthTotals(year, last > 0).data;
   const [hidden] = useHideNumbers();
-  const spent = reports.map((r) => r.data?.as_if?.expense ?? null);
-  const currency = reports.find((r) => r.data?.as_if)?.data?.as_if?.currency ?? '';
+  const spent = monthSpent(totals, year, last);
+  const currency = totals?.find((t) => t.as_if)?.as_if?.currency ?? '';
   // The month still going on does not set the median.
   const closed = spent.slice(0, running ? last - 1 : last).filter((v): v is number => v !== null);
   const med = median(closed);

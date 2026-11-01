@@ -207,6 +207,42 @@ export function unusualSpend(
   return median > 0 && Math.abs(amount) >= 3 * median ? { median } : null;
 }
 
+/** A spend of the day as the unusual-spend check reads it. */
+export type SpendRow = {
+  id: string;
+  type: string;
+  category_id: string | null;
+  currency: string;
+  note?: string;
+};
+
+/**
+ * The next spends to check against their usual: the expenses of the first
+ * category and currency not checked yet, together. One history read covers
+ * the whole group, and a tick reads at most one, so twenty expenses of a day
+ * no longer send twenty reads at once. A spend already marked "разовая" is
+ * left out.
+ */
+export function nextSpendGroup<T extends SpendRow>(
+  spends: readonly T[],
+  unchecked: (id: string) => boolean,
+): { category: string; currency: string; items: T[] } | null {
+  const fresh = spends.filter(
+    (t) =>
+      t.type === 'expense' &&
+      !!t.category_id &&
+      unchecked(t.id) &&
+      !(t.note ?? '').includes('разовая'),
+  );
+  const head = fresh[0];
+  if (!head?.category_id) return null;
+  return {
+    category: head.category_id,
+    currency: head.currency,
+    items: fresh.filter((t) => t.category_id === head.category_id && t.currency === head.currency),
+  };
+}
+
 const HELLO: Record<string, string> = {
   TH: 'Сават-ди',
   UZ: 'Ассалому алейкум',

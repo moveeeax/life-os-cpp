@@ -24,6 +24,9 @@ inline constexpr const char* kPollJob = "telegram_poll";
 inline constexpr int kChatsPerPoll = 30;
 inline constexpr int kMessagesPerChat = 50;
 inline constexpr int kMessagesPerEvent = 10;
+/// The owner's poll lock: longer than a pass that waits out every call (1 + 2 x kChatsPerPoll
+/// gateway calls of 15 s), so a slow poll is never joined by the next minute's.
+inline constexpr int kPollLockSeconds = 1200;
 /// A chat seen for the first time after the link: only its messages this recent count.
 inline constexpr long long kNewChatSeconds = 600;
 

@@ -116,6 +116,20 @@ public:
         });
     }
 
+    /// Whether a run of this account was queued in the last @p seconds and has
+    /// not failed: the schedule's startup tick leaves such an account alone.
+    bool recent_run(const std::string& xiaomi_user_id, long seconds) {
+        return Database::get().execute_read([&](auto& txn) {
+            return !txn.exec_params(
+                           "SELECT 1 FROM sync_runs WHERE xiaomi_user_id = $1 AND started_at > now() - "
+                           "make_interval(secs => $2::double precision) AND status IN ('queued', "
+                           "'running', 'succeeded') LIMIT 1",
+                           xiaomi_user_id,
+                           seconds)
+                        .empty();
+        });
+    }
+
     /// A run of this account; a run of another account does not exist for the caller.
     std::optional<nlohmann::json> get(long id, const std::string& xiaomi_user_id) {
         return Database::get().execute_read([&](auto& txn) -> std::optional<nlohmann::json> {

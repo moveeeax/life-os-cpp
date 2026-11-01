@@ -295,6 +295,7 @@ inline constexpr ConfigKey worker_brpop_timeout{"worker.brpop_timeout", "WORKER_
 inline constexpr ConfigKey worker_concurrency{"worker.concurrency", "WORKER_CONCURRENCY"};
 inline constexpr ConfigKey worker_health_port{"worker.health_port", "WORKER_HEALTH_PORT"};
 inline constexpr ConfigKey worker_id{"worker.id", "WORKER_ID"};
+inline constexpr ConfigKey worker_priority_types{"worker.priority_types", "WORKER_PRIORITY_TYPES"};
 inline constexpr ConfigKey worker_strict_types{"worker.strict_types", "WORKER_STRICT_TYPES"};
 
 // --- workout ---

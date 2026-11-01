@@ -7,7 +7,9 @@
  *        person's own text before Confirm while other actions do not.
  */
 
+#include <chrono>
 #include <map>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -17,9 +19,11 @@
 #include <nlohmann/json.hpp>
 
 #include "agent/TelegramPoll.hpp"
+#include "cache/Cache.hpp"
 #include "database/Database.hpp"
 #include "net/Http.hpp"
 #include "repositories/agent/ActionRepository.hpp"
+#include "repositories/agent/InboxRepository.hpp"
 #include "repositories/agent/TurnRepository.hpp"
 #include "repositories/telegram/LinkRepository.hpp"
 #include "test_helpers.hpp"
@@ -42,6 +46,8 @@ struct ScriptedTelegram : Net::Http::Transport {
     json chats = json::array();
     std::map<std::string, json> history;
     std::vector<std::string> urls;
+    /// The gateway stops answering after the chat list (a hung tg.tarassov.me).
+    bool hung = false;
 
     Net::Http::Response get(const std::string&, const std::vector<std::pair<std::string, std::string>>&) override {
         return {404, ""};
@@ -57,6 +63,9 @@ struct ScriptedTelegram : Net::Http::Transport {
         const std::string base = "http://tg.test";
         if (r.url.rfind(base + "/v1/chats?", 0) == 0) {
             return {200, json{{"ok", true}, {"data", chats}}.dump()};
+        }
+        if (hung) {
+            throw Net::Http::TransportError("timed out");
         }
         for (const auto& [id, list] : history) {
             if (r.url.rfind(base + "/v1/chats/" + id + "/messages?", 0) == 0) {
@@ -180,6 +189,70 @@ TEST_F(TelegramPollDb, NewDmsAndMentionsBecomeOneEvent) {
 
     Agent::TelegramPoll::process_poll(json::object());
     EXPECT_EQ(events(), 1) << "the same messages are not told twice";
+}
+
+// A message Ani could not take (her inbox is full) is not lost: the cursors wait, the next poll raises it.
+TEST_F(TelegramPollDb, AMessageRefusedForAFullInboxComesAgain) {
+    ASSERT_TRUE(links.set(kAnna, "1389231240", "moveeeax"));
+    Agent::TelegramPoll::process_poll(json::object());
+    Repositories::Agent::InboxRepository inbox;
+    std::vector<std::string> filler;
+    for (int i = 0; i < 50; ++i) {
+        filler.push_back(inbox.add(kAnna, "say", json{{"text", "x"}}, std::nullopt, 3600, "ready").id);
+    }
+    telegram.chats[0]["unread_count"] = 1;
+    telegram.history["10"] = json::array({message(101, "привет"), message(100, "старое")});
+    const auto refused = Agent::TelegramPoll::process_poll(json::object());
+    EXPECT_EQ(refused["event"], "backlog");
+    EXPECT_EQ(links.cursors(kAnna).at("10"), 100) << "the cursor waits for the event";
+
+    Database::get().execute_write([](auto& txn) {
+        txn.exec_params("DELETE FROM ani_inbox WHERE owner_id = $1::uuid AND kind = 'say'", std::string(kAnna));
+        return true;
+    });
+    Agent::TelegramPoll::process_poll(json::object());
+    EXPECT_EQ(events(), 1) << "raised by the next poll";
+    EXPECT_EQ(links.cursors(kAnna).at("10"), 101);
+}
+
+// A poll still running (the gateway hangs) is not joined by the next minute's.
+TEST_F(TelegramPollDb, APollWaitsForTheOneRunning) {
+    ASSERT_TRUE(links.set(kAnna, "1389231240", "moveeeax"));
+    const std::string key = std::string("telegram:poll:lock:") + kAnna;
+    ASSERT_TRUE(Cache::get().set_nx(key, "held elsewhere", std::chrono::seconds(60)));
+    const auto out = Agent::TelegramPoll::process_poll(json::object());
+    EXPECT_EQ(out["reason"], "poll_running");
+    EXPECT_TRUE(telegram.urls.empty());
+    Cache::get().del(key);
+    Agent::TelegramPoll::process_poll(json::object());
+    EXPECT_FALSE(telegram.urls.empty()) << "the lock went with its holder";
+    EXPECT_FALSE(Cache::get().exists(key)) << "a poll releases its own lock";
+}
+
+// No answer at all: the pass ends at the first call instead of waiting 15 s on each of 60 more.
+TEST_F(TelegramPollDb, AGatewayThatStopsAnsweringEndsThePass) {
+    ASSERT_TRUE(links.set(kAnna, "1389231240", "moveeeax"));
+    Agent::TelegramPoll::process_poll(json::object());
+    telegram.chats[0]["unread_count"] = 2;
+    telegram.chats[1]["unread_count"] = 3;
+    telegram.urls.clear();
+    telegram.hung = true;
+    Agent::TelegramPoll::process_poll(json::object());
+    EXPECT_EQ(telegram.urls.size(), 2u) << "the chat list and one history call";
+    EXPECT_EQ(events(), 0);
+}
+
+// The voice line is claimed before it goes and given back when it did not: one failed voice or
+// gateway call no longer loses the morning or the evening.
+TEST_F(TelegramPollDb, AVoiceLineThatFailedIsGivenBack) {
+    ASSERT_TRUE(links.set(kAnna, "1389231240", "moveeeax"));
+    links.set_voice_to_self(kAnna, true);
+    ASSERT_TRUE(links.claim_voice(kAnna, "morning", "2026-11-01"));
+    EXPECT_FALSE(links.claim_voice(kAnna, "morning", "2026-11-01")) << "once a day";
+    links.release_voice(kAnna, "morning", "2026-10-31");
+    EXPECT_FALSE(links.claim_voice(kAnna, "morning", "2026-11-01")) << "another day's release frees nothing";
+    links.release_voice(kAnna, "morning", "2026-11-01");
+    EXPECT_TRUE(links.claim_voice(kAnna, "morning", "2026-11-01")) << "the next poll tries again";
 }
 
 TEST_F(TelegramPollDb, OnlyATelegramProposalTakesANewText) {

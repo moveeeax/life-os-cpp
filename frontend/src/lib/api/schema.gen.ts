@@ -9762,6 +9762,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/money/reports/months": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The months of a year with their "as if" totals, one call for the month strip
+         * @description Every month of a past year, this year's months up to the running one (in tz), none of a coming year. Each month's as_if block holds the totals that the period report gives for that month; it is null when there is no as_if currency.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The year; this year in tz by default */
+                    year?: string;
+                    /** @description Defaults to the settings' view_currency */
+                    as_if?: string;
+                    /** @description IANA zone of the caller: this year and this month are counted there; a name that is not a zone answers 400 invalid_query */
+                    tz?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The months, January first */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyMonthTotals"][];
+                        };
+                    };
+                };
+                /** @description A bad year, currency or zone */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/money/reports/balances": {
         parameters: {
             query?: never;
@@ -13203,7 +13287,7 @@ export interface paths {
         put?: never;
         /**
          * Create a goal
-         * @description number needs start_value and target_value (different); count needs target_count; unit is for number only; start_date defaults to today; due must be after it.
+         * @description number needs start_value and target_value (different); count needs target_count; unit is for number only; start_date defaults to today in ?tz= (UTC without it); due must be after it.
          */
         post: {
             parameters: {
@@ -15710,7 +15794,14 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                            };
+                        };
+                    };
                 };
                 /** @description invalid_text */
                 400: {
@@ -16064,7 +16155,7 @@ export interface paths {
             parameters: {
                 query: {
                     date: string;
-                    /** @description The caller's IANA zone (UTC when not one) */
+                    /** @description The caller's IANA zone; UTC when absent, 400 invalid_query when it names no zone */
                     tz?: string;
                 };
                 header?: never;
@@ -16084,7 +16175,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description invalid_date */
+                /** @description invalid_date, invalid_query (tz names no zone) */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -16147,7 +16238,8 @@ export interface paths {
                         ended_at: string;
                         /** @description Time in focus without pauses; the span when left out */
                         minutes?: number;
-                        label?: string;
+                        /** @description Kept to its first 200 characters; null is no label */
+                        label?: string | null;
                     };
                 };
             };
@@ -16166,7 +16258,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description invalid_time, invalid_minutes */
+                /** @description invalid_time, invalid_minutes, invalid_label (not text) */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -16206,7 +16298,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    /** @description The caller's IANA zone (UTC when not one) */
+                    /** @description The caller's IANA zone; UTC when absent, 400 invalid_query when it names no zone */
                     tz?: string;
                 };
                 header?: never;
@@ -16225,6 +16317,13 @@ export interface paths {
                             data: components["schemas"]["FocusStats"];
                         };
                     };
+                };
+                /** @description invalid_query (tz names no zone) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Not authenticated */
                 401: {
@@ -16522,11 +16621,13 @@ export interface paths {
                         /** @description RFC 3339, after start, a day at most */
                         end: string;
                         description?: string;
+                        /** @description The event's id, chosen by the caller (base32hex as Google takes it). An add sent again with the same id answers the event the first one made instead of adding a second. */
+                        id?: string;
                     };
                 };
             };
             responses: {
-                /** @description Added */
+                /** @description Added (or, with an id already taken, the event the earlier add made) */
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -16537,7 +16638,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description invalid_title, invalid_time */
+                /** @description invalid_title, invalid_time, invalid_id */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -16565,7 +16666,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Google did not answer (calendar_unavailable) */
+                /** @description Google did not answer, or its answer could not be read and the event may exist (calendar_unavailable) */
                 502: {
                     headers: {
                         [name: string]: unknown;
@@ -16730,7 +16831,10 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            data: Record<string, never>;
+                            data: {
+                                /** @enum {boolean} */
+                                moved: true;
+                            };
                         };
                     };
                 };
@@ -16748,7 +16852,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked) */
+                /** @description Not in the calendar (calendar_event_not_found), calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -16886,7 +16990,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -17045,14 +17149,14 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found) */
+                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17113,14 +17217,14 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found) */
+                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17195,14 +17299,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found) */
+                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17261,21 +17365,21 @@ export interface paths {
                         };
                     };
                 };
-                /** @description invalid_text, invalid_reply_to, or a body that is not JSON */
+                /** @description invalid_text, invalid_reply_to, invalid_body (reply_to or key not text), or a body that is not JSON */
                 400: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found) */
+                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17354,14 +17458,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found) */
+                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17427,21 +17531,21 @@ export interface paths {
                         };
                     };
                 };
-                /** @description invalid_emoji */
+                /** @description invalid_emoji, invalid_remove (not true or false) */
                 400: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found) */
+                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17515,14 +17619,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found) */
+                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17587,14 +17691,14 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17642,14 +17746,14 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17702,14 +17806,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17738,14 +17842,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17807,14 +17911,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17877,14 +17981,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17955,14 +18059,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found) */
+                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -24936,7 +25040,7 @@ export interface components {
             target_count: number | null;
             /** @enum {string|null} */
             result: "pass" | "fail" | null;
-            /** @description A number goal only: the id of the metrics catalog series it follows (GET /api/v1/metrics), null when fed by check-ins alone */
+            /** @description A number goal only: the id of the metrics catalog series it follows (GET /api/v1/metrics), null when fed by check-ins alone. A series that adds up by day (reduce sum or count: steps, income, tasks done) counts as its running total from start_date on top of start_value; any other series counts its day value */
             source: string | null;
             /**
              * @description Why the source cannot be read for the caller; null when it can or there is none. An unreadable source leaves the check-ins alone driving the progress.
@@ -24951,7 +25055,7 @@ export interface components {
         };
         GoalDetail: components["schemas"]["Goal"] & {
             checkins: components["schemas"]["GoalCheckin"][];
-            /** @description A number goal: the days of its source from start_date to the date asked for, merged with its check-ins (a check-in wins on its date), oldest first; empty for the other kinds */
+            /** @description A number goal: the days of its source from start_date to the date asked for (no later than tomorrow), merged with its check-ins (a check-in wins on its date), oldest first; for a source that adds up by day each point is the running total; empty for the other kinds */
             points: components["schemas"]["GoalPoint"][];
             sections: (components["schemas"]["GoalSection"] & {
                 tasks: components["schemas"]["Task"][];
@@ -28531,6 +28635,22 @@ export interface components {
             unconverted: number;
             rates: Record<string, never>;
             source: string;
+        };
+        MoneyMonthTotals: {
+            /** @description YYYY-MM */
+            month: string;
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** @description The month's totals converted into the as_if currency, as in the period report; null with no as_if currency */
+            as_if: null | {
+                currency: string;
+                income: number;
+                expense: number;
+                /** @description Some currency had no rate */
+                partial: boolean;
+            };
         };
         MoneyReport: {
             period: {

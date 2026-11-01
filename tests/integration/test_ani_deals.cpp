@@ -63,26 +63,31 @@ TEST_F(AniDeals, ProgressComesFromTheWeeksRows) {
     ASSERT_TRUE(deals.add(kAnna, "UTC", "Зал три раза", "workouts", 3, std::nullopt));
     ASSERT_TRUE(deals.add(kAnna, "UTC", "Пять часов фокуса", "focus_minutes", 300, std::nullopt));
     ASSERT_TRUE(deals.add(kAnna, "UTC", "Медитация каждый день", "habit", 7, std::string(kHabit)));
+    // One fixed week (Monday 2026-10-26) and rows at fixed times in and out of
+    // it: rows written around now() fell into the previous week in the first
+    // minute of a Monday (UTC) and the test failed.
+    exec("UPDATE ani_deals SET week_start = '2026-10-26' WHERE owner_id = $1::uuid");
     exec(
-        "INSERT INTO workout_sessions (owner_id, started_at, finished_at) VALUES ($1::uuid, now() - interval "
-        "'1 minute', now())");
-    exec("INSERT INTO workout_sessions (owner_id, started_at) VALUES ($1::uuid, now())");  // not finished
+        "INSERT INTO workout_sessions (owner_id, started_at, finished_at) VALUES ($1::uuid, '2026-10-27T18:00:00Z', "
+        "'2026-10-27T19:00:00Z')");
+    exec("INSERT INTO workout_sessions (owner_id, started_at) VALUES ($1::uuid, '2026-10-28T18:00:00Z')");  // not
+                                                                                                            // finished
     exec(
-        "INSERT INTO focus_sessions (owner_id, started_at, ended_at, minutes) VALUES ($1::uuid, now() - interval "
-        "'1 minute', now(), 25)");
+        "INSERT INTO focus_sessions (owner_id, started_at, ended_at, minutes) VALUES ($1::uuid, "
+        "'2026-11-01T23:30:00Z', '2026-11-01T23:55:00Z', 25)");  // Sunday, the week's last day
     exec(
-        "INSERT INTO focus_sessions (owner_id, started_at, ended_at, minutes) VALUES ($1::uuid, now() - interval "
-        "'15 days', now() - interval '15 days' + interval '40 minutes', 40)");  // another week
+        "INSERT INTO focus_sessions (owner_id, started_at, ended_at, minutes) VALUES ($1::uuid, "
+        "'2026-10-25T23:00:00Z', '2026-10-25T23:40:00Z', 40)");  // the Sunday before: another week
     exec(
         "INSERT INTO habit_checks (owner_id, habit_id, date) VALUES ($1::uuid, '11111111-1111-4111-8111-11111111de01', "
-        "(now() AT TIME ZONE 'UTC')::date)");
-    const json week = deals.week(kAnna, "UTC");
+        "'2026-10-26')");
+    const json week = deals.week(kAnna, "UTC", std::string("2026-10-26"));
     ASSERT_EQ(week.size(), 3u);
     EXPECT_EQ(week[0]["done"], 1) << "one finished workout";
     EXPECT_EQ(week[1]["done"], 25) << "this week's focus only";
     EXPECT_EQ(week[2]["done"], 1);
     EXPECT_EQ(week[2]["habit"], "Meditation");
-    EXPECT_TRUE(deals.week(kBoris, "UTC").empty()) << "only the owner's";
+    EXPECT_TRUE(deals.week(kBoris, "UTC", std::string("2026-10-26")).empty()) << "only the owner's";
 }
 
 TEST_F(AniDeals, FivePerWeekAndOnlyOwnHabits) {

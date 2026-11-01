@@ -538,6 +538,62 @@ TEST_F(GoalsApiTest, CheckinWinsOnItsDate) {
     EXPECT_DOUBLE_EQ(d["points"][1]["value"].get<double>(), 91.0);
 }
 
+// "Close 10 tasks" on tasks:done, a summed series: two tasks on 2026-10-02 and one on
+// 2026-10-05 make 3 on 2026-10-08, not the last day's 1. A date far ahead reads the same.
+TEST_F(GoalsApiTest, ASummedSourceCountsFromTheStart) {
+    Database::get().execute_write([](auto& txn) {
+        txn.exec_params(
+            "INSERT INTO task_items (owner_id, title, area, status, completed_at) VALUES "
+            "($1::uuid, 'A', 'health', 'done', '2026-10-02T09:00:00Z'), "
+            "($1::uuid, 'B', 'health', 'done', '2026-10-02T15:00:00Z'), "
+            "($1::uuid, 'C', 'health', 'done', '2026-10-05T09:00:00Z'), "
+            "($1::uuid, 'Old', 'health', 'done', '2026-09-20T09:00:00Z')",
+            std::string(kAnna));
+        return true;
+    });
+    const json g = goal({{"title", "Close 10 tasks"},
+                         {"area", "health"},
+                         {"kind", "number"},
+                         {"start_date", "2026-10-01"},
+                         {"due", "2026-12-31"},
+                         {"start_value", 0},
+                         {"target_value", 10},
+                         {"source", "tasks:done"}});
+    EXPECT_TRUE(g["source_why"].is_null()) << g.dump();
+    EXPECT_DOUBLE_EQ(g["progress"]["current"].get<double>(), 3) << "the sum since start_date, not 1";
+    EXPECT_EQ(g["progress"]["current_date"], "2026-10-05");
+    const json d = detail(g["id"]);
+    ASSERT_EQ(d["points"].size(), 2u);
+    EXPECT_DOUBLE_EQ(d["points"][0]["value"].get<double>(), 2) << "the running total of 2026-10-02";
+    EXPECT_DOUBLE_EQ(d["points"][1]["value"].get<double>(), 3);
+    const auto far =
+        call_id(goals, &Api::GoalsController::getGoal, kAnna, Get, g["id"], json::object(), {{"date", "2100-12-31"}});
+    ASSERT_EQ(far->statusCode(), k200OK) << far->body();
+    EXPECT_DOUBLE_EQ(body_of(far)["data"]["progress"]["current"].get<double>(), 3)
+        << "the read stops at tomorrow, the answer is the same";
+}
+
+// A goal without start_date starts on today in ?tz=, not on today in UTC.
+TEST_F(GoalsApiTest, AGoalStartsOnTheCallersToday) {
+    const auto [zone, local, utc] = Database::get().execute_read([](auto& txn) {
+        auto r = txn.exec(
+            "SELECT z, to_char(now() AT TIME ZONE z, 'YYYY-MM-DD'), to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD') "
+            "FROM unnest(ARRAY['Pacific/Kiritimati', 'Pacific/Pago_Pago']) AS z "
+            "WHERE (now() AT TIME ZONE z)::date <> (now() AT TIME ZONE 'UTC')::date LIMIT 1");
+        return std::make_tuple(
+            r[0][0].template as<std::string>(), r[0][1].template as<std::string>(), r[0][2].template as<std::string>());
+    });
+    ASSERT_NE(local, utc);
+    const json body{
+        {"title", "Read 12 books"}, {"area", "health"}, {"kind", "count"}, {"target_count", 12}, {"due", "2030-12-31"}};
+    const auto there = call(goals, &Api::GoalsController::createGoal, kAnna, Post, body, {{"tz", zone}});
+    ASSERT_EQ(there->statusCode(), k201Created) << there->body();
+    EXPECT_EQ(body_of(there)["data"]["start_date"], local);
+    const auto plain = call(goals, &Api::GoalsController::createGoal, kAnna, Post, body);
+    ASSERT_EQ(plain->statusCode(), k201Created) << plain->body();
+    EXPECT_EQ(body_of(plain)["data"]["start_date"], utc) << "no tz: UTC";
+}
+
 TEST_F(GoalsApiTest, SourceOnlyForNumberGoals) {
     const auto create = [&](const json& body) {
         return call(goals, &Api::GoalsController::createGoal, kAnna, Post, body, {{"date", "2026-10-08"}});

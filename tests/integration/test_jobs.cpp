@@ -28,6 +28,7 @@
 
 #include "jobs/Dispatcher.hpp"
 #include "jobs/Jobs.hpp"
+#include "jobs/Tick.hpp"
 #include "jobs/Worker.hpp"
 #include "test_helpers.hpp"
 #include "utils/Time.hpp"
@@ -39,23 +40,10 @@ namespace {
 class JobsIntegrationTest : public TestHelpers::CoreBackedTest {
 protected:
     // Queue names used by the tests below; TearDown drains exactly these.
-    static constexpr const char* kQueues[] = {"default",
-                                              "retryq",
-                                              "cancelq",
-                                              "pagedq",
-                                              "healq",
-                                              "depthq",
-                                              "backoffq",
-                                              "leaseq",
-                                              "deferq",
-                                              "hookq",
-                                              "hookq-throws",
-                                              "multiq-a",
-                                              "multiq-b",
-                                              "runq",
-                                              "beatq",
-                                              "trimq",
-                                              "promoteq"};
+    static constexpr const char* kQueues[] = {"default",      "retryq",   "cancelq",    "pagedq",  "healq",
+                                              "depthq",       "backoffq", "leaseq",     "deferq",  "hookq",
+                                              "hookq-throws", "multiq-a", "multiq-b",   "runq",    "beatq",
+                                              "trimq",        "promoteq", "cancelrunq", "orphanq", "tickq"};
 
     std::vector<std::string> job_ids_to_cleanup;
 
@@ -444,6 +432,63 @@ TEST_F(JobsIntegrationTest, FailAfterCompleteLeavesTheJobDone) {
     std::vector<std::string> q;
     Cache::get().get_client().lrange(Jobs::queue_key("donefailq"), 0, -1, std::back_inserter(q));
     EXPECT_TRUE(q.empty());
+}
+
+// An admin's cancel that lands while the handler runs stands: the success or
+// failure the worker records afterwards does not write over it (compare-and-set).
+TEST_F(JobsIntegrationTest, ACancelWhileTheHandlerRunsStands) {
+    auto done = picked("cancelrunq", "cw-0");
+    ASSERT_TRUE(Jobs::get().cancel(done.id));
+    Jobs::get().complete(done.id, json{{"ok", true}});
+    EXPECT_EQ(Jobs::get().get_status(done.id)->status, "failed");
+    EXPECT_EQ(Jobs::get().get_status(done.id)->error, "cancelled");
+
+    auto failed = picked("cancelrunq", "cw-0");
+    ASSERT_TRUE(Jobs::get().cancel(failed.id));
+    Jobs::get().fail(failed.id, "boom");
+    const auto after = Jobs::get().get_status(failed.id);
+    EXPECT_EQ(after->status, "failed");
+    EXPECT_EQ(after->error, "cancelled");
+    EXPECT_EQ(after->retry_count, 0);
+    EXPECT_TRUE(list(Jobs::queue_key("cancelrunq")).empty()) << "a cancelled job is not requeued";
+    EXPECT_TRUE(list(Jobs::processing_key("cw-0")).empty());
+}
+
+// An id in another pod's processing list without a lease (the lease write
+// failed, or the pod died between the pop and the lease) is requeued once its
+// blob has not moved for a visibility timeout; a fresh one is left alone.
+TEST_F(JobsIntegrationTest, AnOrphanWithoutALeaseIsRequeued) {
+    Jobs::get().set_visibility_timeout(/*sec=*/100);
+    auto job = picked("orphanq", "orphan-pod-0");
+    Cache::get().get_client().zrem(Jobs::leases_key(), job.id);
+    const int64_t now = Utils::Time::now_epoch_millis();
+
+    EXPECT_EQ(Jobs::get().recover_orphans(now, "orphan-*"), 0) << "just picked: the lease may be on its way";
+    EXPECT_EQ(list(Jobs::processing_key("orphan-pod-0")), std::vector<std::string>{job.id});
+
+    EXPECT_EQ(Jobs::get().recover_orphans(now + 200 * 1000, "orphan-*"), 1);
+    EXPECT_TRUE(list(Jobs::processing_key("orphan-pod-0")).empty());
+    EXPECT_EQ(list(Jobs::queue_key("orphanq")), std::vector<std::string>{job.id});
+    EXPECT_EQ(Jobs::get().get_status(job.id)->status, "pending");
+
+    // A leased id belongs to the reaper (its own queue: the requeued orphan waits on orphanq).
+    auto leased = picked("orphanq-leased", "orphan-pod-1");
+    EXPECT_EQ(Jobs::get().recover_orphans(now + 200 * 1000, "orphan-*"), 0);
+    EXPECT_EQ(list(Jobs::processing_key("orphan-pod-1")), std::vector<std::string>{leased.id});
+    Jobs::get().complete(leased.id, json::object());
+    Jobs::get().set_visibility_timeout(0);
+}
+
+// A minute's tick queues its job only when the last one ended.
+TEST_F(JobsIntegrationTest, ATickQueuesOneJobAtATime) {
+    Cache::get().del(Jobs::Tick::marker_key("tickq"));
+    EXPECT_TRUE(Jobs::Tick::submit("tickq", json::object(), 600));
+    EXPECT_FALSE(Jobs::Tick::submit("tickq", json::object(), 600)) << "the last tick's job still waits";
+    EXPECT_EQ(list(Jobs::queue_key("tickq")).size(), 1u);
+    Jobs::Tick::done("tickq");
+    EXPECT_TRUE(Jobs::Tick::submit("tickq", json::object(), 600));
+    EXPECT_EQ(list(Jobs::queue_key("tickq")).size(), 2u);
+    Cache::get().del(Jobs::Tick::marker_key("tickq"));
 }
 
 TEST_F(JobsIntegrationTest, BackoffDelaysRequeueUntilDue) {

@@ -29,8 +29,10 @@
 #include "repositories/agent/ActionRepository.hpp"
 #include "repositories/agent/AgentRepository.hpp"
 #include "repositories/agent/TurnRepository.hpp"
+#include "telegram/Gateway.hpp"
 #include "utils/BlockingPool.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Api {
 
@@ -51,15 +53,6 @@ json view(const std::string& owner) {
                 {"generation", row ? row->value("generation", 0) : 0},
                 {"last_error", row ? (*row)["last_error"] : json()},
                 {"usage", usage}};
-}
-
-/// Characters, not bytes: the limit of a message is what the person typed.
-std::size_t utf8_length(const std::string& s) {
-    std::size_t n = 0;
-    for (const unsigned char c : s) {
-        n += (c & 0xC0) != 0x80 ? 1 : 0;
-    }
-    return n;
 }
 
 HttpResponsePtr accepted(const json& body) {
@@ -144,7 +137,8 @@ void AniController::message(const HttpRequestPtr& req, Callback&& callback) {
     }
     const auto text_it = body.find("text");
     const std::string text = text_it != body.end() && text_it->is_string() ? text_it->get<std::string>() : "";
-    const std::size_t length = utf8_length(text);
+    // Characters, not bytes: the limit of a message is what the person typed.
+    const std::size_t length = Utils::Utf8::length(text);
     if (text.find_first_not_of(" \t\r\n") == std::string::npos || length > ::Agent::kTurnTextMax) {
         callback(ErrorResponse::bad_request("invalid_text",
                                             "text is 1 to " + std::to_string(::Agent::kTurnTextMax) + " characters"));
@@ -342,8 +336,9 @@ void AniController::confirmAction(const HttpRequestPtr& req, Callback&& callback
             return;
         }
         text = body.value("text", std::string());
-        if (body.contains("text") && (text.empty() || text.size() > 16000)) {
-            callback(ErrorResponse::bad_request("invalid_text", "text is 1 to 4000 characters"));
+        // The Telegram route's own limit, in its unit: a longer text would be confirmed and then refused.
+        if (body.contains("text") && (text.empty() || text.size() > ::Telegram::kTextMaxBytes)) {
+            callback(ErrorResponse::bad_request("invalid_text", "text is 1 to 4096 bytes of UTF-8"));
             return;
         }
     }

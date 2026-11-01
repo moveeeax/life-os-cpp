@@ -15,8 +15,56 @@ import type { components } from '@/lib/api/schema.gen';
 export type Turn = components['schemas']['AniTurn'];
 export type Action = components['schemas']['AniAction'];
 
-/** How often an open turn is read again. */
+/** How often an open turn is read again at first. */
 export const POLL_MS = 1000;
+/** For how long the first, quick reads go on; a turn usually ends within it. */
+export const POLL_FAST_FOR_MS = 10_000;
+/** How often a turn still open after that is read (a sleeping agent wakes in about 30 s). */
+export const POLL_SLOW_MS = 5000;
+
+/** The wait before the next read of a turn watched for @p elapsed ms. */
+export function pollDelay(elapsed: number): number {
+  return elapsed < POLL_FAST_FOR_MS ? POLL_MS : POLL_SLOW_MS;
+}
+
+/**
+ * Read a turn again and again: every second for ten seconds, then every five.
+ * One read at a time (the next waits for the last to settle). While the tab is
+ * hidden nothing is read; showing it again reads at once. Returns the stop.
+ */
+export function pollTurn(read: () => Promise<unknown>): () => void {
+  const started = Date.now();
+  let timer: number | undefined;
+  let stopped = false;
+  let reading = false;
+  const hidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
+  const schedule = () => {
+    if (stopped) return;
+    window.clearTimeout(timer);
+    timer = window.setTimeout(tick, pollDelay(Date.now() - started));
+  };
+  const tick = () => {
+    timer = undefined;
+    if (stopped || reading || hidden()) return;
+    reading = true;
+    read()
+      .catch(() => {})
+      .finally(() => {
+        reading = false;
+        schedule();
+      });
+  };
+  const onVisible = () => {
+    if (!hidden() && timer === undefined && !reading) tick();
+  };
+  document.addEventListener('visibilitychange', onVisible);
+  schedule();
+  return () => {
+    stopped = true;
+    window.clearTimeout(timer);
+    document.removeEventListener('visibilitychange', onVisible);
+  };
+}
 /** The longest message, in characters (the API checks the same). */
 export const TEXT_MAX = 4000;
 
@@ -63,6 +111,33 @@ export async function sendMessage(text: string, tz: string): Promise<Turn> {
 
 export async function readTurn(id: string): Promise<Turn> {
   return (await api.getJson<{ data: Turn }>(`/api/v1/ani/turns/${encodeURIComponent(id)}`)).data;
+}
+
+/** How often, and how many times, a confirmed change is read until the worker has made it. */
+export const SETTLE_MS = 2000;
+export const SETTLE_TRIES = 15;
+
+/**
+ * Reads @p turnId until its action @p actionId is no longer being made
+ * (confirmed or running); the action as it ended, or null when it did not
+ * end within SETTLE_TRIES reads or the reads failed.
+ */
+export async function settledAction(
+  turnId: string,
+  actionId: string,
+  wait: (ms: number) => Promise<void> = (ms) => new Promise((ok) => setTimeout(ok, ms)),
+): Promise<Action | null> {
+  for (let i = 0; i < SETTLE_TRIES; i++) {
+    await wait(SETTLE_MS);
+    try {
+      const a = (await readTurn(turnId)).actions.find((x) => x.id === actionId);
+      if (!a) return null;
+      if (a.status !== 'confirmed' && a.status !== 'running') return a;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 /** The reply of a done turn read aloud (MP3); `engine.say` plays it with her lips. */
@@ -198,4 +273,15 @@ export async function askAgent(
 export function chatOf(summary: string): string | null {
   const m = /^Send to (.+?): «/.exec(summary) ?? /^Edit your message in (.+?) to «/.exec(summary);
   return m ? m[1] : null;
+}
+
+/**
+ * What the person confirms, in words. The summary of a Telegram proposal cuts
+ * its message at 300 characters, while the whole text is what gets sent, so
+ * that one shows the summary's head ("Send to Анна: ") with the whole text.
+ */
+export function confirmWords(a: Pick<Action, 'summary' | 'text'>): string {
+  if (a.text == null) return a.summary;
+  const at = a.summary.indexOf('«' + Array.from(a.text).slice(0, 20).join(''));
+  return at >= 0 ? `${a.summary.slice(0, at)}«${a.text}»` : `${a.summary} ${a.text}`;
 }

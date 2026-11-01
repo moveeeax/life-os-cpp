@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -57,6 +57,9 @@ export function WeeklyReview({
   const habits = g.habits.filter((h) => !closed.includes(`habit:${h.name}`));
   const qc = useQueryClient();
   const [failed, setFailed] = useState(false);
+  // The tasks whose PATCH is on its way: their buttons wait, so two taps cannot race.
+  const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
+  const pendingRef = useRef(new Set<string>());
   // On Sunday it also goes to Saved Messages when the owner turned that on;
   // the server keeps it to once a week and answers 404 without Telegram.
   const sunday = new Date(`${date}T12:00:00Z`).getUTCDay() === 0;
@@ -68,15 +71,25 @@ export function WeeklyReview({
     // Once per opening: the text of the moment it opened.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sunday, week, today === undefined]);
-  const patch = (id: string, body: Record<string, unknown>) =>
-    api.patchJson(`/api/v1/tasks/items/${id}`, { body, query: { tz } }).then(
+  const settle = (id: string) => {
+    pendingRef.current.delete(id);
+    setPending(new Set(pendingRef.current));
+  };
+  const patch = async (id: string, body: Record<string, unknown>) => {
+    if (pendingRef.current.has(id)) return;
+    pendingRef.current.add(id);
+    setPending(new Set(pendingRef.current));
+    await api.patchJson(`/api/v1/tasks/items/${id}`, { body, query: { tz } }).then(
       () => {
         setFailed(false);
         close(`task:${id}`);
         void qc.invalidateQueries({ queryKey: qk.now.today(date, tz) });
+        void qc.invalidateQueries({ queryKey: qk.tasks.all() });
       },
       () => setFailed(true),
     );
+    settle(id);
+  };
   const empty = late.length + behind.length + habits.length === 0;
 
   return (
@@ -99,6 +112,7 @@ export function WeeklyReview({
                   <button
                     type="button"
                     aria-label={`Today: ${t.title}`}
+                    disabled={pending.has(t.id)}
                     onClick={() => void patch(t.id, { due: date })}
                   >
                     Today
@@ -106,6 +120,7 @@ export function WeeklyReview({
                   <button
                     type="button"
                     aria-label={`Tomorrow: ${t.title}`}
+                    disabled={pending.has(t.id)}
                     onClick={() => void patch(t.id, { due: tomorrowOf(date) })}
                   >
                     Tomorrow
@@ -113,6 +128,7 @@ export function WeeklyReview({
                   <button
                     type="button"
                     aria-label={`Done: ${t.title}`}
+                    disabled={pending.has(t.id)}
                     onClick={() => void patch(t.id, { status: 'done' })}
                   >
                     Done
