@@ -26,6 +26,15 @@ worker:
   # holding a thread; a turn talking to its agent holds one for its seconds
   # to a few minutes, so a few at once keep users from queueing behind one.
   concurrency: 6
+  # values-worker-prod.yaml gives the main worker's parses a thread of their
+  # own; this release pulls none of them.
+  priorityTypes: ""
+
+# Six job threads and the model proxy's eight threads share the pool; the
+# main worker's 3 (values-worker-prod.yaml) left turns and proxy calls
+# waiting for a connection.
+externalDatabase:
+  poolSize: 12
 
 # extraEnvFrom replaces the list of values-worker-prod.yaml: the app Secret
 # (database and Redis passwords) and the agent's knobs and upstream key.

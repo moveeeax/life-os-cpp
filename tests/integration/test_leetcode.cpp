@@ -118,6 +118,18 @@ TEST_F(LeetCodeSync, SyncStoresToday) {
     EXPECT_TRUE((*p)["last_error"].is_null());
 }
 
+// A saved profile pulls only its owner's: saving used to queue a pull of every user's profile.
+TEST_F(LeetCodeSync, ASavedProfilePullsOnlyItsOwner) {
+    profiles.set(kAnna, "moveeeax", "UTC");
+    profiles.set("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbcce", "someone_else", "UTC");
+    const auto out = LeetCode::process_sync(json{{"owner", kAnna}});
+    EXPECT_EQ(leetcode.posts, 1);
+    EXPECT_EQ(out["ok"], 1);
+    EXPECT_NE(leetcode.last_body.find("moveeeax"), std::string::npos);
+    LeetCode::process_sync(json::object());
+    EXPECT_EQ(leetcode.posts, 3) << "the hourly pull reads every profile";
+}
+
 TEST_F(LeetCodeSync, FailedPullKeepsTheDay) {
     profiles.set(kAnna, "moveeeax", "UTC");
     RateLimited down;

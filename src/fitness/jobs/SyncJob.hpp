@@ -89,13 +89,21 @@ inline long enqueue_recent(const Repositories::MiAccountRepository::Linked& acco
 /**
  * @brief The scheduled tick: one job per account whose token Xiaomi still
  *        accepts. An account that asks to be linked again is skipped, its
- *        sync could only fail. Returns how many jobs were enqueued; a failure
- *        on one account does not stop the others.
+ *        sync could only fail. An account with a run queued in the last
+ *        @p skip_within_seconds (and not failed) is skipped too: the tick
+ *        that runs after every API start would otherwise queue a whole
+ *        round of syncs per deploy in front of the parse jobs. Returns how
+ *        many jobs were enqueued; a failure on one account does not stop the
+ *        others.
  */
-inline int enqueue_recent_for_all(int window_days, long long now_epoch) {
+inline int enqueue_recent_for_all(int window_days, long long now_epoch, long skip_within_seconds = 0) {
     int enqueued = 0;
+    Repositories::SyncRunRepository runs;
     for (const auto& account : Repositories::MiAccountRepository("").list_syncable()) {
         try {
+            if (skip_within_seconds > 0 && runs.recent_run(account.xiaomi_user_id, skip_within_seconds)) {
+                continue;
+            }
             enqueue_recent(account, window_days, now_epoch);
             ++enqueued;
         } catch (const std::exception& e) {

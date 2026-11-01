@@ -61,6 +61,9 @@ worker:
   types: "fitness_sync,leetcode_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,now_media_sweep,files_sweep"
   # One sync per system by construction.
   concurrency: 1
+  # The parses the user waits for on screen get a thread of their own, so
+  # they never queue behind a fitness sync on the shared one.
+  priorityTypes: "food_parse,money_parse,tasks_parse"
 
 jobs:
   enabled: true

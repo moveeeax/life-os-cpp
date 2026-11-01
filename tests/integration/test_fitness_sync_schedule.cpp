@@ -139,6 +139,36 @@ TEST_F(SyncScheduleTest, TickEnqueuesOneJobPerAccountWithAnAcceptedToken) {
     EXPECT_EQ(Jobs::FitnessSync::enqueue_recent_for_all(2, 1790006400), 0);
 }
 
+// The tick after every API start skips an account synced within half the interval.
+TEST_F(SyncScheduleTest, TickLeavesARecentlySyncedAccountAlone) {
+    Database::get().execute_write([](auto& txn) {
+        txn.exec("TRUNCATE TABLE mi_accounts");
+        txn.exec_params(
+            "INSERT INTO users (id, email, confirmed, role_id) "
+            "VALUES ($1::uuid, $2, TRUE, (SELECT id FROM roles ORDER BY id LIMIT 1)) ON CONFLICT DO NOTHING",
+            std::string(kAnna),
+            std::string(kAnna) + "@example.test");
+        txn.exec_params(
+            "INSERT INTO mi_accounts (owner_id, xiaomi_user_id, pass_token_sealed, nonce, region, status) VALUES "
+            "($1::uuid, '1111111111', 'x', 'x', 'cn', 'ok')",
+            std::string(kAnna));
+        return true;
+    });
+    Repositories::SyncRunRepository runs;
+    const long earlier = runs.create("1111111111", "2026-09-21", "2026-09-22", Sync::kAllDataTypes);
+    runs.finish(earlier, "succeeded", json::object());
+
+    EXPECT_EQ(Jobs::FitnessSync::enqueue_recent_for_all(2, 1790006400, 7200), 0) << "synced a moment ago";
+    runs.finish(earlier, "failed", json::object());
+    EXPECT_EQ(Jobs::FitnessSync::enqueue_recent_for_all(2, 1790006400, 7200), 1) << "a failed run does not count";
+    (void)Jobs::get().pick({"fitness_sync"}, 1);
+
+    Database::get().execute_write([](auto& txn) {
+        txn.exec("TRUNCATE TABLE mi_accounts");
+        return true;
+    });
+}
+
 // A job enqueued before runs had an owner cannot be attributed to an account.
 TEST_F(SyncScheduleTest, JobWithoutAnOwnerFailsHonestly) {
     Repositories::SyncRunRepository runs;

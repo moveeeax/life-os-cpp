@@ -36,7 +36,7 @@ std::optional<Stats> parse_stats(const std::string& body);
 /// Pulls one username (Net::Http::transport()); nullopt with @p why on failure.
 std::optional<Stats> fetch(const std::string& username, std::string& why);
 
-/// The job: every profile pulled once.
+/// The job: every profile pulled once; with {"owner": id} in @p payload only that user's.
 nlohmann::json process_sync(const nlohmann::json& payload);
 
 }  // namespace LeetCode
