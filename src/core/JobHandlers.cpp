@@ -11,6 +11,7 @@
 #include "files/jobs/Register.hpp"
 #include "fitness/jobs/Register.hpp"
 #include "food/jobs/Register.hpp"
+#include "github/jobs/Register.hpp"
 #include "jobs/BuiltinHandlers.hpp"
 #include "jobs/Dispatcher.hpp"
 #include "leetcode/jobs/Register.hpp"
@@ -28,6 +29,7 @@ void register_job_handlers() {
     Files::register_jobs(d);
     Fitness::register_jobs(d);
     Food::register_jobs(d);
+    Github::register_jobs(d);
     LeetCode::register_jobs(d);
     Money::register_jobs(d);
     Now::register_jobs(d);
