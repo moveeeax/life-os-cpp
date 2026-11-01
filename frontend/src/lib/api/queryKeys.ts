@@ -179,6 +179,16 @@ export const qk = {
     /** Outside ['medical'], so a write there does not re-run the probe. */
     enabled: () => ['medical-enabled'] as const,
   },
+  /** GitHub section: the link on Account and the repositories of the last sync. */
+  github: {
+    all: () => ['github'] as const,
+    status: () => ['github', 'status'] as const,
+    /** The list of one view and its filters; the pages hang off this key (useInfiniteQuery). */
+    repos: (filter: string) => ['github', 'repos', filter] as const,
+    repo: (fullName: string) => ['github', 'repo', fullName] as const,
+    /** Outside ['github'], so a write there does not re-run the probe. */
+    enabled: () => ['github-enabled'] as const,
+  },
   /** The private files of one record or document. */
   files: {
     all: () => ['files'] as const,

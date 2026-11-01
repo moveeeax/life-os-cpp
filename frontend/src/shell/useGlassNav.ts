@@ -1,5 +1,6 @@
 import {
   FOOD_PROBE,
+  GITHUB_PROBE,
   GOALS_PROBE,
   HABITS_PROBE,
   MEDICAL_PROBE,
@@ -46,6 +47,7 @@ export function useGlassNav(): {
       enabled: signedIn,
       on: useModuleOn('practice', PRACTICE_PROBE, signedIn),
     },
+    { id: 'github', enabled: signedIn, on: useModuleOn('github', GITHUB_PROBE, signedIn) },
   ];
   // Body shows without fitness:read while the medical module is on.
   const medicalOn = useModuleOn('medical', MEDICAL_PROBE, signedIn && !canTrain);

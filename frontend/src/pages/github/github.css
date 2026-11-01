@@ -1,0 +1,46 @@
+/* The GitHub section on the calm sheet. */
+/* A repository's name reads as on GitHub: owner/name in a monospace face. */
+.gh-name {
+  font:
+    13.5px/1.4 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+  overflow-wrap: anywhere;
+}
+/* The topics of a repository: small quiet pills. */
+.gh-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gh-topics li {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--g-ink-ghost);
+  font-size: 12px;
+  color: var(--g-ink-faint);
+}
+/* One attention item: the reason, its detail, the two actions under it. */
+.gh-item {
+  display: grid;
+  gap: 4px;
+  padding: 10px 0;
+  border-top: 1px solid var(--g-ink-ghost);
+}
+.gh-item:first-child {
+  border-top: 0;
+}
+.gh-item-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.gh-description {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
