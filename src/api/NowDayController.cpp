@@ -90,6 +90,13 @@ void NowDayController::day(const HttpRequestPtr& req, Callback&& callback) {
             return;
         }
         Repositories::Calendar::LinkRepository links;
+        // Most users have no calendar linked: that answer needs one row, not the pool.
+        const auto link = links.get(owner);
+        if (!link || link->broken) {
+            out["calendar"] = link ? "disconnected" : "not_linked";
+            callback(Response::ok(json{{"data", out}}));
+            return;
+        }
         span = DaySpan{links.local_instant(date, 0, tz),
                        links.local_instant(date, 24, tz),
                        links.local_instant(date, 8, tz),
