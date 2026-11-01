@@ -10426,7 +10426,19 @@ paths:
           application/json:
             schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 200 } } }
       responses:
-        '201': { description: Added }
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [id]
+                    properties:
+                      id: { type: string, format: uuid }
         '400': { description: invalid_text }
         '401': { description: Not authenticated }
         '409': { description: 50 facts already (too_many_facts) }
@@ -10725,7 +10737,7 @@ paths:
         '401': { description: Not authenticated }
         '404': { description: 'Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked)' }
         '409': { description: 'Google refused the token (calendar_disconnected): connect again' }
-        '502': { description: Google did not answer (calendar_unavailable) }
+        '502': { description: 'Google did not answer, or its answer could not be read and the event may exist (calendar_unavailable)' }
   /api/v1/calendar/events/{id}:
     get:
       summary: One event, with its times on the caller's clock
@@ -10782,10 +10794,14 @@ paths:
                 type: object
                 required: [data]
                 properties:
-                  data: { type: object }
+                  data:
+                    type: object
+                    required: [moved]
+                    properties:
+                      moved: { type: boolean, enum: [true] }
         '400': { description: invalid_time }
         '401': { description: Not authenticated }
-        '404': { description: 'Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked)' }
+        '404': { description: 'Not in the calendar (calendar_event_not_found), calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked)' }
         '409': { description: 'Google refused the token (calendar_disconnected): connect again' }
         '502': { description: Google did not answer (calendar_unavailable) }
     delete:

@@ -30184,7 +30184,31 @@
     },
     "responses": {
      "201": {
-      "description": "Added"
+      "description": "Added",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "id"
+           ],
+           "properties": {
+            "id": {
+             "type": "string",
+             "format": "uuid"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
      },
      "400": {
       "description": "invalid_text"
@@ -30947,7 +30971,7 @@
       "description": "Google refused the token (calendar_disconnected): connect again"
      },
      "502": {
-      "description": "Google did not answer (calendar_unavailable)"
+      "description": "Google did not answer, or its answer could not be read and the event may exist (calendar_unavailable)"
      }
     }
    }
@@ -31099,7 +31123,18 @@
          ],
          "properties": {
           "data": {
-           "type": "object"
+           "type": "object",
+           "required": [
+            "moved"
+           ],
+           "properties": {
+            "moved": {
+             "type": "boolean",
+             "enum": [
+              true
+             ]
+            }
+           }
           }
          }
         }
@@ -31113,7 +31148,7 @@
       "description": "Not authenticated"
      },
      "404": {
-      "description": "Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked)"
+      "description": "Not in the calendar (calendar_event_not_found), calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked)"
      },
      "409": {
       "description": "Google refused the token (calendar_disconnected): connect again"
@@ -39825,7 +39860,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 601532,
-  "source_fnv1a64": "08809d5b90a69332"
+  "source_bytes": 602134,
+  "source_fnv1a64": "eaa1d9e2a0b92a4b"
  }
 }
