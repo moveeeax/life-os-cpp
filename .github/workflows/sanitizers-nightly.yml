@@ -374,3 +374,108 @@ jobs:
         run: |
           docker compose -f docker/docker-compose.yml --env-file docker/.env \
             --profile test logs test-postgres test-redis || true
+
+  clang-tidy-full:
+    runs-on: ubuntu-latest
+    # Structural and API-usage lint. Uses the builder image for
+    # compile_commands.json so the analysis sees the real include paths
+    # vcpkg resolved. Best-effort: warnings don't gate yet, the .clang-tidy
+    # baseline is still being tightened.
+    # 90, not 60: cold-cache runs rebuild the vcpkg world (~35 min) before
+    # analysis starts — see build-and-test.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 2  # HEAD^ fallback for the push-event scope diff
+
+      - name: Free runner disk for the vcpkg build
+        # vcpkg writes debug and release libs into the builder layers, and the
+        # tree only grows: master run 41201001899 died with "no space left on
+        # device" in libprotocd.a and held up the v1.54.0 tag. The removed
+        # SDKs (.NET, Android, GHC, CodeQL) are not used by any job here.
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          docker system prune -af >/dev/null || true
+          df -h /
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3.12.0
+
+      - name: Expose Actions cache env for sccache
+        # Exports ACTIONS_RESULTS_URL / ACTIONS_RUNTIME_TOKEN so sccache (inside
+        # docker builds and `docker run` compile steps) can talk to the Actions
+        # cache API. The Dockerfile receives them as BuildKit secrets — never
+        # ARGs — so layer cache keys and image history stay credential-free.
+        uses: crazy-max/ghaction-github-runtime@3cb05d89e1f492524af3d41a1c98c83bc3025124  # v3.1.0
+
+      - name: Build builder image
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25  # v5.4.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: builder
+          push: false
+          load: true
+          tags: life-os-cpp-ci:builder
+          build-args: ENABLE_WERROR=ON
+          secrets: |
+            actions_results_url=${{ env.ACTIONS_RESULTS_URL }}
+            actions_runtime_token=${{ env.ACTIONS_RUNTIME_TOKEN }}
+          cache-from: |
+            type=gha
+            type=registry,ref=ghcr.io/${{ github.repository }}/builder:cache
+          cache-to: type=gha,mode=max,ignore-error=true
+
+      - name: Run clang-tidy inside builder
+        # continue-on-error: ratchet — flip to false once the baseline is
+        # clean. It is NOT clean: baseline 364 unique warnings in src/
+        # (981 raw lines — headers repeat across TUs) as of 2026-08-23,
+        # master run 32594916143; ~70% is readability-identifier-naming.
+        # Checks come from .clang-tidy in the repo root (mounted read-only):
+        # bugprone-*, performance-*, portability-*, clang-analyzer-*.
+        # On a pull request only the translation units the PR touches are
+        # checked: the changed src/*.cpp files, plus the .cpp next to a changed
+        # header. The whole tree (36 minutes on two cores, measured
+        # 2026-11-01) runs nightly in sanitizers-nightly.yml and on every push
+        # to master. A PR that changes only headers without a sibling .cpp,
+        # or whose file list could not be read, falls back to the whole tree.
+        continue-on-error: true
+        run: |
+          targets=""
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ] && [ -s changed-files.txt ]; then
+            cpp=$(grep -E '^src/.*\.cpp$' changed-files.txt || true)
+            siblings=$(grep -E '^src/.*\.hpp$' changed-files.txt | sed 's/\.hpp$/.cpp/' || true)
+            orphan_headers=$(for h in $siblings; do [ -f "$h" ] || echo "$h"; done)
+            for f in $cpp $siblings; do [ -f "$f" ] && targets="$targets /app/$f"; done
+            # shellcheck disable=SC2086  # the list is split on purpose
+            targets=$(printf '%s\n' $targets | sort -u | tr '\n' ' ')
+            if [ -n "$orphan_headers" ] && [ -z "$cpp" ]; then
+              echo "headers without a sibling .cpp changed: checking the whole tree"
+              targets=""
+            fi
+          fi
+          if [ -z "$targets" ]; then
+            targets="/app/src/"
+            echo "clang-tidy over the whole tree"
+          else
+            echo "clang-tidy over:$targets"
+          fi
+          docker run --rm \
+              -v "$PWD":/src \
+              -v "$PWD/.clang-tidy":/app/.clang-tidy:ro \
+              --entrypoint /bin/bash \
+              life-os-cpp-ci:builder -c "
+                  apt-get update -qq && apt-get install -y -qq clang-tidy >/dev/null && \
+                  run-clang-tidy -p /app/build -quiet -header-filter='src/.*' $targets \
+                      | tee /src/clang-tidy.log
+              "
+
+      - name: Upload clang-tidy log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: clang-tidy-full-log
+          path: clang-tidy.log
+          if-no-files-found: ignore
