@@ -24,8 +24,8 @@ Feature modules are compiled in always and switched at runtime. Each has a
 `Core::<name>_enabled()` switch in `src/utils/Modules.hpp` that reads the
 config (`<name>.enabled`, env `<NAME>_ENABLED`, default off): `billing`,
 `fitness`, `workout`, `food`, `money`, `tasks`, `goals`, `now` (the Now
-screen, with the wallpaper and sound library behind it), `travel`, `habits`
-and `notes`. Projects and learning have no switch of their own: projects
+screen, with the wallpaper and sound library behind it), `travel`, `habits`,
+`notes`, `practice`, `medical` and `github`. Projects and learning have no switch of their own: projects
 (courses are projects of kind course) are part of `tasks`. A disabled module
 answers 404 from its handlers. There are no plugins, no `dlopen`, no per-feature deployables.
 A single program keeps one init/shutdown lifecycle, whole-program sanitizers
@@ -105,6 +105,20 @@ the include graph (`docs/module-deps.txt`):
   in `src/now/Today.hpp`, the words of the Now screen.
 - `src/api/<Module>Controller.hpp` + `.cpp`: the routes (declarations in the
   header, bodies in the `.cpp`).
+
+`src/github/` is this shape with a small domain: `Settings.hpp` (the OAuth
+App, the scopes, the sync interval) and `Rules.hpp` (the six attention
+rules, pure functions over the facts a row stores and its mutes), the SQL
+in `repositories/github/` (the link with the sealed token, the
+repositories, the mutes), the routes in `api/GithubController`. The worker
+job `github_sync` (`src/github/jobs/`) is the only code that talks to
+GitHub's API: it unseals the user's token, pulls the repositories over
+GraphQL and writes each row together with the rules' verdict, so the
+controller reads rows and never calls GitHub beyond the OAuth round (the
+code exchange at link time, the revoke at unlink). A mute recomputes the
+verdict from the stored facts without a new sync. The API pod's timer
+queues the job every six hours per linked user; `POST /api/v1/github/sync`
+queues one at most once a minute.
 
 The module switches (`Core::<name>_enabled()`) and the shutdown flag live in
 `src/utils/Modules.hpp` so that a handler or a facade can read them without

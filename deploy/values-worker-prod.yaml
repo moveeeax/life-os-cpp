@@ -12,6 +12,11 @@ image:
 replicaCount: 1
 
 extraEnvFrom:
+  # The same Secret as the API (deploy/values-prod.yaml). The github_sync
+  # job needs the GitHub OAuth App's GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET
+  # and the seal key GITHUB_TOKEN_KEY from it: without all three
+  # Github::settings() reads as not configured and no sync runs
+  # (docs/RUNBOOK.md, "GitHub section").
   - secretRef:
       name: life-os-app
   - configMapRef:

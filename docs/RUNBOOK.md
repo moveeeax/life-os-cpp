@@ -148,6 +148,7 @@ to the six without mail and webhooks.
 | `tasks_parse` | `POST /api/v1/tasks/parse` | `{job_id, owner_id, max_attempts}` | As `money_parse`, row in `task_parse_jobs`; falls back to the money provider when `TASKS_LLM_*` is not set |
 | `now_media_sweep` | The `now_media_sweep_schedule` timer in the API pod, hourly while `NOW_ENABLED` is on | `{}` | Deletes wallpaper and sound rows still `pending` an hour after their create (an upload the browser never finished, or a delete whose store call failed), objects first. A row the store would not clear stays for the next tick. Skipped without `S3_*` on the worker |
 | `files_sweep` | The `files_sweep_schedule` timer in the API pod, hourly while `MEDICAL_ENABLED` or `TRAVEL_ENABLED` is on | `{}` | Deletes `private_files` rows still `pending` an hour after their create, then removes the object of every `private_file_purges` entry older than an hour (a file, record, document or account deleted) and forgets the entry. An object the store would not remove keeps its entry for the next tick. Skipped without `S3_*` on the worker. See [Private files](#private-files) |
+| `github_sync` | The `github_sync` schedule in the API pod every six hours for every linked user (`Github::kSyncEveryHours`), the first link (the OAuth callback), and `POST /api/v1/github/sync` (at most once a minute per user, 429 `sync_too_soon` sooner) | `{owner_id}` | Unseals the user's token with `GITHUB_TOKEN_KEY`, pulls their repositories (own and organisations') over GitHub's GraphQL API, upserts `github_repos` by node id with the attention verdict of `src/github/Rules.hpp` after the mutes, and deletes the rows GitHub no longer returns. A success sets `github_links.synced_at`; a failure writes the reason into `sync_error` (200 characters) and keeps the last list. A duplicate runs the same sync again. Needs the three `GITHUB_*` keys on the worker (`src/github/Settings.hpp`). See [GitHub section](#github) |
 
 The four LLM rows are written through the transactional outbox when
 `OUTBOX_DRAIN_INTERVAL_SEC` is above zero (production: 5 s on the API
@@ -235,6 +236,139 @@ answer 503. Deleting a file, a record, a document or an account removes the
 rows at once and leaves the object keys in `private_file_purges`; the API
 removes the object of a deleted file right away, and the hourly `files_sweep`
 job removes whatever is left (see the job table above).
+
+## GitHub section {#github}
+
+The GitHub section (`src/github/`, module `github`) shows each user their
+repositories, their own and their organisations', public and private, with
+what needs attention. A user links their GitHub account through an OAuth
+App of the site; the token is sealed with `GITHUB_TOKEN_KEY` and the worker
+job `github_sync` pulls the list every six hours (the job table above).
+The owner registers the app once; every user links their own account in
+Account. The API's NetworkPolicy already lets TCP 443 out anywhere, and the
+worker chart has none, so api.github.com and github.com need no policy
+change.
+
+### Register the OAuth App {#github-app}
+
+1. On github.com, signed in as the owner: profile picture > Settings >
+   Developer settings (the last entry of the left column) > OAuth Apps >
+   New OAuth App. The page is `https://github.com/settings/developers`.
+   Fill in:
+   - Application name: `Life OS` (the users see it on the consent page);
+   - Homepage URL: `https://life-os.tarassov.me`;
+   - Authorization callback URL: exactly the value of `GITHUB_REDIRECT_URL`,
+     `https://life-os.tarassov.me/api/v1/github/oauth/callback` by default
+     (`docs/CONFIG.md`). GitHub compares it with the `redirect_uri` the
+     site sends; a trailing slash, `http` or another host makes the consent
+     fail with `redirect_uri_mismatch`.
+   Leave the device flow checkbox off (check in the GitHub UI: the form
+   has had one for a while; the section does not use it).
+2. Register application. The page shows the Client ID. Press "Generate a
+   new client secret" and copy it at once: it is shown once.
+3. The seal key: `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`
+   (32 random bytes, base64url without padding, `utils/Seal.hpp`). A key of
+   its own, not `CALENDAR_TOKEN_KEY` and not `MI_FITNESS_TOKEN_KEY`.
+4. Put the three into the Secret `life-os-app` next to the other keys (the
+   Secret is hand-made and lives outside the repository):
+
+   ```bash
+   kubectl -n life-os patch secret life-os-app --type merge -p \
+     '{"stringData":{"GITHUB_CLIENT_ID":"<client id>","GITHUB_CLIENT_SECRET":"<client secret>","GITHUB_TOKEN_KEY":"<seal key>"}}'
+   ```
+
+   Or `kubectl -n life-os edit secret life-os-app` and add them under
+   `stringData`, as in [Rotate a secret](#rotate-secret). Both charts take
+   the Secret through `extraEnvFrom`, so the API and the worker read all
+   three. The worker needs them as much as the API: the sync job unseals
+   the tokens with the key, and `Github::settings()` answers "not
+   configured" while any of the three is empty.
+5. `github.enabled: true` is already set in `deploy/values-prod.yaml` and
+   `deploy/values-worker-prod.yaml`; the switch and the callback URL come
+   from the chart (`GITHUB_ENABLED`, `GITHUB_REDIRECT_URL`), the three keys
+   from the Secret. Set `secretsVersion` to the date in both overlays and
+   upgrade API then worker ([Upgrade order](#upgrade-order)), or
+   `kubectl -n life-os rollout restart deployment life-os-cpp life-os-cpp-worker`.
+6. Check: signed in, `GET /api/v1/github` answers `configured: true`.
+   `false` means one of the three is empty in the pod;
+   `kubectl -n life-os exec deploy/life-os-cpp -- env | grep '^GITHUB_'`
+   shows which (the secret's value is not needed, its presence is).
+
+### Link an account {#github-link}
+
+Account > GitHub > Connect. The browser goes to GitHub's consent page with
+the scopes `repo` and `read:org` (`src/github/Settings.hpp`); GitHub comes
+back to the callback, the token is sealed, a first sync is queued, and the
+page returns to Account with the outcome (`?github=ok`, `denied`, `expired`
+after ten minutes, or `error`). The card then shows the login, the scopes
+GitHub granted and the time of the last sync. The section fills within a
+minute or two: 378 repositories are four pages of the user's list plus the
+organisations' pages. Every site user links their own account the same way;
+the data is per user, and Disconnect revokes the token at GitHub and drops
+the repositories and mutes.
+
+`repo` is the one classic scope that reads private repositories, and it
+covers issues, pull requests and check runs. Open Dependabot alerts were
+read with `repo` on a classic OAuth token when the section was designed;
+if `open_alerts` stays 0 on a repository that has alerts on GitHub, check
+in the GitHub docs whether the `security_events` scope is needed now and
+add it to `kScope`.
+
+### The cybercapybara organisation {#github-org}
+
+An organisation can restrict third-party OAuth apps (the org's Settings >
+Third-party Access > OAuth application policy; check the exact labels in
+the GitHub UI, they have been renamed before). With the restriction on,
+the app does not see the organisation's repositories until an org owner
+approves it, and the sync gets an empty or forbidden answer for that
+organisation. The API then fills `org_hint` in `GET /api/v1/github` with
+the organisation's login, and the Account card says that this
+organisation's repositories are missing until the app is approved in its
+settings. To approve:
+
+1. As the user who linked: GitHub Settings > Applications > Authorized
+   OAuth Apps > Life OS. Under "Organization access" press Grant next to
+   the organisation (an org owner) or Request (a member; an org owner then
+   approves the request in the org's Third-party Access page, where pending
+   requests are listed).
+2. Sync now in the section, or wait for the next scheduled sync. The hint
+   goes away when the organisation's repositories come back.
+
+The approval is per app, once: after it, every member who links sees the
+organisation's repositories their own GitHub account can see.
+
+### Rotation {#github-rotate}
+
+`GITHUB_TOKEN_KEY` seals the users' tokens in `github_links`, and there is
+no re-keying path (the same as `MI_FITNESS_TOKEN_KEY` and
+`CALENDAR_TOKEN_KEY`). After a new key every link is dead: the sync fails
+for everyone with an unseal error in `sync_error`, the card asks to connect
+again, and each user links again from Account. Rotate it only on a
+suspected leak, at a quiet hour, and tell the users. The old tokens stay
+valid at GitHub until revoked: after the rotation, revoke them on the
+app's page (Developer settings > OAuth Apps > Life OS > "Revoke all user
+tokens"; check the exact wording in the GitHub UI).
+
+The client secret is used only when a link is made (the code exchange) and
+undone (the revoke call), never by the sync, so its rotation has no gap
+for the users: generate a new secret on the app's page (GitHub keeps the
+old one valid next to it until you delete it; check in the GitHub UI, the
+limit on the number of secrets is theirs), put it into `life-os-app`, roll
+API and worker, then delete the old secret on the app's page. While a pod
+still holds a deleted secret, Connect ends in `?github=error` and
+Disconnect still drops the link locally.
+
+### Where sync errors show {#github-errors}
+
+`GET /api/v1/github` carries `synced_at` (the last sync that worked) and
+`sync_error` (why the last one failed; the list shown is the one before
+it). The Account card and the section's header show the same, as "synced
+N h ago" and the error text. The worker log has the job:
+`kubectl -n life-os logs deploy/life-os-cpp-worker | grep github_sync`. The
+usual causes: a 401 from GitHub, when the user revoked the app on GitHub
+or the seal key was rotated (the user links again); an empty organisation,
+which is `org_hint` above rather than an error; a rate limit or a GitHub
+outage, which the next scheduled run retries on its own.
 
 ## Backups {#backup}
 
@@ -602,6 +736,11 @@ captures that failed in the window. The PayPal calls are made by the API
 pod; the worker initializes the billing client too and refuses to boot
 with billing enabled and empty credentials, so roll both as in the
 procedure above.
+
+`GITHUB_TOKEN_KEY` and `GITHUB_CLIENT_SECRET` (both in `life-os-app`): see
+[GitHub section, Rotation](#github-rotate). The key drops every GitHub link
+and has no re-keying path, like `MI_FITNESS_TOKEN_KEY`; the secret rotates
+without a gap for the users.
 
 The database role password (`DATABASE_PASSWORD` in `life-os-app`) belongs
 to the CNPG managed role `life-os`, whose password comes from Secret

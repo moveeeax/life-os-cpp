@@ -308,7 +308,25 @@ outage can never affect the money path.
 | `NOTES_ENABLED` | `notes.enabled` | bool | `false` | Master switch for the notes module (`Core::notes_enabled()`): private Markdown notes with the fields of a tarassov.me blog post, linked to a project, course or task. Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
 | `PRACTICE_ENABLED` | `practice.enabled` | bool | `false` | Master switch for the practice module (`Core::practice_enabled()`): the freelance practice's clients, deals with stages, incomes and expenses, and a month view with totals per currency. Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
 | `MEDICAL_ENABLED` | `medical.enabled` | bool | `false` | Master switch for the medical module (`Core::medical_enabled()`): the family medical archive (people, doctors and clinics, visits, records, medications) under `/api/v1/medical`, and the files of its records under `/api/v1/files`. Routes stay registered, handlers 404 while off. The files need `S3_*` and a key with rights on `<prefix>private/*` (docs/RUNBOOK.md, private files); without them the file routes answer 503 and the rest works. |
-| `GITHUB_ENABLED` | `github.enabled` | bool | `false` | Master switch for the github module (`Core::github_enabled()`): the caller's GitHub repositories under `/api/v1/github`, synced by the worker job `github_sync` every six hours and on demand, with what needs attention per repository. Routes stay registered, handlers 404 while off. Linking needs the `GITHUB_*` OAuth keys below; without them `/api/v1/github` answers `configured: false`. |
+
+## GitHub module
+
+The user's GitHub repositories, their own and their organisations', with
+what needs attention (`src/github/`, docs/RUNBOOK.md "GitHub section"). A
+user links their account through an OAuth App of the site; the token is
+sealed server-side and the worker job `github_sync` keeps the list fresh.
+The switch and the callback URL come from the chart; the three keys below
+come from the Secret `life-os-app` in prod, into both the API and the
+worker (the worker unseals the tokens and refuses to sync while any of the
+three is empty).
+
+| Env | JSON key | Type | Default | Notes |
+|---|---|---|---|---|
+| `GITHUB_ENABLED` | `github.enabled` | bool | `false` | Master switch for the github module (`Core::github_enabled()`): the caller's GitHub repositories under `/api/v1/github`, synced by the worker job `github_sync` every six hours and on demand, with what needs attention per repository. Routes stay registered, handlers 404 while off. Linking needs the three keys below; without them `GET /api/v1/github` answers `configured: false` and Connect answers 404 `github_not_configured`. |
+| `GITHUB_CLIENT_ID` | `github.client_id` | string | empty | The Client ID of the site's GitHub OAuth App (registered by the owner, docs/RUNBOOK.md "Register the OAuth App"). Sent to GitHub when the browser is redirected to the consent page and at the code exchange. |
+| `GITHUB_CLIENT_SECRET` | `github.client_secret` | string | empty | The app's client secret, shown once by GitHub. Used when a link is made (the code exchange) and undone (the revoke call at GitHub), never by the sync, so a rotation has no gap for the users. |
+| `GITHUB_REDIRECT_URL` | `github.redirect_url` | string | `https://life-os.tarassov.me/api/v1/github/oauth/callback` | Where GitHub sends the browser back with the code. Must equal the app's Authorization callback URL character for character, or the consent fails with `redirect_uri_mismatch`. The path is public (`api.public_paths`): the one-time state names the user, who must be the one signed in. The chart sets it from `github.redirectUrl`. |
+| `GITHUB_TOKEN_KEY` | `github.token_key` | string | empty | 32 random bytes, base64url without padding (`openssl rand -base64 32 \| tr '+/' '-_' \| tr -d '='`), that seal the users' GitHub tokens in `github_links` (utils/Seal.hpp). A key of its own, not `CALENDAR_TOKEN_KEY` or `MI_FITNESS_TOKEN_KEY`. No re-keying path: a new key drops every link and each user connects again (docs/RUNBOOK.md "Rotation"). |
 
 ## Now module
 
@@ -354,10 +372,6 @@ the API and the worker.
 | `GOOGLE_CALENDAR_CLIENT_SECRET` | `calendar.google.client_secret` | string | empty | Its secret (Secret `life-os-app`). |
 | `GOOGLE_CALENDAR_REDIRECT_URL` | `calendar.google.redirect_url` | string | `https://life-os.tarassov.me/api/v1/calendar/oauth/callback` | Where Google's consent comes back; must match the client's authorized redirect exactly. |
 | `CALENDAR_TOKEN_KEY` | `calendar.google.token_key` | string | empty | 32 random bytes, base64url without padding, that seal the users' refresh tokens (utils/Seal.hpp). Changing it disconnects every calendar. |
-| `GITHUB_CLIENT_ID` | `github.client_id` | string | empty | The GitHub OAuth App of the site (Secret `life-os-app`). Empty: linking GitHub is off (`github_not_configured`). |
-| `GITHUB_CLIENT_SECRET` | `github.client_secret` | string | empty | Its client secret (Secret `life-os-app`). |
-| `GITHUB_REDIRECT_URL` | `github.redirect_url` | string | `https://life-os.tarassov.me/api/v1/github/oauth/callback` | Where GitHub's authorization comes back; must match the App's authorization callback URL exactly. |
-| `GITHUB_TOKEN_KEY` | `github.token_key` | string | empty | 32 random bytes, base64url without padding, that seal the users' GitHub tokens (utils/Seal.hpp); a different key from `CALENDAR_TOKEN_KEY`. Changing it disconnects every GitHub link. |
 
 ## Storage (S3)
 
