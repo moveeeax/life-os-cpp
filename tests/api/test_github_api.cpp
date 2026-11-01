@@ -223,7 +223,7 @@ TEST_F(GithubApiUnconfiguredTest, NotConfiguredIsVisibleAndStartIs404) {
     EXPECT_FALSE(body_of(st)["data"]["linked"].get<bool>());
     const auto resp = start(anna);
     ASSERT_EQ(resp->statusCode(), k404NotFound);
-    EXPECT_EQ(body_of(resp)["error"], "github_not_configured");
+    EXPECT_EQ(body_of(resp)["message"], "github_not_configured not found");
     EXPECT_EQ(location(callback(kAnna, "whatever", "c")), "/account?github=error");
 }
 
@@ -321,7 +321,7 @@ TEST_F(GithubApiTest, SyncNowQueuesOncePerMinute) {
     const auto anna = principal(kAnna);
     auto resp = sync(anna);
     ASSERT_EQ(resp->statusCode(), k404NotFound);
-    EXPECT_EQ(body_of(resp)["error"], "github_not_linked");
+    EXPECT_EQ(body_of(resp)["message"], "github_not_linked not found");
 
     linked(kAnna);
     resp = sync(anna);

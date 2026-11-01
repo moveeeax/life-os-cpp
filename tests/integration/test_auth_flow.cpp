@@ -248,7 +248,8 @@ TEST_F(AuthModulesTest, modulesAnswersTheSwitchesTheRoutesObey) {
     EXPECT_EQ(data["travel"], false);
     EXPECT_TRUE(data.contains("medical"));
     EXPECT_TRUE(data.contains("practice"));
-    EXPECT_EQ(data.size(), 13U) << "one flag per module";
+    EXPECT_TRUE(data.contains("github"));
+    EXPECT_EQ(data.size(), 14U) << "one flag per module";
 
     auto anonymous = HttpRequest::newHttpRequest();
     anonymous->setMethod(Get);

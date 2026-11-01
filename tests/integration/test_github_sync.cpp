@@ -188,7 +188,7 @@ TEST_F(GithubSyncTest, SyncStoresRepositoriesVerdictsAndTheOrgHint) {
     const auto first = repos.one(kAnna, "moveeeax/first");
     ASSERT_TRUE(first.has_value());
     EXPECT_EQ((*first)["attention"], json::array()) << "nothing to do";
-    EXPECT_EQ((*first)["pushed_at"], "2026-10-29T11:00:00Z");
+    EXPECT_EQ((*first)["pushed_at"], "2026-10-29T11:00:00+00:00") << "timestamptz, as the other rows give it";
 
     const auto link = links.get(kAnna);
     ASSERT_TRUE(link.has_value());
