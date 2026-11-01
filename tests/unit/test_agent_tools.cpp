@@ -22,6 +22,7 @@
 #include "agent/CalendarTools.hpp"
 #include "agent/Tools.hpp"
 #include "agent/Turn.hpp"
+#include "calendar/Google.hpp"
 #include "net/Http.hpp"
 #include "security/Jwt.hpp"
 
@@ -358,6 +359,64 @@ TEST(AgentTools, AClearedChatIsANewSession) {
     EXPECT_EQ(Agent::session_of("u-1", 2), "u-1#2");
 }
 
+/// Gives no answer to the first @p silent requests (a timeout), then 201.
+struct SlowSite : Net::Http::Transport {
+    int silent = 1;
+    std::vector<Net::Http::Request> sent;
+    Net::Http::Response get(const std::string&, const std::vector<std::pair<std::string, std::string>>&) override {
+        throw std::runtime_error("not expected");
+    }
+    Net::Http::Response post_json(const std::string&,
+                                  const std::string&,
+                                  const std::vector<std::pair<std::string, std::string>>&,
+                                  long) override {
+        throw std::runtime_error("not expected");
+    }
+    Net::Http::Response send(const Net::Http::Request& r) override {
+        sent.push_back(r);
+        if (silent-- > 0) {
+            throw Net::Http::TransportError("timed out");
+        }
+        return {201, R"({"data":{}})"};
+    }
+};
+
+}  // namespace
+
+TEST(AgentActions, AnIdempotentAddIsSentOnceMoreAfterNoAnswer) {
+    const json add{{"method", "POST"},
+                   {"path", "/api/v1/calendar/events"},
+                   {"retry", true},
+                   {"body", {{"title", "x"}, {"id", "ani0123456789abcdef"}}}};
+    SlowSite slow;
+    EXPECT_EQ(A::execute(slow, kApi, "jwt", add), "");
+    ASSERT_EQ(slow.sent.size(), 2u);
+    EXPECT_EQ(slow.sent[0].body, slow.sent[1].body) << "the same event id both times";
+
+    SlowSite down;
+    down.silent = 5;
+    EXPECT_EQ(A::execute(down, kApi, "jwt", add), "unavailable");
+    EXPECT_EQ(down.sent.size(), 2u) << "one retry, no more";
+
+    SlowSite once;
+    EXPECT_EQ(A::execute(once, kApi, "jwt", json{{"method", "POST"}, {"path", "/api/v1/tasks/items"}}), "unavailable");
+    EXPECT_EQ(once.sent.size(), 1u) << "a request without its own id is not repeated";
+}
+
+TEST(AgentActions, ATelegramTextIsCountedInBytesAsTheRouteCountsThem) {
+    Site site;
+    site.answers.emplace_back(kApi + "/api/v1/telegram/chats/10",
+                              Net::Http::Response{200, R"({"data":{"id":"10","title":"Anna","type":"private"}})"});
+    std::string cyrillic;
+    for (int i = 0; i < 2100; ++i) {
+        cyrillic += "я";  // two bytes each: 4200 bytes in 2100 characters
+    }
+    EXPECT_EQ(refused(propose(site, "tg_send", json{{"chat", "10"}, {"text", cyrillic}}))["error"], "invalid")
+        << "the route refuses more than 4096 bytes";
+    EXPECT_TRUE(std::holds_alternative<A::Proposal>(
+        propose(site, "tg_send", json{{"chat", "10"}, {"text", cyrillic.substr(0, 4096)}})));
+}
+
 TEST(AgentActions, TelegramMessagesAreProposalsWithTheChatTitle) {
     for (const auto& d : A::telegram_definitions()) {
         EXPECT_TRUE(A::is_write(d["function"]["name"].get<std::string>()));
@@ -412,7 +471,16 @@ TEST(AgentActions, CalendarChangesAreProposalsInThePersonsTime) {
     EXPECT_EQ(add.summary, "Add «Focus» to the calendar, 2026-10-29 14:00–15:30");
     EXPECT_EQ(add.request["method"], "POST");
     EXPECT_EQ(add.request["path"], "/api/v1/calendar/events");
+    EXPECT_TRUE(Calendar::client_event_id_ok(add.request["body"]["id"].get<std::string>()))
+        << "the add carries its own event id, so a retry cannot add it twice";
+    EXPECT_TRUE(add.request.value("retry", false));
     EXPECT_TRUE(site.sent.empty()) << "adding reads nothing";
+    EXPECT_EQ(refused(propose(
+                  site,
+                  "calendar_add",
+                  json{{"title", "x"}, {"start", "2026-10-29T09:00:00Z"}, {"end", "2026-10-30T10:00:00Z"}}))["error"],
+              "invalid")
+        << "the calendar route takes a day at most";
     // Moving and removing name the event as the calendar has it, in the person's time, whatever Ani called it.
     site.answers = {
         {kApi + "/api/v1/calendar/events/abc_123",

@@ -47,6 +47,23 @@ Repositories::Agent::InboxRepository::Answer answer(const std::string& owner,
                                                     const std::string& id,
                                                     const std::string& text);
 
+/// How long the marker of a queued event job lives: a lost job frees the user's events after this.
+inline constexpr int kEventJobMarkerSeconds = 600;
+
+/// Queues the user's event job (Hook::kEventJob) unless one is queued or
+/// running already: a marker in Redis (ani:hook:event:queued:<owner>) stands
+/// for it, and the job reads every waiting event of the user, so one is
+/// enough. Without a cache every call queues a job, as before.
+void queue_event_job(const std::string& owner);
+
+/// The event job of the user ran to an end (not deferred): its marker goes,
+/// and a new job is queued when events still wait for a turn (one may have
+/// come while the job ran and found the marker).
+void event_job_ended(const std::string& owner);
+
+/// Keeps the marker of a job that runs or waits (deferred) alive.
+void event_job_alive(const std::string& owner);
+
 /// Queues the callbacks of answered and unanswered-expired asks, each once
 /// (outbound webhook jobs, signed with the user's webhook token); returns
 /// how many. Nothing happens without the job queue.

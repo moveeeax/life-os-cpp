@@ -8,13 +8,17 @@
 #include <algorithm>
 #include <chrono>
 #include <exception>
+#include <string>
+#include <utility>
 #include <variant>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 
 #include "agent/Hook.hpp"
 #include "agent/Intake.hpp"
 #include "agent/VoiceBrief.hpp"
+#include "cache/Lock.hpp"
 #include "repositories/telegram/LinkRepository.hpp"
 #include "telegram/Gateway.hpp"
 
@@ -168,6 +172,12 @@ json process_poll(const json&) {
     if (!link) {
         return json{{"status", "skipped"}, {"reason", "not_linked"}};
     }
+    // One poll of the owner at a time: with the gateway hanging a pass takes minutes, and the next
+    // minute's poll would read the same cursors beside it and double the gateway's load.
+    Cache::Lock lock("telegram:poll:lock:" + link->owner, std::chrono::seconds(kPollLockSeconds));
+    if (!lock.held()) {
+        return json{{"status", "skipped"}, {"reason", "poll_running"}};
+    }
     auto& transport = Net::Http::transport();
     const auto chats = ::Telegram::call(transport, *s, "GET", "/v1/chats", {{"limit", "100"}});
     if (!chats.ok()) {
@@ -179,6 +189,16 @@ json process_poll(const json&) {
     const long long since = now_unix() - kNewChatSeconds;
     std::vector<Incoming> found;
     int read = 0;
+    // No answer at all (status 0): the gateway is gone, the rest of the pass would wait 15 s a call.
+    bool unreachable = false;
+    // The cursors move once the messages are told (or there was nothing to tell): an event Ani
+    // could not take for a while (a full backlog, an error) is raised again by the next poll.
+    std::vector<std::pair<std::string, long long>> moves;
+    const auto move_cursors = [&] {
+        for (const auto& [chat, top] : moves) {
+            links.set_cursor(link->owner, chat, top);
+        }
+    };
     for (const auto& chat : list_of(chats)) {
         const std::string id = chat.value("id", std::string());
         const std::string type = chat.value("type", "");
@@ -200,6 +220,10 @@ json process_poll(const json&) {
                              "/v1/chats/" + id + "/messages",
                              {{"limit", link->primed ? std::to_string(kMessagesPerChat) : std::string("1")}});
         if (!history.ok()) {
+            if (history.status == 0) {
+                unreachable = true;
+                break;
+            }
             continue;
         }
         const json messages = list_of(history);
@@ -210,11 +234,13 @@ json process_poll(const json&) {
             found.insert(found.end(), mine.begin(), mine.end());
         }
         if (const long long top = newest(messages); top > 0) {
-            links.set_cursor(link->owner, id, top);
+            moves.emplace_back(id, top);
         }
     }
     // Once an hour: the private chats whose newest message waits for the owner.
-    if (link->primed && !link->waiting_fresh) {
+    if (unreachable) {
+        links.failed(link->owner, "history: no answer");
+    } else if (link->primed && !link->waiting_fresh) {
         json waiting = json::array();
         int looked = 0;
         int answered = 0;
@@ -228,6 +254,9 @@ json process_poll(const json&) {
                 break;
             }
             const auto top = ::Telegram::call(transport, *s, "GET", "/v1/chats/" + id + "/messages", {{"limit", "1"}});
+            if (top.status == 0) {
+                break;
+            }
             answered += top.ok() ? 1 : 0;
             const json list = top.ok() ? list_of(top) : json::array();
             if (const long long at = list.empty() ? 0 : waiting_since(chat, list[0], now); at > 0) {
@@ -239,12 +268,15 @@ json process_poll(const json&) {
             links.set_waiting(link->owner, waiting);
         }
     }
-    links.polled(link->owner);
+    if (!unreachable) {
+        links.polled(link->owner);
+    }
     // The morning and evening line as a voice message, once a day each (the switch is in Account).
-    if (link->voice_to_self) {
+    if (link->voice_to_self && !unreachable) {
         VoiceBrief::send_due(transport, link->owner, link->me_id);
     }
     if (found.empty()) {
+        move_cursors();
         return json{{"status", "done"}, {"new", 0}};
     }
     std::sort(found.begin(), found.end(), [](const Incoming& a, const Incoming& b) { return a.date < b.date; });
@@ -260,11 +292,18 @@ json process_poll(const json&) {
         const auto out = Intake::accept(link->owner, std::move(item), "telegram");
         if (const auto* refused = std::get_if<Intake::Refused>(&out)) {
             spdlog::info("telegram poll: Ani did not take the event: {}", refused->code);
+            // A full backlog clears; the other refusals (her agent off, the month's tokens spent, told
+            // already) would raise the same messages every minute, so the cursors move.
+            if (refused->code != "backlog") {
+                move_cursors();
+            }
             return json{{"status", "done"}, {"new", found.size()}, {"event", refused->code}};
         }
     } catch (const std::exception& e) {
-        spdlog::warn("telegram poll: the event failed: {}", e.what());
+        spdlog::warn("telegram poll: the event failed (raised again next poll): {}", e.what());
+        return json{{"status", "done"}, {"new", found.size()}, {"event", "error"}};
     }
+    move_cursors();
     return json{{"status", "done"}, {"new", found.size()}};
 }
 

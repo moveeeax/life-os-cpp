@@ -24,25 +24,35 @@ namespace Repositories::Agent {
 
 class TurnRepository {
 public:
-    /// An open turn older than this is taken for lost and failed as a timeout.
+    /// A queued turn older than this (from created_at) is taken for lost and failed as a timeout.
     static constexpr int kStaleSeconds = 900;
+    /// A running turn is taken for lost when it has not moved for this long: updated_at is set
+    /// when it starts and touched before every tool call (touch). The limit covers a whole turn
+    /// without one touch: 8 rounds of at most 120 s in the gateway (agent/Gateway.hpp) plus the
+    /// tools; Turn.cpp checks it against the gateway's constants.
+    static constexpr int kRunningStaleSeconds = 1200;
+
+    /// SQL condition on an open turn of the user that went stale ($2 queued, $3 running seconds).
+    static constexpr const char* kStaleSql =
+        "((status = 'queued' AND created_at < now() - make_interval(secs => $2)) OR (status = 'running' AND "
+        "updated_at < now() - make_interval(secs => $3)))";
 
     /// Queues a turn of @p origin ("user", "hook" or "mcp"). nullopt while another
-    /// turn of the user from the same origin is open; an open turn older than
-    /// kStaleSeconds is failed first, so a lost job cannot lock the chat.
+    /// turn of the user from the same origin is open; a stale one of that origin
+    /// (see kStaleSql) is failed first, so a lost job cannot lock the chat.
     std::optional<nlohmann::json> open(const std::string& owner,
                                        const std::string& text,
                                        const std::string& tz,
                                        const std::string& origin = "user",
                                        const std::optional<nlohmann::json>& proposal = std::nullopt) {
         return Database::get().execute_write([&](auto& txn) -> std::optional<nlohmann::json> {
-            txn.exec_params(
-                "UPDATE ani_turns SET status = 'failed', error = 'timeout' WHERE owner_id = $1::uuid "
-                "AND status IN ('queued', 'running') AND origin = $3 AND created_at < now() - make_interval(secs => "
-                "$2)",
-                owner,
-                kStaleSeconds,
-                origin);
+            txn.exec_params(std::string("UPDATE ani_turns SET status = 'failed', error = 'timeout' WHERE owner_id = "
+                                        "$1::uuid AND origin = $4 AND ") +
+                                kStaleSql,
+                            owner,
+                            kStaleSeconds,
+                            kRunningStaleSeconds,
+                            origin);
             // The conflict target names the origin's own index (exactly its predicate).
             const std::string target = origin == "hook" ? "'hook'" : origin == "mcp" ? "'mcp'" : "'user'";
             auto r = txn.exec_params(
@@ -132,14 +142,31 @@ public:
         });
     }
 
-    /// The zone of the user's last turn they wrote (for a webhook turn); UTC without one.
+    /// The heartbeat of a running turn: updated_at moves to now. False when the
+    /// turn no longer runs (it ended, or it went stale and was failed), so the
+    /// worker stops acting for it.
+    bool touch(const std::string& id) {
+        return Database::get().execute_write([&](auto& txn) {
+            return !txn.exec_params(
+                           "UPDATE ani_turns SET updated_at = now() WHERE id::text = $1 AND status = 'running' "
+                           "RETURNING id",
+                           id)
+                        .empty();
+        });
+    }
+
+    /// The user's zone for a turn they did not write (webhook, Telegram, MCP)
+    /// and for the voice brief: the zone of their last own turn, else the zone
+    /// of their Now settings (the weather city), else UTC. Someone who talks to
+    /// Ani only through MCP or Telegram had UTC days and an 08:00 UTC morning.
     std::string last_tz(const std::string& owner) {
         return Database::get().execute_read([&](auto& txn) {
             auto r = txn.exec_params(
-                "SELECT tz FROM ani_turns WHERE owner_id = $1::uuid AND origin = 'user' ORDER BY created_at DESC "
-                "LIMIT 1",
+                "SELECT COALESCE((SELECT tz FROM ani_turns WHERE owner_id = $1::uuid AND origin = 'user' ORDER BY "
+                "created_at DESC LIMIT 1), (SELECT s.timezone FROM now_settings s WHERE s.owner_id = $1::uuid AND "
+                "EXISTS (SELECT 1 FROM pg_timezone_names z WHERE z.name = s.timezone)), 'UTC')",
                 owner);
-            return r.empty() ? std::string("UTC") : r[0][0].template as<std::string>();
+            return r[0][0].template as<std::string>();
         });
     }
 
@@ -208,17 +235,20 @@ public:
         });
     }
 
-    /// Fails the user's open turns older than kStaleSeconds (their job was
-    /// lost or their worker died) and returns their ids, so nothing waits on
-    /// them for ever.
+    /// Fails the user's stale turns (kStaleSeconds queued, kRunningStaleSeconds
+    /// running without a touch: their job was lost or their worker died) and
+    /// returns their ids, so nothing waits on them for ever. A running turn
+    /// that is alive is never failed here.
     std::vector<std::string> reap_stale(const std::string& owner) {
         return Database::get().execute_write([&](auto& txn) {
             std::vector<std::string> ids;
             for (const auto& row : txn.exec_params(
-                     "UPDATE ani_turns SET status = 'failed', error = 'timeout' WHERE owner_id = $1::uuid AND status "
-                     "IN ('queued', 'running') AND created_at < now() - make_interval(secs => $2) RETURNING id::text",
+                     std::string("UPDATE ani_turns SET status = 'failed', error = 'timeout' WHERE owner_id = $1::uuid "
+                                 "AND ") +
+                         kStaleSql + " RETURNING id::text",
                      owner,
-                     kStaleSeconds)) {
+                     kStaleSeconds,
+                     kRunningStaleSeconds)) {
                 ids.push_back(row[0].template as<std::string>());
             }
             return ids;
