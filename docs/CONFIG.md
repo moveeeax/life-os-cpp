@@ -308,6 +308,7 @@ outage can never affect the money path.
 | `NOTES_ENABLED` | `notes.enabled` | bool | `false` | Master switch for the notes module (`Core::notes_enabled()`): private Markdown notes with the fields of a tarassov.me blog post, linked to a project, course or task. Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
 | `PRACTICE_ENABLED` | `practice.enabled` | bool | `false` | Master switch for the practice module (`Core::practice_enabled()`): the freelance practice's clients, deals with stages, incomes and expenses, and a month view with totals per currency. Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
 | `MEDICAL_ENABLED` | `medical.enabled` | bool | `false` | Master switch for the medical module (`Core::medical_enabled()`): the family medical archive (people, doctors and clinics, visits, records, medications) under `/api/v1/medical`, and the files of its records under `/api/v1/files`. Routes stay registered, handlers 404 while off. The files need `S3_*` and a key with rights on `<prefix>private/*` (docs/RUNBOOK.md, private files); without them the file routes answer 503 and the rest works. |
+| `GITHUB_ENABLED` | `github.enabled` | bool | `false` | Master switch for the github module (`Core::github_enabled()`): the caller's GitHub repositories under `/api/v1/github`, synced by the worker job `github_sync` every six hours and on demand, with what needs attention per repository. Routes stay registered, handlers 404 while off. Linking needs the `GITHUB_*` OAuth keys below; without them `/api/v1/github` answers `configured: false`. |
 
 ## Now module
 
@@ -353,6 +354,10 @@ the API and the worker.
 | `GOOGLE_CALENDAR_CLIENT_SECRET` | `calendar.google.client_secret` | string | empty | Its secret (Secret `life-os-app`). |
 | `GOOGLE_CALENDAR_REDIRECT_URL` | `calendar.google.redirect_url` | string | `https://life-os.tarassov.me/api/v1/calendar/oauth/callback` | Where Google's consent comes back; must match the client's authorized redirect exactly. |
 | `CALENDAR_TOKEN_KEY` | `calendar.google.token_key` | string | empty | 32 random bytes, base64url without padding, that seal the users' refresh tokens (utils/Seal.hpp). Changing it disconnects every calendar. |
+| `GITHUB_CLIENT_ID` | `github.client_id` | string | empty | The GitHub OAuth App of the site (Secret `life-os-app`). Empty: linking GitHub is off (`github_not_configured`). |
+| `GITHUB_CLIENT_SECRET` | `github.client_secret` | string | empty | Its client secret (Secret `life-os-app`). |
+| `GITHUB_REDIRECT_URL` | `github.redirect_url` | string | `https://life-os.tarassov.me/api/v1/github/oauth/callback` | Where GitHub's authorization comes back; must match the App's authorization callback URL exactly. |
+| `GITHUB_TOKEN_KEY` | `github.token_key` | string | empty | 32 random bytes, base64url without padding, that seal the users' GitHub tokens (utils/Seal.hpp); a different key from `CALENDAR_TOKEN_KEY`. Changing it disconnects every GitHub link. |
 
 ## Storage (S3)
 
@@ -389,7 +394,7 @@ the API and the worker.
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
 | `WORKER_ID` | `worker.id` | string | `worker-1` | Names the Redis processing list of this instance. Helm: the pod name (`metadata.name`) unless `worker.id` is set, so replicas never share a list |
-| `WORKER_TYPES` | `worker.types` | csv | all registered handler types | Queues the worker pulls from. Unset (prod leaves it unset) → every type with a registered handler. The eleven handlers this binary registers: `account_email`, `email.send`, `webhook.deliver`, `fitness_sync`, `food_parse`, `money_parse`, `money_rates`, `money_advisor`, `tasks_parse`, `now_media_sweep`, `files_sweep`. When you DO set it, a type left out piles up undrained: the compose stack lists all eleven, `config.json` ships `default` (no handler of that name; the startup guard warns). |
+| `WORKER_TYPES` | `worker.types` | csv | all registered handler types | Queues the worker pulls from. Unset (prod leaves it unset) → every type with a registered handler. The handlers this binary registers: `account_email`, `email.send`, `webhook.deliver`, `fitness_sync`, `leetcode_sync`, `github_sync`, `food_parse`, `money_parse`, `money_rates`, `money_advisor`, `tasks_parse`, `now_media_sweep`, `files_sweep`. When you DO set it, a type left out piles up undrained: the compose stack and the worker chart list them all, `config.json` ships `default` (no handler of that name; the startup guard warns). |
 | `WORKER_STRICT_TYPES` | `worker.strict_types` | bool | `false` | A `WORKER_TYPES` entry without a registered handler logs a warning; `true` upgrades it to a refusal to start |
 | `WORKER_CONCURRENCY` | `worker.concurrency` | int | `2` | |
 | `WORKER_HEALTH_PORT` | `worker.health_port` | int | `9091` | |

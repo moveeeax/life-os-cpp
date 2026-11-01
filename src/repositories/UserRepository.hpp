@@ -356,6 +356,9 @@ public:
         "focus_sessions",
         "food_water",
         "ani_deals",
+        "github_mutes",
+        "github_repos",
+        "github_links",
     };
 
     /// The foreign keys of the billing tables (migration 007, ON DELETE

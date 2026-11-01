@@ -318,3 +318,11 @@ repositories/calendar -> database
 repositories/calendar -> utils
 agent -> calendar
 agent -> repositories/calendar
+api -> github
+api -> repositories/github
+github -> utils
+repositories/github -> cache
+repositories/github -> database
+repositories/github -> github
+repositories/github -> utils
+repositories/github -> repositories

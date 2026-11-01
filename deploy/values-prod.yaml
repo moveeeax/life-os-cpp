@@ -185,6 +185,12 @@ practice:
 medical:
   enabled: true
 
+# GitHub: the OAuth App's GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET and the seal
+# key GITHUB_TOKEN_KEY live in the Secret life-os-app; without them the
+# section says the server is not set up and nothing else happens.
+github:
+  enabled: true
+
 # Invite-only: self sign-up is closed, admins invite people (POST /api/v1/admin/invite).
 registration:
   open: false

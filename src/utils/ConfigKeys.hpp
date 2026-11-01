@@ -211,6 +211,13 @@ inline constexpr ConfigKey calendar_google_client_secret{"calendar.google.client
 inline constexpr ConfigKey calendar_google_redirect_url{"calendar.google.redirect_url", "GOOGLE_CALENDAR_REDIRECT_URL"};
 inline constexpr ConfigKey calendar_google_token_key{"calendar.google.token_key", "CALENDAR_TOKEN_KEY"};
 
+// --- github ---
+inline constexpr ConfigKey github_enabled{"github.enabled", "GITHUB_ENABLED"};
+inline constexpr ConfigKey github_client_id{"github.client_id", "GITHUB_CLIENT_ID"};
+inline constexpr ConfigKey github_client_secret{"github.client_secret", "GITHUB_CLIENT_SECRET"};
+inline constexpr ConfigKey github_redirect_url{"github.redirect_url", "GITHUB_REDIRECT_URL"};
+inline constexpr ConfigKey github_token_key{"github.token_key", "GITHUB_TOKEN_KEY"};
+
 // --- now ---
 inline constexpr ConfigKey now_enabled{"now.enabled", "NOW_ENABLED"};
 inline constexpr ConfigKey now_ani_voice_api_key{"now.ani_voice.api_key", "ANI_VOICE_API_KEY"};
