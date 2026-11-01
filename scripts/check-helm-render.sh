@@ -247,6 +247,76 @@ wait_image="$(printf '%s' "$WORKER_RENDERED" |
 [ "$wait_image" = "ghcr.io/moveeeax/life-os-cpp:$worker_tag" ] ||
     fail "deploy/values-worker-prod.yaml: wait-for-schema init container image is '$wait_image', want the API image at the worker tag (ghcr.io/moveeeax/life-os-cpp:$worker_tag)"
 
+# 10. The ani worker release (life-os-ani-worker): the worker chart with
+#     deploy/values-worker-prod.yaml and deploy/values-ani-worker-prod.yaml on
+#     top, as docs/RUNBOOK.md installs it. The only release with a
+#     ServiceAccount token, a Role on pods and secrets, a Namespace, a
+#     NetworkPolicy and a ResourceQuota, so it gets its own assertions.
+PROD_ANI_VALUES="$ROOT/deploy/values-ani-worker-prod.yaml"
+[ -f "$PROD_ANI_VALUES" ] || fail "prod values file $PROD_ANI_VALUES is gone — update the list in this script"
+echo "==> helm lint + template (prod ani worker: values-worker-prod + values-ani-worker-prod) + assertions"
+helm lint "$WORKER_CHART" -f "$PROD_WORKER_VALUES" -f "$PROD_ANI_VALUES" >/dev/null ||
+    fail "helm lint life-os-cpp-worker with deploy/values-worker-prod.yaml + deploy/values-ani-worker-prod.yaml"
+ANI_RENDERED="$(helm template life-os-ani-worker "$WORKER_CHART" -n life-os -f "$PROD_WORKER_VALUES" -f "$PROD_ANI_VALUES")"
+aq() { printf '%s' "$ANI_RENDERED" | yq "$1" | grep -v '^---$' || true; }
+
+# The worker pod is the one pod that talks to the Kubernetes API: its token is
+# mounted, through its own ServiceAccount, and nothing else in the render
+# mounts one (the pre-puller's DaemonSet included).
+[ "$(aq 'select(.kind=="Deployment") | .spec.template.spec.automountServiceAccountToken')" = "true" ] ||
+    fail "life-os-ani-worker: the Deployment does not mount its ServiceAccount token (it starts the agent pods through the Kubernetes API)"
+[ "$(aq 'select(.kind=="Deployment") | .spec.template.spec.serviceAccountName')" = "$(aq 'select(.kind=="ServiceAccount") | .metadata.name')" ] ||
+    fail "life-os-ani-worker: the Deployment does not run as the chart's ServiceAccount"
+[ "$(aq 'select(.kind=="DaemonSet") | .spec.template.spec.automountServiceAccountToken')" = "false" ] ||
+    fail "life-os-ani-worker: the pre-puller DaemonSet mounts a ServiceAccount token"
+[ "$(aq 'select(.kind=="NetworkPolicy" and .metadata.name=="ani-agents") | .metadata.name')" = "ani-agents" ] ||
+    fail "life-os-ani-worker: no NetworkPolicy ani-agents for the agent pods (they would reach anything)"
+
+# The quota: whole Mi, above zero. A unit slip once rendered "0Mi" and every
+# agent pod was refused admission without a word.
+for k in requests.memory limits.memory; do
+    v="$(aq "select(.kind==\"ResourceQuota\") | .spec.hard.\"$k\"")"
+    case "$v" in
+    '' | 0Mi | *[!0-9]*Mi | *[!0-9Mi]*) fail "life-os-ani-worker: ResourceQuota $k is '$v', want a positive whole number of Mi" ;;
+    esac
+done
+pods="$(aq 'select(.kind=="ResourceQuota") | .spec.hard.pods')"
+max_pods="$(printf '%s' "$(helm show values "$WORKER_CHART")" | yq '.aniAgents.maxPods')"
+ani_max="$(yq '.aniAgents.maxPods // ""' "$PROD_ANI_VALUES")"
+[ -n "$ani_max" ] && max_pods="$ani_max"
+[ "$pods" -ge "$max_pods" ] 2>/dev/null ||
+    fail "life-os-ani-worker: ResourceQuota pods is '$pods', below aniAgents.maxPods ($max_pods)"
+
+# aniAgents.maxPods is the backstop of ANI_AGENT_MAX_RUNNING, and the
+# pre-puller must warm the image the pods run (ANI_AGENT_IMAGE). Both pairs
+# are copied by hand (and renovate bumps one image at a time), so compare the
+# chart with the defaults in config/config.json and src/agent/Settings.hpp.
+cfg_default() { sed -nE "s/.*\"\\\$\\{$1:-([^}]*)\\}\".*/\\1/p" "$ROOT/config/config.json" | head -1; }
+cfg_max="$(cfg_default ANI_AGENT_MAX_RUNNING)"
+src_max="$(sed -nE 's/.*"ANI_AGENT_MAX_RUNNING", ([0-9]+)\).*/\1/p' "$ROOT/src/agent/Settings.hpp" | head -1)"
+[ "$max_pods" = "$cfg_max" ] && [ "$max_pods" = "$src_max" ] ||
+    fail "aniAgents.maxPods ($max_pods) must equal ANI_AGENT_MAX_RUNNING (config/config.json: '$cfg_max', src/agent/Settings.hpp: '$src_max')"
+prepull_image="$(aq 'select(.kind=="DaemonSet") | .spec.template.spec.initContainers[] | select(.name=="pull") | .image')"
+cfg_image="$(cfg_default ANI_AGENT_IMAGE)"
+src_image="$(sed -nE 's/.*"ANI_AGENT_IMAGE", "([^"]+)"\).*/\1/p' "$ROOT/src/agent/Settings.hpp" | head -1)"
+[ -n "$prepull_image" ] && [ "$prepull_image" = "$cfg_image" ] && [ "$prepull_image" = "$src_image" ] ||
+    fail "aniAgents.prepull.image ('$prepull_image') must equal ANI_AGENT_IMAGE (config/config.json: '$cfg_image', src/agent/Settings.hpp: '$src_image'), or the pre-puller warms an image the pods do not run"
+
+# Every job the agent registers (src/agent/jobs/Register.cpp) is pulled by
+# this release; a missing type sits in its queue forever.
+ani_types="$(aq 'select(.kind=="Deployment") | .spec.template.spec.containers[0].env[] | select(.name=="WORKER_TYPES") | .value')"
+[ -n "$ani_types" ] || fail "life-os-ani-worker: WORKER_TYPES is not rendered"
+handlers="$(grep -oE 'register_handler\(([A-Za-z]+::)?k[A-Za-z]+Job' "$ROOT/src/agent/jobs/Register.cpp" | sed -E 's/.*(k[A-Za-z]+Job)$/\1/' | sort -u)"
+[ -n "$handlers" ] || fail "no register_handler(k...Job) found in src/agent/jobs/Register.cpp — the layout changed, update this script"
+for c in $handlers; do
+    t="$(grep -hoE "$c = \"[^\"]+\"" "$ROOT"/src/agent/*.hpp | sed -E 's/.*"(.*)"/\1/' | head -1)"
+    [ -n "$t" ] || fail "cannot resolve the job name of $c in src/agent/*.hpp — update this script"
+    case ",$ani_types," in
+    *",$t,"*) ;;
+    *) fail "deploy/values-ani-worker-prod.yaml: worker.types lacks $t (registered in src/agent/jobs/Register.cpp)" ;;
+    esac
+done
+
 echo "==> helm template (umbrella, chart defaults) + committed-credential assertion"
 DEFAULT_RENDERED="$(helm template env-smoke "$CHART")"
 assert_no_secret_credentials "umbrella defaults (values.yaml)" "$DEFAULT_RENDERED"
