@@ -4,7 +4,7 @@ import { useApiMutation } from '@/hooks/useApiMutation';
 import { MEDICAL_PROBE } from '@/hooks/moduleProbes';
 import { useModuleOn } from '@/hooks/useModuleProbe';
 import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
+import { NOW_RIBBON, qk } from '@/lib/api/queryKeys';
 import type {
   MedicalMedication,
   MedicalMedicationInput,
@@ -23,7 +23,7 @@ const BASE = '/api/v1/medical';
 
 /** A medical write moves the archive; a task made from it moves Tasks and Now too. */
 const WRITES = [qk.medical.all()] as const;
-const TASK_WRITES = [qk.medical.all(), qk.tasks.all(), qk.now.all()] as const;
+const TASK_WRITES = [qk.medical.all(), qk.tasks.all(), ...NOW_RIBBON] as const;
 
 /** Whether the medical module is on (undefined while asked). */
 export function useMedicalOn(enabled = true): boolean | undefined {

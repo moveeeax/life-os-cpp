@@ -13,6 +13,7 @@
 
 #include "repositories/agent/DealRepository.hpp"
 #include "security/Audit.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Agent::DealTools {
 
@@ -25,13 +26,7 @@ json tool(const char* name, const char* description, json parameters) {
                 {"function", {{"name", name}, {"description", description}, {"parameters", std::move(parameters)}}}};
 }
 
-std::size_t length(const std::string& s) {
-    std::size_t n = 0;
-    for (const unsigned char c : s) {
-        n += (c & 0xC0) != 0x80 ? 1 : 0;
-    }
-    return n;
-}
+using Utils::Utf8::length;
 
 std::string unit_of(const json& d) {
     const std::string kind = d.value("kind", std::string());

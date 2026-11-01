@@ -580,6 +580,33 @@ affinity: {}
 secretsVersion: ""
 
 # ---------------------------------------------------------------
+# Ani's agent and Telegram knobs, taken from a Secret one key at a time (in
+# production life-os-ani-agent), not as a whole through extraEnvFrom: that
+# Secret also holds the upstream model key (ANI_AGENT_UPSTREAM_KEY) and the
+# proxy URL, which only the ani worker uses. Every key is optional; a key the
+# Secret lacks keeps its default. scripts/check-helm-render.sh fails when the
+# code reads an ANI_AGENT_* or ANI_TELEGRAM_* variable this list misses.
+# Empty name: nothing is rendered.
+# ---------------------------------------------------------------
+aniAgentSecret:
+  name: ""
+  keys:
+    - ANI_AGENT_ENABLED
+    - ANI_AGENT_IMAGE
+    - ANI_AGENT_KEEPER_IMAGE
+    - ANI_AGENT_NAMESPACE
+    - ANI_AGENT_NODE_LABEL
+    - ANI_AGENT_MAX_RUNNING
+    - ANI_AGENT_IDLE_MINUTES
+    - ANI_AGENT_MAX_HOURS
+    - ANI_AGENT_MODEL
+    - ANI_AGENT_UPSTREAM_URL
+    - ANI_AGENT_API_URL
+    - ANI_AGENT_MONTHLY_TOKENS
+    - ANI_TELEGRAM_URL
+    - ANI_TELEGRAM_TOKEN
+
+# ---------------------------------------------------------------
 # Postgres logical backup (pg_dump → S3-compatible storage)
 # Off by default. STARTER-grade: fine to a few GB; past that move to
 # pgBackRest / WAL-G for incremental + PITR. Restore is manual — see

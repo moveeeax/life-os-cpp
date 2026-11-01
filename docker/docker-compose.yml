@@ -282,14 +282,17 @@ services:
       REGISTRATION_OPEN: ${REGISTRATION_OPEN:-true}
       NOW_ENABLED: ${NOW_ENABLED:-false}
       WORKER_ID: ${WORKER_ID:-worker-1}
-      # Every job type this binary registers a handler for (the same set an
-      # unset WORKER_TYPES resolves to; docs/CONFIG.md lists them). The demo
+      # Every job type this binary registers a handler for, except Ani's
+      # agent jobs (ani_* and telegram_poll; in production they run in the
+      # ani worker, deploy/values-ani-worker-prod.yaml), as docs/CONFIG.md
+      # lists them. The demo
       # handlers `echo`/`slow`/`fail` live in src/worker_main.cpp for manual
       # testing — opt them in explicitly when you want them, e.g.:
       #   WORKER_TYPES=account_email,echo,slow,fail
       # (The API job tests drain Redis directly and do NOT rely on this list.)
-      WORKER_TYPES: ${WORKER_TYPES:-account_email,email.send,webhook.deliver,fitness_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,now_media_sweep,files_sweep,github_sync}
+      WORKER_TYPES: ${WORKER_TYPES:-account_email,email.send,webhook.deliver,fitness_sync,leetcode_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,now_media_sweep,files_sweep,github_sync}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+      WORKER_PRIORITY_TYPES: ${WORKER_PRIORITY_TYPES:-food_parse,money_parse,tasks_parse}
       WORKER_HEALTH_PORT: ${WORKER_HEALTH_PORT:-9091}
       WORKER_BRPOP_TIMEOUT: ${WORKER_BRPOP_TIMEOUT:-5}
       OTLP_ENDPOINT: ${OTLP_ENDPOINT:-}

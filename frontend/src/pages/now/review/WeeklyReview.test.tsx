@@ -96,4 +96,20 @@ describe('WeeklyReview', () => {
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(screen.getByText('Сдать отчет')).toBeTruthy();
   });
+
+  it('ReviewOnePatch: Today then Tomorrow while the first PATCH runs sends one PATCH', async () => {
+    let done: (v: { data: object }) => void = () => {};
+    const patch = vi
+      .spyOn(api, 'patchJson')
+      .mockImplementation(() => new Promise((ok) => (done = ok)));
+    show();
+    fireEvent.click(screen.getByRole('button', { name: 'Today: Сдать отчет' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tomorrow: Сдать отчет' }));
+    expect(patch).toHaveBeenCalledTimes(1);
+    expect(
+      (screen.getByRole('button', { name: 'Done: Сдать отчет' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    done({ data: {} });
+    await waitFor(() => expect(screen.queryByText('Сдать отчет')).toBeNull());
+  });
 });

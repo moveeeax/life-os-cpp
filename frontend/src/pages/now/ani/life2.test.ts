@@ -16,6 +16,7 @@ import {
   stepsRecord,
   tabTip,
   tripHello,
+  nextSpendGroup,
   unusualSpend,
   windDownNow,
   wishDue,
@@ -117,6 +118,35 @@ describe("Ani's life, part two", () => {
     });
     expect(unusualSpend(-40000, [-20000, -25000, -18000, -30000, -22000])).toBeNull();
     expect(unusualSpend(-90000, [-20000])).toBeNull();
+  });
+
+  it('NextSpendGroup: one history read covers every spend of a category and currency', () => {
+    const tx = (id: string, category_id: string | null, currency = 'KZT', extra = {}) => ({
+      id,
+      type: 'expense',
+      category_id,
+      currency,
+      ...extra,
+    });
+    const day = [
+      tx('a', 'food'),
+      tx('b', 'taxi'),
+      tx('c', 'food'),
+      tx('d', 'food', 'THB'),
+      tx('e', null),
+      tx('f', 'food', 'KZT', { type: 'income' }),
+      tx('g', 'food', 'KZT', { note: 'разовая' }),
+    ];
+    const seen = new Set<string>();
+    const unchecked = (id: string) => !seen.has(id);
+    const reads: string[] = [];
+    for (let g = nextSpendGroup(day, unchecked); g; g = nextSpendGroup(day, unchecked)) {
+      reads.push(`${g.category}/${g.currency}:${g.items.map((t) => t.id).join('')}`);
+      for (const t of g.items) seen.add(t.id);
+    }
+    // Seven rows of the day, three reads (not five), none for income, no category or "разовая".
+    expect(reads).toEqual(['food/KZT:ac', 'taxi/KZT:b', 'food/THB:d']);
+    expect(nextSpendGroup([], unchecked)).toBeNull();
   });
 
   it('TripHello: the local hello and a price in the home currency', () => {

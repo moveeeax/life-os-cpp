@@ -18,9 +18,12 @@
 #include <nlohmann/json.hpp>
 
 #include "agent/Hook.hpp"
+#include "agent/Intake.hpp"
 #include "agent/Turn.hpp"
+#include "cache/Cache.hpp"
 #include "database/Database.hpp"
 #include "jobs/Job.hpp"
+#include "jobs/Jobs.hpp"
 #include "net/Http.hpp"
 #include "repositories/agent/AgentRepository.hpp"
 #include "repositories/agent/InboxRepository.hpp"
@@ -227,9 +230,15 @@ TEST_F(AniHookEvents, StaleHookTurnDoesNotLockTheChat) {
     run_event();
     const std::string hook = hook_turn();
     ASSERT_TRUE(turns.start(hook));
-    // Its worker died long ago: the row still says running.
+    // Its worker died long ago: the row still says running and has not moved since.
     Database::get().execute_write([&](auto& txn) {
-        txn.exec_params("UPDATE ani_turns SET created_at = now() - interval '20 minutes' WHERE id::text = $1", hook);
+        // The trigger would set updated_at to now(); the test puts it in the past.
+        txn.exec("ALTER TABLE ani_turns DISABLE TRIGGER ani_turns_touch_updated_at");
+        txn.exec_params(
+            "UPDATE ani_turns SET created_at = now() - interval '40 minutes', updated_at = now() - interval '30 "
+            "minutes' WHERE id::text = $1",
+            hook);
+        txn.exec("ALTER TABLE ani_turns ENABLE TRIGGER ani_turns_touch_updated_at");
         return true;
     });
     const auto sent = Agent::send(kAnna, "Привет", "UTC");
@@ -238,6 +247,51 @@ TEST_F(AniHookEvents, StaleHookTurnDoesNotLockTheChat) {
     EXPECT_EQ((*turns.get(kAnna, sent.turn["id"].get<std::string>()))["status"], "done") << "not held by a dead turn";
     EXPECT_EQ((*turns.get(kAnna, hook))["status"], "failed");
     EXPECT_EQ(status_of(item), "failed") << "its events fail with it";
+}
+
+// A turn may wait 480 s for its agent and then spend 8 rounds of 120 s in the gateway: past 900 s
+// from its creation it is alive as long as it moves (a tool call touches it), and while it runs no
+// second turn starts in the same session.
+TEST_F(AniHookEvents, ALiveRunningTurnIsNotReaped) {
+    running(kAnna);
+    event("x");
+    run_event();
+    const std::string hook = hook_turn();
+    ASSERT_TRUE(turns.start(hook));
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE ani_turns SET created_at = now() - interval '20 minutes' WHERE id::text = $1", hook);
+        return true;
+    });
+    EXPECT_TRUE(turns.touch(hook)) << "a tool call of the running turn";
+    const auto sent = Agent::send(kAnna, "Привет", "UTC");
+    ASSERT_EQ(sent.status, Agent::Send::Queued);
+    const std::string user = sent.turn["id"];
+    EXPECT_THROW(Agent::process_turn(json{{"turn", user}}), Jobs::DeferJob) << "it waits for the live turn";
+    EXPECT_EQ((*turns.get(kAnna, hook))["status"], "running") << "not reaped while it moves";
+    EXPECT_EQ((*turns.get(kAnna, user))["status"], "queued");
+    ASSERT_TRUE(turns.fail(hook, "failed"));
+    EXPECT_FALSE(turns.touch(hook)) << "an ended turn runs no more tools";
+}
+
+// Each event used to queue its own job, and all but one spun on 1-2 s deferrals for the whole turn.
+TEST_F(AniHookEvents, OneEventJobPerUserIsQueued) {
+    auto& redis = Cache::get().get_client();
+    const std::string queue = Jobs::queue_key(Agent::Hook::kEventJob);
+    const std::string marker = std::string("ani:hook:event:queued:") + kAnna;
+    Cache::get().del(marker);
+    const long long before = redis.llen(queue);
+    Agent::Intake::queue_event_job(kAnna);
+    Agent::Intake::queue_event_job(kAnna);
+    EXPECT_EQ(redis.llen(queue), before + 1) << "the second event finds the first job queued";
+    Agent::Intake::event_job_ended(kAnna);
+    EXPECT_EQ(redis.llen(queue), before + 1) << "nothing waits: no new job";
+    event("пришло, пока работа шла");
+    Agent::Intake::event_job_ended(kAnna);
+    EXPECT_EQ(redis.llen(queue), before + 2) << "an event that found the marker gets a job when the job ends";
+    // The two test jobs leave the queue (LPUSH puts them at the head).
+    (void)redis.lpop(queue);
+    (void)redis.lpop(queue);
+    Cache::get().del(marker);
 }
 
 TEST_F(AniHookEvents, LostQueuedHookTurnIsReplaced) {

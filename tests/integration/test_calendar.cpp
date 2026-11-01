@@ -31,6 +31,8 @@ const std::string kKey = Utils::Seal::new_key();
 
 struct ScriptedGoogle : Net::Http::Transport {
     bool refuse = false;
+    /// The events come in two pages.
+    bool paged = false;
     int refreshes = 0;
     std::vector<std::string> urls;
     Net::Http::Response get(const std::string&, const std::vector<std::pair<std::string, std::string>>&) override {
@@ -50,6 +52,14 @@ struct ScriptedGoogle : Net::Http::Transport {
                 return {400, R"({"error":"invalid_grant","error_description":"Token has been expired or revoked."})"};
             }
             return {200, R"({"access_token":"ya29.test","expires_in":3599,"token_type":"Bearer"})"};
+        }
+        if (paged && r.url.rfind("https://www.googleapis.com/calendar/v3/calendars/primary/events?", 0) == 0) {
+            if (r.url.find("pageToken=p2") != std::string::npos) {
+                return {200, R"({"items":[
+              {"id":"e3","summary":"Late","start":{"dateTime":"2026-10-29T20:00:00+05:00"},"end":{"dateTime":"2026-10-29T21:00:00+05:00"}}]})"};
+            }
+            return {200, R"({"nextPageToken":"p2","items":[
+              {"id":"e1","summary":"Call with Anna","start":{"dateTime":"2026-10-29T11:00:00+05:00"},"end":{"dateTime":"2026-10-29T12:00:00+05:00"}}]})"};
         }
         if (r.url.rfind("https://www.googleapis.com/calendar/v3/calendars/primary/events?", 0) == 0) {
             return {200, R"({"items":[
@@ -182,6 +192,20 @@ TEST_F(CalendarLink, EventsInTheUsersZone) {
     EXPECT_TRUE(std::holds_alternative<Calendar::Problem>(
         Calendar::events(google, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbb0ca1", from, to, "UTC")))
         << "no link, no events";
+}
+
+// A busy range comes in pages: every page is read, not the first 250 events only.
+TEST_F(CalendarLink, EveryPageOfEventsIsRead) {
+    linked();
+    google.paged = true;
+    const long long from = links.local_instant("2026-10-29", 0, "Asia/Tashkent");
+    auto out = Calendar::events(google, kAnna, from, from + 86400, "Asia/Tashkent");
+    ASSERT_TRUE(std::holds_alternative<std::vector<Calendar::Event>>(out));
+    const auto& ev = std::get<std::vector<Calendar::Event>>(out);
+    ASSERT_EQ(ev.size(), 2u);
+    EXPECT_EQ(ev[0].id, "e1");
+    EXPECT_EQ(ev[1].id, "e3");
+    EXPECT_NE(google.urls.back().find("pageToken=p2"), std::string::npos);
 }
 
 TEST_F(CalendarLink, DisconnectRemoves) {

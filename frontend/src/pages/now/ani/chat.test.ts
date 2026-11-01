@@ -7,6 +7,7 @@ import {
   chatOf,
   askAgent,
   confirmAction,
+  confirmWords,
   failure,
   isDoing,
   isOpen,
@@ -116,5 +117,24 @@ describe('chatOf', () => {
     expect(chatOf('Send to Анна: «Ок»')).toBe('Анна');
     expect(chatOf('Edit your message in Work chat to «x»')).toBe('Work chat');
     expect(chatOf('Add the task «Паспорт»')).toBeNull();
+  });
+});
+
+describe('confirmWords', () => {
+  it('shows the whole message of a Telegram proposal, not the cut summary', () => {
+    const long = 'Конечно, увидимся в пять. '.repeat(20) + 'А вот мои заметки.';
+    const cut = Array.from(long).slice(0, 300).join('') + '…';
+    expect(confirmWords({ summary: `Send to Bob: «${cut}»`, text: long })).toBe(
+      `Send to Bob: «${long}»`,
+    );
+    expect(confirmWords({ summary: 'Edit your message in Work to «x»', text: 'x' })).toBe(
+      'Edit your message in Work to «x»',
+    );
+    expect(confirmWords({ summary: 'Add the task «Паспорт»', text: null })).toBe(
+      'Add the task «Паспорт»',
+    );
+    expect(confirmWords({ summary: 'Send to Bob: «старый»', text: 'новый' })).toBe(
+      'Send to Bob: «старый» новый',
+    );
   });
 });

@@ -318,6 +318,7 @@ repositories/calendar -> database
 repositories/calendar -> utils
 agent -> calendar
 agent -> repositories/calendar
+mcp -> utils
 api -> github
 api -> repositories/github
 github -> utils

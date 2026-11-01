@@ -25,6 +25,21 @@
 .h-tick:disabled {
   cursor: default;
 }
+/* Hit areas past the drawn rings (WCAG 2.2, 2.5.8): 32 px for the tick, 26 px
+   for a day of the week, whose neighbours sit 28 px apart. */
+.h-tick,
+.h-c {
+  position: relative;
+}
+.h-tick::before,
+.h-c::before {
+  content: '';
+  position: absolute;
+  inset: min(0px, (100% - 32px) / 2);
+}
+.h-c::before {
+  inset: min(0px, (100% - 26px) / 2);
+}
 .h-tick:focus-visible,
 .h-c:focus-visible {
   outline: 2px solid var(--g-brand);

@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HOLD_MIN_MS, heldLongEnough, startTalk, type TalkState } from './talk';
+import { api } from '@/lib/api/client';
+
+import { HOLD_MIN_MS, heldLongEnough, startTalk, TalkAborted, type TalkState } from './talk';
 
 vi.mock('@/lib/api/client', () => ({
   api: { postJson: vi.fn(() => Promise.resolve({ data: { value: 'ek_test' } })) },
@@ -113,6 +115,57 @@ describe('startTalk', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(track.enabled).toBe(true);
     talk.stop();
+  });
+});
+
+describe('hanging up while it connects', () => {
+  const start = (signal: AbortSignal, states: TalkState[]) =>
+    startTalk({
+      instructions: '',
+      tools: [],
+      onAudio: () => {},
+      onText: () => {},
+      onState: (s) => states.push(s),
+      onEnd: () => {},
+      signal,
+    });
+
+  it('TalkCancelBeforeMic: the microphone goes off and no session key is minted', async () => {
+    const post = vi.mocked(api.postJson);
+    post.mockClear();
+    track.stop.mockClear();
+    let grant: (m: unknown) => void = () => {};
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: () => new Promise((ok) => (grant = ok)) },
+    });
+    const states: TalkState[] = [];
+    const hang = new AbortController();
+    const talk = start(hang.signal, states);
+    const failed = expect(talk).rejects.toBeInstanceOf(TalkAborted);
+    hang.abort();
+    grant({ getTracks: () => [track], getAudioTracks: () => [track] });
+    await failed;
+    expect(track.stop).toHaveBeenCalled();
+    expect(post).not.toHaveBeenCalled();
+    expect(states).toEqual(['connecting']);
+  });
+
+  it('TalkCancelMidCall: no session, no paid first reply, no state after the hang-up', async () => {
+    let answer: (r: unknown) => void = () => {};
+    vi.stubGlobal('fetch', () => new Promise((ok) => (answer = ok)));
+    const states: TalkState[] = [];
+    const hang = new AbortController();
+    const talk = start(hang.signal, states);
+    const failed = expect(talk).rejects.toBeInstanceOf(TalkAborted);
+    await vi.advanceTimersByTimeAsync(10);
+    hang.abort();
+    answer({ ok: true, text: () => Promise.resolve('answer') });
+    await failed;
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(sent.map((e) => e.type)).not.toContain('session.update');
+    expect(sent.map((e) => e.type)).not.toContain('response.create');
+    expect(states).toEqual(['connecting']);
   });
 });
 

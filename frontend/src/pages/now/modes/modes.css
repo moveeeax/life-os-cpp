@@ -38,6 +38,7 @@
   margin-top: 2px;
 }
 .m-hide {
+  position: relative;
   align-self: center;
   font: inherit;
   font-size: 12px;
@@ -45,4 +46,10 @@
   background: none;
   border: 0;
   cursor: pointer;
+}
+/* A hit area of 32 px past the small word. */
+.m-hide::before {
+  content: '';
+  position: absolute;
+  inset: min(0px, (100% - 32px) / 2);
 }

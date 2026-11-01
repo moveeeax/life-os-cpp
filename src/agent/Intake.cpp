@@ -5,6 +5,7 @@
 
 #include "agent/Intake.hpp"
 
+#include <chrono>
 #include <exception>
 
 #include <spdlog/spdlog.h>
@@ -90,7 +91,7 @@ std::variant<Accepted, Refused> accept(const std::string& owner, Hook::Item item
         return Refused{409, "duplicate", "this id was sent in the last 24 hours", json{{"id", added.id}}};
     }
     if (event) {
-        Jobs::get().submit(Hook::kEventJob, json{{"owner", owner}});
+        queue_event_job(owner);
     }
     if (hold) {
         Repositories::Agent::PrefsRepository().hold(owner, item.payload.value("minutes", 0));
@@ -102,6 +103,43 @@ std::variant<Accepted, Refused> accept(const std::string& owner, Hook::Item item
     Security::Audit::record(
         owner, "ani.inbox." + item.kind, "ani_inbox", added.id, json{{"via", via}, {"status", status}});
     return Accepted{added.id};
+}
+
+namespace {
+
+std::string event_marker(const std::string& owner) {
+    return "ani:hook:event:queued:" + owner;
+}
+
+}  // namespace
+
+void queue_event_job(const std::string& owner) {
+    if (Cache::is_initialized() &&
+        !Cache::get().set_nx(event_marker(owner), "1", std::chrono::seconds(kEventJobMarkerSeconds))) {
+        // A job of the user is queued or running and will read this event too. (A Redis error also
+        // lands here: the marker's TTL bounds the wait, the next event or turn end queues again.)
+        return;
+    }
+    Jobs::get().submit(Hook::kEventJob, json{{"owner", owner}});
+}
+
+void event_job_ended(const std::string& owner) {
+    try {
+        if (Cache::is_initialized()) {
+            Cache::get().del(event_marker(owner));
+        }
+        if (!Repositories::Agent::InboxRepository().thinking_unlinked(owner).empty()) {
+            queue_event_job(owner);
+        }
+    } catch (const std::exception& e) {
+        spdlog::warn("ani.intake: the waiting events were not queued again: {}", e.what());
+    }
+}
+
+void event_job_alive(const std::string& owner) {
+    if (Cache::is_initialized()) {
+        Cache::get().expire(event_marker(owner), kEventJobMarkerSeconds);
+    }
 }
 
 Repositories::Agent::InboxRepository::Answer answer(const std::string& owner,

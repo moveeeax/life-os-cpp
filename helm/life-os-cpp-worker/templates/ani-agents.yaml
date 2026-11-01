@@ -58,11 +58,24 @@ metadata:
   namespace: {{ $ns }}
   labels:
     {{- include "life-os-cpp-worker.labels" . | nindent 4 }}
+{{- /* Room for the pre-puller: one pod per node, 32Mi request and 128Mi
+     limit each (its init container, below). Without it the DaemonSet pods
+     eat the agents' slack and the last agent pod is refused. */}}
+{{- $extraPods := 0 }}
+{{- $extraReq := 0 }}
+{{- $extraLim := 0 }}
+{{- if .Values.aniAgents.prepull.enabled }}
+{{- $extraPods = int .Values.aniAgents.prepull.nodes }}
+{{- $extraReq = mul $extraPods 32 }}
+{{- $extraLim = mul $extraPods 128 }}
+{{- end }}
+{{- $req := include "life-os-cpp-worker.mebibytes" (list "aniAgents.podMemoryRequest" .Values.aniAgents.podMemoryRequest) | int }}
+{{- $lim := include "life-os-cpp-worker.mebibytes" (list "aniAgents.podMemoryLimit" .Values.aniAgents.podMemoryLimit) | int }}
 spec:
   hard:
-    pods: {{ add (int .Values.aniAgents.maxPods) 6 | quote }}
-    requests.memory: {{ printf "%dMi" (mul (int .Values.aniAgents.maxPods) (trimSuffix "Mi" .Values.aniAgents.podMemoryRequest | int)) | quote }}
-    limits.memory: {{ printf "%dMi" (mul (int .Values.aniAgents.maxPods) (trimSuffix "Mi" .Values.aniAgents.podMemoryLimit | int)) | quote }}
+    pods: {{ add (int .Values.aniAgents.maxPods) $extraPods | quote }}
+    requests.memory: {{ printf "%dMi" (add (mul (int .Values.aniAgents.maxPods) $req) $extraReq) | quote }}
+    limits.memory: {{ printf "%dMi" (add (mul (int .Values.aniAgents.maxPods) $lim) $extraLim) | quote }}
 ---
 # Agent pods: in only from this worker (the gateway, for the chat), out only to
 # DNS, this worker's model proxy and the bucket.

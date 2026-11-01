@@ -20,7 +20,8 @@
 
 namespace Agent::TelegramTools {
 
-/// Whether Telegram serves @p owner (the gateway is set up and linked to them).
+/// Whether Telegram serves @p owner (the gateway is set up and linked to
+/// them, and they are still an administrator, as the routes require).
 bool available(const std::string& owner);
 
 /// The read and do-it-yourself tools as the gateway takes them.

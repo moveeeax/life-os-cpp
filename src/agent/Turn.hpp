@@ -15,7 +15,10 @@
  *        webhook turn (origin hook) and queues it; its reply becomes the line
  *        the Now page plays, or nothing when the agent answers SILENT. The
  *        worker runs one turn of a user at a time; the user's own turn waits
- *        for a running webhook turn and the other way round.
+ *        for a running webhook turn and the other way round. A webhook turn
+ *        carries other people's text: it runs in a session of its own, under
+ *        its own hourly cap, and with the read and proposal tools only
+ *        (Tools::offered).
  */
 
 #pragma once
@@ -28,8 +31,10 @@
 namespace Agent {
 
 inline constexpr const char* kTurnJob = "ani_turn";
-/// Messages per user and hour.
+/// Messages per user and hour (the chat and the MCP together).
 inline constexpr int kTurnsPerHour = 60;
+/// Webhook turns (webhook and Telegram events) per user and hour, counted apart.
+inline constexpr int kHookTurnsPerHour = 20;
 /// The longest message.
 inline constexpr std::size_t kTurnTextMax = 4000;
 /// How long the line of a reply to an MCP message waits for the Now page.
@@ -67,6 +72,11 @@ Sent propose(const std::string& owner, const std::string& tool, const nlohmann::
 /// chat was cleared n times, so a cleared chat is a new conversation for it.
 std::string session_of(const std::string& owner, int chat_session);
 
+/// The agent's session for the user's webhook turns: apart from the chat (its
+/// key plus "#hook"), so text from other people never joins the person's
+/// conversation; clearing the chat starts it anew too.
+std::string hook_session_of(const std::string& owner, int chat_session);
+
 /// The bracketed line put in front of a message: the person's local time
 /// (@p local, empty when unknown), that the reply is spoken; when the turn
 /// offers @p tools, that their data is read with them and not recalled and
@@ -91,7 +101,9 @@ inline constexpr const char* kSilent = "SILENT";
 /// person, and how to stay silent.
 std::string hook_note();
 
-/// One event as its line in a webhook turn: "[source, title] text".
+/// One event as its line in a webhook turn: "[source, title] text", with the
+/// sender's text defanged (Hook::defanged); the Telegram poll's text keeps
+/// its own labels, its senders' parts defanged when it was written.
 std::string event_line(const nlohmann::json& payload);
 
 /// The ani_hook_event job: the user's thinking events join their queued

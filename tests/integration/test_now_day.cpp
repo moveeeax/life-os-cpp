@@ -76,17 +76,47 @@ TEST_F(NowDay, RibbonOpenEnds) {
     EXPECT_TRUE(today["workouts"][0]["end"].is_null()) << "a running workout has no end yet";
 }
 
+// A session started three days ago and never finished: on its own day and on today (it may
+// still run), not on the two days between, and not tomorrow.
+TEST_F(NowDay, AnUnfinishedWorkoutIsNotOnEveryDay) {
+    Database::get().execute_write([](auto& txn) {
+        txn.exec_params(
+            "INSERT INTO workout_sessions (owner_id, name, started_at) VALUES ($1::uuid, 'Forgotten', "
+            "date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' - interval '3 days' + interval '10 hours')",
+            std::string(kAnna));
+        return true;
+    });
+    const auto utc_day = [](int shift) {
+        return Database::get().execute_read([&](auto& txn) {
+            return txn
+                .exec_params("SELECT to_char((now() AT TIME ZONE 'UTC')::date + $1::integer, 'YYYY-MM-DD')",
+                             shift)[0][0]
+                .template as<std::string>();
+        });
+    };
+    EXPECT_EQ(day.day(kAnna, utc_day(-3), "UTC")["workouts"].size(), 1u) << "the day it started";
+    EXPECT_EQ(day.day(kAnna, utc_day(-2), "UTC")["workouts"].size(), 0u);
+    EXPECT_EQ(day.day(kAnna, utc_day(-1), "UTC")["workouts"].size(), 0u);
+    const json today = day.day(kAnna, utc_day(0), "UTC");
+    ASSERT_EQ(today["workouts"].size(), 1u) << "today, while it may still run";
+    EXPECT_TRUE(today["workouts"][0]["end"].is_null());
+    EXPECT_EQ(day.day(kAnna, utc_day(1), "UTC")["workouts"].size(), 0u) << "not tomorrow";
+}
+
 TEST_F(NowDay, FocusSessionValidates) {
     EXPECT_ANY_THROW(day.add_focus(kAnna, "2026-10-29T04:00:00Z", "2026-10-29T03:30:00Z", 30, ""));
     EXPECT_ANY_THROW(day.add_focus(kAnna, "2026-10-29T03:00:00Z", "2026-10-29T08:00:00Z", 300, ""));
 }
 
 TEST_F(NowDay, FocusStatsByTheClock) {
+    // Today's session starts no earlier than today's UTC midnight: 30 seconds
+    // back put it on yesterday in the first half minute of a day.
     Database::get().execute_write([](auto& txn) {
         txn.exec_params(
-            "INSERT INTO focus_sessions (owner_id, started_at, ended_at, minutes) VALUES ($1::uuid, now() - interval "
-            "'30 seconds', now(), 25), ($1::uuid, now() - interval '40 days', now() - interval '40 days' + interval "
-            "'50 minutes', 50)",
+            "INSERT INTO focus_sessions (owner_id, started_at, ended_at, minutes) SELECT $1::uuid, s, s + interval "
+            "'25 minutes', 25 FROM (SELECT GREATEST(now() - interval '30 seconds', date_trunc('day', now(), 'UTC')) "
+            "AS s) t UNION ALL SELECT $1::uuid, now() - interval '40 days', now() - interval '40 days' + interval "
+            "'50 minutes', 50",
             std::string(kAnna));
         return true;
     });

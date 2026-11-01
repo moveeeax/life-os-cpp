@@ -923,41 +923,46 @@ run_case nginx-body-cap check-frontend-nginx-sync.sh break_nginx_body_cap \
     'client_max_body_size drifted' \
     'will 413 in one environment only'
 
+# check-helm-render.sh reads the charts and overlays, and for the ani worker
+# release also the code: the job types (src/agent), the ANI_* variables the
+# API must get (src) and the agent image and pod limit (config/config.json).
+HELM_RENDER_PATHS="helm deploy config/config.json src"
+
 run_case helm-fail-open check-helm-render.sh break_helm_fail_open \
-    "helm deploy" \
+    "$HELM_RENDER_PATHS" \
     'rate limiter is fail-OPEN' \
     'Set rateLimit.failOpen=false.'
 
 run_case helm-committed-jwt check-helm-render.sh break_helm_committed_jwt \
-    "helm deploy" \
+    "$HELM_RENDER_PATHS" \
     'rendered Secret carries a committed credential (jwt-secret)'
 
 run_case helm-registration-open check-helm-render.sh break_helm_registration_open \
-    "helm deploy" \
+    "$HELM_RENDER_PATHS" \
     'REGISTRATION_OPEN != false' \
     'Set registration.open=false.'
 
 run_case helm-app-env-dev check-helm-render.sh break_helm_app_env_dev \
-    "helm deploy" \
+    "$HELM_RENDER_PATHS" \
     'APP_ENV != production' \
     'Set app.env=production.'
 
 run_case helm-docs-enabled check-helm-render.sh break_helm_docs_enabled \
-    "helm deploy" \
+    "$HELM_RENDER_PATHS" \
     'docs.enabled != false' \
     'Set docs.enabled=false.'
 
 run_case helm-worker-lease-off check-helm-render.sh break_helm_worker_lease_off \
-    "helm deploy" \
+    "$HELM_RENDER_PATHS" \
     'JOBS_VISIBILITY_TIMEOUT_SEC is 0' \
     'Set jobs.visibilityTimeoutSec=300.'
 
 run_case helm-automount-token check-helm-render.sh break_helm_automount_token \
-    "helm deploy" \
+    "$HELM_RENDER_PATHS" \
     'without automountServiceAccountToken: false in the pod spec: life-os-cpp'
 
 run_case helm-networkpolicy-off check-helm-render.sh break_helm_networkpolicy_off \
-    "helm deploy" \
+    "$HELM_RENDER_PATHS" \
     'no NetworkPolicy rendered for the API pods' \
     'networkPolicy.enabled must stay true'
 

@@ -138,6 +138,15 @@ public:
 
     virtual std::optional<std::string> get(const std::string& key);
 
+    /**
+     * @brief Deletes @p key only while it still holds @p value (one Lua
+     *        script): the release of a lock taken with set_nx and a token of
+     *        its own, so a holder that outlived its TTL never deletes the
+     *        next holder's lock. False when the key holds something else, is
+     *        gone, or Redis failed (fail-open, logged).
+     */
+    virtual bool del_if_equals(const std::string& key, const std::string& value);
+
     virtual long del(const std::string& key);
 
     virtual long del(const std::vector<std::string>& keys);

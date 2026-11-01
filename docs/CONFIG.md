@@ -347,8 +347,9 @@ when it stops and restored when it starts. The worker alone talks to the
 Kubernetes API (its service account, see the worker chart's `aniAgents`) and
 serves the pods' model proxy on its health port (`POST
 /ani/llm/v1/chat/completions`); the API only changes the state and queues the
-jobs. In prod the knobs come from the Secret `life-os-ani-agent` into both
-the API and the worker.
+jobs. In prod the knobs come from the Secret `life-os-ani-agent`: the ani
+worker takes it whole, the API key by key (`aniAgentSecret` of the API
+chart) without `ANI_AGENT_UPSTREAM_KEY` and `ANI_AGENT_PROXY_URL`.
 
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
@@ -362,8 +363,8 @@ the API and the worker.
 | `ANI_AGENT_MAX_HOURS` | `ani.agent.max_hours` | int | `12` | A run is stopped this long after its start, busy or not (its presigned snapshot URL lives one hour more). |
 | `ANI_AGENT_MODEL` | `ani.agent.model` | string | `gpt-5-mini` | The upstream model every proxied call is pinned to. |
 | `ANI_AGENT_UPSTREAM_URL` | `ani.agent.upstream_url` | string | `https://api.openai.com/v1` | An OpenAI-compatible base URL the proxy forwards to (`/chat/completions`). |
-| `ANI_AGENT_UPSTREAM_KEY` | `ani.agent.upstream_key` | string | empty | The upstream's key. It stays in the worker; the pods get a per-run proxy token. Empty: the agent counts as not configured. |
-| `ANI_AGENT_PROXY_URL` | `ani.agent.proxy_url` | string | empty | The proxy as the pods reach it, ending in `/v1`, e.g. `http://life-os-cpp-worker.life-os.svc.cluster.local:9091/ani/llm/v1`. Empty: not configured. |
+| `ANI_AGENT_UPSTREAM_KEY` | `ani.agent.upstream_key` | string | empty | The upstream's key. Only the ani worker has it (the API pod does not get it); the pods get a per-run proxy token. Empty in the worker: no pod is started and the proxy route is not served. |
+| `ANI_AGENT_PROXY_URL` | `ani.agent.proxy_url` | string | empty | The proxy as the pods reach it, ending in `/v1`, e.g. `http://life-os-ani-worker.life-os.svc.cluster.local:9091/ani/llm/v1` in prod. Worker only, like the key; empty in the worker: no pod is started. |
 | `ANI_AGENT_API_URL` | `ani.agent.api_url` | string | empty | The site's API as the worker reaches it, e.g. `http://life-os-cpp.life-os.svc.cluster.local:8080`: the agent's tools read the user's data there with a five-minute token of the user. Empty: the agent chats without tools. |
 | `ANI_AGENT_MONTHLY_TOKENS` | `ani.agent.monthly_tokens` | int | `20000000` | Prompt plus completion tokens per user and calendar month (UTC); past it the proxy answers 429 `insufficient_quota`. |
 | `ANI_TELEGRAM_URL` | `ani.telegram.url` | string | `https://tg.tarassov.me` | The owner's telegram-rest-gateway (REST), which Ani's Telegram tools and the minutely poll call (src/telegram/). |
@@ -371,7 +372,7 @@ the API and the worker.
 | `GOOGLE_CALENDAR_CLIENT_ID` | `calendar.google.client_id` | string | empty | The Google OAuth Web client of the site (Secret `life-os-app`). Empty: Google Calendar is off. |
 | `GOOGLE_CALENDAR_CLIENT_SECRET` | `calendar.google.client_secret` | string | empty | Its secret (Secret `life-os-app`). |
 | `GOOGLE_CALENDAR_REDIRECT_URL` | `calendar.google.redirect_url` | string | `https://life-os.tarassov.me/api/v1/calendar/oauth/callback` | Where Google's consent comes back; must match the client's authorized redirect exactly. |
-| `CALENDAR_TOKEN_KEY` | `calendar.google.token_key` | string | empty | 32 random bytes, base64url without padding, that seal the users' refresh tokens (utils/Seal.hpp). Changing it disconnects every calendar. |
+| `CALENDAR_TOKEN_KEY` | `calendar.google.token_key` | string | empty | 32 random bytes, base64url without padding, that seal the users' refresh tokens (utils/Seal.hpp), in the Secret `life-os-app`; the API and the ani worker (Ani's calendar tools) read it. Changing it disconnects every calendar (docs/RUNBOOK.md, Rotate a secret). |
 
 ## Storage (S3)
 
@@ -408,9 +409,10 @@ the API and the worker.
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
 | `WORKER_ID` | `worker.id` | string | `worker-1` | Names the Redis processing list of this instance. Helm: the pod name (`metadata.name`) unless `worker.id` is set, so replicas never share a list |
-| `WORKER_TYPES` | `worker.types` | csv | all registered handler types | Queues the worker pulls from. Unset (prod leaves it unset) → every type with a registered handler. The handlers this binary registers: `account_email`, `email.send`, `webhook.deliver`, `fitness_sync`, `leetcode_sync`, `github_sync`, `food_parse`, `money_parse`, `money_rates`, `money_advisor`, `tasks_parse`, `now_media_sweep`, `files_sweep`. When you DO set it, a type left out piles up undrained: the compose stack and the worker chart list them all, `config.json` ships `default` (no handler of that name; the startup guard warns). |
+| `WORKER_TYPES` | `worker.types` | csv | all registered handler types | Queues the worker pulls from. Unset → every type with a registered handler. The thirteen handlers this binary registers besides Ani's agent: `account_email`, `email.send`, `webhook.deliver`, `fitness_sync`, `leetcode_sync`, `github_sync`, `food_parse`, `money_parse`, `money_rates`, `money_advisor`, `tasks_parse`, `now_media_sweep`, `files_sweep`; the agent's nine (`ani_agent_start`, `ani_agent_stop`, `ani_agents_reconcile`, `ani_turn`, `ani_action`, `ani_hook_event`, `ani_inbox_purge`, `ani_reminders_due`, `telegram_poll`) run in the ani worker (`deploy/values-ani-worker-prod.yaml`, checked by `scripts/check-helm-render.sh`). Production sets the list in both worker charts' `worker.types`. When you DO set it, a type left out piles up undrained: the compose stack lists the twelve, `config.json` ships `default` (no handler of that name; the startup guard warns). |
 | `WORKER_STRICT_TYPES` | `worker.strict_types` | bool | `false` | A `WORKER_TYPES` entry without a registered handler logs a warning; `true` upgrades it to a refusal to start |
 | `WORKER_CONCURRENCY` | `worker.concurrency` | int | `2` | |
+| `WORKER_PRIORITY_TYPES` | `worker.priority_types` | csv | empty | Types that also get one worker thread of their own (`<WORKER_ID>-p`) beside the `WORKER_CONCURRENCY` shared ones, so a job a user waits for on screen never waits behind a long job of another type. Prod's main worker sets `food_parse,money_parse,tasks_parse` (its single shared thread also runs `fitness_sync`, up to 30 minutes per data type). |
 | `WORKER_HEALTH_PORT` | `worker.health_port` | int | `9091` | |
 | `WORKER_BRPOP_TIMEOUT` | `worker.brpop_timeout` | int | `5` | |
 

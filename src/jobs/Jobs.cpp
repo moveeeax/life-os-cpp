@@ -28,6 +28,7 @@
 #include <chrono>
 #include <cstddef>
 #include <iterator>
+#include <optional>
 #include <stdexcept>
 #include <utility>
 
@@ -76,6 +77,18 @@ constexpr const char* kRenewLeaseScript =
     "if not ok or j['status'] ~= 'processing' or j['worker_id'] ~= ARGV[1] then return 0 end "
     "if not redis.call('ZSCORE', KEYS[2], ARGV[2]) then return 0 end "
     "redis.call('ZADD', KEYS[2], ARGV[3], ARGV[2]) return 1";
+
+// Write a job blob only while it is still the one the caller read and decided
+// on: a cancel() (or another outcome) landing between the read and the write
+// is not overwritten. KEYS[1] job blob; ARGV[1] the blob read, ARGV[2] the new
+// blob, ARGV[3] TTL in seconds (0 = none).
+constexpr const char* kCompareAndSetBlob =
+    "if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end "
+    "if tonumber(ARGV[3]) > 0 then redis.call('SETEX', KEYS[1], ARGV[3], ARGV[2]) "
+    "else redis.call('SET', KEYS[1], ARGV[2]) end return 1";
+
+// Attempts of a compare-and-set outcome write before it gives up (contended blob).
+constexpr int kOutcomeAttempts = 8;
 
 }  // namespace
 
@@ -255,33 +268,68 @@ void JobQueue::complete(const std::string& id, const json& result) {
     check_initialized();
     auto& redis = Cache::get().get_client();
 
-    auto job = load_job_or_throw_(redis, id);
-    job.status = "completed";
-    job.result = result;
-    job.updated_at = now_epoch();
-
-    redis.setex(job_key(id), result_ttl_, job.to_json().dump());
-    // Drop from the worker's processing list — the job is officially done
-    // and no recovery pass should resurrect it.
-    release_from_worker_(redis, job);
-    spdlog::debug("Job completed: id={}", id);
+    for (int attempt = 0; attempt < kOutcomeAttempts; ++attempt) {
+        const auto raw = redis.get(job_key(id));
+        if (!raw) {
+            throw std::runtime_error("Job not found: " + id);
+        }
+        auto job = Job::from_json(json::parse(*raw));
+        if (is_terminal_status_(job.status)) {
+            // Cancelled (or ended otherwise) while the handler ran: the
+            // outcome stands, the success is not written over it.
+            spdlog::info("Job {} complete() ignored: already {}", id, job.status);
+            release_from_worker_(redis, job);
+            return;
+        }
+        job.status = "completed";
+        job.result = result;
+        job.updated_at = now_epoch();
+        if (!write_if_unchanged_(redis, id, *raw, job, result_ttl_)) {
+            continue;  // the blob changed after the read: decide again on the new state
+        }
+        // Drop from the worker's processing list — the job is officially done
+        // and no recovery pass should resurrect it.
+        release_from_worker_(redis, job);
+        spdlog::debug("Job completed: id={}", id);
+        return;
+    }
+    throw std::runtime_error("Job " + id + ": complete() gave up after contended attempts");
 }
 
 void JobQueue::fail(const std::string& id, const std::string& error) {
     check_initialized();
     auto& redis = Cache::get().get_client();
 
-    auto job = load_job_or_throw_(redis, id);
-    if (is_terminal_status_(job.status)) {
-        // A lease left behind by complete() or cancel() (a pod killed between
-        // the blob write and the ZREM) reaped later: the outcome stands, the
-        // job must not run again.
-        spdlog::info("Job {} fail({}) ignored: already {}", id, error, job.status);
-        release_from_worker_(redis, job);
-        return;
+    std::optional<Job> decided;
+    for (int attempt = 0; attempt < kOutcomeAttempts && !decided; ++attempt) {
+        const auto raw = redis.get(job_key(id));
+        if (!raw) {
+            throw std::runtime_error("Job not found: " + id);
+        }
+        auto job = Job::from_json(json::parse(*raw));
+        if (is_terminal_status_(job.status)) {
+            // A lease left behind by complete() or cancel() (a pod killed between
+            // the blob write and the ZREM) reaped later, or a cancel that landed
+            // while the handler ran: the outcome stands, the job must not run again.
+            spdlog::info("Job {} fail({}) ignored: already {}", id, error, job.status);
+            release_from_worker_(redis, job);
+            return;
+        }
+        job.retry_count++;
+        job.updated_at = now_epoch();
+        job.error = error;
+        job.status = job.retry_count < job.max_retries ? "pending" : "dead";
+        // The status goes first, with a compare-and-set: a cancel between the
+        // read and this write is seen on the next attempt instead of being
+        // overwritten (and the job run again).
+        if (write_if_unchanged_(redis, id, *raw, job, 0)) {
+            decided = std::move(job);
+        }
     }
-    job.retry_count++;
-    job.updated_at = now_epoch();
+    if (!decided) {
+        throw std::runtime_error("Job " + id + ": fail() gave up after contended attempts");
+    }
+    Job& job = *decided;
 
     // The id lands on its next list (live queue, delayed set or DLQ) BEFORE it
     // leaves the worker's processing list. The two writes are not atomic: a
@@ -289,11 +337,8 @@ void JobQueue::fail(const std::string& id, const std::string& error) {
     // pushes it once more (a duplicate, the documented at-least-once
     // contract). The other order left it on neither, with no lease to reap
     // and a blob stuck "pending" that nothing would ever find again.
-    if (job.retry_count < job.max_retries) {
-        // Requeue for retry.
-        job.status = "pending";
-        job.error = error;
-        save_job_(redis, job);
+    if (job.status == "pending") {
+        // Requeue for retry (the blob says pending already).
         const int64_t delay_ms = backoff_delay_ms_(job.retry_count);
         if (delay_ms > 0) {
             // Park in the delayed set; promote_due_jobs() returns it to the
@@ -308,12 +353,10 @@ void JobQueue::fail(const std::string& id, const std::string& error) {
         }
         release_from_worker_(redis, job);
     } else {
-        // Max retries exceeded — send to dead-letter queue for inspection.
-        // DLQ entries are NOT reaped by result_ttl_ (operator must drain
-        // or requeue them explicitly via /api/v1/jobs/dlq/{id}/requeue).
-        job.status = "dead";
-        job.error = error;
-        save_job_(redis, job);
+        // Max retries exceeded — send to dead-letter queue for inspection
+        // (the blob says dead already). DLQ entries are NOT reaped by
+        // result_ttl_ (operator must drain or requeue them explicitly via
+        // /api/v1/jobs/dlq/{id}/requeue).
         redis.lpush(dlq_key(job.type), id);
         redis.sadd(kDlqAllKey, id);  // index for "list all DLQ" queries
         release_from_worker_(redis, job);
@@ -480,6 +523,60 @@ long JobQueue::recover_processing(const std::string& worker_id) {
     if (recovered > 0) {
         spdlog::warn("Jobs: recovered {} orphaned jobs from {}", recovered, proc);
     }
+    return recovered;
+}
+
+long JobQueue::recover_orphans(int64_t now_ms, const std::string& worker_glob) {
+    // Without leases a live handler cannot be told from a lost one.
+    if (!initialized_ || visibility_timeout_ms_ <= 0)
+        return 0;
+    auto& redis = Cache::get().get_client();
+    if (now_ms < 0)
+        now_ms = Utils::Time::now_epoch_millis();
+    const long long older_than = (now_ms - visibility_timeout_ms_) / 1000;
+    long recovered = 0;
+    long long cursor = 0;
+    do {
+        std::vector<std::string> lists;
+        // A read error propagates: the worker's maintenance pass logs it.
+        cursor = redis.scan(cursor, processing_key(worker_glob), 100, std::back_inserter(lists));
+        for (const auto& proc : lists) {
+            std::vector<std::string> ids;
+            redis.lrange(proc, 0, -1, std::back_inserter(ids));
+            for (const auto& id : ids) {
+                try {
+                    if (redis.zscore(leases_key(), id)) {
+                        continue;  // leased: the reaper owns it
+                    }
+                    std::optional<Job> loaded;
+                    try {
+                        loaded = load_job_(redis, id);
+                    } catch (const json::exception& e) {
+                        spdlog::warn("Jobs: dropping {} from {}: unreadable blob: {}", id, proc, e.what());
+                    }
+                    if (!loaded || is_terminal_status_(loaded->status)) {
+                        redis.lrem(proc, 0, id);
+                        continue;
+                    }
+                    // Fresh ids are between a pick's move and its lease (or a
+                    // pick that is about to drop a ghost id): left alone.
+                    if (loaded->updated_at > older_than)
+                        continue;
+                    Job job = std::move(*loaded);
+                    job.status = "pending";
+                    job.worker_id.clear();
+                    job.updated_at = now_epoch();
+                    save_job_(redis, job);
+                    if (redis.eval<long long>(kRecoverScript, {proc, queue_key(job.type)}, {id}) > 0) {
+                        ++recovered;
+                        spdlog::warn("Jobs: {} was left in {} without a lease; requeued", id, proc);
+                    }
+                } catch (const std::exception& e) {
+                    spdlog::warn("Jobs: could not recover {} from {} (tried again next pass): {}", id, proc, e.what());
+                }
+            }
+        }
+    } while (cursor != 0);
     return recovered;
 }
 
@@ -805,6 +902,12 @@ Job JobQueue::load_job_or_throw_(sw::redis::Redis& redis, const std::string& id)
 
 void JobQueue::save_job_(sw::redis::Redis& redis, const Job& job) {
     redis.set(job_key(job.id), job.to_json().dump());
+}
+
+bool JobQueue::write_if_unchanged_(
+    sw::redis::Redis& redis, const std::string& id, const std::string& read, const Job& job, long ttl_seconds) {
+    return redis.eval<long long>(
+               kCompareAndSetBlob, {job_key(id)}, {read, job.to_json().dump(), std::to_string(ttl_seconds)}) > 0;
 }
 
 void JobQueue::release_from_worker_(sw::redis::Redis& redis, const Job& job) {

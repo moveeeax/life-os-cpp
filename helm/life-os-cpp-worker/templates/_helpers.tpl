@@ -67,3 +67,21 @@ assembles the libpq DSN in code so the password stays only in DATABASE_PASSWORD
   value: {{ .Values.externalDatabase.replicaHost | quote }}
 {{- end }}
 {{- end }}
+
+{{/*
+A memory quantity as whole MiB, for the agents' quota. Takes "<n>Mi" or
+"<n>Gi" and fails the render on any other unit: a bare trimSuffix "Mi"
+turned "2Gi" into 0Mi and every agent pod was refused admission.
+Call with (list "<value name>" <value>).
+*/}}
+{{- define "life-os-cpp-worker.mebibytes" -}}
+{{- $name := index . 0 -}}
+{{- $v := toString (index . 1) -}}
+{{- if regexMatch "^[1-9][0-9]*Mi$" $v -}}
+{{- trimSuffix "Mi" $v | int -}}
+{{- else if regexMatch "^[1-9][0-9]*Gi$" $v -}}
+{{- mul (trimSuffix "Gi" $v | int) 1024 -}}
+{{- else -}}
+{{- fail (printf "%s must be a positive whole number of Mi or Gi (got %q)" $name $v) -}}
+{{- end -}}
+{{- end }}

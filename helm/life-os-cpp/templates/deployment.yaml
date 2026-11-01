@@ -19,7 +19,7 @@ spec:
         # bumps secretsVersion after rotating a key in one of those Secrets
         # (their contents are outside the chart, so the config checksum above
         # cannot see them). See secretsVersion in values.yaml.
-        checksum/extra-env: {{ printf "%s|%s" (toJson .Values.extraEnvFrom) (.Values.secretsVersion | default "" | toString) | sha256sum }}
+        checksum/extra-env: {{ printf "%s|%s|%s" (toJson .Values.extraEnvFrom) (.Values.secretsVersion | default "" | toString) (toJson .Values.aniAgentSecret) | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -440,6 +440,18 @@ spec:
               value: {{ .Values.mail.fromName | quote }}
             - name: MAIL_SUBJECT_PREFIX
               value: {{ .Values.mail.subjectPrefix | quote }}
+            {{- end }}
+            {{- /* Ani's knobs key by key: the upstream key in the same Secret stays out (values.yaml aniAgentSecret). */}}
+            {{- if .Values.aniAgentSecret.name }}
+            {{- $aniSecret := .Values.aniAgentSecret.name }}
+            {{- range .Values.aniAgentSecret.keys }}
+            - name: {{ . }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $aniSecret }}
+                  key: {{ . }}
+                  optional: true
+            {{- end }}
             {{- end }}
           {{- with .Values.extraEnvFrom }}
           envFrom:

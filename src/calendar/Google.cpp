@@ -273,6 +273,13 @@ std::vector<std::pair<long long, long long>> free_slots(const std::vector<Event>
     return out;
 }
 
+bool client_event_id_ok(const std::string& id) {
+    if (id.size() < 5 || id.size() > 1024) {
+        return false;
+    }
+    return std::all_of(id.begin(), id.end(), [](char c) { return (c >= 'a' && c <= 'v') || (c >= '0' && c <= '9'); });
+}
+
 json event_view(const Event& e) {
     return json{{"id", e.id},
                 {"title", e.title},

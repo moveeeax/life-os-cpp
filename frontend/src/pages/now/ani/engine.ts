@@ -304,7 +304,10 @@ interface MmdGrant {
 type Walk = 'here' | 'leaving' | 'away' | 'arriving';
 
 export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
-  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Reduced motion: a still pose, no idle moves, no hair or cloth in the
+  // wind; followed live, so a change in the system settings applies at once.
+  const motion = matchMedia('(prefers-reduced-motion: reduce)');
+  let still = motion.matches;
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   // The toon materials read right with linear output.
@@ -339,7 +342,10 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   // Her feet, moved to her ledge every frame.
   const root = new THREE.Group();
   scene.add(root);
-  const resize = new ResizeObserver(place);
+  const resize = new ResizeObserver(() => {
+    place();
+    wake();
+  });
   resize.observe(canvas);
 
   const clock = new THREE.Clock();
@@ -350,6 +356,13 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   let ik: CCDIKSolver | null = null;
   let springs: Springs | null = null;
   let settle = false;
+  // A live voice (the Realtime call) moves her lips for as long as it runs.
+  let following = false;
+  // Until when (clock s) the loop draws every frame whatever else holds.
+  let wakeUntil = 0;
+  const wake = (seconds = 1.5) => {
+    wakeUntil = Math.max(wakeUntil, clock.getElapsedTime() + seconds);
+  };
   const B: Record<string, THREE.Bone> = {};
   const baseQ: Record<string, THREE.Quaternion> = {};
   const baseP: Record<string, THREE.Vector3> = {};
@@ -577,6 +590,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     ([m, v1]) => {
       if (disposed) return;
       setUp(m, v1);
+      wake(2);
       opts.onReady?.();
     },
     (e) => opts.onError?.(e),
@@ -735,32 +749,31 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     ik = new CCDIKSolver(m, mmd.iks);
     // The moves load now; a pose loads when she first picks it.
     for (const name of Object.keys(CLIPS)) if (!POSES.includes(name)) void clipOf(name);
-    if (!still) {
-      // v2 has rigid bodies for its hair and chest only; the clothes' bones
-      // have theirs in v1.
-      springs = createSprings(m, SPRINGS, [v1]);
-      // Calibrate in the bind pose, against every collider.
-      m.updateMatrixWorld(true);
-      placeColliders();
-      springs.calibrate(colliders);
-      const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
-      springs.setLeads([
-        {
-          thigh: B['左足D'],
-          hips: B['下半身'],
-          a: V(1.16, 12.65, -0.11),
-          b: V(0.91, 7.26, -0.13),
-          r: 1.15,
-        },
-        {
-          thigh: B['右足D'],
-          hips: B['下半身'],
-          a: V(-1.16, 12.65, -0.11),
-          b: V(-0.91, 7.26, -0.13),
-          r: 1.15,
-        },
-      ]);
-    }
+    // v2 has rigid bodies for its hair and chest only; the clothes' bones
+    // have theirs in v1. Made under reduced motion too (they rest there,
+    // see frame), so turning it off later brings the sway back.
+    springs = createSprings(m, SPRINGS, [v1]);
+    // Calibrate in the bind pose, against every collider.
+    m.updateMatrixWorld(true);
+    placeColliders();
+    springs.calibrate(colliders);
+    const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+    springs.setLeads([
+      {
+        thigh: B['左足D'],
+        hips: B['下半身'],
+        a: V(1.16, 12.65, -0.11),
+        b: V(0.91, 7.26, -0.13),
+        r: 1.15,
+      },
+      {
+        thigh: B['右足D'],
+        hips: B['下半身'],
+        a: V(-1.16, 12.65, -0.11),
+        b: V(-0.91, 7.26, -0.13),
+        r: 1.15,
+      },
+    ]);
     dress(outfit);
   }
 
@@ -1577,29 +1590,94 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
         springs.reset();
         settle = false;
       }
-      placeColliders();
-      wind.set(Math.sin(now * 0.7) * 0.6 + Math.sin(now * 1.9) * 0.3, 0, Math.sin(now * 0.5) * 0.4);
-      springs.update(dt, colliders, wind);
+      // Under reduced motion the hair and cloth hang at rest, no wind.
+      if (!still) {
+        placeColliders();
+        wind.set(
+          Math.sin(now * 0.7) * 0.6 + Math.sin(now * 1.9) * 0.3,
+          0,
+          Math.sin(now * 0.5) * 0.4,
+        );
+        springs.update(dt, colliders, wind);
+      }
     }
+  }
+
+  // Something on screen can change: a walk, a clip, a drag or a turn back,
+  // speech, a touch's face or lean easing in and out, the cursor or typing
+  // she follows. Otherwise she only breathes and blinks, or, under reduced
+  // motion, nothing moves at all.
+  function lively(now: number) {
+    return (
+      now < wakeUntil ||
+      walk.state === 'arriving' ||
+      walk.state === 'leaving' ||
+      play.clip !== null ||
+      spin.drag !== null ||
+      Math.abs(spin.yaw) > 1e-3 ||
+      Math.abs(spin.vel) > 1e-4 ||
+      voice.speaking ||
+      following ||
+      now <
+        Math.max(
+          touch.feelUntil,
+          touch.tiltUntil,
+          touch.glanceUntil,
+          touch.sulkUntil,
+          touch.coverUntil,
+          touch.hugUntil,
+          touch.blushUntil,
+        ) ||
+      now - pointer.at < 1 ||
+      now - typedAt < 1
+    );
   }
 
   // Sent away she is not drawn: after a frame that clears her, the loop
   // only waits for her to be called back. (A hidden tab gets no frames.)
+  // Calm (nothing above for 1.5 s), she is drawn at 30 frames a second, the
+  // breath and blinks need no more; under reduced motion a calm frame is
+  // not drawn at all, unless her ledge moved, and once a minute in case
+  // the hour made her sleepy.
   let awayFrames = 0;
+  let busyAt = -10;
+  let drawnAt = -10;
+  let feetAt = { x: NaN, y: NaN };
   function tick() {
     if (disposed) return;
-    awayFrames = walk.state === 'away' ? awayFrames + 1 : 0;
-    if (awayFrames < 3) {
-      if (mesh) frame(mesh);
-      renderer.render(scene, cam);
-    }
     raf = requestAnimationFrame(tick);
+    awayFrames = walk.state === 'away' ? awayFrames + 1 : 0;
+    if (awayFrames >= 3) return;
+    const now = clock.getElapsedTime();
+    if (lively(now)) busyAt = now;
+    const ft = opts.feet();
+    const moved = ft.x !== feetAt.x || ft.y !== feetAt.y;
+    if (mesh && !moved && now - busyAt > 1.5) {
+      if (still ? now - drawnAt < 60 : now - drawnAt < 1 / 30 - 0.004) return;
+    }
+    feetAt = ft;
+    drawnAt = now;
+    if (mesh) frame(mesh);
+    renderer.render(scene, cam);
   }
+  const onMotion = () => {
+    still = motion.matches;
+    if (still) {
+      // Stop where she is: no clip, no turn, the hair and cloth at rest.
+      play.clip = null;
+      play.w = 0;
+      spin.yaw = spin.vel = 0;
+    }
+    settle = true;
+    wake();
+  };
+  motion.addEventListener('change', onMotion);
   place();
   tick();
 
   return {
     present(on, done) {
+      wake();
       if (still || !mesh) {
         walk.state = on ? 'here' : 'away';
         if (mesh) mesh.visible = on;
@@ -1625,6 +1703,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
         });
     },
     feel(f, seconds) {
+      wake();
       const now = clock.getElapsedTime();
       // A new face replaces the old one at once.
       if (f !== touch.feel) touch.feelW = 0;
@@ -1632,40 +1711,62 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       touch.feelUntil = now + seconds;
     },
     tilt(side, seconds) {
+      wake();
       touch.tiltSide = side;
       touch.tiltUntil = clock.getElapsedTime() + seconds;
     },
     glance(x, y, seconds) {
+      wake();
       touch.glance = { x, y };
       touch.glanceUntil = clock.getElapsedTime() + seconds;
     },
     sulk(seconds) {
+      wake();
       touch.sulkUntil = clock.getElapsedTime() + seconds;
     },
     cover(seconds) {
+      wake();
       touch.coverUntil = clock.getElapsedTime() + seconds;
     },
     hug(seconds) {
+      wake();
       touch.hugUntil = clock.getElapsedTime() + seconds;
     },
     blush(seconds) {
+      wake();
       touch.blushUntil = Math.max(touch.blushUntil, clock.getElapsedTime() + seconds);
     },
     act(name) {
+      wake();
       if (CLIPS[name]) void playClip(name);
     },
     mood(level) {
+      wake();
       touch.mood = level;
     },
-    hush: () => voice.stop(),
-    setOutfit: dress,
-    say: (url) => voice.say(url),
-    follow: (stream) => voice.follow(stream),
+    hush: () => {
+      voice.stop();
+      wake();
+    },
+    setOutfit: (o) => {
+      dress(o);
+      wake();
+    },
+    say: (url) => {
+      wake();
+      return voice.say(url).finally(() => wake());
+    },
+    follow: (stream) => {
+      following = stream !== null;
+      wake();
+      voice.follow(stream);
+    },
     dispose() {
       disposed = true;
       clearTimeout(burst.timer);
       voice.dispose();
       cancelAnimationFrame(raf);
+      motion.removeEventListener('change', onMotion);
       resize.disconnect();
       removeEventListener('pointermove', onPointer);
       removeEventListener('input', onInput, true);

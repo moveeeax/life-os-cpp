@@ -295,6 +295,8 @@ spec:
               value: {{ .Values.worker.types | quote }}
             - name: WORKER_CONCURRENCY
               value: {{ .Values.worker.concurrency | quote }}
+            - name: WORKER_PRIORITY_TYPES
+              value: {{ .Values.worker.priorityTypes | default "" | quote }}
             - name: WORKER_HEALTH_PORT
               value: {{ .Values.worker.healthPort | quote }}
             - name: WORKER_BRPOP_TIMEOUT

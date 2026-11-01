@@ -229,6 +229,22 @@ public:
     long recover_processing(const std::string& worker_id);
 
     /**
+     * @brief Requeue ids left in any processing list (jobs:processing:*)
+     *        without a lease, whose blob has not changed for one visibility
+     *        timeout: a pick whose lease ZADD failed, or a worker killed
+     *        between BRPOPLPUSH and the lease. recover_processing runs only
+     *        for the starting worker's own id, and WORKER_ID is the pod name,
+     *        so such an id was never picked again. A missing, unreadable or
+     *        terminal blob just leaves its list. No-op without leases (a live
+     *        handler could not be told from a lost one). Called from the
+     *        worker's maintenance pass with the index trim.
+     * @param now_ms the clock (-1 = the wall clock).
+     * @param worker_glob the workers whose lists are read (a SCAN pattern; tests narrow it).
+     * @return ids requeued. Throws when the lists cannot be scanned.
+     */
+    long recover_orphans(int64_t now_ms = -1, const std::string& worker_glob = "*");
+
+    /**
      * @brief Move every job whose backoff or defer window has elapsed from the
      *        delayed set back onto its live queue. Runs whether or not retry
      *        backoff is on (a deferred job waits there too); an empty set
@@ -363,6 +379,12 @@ private:
 
     /// Persist the job blob (plain SET, no TTL) — the write half of load_job_.
     void save_job_(sw::redis::Redis& redis, const Job& job);
+
+    /// Writes @p job as the blob of @p id only while the blob is still @p read
+    /// (one Lua compare-and-set; @p ttl_seconds 0 = no TTL). False when it
+    /// changed meanwhile: the caller reads again and decides on the new state.
+    bool write_if_unchanged_(
+        sw::redis::Redis& redis, const std::string& id, const std::string& read, const Job& job, long ttl_seconds);
 
     // Drop the job from its worker's processing list (best-effort) and release
     // its visibility lease — the shared terminal-transition cleanup of

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -334,5 +335,48 @@ describe('AniChat', () => {
       'После встречи «Sync» есть задачи: ',
     );
     expect(chat.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('ConfirmOnce: a double click sends one confirm, and the made change refreshes its section', async () => {
+    const pending = {
+      id: 'a1',
+      kind: 'create_task' as const,
+      summary: 'Task «Позвонить»',
+      status: 'pending' as const,
+      error: null,
+    };
+    vi.mocked(chat.loadTurns).mockResolvedValue([
+      turn({ status: 'done', reply: 'Создать?', actions: [pending] }),
+    ]);
+    let made: (a: typeof pending | { status: 'confirmed' }) => void = () => {};
+    vi.mocked(chat.confirmAction).mockImplementation(
+      () => new Promise((ok) => (made = ok as typeof made)),
+    );
+    vi.mocked(chat.readTurn).mockResolvedValue(
+      turn({ status: 'done', reply: 'Создать?', actions: [{ ...pending, status: 'done' }] }),
+    );
+    const qc = new QueryClient();
+    const invalidate = vi.spyOn(qc, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={qc}>
+        <AniChat tz="UTC" onClose={() => {}} />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText('Task «Позвонить»')).toBeTruthy();
+    fireEvent.click(screen.getByText('Confirm'));
+    fireEvent.click(screen.getByText('Confirm'));
+    expect(chat.confirmAction).toHaveBeenCalledTimes(1);
+    expect((screen.getByText('Cancel') as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => {
+      made({ ...pending, status: 'confirmed' });
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(await screen.findByText('Doing it')).toBeTruthy();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(chat.POLL_MS + 10);
+    });
+    expect(await screen.findByText('Done')).toBeTruthy();
+    const keys = invalidate.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+    expect(keys).toContain(JSON.stringify(['tasks']));
   });
 });

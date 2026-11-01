@@ -247,6 +247,20 @@ public:
         });
     }
 
+    /// Gives the @p kind line of @p day back after the voice or Telegram failed,
+    /// so the next poll of that hour tries again (as release_review_week).
+    void release_voice(const std::string& owner, const std::string& kind, const std::string& day) {
+        Database::get().execute_write([&](auto& txn) {
+            txn.exec_params(
+                "UPDATE telegram_link SET voice_sent = voice_sent - $2::text WHERE owner_id = $1::uuid AND "
+                "(voice_sent->>$2) = $3",
+                owner,
+                kind,
+                day);
+            return true;
+        });
+    }
+
     /// Gives @p week back after Telegram refused the review, so the next try can send it.
     void release_review_week(const std::string& owner, const std::string& week) {
         Database::get().execute_write([&](auto& txn) {

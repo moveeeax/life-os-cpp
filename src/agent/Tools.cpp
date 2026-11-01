@@ -5,15 +5,19 @@
 
 #include "agent/Tools.hpp"
 
-#include <regex>
-
 #include <spdlog/spdlog.h>
 
+#include "agent/Actions.hpp"
+#include "agent/CalendarTools.hpp"
+#include "agent/TelegramTools.hpp"
 #include "repositories/UserRepository.hpp"
+#include "security/ApiKeys.hpp"
 #include "security/Auth.hpp"
 #include "security/Jwt.hpp"
 #include "storage/S3Presign.hpp"
+#include "utils/Date.hpp"
 #include "utils/Time.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Agent::Tools {
 
@@ -42,11 +46,10 @@ std::string text_arg(const json& args, const char* key) {
     return it != args.end() && it->is_string() ? it->get<std::string>() : std::string();
 }
 
-/// A day argument; anything that is not YYYY-MM-DD is dropped.
+/// A day argument; anything that is not a real YYYY-MM-DD day is dropped.
 std::string day_arg(const json& args, const char* key) {
-    static const std::regex kDayRe("^\\d{4}-\\d{2}-\\d{2}$");
     const std::string v = text_arg(args, key);
-    return std::regex_match(v, kDayRe) ? v : std::string();
+    return Utils::Date::is_ymd(v) ? v : std::string();
 }
 
 void put(Call& c, const char* key, const std::string& value) {
@@ -105,7 +108,7 @@ std::optional<Call> route(const std::string& name, const json& raw, const std::s
     } else if (name == "find_tasks") {
         c.path = "/api/v1/tasks/items";
         c.query.emplace_back("limit", "20");
-        put(c, "q", text_arg(args, "query").substr(0, 200));
+        put(c, "q", Utils::Utf8::cut(text_arg(args, "query"), 200));
         put(c, "status", text_arg(args, "status"));
     } else if (name == "goals") {
         c.path = "/api/v1/goals";
@@ -215,13 +218,58 @@ std::optional<std::string> access_token(const std::string& owner) {
     Security::Auth::AccessSubject who;
     who.id = user->id;
     who.confirmed = user->confirmed;
-    who.permissions = user->role ? user->role->permissions : 0U;
+    who.permissions = token_permissions(user->role ? user->role->permissions : 0U);
     if (user->role) {
         who.roles.push_back(user->role->name);
     }
     const auto claims = Security::Auth::access_claims(
         who, Utils::Time::now_epoch_millis(), kTokenSeconds, cfg.jwt_roles_claim, cfg.jwt_issuer, cfg.jwt_audience);
     return Security::Auth::issue_hs256_jwt(claims, cfg.jwt_secret);
+}
+
+std::uint32_t token_permissions(std::uint32_t role) {
+    constexpr std::uint32_t kAdmin = Security::Auth::kAdminPermissionBits;
+    const bool admin = (role & kAdmin) == kAdmin;
+    return (role & ~kAdmin) | (admin ? Security::ApiKeys::kAdminKeyDataBits : 0U);
+}
+
+bool may_offer(const std::string& origin, const std::string& name) {
+    const bool telegram = TelegramTools::is_telegram(name) || name == "tg_send" || name == "tg_edit";
+    if (origin == "mcp") {
+        return !telegram;
+    }
+    if (origin != "hook") {
+        return true;
+    }
+    // A list of what is allowed, so a tool added later stays out of webhook
+    // turns until it is known to be a read or a proposal.
+    if (Actions::is_write(name)) {
+        return true;  // proposals: the person confirms each
+    }
+    if (name == "tg_chats" || name == "tg_history" || name == "tg_search" || CalendarTools::is_calendar(name)) {
+        return true;
+    }
+    return route(name, json::object(), "UTC").has_value();
+}
+
+json offered(const std::string& origin, const json& tools) {
+    json out = json::array();
+    for (const auto& t : tools.is_array() ? tools : json::array()) {
+        if (may_offer(origin, t.value(json::json_pointer("/function/name"), std::string()))) {
+            out.push_back(t);
+        }
+    }
+    return out;
+}
+
+Gateway::ToolRunner offered_runner(const std::string& origin, Gateway::ToolRunner run) {
+    return [origin, run = std::move(run)](const std::string& name, const json& args) -> std::string {
+        if (!may_offer(origin, name)) {
+            return json{{"error", "not_offered"}, {"message", "the tool " + name + " is not offered in this message"}}
+                .dump();
+        }
+        return run(name, args);
+    };
 }
 
 }  // namespace Agent::Tools

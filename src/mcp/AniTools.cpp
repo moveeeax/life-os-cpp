@@ -31,6 +31,7 @@
 #include "repositories/now/SoundRepository.hpp"
 #include "repositories/now/WallpaperRepository.hpp"
 #include "security/Audit.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Mcp {
 
@@ -78,14 +79,6 @@ int clamp_arg(const json& args, const char* key, int fallback, int lo, int hi) {
     const auto it = args.find(key);
     const int v = it != args.end() && it->is_number_integer() ? it->get<int>() : fallback;
     return std::clamp(v, lo, hi);
-}
-
-std::size_t utf8_length(const std::string& s) {
-    std::size_t n = 0;
-    for (const unsigned char c : s) {
-        n += (c & 0xC0) != 0x80 ? 1 : 0;
-    }
-    return n;
 }
 
 /// say, outfit, act or event: through the webhook's parser and intake.
@@ -184,7 +177,7 @@ json chat(const std::string& owner, const json& args) {
         return refusal("Her agent is off.");
     }
     const std::string text = args.value("text", "");
-    if (text.find_first_not_of(" \t\r\n") == std::string::npos || utf8_length(text) > Agent::kTurnTextMax) {
+    if (text.find_first_not_of(" \t\r\n") == std::string::npos || Utils::Utf8::length(text) > Agent::kTurnTextMax) {
         return refusal("text is 1 to " + std::to_string(Agent::kTurnTextMax) + " characters.");
     }
     if (!Jobs::is_initialized()) {

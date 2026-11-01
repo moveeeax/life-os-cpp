@@ -9,19 +9,26 @@
 #include <ctime>
 #include <exception>
 #include <optional>
+#include <string>
+#include <utility>
 
 #include <drogon/drogon.h>
 #include <spdlog/spdlog.h>
 
 #include <nlohmann/json.hpp>
 
+#include "api/FieldChecks.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
+#include "api/Outbound.hpp"
 #include "net/Http.hpp"
+#include "repositories/UserRepository.hpp"
 #include "repositories/telegram/LinkRepository.hpp"
 #include "security/Audit.hpp"
+#include "security/Auth.hpp"
 #include "telegram/Gateway.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Api {
 
@@ -36,7 +43,7 @@ std::string str_of(const json& body, const char* key) {
     return it != body.end() && it->is_string() ? it->get<std::string>() : std::string();
 }
 
-constexpr std::size_t kTextMax = 4096;
+constexpr std::size_t kTextMax = Telegram::kTextMaxBytes;
 
 /// The gateway settings, or a 404 for a site without Telegram.
 std::optional<Telegram::Settings> configured(const TelegramController::Callback& callback) {
@@ -47,8 +54,18 @@ std::optional<Telegram::Settings> configured(const TelegramController::Callback&
     return s;
 }
 
-/// The settings when @p owner is the linked user; otherwise 404.
-std::optional<Telegram::Settings> served(const std::string& owner, const TelegramController::Callback& callback) {
+/// The settings when @p owner is the linked user and still an administrator
+/// (the check the link makes, read from their role now, so a role taken away
+/// ends the access at once); otherwise 404. The owner's Telegram is never
+/// reached with an API key: a key made for the site's data must not read
+/// or send their private messages (401 key_not_allowed).
+std::optional<Telegram::Settings> served(const HttpRequestPtr& req,
+                                         const std::string& owner,
+                                         const TelegramController::Callback& callback) {
+    if (const auto p = Security::Auth::principal_of(req); p && p->via_api_key) {
+        callback(ErrorResponse::unauthorized("key_not_allowed"));
+        return std::nullopt;
+    }
     auto s = configured(callback);
     if (!s) {
         return std::nullopt;
@@ -56,6 +73,13 @@ std::optional<Telegram::Settings> served(const std::string& owner, const Telegra
     if (!LinkRepository().of(owner)) {
         callback(ErrorResponse::not_found("telegram_not_linked"));
         return std::nullopt;
+    }
+    if (Security::Auth::auth_enforced()) {
+        const auto user = Repositories::UserRepository().find(owner);
+        if (!user || !user->is_admin()) {
+            callback(ErrorResponse::not_found("telegram_not_linked"));
+            return std::nullopt;
+        }
     }
     return s;
 }
@@ -127,7 +151,7 @@ std::optional<std::string> text_field(const json& body, const TelegramController
     const auto t = body.find("text");
     if (t == body.end() || !t->is_string() || t->get<std::string>().empty() ||
         t->get<std::string>().size() > kTextMax) {
-        callback(ErrorResponse::bad_request("invalid_text", "text is 1 to 4096 characters"));
+        callback(ErrorResponse::bad_request("invalid_text", "text is 1 to 4096 bytes of UTF-8"));
         return std::nullopt;
     }
     return t->get<std::string>();
@@ -146,6 +170,7 @@ bool ids_ok(const std::string& id, const TelegramController::Callback& callback)
 void TelegramController::status(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_ADMIN(req, callback);
     API_REQUIRE_USER(req, callback, owner);
+    API_REFUSE_API_KEY(req, callback);
     try {
         const bool on = Telegram::settings().has_value();
         LinkRepository links;
@@ -172,33 +197,30 @@ void TelegramController::link(const HttpRequestPtr& req, Callback&& callback) {
     if (!s) {
         return;
     }
-    try {
-        const auto me = Telegram::call(Net::Http::transport(), *s, "GET", "/v1/me");
+    Outbound::run(std::move(callback), "telegram.link", [gw = *s, owner](const Callback& reply) {
+        const auto me = Telegram::call(Net::Http::transport(), gw, "GET", "/v1/me");
         const json user = me.data();
         if (!me.ok() || !user.is_object() || user.value("id", std::string()).empty()) {
-            callback(refusal(me));
+            reply(refusal(me));
             return;
         }
         const std::string me_id = user.value("id", std::string());
         // /v1/me carries no username; the user card does (the poll spots @mentions by it).
         std::string username = user.value("username", std::string());
         if (username.empty() && Telegram::valid_id(me_id)) {
-            const auto card = Telegram::call(Net::Http::transport(), *s, "GET", "/v1/users/" + me_id);
+            const auto card = Telegram::call(Net::Http::transport(), gw, "GET", "/v1/users/" + me_id);
             if (card.ok() && card.data().is_object()) {
                 username = card.data().value("username", std::string());
             }
         }
         LinkRepository links;
         if (!links.set(owner, me_id, username)) {
-            callback(ErrorResponse::conflict("telegram_linked_elsewhere", "the account serves another user"));
+            reply(ErrorResponse::conflict("telegram_linked_elsewhere", "the account serves another user"));
             return;
         }
         Security::Audit::record(owner, "telegram.link", "telegram_link", owner);
-        callback(Response::ok(json{{"data", links.status(owner).value_or(json::object())}}));
-    } catch (const std::exception& e) {
-        spdlog::error("telegram.link failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+        reply(Response::ok(json{{"data", links.status(owner).value_or(json::object())}}));
+    });
 }
 
 void TelegramController::unlink(const HttpRequestPtr& req, Callback&& callback) {
@@ -220,40 +242,45 @@ void TelegramController::unlink(const HttpRequestPtr& req, Callback&& callback) 
 
 void TelegramController::chats(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s) {
         return;
     }
     const int limit = int_param(req, "limit", 20, 50);
-    const auto r = Telegram::call(Net::Http::transport(), *s, "GET", "/v1/chats", {{"limit", std::to_string(limit)}});
-    if (!r.ok()) {
-        callback(refusal(r));
-        return;
-    }
-    json out = json::array();
-    for (const auto& c : list_of(r)) {
-        out.push_back(chat_view(c));
-    }
-    callback(Response::ok(json{{"data", out}}));
+    Outbound::run(std::move(callback), "telegram.chats", [gw = *s, limit](const Callback& reply) {
+        const auto r =
+            Telegram::call(Net::Http::transport(), gw, "GET", "/v1/chats", {{"limit", std::to_string(limit)}});
+        if (!r.ok()) {
+            reply(refusal(r));
+            return;
+        }
+        json out = json::array();
+        for (const auto& c : list_of(r)) {
+            out.push_back(chat_view(c));
+        }
+        reply(Response::ok(json{{"data", out}}));
+    });
 }
 
 void TelegramController::chat(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s || !ids_ok(id, callback)) {
         return;
     }
-    const auto r = Telegram::call(Net::Http::transport(), *s, "GET", "/v1/chats/" + id);
-    if (!r.ok() || !r.data().is_object()) {
-        callback(refusal(r));
-        return;
-    }
-    callback(Response::ok(json{{"data", chat_view(r.data())}}));
+    Outbound::run(std::move(callback), "telegram.chat", [gw = *s, id](const Callback& reply) {
+        const auto r = Telegram::call(Net::Http::transport(), gw, "GET", "/v1/chats/" + id);
+        if (!r.ok() || !r.data().is_object()) {
+            reply(refusal(r));
+            return;
+        }
+        reply(Response::ok(json{{"data", chat_view(r.data())}}));
+    });
 }
 
 void TelegramController::messages(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s || !ids_ok(id, callback)) {
         return;
     }
@@ -266,21 +293,23 @@ void TelegramController::messages(const HttpRequestPtr& req, Callback&& callback
         }
         q.emplace_back("from_id", before);
     }
-    const auto r = Telegram::call(Net::Http::transport(), *s, "GET", "/v1/chats/" + id + "/messages", q);
-    if (!r.ok()) {
-        callback(refusal(r));
-        return;
-    }
-    json out = json::array();
-    for (const auto& m : list_of(r)) {
-        out.push_back(message_view(m));
-    }
-    callback(Response::ok(json{{"data", out}}));
+    Outbound::run(std::move(callback), "telegram.messages", [gw = *s, id, q](const Callback& reply) {
+        const auto r = Telegram::call(Net::Http::transport(), gw, "GET", "/v1/chats/" + id + "/messages", q);
+        if (!r.ok()) {
+            reply(refusal(r));
+            return;
+        }
+        json out = json::array();
+        for (const auto& m : list_of(r)) {
+            out.push_back(message_view(m));
+        }
+        reply(Response::ok(json{{"data", out}}));
+    });
 }
 
 void TelegramController::send(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s || !ids_ok(id, callback)) {
         return;
     }
@@ -293,7 +322,13 @@ void TelegramController::send(const HttpRequestPtr& req, Callback&& callback, co
         return;
     }
     json out{{"text", *text}};
-    const std::string reply_to = body.value("reply_to", std::string());
+    const auto reply_in = Fields::text_or_empty(body, "reply_to");
+    const auto key_in = Fields::text_or_empty(body, "key");
+    if (!reply_in || !key_in) {
+        callback(ErrorResponse::bad_request("invalid_body", "reply_to and key are text"));
+        return;
+    }
+    const std::string& reply_to = *reply_in;
     if (!reply_to.empty()) {
         if (!Telegram::valid_id(reply_to)) {
             callback(ErrorResponse::bad_request("invalid_reply_to", "reply_to is a message id"));
@@ -302,14 +337,17 @@ void TelegramController::send(const HttpRequestPtr& req, Callback&& callback, co
         out["reply_to_message_id"] = reply_to;
     }
     // A confirmed proposal carries its own key, so a retried job sends once.
-    const std::string key = body.value("key", std::string()).substr(0, 80);
-    const auto r = Telegram::call(Net::Http::transport(), *s, "POST", "/v1/chats/" + id + "/messages", {}, out, key);
-    if (!r.ok()) {
-        callback(refusal(r));
-        return;
-    }
-    Security::Audit::record(owner, "telegram.send", "telegram_chat", id);
-    callback(Response::ok(json{{"data", json{{"sent", true}}}}));
+    const std::string key = Utils::Utf8::cut(*key_in, 80);
+    Outbound::run(std::move(callback), "telegram.send", [gw = *s, owner, id, out, key](const Callback& reply) {
+        const auto r =
+            Telegram::call(Net::Http::transport(), gw, "POST", "/v1/chats/" + id + "/messages", {}, out, key);
+        if (!r.ok()) {
+            reply(refusal(r));
+            return;
+        }
+        Security::Audit::record(owner, "telegram.send", "telegram_chat", id);
+        reply(Response::ok(json{{"data", json{{"sent", true}}}}));
+    });
 }
 
 void TelegramController::edit(const HttpRequestPtr& req,
@@ -317,7 +355,7 @@ void TelegramController::edit(const HttpRequestPtr& req,
                               const std::string& id,
                               const std::string& mid) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s || !ids_ok(id, callback) || !ids_ok(mid, callback)) {
         return;
     }
@@ -329,14 +367,16 @@ void TelegramController::edit(const HttpRequestPtr& req,
     if (!text) {
         return;
     }
-    const auto r = Telegram::call(
-        Net::Http::transport(), *s, "PATCH", "/v1/chats/" + id + "/messages/" + mid, {}, json{{"text", *text}});
-    if (!r.ok()) {
-        callback(refusal(r));
-        return;
-    }
-    Security::Audit::record(owner, "telegram.edit", "telegram_chat", id, json{{"message", mid}});
-    callback(Response::ok(json{{"data", json{{"edited", true}}}}));
+    Outbound::run(std::move(callback), "telegram.edit", [gw = *s, owner, id, mid, msg = *text](const Callback& reply) {
+        const auto r = Telegram::call(
+            Net::Http::transport(), gw, "PATCH", "/v1/chats/" + id + "/messages/" + mid, {}, json{{"text", msg}});
+        if (!r.ok()) {
+            reply(refusal(r));
+            return;
+        }
+        Security::Audit::record(owner, "telegram.edit", "telegram_chat", id, json{{"message", mid}});
+        reply(Response::ok(json{{"data", json{{"edited", true}}}}));
+    });
 }
 
 void TelegramController::react(const HttpRequestPtr& req,
@@ -344,7 +384,7 @@ void TelegramController::react(const HttpRequestPtr& req,
                                const std::string& id,
                                const std::string& mid) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s || !ids_ok(id, callback) || !ids_ok(mid, callback)) {
         return;
     }
@@ -352,29 +392,38 @@ void TelegramController::react(const HttpRequestPtr& req,
     if (!parse_object(req, body, callback)) {
         return;
     }
-    const std::string emoji = body.value("emoji", std::string());
+    const std::string emoji = Fields::text_or_empty(body, "emoji").value_or("");
     if (emoji.empty() || emoji.size() > 32) {
         callback(ErrorResponse::bad_request("invalid_emoji", "emoji is one emoji"));
         return;
     }
-    const bool remove = body.value("remove", false);
-    const auto r = Telegram::call(Net::Http::transport(),
-                                  *s,
-                                  remove ? "DELETE" : "POST",
-                                  "/v1/chats/" + id + "/messages/" + mid + "/reactions",
-                                  {},
-                                  json{{"emoji", emoji}});
-    if (!r.ok()) {
-        callback(refusal(r));
+    const auto r_in = body.find("remove");
+    if (r_in != body.end() && !r_in->is_null() && !r_in->is_boolean()) {
+        callback(ErrorResponse::bad_request("invalid_remove", "remove is true or false"));
         return;
     }
-    Security::Audit::record(owner, "telegram.react", "telegram_chat", id, json{{"message", mid}, {"remove", remove}});
-    callback(Response::ok(json{{"data", json{{"done", true}}}}));
+    const bool remove = r_in != body.end() && r_in->is_boolean() && r_in->get<bool>();
+    Outbound::run(
+        std::move(callback), "telegram.react", [gw = *s, owner, id, mid, emoji, remove](const Callback& reply) {
+            const auto r = Telegram::call(Net::Http::transport(),
+                                          gw,
+                                          remove ? "DELETE" : "POST",
+                                          "/v1/chats/" + id + "/messages/" + mid + "/reactions",
+                                          {},
+                                          json{{"emoji", emoji}});
+            if (!r.ok()) {
+                reply(refusal(r));
+                return;
+            }
+            Security::Audit::record(
+                owner, "telegram.react", "telegram_chat", id, json{{"message", mid}, {"remove", remove}});
+            reply(Response::ok(json{{"data", json{{"done", true}}}}));
+        });
 }
 
 void TelegramController::read(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s || !ids_ok(id, callback)) {
         return;
     }
@@ -395,19 +444,21 @@ void TelegramController::read(const HttpRequestPtr& req, Callback&& callback, co
         }
         out.push_back(m);
     }
-    const auto r = Telegram::call(
-        Net::Http::transport(), *s, "POST", "/v1/chats/" + id + "/messages/read", {}, json{{"message_ids", out}});
-    if (!r.ok()) {
-        callback(refusal(r));
-        return;
-    }
-    Security::Audit::record(owner, "telegram.read", "telegram_chat", id, json{{"messages", out.size()}});
-    callback(Response::ok(json{{"data", json{{"done", true}}}}));
+    Outbound::run(std::move(callback), "telegram.read", [gw = *s, owner, id, out](const Callback& reply) {
+        const auto r = Telegram::call(
+            Net::Http::transport(), gw, "POST", "/v1/chats/" + id + "/messages/read", {}, json{{"message_ids", out}});
+        if (!r.ok()) {
+            reply(refusal(r));
+            return;
+        }
+        Security::Audit::record(owner, "telegram.read", "telegram_chat", id, json{{"messages", out.size()}});
+        reply(Response::ok(json{{"data", json{{"done", true}}}}));
+    });
 }
 
 void TelegramController::search(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s) {
         return;
     }
@@ -422,27 +473,29 @@ void TelegramController::search(const HttpRequestPtr& req, Callback&& callback) 
         return;
     }
     const std::string limit = std::to_string(int_param(req, "limit", 10, 20));
-    const auto r =
-        chat.empty()
-            ? Telegram::call(Net::Http::transport(), *s, "GET", "/v1/search", {{"q", q}, {"limit", limit}})
-            : Telegram::call(
-                  Net::Http::transport(), *s, "GET", "/v1/chats/" + chat + "/search", {{"q", q}, {"limit", limit}});
-    if (!r.ok()) {
-        callback(refusal(r));
-        return;
-    }
-    json out = json::array();
-    for (const auto& m : list_of(r)) {
-        json v = message_view(m);
-        v["chat"] = m.value("chat_id", std::string());
-        out.push_back(std::move(v));
-    }
-    callback(Response::ok(json{{"data", out}}));
+    Outbound::run(std::move(callback), "telegram.search", [gw = *s, q, chat, limit](const Callback& reply) {
+        const auto r =
+            chat.empty()
+                ? Telegram::call(Net::Http::transport(), gw, "GET", "/v1/search", {{"q", q}, {"limit", limit}})
+                : Telegram::call(
+                      Net::Http::transport(), gw, "GET", "/v1/chats/" + chat + "/search", {{"q", q}, {"limit", limit}});
+        if (!r.ok()) {
+            reply(refusal(r));
+            return;
+        }
+        json out = json::array();
+        for (const auto& m : list_of(r)) {
+            json v = message_view(m);
+            v["chat"] = m.value("chat_id", std::string());
+            out.push_back(std::move(v));
+        }
+        reply(Response::ok(json{{"data", out}}));
+    });
 }
 
 void TelegramController::waiting(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
-    if (!served(owner, callback)) {
+    if (!served(req, owner, callback)) {
         return;
     }
     callback(Response::ok(json{{"data", LinkRepository().waiting(owner)}}));
@@ -450,7 +503,7 @@ void TelegramController::waiting(const HttpRequestPtr& req, Callback&& callback)
 
 void TelegramController::quietList(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
-    if (!served(owner, callback)) {
+    if (!served(req, owner, callback)) {
         return;
     }
     json out = json::array();
@@ -462,7 +515,7 @@ void TelegramController::quietList(const HttpRequestPtr& req, Callback&& callbac
 
 void TelegramController::quietOn(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_REQUIRE_USER(req, callback, owner);
-    if (!served(owner, callback) || !ids_ok(id, callback)) {
+    if (!served(req, owner, callback) || !ids_ok(id, callback)) {
         return;
     }
     json body = json::object();
@@ -475,7 +528,7 @@ void TelegramController::quietOn(const HttpRequestPtr& req, Callback&& callback,
 
 void TelegramController::quietOff(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_REQUIRE_USER(req, callback, owner);
-    if (!served(owner, callback) || !ids_ok(id, callback)) {
+    if (!served(req, owner, callback) || !ids_ok(id, callback)) {
         return;
     }
     LinkRepository().set_quiet(owner, id, "", false);
@@ -485,7 +538,7 @@ void TelegramController::quietOff(const HttpRequestPtr& req, Callback&& callback
 void TelegramController::settings(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
     API_REFUSE_API_KEY(req, callback);
-    if (!served(owner, callback)) {
+    if (!served(req, owner, callback)) {
         return;
     }
     json body;
@@ -512,7 +565,7 @@ void TelegramController::settings(const HttpRequestPtr& req, Callback&& callback
 
 void TelegramController::toSelf(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s) {
         return;
     }
@@ -533,17 +586,21 @@ void TelegramController::toSelf(const HttpRequestPtr& req, Callback&& callback) 
         return;
     }
     // Saved Messages is the chat with oneself: its id is the account's own.
-    const auto r = Telegram::call(
-        Net::Http::transport(), *s, "POST", "/v1/chats/" + link->me_id + "/messages", {}, json{{"text", *text}});
-    if (!r.ok()) {
-        if (!week.empty()) {
-            links.release_review_week(owner, week);
-        }
-        callback(refusal(r));
-        return;
-    }
-    Security::Audit::record(owner, "telegram.send", "telegram_chat", link->me_id, json{{"self", true}});
-    callback(Response::ok(json{{"data", json{{"sent", true}}}}));
+    Outbound::run(std::move(callback),
+                  "telegram.toSelf",
+                  [gw = *s, owner, me = link->me_id, week, msg = *text](const Callback& reply) {
+                      const auto r = Telegram::call(
+                          Net::Http::transport(), gw, "POST", "/v1/chats/" + me + "/messages", {}, json{{"text", msg}});
+                      if (!r.ok()) {
+                          if (!week.empty()) {
+                              LinkRepository().release_review_week(owner, week);
+                          }
+                          reply(refusal(r));
+                          return;
+                      }
+                      Security::Audit::record(owner, "telegram.send", "telegram_chat", me, json{{"self", true}});
+                      reply(Response::ok(json{{"data", json{{"sent", true}}}}));
+                  });
 }
 
 }  // namespace Api

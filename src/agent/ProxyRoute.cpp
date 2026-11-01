@@ -46,7 +46,7 @@ drogon::HttpResponsePtr to_response(const Proxy::Reply& reply) {
 
 void register_proxy_route() {
     const auto settings = read_settings();
-    if (!settings) {
+    if (!settings || !serves_models(*settings)) {
         return;
     }
     drogon::app().setClientMaxBodySize(kMaxBodyBytes);

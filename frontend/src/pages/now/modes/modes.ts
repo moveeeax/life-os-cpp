@@ -50,6 +50,32 @@ export function modeOf(
   return null;
 }
 
+/** The running or next trip as the /today digest carries it (null with none). */
+export type NextTrip = { start_date: string; days_to: number } | null | undefined;
+
+/**
+ * What Now has to read before it can tell its mode, so nothing is asked that
+ * the mode will not show. Trips are read only while a trip runs or starts
+ * today (a flight sits on its first or last day); the newest crossings only
+ * while an arrival can still win (no flight pinned or found, no time-of-day
+ * pin). Travel off, or the digest not here yet, reads neither.
+ */
+export function modeNeeds(
+  pinned: string | null,
+  travelOn: boolean | undefined,
+  todayLoaded: boolean,
+  next: NextTrip,
+  hasFlight: boolean,
+  tripsSettled: boolean,
+): { trips: boolean; crossings: boolean } {
+  if (pinned === 'off' || pinned === 'morning' || pinned === 'evening')
+    return { trips: false, crossings: false };
+  if (travelOn !== true || !todayLoaded) return { trips: false, crossings: false };
+  const trips = pinned !== 'arrive' && next != null && next.days_to <= 0;
+  const crossings = pinned !== 'flight' && !hasFlight && (!trips || tripsSettled);
+  return { trips, crossings };
+}
+
 /** Minutes from @p now to a local "HH:MM" of today, negative when past. */
 export function minutesUntil(time: string | null | undefined, now: Date): number | null {
   if (!time || !/^\d{2}:\d{2}$/.test(time)) return null;

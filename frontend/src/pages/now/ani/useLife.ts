@@ -3,6 +3,8 @@ import { useEffect, useRef } from 'react';
 
 import { useCrossings } from '@/hooks/useTravel';
 import { api } from '@/lib/api/client';
+import { qk } from '@/lib/api/queryKeys';
+import { clockIn } from '@/lib/dates';
 
 import type { Ani } from './engine';
 import type { AniContext } from './AniCorner';
@@ -13,6 +15,7 @@ import {
   dealLine,
   energyLine,
   energyOf,
+  MORNING_FROM,
   meetingAsk,
   questDone,
   questOf,
@@ -50,20 +53,6 @@ function mark(k: string, v: string) {
   }
 }
 
-/** The local hour, minute and weekday (0 Sunday) on @p tz's clock. */
-function clockOf(tz: string, now = new Date()) {
-  const p = new Intl.DateTimeFormat('en-GB', {
-    timeZone: tz,
-    hour: '2-digit',
-    minute: '2-digit',
-    weekday: 'short',
-    hourCycle: 'h23',
-  }).formatToParts(now);
-  const get = (t: string) => p.find((x) => x.type === t)?.value ?? '';
-  const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(get('weekday'));
-  return { hour: Number(get('hour')) % 24, minute: Number(get('minute')), weekday };
-}
-
 /**
  * Her own lines through the day, played by the corner: the energy of the
  * night, the quest of the day and its success, an anniversary, a question
@@ -93,7 +82,7 @@ export function useLife({
   const warmFocus = useWarm(on, 1);
   const warmWater = useWarm(on, 2);
   const deals = useQuery({
-    queryKey: ['ani', 'deals', tz],
+    queryKey: qk.ani.deals(tz),
     enabled: warmDeals,
     retry: false,
     staleTime: 10 * 60_000,
@@ -160,7 +149,7 @@ export function useLife({
       const seen = read();
       const once = (k: string) => seen[k] !== day;
       const age = (Date.now() - since) / 1000;
-      const { hour, minute, weekday } = clockOf(c.tz);
+      const { hour, minute, weekday } = clockIn(c.tz);
       const e = engine.current;
       const input: QuestInput = {
         overdue: c.today?.tasks?.late_count ?? 0,
@@ -171,7 +160,14 @@ export function useLife({
 
       // The energy of the night, in the morning.
       const energy = energyOf(c.today?.health?.sleep_minutes);
-      if (hour < 12 && age >= AFTER_S.energy && once('energy') && energyLine(energy)) {
+      // From MORNING_FROM: right after midnight the newest night is the one before.
+      if (
+        hour >= MORNING_FROM &&
+        hour < 12 &&
+        age >= AFTER_S.energy &&
+        once('energy') &&
+        energyLine(energy)
+      ) {
         mark('energy', day);
         if (energy === 'low') e?.feel('yawn', 3);
         else e?.feel('happy', 3);

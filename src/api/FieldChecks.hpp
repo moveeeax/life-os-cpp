@@ -121,6 +121,20 @@ inline void text_length(
     }
 }
 
+/// An optional text field: "" when absent or null, the text when a string, nullopt
+/// when it holds another type (the caller answers 400; body.value() would throw a
+/// type_error that ends as 500).
+inline std::optional<std::string> text_or_empty(const nlohmann::json& body, const std::string& field) {
+    const auto it = body.find(field);
+    if (it == body.end() || it->is_null()) {
+        return std::string();
+    }
+    if (!it->is_string()) {
+        return std::nullopt;
+    }
+    return it->get<std::string>();
+}
+
 inline std::optional<double> opt_number(const nlohmann::json& body, const std::string& field) {
     if (body.contains(field) && body[field].is_number()) {
         return body[field].get<double>();

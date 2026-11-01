@@ -81,17 +81,28 @@ void send_due(Net::Http::Transport& transport, const std::string& owner, const s
         }
         const std::string day = local.substr(0, 10);
         Repositories::Telegram::LinkRepository links;
+        // Claimed first, so two polls never send it twice; given back when it did not go out, so one
+        // failed voice or gateway call does not lose the day's line.
         if (!links.claim_voice(owner, *kind, day)) {
             return;
         }
-        const std::string words = brief_words(*kind, counts_of(owner, day, tz));
-        const std::string audio = Now::Voice::speak(transport, *voice, words, "opus");
-        const auto sent = ::Telegram::upload(transport, *gateway, me_id, audio, "voice", "ani.ogg");
-        if (!sent.ok()) {
-            spdlog::warn("ani agent {}: the {} voice line was not sent (gateway {})",
-                         Manifest::owner_hash(owner),
-                         *kind,
-                         sent.status);
+        bool sent_ok = false;
+        try {
+            const std::string words = brief_words(*kind, counts_of(owner, day, tz));
+            const std::string audio = Now::Voice::speak(transport, *voice, words, "opus");
+            const auto sent = ::Telegram::upload(transport, *gateway, me_id, audio, "voice", "ani.ogg");
+            sent_ok = sent.ok();
+            if (!sent_ok) {
+                spdlog::warn("ani agent {}: the {} voice line was not sent (gateway {})",
+                             Manifest::owner_hash(owner),
+                             *kind,
+                             sent.status);
+            }
+        } catch (const std::exception& e) {
+            spdlog::warn("ani agent {}: the {} voice line failed: {}", Manifest::owner_hash(owner), *kind, e.what());
+        }
+        if (!sent_ok) {
+            links.release_voice(owner, *kind, day);
         }
     } catch (const std::exception& e) {
         spdlog::warn("ani agent {}: the voice line failed: {}", Manifest::owner_hash(owner), e.what());

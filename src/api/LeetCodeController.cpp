@@ -5,6 +5,7 @@
 
 #include "api/LeetCodeController.hpp"
 
+#include <chrono>
 #include <exception>
 #include <string>
 
@@ -15,6 +16,7 @@
 
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
+#include "cache/Cache.hpp"
 #include "jobs/Jobs.hpp"
 #include "leetcode/Sync.hpp"
 #include "repositories/Zones.hpp"
@@ -61,8 +63,12 @@ void LeetCodeController::setProfile(const HttpRequestPtr& req, Callback&& callba
     try {
         ProfileRepository repo;
         repo.set(owner, u->get<std::string>(), tz);
-        if (Jobs::is_initialized()) {
-            Jobs::get().submit(::LeetCode::kSyncJob, json::object());
+        // Only this user's profile is pulled, at most once a minute however often it is saved: a pull
+        // of everyone per save could have LeetCode throttle the worker for every user.
+        if (Jobs::is_initialized() &&
+            (!Cache::is_initialized() ||
+             Cache::get().set_nx("leetcode:sync:queued:" + owner, "1", std::chrono::seconds(60)))) {
+            Jobs::get().submit(::LeetCode::kSyncJob, json{{"owner", owner}});
         }
         callback(Response::ok(json{{"data", *repo.get(owner)}}));
     } catch (const std::exception& e) {

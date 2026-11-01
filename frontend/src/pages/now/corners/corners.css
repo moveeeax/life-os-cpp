@@ -33,15 +33,15 @@
   font-variant-numeric: tabular-nums;
 }
 .n-tl {
-  left: 16px;
+  left: max(16px, env(safe-area-inset-left, 0px));
   top: calc(max(14px, env(safe-area-inset-top, 0px)) + 62px);
 }
 .n-bl {
-  left: 16px;
+  left: max(16px, env(safe-area-inset-left, 0px));
   bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 118px);
 }
 .n-br {
-  right: 16px;
+  right: max(16px, env(safe-area-inset-right, 0px));
   bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 118px);
 }
 
@@ -163,7 +163,6 @@
     animation: none;
   }
 }
-.c-panel.c-tr,
 .c-panel.c-br {
   /* A panel on the right reads left to right like the others. */
   text-align: left;
@@ -173,12 +172,10 @@
 .c-panel.c-bl {
   left: 16px;
 }
-.c-panel.c-tr,
 .c-panel.c-br {
   right: 16px;
 }
-.c-panel.c-tl,
-.c-panel.c-tr {
+.c-panel.c-tl {
   top: calc(max(14px, env(safe-area-inset-top, 0px)) + 120px);
 }
 .c-panel.c-bl,
@@ -200,9 +197,6 @@
 }
 .c-panel.c-tl {
   --c-origin: top left;
-}
-.c-panel.c-tr {
-  --c-origin: top right;
 }
 .c-panel.c-bl {
   --c-origin: bottom left;
@@ -396,6 +390,27 @@
   background: transparent;
 }
 
+/* With Ani on: the dock starts right of her ledge, Links moves under Add.
+   Here rather than in ani.css, which comes later with her code, so the dock
+   stands in its place from the first paint. */
+.n-now[data-ani] .n-dock {
+  left: max(220px, 50vw - 500px);
+  transform: none;
+  width: min(1000px, 100vw - 360px);
+}
+.n-now[data-ani] .c-panel.c-dock {
+  left: calc(max(220px, 50vw - 500px) + min(1000px, 100vw - 360px) / 2);
+}
+.n-now[data-ani] .n-bl {
+  bottom: auto;
+  top: calc(max(14px, env(safe-area-inset-top, 0px)) + 106px);
+}
+.n-now[data-ani] .c-panel.c-bl {
+  bottom: auto;
+  top: calc(max(14px, env(safe-area-inset-top, 0px)) + 164px);
+  --c-origin: top left;
+}
+
 /* Phone: the corners fold into one row, the dock is a list, and both sit in
    the flow of the page under the focus rather than fixed over it: the dock's
    height depends on the tiles placed and their wrapping, and a phone's
@@ -455,7 +470,6 @@
   }
   .c-panel,
   .c-panel.c-tl,
-  .c-panel.c-tr,
   .c-panel.c-bl,
   .c-panel.c-br,
   .c-panel.c-dock {
@@ -521,4 +535,17 @@
 .c-add:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+/* Reduced motion: no panel pops in, the centred and phone ones included
+   (their own animation rules above are as specific, so this comes last). */
+@media (prefers-reduced-motion: reduce) {
+  .c-panel,
+  .c-panel.c-tl,
+  .c-panel.c-tr,
+  .c-panel.c-bl,
+  .c-panel.c-br,
+  .c-panel.c-dock {
+    animation: none;
+  }
 }

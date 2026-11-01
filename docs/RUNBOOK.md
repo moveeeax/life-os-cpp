@@ -576,29 +576,52 @@ keeps the OpenClaw image on the worker nodes.
 
 First install:
 
-1. The Secret with the knobs, in both the API and the ani worker (the API
-   reads the switch and the pod limit, the worker everything):
+1. The Secret with the knobs. The ani worker takes it whole; the API takes
+   it key by key (`aniAgentSecret` in `deploy/values-prod.yaml`, the list in
+   `helm/life-os-cpp/values.yaml`) and never gets `ANI_AGENT_UPSTREAM_KEY`
+   or `ANI_AGENT_PROXY_URL`. `ANI_TELEGRAM_TOKEN` is the owner's Telegram
+   gateway token (leave it out and Telegram stays off):
 
    ```bash
    kubectl -n life-os create secret generic life-os-ani-agent \
      --from-literal=ANI_AGENT_ENABLED=true \
      --from-literal=ANI_AGENT_UPSTREAM_KEY=<an OpenAI key> \
      --from-literal=ANI_AGENT_PROXY_URL=http://life-os-ani-worker.life-os.svc.cluster.local:9091/ani/llm/v1 \
-     --from-literal=ANI_AGENT_API_URL=http://life-os-cpp.life-os.svc.cluster.local:8080
+     --from-literal=ANI_AGENT_API_URL=http://life-os-cpp.life-os.svc.cluster.local:8080 \
+     --from-literal=ANI_TELEGRAM_TOKEN=<accountId>.<secret>
    ```
 
    An existing Secret gets a new key with
    `kubectl -n life-os patch secret life-os-ani-agent --type merge -p '{"stringData":{"ANI_AGENT_API_URL":"..."}}'`
-   and a restart of the ani worker (`kubectl -n life-os rollout restart deploy/life-os-ani-worker`).
-
-   `deploy/values-prod.yaml` takes it as an optional `extraEnvFrom`; bump
-   `secretsVersion` there to restart the API after changing it.
+   and a restart of the ani worker and the API
+   (`kubectl -n life-os rollout restart deploy/life-os-ani-worker deploy/life-os-cpp`),
+   or `secretsVersion` as in [Rotate a secret](#rotate-secret). A new key the
+   API must read goes into `aniAgentSecret.keys` too; `scripts/check-helm-render.sh`
+   fails when the code reads an `ANI_AGENT_*` or `ANI_TELEGRAM_*` variable the
+   list misses.
 2. `helm upgrade --install life-os-ani-worker ./helm/life-os-cpp-worker -n life-os
    -f deploy/values-worker-prod.yaml -f deploy/values-ani-worker-prod.yaml`.
 3. Check: `kubectl -n life-os-agents get ds,quota,netpol` and, signed in,
    `POST /api/v1/ani/agent/wake`, then
    `kubectl -n life-os-agents get pods -w` (ready in about 30 s with the image
-   cached).
+   cached). The quota counts the pre-puller too: one pod, 32Mi of requests
+   and 128Mi of limits per node, for `aniAgents.prepull.nodes` nodes (6 in
+   the chart). With more worker nodes than that, raise it, or the last agent
+   pod is refused with "exceeded quota" (`kubectl -n life-os-agents describe quota ani-agents`).
+4. Check the TLS chain of the Telegram gateway from inside the pods that
+   call it. On 2026-11-01 `tg.tarassov.me` was seen sending only its leaf and
+   the intermediate (checked from outside the cluster, not from a pod), and
+   a client whose store lacks the root then fails with "unable to verify
+   the first certificate":
+
+   ```bash
+   kubectl -n life-os exec deploy/life-os-cpp -- curl -sv -o /dev/null https://tg.tarassov.me/ 2>&1 | grep -iE 'issuer|verify|SSL certificate'
+   kubectl -n life-os exec deploy/life-os-ani-worker -- curl -sv -o /dev/null https://tg.tarassov.me/ 2>&1 | grep -iE 'issuer|verify|SSL certificate'
+   ```
+
+   `SSL certificate verify ok` in both: fine. A verify error: every
+   Telegram call of the API and of the ani worker fails the same way; serve
+   the full chain on the gateway.
 
 The chat (`POST /api/v1/ani/messages`, a row in `ani_turns`) runs in the ani
 worker as the job `ani_turn`: it wakes the agent and waits for it, then calls
@@ -669,8 +692,13 @@ anchors in this file; the thresholds are in `docs/SLO.md`.
 ## Roll back a release {#rollback}
 
 - k8s: `helm rollback <release> <REVISION>` (`helm history <release>`) for
-  each of `life-os-cpp`, `life-os-cpp-worker`, `life-os-cpp-frontend`; roll
-  back in the reverse order: frontend, worker, API.
+  each of `life-os-cpp`, `life-os-cpp-worker`, `life-os-ani-worker`,
+  `life-os-cpp-frontend`; roll back in the reverse order: frontend, ani
+  worker, worker, API. The ani worker runs the worker image at the tag of
+  `deploy/values-worker-prod.yaml`, so it goes back with the worker. Its
+  rollback keeps the agents' namespace (`helm.sh/resource-policy: keep`);
+  the agent pods are not helm's, they are the worker's, and stay as they
+  are.
 - Images are tagged with the unprefixed version (`1.26.0`) in GHCR; pin the
   previous tag if needed.
 - Migrations are forward-only — a rollback of the app does NOT revert schema.
@@ -682,21 +710,24 @@ anchors in this file; the thresholds are in `docs/SLO.md`.
 
 The pods hash only the chart's own ConfigMap (`checksum/config`). The
 credentials arrive through `extraEnvFrom` from the hand-made Secrets
-(`life-os-app`, `life-os-food-llm`, `life-os-money-llm`, `life-os-s3`), so
-editing a Secret changes nothing in the pod template and the running pods
-keep the old value. Both app charts add a second annotation,
-`checksum/extra-env`, computed from the `extraEnvFrom` list plus the value
-`secretsVersion` (`deploy/values-prod.yaml` and
-`deploy/values-worker-prod.yaml`, empty by default). The procedure:
+(`life-os-app`, `life-os-food-llm`, `life-os-money-llm`, `life-os-s3`,
+`life-os-ani-agent`, `life-os-ani-voice`; the API takes `life-os-ani-agent`
+key by key through `aniAgentSecret`), so editing a Secret changes nothing
+in the pod template and the running pods keep the old value. Both app
+charts add a second annotation, `checksum/extra-env`, computed from the
+`extraEnvFrom` list plus the value `secretsVersion` (`deploy/values-prod.yaml`
+and `deploy/values-worker-prod.yaml`, empty by default; the ani worker is
+installed with `values-worker-prod.yaml` underneath, so it takes the same
+value). The procedure:
 
 1. Write the new value into the Secret (`kubectl -n life-os edit secret life-os-app`,
    or re-apply the manifest kept outside the repository).
 2. Set `secretsVersion` to the date (`"2026-10-14"`) in both prod overlays
    and commit.
-3. Upgrade in the usual order, API then worker (the frontend holds no
-   secret). The annotation changes, every pod of the release restarts and
-   reads the new value.
-4. Without a chart upgrade, `kubectl -n life-os rollout restart deployment life-os-cpp life-os-cpp-worker`
+3. Upgrade in the usual order, API, worker, then the ani worker (the
+   frontend holds no secret). The annotation changes, every pod of the
+   release restarts and reads the new value.
+4. Without a chart upgrade, `kubectl -n life-os rollout restart deployment life-os-cpp life-os-cpp-worker life-os-ani-worker`
    does the same restart; `secretsVersion` only makes it reproducible from
    git.
 
@@ -717,6 +748,40 @@ sealed under the old key fails authentication under the new one
 links their Mi account again through the QR sign-in, and scheduled syncs
 fail with that error until they do. Rotate it only when the key is
 suspected leaked.
+
+`CALENDAR_TOKEN_KEY` (Secret `life-os-app`) seals the users' Google refresh
+tokens in `calendar_links` (`src/utils/Seal.hpp`); the API and the ani
+worker (Ani's calendar tools) open them. Same as the Mi key, there is no
+re-keying path: after a rotation a sealed token does not open
+(`src/calendar/Access.cpp`), the link is marked broken, the calendar
+routes answer 409 `calendar_disconnected` and each user connects Google
+again on the Calendar card. Generate the key as 32 random bytes,
+base64url without padding (`openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`),
+put it in `life-os-app`, roll the API and both workers in one go. Rotate it
+only when the key is suspected leaked.
+
+`GOOGLE_CALENDAR_CLIENT_SECRET` (Secret `life-os-app`, with
+`GOOGLE_CALENDAR_CLIENT_ID`) is the OAuth client of the Calendar card and of
+every token refresh. In the Google Cloud console add a second secret to the
+same client, put it in the Secret, roll the API and both workers, then
+disable the old secret there. The client id stays, so the links and the
+refresh tokens stay valid. A new client (a new id) disconnects every
+calendar like a new `CALENDAR_TOKEN_KEY`.
+
+`ANI_TELEGRAM_TOKEN` (Secret `life-os-ani-agent`) is the owner's client
+token of the Telegram gateway at `ANI_TELEGRAM_URL` (scopes read and
+write). The API (the Telegram routes) and the ani worker (the minutely
+poll, Ani's Telegram tools and the voice message to Saved Messages) use it.
+Issue a new client token on the gateway, patch it into the Secret
+(`kubectl -n life-os patch secret life-os-ani-agent --type merge -p '{"stringData":{"ANI_TELEGRAM_TOKEN":"<accountId>.<secret>"}}'`),
+roll the API and the ani worker, then revoke the old token on the gateway.
+The link (`telegram_link`) stays as long as the token is for the same
+account; a token of another account needs Link again on the Telegram card.
+
+`ANI_AGENT_UPSTREAM_KEY` (Secret `life-os-ani-agent`) is the OpenAI key of
+the agents' model proxy; only the ani worker holds it. Create the new key,
+patch it in, roll the ani worker, then revoke the old one. The running
+agent pods hold only their per-run proxy token, so they are not touched.
 
 `S3_SECRET_ACCESS_KEY` (Secret `life-os-s3`, key `secret-access-key`, with
 its `access-key-id`) signs the wallpaper and sound uploads, deletes and

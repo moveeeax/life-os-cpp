@@ -10,6 +10,9 @@
 #include <exception>
 #include <map>
 #include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 
@@ -36,6 +39,9 @@ std::map<std::string, Cached>& cache() {
     static std::map<std::string, Cached> c;
     return c;
 }
+
+/// Pages of 250 events read at most for one range (a busy 31 days).
+constexpr int kMaxPages = 4;
 
 }  // namespace
 
@@ -105,24 +111,47 @@ std::variant<std::vector<Event>, Problem> events(
     if (auto* p = std::get_if<Problem>(&token)) {
         return *p;
     }
-    const auto r = api(t,
-                       std::get<std::string>(token),
-                       "GET",
-                       "/calendars/primary/events",
-                       {{"timeMin", rfc3339(from)},
-                        {"timeMax", rfc3339(to)},
-                        {"singleEvents", "true"},
-                        {"orderBy", "startTime"},
-                        {"maxResults", "250"}});
-    if (r.status == 401) {
-        forget(owner);
-        return Problem{502, "calendar_unavailable"};
-    }
-    if (!r.ok() || !r.body.is_object()) {
-        return Problem{502, "calendar_unavailable"};
+    // A busy month fills more than one page: the pages are read up to kMaxPages and joined.
+    nlohmann::json items = nlohmann::json::array();
+    std::string page;
+    for (int n = 0; n < kMaxPages; ++n) {
+        std::vector<std::pair<std::string, std::string>> query{{"timeMin", rfc3339(from)},
+                                                               {"timeMax", rfc3339(to)},
+                                                               {"singleEvents", "true"},
+                                                               {"orderBy", "startTime"},
+                                                               {"maxResults", "250"}};
+        if (!page.empty()) {
+            query.emplace_back("pageToken", page);
+        }
+        const auto r = api(t, std::get<std::string>(token), "GET", "/calendars/primary/events", query);
+        if (r.status == 401) {
+            forget(owner);
+            return Problem{502, "calendar_unavailable"};
+        }
+        if (!r.ok() || !r.body.is_object()) {
+            return Problem{502, "calendar_unavailable"};
+        }
+        for (const auto& item : r.body.value("items", nlohmann::json::array())) {
+            items.push_back(item);
+        }
+        const auto next = r.body.find("nextPageToken");
+        if (next == r.body.end() || !next->is_string() || next->get<std::string>().empty()) {
+            break;
+        }
+        page = next->get<std::string>();
     }
     Repositories::Calendar::LinkRepository links;
-    return parse_events(r.body, [&](const std::string& date) { return links.local_instant(date, 0, tz); });
+    // One query per distinct day, not two per all-day event.
+    std::map<std::string, long long> day_starts;
+    return parse_events(nlohmann::json{{"items", std::move(items)}}, [&](const std::string& date) {
+        const auto it = day_starts.find(date);
+        if (it != day_starts.end()) {
+            return it->second;
+        }
+        const long long at = links.local_instant(date, 0, tz);
+        day_starts.emplace(date, at);
+        return at;
+    });
 }
 
 }  // namespace Calendar

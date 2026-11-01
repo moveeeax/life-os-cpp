@@ -4,6 +4,25 @@
   overflow-x: auto;
   scrollbar-width: none;
 }
+/* Narrower than the ribbon: soft side edges say there is more to scroll. */
+@media (max-width: 640px) {
+  .r-wrap {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 14px,
+      #000 calc(100% - 14px),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 14px,
+      #000 calc(100% - 14px),
+      transparent
+    );
+  }
+}
 .r-ribbon {
   position: relative;
   min-width: 600px;
@@ -138,6 +157,13 @@
   border-radius: 999px;
   padding: 3px 11px;
   cursor: pointer;
+}
+.r-menu button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.r-menu-error {
+  color: var(--g-ink);
 }
 @media (prefers-reduced-motion: reduce) {
   .r-b.r-lit {
