@@ -73,6 +73,26 @@ private:
     long timeout_seconds_;
 };
 
+/// @p inner with every post_json and send cut to at most @p max_seconds, for
+/// calls a page waits on (a module's own timeouts are for its jobs). get()
+/// goes through as it is: it carries no timeout of its own.
+class CappedTransport : public Transport {
+public:
+    CappedTransport(Transport& inner, long max_seconds) : inner_(inner), max_seconds_(max_seconds) {}
+    Response get(const std::string& url, const std::vector<std::pair<std::string, std::string>>& headers) override;
+    Response post_json(const std::string& url,
+                       const std::string& body,
+                       const std::vector<std::pair<std::string, std::string>>& headers,
+                       long timeout_seconds) override;
+    Response send(const Request& request) override;
+
+private:
+    long cap(long seconds) const { return seconds <= 0 || seconds > max_seconds_ ? max_seconds_ : seconds; }
+
+    Transport& inner_;
+    long max_seconds_;
+};
+
 /// The transport the modules use: CurlTransport until a test overrides it.
 Transport& transport();
 

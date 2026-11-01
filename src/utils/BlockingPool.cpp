@@ -51,6 +51,11 @@ BlockingPool& BlockingPool::shared() {
     return *pool;
 }
 
+BlockingPool& BlockingPool::outbound() {
+    static auto* pool = new BlockingPool(4, 32);
+    return *pool;
+}
+
 void BlockingPool::ensure_started_() {
     if (!workers_.empty()) {
         return;
