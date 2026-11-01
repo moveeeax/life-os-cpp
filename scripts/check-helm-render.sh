@@ -144,6 +144,28 @@ prod_cfg="$(printf '%s' "$PROD_RENDERED" | yq 'select(.kind=="ConfigMap" and .da
 [ "$(printf '%s' "$prod_cfg" | yq '.security.hsts')" = "true" ] ||
     fail "deploy/values-prod.yaml: rendered config.json has security.hsts != true. Set security.hsts=true."
 
+# 7b'. The internet-facing API pod does not hold the agent's upstream model
+#     key: the Secret life-os-ani-agent reaches it key by key (aniAgentSecret),
+#     never whole through envFrom, and without ANI_AGENT_UPSTREAM_KEY and
+#     ANI_AGENT_PROXY_URL (the ani worker's alone). Every other ANI_AGENT_* and
+#     ANI_TELEGRAM_* variable the code reads is on the list, so a new knob is
+#     not lost on the way to the API.
+api_env_names="$(printf '%s' "$PROD_RENDERED" | yq 'select(.kind=="Deployment") | .spec.template.spec.containers[0].env[].name')"
+whole="$(printf '%s' "$PROD_RENDERED" |
+    yq 'select(.kind=="Deployment") | (.spec.template.spec.containers[], .spec.template.spec.initContainers[]) | .envFrom[]? | select(.secretRef.name=="life-os-ani-agent") | .secretRef.name' | grep -v '^---$' || true)"
+[ -z "$whole" ] ||
+    fail "deploy/values-prod.yaml: the API takes the Secret life-os-ani-agent whole through extraEnvFrom; it carries the upstream model key. Use aniAgentSecret.name instead."
+for k in ANI_AGENT_UPSTREAM_KEY ANI_AGENT_PROXY_URL; do
+    if printf '%s\n' "$api_env_names" | grep -qx "$k"; then
+        fail "life-os-cpp: the API pod gets $k, which only the ani worker uses (aniAgentSecret.keys)"
+    fi
+done
+for k in $(grep -rhoE '"ANI_(AGENT|TELEGRAM)_[A-Z_]+"' "$ROOT/src" | tr -d '"' | sort -u); do
+    case "$k" in ANI_AGENT_UPSTREAM_KEY | ANI_AGENT_PROXY_URL) continue ;; esac
+    printf '%s\n' "$api_env_names" | grep -qx "$k" ||
+        fail "life-os-cpp: the code reads $k, but the API pod does not get it from life-os-ani-agent; add it to aniAgentSecret.keys in helm/life-os-cpp/values.yaml"
+done
+
 # 7c. The worker's processing lease. With 0 a job whose pod was killed stays
 #     in its Redis processing list forever; the lease returns it to the queue.
 #     And the id of that list must be the pod name, or two replicas (or a

@@ -38,6 +38,9 @@ inline bool enabled() {
 }
 
 /// The settings; nullopt while the agent is off or a required knob is missing.
+/// The upstream key and the proxy URL are not required here: the API pod does
+/// not get the key (only the ani worker does), and the worker checks both with
+/// serves_models() where it starts a pod or serves the model proxy.
 inline std::optional<Settings> read_settings() {
     if (!enabled()) {
         return std::nullopt;
@@ -63,10 +66,17 @@ inline std::optional<Settings> read_settings() {
     }
     s.monthly_tokens = cfg.get<long>("ani.agent.monthly_tokens", "ANI_AGENT_MONTHLY_TOKENS", 20000000L);
     if (s.image.empty() || s.keeper_image.empty() || s.ns.empty() || s.model.empty() || s.upstream_url.empty() ||
-        s.upstream_key.empty() || s.proxy_url.empty() || s.max_running < 1 || s.idle_minutes < 1 || s.max_hours < 1) {
+        s.max_running < 1 || s.idle_minutes < 1 || s.max_hours < 1) {
         return std::nullopt;
     }
     return s;
+}
+
+/// Whether these settings can carry a pod's model calls: the upstream key the
+/// proxy forwards with and the proxy URL the pods are given. Only the ani
+/// worker has both.
+inline bool serves_models(const Settings& s) {
+    return !s.upstream_key.empty() && !s.proxy_url.empty();
 }
 
 }  // namespace Agent
