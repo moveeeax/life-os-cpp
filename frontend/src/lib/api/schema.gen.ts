@@ -16886,7 +16886,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -17045,14 +17045,14 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found) */
+                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17113,14 +17113,14 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found) */
+                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17195,14 +17195,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found) */
+                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17268,14 +17268,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found) */
+                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17354,14 +17354,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found) */
+                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17434,14 +17434,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found) */
+                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17515,14 +17515,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found) */
+                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17587,14 +17587,14 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17642,14 +17642,14 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17702,14 +17702,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17738,14 +17738,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17807,14 +17807,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17877,14 +17877,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked) */
+                /** @description Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked) */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17955,14 +17955,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
+                /** @description Not authenticated, or an API key (key_not_allowed) */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found) */
+                /** @description Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found) */
                 404: {
                     headers: {
                         [name: string]: unknown;

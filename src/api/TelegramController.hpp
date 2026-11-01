@@ -2,10 +2,10 @@
  * @file TelegramController.hpp
  * @brief The owner's Telegram as Ani and the owner reach it (telegram/). An
  *        admin links the gateway account to themselves (one user at most);
- *        every other route serves only that user and answers 404 to anyone
- *        else. Reading, reactions and "read" go to the gateway at once;
- *        sending and editing are what Ani's confirmed proposals call (the
- *        owner may call them too). The gateway token stays on the server.
+ *        every other route serves only that user while they stay an admin,
+ *        and answers 404 to anyone else. No route takes an API key. Reading, reactions and "read" go to the gateway at
+ * once; sending and editing are what Ani's confirmed proposals call (the owner may call them too). The gateway token
+ * stays on the server.
  */
 
 #pragma once

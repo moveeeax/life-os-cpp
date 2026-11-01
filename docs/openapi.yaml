@@ -38,7 +38,8 @@ components:
     # API keys (cpk_..., in X-API-Key or as the Bearer token) authenticate
     # like BearerAuth on data routes, with the owner's permissions minus the
     # admin bit. /api/v1/account/* (including the api-keys routes) and
-    # /api/v1/admin/* answer 401 key_not_allowed to a key. A key with
+    # /api/v1/admin/* and /api/v1/telegram/* answer 401 key_not_allowed to
+    # a key. A key with
     # scope `read` is answered 403 key_read_only on any method other than
     # GET, HEAD and OPTIONS.
     # Browser-SPA session: the access JWT travels in an HttpOnly
@@ -10843,7 +10844,7 @@ paths:
                 required: [data]
                 properties:
                   data: { $ref: '#/components/schemas/TelegramStatus' }
-        '401': { description: Not authenticated }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
         '403': { description: Not an admin }
     put:
       summary: Link the owner's Telegram account to the caller
@@ -10897,8 +10898,8 @@ paths:
                 required: [data]
                 properties:
                   data: { type: array, items: { $ref: '#/components/schemas/TelegramChat' } }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
         '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
   /api/v1/telegram/chats/{id}:
@@ -10918,8 +10919,8 @@ paths:
                 required: [data]
                 properties:
                   data: { $ref: '#/components/schemas/TelegramChat' }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
         '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
   /api/v1/telegram/chats/{id}/messages:
@@ -10945,8 +10946,8 @@ paths:
                 properties:
                   data: { type: array, items: { $ref: '#/components/schemas/TelegramMessage' } }
         '400': { description: 'before is not a message id (invalid_before)' }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
         '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
     post:
@@ -10980,8 +10981,8 @@ paths:
                 properties:
                   data: { type: object }
         '400': { description: 'invalid_text, invalid_reply_to, or a body that is not JSON' }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
         '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
   /api/v1/telegram/chats/{id}/messages/{mid}:
@@ -11012,8 +11013,8 @@ paths:
                 properties:
                   data: { type: object }
         '400': { description: invalid_text }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
         '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
   /api/v1/telegram/chats/{id}/messages/{mid}/reactions:
@@ -11045,8 +11046,8 @@ paths:
                 properties:
                   data: { type: object }
         '400': { description: invalid_emoji }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
         '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
   /api/v1/telegram/chats/{id}/read:
@@ -11076,8 +11077,8 @@ paths:
                 properties:
                   data: { type: object }
         '400': { description: invalid_message_ids }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
         '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
   /api/v1/telegram/waiting:
@@ -11096,8 +11097,8 @@ paths:
                 required: [data]
                 properties:
                   data: { type: array, items: { type: object, properties: { chat: { type: string }, title: { type: string }, since: { type: string, format: date-time } } } }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)' }
   /api/v1/telegram/quiet:
     get:
       summary: Chats Ani never tells about
@@ -11113,8 +11114,8 @@ paths:
                 required: [data]
                 properties:
                   data: { type: array, items: { type: object, properties: { chat: { type: string }, title: { type: string } } } }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)' }
   /api/v1/telegram/quiet/{id}:
     put:
       summary: Make a chat quiet for Ani
@@ -11130,8 +11131,8 @@ paths:
             schema: { type: object, properties: { title: { type: string, maxLength: 200 } } }
       responses:
         '204': { description: Quiet }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)' }
     delete:
       summary: Let Ani tell about a chat again
       tags: [telegram]
@@ -11140,8 +11141,8 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string } }
       responses:
         '204': { description: Not quiet }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)' }
   /api/v1/telegram/settings:
     put:
       summary: The switches of what goes to Saved Messages
@@ -11168,8 +11169,8 @@ paths:
                 properties:
                   data: { type: object }
         '400': { description: invalid_settings }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)' }
   /api/v1/telegram/self:
     post:
       summary: Send a text to the owner's own Saved Messages
@@ -11201,8 +11202,8 @@ paths:
                   data: { type: object }
         '400': { description: invalid_text }
         '409': { description: review_not_sent }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller (telegram_not_linked)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured) or not linked to the caller or the caller is no longer an admin (telegram_not_linked)' }
         '502': { description: The gateway refused or did not answer }
   /api/v1/telegram/search:
     get:
@@ -11225,8 +11226,8 @@ paths:
                 properties:
                   data: { type: array, items: { $ref: '#/components/schemas/TelegramMessage' } }
         '400': { description: 'invalid_q, invalid_chat' }
-        '401': { description: Not authenticated }
-        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller or the caller is no longer an admin (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
         '502': { description: 'The gateway refused or did not answer (telegram_unavailable, telegram_<code>)' }
   /api/v1/leetcode/profile:

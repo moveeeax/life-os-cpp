@@ -18,8 +18,10 @@
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
 #include "net/Http.hpp"
+#include "repositories/UserRepository.hpp"
 #include "repositories/telegram/LinkRepository.hpp"
 #include "security/Audit.hpp"
+#include "security/Auth.hpp"
 #include "telegram/Gateway.hpp"
 #include "utils/ErrorResponse.hpp"
 
@@ -47,8 +49,18 @@ std::optional<Telegram::Settings> configured(const TelegramController::Callback&
     return s;
 }
 
-/// The settings when @p owner is the linked user; otherwise 404.
-std::optional<Telegram::Settings> served(const std::string& owner, const TelegramController::Callback& callback) {
+/// The settings when @p owner is the linked user and still an administrator
+/// (the check the link makes, read from their role now, so a role taken away
+/// ends the access at once); otherwise 404. The owner's Telegram is never
+/// reached with an API key: a key made for the site's data must not read
+/// or send their private messages (401 key_not_allowed).
+std::optional<Telegram::Settings> served(const HttpRequestPtr& req,
+                                         const std::string& owner,
+                                         const TelegramController::Callback& callback) {
+    if (const auto p = Security::Auth::principal_of(req); p && p->via_api_key) {
+        callback(ErrorResponse::unauthorized("key_not_allowed"));
+        return std::nullopt;
+    }
     auto s = configured(callback);
     if (!s) {
         return std::nullopt;
@@ -56,6 +68,13 @@ std::optional<Telegram::Settings> served(const std::string& owner, const Telegra
     if (!LinkRepository().of(owner)) {
         callback(ErrorResponse::not_found("telegram_not_linked"));
         return std::nullopt;
+    }
+    if (Security::Auth::auth_enforced()) {
+        const auto user = Repositories::UserRepository().find(owner);
+        if (!user || !user->is_admin()) {
+            callback(ErrorResponse::not_found("telegram_not_linked"));
+            return std::nullopt;
+        }
     }
     return s;
 }
@@ -146,6 +165,7 @@ bool ids_ok(const std::string& id, const TelegramController::Callback& callback)
 void TelegramController::status(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_ADMIN(req, callback);
     API_REQUIRE_USER(req, callback, owner);
+    API_REFUSE_API_KEY(req, callback);
     try {
         const bool on = Telegram::settings().has_value();
         LinkRepository links;
@@ -220,7 +240,7 @@ void TelegramController::unlink(const HttpRequestPtr& req, Callback&& callback) 
 
 void TelegramController::chats(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s) {
         return;
     }
@@ -239,7 +259,7 @@ void TelegramController::chats(const HttpRequestPtr& req, Callback&& callback) {
 
 void TelegramController::chat(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s || !ids_ok(id, callback)) {
         return;
     }
@@ -253,7 +273,7 @@ void TelegramController::chat(const HttpRequestPtr& req, Callback&& callback, co
 
 void TelegramController::messages(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s || !ids_ok(id, callback)) {
         return;
     }
@@ -280,7 +300,7 @@ void TelegramController::messages(const HttpRequestPtr& req, Callback&& callback
 
 void TelegramController::send(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s || !ids_ok(id, callback)) {
         return;
     }
@@ -317,7 +337,7 @@ void TelegramController::edit(const HttpRequestPtr& req,
                               const std::string& id,
                               const std::string& mid) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s || !ids_ok(id, callback) || !ids_ok(mid, callback)) {
         return;
     }
@@ -344,7 +364,7 @@ void TelegramController::react(const HttpRequestPtr& req,
                                const std::string& id,
                                const std::string& mid) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s || !ids_ok(id, callback) || !ids_ok(mid, callback)) {
         return;
     }
@@ -374,7 +394,7 @@ void TelegramController::react(const HttpRequestPtr& req,
 
 void TelegramController::read(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s || !ids_ok(id, callback)) {
         return;
     }
@@ -407,7 +427,7 @@ void TelegramController::read(const HttpRequestPtr& req, Callback&& callback, co
 
 void TelegramController::search(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s) {
         return;
     }
@@ -442,7 +462,7 @@ void TelegramController::search(const HttpRequestPtr& req, Callback&& callback) 
 
 void TelegramController::waiting(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
-    if (!served(owner, callback)) {
+    if (!served(req, owner, callback)) {
         return;
     }
     callback(Response::ok(json{{"data", LinkRepository().waiting(owner)}}));
@@ -450,7 +470,7 @@ void TelegramController::waiting(const HttpRequestPtr& req, Callback&& callback)
 
 void TelegramController::quietList(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
-    if (!served(owner, callback)) {
+    if (!served(req, owner, callback)) {
         return;
     }
     json out = json::array();
@@ -462,7 +482,7 @@ void TelegramController::quietList(const HttpRequestPtr& req, Callback&& callbac
 
 void TelegramController::quietOn(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_REQUIRE_USER(req, callback, owner);
-    if (!served(owner, callback) || !ids_ok(id, callback)) {
+    if (!served(req, owner, callback) || !ids_ok(id, callback)) {
         return;
     }
     json body = json::object();
@@ -475,7 +495,7 @@ void TelegramController::quietOn(const HttpRequestPtr& req, Callback&& callback,
 
 void TelegramController::quietOff(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     API_REQUIRE_USER(req, callback, owner);
-    if (!served(owner, callback) || !ids_ok(id, callback)) {
+    if (!served(req, owner, callback) || !ids_ok(id, callback)) {
         return;
     }
     LinkRepository().set_quiet(owner, id, "", false);
@@ -485,7 +505,7 @@ void TelegramController::quietOff(const HttpRequestPtr& req, Callback&& callback
 void TelegramController::settings(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
     API_REFUSE_API_KEY(req, callback);
-    if (!served(owner, callback)) {
+    if (!served(req, owner, callback)) {
         return;
     }
     json body;
@@ -512,7 +532,7 @@ void TelegramController::settings(const HttpRequestPtr& req, Callback&& callback
 
 void TelegramController::toSelf(const HttpRequestPtr& req, Callback&& callback) {
     API_REQUIRE_USER(req, callback, owner);
-    const auto s = served(owner, callback);
+    const auto s = served(req, owner, callback);
     if (!s) {
         return;
     }
