@@ -395,6 +395,8 @@ TEST(AgentTools, AClearedChatIsANewSession) {
     EXPECT_EQ(Agent::session_of("u-1", 2), "u-1#2");
 }
 
+namespace {
+
 /// Gives no answer to the first @p silent requests (a timeout), then 201.
 struct SlowSite : Net::Http::Transport {
     int silent = 1;
