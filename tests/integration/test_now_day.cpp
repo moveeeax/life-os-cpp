@@ -109,11 +109,14 @@ TEST_F(NowDay, FocusSessionValidates) {
 }
 
 TEST_F(NowDay, FocusStatsByTheClock) {
+    // Today's session starts no earlier than today's UTC midnight: 30 seconds
+    // back put it on yesterday in the first half minute of a day.
     Database::get().execute_write([](auto& txn) {
         txn.exec_params(
-            "INSERT INTO focus_sessions (owner_id, started_at, ended_at, minutes) VALUES ($1::uuid, now() - interval "
-            "'30 seconds', now(), 25), ($1::uuid, now() - interval '40 days', now() - interval '40 days' + interval "
-            "'50 minutes', 50)",
+            "INSERT INTO focus_sessions (owner_id, started_at, ended_at, minutes) SELECT $1::uuid, s, s + interval "
+            "'25 minutes', 25 FROM (SELECT GREATEST(now() - interval '30 seconds', date_trunc('day', now(), 'UTC')) "
+            "AS s) t UNION ALL SELECT $1::uuid, now() - interval '40 days', now() - interval '40 days' + interval "
+            "'50 minutes', 50",
             std::string(kAnna));
         return true;
     });

@@ -340,7 +340,16 @@ void CalendarController::add(const HttpRequestPtr& req, Callback&& callback) {
         CalendarCache::forget(owner);
         Security::Audit::record(owner, "calendar.add", "calendar_event", r.body.value("id", std::string()));
         const auto parsed = Calendar::parse_events(json{{"items", json::array({r.body})}}, nullptr);
-        reply(Response::created(json{{"data", parsed.empty() ? json::object() : Calendar::event_view(parsed[0])}}));
+        if (parsed.empty()) {
+            // The 201 promises a whole event; an empty one is not that. Google
+            // may hold the event already, so the message says to look first.
+            reply(ErrorResponse::make(
+                {drogon::k502BadGateway,
+                 "calendar_unavailable",
+                 "Google's answer could not be read; the event may be in the calendar, check before adding it again"}));
+            return;
+        }
+        reply(Response::created(json{{"data", Calendar::event_view(parsed[0])}}));
     });
 }
 

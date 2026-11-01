@@ -237,15 +237,18 @@ Four charts under `helm/`:
 - `cpp-env`, an umbrella that deploys the three as one environment
 
 Production is the owner's arm64 k3s cluster (kube context `oci-k3s`),
-namespace `life-os`, as three helm releases. Their values live in `deploy/`:
+namespace `life-os`, as four helm releases. Their values live in `deploy/`:
 `values-prod.yaml` (release `life-os-cpp`), `values-worker-prod.yaml`
-(`life-os-cpp-worker`) and `values-frontend-prod.yaml`
-(`life-os-cpp-frontend`). External CNPG Postgres and Redis, secrets through
-`extraEnvFrom`; `deploy/db/` documents the database and role setup,
-`deploy/sync-tuning-configmap.yaml` holds the fitness sync knobs. There is
-no stage environment. Upgrade the releases in the order below, API, worker,
-frontend: the API migrates, and the worker waits in an init container until
-the schema of its version is there (`docs/RUNBOOK.md`, "Upgrade order").
+(`life-os-cpp-worker`), `values-worker-prod.yaml` with
+`values-ani-worker-prod.yaml` on top (`life-os-ani-worker`, the worker chart
+again for Ani's agent pods, `docs/RUNBOOK.md` "Ani's agents") and
+`values-frontend-prod.yaml` (`life-os-cpp-frontend`). External CNPG Postgres
+and Redis, secrets through `extraEnvFrom`; `deploy/db/` documents the
+database and role setup, `deploy/sync-tuning-configmap.yaml` holds the
+fitness sync knobs. There is no stage environment. Upgrade the releases in
+the order below, API, worker, ani worker, frontend: the API migrates, and
+both workers wait in an init container until the schema of their version is
+there (`docs/RUNBOOK.md`, "Upgrade order").
 
 ```bash
 make helm-lint        # helm lint + template over every chart
@@ -254,6 +257,8 @@ helm --kube-context oci-k3s upgrade --install life-os-cpp ./helm/life-os-cpp \
   -n life-os -f deploy/values-prod.yaml
 helm --kube-context oci-k3s upgrade --install life-os-cpp-worker ./helm/life-os-cpp-worker \
   -n life-os -f deploy/values-worker-prod.yaml
+helm --kube-context oci-k3s upgrade --install life-os-ani-worker ./helm/life-os-cpp-worker \
+  -n life-os -f deploy/values-worker-prod.yaml -f deploy/values-ani-worker-prod.yaml
 helm --kube-context oci-k3s upgrade --install life-os-cpp-frontend ./helm/cpp-frontend \
   -n life-os -f deploy/values-frontend-prod.yaml
 ```

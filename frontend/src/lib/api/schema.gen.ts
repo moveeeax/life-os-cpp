@@ -15794,7 +15794,14 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                            };
+                        };
+                    };
                 };
                 /** @description invalid_text */
                 400: {
@@ -16659,7 +16666,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Google did not answer (calendar_unavailable) */
+                /** @description Google did not answer, or its answer could not be read and the event may exist (calendar_unavailable) */
                 502: {
                     headers: {
                         [name: string]: unknown;
@@ -16824,7 +16831,10 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            data: Record<string, never>;
+                            data: {
+                                /** @enum {boolean} */
+                                moved: true;
+                            };
                         };
                     };
                 };
@@ -16842,7 +16852,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked) */
+                /** @description Not in the calendar (calendar_event_not_found), calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked) */
                 404: {
                     headers: {
                         [name: string]: unknown;

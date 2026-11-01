@@ -144,7 +144,7 @@ json process_start(const json& payload) {
         return json{{"status", "skipped"}, {"reason", "not_starting"}};
     }
     const auto s = read_settings();
-    if (!s) {
+    if (!s || !serves_models(*s)) {
         return fail(owner, "the agent is not configured");
     }
     auto client = kube();
