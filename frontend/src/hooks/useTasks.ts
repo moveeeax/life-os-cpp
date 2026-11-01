@@ -28,7 +28,8 @@ const BASE = '/api/v1/tasks';
  * day's digest of Now, whose corners list them.
  */
 // A task write also moves a trip's packing.
-const ALL = [qk.tasks.all(), qk.goals.all(), qk.now.all(), qk.travel.all()] as const;
+export const TASK_WRITES = [qk.tasks.all(), qk.goals.all(), qk.now.all(), qk.travel.all()] as const;
+const ALL = TASK_WRITES;
 
 export const TASKS_PARSE_POLL_MS = 1500;
 /** The provider call is capped by its timeout; a job unfinished after this is stuck. */

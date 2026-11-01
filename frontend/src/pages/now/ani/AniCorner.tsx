@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { QueryClientContext } from '@tanstack/react-query';
+import { useContext, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
+import { qk } from '@/lib/api/queryKeys';
+import { clockIn } from '@/lib/dates';
 
 import { fetchAniBare, useAniPrefs, useMuteKind } from '@/hooks/useAni';
 import type { NowWeather, Today } from '@/lib/now/types';
@@ -24,6 +27,7 @@ import { ACT_EVENT, type Act } from '@/lib/now/act';
 import { readGive } from '@/lib/now/drag';
 import { FACT_MAX, firstFreeSlot, topCategory } from './give';
 import { reactionTo, ReactionGate } from './reactions';
+import { useRefresh } from './refresh';
 import { HOLD_KEY, eventOfLine, quietKind, snooze, type LineKind } from './lines';
 import { RIBBON_POINT, type NowDay } from '../ribbon/layout';
 import './ani.css';
@@ -89,6 +93,10 @@ function setDayOf(key: string, day: string) {
 }
 const helloDay = () => dayOf(HELLO_KEY);
 const setHelloDay = (day: string) => setDayOf(HELLO_KEY, day);
+/** Hide numbers is on (a shared screen). */
+const numbersHidden = () => document.documentElement.classList.contains('hide-numbers');
+/** A text with a digit in it: under Hide numbers it is blurred and not said aloud. */
+const hasNumber = (text: string) => /\d/.test(text);
 
 // An hour of activity on the page, with no pause of five minutes, earns a
 // word about a break; at most one an hour. Her evening word comes after 21:00.
@@ -257,8 +265,12 @@ export function AniCorner({
   // From the microphone tap until the call ends, connecting included: her
   // own lines keep quiet, the call's microphone would hear them.
   const calling = useRef(false);
+  // The call being placed: hanging up aborts what is still ahead of it.
+  const hangUp = useRef<AbortController | null>(null);
   const stopTalk = () => {
     calling.current = false;
+    hangUp.current?.abort();
+    hangUp.current = null;
     talkRef.current?.stop();
     talkRef.current = null;
     engine.current?.follow(null);
@@ -267,14 +279,20 @@ export function AniCorner({
   };
   const startTalking = async () => {
     const e = engine.current;
-    if (!e) return;
+    // A second tap while the first call still connects places no second call.
+    if (!e || calling.current) return;
     calling.current = true;
+    const ctrl = new AbortController();
+    hangUp.current = ctrl;
     e.hush();
     clearTimeout(sayTimer.current);
     setTalk('connecting');
     setSaid(null);
-    const [{ startTalk }, persona] = await Promise.all([import('./talk'), import('./persona')]);
+    // Only the call this tap placed may change the corner.
+    const mine = () => hangUp.current === ctrl && !ctrl.signal.aborted;
     try {
+      const [{ startTalk }, persona] = await Promise.all([import('./talk'), import('./persona')]);
+      if (!mine()) return;
       const t = await startTalk({
         instructions: persona.instructions({ ...context, now: new Date() }),
         tools: persona.tools({
@@ -288,15 +306,18 @@ export function AniCorner({
           },
         }),
         onAudio: (stream) => e.follow(stream),
-        onText: (t) => setSaid(t),
-        onState: (st) => setTalk(st),
-        onEnd: () => stopTalk(),
+        onText: (t) => mine() && setSaid(t),
+        onState: (st) => mine() && setTalk(st),
+        onEnd: () => mine() && stopTalk(),
         hold: holdToTalk(),
+        signal: ctrl.signal,
       });
-      // Hung up while it was connecting.
-      if (!calling.current) t.stop();
+      // Hung up just as it came up.
+      if (!mine()) t.stop();
       else talkRef.current = t;
     } catch {
+      // Hung up while connecting: stopTalk already reset the corner.
+      if (!mine()) return;
       stopTalk();
       setSaid('Не получилось подключиться. Попробуй ещё раз чуть позже.');
     }
@@ -324,6 +345,7 @@ export function AniCorner({
   useEffect(
     () => () => {
       calling.current = false;
+      hangUp.current?.abort();
       talkRef.current?.stop();
     },
     [],
@@ -360,6 +382,9 @@ export function AniCorner({
   const mutedRef = useRef<string[]>([]);
   mutedRef.current = prefs.data?.muted ?? [];
   const muteKind = useMuteKind();
+  // Her own changes (a chip, a dropped task) refresh the sections they touched.
+  const refresh = useRefresh();
+  const qcRef = useRef(useContext(QueryClientContext));
   /**
    * Her answer to a tap, in the bubble while she says it: a recorded line
    * from the bucket, one with the day in it read by the server, or a silent
@@ -398,7 +423,8 @@ export function AniCorner({
         if (lineEnds.current === finished) lineEnds.current = null;
         finished();
       };
-      if (a.silent || !soundOn()) {
+      // Under Hide numbers a line with a number in it is only shown, blurred: never said aloud.
+      if (a.silent || !soundOn() || (hasNumber(a.text) && numbersHidden())) {
         // A line with buttons waits for a tap a while longer.
         const hold = a.chips?.length ? CHIPS_HOLD_MS : 0;
         sayTimer.current = window.setTimeout(
@@ -449,23 +475,31 @@ export function AniCorner({
       if (now - lastSaidAt.current < 60_000) return;
       const c = contextRef.current;
       if (
-        new Date().getHours() >= EVENING_HOUR &&
+        clockIn(c.tz).hour >= EVENING_HOUR &&
         helloDay() === c.date &&
         dayOf(EVENING_KEY) !== c.date
       ) {
         setDayOf(EVENING_KEY, c.date);
         // Telegram answers still owed go after the day's line (none without Telegram).
-        void api
-          .getJson<{ data: Waiting[] }>('/api/v1/telegram/waiting')
-          .then((r) => (Array.isArray(r.data) ? r.data : []))
+        // Through the cache Now's Telegram widget reads, so the two agree.
+        const read = async () =>
+          (await api.getJson<{ data: Waiting[] }>('/api/v1/telegram/waiting')).data;
+        void (
+          qcRef.current
+            ? qcRef.current.fetchQuery({
+                queryKey: qk.telegramWaiting(),
+                queryFn: read,
+                staleTime: 60_000,
+                retry: false,
+              })
+            : read()
+        )
+          .then((r) => (Array.isArray(r) ? r : []))
           .catch(() => [] as Waiting[])
           .then((waiting) => {
             const owed = waitingWords(waiting, new Date());
             // The day's tasks first: done of all, and an offer to move the rest.
-            const sum = evening(
-              c.today,
-              document.documentElement.classList.contains('hide-numbers'),
-            );
+            const sum = evening(c.today, numbersHidden());
             if (sum) {
               if (sum.move.length > 0) setMoveOffer({ ids: sum.move, due: tomorrowOf(c.date) });
               answer.current({ text: owed ? `${sum.text} ${owed}` : sum.text, kind: 'evening' });
@@ -525,6 +559,7 @@ export function AniCorner({
       ),
     ).then(
       () => {
+        refresh('task');
         pageRef.current.onTasksMoved?.();
         answer.current({ text: 'Перенесла на завтра.' });
       },
@@ -561,7 +596,9 @@ export function AniCorner({
     void api.postJson(`/api/v1/ani/inbox/${id}/answer`, { body: { answer: text } }).catch(() => {});
   };
   const { waiting } = useInbox(
-    ready && !failed && ani.here && !hideNums && talk == null,
+    // During a focus session nothing is claimed: the items wait on the server (FocusMode counts
+    // them) and play after it; useFocusInbox takes the focus items meanwhile.
+    ready && !failed && ani.here && !hideNums && talk == null && !focusing,
     (p: Play): Promise<void> => {
       const pause = (ms: number) => new Promise<void>((ok) => window.setTimeout(ok, ms));
       switch (p.kind) {
@@ -648,34 +685,44 @@ export function AniCorner({
   // (late tasks, rain, the night's sleep); after a focus session, a break.
   // Browsers play sound only after a gesture on the page: until one she waits.
   const hasToday = context.today != null;
-  useEffect(() => {
-    if (!ready || !ani.here || (!afterFocus && !hasToday)) return;
-    let line: Answer;
-    if (afterFocus) {
-      line = { ...say('breakTime'), kind: 'break' };
-      onAfterFocus?.();
-      engine.current?.feel('happy', 3);
-      engine.current?.act('peace');
-    } else {
-      if (helloDay() === contextRef.current.date) return;
-      setHelloDay(contextRef.current.date);
-      const c = contextRef.current;
-      const hidden = document.documentElement.classList.contains('hide-numbers');
-      line = {
-        ...greeting(c.today, c.weather, new Date().getHours(), hidden),
-        kind: new Date().getHours() < 12 ? 'brief' : 'hello',
-      };
-    }
+  // Plays a line now, or after the first gesture on the page; the cleanup drops the wait.
+  const sayWhenAllowed = (line: Answer) => {
     if (navigator.userActivation?.hasBeenActive !== false) {
       answer.current(line);
-      return;
+      return undefined;
     }
     const go = () => answer.current(line);
     addEventListener('pointerdown', go, { once: true });
     return () => removeEventListener('pointerdown', go);
+  };
+  useEffect(() => {
+    // After a focus session the break line goes instead (below).
+    if (!ready || !ani.here || afterFocus || !hasToday) return;
+    if (helloDay() === contextRef.current.date) return;
+    setHelloDay(contextRef.current.date);
+    const c = contextRef.current;
+    const hour = clockIn(c.tz).hour;
+    return sayWhenAllowed({
+      ...greeting(c.today, c.weather, hour, numbersHidden()),
+      kind: hour < 12 ? 'brief' : 'hello',
+    });
     // Once per mount: when she is ready and the day is in.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, hasToday]);
+  // A focus session ran to its end: a word about a break. She stays mounted through the session,
+  // so this follows the prop, not the mount.
+  useEffect(() => {
+    if (!ready || !afterFocus) return;
+    onAfterFocus?.();
+    // Sent off her ledge: no word, and none later when she comes back.
+    if (!ani.here) return;
+    engine.current?.feel('happy', 3);
+    engine.current?.act('peace');
+    // Not dropped on cleanup: onAfterFocus turns the prop off at once, which re-runs this effect.
+    sayWhenAllowed({ ...say('breakTime'), kind: 'break' });
+    // onAfterFocus is a new function each render of the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, afterFocus]);
 
   // Her own lines through the day (useLife): energy, the quest, anniversaries, meetings, promises,
   // achievements and the evening diary; never over another line, the chat, a call or a focus.
@@ -696,6 +743,7 @@ export function AniCorner({
     quiet: () => quietRef.current || calling.current,
     say: (a) => void answer.current(a),
     onSeed: setSeed,
+    onChanged: refresh,
   });
 
   // What the person does on the site (lib/now/act): an instant reaction from reactions.ts, one per
@@ -737,7 +785,10 @@ export function AniCorner({
       const patch = (due: string, time: string, words: string) =>
         void api
           .patchJson(`/api/v1/tasks/items/${g.id}`, { body: { due, due_time: time } })
-          .then(() => done(words))
+          .then(() => {
+            refresh('task');
+            done(words);
+          })
           .catch(() => done('Не получилось, попробуй еще раз.'));
       said(
         slot
@@ -782,7 +833,10 @@ export function AniCorner({
             run: () =>
               void api
                 .patchJson(`/api/v1/money/transactions/${g.id}`, { body: { category_id: cat.id } })
-                .then(() => done(`Записала в «${cat.name}».`))
+                .then(() => {
+                  refresh('transaction');
+                  done(`Записала в «${cat.name}».`);
+                })
                 .catch(() => done('Не получилось, попробуй еще раз.')),
           },
           { label: 'Отмена', run: () => undefined },
@@ -809,7 +863,10 @@ export function AniCorner({
         run: () =>
           void api
             .postJson('/api/v1/ani/facts', { body: { text } })
-            .then(() => done('Запомнила.'))
+            .then(() => {
+              refresh('fact');
+              done('Запомнила.');
+            })
             .catch(() => done('Не получилось запомнить.')),
       },
       {
@@ -817,7 +874,10 @@ export function AniCorner({
         run: () =>
           void api
             .postJson('/api/v1/tasks/notes', { body: { text: g.text } })
-            .then(() => done('Положила во входящие задач.'))
+            .then(() => {
+              refresh('add_note');
+              done('Положила во входящие задач.');
+            })
             .catch(() => done('Не получилось.')),
       },
       { label: 'Отмена', run: () => undefined },
@@ -1024,8 +1084,7 @@ export function AniCorner({
         saidChat ? (
           <button
             type="button"
-            className="ani-say ani-say-chat"
-            data-num-ok
+            className={`ani-say ani-say-chat${hasNumber(said) ? ' num' : ''}`}
             title="Write to Ani"
             onClick={() => {
               engine.current?.hush();
@@ -1038,7 +1097,7 @@ export function AniCorner({
             {said}
           </button>
         ) : (
-          <div className="ani-say" role="status" data-num-ok>
+          <div className={`ani-say${hasNumber(said) ? ' num' : ''}`} role="status">
             {said}
           </div>
         )
@@ -1049,6 +1108,7 @@ export function AniCorner({
             <button
               key={c.label}
               type="button"
+              className={hasNumber(c.label) ? 'num' : undefined}
               onClick={() => {
                 engine.current?.hush();
                 setChips(null);
@@ -1152,6 +1212,8 @@ export function AniCorner({
         <Shelf
           on={ready && ani.here}
           date={context.date}
+          tz={context.tz}
+          hidden={hideNums}
           sleepMinutes={context.today?.health?.sleep_minutes}
           hour={new Date().getHours()}
         />
@@ -1265,8 +1327,9 @@ export function AniCorner({
             setChatSeed(null);
           }}
           onReply={(t) => {
-            // She speaks only when she is on screen and not in a voice call.
-            if (engine.current && ani.here && !calling.current) {
+            // She speaks only when she is on screen and not in a voice call; under Hide
+            // numbers the answer stays in the chat (it may carry amounts).
+            if (engine.current && ani.here && !calling.current && !numbersHidden()) {
               void engine.current.say(speechUrl(t.id));
             }
           }}

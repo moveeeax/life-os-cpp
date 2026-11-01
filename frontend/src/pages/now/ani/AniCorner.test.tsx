@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -8,6 +9,27 @@ import type { Today } from '@/lib/now/types';
 import { AniCorner } from './AniCorner';
 import { setSoundOn } from './chat';
 import type { Ani, AniOptions } from './engine';
+import type { TalkOptions } from './talk';
+
+// The voice call: a stand-in whose connecting the test holds open and lets through.
+const talkCall = {
+  opts: null as TalkOptions | null,
+  up: (() => {}) as () => void,
+  stop: vi.fn(),
+  rejectOnAbort: true,
+};
+vi.mock('./talk', () => ({
+  startTalk: (opts: TalkOptions) =>
+    new Promise((ok, fail) => {
+      talkCall.opts = opts;
+      opts.onState('connecting');
+      opts.signal?.addEventListener('abort', () => {
+        if (talkCall.rejectOnAbort) fail(new Error('aborted'));
+      });
+      talkCall.up = () => ok({ stop: talkCall.stop, interrupt() {}, press() {}, release() {} });
+    }),
+}));
+vi.mock('./persona', () => ({ instructions: () => '', tools: () => [] }));
 
 // The chat's network calls: the panel opens without a server.
 vi.mock('./chat', async (orig) => ({
@@ -89,9 +111,10 @@ async function mount(
     onFocus?: (action: 'start' | 'stop', minutes?: number) => void;
     onWallpaper?: (which?: string) => void;
     onSound?: (which?: string) => void;
+    focusing?: boolean;
   } = {},
 ) {
-  render(
+  const view = render(
     <AniCorner
       base="https://s3.example.com/wallpapers/ani/"
       context={{ tz: 'Asia/Almaty', date: DATE, today }}
@@ -101,6 +124,7 @@ async function mount(
   await act(async () => {
     await vi.advanceTimersByTimeAsync(10);
   });
+  return view;
 }
 
 const bubble = () => document.querySelector('.ani-say')?.textContent ?? null;
@@ -490,5 +514,160 @@ describe('AniCorner', () => {
     } finally {
       setSoundOn(true);
     }
+  });
+
+  const props = (over: Record<string, unknown> = {}) => ({
+    base: 'https://s3.example.com/wallpapers/ani/',
+    context: { tz: 'Asia/Almaty', date: DATE, today: base },
+    ...over,
+  });
+
+  it('FocusInboxKept: during a focus session the webhook items wait on the server and play after it', async () => {
+    const { rerender } = render(<AniCorner {...props({ focusing: true })} />);
+    await tick(10);
+    await tick(20_000);
+    inbox.items = [hookSay('Напоминание: позвонить маме.')];
+    inbox.waiting = 1;
+    await tick(30_000);
+    // Nothing claimed (useFocusInbox takes only the focus items), so FocusMode's count is real.
+    expect(claimSpy).not.toHaveBeenCalledWith('/api/v1/ani/inbox/claim');
+    expect(inbox.items).toHaveLength(1);
+    rerender(<AniCorner {...props({ focusing: false })} />);
+    await tick(500);
+    expect(claimSpy).toHaveBeenCalledWith('/api/v1/ani/inbox/claim');
+    expect(bubble()).toBe('Напоминание: позвонить маме.');
+  });
+
+  it('BreakAfterFocusOnFlip: the break line plays when the prop turns on for a mounted corner', async () => {
+    const onAfterFocus = vi.fn();
+    const { rerender } = render(<AniCorner {...props({ onAfterFocus })} />);
+    await tick(10);
+    await tick(30_000); // the hello is over
+    expect(bubble()).not.toBe('Перерыв. Ты молодец, разомнись.');
+    rerender(<AniCorner {...props({ onAfterFocus, afterFocus: true })} />);
+    await tick(10);
+    expect(bubble()).toBe('Перерыв. Ты молодец, разомнись.');
+    expect(played()).toContain(
+      'https://s3.example.com/wallpapers/ani/v2/voice/touch/breakTime.mp3',
+    );
+    expect(onAfterFocus).toHaveBeenCalledOnce();
+  });
+
+  it('HideNumbersLine: under Hide numbers a line with a number is blurred and not said aloud', async () => {
+    await mount();
+    await tick(30_000);
+    engine.ani!.say.mockClear();
+    document.documentElement.classList.add('hide-numbers');
+    await act(async () => {
+      (globalThis as { aniSay?: (a: unknown) => void }).aniSay?.({
+        text: 'В этом месяце ушло около 345 000 KZT.',
+        chips: [{ label: '4 тыс', run: () => undefined }],
+      });
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    const say = document.querySelector('.ani-say')!;
+    expect(say.textContent).toContain('345 000');
+    expect(say.classList.contains('num')).toBe(true);
+    expect(say.hasAttribute('data-num-ok')).toBe(false);
+    expect(screen.getByRole('button', { name: '4 тыс' }).classList.contains('num')).toBe(true);
+    expect(engine.ani!.say).not.toHaveBeenCalled();
+    // The Hide numbers guard (pages/hideNumbers.guard.test.tsx) over her corner: every text
+    // with a digit is blurred or says it is not personal.
+    const loose: string[] = [];
+    const walk = document.createTreeWalker(
+      document.querySelector('.ani-corner')!,
+      NodeFilter.SHOW_TEXT,
+    );
+    for (let n = walk.nextNode(); n; n = walk.nextNode())
+      if (/\d/.test(n.textContent ?? '') && !n.parentElement?.closest('.num, [data-num-ok]'))
+        loose.push(n.textContent ?? '');
+    expect(loose).toEqual([]);
+  });
+
+  it('HideNumbersLine: a line without numbers is still said under Hide numbers', async () => {
+    await mount();
+    await tick(30_000);
+    engine.ani!.say.mockClear();
+    document.documentElement.classList.add('hide-numbers');
+    await act(async () => {
+      (globalThis as { aniSay?: (a: unknown) => void }).aniSay?.({ text: 'Пора размяться.' });
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(document.querySelector('.ani-say')!.classList.contains('num')).toBe(false);
+    expect(engine.ani!.say).toHaveBeenCalledOnce();
+  });
+
+  it('TalkHangUpWhileConnecting: the call is aborted and the ledge is back at once', async () => {
+    await mount();
+    talkCall.stop.mockClear();
+    const mic = () => document.querySelector<HTMLButtonElement>('.ani-mic')!;
+    await act(async () => {
+      fireEvent.click(mic());
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(screen.getByText('Connecting')).toBeTruthy();
+    // A second tap is the hang-up.
+    await act(async () => {
+      fireEvent.click(mic());
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(talkCall.opts?.signal?.aborted).toBe(true);
+    expect(screen.queryByText('Connecting')).toBeNull();
+    expect(screen.getByText('With you')).toBeTruthy();
+    // A late state from the dead call changes nothing, and no error line shows.
+    act(() => talkCall.opts?.onState('listening'));
+    expect(screen.queryByText('Listening')).toBeNull();
+    expect(bubble() ?? '').not.toMatch(/Не получилось подключиться/);
+  });
+
+  it('TalkHangUpWhileConnecting: a call that comes up after the hang-up is stopped', async () => {
+    await mount();
+    talkCall.stop.mockClear();
+    const mic = () => document.querySelector<HTMLButtonElement>('.ani-mic')!;
+    await act(async () => {
+      fireEvent.click(mic());
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    // The stand-in ignores the abort here: it answers as a call that came up just then.
+    talkCall.rejectOnAbort = false;
+    try {
+      await act(async () => {
+        fireEvent.click(mic());
+        talkCall.up();
+        await vi.advanceTimersByTimeAsync(10);
+      });
+    } finally {
+      talkCall.rejectOnAbort = true;
+    }
+    expect(talkCall.stop).toHaveBeenCalled();
+    expect(screen.getByText('With you')).toBeTruthy();
+  });
+
+  it('RefreshAfterGive: a task she moved on a drop refreshes Tasks and Now', async () => {
+    const qc = new QueryClient();
+    const invalidate = vi.spyOn(qc, 'invalidateQueries');
+    vi.spyOn(api, 'patchJson').mockResolvedValue({ data: {} });
+    render(
+      <QueryClientProvider client={qc}>
+        <AniCorner {...props()} />
+      </QueryClientProvider>,
+    );
+    await tick(10);
+    await tick(30_000);
+    const hit = document.querySelector('.ani-hit')!;
+    const data: Record<string, string> = {
+      'application/x-life-give': JSON.stringify({ kind: 'task', id: 't1', title: 'Отчет' }),
+    };
+    await act(async () => {
+      fireEvent.drop(hit, { dataTransfer: { getData: (t: string) => data[t] ?? '' } });
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Сегодня в 19:00' }));
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    const keys = invalidate.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+    expect(keys).toContain(JSON.stringify(['tasks']));
+    expect(keys).toContain(JSON.stringify(['now']));
   });
 });

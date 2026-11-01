@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 
+import { useHabitDays } from '@/hooks/useHabits';
 import { useCrossings } from '@/hooks/useTravel';
 import { api } from '@/lib/api/client';
+import { qk } from '@/lib/api/queryKeys';
 
 import { booksOf, coffeeOf, cupsOf, flagOf, plantOf, type Plant } from './shelfItems';
 import { useWarm } from './warm';
@@ -12,7 +14,7 @@ const shift = (date: string, by: number) =>
   new Date(Date.parse(`${date}T00:00:00Z`) + by * DAY_MS).toISOString().slice(0, 10);
 
 function useShelfRead<T>(
-  key: string,
+  key: readonly unknown[],
   path: string,
   query: Record<string, string>,
   on: boolean,
@@ -20,7 +22,7 @@ function useShelfRead<T>(
 ) {
   const warm = useWarm(on, step);
   return useQuery({
-    queryKey: ['ani', 'shelf', key, query],
+    queryKey: key,
     enabled: warm,
     retry: false,
     staleTime: 30 * 60_000,
@@ -113,35 +115,41 @@ const Coffee = ({ full }: { full: boolean }) => (
 export function Shelf({
   on,
   date,
+  tz,
   sleepMinutes,
   hour,
+  hidden = false,
 }: {
   on: boolean;
   date: string;
+  /** The person's zone: the promises of the week are counted in it. */
+  tz: string;
   sleepMinutes?: number | null;
   hour: number;
+  /** Hide numbers is on: the tooltips carry no counts or dates. */
+  hidden?: boolean;
 }) {
   const navigate = useNavigate();
-  const habits = useShelfRead<
-    { schedule: string; streak: number; best: number; days: { date: string; done: boolean }[] }[]
-  >('habits', '/api/v1/habits/days', { from: shift(date, -3), to: date }, on, 20);
+  // The same read (and cache) as Habits and her lines (useLife2): a tick there shows here.
+  const habits = useHabitDays(shift(date, -5), date, useWarm(on, 20));
   const courses = useShelfRead<unknown[]>(
-    'courses',
+    ['ani', 'shelf', 'courses'],
     '/api/v1/tasks/projects',
     { kind: 'course', status: 'done' },
     on,
     21,
   );
+  // The same key as the promises on the Account page and in useLife.
   const deals = useShelfRead<{ done: number; target: number }[]>(
-    'deals',
+    qk.ani.deals(tz),
     '/api/v1/ani/deals',
-    {},
+    { tz },
     on,
     22,
   );
   const crossings = useCrossings();
 
-  const hs = Array.isArray(habits.data) ? habits.data : [];
+  const hs = Array.isArray(habits.data?.data) ? habits.data.data : [];
   const longest = hs.reduce((n, h) => Math.max(n, h.streak ?? 0), 0);
   const yesterday = shift(date, -1);
   const broke = hs.some(
@@ -164,7 +172,7 @@ export function Shelf({
       {plant && (
         <button
           type="button"
-          title={`Longest habit streak: ${longest} days`}
+          title={hidden ? 'Longest habit streak' : `Longest habit streak: ${longest} days`}
           onClick={() => void navigate('/habits')}
         >
           <PlantIcon p={plant} />
@@ -173,7 +181,7 @@ export function Shelf({
       {books > 0 && (
         <button
           type="button"
-          title={`Courses finished: ${books}`}
+          title={hidden ? 'Courses finished' : `Courses finished: ${books}`}
           onClick={() => void navigate('/learning')}
         >
           <Books n={books} />
@@ -202,7 +210,11 @@ export function Shelf({
         <button
           type="button"
           className="ani-shelf-flag"
-          title={`Last crossing: ${last.to_country}, ${last.date}`}
+          title={
+            hidden
+              ? `Last crossing: ${last.to_country}`
+              : `Last crossing: ${last.to_country}, ${last.date}`
+          }
           onClick={() => void navigate('/travel')}
         >
           {flag}

@@ -2,9 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 
+import { useHabitDays } from '@/hooks/useHabits';
 import { useMoneySettings } from '@/hooks/useMoney';
 import { useCrossings } from '@/hooks/useTravel';
 import { api } from '@/lib/api/client';
+import { qk } from '@/lib/api/queryKeys';
+import { clockIn } from '@/lib/dates';
 import { CURRENCY_OF } from '@/lib/now/currency';
 
 import type { AniContext } from './AniCorner';
@@ -32,7 +35,8 @@ import {
 } from './life2';
 import { arrival } from '../modes/modes';
 import { useWarm } from './warm';
-import { addMoment } from './life';
+import { addMoment, MORNING_FROM } from './life';
+import type { Changed } from './refresh';
 import type { Answer } from './touch';
 
 const TICK_MS = 60_000;
@@ -56,34 +60,32 @@ function mark(k: string, v: string) {
   }
 }
 
-function clockOf(tz: string) {
-  const p = new Intl.DateTimeFormat('en-GB', {
-    timeZone: tz,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(new Date());
-  return {
-    hour: Number(p.find((x) => x.type === 'hour')?.value ?? 0) % 24,
-    minute: Number(p.find((x) => x.type === 'minute')?.value ?? 0),
-  };
-}
+/** Hide numbers is on: her lines that carry a personal number wait until it is off. */
+const numbersHidden = () => document.documentElement.classList.contains('hide-numbers');
 
 let reads = 0;
 
-/** One GET of the site for her lines: quiet when the module is off (404) or the call fails. */
+/** The warm-up step of the next read (warm.ts): one after another, not one burst at load. */
+function useStep(): number {
+  const [step] = useState(() => reads++ % 16);
+  return step;
+}
+
+/**
+ * One GET of the site for her lines: quiet when the module is off (404) or the call fails.
+ * @p key is the endpoint's key wherever the site reads it, so a write there reaches her too.
+ */
 function useRead<T>(
-  key: unknown[],
+  key: readonly unknown[],
   path: string,
   query: Record<string, string | number>,
   on: boolean,
   stale = 10 * 60_000,
 ) {
   // Each read takes its own step after the page has settled (warm.ts), not one burst at load.
-  const [step] = useState(() => reads++ % 16);
-  const warm = useWarm(on, 3 + step);
+  const warm = useWarm(on, 3 + useStep());
   return useQuery({
-    queryKey: ['ani', 'life', ...key],
+    queryKey: key,
     enabled: warm,
     retry: false,
     staleTime: stale,
@@ -124,6 +126,7 @@ export function useLife2({
   quiet,
   say,
   onSeed,
+  onChanged,
 }: {
   on: boolean;
   context: AniContext;
@@ -131,27 +134,33 @@ export function useLife2({
   quiet: () => boolean;
   say: (a: Answer) => void;
   onSeed: (text: string | null) => void;
+  /** One of her chips changed something (a meal, a note on a spend): the page reads it again. */
+  onChanged?: (what: Changed) => void;
 }) {
   const { tz, date } = context;
   const { pathname } = useLocation();
-  const facts = useRead<{ id: string; text: string }[]>(['facts'], '/api/v1/ani/facts', {}, on);
+  const facts = useRead<{ id: string; text: string }[]>(
+    qk.ani.facts(),
+    '/api/v1/ani/facts',
+    {},
+    on,
+  );
   const mood = useRead<{ date: string; score: number }[]>(
-    ['mood', date],
+    ['ani', 'life', 'mood', date],
     '/api/v1/habits/mood',
     { from: date, to: date },
     on,
   );
   const sleeps = useRead<Sleep[]>(
-    ['sleep', date],
+    ['ani', 'life', 'sleep', date],
     '/api/v1/fitness/sleep',
     { from: shift(date, -30), to: date },
     on,
   );
-  const habits = useRead<
-    { id: string; name: string; schedule: string; days: { date: string; done: boolean }[] }[]
-  >(['habit-days', date], '/api/v1/habits/days', { from: shift(date, -5), to: date, tz }, on);
+  // The Habits section's own read: a tick there reaches her streak line.
+  const habits = useHabitDays(shift(date, -5), date, useWarm(on, 3 + useStep()));
   const steps = useRead<{ date: string; value: number | null }[]>(
-    ['steps', date],
+    ['ani', 'life', 'steps', date],
     '/api/v1/metrics/series',
     { source: 'fitness:steps', from: shift(date, -30), to: date, tz },
     on,
@@ -159,17 +168,22 @@ export function useLife2({
   const food = useRead<{
     totals: { kcal: number; protein_g: number };
     targets: { kcal: number; protein_g: number } | null;
-  }>(['food-day', date], '/api/v1/food/day', { date, tz }, on, 60_000);
-  const recent = useRead<Item[]>(['food-recent'], '/api/v1/food/recent', {}, on);
+  }>(['ani', 'life', 'food-day', date], '/api/v1/food/day', { date, tz }, on, 60_000);
+  const recent = useRead<Item[]>(['ani', 'life', 'food-recent'], '/api/v1/food/recent', {}, on);
   const goalsProfile = useRead<{ profile: { birth_date: string | null } }>(
-    ['food-goals'],
+    ['ani', 'life', 'food-goals'],
     '/api/v1/food/goals',
     {},
     on,
   );
-  const waiting = useRead<{ title: string }[]>(['tg-waiting'], '/api/v1/telegram/waiting', {}, on);
+  const waiting = useRead<{ title: string }[]>(
+    qk.telegramWaiting(),
+    '/api/v1/telegram/waiting',
+    {},
+    on,
+  );
   const spends = useRead<Tx[]>(
-    ['tx-today', date],
+    ['ani', 'life', 'tx-today', date],
     '/api/v1/money/transactions',
     { from: date, to: date, status: 'posted', limit: 20 },
     on,
@@ -179,37 +193,34 @@ export function useLife2({
   const view = useMoneySettings().data?.view_currency ?? 'KZT';
   const arrived = arrival(crossings.data, date);
   const local = arrived ? CURRENCY_OF[arrived.to_country] : undefined;
+  // The trip mode card's key: one read of the rate for both.
   const rate = useRead<{ amount: number }>(
-    ['rate', local ?? '', view, date],
+    qk.now.arrivalRate(local ?? '', view, date),
     '/api/v1/money/rates/convert',
     { amount: 1, from: local ?? '', to: view, date },
     on && !!local && local !== view,
     60 * 60_000,
   );
-  const report = {
-    data: useRead<{ as_if?: { expense: number; currency: string } | null }>(
-      ['report', date],
-      '/api/v1/money/reports/period',
-      { kind: 'month', date },
-      on,
-    ).data,
-  };
-  const goals = {
-    data: useRead<{ title: string; progress?: { pace?: string } | null }[]>(
-      ['goals', date],
-      '/api/v1/goals',
-      { status: 'active', date, tz },
-      on,
-    ).data,
-  };
+  const report = useRead<{ as_if?: { expense: number; currency: string } | null }>(
+    ['ani', 'life', 'report', date],
+    '/api/v1/money/reports/period',
+    { kind: 'month', date },
+    on,
+  );
+  const goals = useRead<{ title: string; progress?: { pace?: string } | null }[]>(
+    ['ani', 'life', 'goals', date],
+    '/api/v1/goals',
+    { status: 'active', date, tz },
+    on,
+  );
 
-  const live = useRef({
+  const snapshot = () => ({
     context,
     pathname,
     facts: facts.data,
     mood: mood.data,
     sleeps: sleeps.data,
-    habits: habits.data,
+    habits: habits.data?.data,
     steps: steps.data,
     food: food.data,
     recent: recent.data,
@@ -226,33 +237,23 @@ export function useLife2({
     stalled:
       (Array.isArray(goals.data) ? goals.data : []).find((g) => g.progress?.pace === 'behind')
         ?.title ?? null,
+    // Whether each read has answered: a line is marked as said only once its data is in, or a
+    // line checked before its read (the reads warm up one by one) would be lost for the day.
+    got: {
+      sleeps: sleeps.isSuccess,
+      steps: steps.isSuccess,
+      habits: habits.isSuccess,
+      waiting: waiting.isSuccess,
+      report: report.isSuccess,
+      goals: goals.isSuccess,
+    },
   });
-  live.current = {
-    context,
-    pathname,
-    facts: facts.data,
-    mood: mood.data,
-    sleeps: sleeps.data,
-    habits: habits.data,
-    steps: steps.data,
-    food: food.data,
-    recent: recent.data,
-    birth: goalsProfile.data?.profile?.birth_date ?? null,
-    waiting: waiting.data,
-    spends: spends.data,
-    arrived,
-    local,
-    view,
-    rate: rate.data?.amount ?? null,
-    spent: report.data?.as_if
-      ? { amount: report.data.as_if.expense, currency: report.data.as_if.currency }
-      : null,
-    stalled:
-      (Array.isArray(goals.data) ? goals.data : []).find((g) => g.progress?.pace === 'behind')
-        ?.title ?? null,
-  };
+  const live = useRef(snapshot());
+  live.current = snapshot();
   const sayRef = useRef(say);
   sayRef.current = say;
+  const changedRef = useRef(onChanged);
+  changedRef.current = onChanged;
   const quietRef = useRef(quiet);
   quietRef.current = quiet;
   const seedRef = useRef(onSeed);
@@ -268,7 +269,11 @@ export function useLife2({
       const seen = read();
       const once = (k: string) => seen[k] !== day;
       const age = (Date.now() - since) / 1000;
-      const { hour, minute } = clockOf(d.context.tz);
+      const { hour, minute } = clockIn(d.context.tz);
+      const morning = hour >= MORNING_FROM && hour < 12;
+      // Lines with a personal number in them keep quiet under Hide numbers (not marked: they
+      // may come once it is off).
+      const hidden = numbersHidden();
       const e = engine.current;
       const arr = <T>(x: T[] | undefined) => (Array.isArray(x) ? x : []);
 
@@ -295,7 +300,8 @@ export function useLife2({
         return;
       }
       if (d.arrived && once(`trip:${d.arrived.to_country}`)) {
-        const line = tripHello(d.arrived.to_country, d.local, d.view, d.rate);
+        // Under Hide numbers the hello goes without the price.
+        const line = tripHello(d.arrived.to_country, d.local, d.view, hidden ? null : d.rate);
         if (line) {
           mark(`trip:${d.arrived.to_country}`, day);
           e?.act('wave');
@@ -303,7 +309,7 @@ export function useLife2({
           return;
         }
       }
-      if (hour < 12 && age >= 60 && once('bedtimeMorning')) {
+      if (morning && age >= 60 && d.got.sleeps && !hidden && once('bedtimeMorning')) {
         const nights = arr(d.sleeps).filter((s) => !s.is_nap);
         const last = nights.reduce<Sleep | undefined>(
           (a, b) => (!a || b.end_at > a.end_at ? b : a),
@@ -323,7 +329,7 @@ export function useLife2({
           return;
         }
       }
-      if (hour < 12 && age >= 120 && once('records')) {
+      if (morning && age >= 120 && d.got.sleeps && d.got.steps && !hidden && once('records')) {
         mark('records', day);
         const line = sleepRecord(arr(d.sleeps)) ?? stepsRecord(arr(d.steps), day);
         if (line) {
@@ -334,7 +340,7 @@ export function useLife2({
           return;
         }
       }
-      if (hour < 12 && age >= 180 && once('streak')) {
+      if (morning && age >= 180 && d.got.habits && once('streak')) {
         mark('streak', day);
         const name = brokenStreakOf(arr(d.habits), day);
         if (name) {
@@ -345,7 +351,7 @@ export function useLife2({
           return;
         }
       }
-      if (hour >= 8 && hour < 12 && age >= 240 && once('guess')) {
+      if (hour >= 8 && hour < 12 && age >= 240 && d.got.steps && !hidden && once('guess')) {
         const y = arr(d.steps).find((p) => p.date === shift(day, -1))?.value;
         mark('guess', day);
         if (y != null && y > 0) {
@@ -402,19 +408,21 @@ export function useLife2({
         });
         return;
       }
-      if (hour === 12 && once('tgNoon')) {
+      if (hour === 12 && d.got.waiting && once('tgNoon')) {
         mark('tgNoon', day);
         const w = arr(d.waiting);
         if (w.length > 0) {
           sayRef.current({
-            text: `Ждут ответа ${w.length}: главный ${w[0].title}.`,
+            text: hidden
+              ? `В Telegram ждут ответа, главный ${w[0].title}.`
+              : `Ждут ответа ${w.length}: главный ${w[0].title}.`,
             kind: 'telegram',
           });
           return;
         }
       }
       for (const [meal, at] of Object.entries(MEAL_HOURS) as [Meal, number][]) {
-        if (hour !== at || !once(`meal:${meal}`) || !d.food?.targets) continue;
+        if (hour !== at || hidden || !once(`meal:${meal}`) || !d.food?.targets) continue;
         mark(`meal:${meal}`, day);
         const left = {
           kcal: d.food.targets.kcal - d.food.totals.kcal,
@@ -433,13 +441,14 @@ export function useLife2({
                 .postJson('/api/v1/food/entries', {
                   body: { date: day, meal, item_id: o.item.id, grams: o.grams },
                 })
-                .then(() =>
+                .then(() => {
+                  changedRef.current?.('food');
                   sayRef.current({
                     text: `Записала: ${o.item.name}.`,
                     silent: true,
                     kind: 'hello',
-                  }),
-                )
+                  });
+                })
                 .catch(() => undefined),
           })),
         });
@@ -484,6 +493,7 @@ export function useLife2({
                     .patchJson(`/api/v1/money/transactions/${t.id}`, {
                       body: { note: t.note ? `${t.note} · разовая` : 'разовая' },
                     })
+                    .then(() => changedRef.current?.('transaction'))
                     .catch(() => undefined),
               },
               { label: 'Нет', run: () => undefined },
@@ -494,13 +504,23 @@ export function useLife2({
           // The money module is off or the call failed: nothing to ask.
         }
       }
-      if (d.pathname !== '/now' && once(`tab:${d.pathname.split('/')[1]}`)) {
+      // The tips for Tasks and Money carry a count and an amount; each waits for its read.
+      const tab = d.pathname.split('/')[1];
+      const tabReady =
+        tab === 'money'
+          ? d.got.report && !hidden
+          : tab === 'goals'
+            ? d.got.goals
+            : tab === 'tasks'
+              ? d.context.today != null && !hidden
+              : true;
+      if (d.pathname !== '/now' && tabReady && once(`tab:${tab}`)) {
         const line = tabTip(d.pathname, {
           inbox: d.context.today?.tasks?.inbox_count,
           spent: d.spent,
           stalled: d.stalled,
         });
-        mark(`tab:${d.pathname.split('/')[1]}`, day);
+        mark(`tab:${tab}`, day);
         if (line) {
           sayRef.current({ text: line, kind: 'hello' });
           return;

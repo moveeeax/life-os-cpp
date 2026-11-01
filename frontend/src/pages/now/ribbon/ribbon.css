@@ -139,6 +139,13 @@
   padding: 3px 11px;
   cursor: pointer;
 }
+.r-menu button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.r-menu-error {
+  color: var(--g-ink);
+}
 @media (prefers-reduced-motion: reduce) {
   .r-b.r-lit {
     transition: none;

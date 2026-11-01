@@ -55,6 +55,14 @@ export function Ribbon({
   const [slot, setSlot] = useState<Block | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const qc = useQueryClient();
+  // "Add a focus block" on its way: a second click adds no second event; a failure stays in the menu.
+  const [adding, setAdding] = useState(false);
+  const addingRef = useRef(false);
+  const [addFailed, setAddFailed] = useState(false);
+  const pick = (b: Block | null) => {
+    setSlot(b);
+    setAddFailed(false);
+  };
 
   useEffect(() => {
     const onPoint = (e: Event) => {
@@ -88,19 +96,29 @@ export function Ribbon({
         : null;
 
   const addBlock = async (b: Block) => {
+    if (addingRef.current) return;
+    addingRef.current = true;
+    setAdding(true);
+    setAddFailed(false);
     const start = Math.max(b.start, now);
     const end = Math.min(b.end, start + 90 * 60_000);
-    await api
-      .postJson('/api/v1/calendar/events', {
+    try {
+      await api.postJson('/api/v1/calendar/events', {
         body: {
           title: 'Focus',
           start: new Date(start).toISOString(),
           end: new Date(end).toISOString(),
         },
-      })
-      .catch(() => {});
-    setSlot(null);
-    void qc.invalidateQueries({ queryKey: qk.now.day(date, tz) });
+      });
+      setSlot(null);
+      void qc.invalidateQueries({ queryKey: qk.now.day(date, tz) });
+      void qc.invalidateQueries({ queryKey: qk.calendar() });
+    } catch {
+      setAddFailed(true);
+    } finally {
+      addingRef.current = false;
+      setAdding(false);
+    }
   };
 
   return (
@@ -125,7 +143,7 @@ export function Ribbon({
           onClick={(e) => {
             const r = e.currentTarget.getBoundingClientRect();
             const b = freeAt(blocks, ((e.clientX - r.left) / r.width) * 100);
-            if (b && b.end > now) setSlot(b);
+            if (b && b.end > now) pick(b);
           }}
         >
           {blocks.map((b) => (
@@ -181,17 +199,22 @@ export function Ribbon({
                     Math.min(90, Math.round((slot.end - Math.max(slot.start, now)) / 60_000)),
                   ),
                 );
-                setSlot(null);
+                pick(null);
               }}
             >
               Focus until {hhmm(Math.min(slot.end, Math.max(slot.start, now) + 90 * 60_000), tz)}
             </button>
             {day.data.calendar === 'ok' && (
-              <button type="button" onClick={() => void addBlock(slot)}>
-                Add a focus block
+              <button type="button" disabled={adding} onClick={() => void addBlock(slot)}>
+                {adding ? 'Adding…' : 'Add a focus block'}
               </button>
             )}
-            <button type="button" onClick={() => setSlot(null)}>
+            {addFailed && (
+              <span className="r-menu-error" role="alert">
+                The block was not added. Try again.
+              </span>
+            )}
+            <button type="button" onClick={() => pick(null)}>
               Close
             </button>
           </div>

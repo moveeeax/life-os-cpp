@@ -65,6 +65,33 @@ export async function readTurn(id: string): Promise<Turn> {
   return (await api.getJson<{ data: Turn }>(`/api/v1/ani/turns/${encodeURIComponent(id)}`)).data;
 }
 
+/** How often, and how many times, a confirmed change is read until the worker has made it. */
+export const SETTLE_MS = 2000;
+export const SETTLE_TRIES = 15;
+
+/**
+ * Reads @p turnId until its action @p actionId is no longer being made
+ * (confirmed or running); the action as it ended, or null when it did not
+ * end within SETTLE_TRIES reads or the reads failed.
+ */
+export async function settledAction(
+  turnId: string,
+  actionId: string,
+  wait: (ms: number) => Promise<void> = (ms) => new Promise((ok) => setTimeout(ok, ms)),
+): Promise<Action | null> {
+  for (let i = 0; i < SETTLE_TRIES; i++) {
+    await wait(SETTLE_MS);
+    try {
+      const a = (await readTurn(turnId)).actions.find((x) => x.id === actionId);
+      if (!a) return null;
+      if (a.status !== 'confirmed' && a.status !== 'running') return a;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 /** The reply of a done turn read aloud (MP3); `engine.say` plays it with her lips. */
 export function speechUrl(id: string): string {
   return `/api/v1/ani/turns/${encodeURIComponent(id)}/speech`;

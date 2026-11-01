@@ -1,6 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-import { cancelAction, chatOf, confirmAction, editable, readTurn, type Action } from './chat';
+import {
+  cancelAction,
+  chatOf,
+  confirmAction,
+  editable,
+  readTurn,
+  settledAction,
+  type Action,
+} from './chat';
+import { useRefresh } from './refresh';
 
 /** How long "Sent to …" stays before the bubble goes. */
 const SENT_MS = 2000;
@@ -29,6 +38,7 @@ export function AniOffers({
   const [actions, setActions] = useState<Action[] | null>(null);
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const refresh = useRefresh();
   const [folded, setFolded] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
   const [beside, setBeside] = useState(false);
@@ -89,9 +99,18 @@ export function AniOffers({
     }
     setBusy(false);
   };
+  // Once the worker has made a confirmed change, the section it touched reads again (the
+  // bubble may be gone by then).
+  const follow = (made: Action) => {
+    if (made.status === 'done') refresh(made.kind);
+    else
+      void settledAction(turn, made.id).then((x) => {
+        if (x?.status === 'done') refresh(x.kind);
+      });
+  };
   const confirm = (a: Action, text?: string) =>
     run(async () => {
-      await (text === undefined ? confirmAction(a.id) : confirmAction(a.id, text));
+      follow(await (text === undefined ? confirmAction(a.id) : confirmAction(a.id, text)));
       // A reply was picked: the other drafts to that chat are gone on the server too.
       const chatOfA = a.kind === 'tg_send' ? chatOf(a.summary) : null;
       setActions((all) =>
@@ -222,7 +241,8 @@ export function AniOffers({
                   disabled={busy}
                   onClick={() =>
                     void run(async () => {
-                      for (const a of changes) await confirmAction(a.id).catch(() => undefined);
+                      for (const a of changes)
+                        await confirmAction(a.id).then(follow, () => undefined);
                       setActions((all) => (all ?? []).filter((x) => x.kind === 'tg_send'));
                     })
                   }

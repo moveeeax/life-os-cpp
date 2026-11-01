@@ -6,6 +6,13 @@
  * at most once (the corner keeps the keys).
  */
 
+/**
+ * Her morning lines (the night's energy, bedtime, records, a broken streak)
+ * start at this local hour: right after midnight the newest night is still the
+ * one before, so a page left open overnight keeps them for the morning.
+ */
+export const MORNING_FROM = 5;
+
 export const SLEEP_LOW_MINUTES = 360;
 export const SLEEP_GOOD_MINUTES = 450;
 

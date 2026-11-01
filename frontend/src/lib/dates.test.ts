@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  clockIn,
   daysBetween,
   formatDateTime,
   formatDay,
@@ -122,5 +123,14 @@ describe('mondayOf', () => {
     expect(mondayOf('2026-10-18')).toBe('2026-10-12'); // a Sunday
     expect(mondayOf('2026-10-12')).toBe('2026-10-12');
     expect(mondayOf('2027-01-02')).toBe('2026-12-28');
+  });
+});
+
+describe('clockIn', () => {
+  it('reads the hour in the given zone, not the browser clock', () => {
+    // 2026-10-26 19:30 UTC: 00:30 the next day in Almaty (UTC+5), 15:30 in New York.
+    const at = new Date(Date.UTC(2026, 9, 26, 19, 30));
+    expect(clockIn('Asia/Almaty', at)).toEqual({ hour: 0, minute: 30, weekday: 2 });
+    expect(clockIn('America/New_York', at)).toEqual({ hour: 15, minute: 30, weekday: 1 });
   });
 });

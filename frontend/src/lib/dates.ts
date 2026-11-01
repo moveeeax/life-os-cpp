@@ -33,6 +33,29 @@ export function todayLocal(tz?: string, now: Date = new Date()): string {
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
+/**
+ * The wall clock in the zone @p tz (an IANA name): hour 0-23, minute and
+ * weekday (0 Sunday). Without @p tz, the browser's own zone.
+ */
+export function clockIn(
+  tz?: string,
+  now: Date = new Date(),
+): { hour: number; minute: number; weekday: number } {
+  const p = new Intl.DateTimeFormat('en-GB', {
+    timeZone: tz,
+    hour: '2-digit',
+    minute: '2-digit',
+    weekday: 'short',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const get = (t: string) => p.find((x) => x.type === t)?.value ?? '';
+  return {
+    hour: Number(get('hour')) % 24,
+    minute: Number(get('minute')),
+    weekday: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(get('weekday')),
+  };
+}
+
 /** The day @p by days from @p date; a broken @p date counts from today. */
 export function shiftDays(date: string, by: number): string {
   const t = utcOf(date) ?? utcOf(todayLocal())!;
