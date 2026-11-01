@@ -37,9 +37,16 @@ export const qk = {
   },
   /** The owner's Telegram link (admin). */
   telegram: () => ['telegram'] as const,
+  /** The Telegram chats waiting for an answer (Now's widget, mode card and Ani's lines). */
+  telegramWaiting: () => ['telegram', 'waiting'] as const,
   calendar: () => ['calendar'] as const,
   /** Ani's settings on the server and her webhook. */
   ani: {
+    /** What she remembers (Account page and her own lines read the same list). */
+    facts: () => ['ani', 'facts'] as const,
+    /** This week's promises to her; the bare prefix matches every zone. */
+    deals: (tz?: string) =>
+      tz === undefined ? (['ani', 'deals'] as const) : (['ani', 'deals', tz] as const),
     prefs: () => ['ani', 'prefs'] as const,
     webhook: () => ['ani', 'webhook'] as const,
     mcpKeys: () => ['ani', 'mcp-keys'] as const,
@@ -136,6 +143,9 @@ export const qk = {
     ribbon: () => ['now', 'day'] as const,
     /** Every device's wallpaper list. */
     wallpaperLists: () => ['now', 'wallpapers'] as const,
+    /** One unit of the arrival currency in the view currency (the trip mode card, Ani's hello abroad). */
+    arrivalRate: (from: string, to: string, date: string) =>
+      ['now', 'mode-rate', from, to, date] as const,
     wallpapers: (device: string) => ['now', 'wallpapers', device] as const,
     adminWallpapers: () => ['now', 'admin-wallpapers'] as const,
     sounds: () => ['now', 'sounds'] as const,

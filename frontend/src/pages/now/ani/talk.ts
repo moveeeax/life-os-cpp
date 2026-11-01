@@ -43,6 +43,20 @@ export interface TalkOptions {
    * sends what was said; without it the server hears the end of a phrase.
    */
   hold?: boolean;
+  /**
+   * Hanging up while it connects: the steps still ahead (the microphone,
+   * the paid session key, the offer, her first reply) do not run, and no
+   * callback fires after it.
+   */
+  signal?: AbortSignal;
+}
+
+/** What startTalk throws when its signal aborted the call before it was up. */
+export class TalkAborted extends Error {
+  constructor() {
+    super('the call was hung up while it connected');
+    this.name = 'TalkAborted';
+  }
 }
 
 export interface Talk {
@@ -69,7 +83,7 @@ const TOOL_MAX = 6000;
 // through speakers it would hear her and answer her as the user.
 const TAIL_MS = 600;
 
-export async function startTalk(o: TalkOptions): Promise<Talk> {
+export async function startTalk(opts: TalkOptions): Promise<Talk> {
   let pc: RTCPeerConnection | null = null;
   let mic: MediaStream | null = null;
   let stopped = false;
@@ -95,10 +109,25 @@ export async function startTalk(o: TalkOptions): Promise<Talk> {
     mic = null;
     audio.srcObject = null;
   };
+  // Nothing reaches the page once the call is stopped or hung up.
+  const o: TalkOptions = {
+    ...opts,
+    onAudio: (s) => !stopped && opts.onAudio(s),
+    onText: (t) => !stopped && opts.onText(t),
+    onState: (st) => !stopped && opts.onState(st),
+    onEnd: () => opts.onEnd(),
+  };
   const end = () => {
     if (stopped) return;
     stop();
     o.onEnd();
+  };
+  const signal = opts.signal;
+  if (signal?.aborted) throw new TalkAborted();
+  signal?.addEventListener('abort', stop, { once: true });
+  // Between the steps of connecting: a hang-up stops here.
+  const check = () => {
+    if (stopped) throw new TalkAborted();
   };
 
   // One call: true once the data channel is open.
@@ -106,6 +135,7 @@ export async function startTalk(o: TalkOptions): Promise<Talk> {
     const { value: key } = (
       await api.postJson<{ data: { value: string } }>('/api/v1/now/voice-session')
     ).data;
+    check();
 
     const p = new RTCPeerConnection();
     pc = p;
@@ -220,15 +250,22 @@ export async function startTalk(o: TalkOptions): Promise<Talk> {
     });
 
     const offer = await p.createOffer();
+    check();
     await p.setLocalDescription(offer);
     const sdp = await fetch('https://api.openai.com/v1/realtime/calls', {
       method: 'POST',
       body: offer.sdp,
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/sdp' },
+      signal,
     });
+    check();
     if (!sdp.ok) throw new Error(`calls ${sdp.status}`);
     await p.setRemoteDescription({ type: 'answer', sdp: await sdp.text() });
-    if (!(await opened)) return false;
+    check();
+    const open = await opened;
+    // Hung up while the channel opened: no session, no paid first reply.
+    check();
+    if (!open) return false;
 
     send({
       type: 'session.update',
@@ -257,17 +294,26 @@ export async function startTalk(o: TalkOptions): Promise<Talk> {
 
   try {
     o.onState('connecting');
-    mic = await navigator.mediaDevices.getUserMedia({
+    const got = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true },
     });
-    for (let i = 1; !stopped; i++) {
+    if (stopped) {
+      // Hung up while the browser asked for the microphone: it goes off at once.
+      for (const t of got.getTracks()) t.stop();
+      throw new TalkAborted();
+    }
+    mic = got;
+    for (let i = 1; ; i++) {
       if (await call()) break;
       hangUp();
+      check();
       if (i >= TRIES) throw new Error('the call did not open');
     }
   } catch (e) {
     stop();
-    throw e;
+    throw signal?.aborted ? new TalkAborted() : e;
+  } finally {
+    signal?.removeEventListener('abort', stop);
   }
   return {
     interrupt: () => {

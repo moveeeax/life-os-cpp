@@ -23,6 +23,7 @@ import {
   type Action,
   type Turn,
 } from './chat';
+import { useRefresh } from './refresh';
 
 /** A bin: clear the chat. */
 function TrashIcon() {
@@ -116,6 +117,16 @@ export function AniChat({
   const [problem, setProblem] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // A confirmed change, once the worker has made it, refreshes the section it touched.
+  const refresh = useRefresh();
+  const making = useRef(new Set<string>());
+  const track = (a: Action) => {
+    if (a.status === 'confirmed' || a.status === 'running') making.current.add(a.id);
+    else if (a.status === 'done' && making.current.delete(a.id)) refresh(a.kind);
+  };
+  // The proposal whose Confirm or Cancel is on its way: a second click sends nothing.
+  const [acting, setActing] = useState<string | null>(null);
+  const actingRef = useRef<string | null>(null);
 
   useEffect(() => {
     wakeAgent();
@@ -143,6 +154,7 @@ export function AniChat({
     const id = watched.id;
     return pollTurn(() =>
       readTurn(id).then((t) => {
+        t.actions.forEach(track);
         setTurns((all) => all?.map((x) => (x.id === t.id ? t : x)) ?? all);
         // Two reads in flight can both see it done: each reply is spoken once.
         // A webhook or MCP turn's answer is played by her inbox (and kept
@@ -174,6 +186,9 @@ export function AniChat({
   const [rewording, setRewording] = useState<{ id: string; text: string } | null>(null);
 
   const answer = async (turnId: string, a: Action, confirm: boolean, text?: string) => {
+    if (actingRef.current) return;
+    actingRef.current = a.id;
+    setActing(a.id);
     setProblem(null);
     const put = (next: Action) =>
       setTurns(
@@ -185,13 +200,16 @@ export function AniChat({
           ) ?? all,
       );
     try {
-      put(
-        await (confirm
-          ? text === undefined
-            ? confirmAction(a.id)
-            : confirmAction(a.id, text)
-          : cancelAction(a.id)),
-      );
+      const next = await (confirm
+        ? text === undefined
+          ? confirmAction(a.id)
+          : confirmAction(a.id, text)
+        : cancelAction(a.id));
+      if (confirm) {
+        making.current.add(next.id);
+        track(next);
+      }
+      put(next);
       setRewording(null);
     } catch (err) {
       if (err instanceof ApiClientError && err.code === 'action_expired') {
@@ -206,6 +224,9 @@ export function AniChat({
           confirm ? 'It was not confirmed. Try again.' : 'It was not cancelled. Try again.',
         );
       }
+    } finally {
+      actingRef.current = null;
+      setActing(null);
     }
   };
 
@@ -413,7 +434,7 @@ export function AniChat({
                           <span className="ani-act-btns">
                             <button
                               type="button"
-                              disabled={words != null && words.trim() === ''}
+                              disabled={acting === a.id || (words != null && words.trim() === '')}
                               onClick={() =>
                                 void answer(
                                   t.id,
@@ -428,12 +449,17 @@ export function AniChat({
                             {editable(a) && words == null && (
                               <button
                                 type="button"
+                                disabled={acting === a.id}
                                 onClick={() => setRewording({ id: a.id, text: a.text ?? '' })}
                               >
                                 Edit
                               </button>
                             )}
-                            <button type="button" onClick={() => void answer(t.id, a, false)}>
+                            <button
+                              type="button"
+                              disabled={acting === a.id}
+                              onClick={() => void answer(t.id, a, false)}
+                            >
                               Cancel
                             </button>
                           </span>

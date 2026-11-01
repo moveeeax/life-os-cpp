@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMetrics } from '@/hooks/useMetrics';
 import { useCreateEntry, useFoodDay, useFoodRecent } from '@/hooks/useFood';
 import { useReport } from '@/hooks/useMoney';
-import { api } from '@/lib/api/client';
+import { api, ApiClientError } from '@/lib/api/client';
 import { shiftDays } from '@/lib/dates';
 import { qk } from '@/lib/api/queryKeys';
 import { formatTotal } from '@/lib/networth';
@@ -23,6 +23,20 @@ import {
   type Widget,
 } from './widgets';
 import './widgets.css';
+
+/**
+ * The API's answer for an account that is not linked: 404 (calendar_not_linked,
+ * telegram_not_linked, not configured on this site) or 409 (calendar_disconnected).
+ * Any other error (a 429, a 500, offline) says nothing about the link.
+ */
+function unlinked(err: unknown): boolean {
+  return err instanceof ApiClientError && (err.status === 404 || err.status === 409);
+}
+
+/** After an error that is not "unlinked", the widget reads again this much later. */
+const RETRY_LATER_MS = 60_000;
+const retryLater = (q: { state: { status: string; error: unknown } }) =>
+  q.state.status === 'error' && !unlinked(q.state.error) ? RETRY_LATER_MS : false;
 
 function seriesNumber(v: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -108,6 +122,7 @@ function CalendarWeek({ date, tz }: { date: string; tz: string }) {
     queryKey: ['calendar', 'week', w.from, tz],
     staleTime: 10 * 60_000,
     retry: false,
+    refetchInterval: retryLater,
     queryFn: async ({ signal }) =>
       (
         await api.getJson<{ data: { start: string; all_day: boolean }[] }>(
@@ -130,7 +145,17 @@ function CalendarWeek({ date, tz }: { date: string; tz: string }) {
   return (
     <Frame
       k="Calendar week"
-      v={events.isError ? 'Not connected' : <span className="num">{list.length} meetings</span>}
+      v={
+        events.isError ? (
+          unlinked(events.error) ? (
+            'Not connected'
+          ) : (
+            '—'
+          )
+        ) : (
+          <span className="num">{list.length} meetings</span>
+        )
+      }
     >
       <div className="w-week" aria-hidden="true">
         {per.map((n, i) => (
@@ -276,9 +301,10 @@ function ProteinWidget({ date, tz }: { date: string; tz: string }) {
 
 function TelegramWidget() {
   const waiting = useQuery({
-    queryKey: ['telegram', 'waiting'],
+    queryKey: qk.telegramWaiting(),
     staleTime: 10 * 60_000,
     retry: false,
+    refetchInterval: retryLater,
     queryFn: async ({ signal }) =>
       (await api.getJson<{ data: { title: string }[] }>('/api/v1/telegram/waiting', { signal }))
         .data,
@@ -289,7 +315,11 @@ function TelegramWidget() {
       k="Telegram"
       v={
         waiting.isError ? (
-          'Not linked'
+          unlinked(waiting.error) ? (
+            'Not linked'
+          ) : (
+            '—'
+          )
         ) : list.length === 0 ? (
           'Nobody waits'
         ) : (

@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { api } from '@/lib/api/client';
+import { api, ApiClientError } from '@/lib/api/client';
 
 import { Board } from './Board';
 
@@ -12,8 +12,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function mount(kind: 'water' | 'protein') {
+function mount(kind: 'water' | 'protein' | 'telegram' | 'calendar_week', fail?: ApiClientError) {
   vi.spyOn(api, 'getJson').mockImplementation(async (path: string) => {
+    if (fail) throw fail;
     if (path === '/api/v1/food/water')
       return { data: { date: '2026-10-31', ml: 1000, goal_ml: 2000 } };
     if (path === '/api/v1/food/day')
@@ -60,5 +61,29 @@ describe('Board', () => {
         body: expect.objectContaining({ date: '2026-10-31', item_id: 'skyr', grams: 150 }),
       }),
     );
+  });
+
+  const failWith = (status: number, code: string) =>
+    new ApiClientError({ status, message: code, code });
+
+  it('LinkStateTelegram: "Not linked" only for the 404 of an unlinked account', async () => {
+    mount('telegram', failWith(404, 'telegram_not_linked'));
+    expect(await screen.findByText('Not linked')).toBeTruthy();
+  });
+
+  it('LinkStateTelegram: a 429 is not "Not linked"', async () => {
+    mount('telegram', failWith(429, 'rate_limited'));
+    expect(await screen.findByText('—')).toBeTruthy();
+    expect(screen.queryByText('Not linked')).toBeNull();
+  });
+
+  it('LinkStateCalendar: "Not connected" for 404 and 409, a dash for a 500', async () => {
+    mount('calendar_week', failWith(409, 'calendar_disconnected'));
+    expect(await screen.findByText('Not connected')).toBeTruthy();
+    cleanup();
+    vi.restoreAllMocks();
+    mount('calendar_week', failWith(500, 'internal'));
+    expect(await screen.findByText('—')).toBeTruthy();
+    expect(screen.queryByText('Not connected')).toBeNull();
   });
 });
