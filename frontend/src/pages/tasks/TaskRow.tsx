@@ -56,7 +56,7 @@ export function TaskRow({
           disabled={update.isPending}
           onClick={() => update.mutate({ status: done ? 'open' : 'done' })}
           className={cn(
-            'size-[18px] rounded-full border-[1.5px]',
+            'k-hit size-[18px] rounded-full border-[1.5px]',
             done ? 'border-success-500 bg-success-500' : 'k-check-ring',
           )}
         />

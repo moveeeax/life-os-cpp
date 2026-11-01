@@ -55,6 +55,24 @@ export function Ribbon({
   const [slot, setSlot] = useState<Block | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const qc = useQueryClient();
+  // On a narrow screen the ribbon scrolls sideways: it opens with now at a
+  // third of the width, once, so the rest of the day is in view (14 px is
+  // the ribbon's side padding around the track).
+  const wrap = useRef<HTMLDivElement>(null);
+  const placed = useRef(false);
+  const hasDay = Boolean(day.data);
+  useEffect(() => {
+    const el = wrap.current;
+    if (!hasDay || placed.current || !el) return;
+    placed.current = true;
+    if (el.scrollWidth <= el.clientWidth) return;
+    const today = date === new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date(now));
+    if (!today) return;
+    const hm = hhmm(now, tz);
+    const pct = pctOf(Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3)));
+    if (pct <= 0 || pct >= 100) return;
+    el.scrollLeft = Math.max(0, 14 + ((el.scrollWidth - 28) * pct) / 100 - el.clientWidth / 3);
+  }, [hasDay, date, tz, now]);
 
   useEffect(() => {
     const onPoint = (e: Event) => {
@@ -104,7 +122,7 @@ export function Ribbon({
   };
 
   return (
-    <div className="r-wrap">
+    <div className="r-wrap" ref={wrap}>
       <div className="r-ribbon" role="group" aria-label="Your day">
         <div className="r-top">
           <span
