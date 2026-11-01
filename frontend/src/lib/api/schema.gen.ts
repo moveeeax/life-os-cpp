@@ -26064,6 +26064,13 @@ export interface components {
                 /** @description Against the latest weighing at least 6 days older */
                 weight_change_7d: number | null;
             };
+            /** @description The repositories needing attention (the line of the Sunday review); absent when none, when GitHub is not linked or when the module is off */
+            github?: {
+                /** @description Not archived and with an attention item */
+                attention: number;
+                /** @description The full names of the first two by last push */
+                top: string[];
+            };
             focus: components["schemas"]["Focus"] | null;
             errors: string[];
         };

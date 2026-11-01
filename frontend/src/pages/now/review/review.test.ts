@@ -124,4 +124,23 @@ describe('reviewText', () => {
       'Обзор недели 2026-W44\nПросрочено: Паспорт\nЦели отстают: Подушка\nПривычки недобраны: Плавание 1 из 3',
     );
   });
+
+  it('adds one line about the repositories, and none when nothing needs attention', async () => {
+    const { githubLine, reviewText } = await import('./review');
+    const github = { attention: 3, top: ['moveeeax/life-os-cpp', 'cybercapybara/site'] };
+    expect(githubLine(github)).toBe(
+      '3 repositories need attention: moveeeax/life-os-cpp, cybercapybara/site',
+    );
+    expect(githubLine({ attention: 1, top: ['moveeeax/old'] })).toBe(
+      '1 repository needs attention: moveeeax/old',
+    );
+    expect(githubLine({ attention: 0, top: [] })).toBe('');
+    expect(githubLine(undefined)).toBe('');
+    expect(reviewText({ github } as never, '2026-W44')).toBe(
+      'Обзор недели 2026-W44\n3 repositories need attention: moveeeax/life-os-cpp, cybercapybara/site',
+    );
+    expect(reviewText({ github: { attention: 0, top: [] } } as never, '2026-W44')).toBe(
+      'Обзор недели 2026-W44\nХвостов нет: задачи, цели и привычки в порядке.',
+    );
+  });
 });

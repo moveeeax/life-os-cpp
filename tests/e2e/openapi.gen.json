@@ -1985,6 +1985,27 @@
        }
       }
      },
+     "github": {
+      "type": "object",
+      "required": [
+       "attention",
+       "top"
+      ],
+      "description": "The repositories needing attention (the line of the Sunday review); absent when none, when GitHub is not linked or when the module is off",
+      "properties": {
+       "attention": {
+        "type": "integer",
+        "description": "Not archived and with an attention item"
+       },
+       "top": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "description": "The full names of the first two by last push"
+       }
+      }
+     },
      "focus": {
       "oneOf": [
        {
@@ -40669,7 +40690,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 616786,
-  "source_fnv1a64": "a1b20114fda3411b"
+  "source_bytes": 617263,
+  "source_fnv1a64": "8672068d45eb3e7b"
  }
 }

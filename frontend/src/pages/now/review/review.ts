@@ -35,7 +35,20 @@ export function groupsOf(today: Today | undefined) {
     late: today?.tasks?.late ?? [],
     behind: (today?.goals ?? []).filter((g) => g.pace === 'behind'),
     habits: (today?.habits?.week ?? []).filter((h) => h.done < h.per_week),
+    github: today?.github && today.github.attention > 0 ? today.github : null,
   };
+}
+
+/**
+ * The one line of the review about GitHub: "3 repositories need attention:
+ * a/b, c/d" (the top two by last push); empty when nothing needs it.
+ */
+export function githubLine(github: Today['github'] | null | undefined): string {
+  if (!github || github.attention <= 0) return '';
+  const n = github.attention;
+  const names = github.top.slice(0, 2).join(', ');
+  const head = n === 1 ? '1 repository needs attention' : `${n} repositories need attention`;
+  return names ? `${head}: ${names}` : head;
 }
 
 /** The review as text for Saved Messages in Telegram. */
@@ -54,6 +67,7 @@ export function reviewText(today: Today | undefined, week: string): string {
     lines.push(
       `Привычки недобраны: ${g.habits.map((h) => `${h.name} ${h.done} из ${h.per_week}`).join('; ')}`,
     );
+  if (g.github) lines.push(githubLine(g.github));
   if (lines.length === 1) lines.push('Хвостов нет: задачи, цели и привычки в порядке.');
   return lines.join('\n').slice(0, 4000);
 }
