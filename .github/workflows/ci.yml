@@ -717,7 +717,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PUSH_BEFORE: ${{ github.event.before }}
-          RELEVANT: '^(src/|tests/|migrations/|docker/|config/|templates/|third_party/|scripts/|CMakeLists\.txt$|CMakePresets\.json$|vcpkg\.json$|Makefile$|\.github/workflows/ci\.yml$)'
+          # Only what clang-tidy reads: the sources, its own config, the build
+          # files and this workflow. A PR of tests, docs or charts skips the job.
+          RELEVANT: '^(src/|\.clang-tidy$|CMakeLists\.txt$|vcpkg\.json$|docker/Dockerfile$|\.github/workflows/ci\.yml$)'
         run: |
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             changed=$(gh api --paginate \
