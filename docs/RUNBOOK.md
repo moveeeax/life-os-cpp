@@ -302,7 +302,7 @@ back to the callback, the token is sealed, a first sync is queued, and the
 page returns to Account with the outcome (`?github=ok`, `denied`, `expired`
 after ten minutes, or `error`). The card then shows the login, the scopes
 GitHub granted and the time of the last sync. The section fills within a
-minute or two: 378 repositories are four pages of the user's list plus the
+minute or two: 378 repositories are about twenty pages of the user's list plus the
 organisations' pages. Every site user links their own account the same way;
 the data is per user, and Disconnect revokes the token at GitHub and drops
 the repositories and mutes.

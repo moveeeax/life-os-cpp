@@ -34,8 +34,12 @@ namespace Github {
 inline constexpr const char* kUserAgent = "Life OS (https://life-os.tarassov.me)";
 inline constexpr const char* kApiVersion = "2022-11-28";
 /// Repositories a page asks for, and the pages one owner may take (5000 repositories).
-inline constexpr int kPageSize = 100;
-inline constexpr int kMaxPages = 50;
+/// 20, not 100: GitHub's GraphQL gives a query ten seconds, and the RepoFields fragment
+/// (three README lookups, the checks rollup, the alert count) costs about 0.2 s per
+/// repository on their side, so a page of 100 came back as 502 every time and 50 sat on
+/// the limit (measured 2026-11-01 on 378 repositories).
+inline constexpr int kPageSize = 20;
+inline constexpr int kMaxPages = 250;
 
 /// @p s percent-encoded for a query value or a form field.
 std::string encode(const std::string& s);
