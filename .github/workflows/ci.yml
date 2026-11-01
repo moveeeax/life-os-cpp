@@ -109,16 +109,24 @@ jobs:
         if: steps.scope.outputs.relevant == 'true'
         uses: crazy-max/ghaction-github-runtime@3cb05d89e1f492524af3d41a1c98c83bc3025124  # v3.1.0
 
-      - name: Build builder image (cache warm)
+      - name: Build test image
+        # The test-runner stage is the builder plus a logs directory and an
+        # entrypoint: building it here, under compose's default image name,
+        # means the test step runs the binaries as they are. It used to build
+        # only the builder stage and let `make test` build test-runner on top,
+        # and that second build missed the layer cache (compose passes no
+        # ENABLE_WERROR), so the same 325 objects compiled a second time, on
+        # two cores and without sccache: 20 minutes of a 25-minute test step,
+        # for a suite that runs in 90 seconds (measured 2026-11-01).
         if: steps.scope.outputs.relevant == 'true'
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25  # v5.4.0
         with:
           context: .
           file: docker/Dockerfile
-          target: builder
+          target: test-runner
           push: false
           load: true
-          tags: life-os-cpp-ci:builder
+          tags: life-os-cpp:test-latest
           build-args: ENABLE_WERROR=ON
           secrets: |
             actions_results_url=${{ env.ACTIONS_RESULTS_URL }}
@@ -129,10 +137,8 @@ jobs:
           cache-to: type=gha,mode=max,ignore-error=true
 
       - name: Run full test suite
-        # `make test` builds the test-runner stage with
-        # --cache-from life-os-cpp:builder-latest. Alias the builder we just loaded
-        # under that tag so the compose build is a cache hit instead of a full
-        # recompile.
+        # `make test-ci` runs the three test binaries on the image loaded
+        # above (compose's TEST_IMAGE default) and builds nothing.
         #
         # CI_REQUIRE_INFRA: without it a mis-wired Postgres/Redis sidecar turns
         # all 160+ integration/api cases into SKIPs and the job reports green
@@ -143,8 +149,7 @@ jobs:
         env:
           CI_REQUIRE_INFRA: "1"
         run: |
-          docker tag life-os-cpp-ci:builder life-os-cpp:builder-latest
-          make test
+          make test-ci
 
       - name: Dump logs on failure
         if: failure() && steps.scope.outputs.relevant == 'true'
@@ -814,361 +819,3 @@ jobs:
           name: clang-tidy-log
           path: clang-tidy.log
           if-no-files-found: ignore
-
-  sanitizers:
-    runs-on: ubuntu-latest
-    # AddressSanitizer + UndefinedBehaviorSanitizer over the unit AND
-    # integration/api buckets. Unit builds and runs first — the fast
-    # memory/UB signal survives even if the heavier integration leg dies.
-    # Integration runs against the same ephemeral test-postgres/test-redis
-    # sidecars `make test` uses (compose `test` profile), with
-    # CI_REQUIRE_INFRA=1 so a mis-wired sidecar FAILS the suites instead of
-    # turning 160+ cases into SKIPs that report green while checking nothing.
-    # History: integration was excluded because compiling its TUs under ASan
-    # OOM'd an 8 GB buildkit VM (~24/39, rpc EOF — heavy header-only bodies
-    # re-instrumented in every TU). app_core STATIC (PRs #44–#46) moved those
-    # bodies into .cpp files compiled once, which removed the blocker.
-    # 120, not 90: cold-cache runs rebuild the vcpkg world (~35 min), the
-    # sanitizer-instrumented compile is slower than the plain one, and the
-    # integration suite under ASan runs a low single-digit multiple of its
-    # plain ~2 min wall clock.
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 2  # HEAD^ fallback for the push-event scope diff
-
-      - name: Scope — does the diff touch anything this job builds?
-        # Self-scoping, NOT a workflow-level `paths:` filter: the job always
-        # STARTS (required-check semantics stay honest — a skipped required
-        # job reports success while checking nothing), computes the diff
-        # itself, and exits green in seconds when none of its inputs changed.
-        # Fail-open: any trouble computing the diff ⇒ run the job in full.
-        id: scope
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PUSH_BEFORE: ${{ github.event.before }}
-          RELEVANT: '^(src/|tests/|migrations/|docker/|config/|templates/|third_party/|scripts/|CMakeLists\.txt$|CMakePresets\.json$|vcpkg\.json$|Makefile$|\.github/workflows/ci\.yml$)'
-        run: |
-          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            changed=$(gh api --paginate \
-              "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
-              --jq '.[].filename') || changed=""
-          elif [ -n "$PUSH_BEFORE" ] && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ]; then
-            # push: diff the whole push (before..sha), not just its last
-            # commit — a multi-commit push would otherwise hide every change
-            # but the head's. Fetch the old tip (the checkout is shallow);
-            # any failure (force-push to an unreachable SHA) fails open below.
-            changed=$(git fetch --no-tags --depth=1 origin "$PUSH_BEFORE" >/dev/null 2>&1 &&
-              git diff --name-only "$PUSH_BEFORE" "$GITHUB_SHA" 2>/dev/null) || changed=""
-          else
-            # push that created the branch (before is all zeros): first-parent
-            # diff of the head (checkout fetched depth 2). HEAD^ is absent on a
-            # root commit → fail open below.
-            changed=$(git diff --name-only HEAD^..HEAD 2>/dev/null) || changed=""
-          fi
-          if [ -z "$changed" ]; then
-            echo "could not determine the changed files — failing open, job runs in full"
-            echo "relevant=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          printf 'changed files:\n%s\n' "$changed"
-          if printf '%s\n' "$changed" | grep -qE "$RELEVANT"; then
-            echo "relevant=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "relevant=false" >> "$GITHUB_OUTPUT"
-            echo "paths untouched — verified nothing this job covers is affected; exiting green"
-          fi
-
-      - name: Free runner disk for the vcpkg build
-        # vcpkg writes debug and release libs into the builder layers, and the
-        # tree only grows: master run 41201001899 died with "no space left on
-        # device" in libprotocd.a and held up the v1.54.0 tag. The removed
-        # SDKs (.NET, Android, GHC, CodeQL) are not used by any job here.
-        if: steps.scope.outputs.relevant == 'true'
-        run: |
-          df -h /
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
-          docker system prune -af >/dev/null || true
-          df -h /
-
-      - name: Set up Docker Buildx
-        if: steps.scope.outputs.relevant == 'true'
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3.12.0
-
-      - name: Expose Actions cache env for sccache
-        # Exports ACTIONS_RESULTS_URL / ACTIONS_RUNTIME_TOKEN so sccache (inside
-        # docker builds and `docker run` compile steps) can talk to the Actions
-        # cache API. The Dockerfile receives them as BuildKit secrets — never
-        # ARGs — so layer cache keys and image history stay credential-free.
-        if: steps.scope.outputs.relevant == 'true'
-        uses: crazy-max/ghaction-github-runtime@3cb05d89e1f492524af3d41a1c98c83bc3025124  # v3.1.0
-
-      - name: Build builder image
-        if: steps.scope.outputs.relevant == 'true'
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25  # v5.4.0
-        with:
-          context: .
-          file: docker/Dockerfile
-          target: builder
-          push: false
-          load: true
-          tags: life-os-cpp-ci:builder
-          build-args: ENABLE_WERROR=ON
-          secrets: |
-            actions_results_url=${{ env.ACTIONS_RESULTS_URL }}
-            actions_runtime_token=${{ env.ACTIONS_RUNTIME_TOKEN }}
-          cache-from: |
-            type=gha
-            type=registry,ref=ghcr.io/${{ github.repository }}/builder:cache
-          cache-to: type=gha,mode=max,ignore-error=true
-
-      - name: Start test Postgres + Redis (compose `test` profile)
-        # The same ephemeral sidecars `make test` uses — no volume, fresh
-        # schema (the integration suites run MigrationRunner themselves).
-        # --wait blocks on the compose healthchecks so the suite never races
-        # a still-starting Postgres.
-        if: steps.scope.outputs.relevant == 'true'
-        run: |
-          docker compose -f docker/docker-compose.yml --env-file docker/.env \
-            --profile test up -d --wait test-postgres test-redis
-
-      - name: Build & run unit + integration tests with ASan + UBSan
-        # The -e ACTIONS_* pass-through + sccache launcher lets the sanitizer
-        # recompile hit the same Actions-cache-backed sccache as the builder
-        # image build (distinct flags → distinct cache entries, no collisions).
-        # The container joins the compose network, so the `test-postgres` /
-        # `test-redis` service names resolve exactly as they do for the
-        # test-runner service. CI_REQUIRE_INFRA=1: missing infra must FAIL,
-        # not skip-and-report-green (see test_helpers.hpp).
-        # Unit first: build + run the cheap binary before the heavy one so a
-        # regression there is reported in minutes, not after the full build.
-        if: steps.scope.outputs.relevant == 'true'
-        run: |
-          NET=$(docker inspect life_os_cpp_test_postgres \
-            --format '{{range $k, $_ := .NetworkSettings.Networks}}{{$k}}{{end}}')
-          docker run --rm \
-              --network "$NET" \
-              -e TEST_PG_HOST=test-postgres \
-              -e TEST_REDIS_HOST=test-redis \
-              -e CI_REQUIRE_INFRA=1 \
-              -e SCCACHE_GHA_ENABLED=on \
-              -e ACTIONS_CACHE_SERVICE_V2 \
-              -e ACTIONS_RESULTS_URL \
-              -e ACTIONS_RUNTIME_TOKEN \
-              --entrypoint /bin/bash \
-              life-os-cpp-ci:builder -c "
-                  set -e
-                  cd /app
-                  rm -rf build-san
-                  # sccache starts its server on the first compile and gives
-                  # it 10 s; with a slow Actions cache that timed out (tsan run
-                  # 41194108256). Start it up front with 60 s and compile
-                  # without the cache if it still does not come up.
-                  printf 'server_startup_timeout_ms = 60000\\n' > /tmp/sccache.toml
-                  export SCCACHE_CONF=/tmp/sccache.toml
-                  LAUNCHER='-DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache'
-                  if ! sccache --start-server && ! { sleep 10; sccache --start-server; }; then
-                      echo '::warning::sccache server did not start, compiling without the cache'
-                      LAUNCHER=''
-                  fi
-                  cmake -B build-san \
-                      -G Ninja \
-                      -DCMAKE_BUILD_TYPE=Debug \
-                      -DENABLE_SANITIZERS=ON \
-                      \$LAUNCHER \
-                      -DCMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake \
-                      -DVCPKG_INSTALLED_DIR=/app/build/vcpkg_installed  # reuse the builder stage's vcpkg tree (mirrors the sanitizer-builder Dockerfile stage); avoids a full vcpkg reinstall
-                  cmake --build build-san -j\$(nproc) --target life_os_cpp_tests_unit
-                  ASAN_OPTIONS=halt_on_error=1:detect_leaks=1 \
-                  UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
-                  ./build-san/life_os_cpp_tests_unit \
-                      --gtest_color=yes
-                  cmake --build build-san -j\$(nproc) --target life_os_cpp_tests_integration
-                  sccache --show-stats || true
-                  ASAN_OPTIONS=halt_on_error=1:detect_leaks=1 \
-                  UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
-                  ./build-san/life_os_cpp_tests_integration \
-                      --gtest_color=yes
-              "
-
-      - name: Dump test-infra logs on failure
-        if: failure() && steps.scope.outputs.relevant == 'true'
-        run: |
-          docker compose -f docker/docker-compose.yml --env-file docker/.env \
-            --profile test logs test-postgres test-redis || true
-
-  tsan:
-    runs-on: ubuntu-latest
-    # ThreadSanitizer over the unit AND integration/api buckets. The codebase
-    # leans on inline singletons + atomics (docs/ARCHITECTURE.md §5) — exactly where races
-    # hide, and the integration bucket is where the connection pools, the job
-    # queue and the cache actually run multi-threaded against real
-    # Postgres/Redis. Kept apart from the ASan job: TSan can't share a
-    # process with ASan. Same infra wiring as the sanitizers job (compose
-    # `test` profile sidecars + CI_REQUIRE_INFRA=1 — skips must not report
-    # green), unit first for the fast signal. Unblocked by app_core STATIC
-    # (PRs #44–#46) — see the sanitizers job header for the OOM history.
-    # No suppression file: if TSan reports races inside redis++/pqxx
-    # internals, read them first — only add a documented, pinpoint tsan.supp
-    # for provably-third-party noise, never for our own code.
-    # 120, not 90: same cold-vcpkg math as the sanitizers job, plus TSan's
-    # runtime slowdown on the integration suite (mostly I/O-bound, so well
-    # under TSan's worst-case multiplier, but real).
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 2  # HEAD^ fallback for the push-event scope diff
-
-      - name: Scope — does the diff touch anything this job builds?
-        # Self-scoping, NOT a workflow-level `paths:` filter: the job always
-        # STARTS (required-check semantics stay honest — a skipped required
-        # job reports success while checking nothing), computes the diff
-        # itself, and exits green in seconds when none of its inputs changed.
-        # Fail-open: any trouble computing the diff ⇒ run the job in full.
-        id: scope
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PUSH_BEFORE: ${{ github.event.before }}
-          RELEVANT: '^(src/|tests/|migrations/|docker/|config/|templates/|third_party/|scripts/|CMakeLists\.txt$|CMakePresets\.json$|vcpkg\.json$|Makefile$|\.github/workflows/ci\.yml$)'
-        run: |
-          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            changed=$(gh api --paginate \
-              "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
-              --jq '.[].filename') || changed=""
-          elif [ -n "$PUSH_BEFORE" ] && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ]; then
-            # push: diff the whole push (before..sha), not just its last
-            # commit — a multi-commit push would otherwise hide every change
-            # but the head's. Fetch the old tip (the checkout is shallow);
-            # any failure (force-push to an unreachable SHA) fails open below.
-            changed=$(git fetch --no-tags --depth=1 origin "$PUSH_BEFORE" >/dev/null 2>&1 &&
-              git diff --name-only "$PUSH_BEFORE" "$GITHUB_SHA" 2>/dev/null) || changed=""
-          else
-            # push that created the branch (before is all zeros): first-parent
-            # diff of the head (checkout fetched depth 2). HEAD^ is absent on a
-            # root commit → fail open below.
-            changed=$(git diff --name-only HEAD^..HEAD 2>/dev/null) || changed=""
-          fi
-          if [ -z "$changed" ]; then
-            echo "could not determine the changed files — failing open, job runs in full"
-            echo "relevant=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          printf 'changed files:\n%s\n' "$changed"
-          if printf '%s\n' "$changed" | grep -qE "$RELEVANT"; then
-            echo "relevant=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "relevant=false" >> "$GITHUB_OUTPUT"
-            echo "paths untouched — verified nothing this job covers is affected; exiting green"
-          fi
-
-      - name: Free runner disk for the vcpkg build
-        # vcpkg writes debug and release libs into the builder layers, and the
-        # tree only grows: master run 41201001899 died with "no space left on
-        # device" in libprotocd.a and held up the v1.54.0 tag. The removed
-        # SDKs (.NET, Android, GHC, CodeQL) are not used by any job here.
-        if: steps.scope.outputs.relevant == 'true'
-        run: |
-          df -h /
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
-          docker system prune -af >/dev/null || true
-          df -h /
-
-      - name: Set up Docker Buildx
-        if: steps.scope.outputs.relevant == 'true'
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3.12.0
-
-      - name: Expose Actions cache env for sccache
-        # Exports ACTIONS_RESULTS_URL / ACTIONS_RUNTIME_TOKEN so sccache (inside
-        # docker builds and `docker run` compile steps) can talk to the Actions
-        # cache API. The Dockerfile receives them as BuildKit secrets — never
-        # ARGs — so layer cache keys and image history stay credential-free.
-        if: steps.scope.outputs.relevant == 'true'
-        uses: crazy-max/ghaction-github-runtime@3cb05d89e1f492524af3d41a1c98c83bc3025124  # v3.1.0
-
-      - name: Build builder image
-        if: steps.scope.outputs.relevant == 'true'
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25  # v5.4.0
-        with:
-          context: .
-          file: docker/Dockerfile
-          target: builder
-          push: false
-          load: true
-          tags: life-os-cpp-ci:builder
-          build-args: ENABLE_WERROR=ON
-          secrets: |
-            actions_results_url=${{ env.ACTIONS_RESULTS_URL }}
-            actions_runtime_token=${{ env.ACTIONS_RUNTIME_TOKEN }}
-          cache-from: |
-            type=gha
-            type=registry,ref=ghcr.io/${{ github.repository }}/builder:cache
-          cache-to: type=gha,mode=max,ignore-error=true
-
-      - name: Start test Postgres + Redis (compose `test` profile)
-        # Same ephemeral sidecars as `make test` and the sanitizers job;
-        # --wait blocks on the compose healthchecks.
-        if: steps.scope.outputs.relevant == 'true'
-        run: |
-          docker compose -f docker/docker-compose.yml --env-file docker/.env \
-            --profile test up -d --wait test-postgres test-redis
-
-      - name: Build & run unit + integration tests with TSan
-        # Same sccache pass-through as the sanitizers job (TSan flags form
-        # their own cache entries), same compose-network + CI_REQUIRE_INFRA=1
-        # wiring, same unit-first ordering for the fast signal.
-        if: steps.scope.outputs.relevant == 'true'
-        run: |
-          NET=$(docker inspect life_os_cpp_test_postgres \
-            --format '{{range $k, $_ := .NetworkSettings.Networks}}{{$k}}{{end}}')
-          docker run --rm \
-              --network "$NET" \
-              -e TEST_PG_HOST=test-postgres \
-              -e TEST_REDIS_HOST=test-redis \
-              -e CI_REQUIRE_INFRA=1 \
-              -e SCCACHE_GHA_ENABLED=on \
-              -e ACTIONS_CACHE_SERVICE_V2 \
-              -e ACTIONS_RESULTS_URL \
-              -e ACTIONS_RUNTIME_TOKEN \
-              --entrypoint /bin/bash \
-              life-os-cpp-ci:builder -c "
-                  set -e
-                  cd /app
-                  rm -rf build-tsan
-                  # sccache starts its server on the first compile and gives
-                  # it 10 s; with a slow Actions cache that timed out (tsan run
-                  # 41194108256). Start it up front with 60 s and compile
-                  # without the cache if it still does not come up.
-                  printf 'server_startup_timeout_ms = 60000\\n' > /tmp/sccache.toml
-                  export SCCACHE_CONF=/tmp/sccache.toml
-                  LAUNCHER='-DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache'
-                  if ! sccache --start-server && ! { sleep 10; sccache --start-server; }; then
-                      echo '::warning::sccache server did not start, compiling without the cache'
-                      LAUNCHER=''
-                  fi
-                  cmake -B build-tsan \
-                      -G Ninja \
-                      -DCMAKE_BUILD_TYPE=Debug \
-                      -DENABLE_TSAN=ON \
-                      \$LAUNCHER \
-                      -DCMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake \
-                      -DVCPKG_INSTALLED_DIR=/app/build/vcpkg_installed
-                  cmake --build build-tsan -j\$(nproc) --target life_os_cpp_tests_unit
-                  TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1 \
-                  ./build-tsan/life_os_cpp_tests_unit \
-                      --gtest_color=yes
-                  cmake --build build-tsan -j\$(nproc) --target life_os_cpp_tests_integration
-                  sccache --show-stats || true
-                  TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1 \
-                  ./build-tsan/life_os_cpp_tests_integration \
-                      --gtest_color=yes
-              "
-
-      - name: Dump test-infra logs on failure
-        if: failure() && steps.scope.outputs.relevant == 'true'
-        run: |
-          docker compose -f docker/docker-compose.yml --env-file docker/.env \
-            --profile test logs test-postgres test-redis || true

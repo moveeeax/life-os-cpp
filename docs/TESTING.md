@@ -142,7 +142,7 @@ the curl TU), and anything needing Drogon types.
   tasks, goals, health and others). There are no rendered component or
   browser tests; visual changes are checked by hand.
 - **Sanitizers (ASan/UBSan and TSan)** cover the **unit** and
-  **integration/api** buckets: the CI `sanitizers` and `tsan` jobs build both
+  **integration/api** buckets: the `sanitizers` and `tsan` jobs of `sanitizers-nightly.yml` (nightly and by hand, not per PR since 2026-11-01) build both
   test binaries and run the integration one against the compose `test`-profile
   Postgres/Redis with `CI_REQUIRE_INFRA=1` (a missing sidecar fails the run
   instead of skipping it green). The **e2e** binary is still uninstrumented.
