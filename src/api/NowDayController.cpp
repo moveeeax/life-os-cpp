@@ -7,14 +7,19 @@
 
 #include <chrono>
 #include <exception>
+#include <memory>
 #include <optional>
 #include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #include <drogon/drogon.h>
 #include <spdlog/spdlog.h>
 
 #include <nlohmann/json.hpp>
 
+#include "api/CalendarCache.hpp"
 #include "api/FieldChecks.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
@@ -24,6 +29,7 @@
 #include "repositories/Zones.hpp"
 #include "repositories/calendar/LinkRepository.hpp"
 #include "repositories/now/DayRepository.hpp"
+#include "utils/BlockingPool.hpp"
 #include "utils/ErrorResponse.hpp"
 #include "utils/Modules.hpp"
 #include "utils/Utf8.hpp"
@@ -53,6 +59,28 @@ std::optional<std::string> zone_of(const HttpRequestPtr& req, const NowDayContro
     return tz;
 }
 
+/// One Google call of the page path at most this long (a token refresh and the events: two calls).
+constexpr long kPageCallSeconds = 4;
+
+/// The day in unix seconds: [from, to) for the events, [a, b) (08:00 to 22:00) for the free slots.
+struct DaySpan {
+    long long from = 0;
+    long long to = 0;
+    long long a = 0;
+    long long b = 0;
+};
+
+void with_events(json& out, const std::vector<Calendar::Event>& list, const DaySpan& span) {
+    out["calendar"] = "ok";
+    for (const auto& e : list) {
+        out["events"].push_back(Calendar::event_view(e));
+    }
+    for (const auto& [x, y] : Calendar::free_slots(list, span.a, span.b, 30)) {
+        out["free"].push_back(
+            {{"start", Calendar::rfc3339(x)}, {"end", Calendar::rfc3339(y)}, {"minutes", (y - x) / 60}});
+    }
+}
+
 }  // namespace
 
 void NowDayController::day(const HttpRequestPtr& req, Callback&& callback) {
@@ -67,41 +95,74 @@ void NowDayController::day(const HttpRequestPtr& req, Callback&& callback) {
         callback(ErrorResponse::bad_request("invalid_date", "date is a day as YYYY-MM-DD"));
         return;
     }
+    json out;
+    DaySpan span;
     try {
-        json out = Repositories::Now::DayRepository().day(owner, date, tz);
+        out = Repositories::Now::DayRepository().day(owner, date, tz);
         out["events"] = json::array();
         out["free"] = json::array();
-        // The calendar's state, so the ribbon can say why it has no events.
-        std::string calendar = "off";
-        if (Calendar::settings()) {
-            Repositories::Calendar::LinkRepository links;
-            const long long from = links.local_instant(date, 0, tz);
-            const long long to = links.local_instant(date, 24, tz);
-            auto events = Calendar::events(Net::Http::transport(), owner, from, to, tz);
-            if (auto* list = std::get_if<std::vector<Calendar::Event>>(&events)) {
-                calendar = "ok";
-                for (const auto& e : *list) {
-                    out["events"].push_back(Calendar::event_view(e));
-                }
-                const long long a = links.local_instant(date, 8, tz);
-                const long long b = links.local_instant(date, 22, tz);
-                for (const auto& [x, y] : Calendar::free_slots(*list, a, b, 30)) {
-                    out["free"].push_back(
-                        {{"start", Calendar::rfc3339(x)}, {"end", Calendar::rfc3339(y)}, {"minutes", (y - x) / 60}});
-                }
-            } else {
-                const auto& p = std::get<Calendar::Problem>(events);
-                calendar = p.code == "calendar_not_linked"     ? "not_linked"
-                           : p.code == "calendar_disconnected" ? "disconnected"
-                                                               : "unavailable";
-            }
-        }
-        out["calendar"] = calendar;
         out["date"] = date;
-        callback(Response::ok(json{{"data", out}}));
+        // The calendar's state, so the ribbon can say why it has no events.
+        out["calendar"] = "off";
+        if (!Calendar::settings()) {
+            callback(Response::ok(json{{"data", out}}));
+            return;
+        }
+        Repositories::Calendar::LinkRepository links;
+        // Most users have no calendar linked: that answer needs one row, not the pool.
+        const auto link = links.get(owner);
+        if (!link || link->broken) {
+            out["calendar"] = link ? "disconnected" : "not_linked";
+            callback(Response::ok(json{{"data", out}}));
+            return;
+        }
+        span = DaySpan{links.local_instant(date, 0, tz),
+                       links.local_instant(date, 24, tz),
+                       links.local_instant(date, 8, tz),
+                       links.local_instant(date, 22, tz)};
+        if (const auto kept = CalendarCache::get(owner, span.from, span.to)) {
+            with_events(out, *kept, span);
+            callback(Response::ok(json{{"data", out}}));
+            return;
+        }
+        if (CalendarCache::down(owner)) {
+            // Google failed a moment ago: the day comes without events instead of waiting on it again.
+            out["calendar"] = "unavailable";
+            callback(Response::ok(json{{"data", out}}));
+            return;
+        }
     } catch (const std::exception& e) {
         spdlog::error("now.day failed: {}", e.what());
         callback(ErrorResponse::internal_error());
+        return;
+    }
+    // Google is asked off the IO thread, each call cut to a few seconds: the page waits on it.
+    auto respond = std::make_shared<Callback>(std::move(callback));
+    const bool queued = Utils::BlockingPool::outbound().try_submit([respond, out, owner, tz, span]() mutable {
+        try {
+            Net::Http::CappedTransport quick(Net::Http::transport(), kPageCallSeconds);
+            auto events = Calendar::events(quick, owner, span.from, span.to, tz);
+            if (auto* list = std::get_if<std::vector<Calendar::Event>>(&events)) {
+                CalendarCache::put(owner, span.from, span.to, *list);
+                with_events(out, *list, span);
+            } else {
+                const auto& p = std::get<Calendar::Problem>(events);
+                out["calendar"] = p.code == "calendar_not_linked"     ? "not_linked"
+                                  : p.code == "calendar_disconnected" ? "disconnected"
+                                                                      : "unavailable";
+                if (p.status == 502) {
+                    CalendarCache::mark_down(owner);
+                }
+            }
+        } catch (const std::exception& e) {
+            spdlog::warn("now.day: the calendar part failed: {}", e.what());
+            out["calendar"] = "unavailable";
+        }
+        (*respond)(Response::ok(json{{"data", out}}));
+    });
+    if (!queued) {
+        out["calendar"] = "unavailable";
+        (*respond)(Response::ok(json{{"data", out}}));
     }
 }
 

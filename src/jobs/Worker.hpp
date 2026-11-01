@@ -127,7 +127,8 @@ private:
 
 /**
  * @brief The worker loop's maintenance pass: promote due jobs and reap
- *        expired leases on every cycle, trim the listing indexes once per
+ *        expired leases on every cycle, trim the listing indexes and requeue
+ *        ids left in a processing list without a lease once per
  *        @p trim_every. A failure is logged at warn, at most once a minute
  *        per worker thread with the count of the failures in between, instead
  *        of being swallowed. Never throws.
@@ -140,6 +141,7 @@ public:
         long promoted = 0;
         long reaped = 0;
         long trimmed = 0;
+        long orphans = 0;
         int errors = 0;
     };
 

@@ -2,8 +2,8 @@
  * @file Tools.hpp
  * @brief The Life OS tools of Ani's agent: what it may read of the user's
  *        site. A tool call becomes a GET on the site's own API, made by the
- *        worker as the user with an access token minted for the turn (five
- *        minutes), so the module switches, permissions and validation that
+ *        worker as the user with an access token minted for the turn (as long
+ *        as the longest turn), so the module switches, permissions and validation that
  *        guard the browser guard the agent too, and the pod itself holds no
  *        Life OS credential. What the model reads is the answer's data
  *        without ids and empty values (as the voice's tools, persona.ts).
@@ -23,8 +23,10 @@
 
 namespace Agent::Tools {
 
-/// How long the access token of one turn lives.
-inline constexpr long kTokenSeconds = 300;
+/// How long the access token of one turn lives: the longest turn (kMaxRounds
+/// gateway calls of kCallTimeoutSeconds each) plus five minutes for its tools,
+/// so a tool call late in a slow turn is not refused with 401.
+inline constexpr long kTokenSeconds = Gateway::kMaxRounds * Gateway::kCallTimeoutSeconds + 300;
 
 /// The tools as the gateway takes them (OpenAI function tools).
 nlohmann::json definitions();

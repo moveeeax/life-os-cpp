@@ -243,6 +243,13 @@ int main(int argc, char* argv[]) {
         auto& config = Config::get();
         std::string worker_id = config.get<std::string>(Config::Keys::worker_id, "worker-1");
         int concurrency = config.get<int>(Config::Keys::worker_concurrency, 2);
+        // Types that also get one thread of their own ("<id>-p"), beside the shared ones: a parse the
+        // user waits for on screen does not queue behind a fitness sync that holds the only shared
+        // thread for up to half an hour.
+        const std::vector<std::string> priority_types =
+            Utils::Strings::split_csv_vec(config.get<std::string>(Config::Keys::worker_priority_types, ""));
+        const std::string priority_id = worker_id + "-p";
+        const int threads = concurrency + (priority_types.empty() ? 0 : 1);
 
         // Rescue any jobs that the previous instance with this WORKER_ID
         // left in the processing list before crashing. Must run BEFORE
@@ -257,6 +264,8 @@ int main(int argc, char* argv[]) {
             Jobs::get().recover_processing(worker_id);
             for (int i = 0; i < concurrency; ++i)
                 Jobs::get().recover_processing(worker_id + "-" + std::to_string(i));
+            if (!priority_types.empty())
+                Jobs::get().recover_processing(priority_id);
         }
 
         // Register worker-specific Prometheus families. Labeled by job type
@@ -297,7 +306,9 @@ int main(int argc, char* argv[]) {
         // dead-letters every job of that type (Dispatcher throws PermanentJobError
         // → straight to DLQ). Surface the producer/consumer mismatch at startup.
         // WORKER_STRICT_TYPES=true upgrades the warning to a hard refusal to start.
-        if (auto missing = Jobs::Dispatcher::get().unregistered(worker_types); !missing.empty()) {
+        std::vector<std::string> subscribed = worker_types;
+        subscribed.insert(subscribed.end(), priority_types.begin(), priority_types.end());
+        if (auto missing = Jobs::Dispatcher::get().unregistered(subscribed); !missing.empty()) {
             const std::string joined = Utils::Strings::join(missing, ",");
             if (config.get<bool>("worker.strict_types", "WORKER_STRICT_TYPES", false)) {
                 spdlog::error(
@@ -362,7 +373,7 @@ int main(int argc, char* argv[]) {
                                                           brpop_timeout,
                                                           redis_password,
                                                           sentinel_password,
-                                                          /*pool_size=*/std::max(concurrency, 4),
+                                                          /*pool_size=*/std::max(threads, 4),
                                                           redis_db);
             } else {
                 std::string redis_url = config.get<std::string>("cache.url", "REDIS_URL", "tcp://127.0.0.1:6379");
@@ -371,7 +382,7 @@ int main(int argc, char* argv[]) {
                                                  addr.port,
                                                  brpop_timeout,
                                                  redis_password,
-                                                 /*pool_size=*/std::max(concurrency, 4),
+                                                 /*pool_size=*/std::max(threads, 4),
                                                  redis_db);
             }
         }
@@ -430,6 +441,11 @@ int main(int argc, char* argv[]) {
         for (int i = 0; i < concurrency; ++i) {
             std::string tid = worker_id + "-" + std::to_string(i);
             workers.emplace_back(worker_loop, tid, worker_types, brpop_timeout);
+        }
+        if (!priority_types.empty()) {
+            std::cout << "Priority:     " << Utils::Strings::join(priority_types, ", ") << " (one thread of their own)"
+                      << std::endl;
+            workers.emplace_back(worker_loop, priority_id, priority_types, brpop_timeout);
         }
 
         std::cout << "Worker ready — " << concurrency << " thread(s) processing " << worker_types.size() << " queue(s)"

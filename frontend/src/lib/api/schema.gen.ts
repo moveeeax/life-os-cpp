@@ -16530,11 +16530,13 @@ export interface paths {
                         /** @description RFC 3339, after start, a day at most */
                         end: string;
                         description?: string;
+                        /** @description The event's id, chosen by the caller (base32hex as Google takes it). An add sent again with the same id answers the event the first one made instead of adding a second. */
+                        id?: string;
                     };
                 };
             };
             responses: {
-                /** @description Added */
+                /** @description Added (or, with an id already taken, the event the earlier add made) */
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -16545,7 +16547,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description invalid_title, invalid_time */
+                /** @description invalid_title, invalid_time, invalid_id */
                 400: {
                     headers: {
                         [name: string]: unknown;

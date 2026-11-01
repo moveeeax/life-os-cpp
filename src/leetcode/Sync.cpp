@@ -98,11 +98,16 @@ std::optional<Stats> fetch(const std::string& username, std::string& why) {
     }
 }
 
-json process_sync(const json& /*payload*/) {
+json process_sync(const json& payload) {
+    // {"owner": id}: a profile just saved, only that one; no owner: the hourly pull of every profile.
+    const std::string only = payload.is_object() ? payload.value("owner", std::string()) : std::string();
     Repositories::LeetCode::ProfileRepository repo;
     int ok = 0;
     int failed = 0;
     for (const auto& p : repo.all()) {
+        if (!only.empty() && p.owner != only) {
+            continue;
+        }
         std::string why;
         if (const auto s = fetch(p.username, why)) {
             repo.snapshot(p.owner, p.tz, s->total, s->easy, s->medium, s->hard);

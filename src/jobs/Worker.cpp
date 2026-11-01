@@ -194,6 +194,13 @@ Maintenance::Pass Maintenance::run(JobQueue& queue, std::chrono::steady_clock::t
         } catch (const std::exception& e) {
             report("trim_indexes", e.what());
         }
+        // Ids stranded in a processing list without a lease (another pod's,
+        // which its own startup recovery never reads): as rare as the trim.
+        try {
+            pass.orphans = queue.recover_orphans();
+        } catch (const std::exception& e) {
+            report("recover_orphans", e.what());
+        }
     }
     return pass;
 }

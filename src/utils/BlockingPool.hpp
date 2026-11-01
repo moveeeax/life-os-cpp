@@ -50,6 +50,12 @@ public:
     /// find its pool gone.
     static BlockingPool& shared();
 
+    /// The pool of the API's calls to Google Calendar and the Telegram
+    /// gateway (api/Outbound.hpp): 4 threads, 32 waiting tasks, apart from
+    /// shared() so a hung gateway does not hold the Xiaomi calls and the
+    /// voice, nor they these. Never destroyed, as shared().
+    static BlockingPool& outbound();
+
 private:
     void ensure_started_();  // called under mutex_
     void run_();

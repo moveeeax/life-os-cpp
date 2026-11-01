@@ -313,6 +313,7 @@
     "types": ["default"],
     "strict_types": "${WORKER_STRICT_TYPES:-false}",
     "concurrency": 2,
+    "priority_types": "${WORKER_PRIORITY_TYPES:-}",
     "health_port": 9091,
     "brpop_timeout": 5
   }

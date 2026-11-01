@@ -44,6 +44,14 @@ public:
 
     long del(const std::string& k) override { return static_cast<long>(store_.erase(k)); }
 
+    bool del_if_equals(const std::string& k, const std::string& v) override {
+        auto it = store_.find(k);
+        if (it == store_.end() || it->second != v)
+            return false;
+        store_.erase(it);
+        return true;
+    }
+
     long del(const std::vector<std::string>& keys) override {
         long n = 0;
         for (const auto& k : keys)

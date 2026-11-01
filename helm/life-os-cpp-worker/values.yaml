@@ -124,7 +124,7 @@ externalSecrets:
 # ---------------------------------------------------------------
 # Worker settings
 # Env vars set: WORKER_ID, WORKER_TYPES, WORKER_CONCURRENCY,
-#               WORKER_HEALTH_PORT, WORKER_BRPOP_TIMEOUT
+#               WORKER_PRIORITY_TYPES, WORKER_HEALTH_PORT, WORKER_BRPOP_TIMEOUT
 # ---------------------------------------------------------------
 worker:
   # WORKER_ID names the Redis processing list a job sits in while this
@@ -141,6 +141,10 @@ worker:
   # silently leaves those jobs to pile up in Redis and no mail is ever sent.
   types: "account_email,email.send,webhook.deliver,fitness_sync,leetcode_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,now_media_sweep,files_sweep"
   concurrency: 2
+  # Comma-separated types that also get one thread of their own beside the
+  # `concurrency` shared ones (WORKER_PRIORITY_TYPES): jobs a user waits for
+  # on screen, so a long job of another type cannot hold them. Empty: none.
+  priorityTypes: ""
   healthPort: 9091
   brpopTimeout: 5
 

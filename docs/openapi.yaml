@@ -10712,9 +10712,15 @@ paths:
                 start: { type: string, description: RFC 3339 with an offset }
                 end: { type: string, description: 'RFC 3339, after start, a day at most' }
                 description: { type: string, maxLength: 2000 }
+                id:
+                  type: string
+                  pattern: '^[a-v0-9]{5,1024}$'
+                  description: >-
+                    The event's id, chosen by the caller (base32hex as Google takes it). An add sent again with
+                    the same id answers the event the first one made instead of adding a second.
       responses:
         '201':
-          description: Added
+          description: Added (or, with an id already taken, the event the earlier add made)
           content:
             application/json:
               schema:
@@ -10722,7 +10728,7 @@ paths:
                 required: [data]
                 properties:
                   data: { $ref: '#/components/schemas/CalendarEvent' }
-        '400': { description: 'invalid_title, invalid_time' }
+        '400': { description: 'invalid_title, invalid_time, invalid_id' }
         '401': { description: Not authenticated }
         '404': { description: 'Calendar not set up on the server (calendar_not_configured) or not linked (calendar_not_linked)' }
         '409': { description: 'Google refused the token (calendar_disconnected): connect again' }

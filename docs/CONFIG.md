@@ -392,6 +392,7 @@ the API and the worker.
 | `WORKER_TYPES` | `worker.types` | csv | all registered handler types | Queues the worker pulls from. Unset (prod leaves it unset) → every type with a registered handler. The eleven handlers this binary registers: `account_email`, `email.send`, `webhook.deliver`, `fitness_sync`, `food_parse`, `money_parse`, `money_rates`, `money_advisor`, `tasks_parse`, `now_media_sweep`, `files_sweep`. When you DO set it, a type left out piles up undrained: the compose stack lists all eleven, `config.json` ships `default` (no handler of that name; the startup guard warns). |
 | `WORKER_STRICT_TYPES` | `worker.strict_types` | bool | `false` | A `WORKER_TYPES` entry without a registered handler logs a warning; `true` upgrades it to a refusal to start |
 | `WORKER_CONCURRENCY` | `worker.concurrency` | int | `2` | |
+| `WORKER_PRIORITY_TYPES` | `worker.priority_types` | csv | empty | Types that also get one worker thread of their own (`<WORKER_ID>-p`) beside the `WORKER_CONCURRENCY` shared ones, so a job a user waits for on screen never waits behind a long job of another type. Prod's main worker sets `food_parse,money_parse,tasks_parse` (its single shared thread also runs `fitness_sync`, up to 30 minutes per data type). |
 | `WORKER_HEALTH_PORT` | `worker.health_port` | int | `9091` | |
 | `WORKER_BRPOP_TIMEOUT` | `worker.brpop_timeout` | int | `5` | |
 

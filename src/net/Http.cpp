@@ -141,6 +141,23 @@ Response CurlTransport::send(const Request& request) {
         handle.get(), request.url, headers, request.timeout_seconds > 0 ? request.timeout_seconds : timeout_seconds_);
 }
 
+Response CappedTransport::get(const std::string& url, const std::vector<std::pair<std::string, std::string>>& headers) {
+    return inner_.get(url, headers);
+}
+
+Response CappedTransport::post_json(const std::string& url,
+                                    const std::string& body,
+                                    const std::vector<std::pair<std::string, std::string>>& headers,
+                                    long timeout_seconds) {
+    return inner_.post_json(url, body, headers, cap(timeout_seconds));
+}
+
+Response CappedTransport::send(const Request& request) {
+    Request capped = request;
+    capped.timeout_seconds = cap(request.timeout_seconds);
+    return inner_.send(capped);
+}
+
 Transport& transport() {
     if (override_slot() != nullptr) {
         return *override_slot();
