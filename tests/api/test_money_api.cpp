@@ -102,6 +102,7 @@ protected:
             {&Api::MoneyController::convert, "/api/v1/money/rates/convert"},
             {&Api::MoneyController::refreshRates, "/api/v1/money/rates/refresh"},
             {&Api::MoneyController::periodReport, "/api/v1/money/reports/period"},
+            {&Api::MoneyController::monthReports, "/api/v1/money/reports/months"},
             {&Api::MoneyController::balances, "/api/v1/money/reports/balances"},
             {&Api::MoneyController::summary, "/api/v1/money/summary"},
             {&Api::MoneyController::parseText, "/api/v1/money/parse"},
@@ -664,6 +665,47 @@ TEST_F(MoneyApiTest, ReportIsPerCurrencyWithBudgetsAndTheAsIfBlock) {
                     .empty());
 }
 
+// The month strip asks once for the year: each month carries the "as if"
+// totals the period report gives for it.
+TEST_F(MoneyApiTest, MonthReportsGiveEveryMonthOfAYearInOneCall) {
+    const json kaspi = account(kAnna, "Kaspi", "KZT");
+    const json food = category(kAnna, json{{"name", "Food"}});
+    expense(kaspi, food, 10000, "2025-03-05", "Big C");
+    expense(kaspi, food, 2500, "2025-11-20", "Big C");
+    Repositories::Money::FxRateRepository().put_day("2025-01-01", {{"KZT", 500}});
+
+    const auto resp = call(&Api::MoneyController::monthReports, user(kAnna), Get, {{"year", "2025"}, {"as_if", "KZT"}});
+    ASSERT_EQ(resp->statusCode(), k200OK) << resp->body();
+    const json months = body_of(resp)["data"];
+    ASSERT_EQ(months.size(), 12u) << "a past year has all twelve";
+    EXPECT_EQ(months[0]["month"], "2025-01");
+    EXPECT_EQ(months[1]["from"], "2025-02-01");
+    EXPECT_EQ(months[1]["to"], "2025-02-28");
+    EXPECT_EQ(months[2]["as_if"]["currency"], "KZT");
+    EXPECT_DOUBLE_EQ(months[2]["as_if"]["expense"].get<double>(), 10000);
+    EXPECT_DOUBLE_EQ(months[10]["as_if"]["expense"].get<double>(), 2500);
+    EXPECT_DOUBLE_EQ(months[0]["as_if"]["expense"].get<double>(), 0);
+
+    const json one = body_of(call(&Api::MoneyController::periodReport,
+                                  user(kAnna),
+                                  Get,
+                                  {{"kind", "month"}, {"date", "2025-03-10"}, {"as_if", "KZT"}}))["data"]["as_if"];
+    EXPECT_DOUBLE_EQ(one["expense"].get<double>(), months[2]["as_if"]["expense"].get<double>());
+
+    EXPECT_TRUE(
+        body_of(call(&Api::MoneyController::monthReports, user(kAnna), Get, {{"year", "2999"}}))["data"].empty())
+        << "a coming year has no month yet";
+    const json boris = body_of(
+        call(&Api::MoneyController::monthReports, user(kBoris), Get, {{"year", "2025"}, {"as_if", "KZT"}}))["data"];
+    ASSERT_EQ(boris.size(), 12u);
+    EXPECT_DOUBLE_EQ(boris[2]["as_if"]["expense"].get<double>(), 0) << "Anna's rows stay hers";
+
+    EXPECT_EQ(call(&Api::MoneyController::monthReports, user(kAnna), Get, {{"year", "25"}})->statusCode(),
+              k400BadRequest);
+    EXPECT_EQ(call(&Api::MoneyController::monthReports, user(kAnna), Get, {{"as_if", "kzt"}})->statusCode(),
+              k400BadRequest);
+}
+
 TEST_F(MoneyApiTest, RatesAndConversion) {
     Repositories::Money::FxRateRepository().put_day("2026-10-02", {{"KZT", 450}, {"THB", 33.5}});
     const json r = body_of(
@@ -929,6 +971,7 @@ TEST_F(MoneyApiTest, RatesBackfillChecksTheRangeBeforeTheQueue) {
 TEST_F(MoneyOffTest, EveryRouteIs404WhileTheModuleIsOff) {
     EXPECT_EQ(call(&Api::MoneyController::listAccounts, user(kAnna), Get)->statusCode(), k404NotFound);
     EXPECT_EQ(call(&Api::MoneyController::periodReport, user(kAnna), Get)->statusCode(), k404NotFound);
+    EXPECT_EQ(call(&Api::MoneyController::monthReports, user(kAnna), Get)->statusCode(), k404NotFound);
     EXPECT_EQ(call_json(&Api::MoneyController::createTransaction, user(kAnna), json::object())->statusCode(),
               k404NotFound);
 }
