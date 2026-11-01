@@ -37,6 +37,7 @@
 #include "email/Mailer.hpp"
 #include "files/jobs/Sweep.hpp"
 #include "fitness/jobs/SyncJob.hpp"
+#include "github/Settings.hpp"
 #include "jobs/Jobs.hpp"
 #include "jobs/Outbox.hpp"
 #include "jobs/Tick.hpp"
@@ -600,6 +601,7 @@ void Application::init_jobs_(Config::AppConfig& cfg) {
     register_files_sweep_schedule_();
     register_ani_agents_schedule_();
     register_leetcode_schedule_();
+    register_github_schedule_();
     register_telegram_schedule_();
 }
 
@@ -754,6 +756,30 @@ void Application::register_leetcode_schedule_() {
             spdlog::warn("leetcode sync tick failed: {}", e.what());
         }
     });
+}
+
+void Application::register_github_schedule_() {
+    // GitHub: every hour a tick queues github_sync without an owner; the worker queues one job per
+    // linked user whose last sync is older than Github::kSyncEveryHours. The first tick comes two
+    // minutes after start, so a deploy does not wait an hour.
+    if (!Tasks::is_initialized() || !Database::is_initialized() || !Jobs::is_initialized())
+        return;
+    if (!github_enabled())
+        return;
+    spdlog::info("github sync enabled: every hour, each user every {} hours", Github::kSyncEveryHours);
+    Tasks::schedule_recurring(
+        "github_sync_schedule",
+        std::chrono::hours(1),
+        [] {
+            if (!Jobs::is_initialized())
+                return;
+            try {
+                Jobs::get().submit(Github::kSyncJob, nlohmann::json::object());
+            } catch (const std::exception& e) {
+                spdlog::warn("github sync tick failed: {}", e.what());
+            }
+        },
+        std::chrono::milliseconds(std::chrono::minutes(2)));
 }
 
 void Application::register_telegram_schedule_() {

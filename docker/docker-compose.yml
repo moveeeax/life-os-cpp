@@ -82,6 +82,12 @@ services:
       NOTES_ENABLED: ${NOTES_ENABLED:-false}
       PRACTICE_ENABLED: ${PRACTICE_ENABLED:-false}
       MEDICAL_ENABLED: ${MEDICAL_ENABLED:-false}
+      # github module: the switch, the OAuth App and the seal key of the users' tokens.
+      GITHUB_ENABLED: ${GITHUB_ENABLED:-false}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_REDIRECT_URL: ${GITHUB_REDIRECT_URL:-https://life-os.tarassov.me/api/v1/github/oauth/callback}
+      GITHUB_TOKEN_KEY: ${GITHUB_TOKEN_KEY:-}
       REGISTRATION_OPEN: ${REGISTRATION_OPEN:-true}
       NOW_ENABLED: ${NOW_ENABLED:-false}
       # Rate limiting, idempotency and CSRF: the defaults are the values of
@@ -267,6 +273,12 @@ services:
       NOTES_ENABLED: ${NOTES_ENABLED:-false}
       PRACTICE_ENABLED: ${PRACTICE_ENABLED:-false}
       MEDICAL_ENABLED: ${MEDICAL_ENABLED:-false}
+      # github module: the switch, the OAuth App and the seal key of the users' tokens.
+      GITHUB_ENABLED: ${GITHUB_ENABLED:-false}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_REDIRECT_URL: ${GITHUB_REDIRECT_URL:-https://life-os.tarassov.me/api/v1/github/oauth/callback}
+      GITHUB_TOKEN_KEY: ${GITHUB_TOKEN_KEY:-}
       REGISTRATION_OPEN: ${REGISTRATION_OPEN:-true}
       NOW_ENABLED: ${NOW_ENABLED:-false}
       WORKER_ID: ${WORKER_ID:-worker-1}
@@ -278,7 +290,7 @@ services:
       # testing — opt them in explicitly when you want them, e.g.:
       #   WORKER_TYPES=account_email,echo,slow,fail
       # (The API job tests drain Redis directly and do NOT rely on this list.)
-      WORKER_TYPES: ${WORKER_TYPES:-account_email,email.send,webhook.deliver,fitness_sync,leetcode_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,now_media_sweep,files_sweep}
+      WORKER_TYPES: ${WORKER_TYPES:-account_email,email.send,webhook.deliver,fitness_sync,leetcode_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,now_media_sweep,files_sweep,github_sync}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
       WORKER_PRIORITY_TYPES: ${WORKER_PRIORITY_TYPES:-food_parse,money_parse,tasks_parse}
       WORKER_HEALTH_PORT: ${WORKER_HEALTH_PORT:-9091}

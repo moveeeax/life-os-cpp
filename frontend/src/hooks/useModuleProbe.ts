@@ -7,6 +7,7 @@ export type ModuleId =
   | 'billing'
   | 'fitness'
   | 'food'
+  | 'github'
   | 'goals'
   | 'habits'
   | 'medical'

@@ -40,6 +40,7 @@
 #include "api/FilesController.hpp"
 #include "api/FitnessController.hpp"
 #include "api/FoodController.hpp"
+#include "api/GithubController.hpp"
 #include "api/GoalsController.hpp"
 #include "api/HabitsController.hpp"
 #include "api/HealthController.hpp"

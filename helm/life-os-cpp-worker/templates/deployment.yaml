@@ -241,6 +241,12 @@ spec:
             # medical module — master switch (the family medical archive)
             - name: MEDICAL_ENABLED
               value: {{ .Values.medical.enabled | quote }}
+            # github module — master switch and the OAuth callback; the App's id,
+            # secret and the seal key arrive through extraEnvFrom (Secret life-os-app)
+            - name: GITHUB_ENABLED
+              value: {{ .Values.github.enabled | quote }}
+            - name: GITHUB_REDIRECT_URL
+              value: {{ .Values.github.redirectUrl | quote }}
             # self sign-up: false = invite-only
             - name: REGISTRATION_OPEN
               value: {{ .Values.registration.open | quote }}

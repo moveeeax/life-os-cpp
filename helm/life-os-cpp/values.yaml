@@ -319,6 +319,18 @@ medical:
   enabled: false
 
 # ---------------------------------------------------------------
+# github module — the user's GitHub repositories, synced by the worker job
+# github_sync, with what needs attention. Env vars set: GITHUB_ENABLED,
+# GITHUB_REDIRECT_URL. The OAuth App's id and secret and the seal key of
+# the users' tokens (GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET,
+# GITHUB_TOKEN_KEY) come from extraEnvFrom (Secret life-os-app), never
+# from chart values.
+# ---------------------------------------------------------------
+github:
+  enabled: false
+  redirectUrl: "https://life-os.tarassov.me/api/v1/github/oauth/callback"
+
+# ---------------------------------------------------------------
 # now module — the Now screen's digest, the focus of the day and the
 # wallpaper library. Env var set: NOW_ENABLED.
 # ---------------------------------------------------------------

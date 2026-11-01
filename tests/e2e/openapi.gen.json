@@ -2,7 +2,7 @@
  "openapi": "3.1.0",
  "info": {
   "title": "life-os-cpp API",
-  "description": "The REST API of Life OS, a C++20 service on Drogon with Postgres and\nRedis. Four families of routes: the probes and infrastructure (`/healthz`,\n`/ready`, `/health`, `/metrics`, the background-job queue and its DLQ under\n`/api/v1/jobs`); accounts and administration (`/api/v1/auth`,\n`/api/v1/account`, `/api/v1/admin`, API keys, the audit log); billing\n(PayPal top-ups into a credit wallet, `/api/v1/billing` and\n`/api/v1/admin/billing`); and the life modules, each behind its own\nswitch and answering 404 while off: fitness (Mi Fitness sync), workout,\nfood, money, tasks with projects, goals, now (`/api/v1/today`, wallpapers,\nsounds), travel, habits, notes and practice. Every route except the probes is under\nsounds), travel, habits, notes and medical (with the private files of its\nrecords and of travel documents under `/api/v1/files`). Every route except the probes is under\n`/api/v1`. Authentication is a JWT bearer, an API key (`X-API-Key`) or the\nHttpOnly session cookie the SPA uses; rate limiting and idempotency are\ndriven by headers (`Idempotency-Key` on writes). Maintained by one owner,\nsee the repository.\n",
+  "description": "The REST API of Life OS, a C++20 service on Drogon with Postgres and\nRedis. Four families of routes: the probes and infrastructure (`/healthz`,\n`/ready`, `/health`, `/metrics`, the background-job queue and its DLQ under\n`/api/v1/jobs`); accounts and administration (`/api/v1/auth`,\n`/api/v1/account`, `/api/v1/admin`, API keys, the audit log); billing\n(PayPal top-ups into a credit wallet, `/api/v1/billing` and\n`/api/v1/admin/billing`); and the life modules, each behind its own\nswitch and answering 404 while off: fitness (Mi Fitness sync), workout,\nfood, money, tasks with projects, goals, now (`/api/v1/today`, wallpapers,\nsounds), travel, habits, notes and practice. Every route except the probes is under\nsounds), travel, habits, notes and medical (with the private files of its\nrecords and of travel documents under `/api/v1/files`) and github (the\nrepositories of a linked GitHub account, under `/api/v1/github`). Every route except the probes is under\n`/api/v1`. Authentication is a JWT bearer, an API key (`X-API-Key`) or the\nHttpOnly session cookie the SPA uses; rate limiting and idempotency are\ndriven by headers (`Idempotency-Key` on writes). Maintained by one owner,\nsee the repository.\n",
   "version": "1.56.0",
   "contact": {
    "name": "life-os-cpp repository",
@@ -1982,6 +1982,27 @@
          "null"
         ],
         "description": "Against the latest weighing at least 6 days older"
+       }
+      }
+     },
+     "github": {
+      "type": "object",
+      "required": [
+       "attention",
+       "top"
+      ],
+      "description": "The repositories needing attention (the line of the Sunday review); absent when none, when GitHub is not linked or when the module is off",
+      "properties": {
+       "attention": {
+        "type": "integer",
+        "description": "Not archived and with an attention item"
+       },
+       "top": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "description": "The full names of the first two by last push"
        }
       }
      },
@@ -5401,6 +5422,286 @@
      "chat": {
       "type": "string",
       "description": "The chat id (search results only)"
+     }
+    }
+   },
+   "GithubRule": {
+    "type": "string",
+    "enum": [
+     "checks",
+     "alerts",
+     "prs",
+     "issues",
+     "hygiene",
+     "stale"
+    ],
+    "description": "An attention rule: failing checks on the default branch (checks), open Dependabot alerts (alerts), open pull requests (prs), open issues (issues), a public repository without a description, license or README (hygiene), no push for twelve months and not archived (stale)."
+   },
+   "GithubAttentionItem": {
+    "type": "object",
+    "required": [
+     "rule",
+     "detail"
+    ],
+    "properties": {
+     "rule": {
+      "$ref": "#/components/schemas/GithubRule"
+     },
+     "detail": {
+      "type": "string",
+      "description": "Why, in a few words: \"3 open issues\", \"no license, no README\", \"no push for 14 months\""
+     }
+    }
+   },
+   "GithubStatus": {
+    "type": "object",
+    "required": [
+     "configured",
+     "linked",
+     "login",
+     "scopes",
+     "linked_at",
+     "synced_at",
+     "sync_error",
+     "org_hint"
+    ],
+    "properties": {
+     "configured": {
+      "type": "boolean",
+      "description": "The server has a GitHub OAuth App and a seal key"
+     },
+     "linked": {
+      "type": "boolean",
+      "description": "The caller linked their GitHub account"
+     },
+     "login": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "The GitHub login linked"
+     },
+     "scopes": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "What GitHub granted (\"repo\", \"read:org\"); empty when not linked"
+     },
+     "linked_at": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time"
+     },
+     "synced_at": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time",
+      "description": "The last sync that worked; null before the first"
+     },
+     "sync_error": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Why the last sync failed; the list shown is the one before it"
+     },
+     "org_hint": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "An organisation whose repositories came back empty or forbidden: approve the app in its settings once"
+     }
+    }
+   },
+   "GithubRepo": {
+    "type": "object",
+    "required": [
+     "full_name",
+     "owner",
+     "name",
+     "visibility",
+     "fork",
+     "archived",
+     "description",
+     "topics",
+     "license",
+     "stars",
+     "pushed_at",
+     "default_branch",
+     "open_issues",
+     "open_prs",
+     "open_alerts",
+     "checks",
+     "has_readme",
+     "attention",
+     "muted",
+     "tasks",
+     "synced_at"
+    ],
+    "properties": {
+     "full_name": {
+      "type": "string",
+      "description": "owner/name, as on GitHub (https://github.com/{full_name})"
+     },
+     "owner": {
+      "type": "string",
+      "description": "The user or organisation login"
+     },
+     "name": {
+      "type": "string"
+     },
+     "visibility": {
+      "type": "string",
+      "enum": [
+       "public",
+       "private",
+       "internal"
+      ]
+     },
+     "fork": {
+      "type": "boolean"
+     },
+     "archived": {
+      "type": "boolean"
+     },
+     "description": {
+      "type": "string",
+      "description": "\"\" when none"
+     },
+     "topics": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "license": {
+      "type": "string",
+      "description": "The SPDX id (\"MIT\"); \"\" when none"
+     },
+     "stars": {
+      "type": "integer"
+     },
+     "pushed_at": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time",
+      "description": "The last push; null when never pushed"
+     },
+     "default_branch": {
+      "type": "string"
+     },
+     "open_issues": {
+      "type": "integer"
+     },
+     "open_prs": {
+      "type": "integer"
+     },
+     "open_alerts": {
+      "type": "integer",
+      "description": "Open Dependabot alerts"
+     },
+     "checks": {
+      "type": "string",
+      "enum": [
+       "success",
+       "failure",
+       "pending",
+       "none"
+      ],
+      "description": "The default branch head's check rollup; none when the branch has no checks"
+     },
+     "has_readme": {
+      "type": "boolean"
+     },
+     "attention": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/GithubAttentionItem"
+      },
+      "description": "What needs attention, in rule order, the muted rules left out; empty for an archived repository"
+     },
+     "muted": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/GithubRule"
+      },
+      "description": "The rules silenced for this repository"
+     },
+     "tasks": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "description": "The task made from each rule, by rule ({\"issues\": \"<task id>\"})"
+     },
+     "synced_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "GithubRepoList": {
+    "type": "object",
+    "required": [
+     "data",
+     "total",
+     "limit",
+     "offset",
+     "owners",
+     "counts"
+    ],
+    "properties": {
+     "data": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/GithubRepo"
+      }
+     },
+     "total": {
+      "type": "integer",
+      "description": "Rows of the view after the owner and q filters"
+     },
+     "limit": {
+      "type": "integer"
+     },
+     "offset": {
+      "type": "integer"
+     },
+     "owners": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Every repository owner of the caller, sorted (the filter chips)"
+     },
+     "counts": {
+      "type": "object",
+      "required": [
+       "attention",
+       "all",
+       "archived"
+      ],
+      "description": "The sizes of the three views over all the caller's repositories (the tabs)",
+      "properties": {
+       "attention": {
+        "type": "integer"
+       },
+       "all": {
+        "type": "integer"
+       },
+       "archived": {
+        "type": "integer"
+       }
+      }
      }
     }
    },
@@ -31450,6 +31751,570 @@
     }
    }
   },
+  "/api/v1/github": {
+   "get": {
+    "summary": "The caller's GitHub link",
+    "description": "Whether the server has a GitHub OAuth App (configured) and whether the caller linked their account, with the last sync's outcome. A key with scope read may call it.",
+    "tags": [
+     "github"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The status",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/GithubStatus"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "GitHub module disabled (github)"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Unlink the caller's GitHub account",
+    "description": "Revokes the token at GitHub (best effort) and deletes it; the repositories and mutes go with it. Refused for API keys.",
+    "tags": [
+     "github"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Unlinked"
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Not linked (github_not_linked), or GitHub module disabled (github)"
+     }
+    }
+   }
+  },
+  "/api/v1/github/oauth/start": {
+   "get": {
+    "summary": "Start linking GitHub",
+    "description": "A redirect to GitHub's authorization page (scopes repo and read:org) with a one-time state (ten minutes, bound to the caller). The browser goes there; GitHub comes back to the callback. Refused for API keys.",
+    "tags": [
+     "github"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "302": {
+      "description": "To https://github.com/login/oauth/authorize"
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Not set up on the server (github_not_configured), or GitHub module disabled (github)"
+     }
+    }
+   }
+  },
+  "/api/v1/github/oauth/callback": {
+   "get": {
+    "summary": "GitHub's authorization comes back here",
+    "description": "Public: the one-time state names the user, who must be the one signed in on the browser. Exchanges the code, seals the token, queues a sync and redirects to /account?github=ok, denied, expired or error.",
+    "tags": [
+     "github"
+    ],
+    "security": [],
+    "parameters": [
+     {
+      "name": "state",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "code",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "error",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "302": {
+      "description": "To /account with the outcome"
+     }
+    }
+   }
+  },
+  "/api/v1/github/repos": {
+   "get": {
+    "summary": "The caller's repositories as the last sync saw them",
+    "description": "view attention (the default): not archived and needing something; all: not archived; archived: archived. Last push first. owner keeps one user or organisation; q matches the full name and the topics. A key with scope read may call it.",
+    "tags": [
+     "github"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "view",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "enum": [
+        "attention",
+        "all",
+        "archived"
+       ],
+       "default": "attention"
+      }
+     },
+     {
+      "name": "owner",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "A repository owner from owners"
+     },
+     {
+      "name": "q",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Over the full name and the topics"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The rows of the view, the owners and the sizes of the views",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/GithubRepoList"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Bad query (invalid_query): a view not in the enum"
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Not linked (github_not_linked), or GitHub module disabled (github)"
+     }
+    }
+   }
+  },
+  "/api/v1/github/repos/{owner}/{name}": {
+   "parameters": [
+    {
+     "name": "owner",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string"
+     },
+     "description": "The user or organisation login"
+    },
+    {
+     "name": "name",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "get": {
+    "summary": "One repository with its attention list",
+    "description": "A key with scope read may call it.",
+    "tags": [
+     "github"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The repository",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/GithubRepo"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Unknown here (github_repo_not_found), not linked (github_not_linked), or GitHub module disabled (github)"
+     }
+    }
+   }
+  },
+  "/api/v1/github/sync": {
+   "post": {
+    "summary": "Sync now",
+    "description": "Queues one github_sync for the caller, at most once a minute (the worker runs it for everyone every six hours anyway). Refused for API keys.",
+    "tags": [
+     "github"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "202": {
+      "description": "Queued",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "status"
+           ],
+           "properties": {
+            "status": {
+             "type": "string",
+             "enum": [
+              "queued"
+             ]
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Not linked (github_not_linked), or GitHub module disabled (github)"
+     },
+     "429": {
+      "description": "A sync ran or was queued less than a minute ago (sync_too_soon, with retry_after_sec)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Job queue not enabled (jobs_disabled)"
+     }
+    }
+   }
+  },
+  "/api/v1/github/repos/{owner}/{name}/mutes/{rule}": {
+   "parameters": [
+    {
+     "name": "owner",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "name",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "rule",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "$ref": "#/components/schemas/GithubRule"
+     }
+    }
+   ],
+   "put": {
+    "summary": "Not about this: silence a rule for a repository",
+    "description": "Idempotent; the repository's attention list is recomputed without the rule. Refused for API keys.",
+    "tags": [
+     "github"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The repository as it reads now",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/GithubRepo"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Not a rule (invalid_rule)"
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Unknown here (github_repo_not_found), not linked (github_not_linked), or GitHub module disabled (github)"
+     }
+    }
+   },
+   "delete": {
+    "summary": "Let a rule speak again",
+    "description": "Idempotent; the attention list is recomputed with the rule. Refused for API keys.",
+    "tags": [
+     "github"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The repository as it reads now",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/GithubRepo"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Not a rule (invalid_rule)"
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Unknown here (github_repo_not_found), not linked (github_not_linked), or GitHub module disabled (github)"
+     }
+    }
+   }
+  },
+  "/api/v1/github/repos/{owner}/{name}/task": {
+   "parameters": [
+    {
+     "name": "owner",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "name",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "post": {
+    "summary": "Make a task from an attention item",
+    "description": "One task per repository and rule: the first call creates a task in Tasks (the title names the repository and the reason, the note carries the GitHub link) and answers created true; a later call answers the same task with created false, or a new one when that task was deleted. Refused for API keys. Needs the tasks module.",
+    "tags": [
+     "github"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "rule"
+        ],
+        "properties": {
+         "rule": {
+          "$ref": "#/components/schemas/GithubRule"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "The task of this repository and rule",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "object",
+           "required": [
+            "task_id",
+            "created"
+           ],
+           "properties": {
+            "task_id": {
+             "type": "string",
+             "format": "uuid"
+            },
+            "created": {
+             "type": "boolean",
+             "description": "true when this call made it"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Not a rule (invalid_rule), or the body is not an object (invalid_body)"
+     },
+     "401": {
+      "description": "Not authenticated, or an API key (key_not_allowed)"
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)"
+     },
+     "404": {
+      "description": "Unknown here (github_repo_not_found), not linked (github_not_linked), or a module disabled (github, tasks)"
+     }
+    }
+   }
+  },
   "/api/v1/telegram": {
    "get": {
     "summary": "The owner's Telegram link",
@@ -40033,7 +40898,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 607073,
-  "source_fnv1a64": "a5b270e634c518e6"
+  "source_bytes": 622804,
+  "source_fnv1a64": "b67824293af40113"
  }
 }

@@ -274,6 +274,7 @@ void AuthController::modules(const HttpRequestPtr& req, std::function<void(const
                             {{"billing", Core::billing_enabled()},
                              {"fitness", Core::fitness_enabled()},
                              {"food", Core::food_enabled()},
+                             {"github", Core::github_enabled()},
                              {"goals", Core::goals_enabled()},
                              {"habits", Core::habits_enabled()},
                              {"medical", Core::medical_enabled()},

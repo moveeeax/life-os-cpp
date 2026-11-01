@@ -25,6 +25,7 @@ export const NAV: readonly NavItem[] = [
   { key: 'learning', label: 'Learning', to: '/learning' },
   { key: 'notes', label: 'Notes', to: '/notes' },
   { key: 'practice', label: 'Practice', to: '/practice' },
+  { key: 'github', label: 'GitHub', to: '/github' },
   { key: 'travel', label: 'Travel', to: '/travel' },
   { key: 'money', label: 'Money', to: '/money' },
   { key: 'food', label: 'Food', to: '/food' },

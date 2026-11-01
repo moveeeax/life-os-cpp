@@ -139,7 +139,7 @@ worker:
   # MUST include "account_email" (transactional confirm/reset/change-email) and
   # "email.send" (generic ad-hoc email) — a worker that only drains "default"
   # silently leaves those jobs to pile up in Redis and no mail is ever sent.
-  types: "account_email,email.send,webhook.deliver,fitness_sync,leetcode_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,now_media_sweep,files_sweep"
+  types: "account_email,email.send,webhook.deliver,fitness_sync,leetcode_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,now_media_sweep,files_sweep,github_sync"
   concurrency: 2
   # Comma-separated types that also get one thread of their own beside the
   # `concurrency` shared ones (WORKER_PRIORITY_TYPES): jobs a user waits for
@@ -270,6 +270,14 @@ practice:
 # ---------------------------------------------------------------
 medical:
   enabled: false
+
+# github module — keep in sync with the life-os-cpp chart. Env vars set:
+# GITHUB_ENABLED, GITHUB_REDIRECT_URL; the OAuth App's id and secret and
+# the seal key come from extraEnvFrom (Secret life-os-app).
+# ---------------------------------------------------------------
+github:
+  enabled: false
+  redirectUrl: "https://life-os.tarassov.me/api/v1/github/oauth/callback"
 
 # ---------------------------------------------------------------
 # now module — keep in sync with the life-os-cpp chart. Env var set: NOW_ENABLED

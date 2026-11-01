@@ -18,6 +18,11 @@ replicaCount: 1
 secretsVersion: ""
 
 extraEnvFrom:
+  # The hand-made Secret with the credentials both binaries read
+  # (DATABASE_PASSWORD, JWT_SECRET, the seal keys, the Google Calendar
+  # client) and, since the GitHub section, the OAuth App's GITHUB_CLIENT_ID,
+  # GITHUB_CLIENT_SECRET and the seal key GITHUB_TOKEN_KEY (docs/RUNBOOK.md,
+  # "GitHub section"). The worker reads the same three from the same Secret.
   - secretRef:
       name: life-os-app
   # Sync knobs and schedule of the fitness module: deploy/sync-tuning-configmap.yaml.
@@ -186,6 +191,12 @@ practice:
 # The family medical archive. Its files need the private prefix in the MinIO
 # policy first (docs/RUNBOOK.md, private files); without it uploads answer 503.
 medical:
+  enabled: true
+
+# GitHub: the OAuth App's GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET and the seal
+# key GITHUB_TOKEN_KEY live in the Secret life-os-app; without them the
+# section says the server is not set up and nothing else happens.
+github:
   enabled: true
 
 # Invite-only: self sign-up is closed, admins invite people (POST /api/v1/admin/invite).

@@ -31,7 +31,8 @@ heading in [`CHANGELOG.md`](CHANGELOG.md).
   - travel: border crossings and day counters (Schengen 90/180, tax residency), trips with flights and stays, family documents (`/api/v1/travel`);
   - habits: daily or N-a-week habits ticked by hand or from data, with streaks (`/api/v1/habits`);
   - notes: private Markdown notes with blog-post fields (`/api/v1/notes`);
-  - practice: the freelance practice's clients, deals by stage, incomes and expenses, and months with totals per currency (`/api/v1/practice`).
+  - practice: the freelance practice's clients, deals by stage, incomes and expenses, and months with totals per currency (`/api/v1/practice`);
+  - github: the user's GitHub repositories, their own and their organisations', pulled by the worker from a linked account, with what needs attention per repository (failing checks, Dependabot alerts, open PRs and issues, missing description, license or README, a year without a push), each rule mutable, and a task from any item (`/api/v1/github`).
 - Observability: Prometheus metrics on `:9090`, OpenTelemetry traces over OTLP HTTP, W3C `traceparent` in and `X-Request-Id` out, structured logs.
 - React SPA in `frontend/`, built to its own nginx image.
 - Docker compose stack in `docker/`, Helm charts in `helm/`, cluster values in `deploy/`.
@@ -179,7 +180,7 @@ src/            api/ (controllers, Endpoints.hpp registry, middleware), core/ (i
                 switches), database/, cache/, repositories/, domain/, security/, jobs/, llm/,
                 net/, storage/, email/, webhooks/, observability/, utils/,
                 module code: billing/, fitness/, food/, money/, tasks/, goals/, now/, travel/,
-                habits/, notes/, practice/ (workout and projects live in api/ + repositories/),
+                habits/, notes/, practice/, github/ (workout and projects live in api/ + repositories/),
                 main.cpp, worker_main.cpp
 tests/          unit/, integration/, api/, e2e/, fitness/, fuzz/
 migrations/     NNN_<slug>.sql, applied in order on boot or via --run-migrations

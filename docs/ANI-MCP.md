@@ -18,6 +18,18 @@ Now page and chat with her agent.
 - Protocol versions: `2026-07-28` (stateless, `server/discover`) and
   `2025-11-25`, `2025-06-18` (`initialize`).
 
+The other two scopes are the site's, not Ani's: a `read` or `full` key
+from Account → API keys works on the data routes (`X-API-Key`, or as the
+Bearer token) with its owner's rights, and a `read` key gets 403
+`key_read_only` on anything but GET. The GitHub section follows that rule
+and adds one of its own. `GET /api/v1/github`, `GET /api/v1/github/repos`
+and `GET /api/v1/github/repos/{owner}/{name}` take a `read` key (the skills
+pack reads the list this way). Linking and unlinking
+(`/api/v1/github/oauth/start`, `DELETE /api/v1/github`), Sync now, the
+mutes and "Make a task" answer 401 `key_not_allowed` to any key, `full`
+included: they change the link or act for the person, and only a signed-in
+session may.
+
 ## Tools
 
 | Tool | What it does |

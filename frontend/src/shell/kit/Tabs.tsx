@@ -104,7 +104,8 @@ export function Tabs({ items, max = 5, label }: { items: TabItem[]; max?: number
       className={({ isActive }) => (isActive ? 'k-tab k-on' : 'k-tab')}
     >
       {t.label}
-      {t.count !== undefined && t.count > 0 && <span className="k-count">{t.count}</span>}
+      {/* A tab's count is the person's own (tasks today, repositories): Hide numbers blurs it. */}
+      {t.count !== undefined && t.count > 0 && <span className="k-count num">{t.count}</span>}
     </NavLink>
   );
   return (

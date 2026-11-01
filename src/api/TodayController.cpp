@@ -29,6 +29,7 @@
 #include "domain/Role.hpp"
 #include "fitness/now/Digest.hpp"
 #include "food/now/Digest.hpp"
+#include "github/now/Digest.hpp"
 #include "goals/now/Digest.hpp"
 #include "habits/now/Digest.hpp"
 #include "money/now/Digest.hpp"
@@ -129,6 +130,7 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
             {"health", Core::fitness_enabled() && fitness_read, [&] { return ::Fitness::digest(owner, date); }},
             {"travel", Core::travel_enabled(), [&] { return ::Travel::digest(owner, date); }},
             {"habits", Core::habits_enabled(), [&] { return ::Habits::digest(owner, date, tz, access_once()); }},
+            {"github", Core::github_enabled(), [&] { return ::Github::digest(owner); }},
         };
         const auto focus = FocusRepository().get(owner, date);
         json data = ::Now::Today::assemble(parts, focus ? focus_out(owner, *focus) : json());

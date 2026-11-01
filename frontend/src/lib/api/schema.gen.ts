@@ -16959,6 +16959,655 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/github": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's GitHub link
+         * @description Whether the server has a GitHub OAuth App (configured) and whether the caller linked their account, with the last sync's outcome. A key with scope read may call it.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["GithubStatus"];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description GitHub module disabled (github) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /**
+         * Unlink the caller's GitHub account
+         * @description Revokes the token at GitHub (best effort) and deletes it; the repositories and mutes go with it. Refused for API keys.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Unlinked */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not linked (github_not_linked), or GitHub module disabled (github) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/github/oauth/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Start linking GitHub
+         * @description A redirect to GitHub's authorization page (scopes repo and read:org) with a one-time state (ten minutes, bound to the caller). The browser goes there; GitHub comes back to the callback. Refused for API keys.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description To https://github.com/login/oauth/authorize */
+                302: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not set up on the server (github_not_configured), or GitHub module disabled (github) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/github/oauth/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GitHub's authorization comes back here
+         * @description Public: the one-time state names the user, who must be the one signed in on the browser. Exchanges the code, seals the token, queues a sync and redirects to /account?github=ok, denied, expired or error.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    state?: string;
+                    code?: string;
+                    error?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description To /account with the outcome */
+                302: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/github/repos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's repositories as the last sync saw them
+         * @description view attention (the default): not archived and needing something; all: not archived; archived: archived. Last push first. owner keeps one user or organisation; q matches the full name and the topics. A key with scope read may call it.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    view?: "attention" | "all" | "archived";
+                    /** @description A repository owner from owners */
+                    owner?: string;
+                    /** @description Over the full name and the topics */
+                    q?: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The rows of the view, the owners and the sizes of the views */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GithubRepoList"];
+                    };
+                };
+                /** @description Bad query (invalid_query): a view not in the enum */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not linked (github_not_linked), or GitHub module disabled (github) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/github/repos/{owner}/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The user or organisation login */
+                owner: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One repository with its attention list
+         * @description A key with scope read may call it.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description The user or organisation login */
+                    owner: string;
+                    name: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The repository */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["GithubRepo"];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unknown here (github_repo_not_found), not linked (github_not_linked), or GitHub module disabled (github) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/github/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync now
+         * @description Queues one github_sync for the caller, at most once a minute (the worker runs it for everyone every six hours anyway). Refused for API keys.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Queued */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** @enum {string} */
+                                status: "queued";
+                            };
+                        };
+                    };
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not linked (github_not_linked), or GitHub module disabled (github) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description A sync ran or was queued less than a minute ago (sync_too_soon, with retry_after_sec) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Job queue not enabled (jobs_disabled) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/github/repos/{owner}/{name}/mutes/{rule}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                name: string;
+                rule: components["schemas"]["GithubRule"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Not about this: silence a rule for a repository
+         * @description Idempotent; the repository's attention list is recomputed without the rule. Refused for API keys.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    owner: string;
+                    name: string;
+                    rule: components["schemas"]["GithubRule"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The repository as it reads now */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["GithubRepo"];
+                        };
+                    };
+                };
+                /** @description Not a rule (invalid_rule) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unknown here (github_repo_not_found), not linked (github_not_linked), or GitHub module disabled (github) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /**
+         * Let a rule speak again
+         * @description Idempotent; the attention list is recomputed with the rule. Refused for API keys.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    owner: string;
+                    name: string;
+                    rule: components["schemas"]["GithubRule"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The repository as it reads now */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["GithubRepo"];
+                        };
+                    };
+                };
+                /** @description Not a rule (invalid_rule) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unknown here (github_repo_not_found), not linked (github_not_linked), or GitHub module disabled (github) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/github/repos/{owner}/{name}/task": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make a task from an attention item
+         * @description One task per repository and rule: the first call creates a task in Tasks (the title names the repository and the reason, the note carries the GitHub link) and answers created true; a later call answers the same task with created false, or a new one when that task was deleted. Refused for API keys. Needs the tasks module.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    owner: string;
+                    name: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        rule: components["schemas"]["GithubRule"];
+                    };
+                };
+            };
+            responses: {
+                /** @description The task of this repository and rule */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** Format: uuid */
+                                task_id: string;
+                                /** @description true when this call made it */
+                                created: boolean;
+                            };
+                        };
+                    };
+                };
+                /** @description Not a rule (invalid_rule), or the body is not an object (invalid_body) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unknown here (github_repo_not_found), not linked (github_not_linked), or a module disabled (github, tasks) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/telegram": {
         parameters: {
             query?: never;
@@ -25519,6 +26168,13 @@ export interface components {
                 /** @description Against the latest weighing at least 6 days older */
                 weight_change_7d: number | null;
             };
+            /** @description The repositories needing attention (the line of the Sunday review); absent when none, when GitHub is not linked or when the module is off */
+            github?: {
+                /** @description Not archived and with an attention item */
+                attention: number;
+                /** @description The full names of the first two by last push */
+                top: string[];
+            };
             focus: components["schemas"]["Focus"] | null;
             errors: string[];
         };
@@ -26589,6 +27245,95 @@ export interface components {
             text: string;
             /** @description The chat id (search results only) */
             chat?: string;
+        };
+        /**
+         * @description An attention rule: failing checks on the default branch (checks), open Dependabot alerts (alerts), open pull requests (prs), open issues (issues), a public repository without a description, license or README (hygiene), no push for twelve months and not archived (stale).
+         * @enum {string}
+         */
+        GithubRule: "checks" | "alerts" | "prs" | "issues" | "hygiene" | "stale";
+        GithubAttentionItem: {
+            rule: components["schemas"]["GithubRule"];
+            /** @description Why, in a few words: "3 open issues", "no license, no README", "no push for 14 months" */
+            detail: string;
+        };
+        GithubStatus: {
+            /** @description The server has a GitHub OAuth App and a seal key */
+            configured: boolean;
+            /** @description The caller linked their GitHub account */
+            linked: boolean;
+            /** @description The GitHub login linked */
+            login: string | null;
+            /** @description What GitHub granted ("repo", "read:org"); empty when not linked */
+            scopes: string[];
+            /** Format: date-time */
+            linked_at: string | null;
+            /**
+             * Format: date-time
+             * @description The last sync that worked; null before the first
+             */
+            synced_at: string | null;
+            /** @description Why the last sync failed; the list shown is the one before it */
+            sync_error: string | null;
+            /** @description An organisation whose repositories came back empty or forbidden: approve the app in its settings once */
+            org_hint: string | null;
+        };
+        GithubRepo: {
+            /** @description owner/name, as on GitHub (https://github.com/{full_name}) */
+            full_name: string;
+            /** @description The user or organisation login */
+            owner: string;
+            name: string;
+            /** @enum {string} */
+            visibility: "public" | "private" | "internal";
+            fork: boolean;
+            archived: boolean;
+            /** @description "" when none */
+            description: string;
+            topics: string[];
+            /** @description The SPDX id ("MIT"); "" when none */
+            license: string;
+            stars: number;
+            /**
+             * Format: date-time
+             * @description The last push; null when never pushed
+             */
+            pushed_at: string | null;
+            default_branch: string;
+            open_issues: number;
+            open_prs: number;
+            /** @description Open Dependabot alerts */
+            open_alerts: number;
+            /**
+             * @description The default branch head's check rollup; none when the branch has no checks
+             * @enum {string}
+             */
+            checks: "success" | "failure" | "pending" | "none";
+            has_readme: boolean;
+            /** @description What needs attention, in rule order, the muted rules left out; empty for an archived repository */
+            attention: components["schemas"]["GithubAttentionItem"][];
+            /** @description The rules silenced for this repository */
+            muted: components["schemas"]["GithubRule"][];
+            /** @description The task made from each rule, by rule ({"issues": "<task id>"}) */
+            tasks: {
+                [key: string]: string;
+            };
+            /** Format: date-time */
+            synced_at: string;
+        };
+        GithubRepoList: {
+            data: components["schemas"]["GithubRepo"][];
+            /** @description Rows of the view after the owner and q filters */
+            total: number;
+            limit: number;
+            offset: number;
+            /** @description Every repository owner of the caller, sorted (the filter chips) */
+            owners: string[];
+            /** @description The sizes of the three views over all the caller's repositories (the tabs) */
+            counts: {
+                attention: number;
+                all: number;
+                archived: number;
+            };
         };
         LeetCodeProfile: {
             username: string;
