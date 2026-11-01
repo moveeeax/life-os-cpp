@@ -127,10 +127,10 @@ TEST(AgentTools, ADayThatDoesNotExistIsDropped) {
 // A long query of Cyrillic words is cut by characters, not bytes, so it stays valid UTF-8.
 TEST(AgentTools, ALongQueryIsCutByCharacters) {
     std::string words;
-    for (int i = 0; i < 150; ++i) {
+    for (int i = 0; i < 300; ++i) {
         words += "\xD0\xB6";  // "ж"
     }
-    words = "a" + words;  // 1 + 300 bytes: a 200-byte cut would split the 100th letter
+    words = "a" + words;  // 301 characters, 601 bytes: a 200-byte cut would split the 100th letter
     const auto c = T::route("find_tasks", json{{"query", words}}, "UTC");
     std::string q;
     for (const auto& [k, v] : c->query) {
