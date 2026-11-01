@@ -1,1 +1,0 @@
-The GitHub sync no longer fails with "unavailable": a page of 100 repositories took GitHub about 20 seconds to answer and its GraphQL gives a query ten, so every sync of a larger account came back as 502. A page is now 20 repositories, about four seconds each; a sync of 378 repositories takes a minute or two.

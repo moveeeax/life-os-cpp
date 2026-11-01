@@ -6,6 +6,15 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.57.1] - 2026-11-01
+
+### Changed
+- CI answers a pull request about twice as fast. The build-and-test job used to compile the whole tree twice (once for the builder image, once more when compose rebuilt the test image without the layer cache, 20 minutes on two cores for a suite that runs in 90 seconds); it now builds the test image once and runs the binaries on it. The sanitizer and ThreadSanitizer jobs, which rebuilt the tree with their own flags on every pull request, run nightly on master and by hand before a release (`sanitizers-nightly.yml`) and are no longer required checks on master.
+- clang-tidy on a pull request checks only the translation units the PR touches (the changed src/*.cpp files and the .cpp next to a changed header) instead of the whole tree, which took 36 minutes on two cores and set the pace of every pull request after the test job dropped to nine minutes. The whole tree is still checked nightly (`clang-tidy-full` in `sanitizers-nightly.yml`) and on every push to master.
+
+### Fixed
+- The GitHub sync no longer fails with "unavailable": a page of 100 repositories took GitHub about 20 seconds to answer and its GraphQL gives a query ten, so every sync of a larger account came back as 502. A page is now 20 repositories, about four seconds each; a sync of 378 repositories takes a minute or two.
+
 ## [1.57.0] - 2026-11-01
 
 ### Added
