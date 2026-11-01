@@ -326,3 +326,12 @@ repositories/github -> database
 repositories/github -> github
 repositories/github -> utils
 repositories/github -> repositories
+github -> net
+github/jobs -> cache
+github/jobs -> github
+github/jobs -> jobs
+github/jobs -> net
+github/jobs -> repositories/github
+github/jobs -> utils
+core -> github
+core -> github/jobs

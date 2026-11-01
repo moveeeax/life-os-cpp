@@ -182,6 +182,22 @@ public:
         });
     }
 
+    /// The users whose sync is due: never synced, or synced more than @p hours ago; a user whose last sync
+    /// failed within the hour waits (the scheduler's tick is hourly, so a dead token costs one call an hour).
+    std::vector<std::string> due(int hours) {
+        return Database::get().execute_read([&](auto& txn) {
+            std::vector<std::string> out;
+            for (const auto& row : txn.exec_params(
+                     "SELECT owner_id::text FROM github_links WHERE (synced_at IS NULL OR synced_at < now() - "
+                     "make_interval(hours => $1)) AND (sync_error IS NULL OR updated_at < now() - interval '1 "
+                     "hour') ORDER BY synced_at NULLS FIRST, linked_at",
+                     hours)) {
+                out.push_back(row[0].template as<std::string>());
+            }
+            return out;
+        });
+    }
+
     /// Every linked user, oldest link first (the job walks them).
     std::vector<Linked> all() {
         return Database::get().execute_read([&](auto& txn) {

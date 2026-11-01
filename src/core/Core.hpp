@@ -145,6 +145,8 @@ private:
     static void register_files_sweep_schedule_();
     static void register_ani_agents_schedule_();
     static void register_leetcode_schedule_();
+    // The hourly tick that queues github_sync; the worker queues one job per user whose sync is due.
+    static void register_github_schedule_();
     static void register_telegram_schedule_();
 
     // Registers db_pool_active_connections + db_pool_size gauges, labeled by
