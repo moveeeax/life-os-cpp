@@ -29,6 +29,7 @@
 #include "domain/Role.hpp"
 #include "fitness/now/Digest.hpp"
 #include "food/now/Digest.hpp"
+#include "github/now/Digest.hpp"
 #include "goals/now/Digest.hpp"
 #include "habits/now/Digest.hpp"
 #include "money/now/Digest.hpp"
@@ -133,6 +134,7 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
                      tz,
                      Repositories::Metrics::access_of(owner, fitness_read ? Domain::Permission::kFitnessRead : 0U));
              }},
+            {"github", Core::github_enabled(), [&] { return ::Github::digest(owner); }},
         };
         const auto focus = FocusRepository().get(owner, date);
         json data = ::Now::Today::assemble(parts, focus ? focus_out(owner, *focus) : json());

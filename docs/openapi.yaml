@@ -564,6 +564,13 @@ components:
             sleep_minutes: { type: [integer, 'null'] }
             weight_kg: { type: [number, 'null'] }
             weight_change_7d: { type: [number, 'null'], description: 'Against the latest weighing at least 6 days older' }
+        github:
+          type: object
+          required: [attention, top]
+          description: 'The repositories needing attention (the line of the Sunday review); absent when none, when GitHub is not linked or when the module is off'
+          properties:
+            attention: { type: integer, description: 'Not archived and with an attention item' }
+            top: { type: array, items: { type: string }, description: 'The full names of the first two by last push' }
         focus:
           oneOf:
             - { $ref: '#/components/schemas/Focus' }

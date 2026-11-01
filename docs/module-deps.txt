@@ -326,3 +326,5 @@ repositories/github -> database
 repositories/github -> github
 repositories/github -> utils
 repositories/github -> repositories
+api -> github/now
+github/now -> repositories/github

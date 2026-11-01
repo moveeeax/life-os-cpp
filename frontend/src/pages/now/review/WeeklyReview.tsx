@@ -9,7 +9,7 @@ import type { Today } from '@/lib/now/types';
 import { Group, Row, Sheet } from '@/shell/kit';
 
 import { tomorrowOf } from '../ani/evening';
-import { closedKey, groupsOf, reviewText, weekOf } from './review';
+import { closedKey, githubLine, groupsOf, reviewText, weekOf } from './review';
 
 function readClosed(week: string): string[] {
   try {
@@ -55,6 +55,7 @@ export function WeeklyReview({
   const late = g.late.filter((t) => !closed.includes(`task:${t.id}`));
   const behind = g.behind.filter((x) => !closed.includes(`goal:${x.id}`));
   const habits = g.habits.filter((h) => !closed.includes(`habit:${h.name}`));
+  const github = closed.includes('github') ? null : g.github;
   const qc = useQueryClient();
   const [failed, setFailed] = useState(false);
   // On Sunday it also goes to Saved Messages when the owner turned that on;
@@ -77,7 +78,7 @@ export function WeeklyReview({
       },
       () => setFailed(true),
     );
-  const empty = late.length + behind.length + habits.length === 0;
+  const empty = late.length + behind.length + habits.length === 0 && !github;
 
   return (
     <Sheet title="Weekly review" onClose={onClose} width={520}>
@@ -167,6 +168,25 @@ export function WeeklyReview({
               }
             />
           ))}
+        </Group>
+      )}
+      {github && (
+        <Group label="Repositories">
+          <Row
+            title={<span className="num">{githubLine(github)}</span>}
+            action={
+              <span className="flex gap-2">
+                <Link to="/github">Open</Link>
+                <button
+                  type="button"
+                  aria-label="Close: repositories"
+                  onClick={() => close('github')}
+                >
+                  ✓
+                </button>
+              </span>
+            }
+          />
         </Group>
       )}
     </Sheet>
