@@ -328,8 +328,9 @@ when it stops and restored when it starts. The worker alone talks to the
 Kubernetes API (its service account, see the worker chart's `aniAgents`) and
 serves the pods' model proxy on its health port (`POST
 /ani/llm/v1/chat/completions`); the API only changes the state and queues the
-jobs. In prod the knobs come from the Secret `life-os-ani-agent` into both
-the API and the worker.
+jobs. In prod the knobs come from the Secret `life-os-ani-agent`: the ani
+worker takes it whole, the API key by key (`aniAgentSecret` of the API
+chart) without `ANI_AGENT_UPSTREAM_KEY` and `ANI_AGENT_PROXY_URL`.
 
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
@@ -343,8 +344,8 @@ the API and the worker.
 | `ANI_AGENT_MAX_HOURS` | `ani.agent.max_hours` | int | `12` | A run is stopped this long after its start, busy or not (its presigned snapshot URL lives one hour more). |
 | `ANI_AGENT_MODEL` | `ani.agent.model` | string | `gpt-5-mini` | The upstream model every proxied call is pinned to. |
 | `ANI_AGENT_UPSTREAM_URL` | `ani.agent.upstream_url` | string | `https://api.openai.com/v1` | An OpenAI-compatible base URL the proxy forwards to (`/chat/completions`). |
-| `ANI_AGENT_UPSTREAM_KEY` | `ani.agent.upstream_key` | string | empty | The upstream's key. It stays in the worker; the pods get a per-run proxy token. Empty: the agent counts as not configured. |
-| `ANI_AGENT_PROXY_URL` | `ani.agent.proxy_url` | string | empty | The proxy as the pods reach it, ending in `/v1`, e.g. `http://life-os-cpp-worker.life-os.svc.cluster.local:9091/ani/llm/v1`. Empty: not configured. |
+| `ANI_AGENT_UPSTREAM_KEY` | `ani.agent.upstream_key` | string | empty | The upstream's key. Only the ani worker has it (the API pod does not get it); the pods get a per-run proxy token. Empty in the worker: no pod is started and the proxy route is not served. |
+| `ANI_AGENT_PROXY_URL` | `ani.agent.proxy_url` | string | empty | The proxy as the pods reach it, ending in `/v1`, e.g. `http://life-os-ani-worker.life-os.svc.cluster.local:9091/ani/llm/v1` in prod. Worker only, like the key; empty in the worker: no pod is started. |
 | `ANI_AGENT_API_URL` | `ani.agent.api_url` | string | empty | The site's API as the worker reaches it, e.g. `http://life-os-cpp.life-os.svc.cluster.local:8080`: the agent's tools read the user's data there with a five-minute token of the user. Empty: the agent chats without tools. |
 | `ANI_AGENT_MONTHLY_TOKENS` | `ani.agent.monthly_tokens` | int | `20000000` | Prompt plus completion tokens per user and calendar month (UTC); past it the proxy answers 429 `insufficient_quota`. |
 | `ANI_TELEGRAM_URL` | `ani.telegram.url` | string | `https://tg.tarassov.me` | The owner's telegram-rest-gateway (REST), which Ani's Telegram tools and the minutely poll call (src/telegram/). |
@@ -352,7 +353,7 @@ the API and the worker.
 | `GOOGLE_CALENDAR_CLIENT_ID` | `calendar.google.client_id` | string | empty | The Google OAuth Web client of the site (Secret `life-os-app`). Empty: Google Calendar is off. |
 | `GOOGLE_CALENDAR_CLIENT_SECRET` | `calendar.google.client_secret` | string | empty | Its secret (Secret `life-os-app`). |
 | `GOOGLE_CALENDAR_REDIRECT_URL` | `calendar.google.redirect_url` | string | `https://life-os.tarassov.me/api/v1/calendar/oauth/callback` | Where Google's consent comes back; must match the client's authorized redirect exactly. |
-| `CALENDAR_TOKEN_KEY` | `calendar.google.token_key` | string | empty | 32 random bytes, base64url without padding, that seal the users' refresh tokens (utils/Seal.hpp). Changing it disconnects every calendar. |
+| `CALENDAR_TOKEN_KEY` | `calendar.google.token_key` | string | empty | 32 random bytes, base64url without padding, that seal the users' refresh tokens (utils/Seal.hpp), in the Secret `life-os-app`; the API and the ani worker (Ani's calendar tools) read it. Changing it disconnects every calendar (docs/RUNBOOK.md, Rotate a secret). |
 
 ## Storage (S3)
 
