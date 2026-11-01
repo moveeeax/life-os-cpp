@@ -15,6 +15,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "api/FieldChecks.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
 #include "net/Http.hpp"
@@ -22,6 +23,7 @@
 #include "security/Audit.hpp"
 #include "telegram/Gateway.hpp"
 #include "utils/ErrorResponse.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Api {
 
@@ -293,7 +295,13 @@ void TelegramController::send(const HttpRequestPtr& req, Callback&& callback, co
         return;
     }
     json out{{"text", *text}};
-    const std::string reply_to = body.value("reply_to", std::string());
+    const auto reply_in = Fields::text_or_empty(body, "reply_to");
+    const auto key_in = Fields::text_or_empty(body, "key");
+    if (!reply_in || !key_in) {
+        callback(ErrorResponse::bad_request("invalid_body", "reply_to and key are text"));
+        return;
+    }
+    const std::string& reply_to = *reply_in;
     if (!reply_to.empty()) {
         if (!Telegram::valid_id(reply_to)) {
             callback(ErrorResponse::bad_request("invalid_reply_to", "reply_to is a message id"));
@@ -302,7 +310,7 @@ void TelegramController::send(const HttpRequestPtr& req, Callback&& callback, co
         out["reply_to_message_id"] = reply_to;
     }
     // A confirmed proposal carries its own key, so a retried job sends once.
-    const std::string key = body.value("key", std::string()).substr(0, 80);
+    const std::string key = Utils::Utf8::cut(*key_in, 80);
     const auto r = Telegram::call(Net::Http::transport(), *s, "POST", "/v1/chats/" + id + "/messages", {}, out, key);
     if (!r.ok()) {
         callback(refusal(r));
@@ -352,12 +360,17 @@ void TelegramController::react(const HttpRequestPtr& req,
     if (!parse_object(req, body, callback)) {
         return;
     }
-    const std::string emoji = body.value("emoji", std::string());
+    const std::string emoji = Fields::text_or_empty(body, "emoji").value_or("");
     if (emoji.empty() || emoji.size() > 32) {
         callback(ErrorResponse::bad_request("invalid_emoji", "emoji is one emoji"));
         return;
     }
-    const bool remove = body.value("remove", false);
+    const auto r_in = body.find("remove");
+    if (r_in != body.end() && !r_in->is_null() && !r_in->is_boolean()) {
+        callback(ErrorResponse::bad_request("invalid_remove", "remove is true or false"));
+        return;
+    }
+    const bool remove = r_in != body.end() && r_in->is_boolean() && r_in->get<bool>();
     const auto r = Telegram::call(Net::Http::transport(),
                                   *s,
                                   remove ? "DELETE" : "POST",

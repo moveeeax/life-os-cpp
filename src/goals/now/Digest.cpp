@@ -5,7 +5,6 @@
 
 #include "goals/now/Digest.hpp"
 
-#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
@@ -28,9 +27,9 @@ using Repositories::Goals::Sources;
 json goals_with_progress(const std::string& owner,
                          const std::string& date,
                          const std::string& tz,
-                         std::uint32_t permissions) {
+                         const Repositories::Metrics::Access& access) {
     GoalRepository repo;
-    Sources sources(owner, tz, permissions);
+    Sources sources(owner, tz, access);
     const auto counts = repo.task_counts(owner);
     const auto points = repo.checkin_points_all(owner);
     json out = json::array();
@@ -52,8 +51,11 @@ json goals_with_progress(const std::string& owner,
 
 }  // namespace
 
-json digest(const std::string& owner, const std::string& day, const std::string& tz, std::uint32_t permissions) {
-    return ::Now::Today::goals_block(goals_with_progress(owner, day, tz, permissions));
+json digest(const std::string& owner,
+            const std::string& day,
+            const std::string& tz,
+            const Repositories::Metrics::Access& access) {
+    return ::Now::Today::goals_block(goals_with_progress(owner, day, tz, access));
 }
 
 }  // namespace Goals

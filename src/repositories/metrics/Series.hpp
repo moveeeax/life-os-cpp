@@ -98,6 +98,13 @@ namespace detail {
 /// Whether @p owner has a money account in @p currency, and (when given) an expense
 /// category @p category; a habit @p habit ticked by hand.
 inline bool owns(const std::string& owner, const ::Metrics::Ref& r) {
+    // Only a currency, a category or a habit id has an owner to check; the other entries
+    // open no transaction.
+    const bool parametrised = r.def->gate == ::Metrics::Gate::Money ||
+                              (r.def->gate == ::Metrics::Gate::Habits && r.def->param == ::Metrics::Param::Habit);
+    if (!parametrised) {
+        return true;
+    }
     return Database::get().execute_read([&](auto& txn) {
         switch (r.def->gate) {
             case ::Metrics::Gate::Money: {
@@ -519,14 +526,18 @@ inline Series read(const std::string& owner,
                 break;
             case Gate::Money: {
                 // Posted rows in the currency's accounts; an expense counts the bank's
-                // adjustments too, as the money reports do. $5 is the category or ''.
+                // adjustments too, as the money reports do, and an adjustment counts in the
+                // category of the expense it adjusts (it has none of its own; report_rows in
+                // money/TransactionRepository.hpp). $5 is the category or ''.
                 const bool income = m == "income";
                 for (const auto& row :
                      txn.exec_params("SELECT t.date::text, SUM(t.amount)::float8 FROM money_transactions t "
                                      "JOIN money_accounts a ON a.id = t.account_id "
+                                     "LEFT JOIN money_transactions o ON o.id = t.adjusts_id "
                                      "WHERE t.owner_id = $1::uuid AND a.owner_id = $1::uuid AND a.currency = $4 "
                                      "AND t.status = 'posted' AND (t.type = 'income') = $6::boolean "
-                                     "AND ($5 = '' OR t.category_id = NULLIF($5, '')::uuid) "
+                                     "AND ($5 = '' OR CASE WHEN t.type <> 'fx_adjustment' THEN t.category_id "
+                                     "WHEN o.type = 'expense' THEN o.category_id END = NULLIF($5, '')::uuid) "
                                      "AND t.date BETWEEN $2::date AND $3::date GROUP BY t.date ORDER BY t.date",
                                      owner,
                                      lo,

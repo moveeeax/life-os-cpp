@@ -128,6 +128,34 @@ TEST(HabitsEval, AtMostDirection) {
     EXPECT_FALSE(Habits::day_state(kcal, d("2026-10-14"), {}, eaten).done);
 }
 
+// A ledger day without a row is 0 for an at-most goal: money, practice, tasks. Food is not a
+// ledger (nothing logged is not kept), at-least goals and the balance (a state) stay as they are.
+TEST(HabitsEval, AnAtMostLedgerDayWithoutARowIsZero) {
+    EXPECT_TRUE(Habits::empty_day_is_zero(daily("money:expense:KZT", 5000, Direction::AtMost)));
+    EXPECT_TRUE(Habits::empty_day_is_zero(
+        daily("money:expense:KZT:3f2b8c4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f", 2000, Direction::AtMost)));
+    EXPECT_TRUE(Habits::empty_day_is_zero(daily("practice:expense:USD", 50, Direction::AtMost)));
+    EXPECT_TRUE(Habits::empty_day_is_zero(daily("tasks:done", 3, Direction::AtMost)));
+    EXPECT_FALSE(Habits::empty_day_is_zero(daily("food:kcal", 2200, Direction::AtMost)));
+    EXPECT_FALSE(Habits::empty_day_is_zero(daily("money:expense:KZT", 5000)));
+    EXPECT_FALSE(Habits::empty_day_is_zero(daily("money:balance:KZT", 1000, Direction::AtMost)));
+    EXPECT_FALSE(Habits::empty_day_is_zero(daily(nullptr)));
+
+    // Spend at most 5000: 2026-10-12 had 7000, 2026-10-13 nothing; filled up to 2026-10-13.
+    const Habit spend = daily("money:expense:KZT", 5000, Direction::AtMost);
+    Habits::Values spent{{d("2026-10-12"), 7000}};
+    Habits::fill_empty_days(spend, spent, d("2026-10-11"), d("2026-10-13"));
+    EXPECT_EQ(Habits::done_days(spend, {}, spent), days({"2026-10-11", "2026-10-13"}))
+        << "the day without spending is done, the 7000 day is not";
+    EXPECT_DOUBLE_EQ(spent.at(d("2026-10-12")), 7000) << "a day with a row keeps its value";
+    EXPECT_EQ(Habits::streak(spend, Habits::done_days(spend, {}, spent), d("2026-10-14")), 1);
+
+    const Habit kcal = daily("food:kcal", 2200, Direction::AtMost);
+    Habits::Values eaten;
+    Habits::fill_empty_days(kcal, eaten, d("2026-10-11"), d("2026-10-13"));
+    EXPECT_TRUE(eaten.empty()) << "food is not filled";
+}
+
 // Weight at most 80 kg: 79.6 done, 80.4 not, a record without a number not. The same
 // series without a goal ticks every weighed day, the record without a number too.
 TEST(HabitsEval, WeightWithGoalAtMost) {

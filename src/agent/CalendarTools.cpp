@@ -6,7 +6,6 @@
 #include "agent/CalendarTools.hpp"
 
 #include <exception>
-#include <regex>
 #include <utility>
 
 #include <spdlog/spdlog.h>
@@ -15,6 +14,7 @@
 #include "calendar/Google.hpp"
 #include "repositories/calendar/LinkRepository.hpp"
 #include "storage/S3Presign.hpp"
+#include "utils/Date.hpp"
 
 namespace Agent::CalendarTools {
 
@@ -28,10 +28,9 @@ json tool(const char* name, const char* description, json parameters) {
 }
 
 std::string day_arg(const json& args, const char* key) {
-    static const std::regex kDay("^\\d{4}-\\d{2}-\\d{2}$");
     const auto it = args.find(key);
     const std::string v = it != args.end() && it->is_string() ? it->get<std::string>() : std::string();
-    return std::regex_match(v, kDay) ? v : std::string();
+    return Utils::Date::is_ymd(v) ? v : std::string();
 }
 
 }  // namespace

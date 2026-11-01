@@ -31,6 +31,7 @@
 #include "security/SessionStore.hpp"
 #include "utils/ErrorResponse.hpp"
 #include "utils/Seal.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Api {
 
@@ -277,8 +278,8 @@ void CalendarController::add(const HttpRequestPtr& req, Callback&& callback) {
         if (!parse_object(req, body, callback)) {
             return;
         }
-        const std::string title = body.value("title", std::string());
-        if (title.empty() || title.size() > 300) {
+        const std::string title = Fields::text_or_empty(body, "title").value_or("");
+        if (title.empty() || Utils::Utf8::length(title) > 300) {
             callback(ErrorResponse::bad_request("invalid_title", "title is 1 to 300 characters"));
             return;
         }
@@ -293,7 +294,7 @@ void CalendarController::add(const HttpRequestPtr& req, Callback&& callback) {
         }
         json event{{"summary", title}, {"start", {{"dateTime", span->first}}}, {"end", {{"dateTime", span->second}}}};
         if (body.value("description", json()).is_string()) {
-            event["description"] = body["description"].get<std::string>().substr(0, 2000);
+            event["description"] = Utils::Utf8::cut(body["description"].get<std::string>(), 2000);
         }
         const auto r = Calendar::api(
             Net::Http::transport(), std::get<std::string>(token), "POST", "/calendars/primary/events", {}, event);
@@ -370,7 +371,7 @@ void CalendarController::move(const HttpRequestPtr& req, Callback&& callback, co
         }
         json patch{{"start", {{"dateTime", span->first}}}, {"end", {{"dateTime", span->second}}}};
         if (body.value("title", json()).is_string() && !body["title"].get<std::string>().empty()) {
-            patch["summary"] = body["title"].get<std::string>().substr(0, 300);
+            patch["summary"] = Utils::Utf8::cut(body["title"].get<std::string>(), 300);
         }
         const auto r = Calendar::api(Net::Http::transport(),
                                      std::get<std::string>(token),

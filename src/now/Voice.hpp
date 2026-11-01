@@ -22,6 +22,7 @@
 
 #include "net/Http.hpp"
 #include "utils/Config.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Now::Voice {
 
@@ -96,13 +97,6 @@ inline std::string spoken_part(const std::string& text) {
     if (flat.empty() || line_ok(flat)) {
         return flat;
     }
-    const auto chars_of = [](std::string_view s) {
-        std::size_t n = 0;
-        for (const char ch : s) {
-            n += (static_cast<unsigned char>(ch) & 0xC0) != 0x80 ? 1 : 0;
-        }
-        return n;
-    };
     // The longest prefix of whole sentences within the limit.
     std::size_t best = 0;
     for (std::size_t i = 0; i < flat.size(); ++i) {
@@ -116,7 +110,7 @@ inline std::string spoken_part(const std::string& text) {
         if (end < flat.size() && flat[end] != ' ') {
             continue;
         }
-        if (chars_of(std::string_view(flat).substr(0, end)) > kLineCharsMax) {
+        if (Utils::Utf8::length(std::string_view(flat).substr(0, end)) > kLineCharsMax) {
             break;
         }
         best = end;

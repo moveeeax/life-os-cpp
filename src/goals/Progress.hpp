@@ -95,6 +95,26 @@ inline std::vector<Point> merge(const std::map<std::string, double>& source, con
     return out;
 }
 
+/**
+ * The days of a summed source (steps, income, tasks done: a day holds that day's
+ * amount, metrics/Catalog.hpp Reduce::Sum or Count) as the goal's running total:
+ * @p start_value plus everything from the goal's start to that day. "Earn 1 000 000"
+ * is the money earned so far, not the last payment day's. A day without a number
+ * (NaN) adds nothing and is no point.
+ */
+inline std::map<std::string, double> running_totals(const std::map<std::string, double>& days, double start_value) {
+    std::map<std::string, double> out;
+    double total = start_value;
+    for (const auto& [date, value] : days) {
+        if (std::isnan(value)) {
+            continue;
+        }
+        total += value;
+        out[date] = total;
+    }
+    return out;
+}
+
 /// The values of @p points as compute() takes them.
 inline std::vector<Checkin> values_of(const std::vector<Point>& points) {
     std::vector<Checkin> out;

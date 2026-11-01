@@ -17,6 +17,7 @@
 #include "agent/VoiceBrief.hpp"
 #include "repositories/telegram/LinkRepository.hpp"
 #include "telegram/Gateway.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Agent::TelegramPoll {
 
@@ -31,20 +32,6 @@ bool word_char(unsigned char c) {
 
 char lower(char c) {
     return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
-}
-
-/// At most @p n code points of @p s, an ellipsis when cut.
-std::string cut(const std::string& s, std::size_t n) {
-    std::size_t points = 0;
-    for (std::size_t i = 0; i < s.size(); ++i) {
-        if ((static_cast<unsigned char>(s[i]) & 0xC0) != 0x80) {
-            if (points == n) {
-                return s.substr(0, i) + "…";
-            }
-            ++points;
-        }
-    }
-    return s;
 }
 
 long long id_of(const json& v) {
@@ -149,13 +136,13 @@ std::string event_text(const std::vector<Incoming>& all) {
         // The chat id goes with the name: a reply she proposes needs it.
         std::string line = (m.chat_title.empty() ? "A chat" : m.chat_title) + " [chat " + m.chat_id + "]" +
                            (m.kind == "mention" ? " (mentions you): " : ": ") +
-                           (m.text.empty() ? "[a message]" : cut(m.text, 300));
+                           (m.text.empty() ? "[a message]" : Utils::Utf8::clip(m.text, 300));
         out += (out.empty() ? "" : "\n") + line;
     }
     if (all.size() > shown) {
         out += "\nand " + std::to_string(all.size() - shown) + " more";
     }
-    return cut(out, 1990);
+    return Utils::Utf8::clip(out, 1990);
 }
 
 json process_poll(const json&) {

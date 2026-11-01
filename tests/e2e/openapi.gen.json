@@ -247,7 +247,7 @@
        "string",
        "null"
       ],
-      "description": "A number goal only: the id of the metrics catalog series it follows (GET /api/v1/metrics), null when fed by check-ins alone"
+      "description": "A number goal only: the id of the metrics catalog series it follows (GET /api/v1/metrics), null when fed by check-ins alone. A series that adds up by day (reduce sum or count: steps, income, tasks done) counts as its running total from start_date on top of start_value; any other series counts its day value"
      },
      "source_why": {
       "type": [
@@ -302,7 +302,7 @@
         "items": {
          "$ref": "#/components/schemas/GoalPoint"
         },
-        "description": "A number goal: the days of its source from start_date to the date asked for, merged with its check-ins (a check-in wins on its date), oldest first; empty for the other kinds"
+        "description": "A number goal: the days of its source from start_date to the date asked for (no later than tomorrow), merged with its check-ins (a check-in wins on its date), oldest first; for a source that adds up by day each point is the running total; empty for the other kinds"
        },
        "sections": {
         "type": "array",
@@ -27695,7 +27695,7 @@
    },
    "post": {
     "summary": "Create a goal",
-    "description": "number needs start_value and target_value (different); count needs target_count; unit is for number only; start_date defaults to today; due must be after it.",
+    "description": "number needs start_value and target_value (different); count needs target_count; unit is for number only; start_date defaults to today in ?tz= (UTC without it); due must be after it.",
     "tags": [
      "goals"
     ],
@@ -30479,7 +30479,7 @@
      {
       "name": "tz",
       "in": "query",
-      "description": "The caller's IANA zone (UTC when not one)",
+      "description": "The caller's IANA zone; UTC when absent, 400 invalid_query when it names no zone",
       "schema": {
        "type": "string"
       }
@@ -30505,7 +30505,7 @@
       }
      },
      "400": {
-      "description": "invalid_date"
+      "description": "invalid_date, invalid_query (tz names no zone)"
      },
      "401": {
       "description": "Not authenticated"
@@ -30553,8 +30553,12 @@
           "description": "Time in focus without pauses; the span when left out"
          },
          "label": {
-          "type": "string",
-          "maxLength": 200
+          "type": [
+           "string",
+           "null"
+          ],
+          "maxLength": 200,
+          "description": "Kept to its first 200 characters; null is no label"
          }
         }
        }
@@ -30587,7 +30591,7 @@
       }
      },
      "400": {
-      "description": "invalid_time, invalid_minutes"
+      "description": "invalid_time, invalid_minutes, invalid_label (not text)"
      },
      "401": {
       "description": "Not authenticated"
@@ -30613,7 +30617,7 @@
      {
       "name": "tz",
       "in": "query",
-      "description": "The caller's IANA zone (UTC when not one)",
+      "description": "The caller's IANA zone; UTC when absent, 400 invalid_query when it names no zone",
       "schema": {
        "type": "string"
       }
@@ -30637,6 +30641,9 @@
         }
        }
       }
+     },
+     "400": {
+      "description": "invalid_query (tz names no zone)"
      },
      "401": {
       "description": "Not authenticated"
@@ -31619,7 +31626,7 @@
       }
      },
      "400": {
-      "description": "invalid_text, invalid_reply_to, or a body that is not JSON"
+      "description": "invalid_text, invalid_reply_to, invalid_body (reply_to or key not text), or a body that is not JSON"
      },
      "401": {
       "description": "Not authenticated"
@@ -31793,7 +31800,7 @@
       }
      },
      "400": {
-      "description": "invalid_emoji"
+      "description": "invalid_emoji, invalid_remove (not true or false)"
      },
      "401": {
       "description": "Not authenticated"
@@ -39825,7 +39832,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 601532,
-  "source_fnv1a64": "08809d5b90a69332"
+  "source_bytes": 602199,
+  "source_fnv1a64": "d245e6e3cf55a06d"
  }
 }

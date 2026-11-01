@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <map>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -81,6 +82,20 @@ inline ::Habits::Habit model_of(const nlohmann::json& row) {
                    ? std::optional<double>(row.at("target").get<double>())
                    : std::nullopt;
     return h;
+}
+
+/// The day the habit @p row was created (the date of created_at as the database
+/// wrote it); far in the future when the row has none, so nothing before it counts.
+inline ::Habits::Day first_day(const nlohmann::json& row) {
+    const auto it = row.find("created_at");
+    if (it != row.end() && it->is_string() && it->get<std::string>().size() >= 10) {
+        try {
+            return ::Habits::day_of(it->get<std::string>().substr(0, 10));
+        } catch (const std::invalid_argument&) {
+            // Falls through to "no first day".
+        }
+    }
+    return ::Habits::Day::max();
 }
 
 /**
@@ -151,10 +166,21 @@ inline std::vector<Evaluated> evaluate(const std::string& owner,
         e.habit = row;
         e.model = models[i];
         const ::Habits::Values* values = &kNoValues;
+        ::Habits::Values filled;
         if (e.model.source && e.model.source->def != nullptr) {
             const auto& s = series.at(::Metrics::canonical(*e.model.source));
             values = &s.values;
             e.no_data = s.why != Repositories::Metrics::Why::Ok;
+            if (!e.no_data && ::Habits::empty_day_is_zero(e.model)) {
+                // A ledger day without a row is 0, from the habit's first day to yesterday, over the
+                // days that were read; before the habit there was nothing to keep.
+                filled = s.values;
+                const ::Habits::Day since = first_day(row);
+                for (const auto& [lo, hi] : read_windows) {
+                    ::Habits::fill_empty_days(e.model, filled, std::max(lo, since), std::min(hi, today - days{1}));
+                }
+                values = &filled;
+            }
         }
         const auto c = checks.find(row.at("id").get<std::string>());
         const ::Habits::Checks& manual = c == checks.end() ? kNoChecks : c->second;

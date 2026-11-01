@@ -38,4 +38,14 @@ inline std::chrono::year_month_day parse_ymd(std::string_view text) {
     return ymd;
 }
 
+/// Whether @p text is YYYY-MM-DD naming a day that exists: "2026-02-30" is not.
+inline bool is_ymd(std::string_view text) {
+    try {
+        parse_ymd(text);
+        return true;
+    } catch (const std::invalid_argument&) {
+        return false;
+    }
+}
+
 }  // namespace Utils::Date

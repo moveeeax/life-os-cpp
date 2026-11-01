@@ -37,6 +37,7 @@
 #include "repositories/agent/FactRepository.hpp"
 #include "repositories/agent/InboxRepository.hpp"
 #include "repositories/agent/TurnRepository.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Agent {
 
@@ -83,15 +84,6 @@ json ended(const std::string& id, const std::string& owner, const std::string& e
     InboxRepository().fail_turn(id);
     more_events(owner);
     return json{{"status", "failed"}, {"error", error}};
-}
-
-/// Characters, not bytes: ani_turns.text holds at most kTurnTextMax characters.
-std::size_t utf8_length(const std::string& s) {
-    std::size_t n = 0;
-    for (const unsigned char c : s) {
-        n += (c & 0xC0) != 0x80 ? 1 : 0;
-    }
-    return n;
 }
 
 std::string trimmed(const std::string& s) {
@@ -543,7 +535,7 @@ json process_hook_event(const json& payload) {
     std::vector<std::string> ids;
     for (const auto& item : live) {
         const std::string line = event_line(item["payload"]);
-        if (!text.empty() && utf8_length(text) + 1 + utf8_length(line) > kTurnTextMax) {
+        if (!text.empty() && Utils::Utf8::length(text) + 1 + Utils::Utf8::length(line) > kTurnTextMax) {
             break;
         }
         text += (text.empty() ? "" : "\n") + line;

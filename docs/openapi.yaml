@@ -114,7 +114,7 @@ components:
         target_value: { type: [number, 'null'] }
         target_count: { type: [integer, 'null'] }
         result: { type: [string, 'null'], enum: [pass, fail, null] }
-        source: { type: [string, 'null'], description: 'A number goal only: the id of the metrics catalog series it follows (GET /api/v1/metrics), null when fed by check-ins alone' }
+        source: { type: [string, 'null'], description: 'A number goal only: the id of the metrics catalog series it follows (GET /api/v1/metrics), null when fed by check-ins alone. A series that adds up by day (reduce sum or count: steps, income, tasks done) counts as its running total from start_date on top of start_value; any other series counts its day value' }
         source_why:
           type: [string, 'null']
           enum: [module_off, no_permission, not_linked, not_yours, null]
@@ -129,7 +129,7 @@ components:
           required: [checkins, points, sections, tasks, milestones]
           properties:
             checkins: { type: array, items: { $ref: '#/components/schemas/GoalCheckin' } }
-            points: { type: array, items: { $ref: '#/components/schemas/GoalPoint' }, description: 'A number goal: the days of its source from start_date to the date asked for, merged with its check-ins (a check-in wins on its date), oldest first; empty for the other kinds' }
+            points: { type: array, items: { $ref: '#/components/schemas/GoalPoint' }, description: 'A number goal: the days of its source from start_date to the date asked for (no later than tomorrow), merged with its check-ins (a check-in wins on its date), oldest first; for a source that adds up by day each point is the running total; empty for the other kinds' }
             sections: { type: array, items: { allOf: [ { $ref: '#/components/schemas/GoalSection' }, { type: object, required: [tasks], properties: { tasks: { type: array, items: { $ref: '#/components/schemas/Task' } } } } ] } }
             tasks: { type: array, items: { $ref: '#/components/schemas/Task' }, description: The goal's tasks without a section }
             milestones: { type: array, items: { $ref: '#/components/schemas/GoalMilestone' } }
@@ -9445,7 +9445,7 @@ paths:
     post:
       summary: Create a goal
       description: >-
-        number needs start_value and target_value (different); count needs target_count; unit is for number only; start_date defaults to today; due must be after it.
+        number needs start_value and target_value (different); count needs target_count; unit is for number only; start_date defaults to today in ?tz= (UTC without it); due must be after it.
       tags: [goals]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -10544,7 +10544,7 @@ paths:
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: date, in: query, required: true, schema: { type: string, format: date } }
-        - { name: tz, in: query, description: The caller's IANA zone (UTC when not one), schema: { type: string } }
+        - { name: tz, in: query, description: 'The caller''s IANA zone; UTC when absent, 400 invalid_query when it names no zone', schema: { type: string } }
       responses:
         '200':
           description: The day
@@ -10555,7 +10555,7 @@ paths:
                 required: [data]
                 properties:
                   data: { $ref: '#/components/schemas/NowDay' }
-        '400': { description: invalid_date }
+        '400': { description: 'invalid_date, invalid_query (tz names no zone)' }
         '401': { description: Not authenticated }
         '404': { description: Now is off (now) }
   /api/v1/now/focus-sessions:
@@ -10575,7 +10575,7 @@ paths:
                 started_at: { type: string, format: date-time }
                 ended_at: { type: string, format: date-time, description: 'After started_at, 4 hours at most, within the last 2 days' }
                 minutes: { type: integer, description: Time in focus without pauses; the span when left out }
-                label: { type: string, maxLength: 200 }
+                label: { type: [string, 'null'], maxLength: 200, description: 'Kept to its first 200 characters; null is no label' }
       responses:
         '201':
           description: Recorded
@@ -10586,7 +10586,7 @@ paths:
                 required: [data]
                 properties:
                   data: { type: object, properties: { id: { type: string, format: uuid } } }
-        '400': { description: 'invalid_time, invalid_minutes' }
+        '400': { description: 'invalid_time, invalid_minutes, invalid_label (not text)' }
         '401': { description: Not authenticated }
         '404': { description: Now is off (now) }
   /api/v1/now/focus-stats:
@@ -10595,7 +10595,7 @@ paths:
       tags: [now]
       security: [{ BearerAuth: [] }]
       parameters:
-        - { name: tz, in: query, description: The caller's IANA zone (UTC when not one), schema: { type: string } }
+        - { name: tz, in: query, description: 'The caller''s IANA zone; UTC when absent, 400 invalid_query when it names no zone', schema: { type: string } }
       responses:
         '200':
           description: This week, the last seven days, the hours of the day over 28 days
@@ -10606,6 +10606,7 @@ paths:
                 required: [data]
                 properties:
                   data: { $ref: '#/components/schemas/FocusStats' }
+        '400': { description: invalid_query (tz names no zone) }
         '401': { description: Not authenticated }
         '404': { description: Now module disabled }
   /api/v1/calendar:
@@ -10979,7 +10980,7 @@ paths:
                 required: [data]
                 properties:
                   data: { type: object }
-        '400': { description: 'invalid_text, invalid_reply_to, or a body that is not JSON' }
+        '400': { description: 'invalid_text, invalid_reply_to, invalid_body (reply_to or key not text), or a body that is not JSON' }
         '401': { description: Not authenticated }
         '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }
@@ -11044,7 +11045,7 @@ paths:
                 required: [data]
                 properties:
                   data: { type: object }
-        '400': { description: invalid_emoji }
+        '400': { description: 'invalid_emoji, invalid_remove (not true or false)' }
         '401': { description: Not authenticated }
         '404': { description: 'Telegram is not set up (telegram_not_configured), not linked to the caller (telegram_not_linked), or no such chat (telegram_not_found)' }
         '429': { description: The gateway is rate limited }

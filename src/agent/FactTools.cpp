@@ -12,6 +12,7 @@
 
 #include "repositories/agent/FactRepository.hpp"
 #include "security/Audit.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Agent::FactTools {
 
@@ -24,13 +25,7 @@ json tool(const char* name, const char* description, json parameters) {
                 {"function", {{"name", name}, {"description", description}, {"parameters", std::move(parameters)}}}};
 }
 
-std::size_t length(const std::string& s) {
-    std::size_t n = 0;
-    for (const unsigned char c : s) {
-        n += (c & 0xC0) != 0x80 ? 1 : 0;
-    }
-    return n;
-}
+using Utils::Utf8::length;
 
 }  // namespace
 
