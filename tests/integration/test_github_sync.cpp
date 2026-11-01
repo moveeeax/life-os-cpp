@@ -32,6 +32,13 @@
 
 namespace {
 
+/// Every repository of a user, the first page.
+const Repositories::Github::RepoRepository::Filter kEvery = [] {
+    Repositories::Github::RepoRepository::Filter f;
+    f.view = "all";
+    return f;
+}();
+
 using nlohmann::json;
 using Repositories::Github::LinkRepository;
 using Repositories::Github::MuteRepository;
@@ -168,7 +175,7 @@ TEST_F(GithubSyncTest, SyncStoresRepositoriesVerdictsAndTheOrgHint) {
     EXPECT_EQ(out["status"], "done") << out.dump();
     EXPECT_EQ(out["repos"], 3);
 
-    const auto all = repos.list(kAnna, {"all"});
+    const auto all = repos.list(kAnna, kEvery);
     EXPECT_EQ(all["total"], 3);
     EXPECT_EQ(all["owners"], json::array({"cybercapybara", "moveeeax"}));
     const auto second = repos.one(kAnna, "moveeeax/second");
@@ -188,16 +195,16 @@ TEST_F(GithubSyncTest, SyncStoresRepositoriesVerdictsAndTheOrgHint) {
     EXPECT_TRUE(link->synced_at.has_value());
     EXPECT_FALSE(link->sync_error.has_value());
     EXPECT_EQ(link->org_hint, "locked") << "the organisation that refused the app";
-    EXPECT_EQ(repos.list(kBoris, {"all"})["total"], 0) << "per user";
+    EXPECT_EQ(repos.list(kBoris, kEvery)["total"], 0) << "per user";
 }
 
 TEST_F(GithubSyncTest, ARepositoryGoneFromGithubGoesAtTheNextSync) {
     linked(kAnna);
     run(kAnna);
-    EXPECT_EQ(repos.list(kAnna, {"all"})["total"], 3);
+    EXPECT_EQ(repos.list(kAnna, kEvery)["total"], 3);
     github.mine = {node("r1", "moveeeax", "renamed")};
     run(kAnna);
-    EXPECT_EQ(repos.list(kAnna, {"all"})["total"], 2);
+    EXPECT_EQ(repos.list(kAnna, kEvery)["total"], 2);
     EXPECT_TRUE(repos.one(kAnna, "moveeeax/renamed").has_value()) << "the node id keeps the row through a rename";
     EXPECT_FALSE(repos.one(kAnna, "moveeeax/second").has_value());
 }
@@ -209,7 +216,7 @@ TEST_F(GithubSyncTest, ARefusalKeepsTheOldListAndNamesItself) {
     const json out = run(kAnna);
     EXPECT_EQ(out["status"], "failed");
     EXPECT_EQ(out["error"], "token_revoked");
-    EXPECT_EQ(repos.list(kAnna, {"all"})["total"], 3) << "the last list stays";
+    EXPECT_EQ(repos.list(kAnna, kEvery)["total"], 3) << "the last list stays";
     const auto link = links.get(kAnna);
     ASSERT_TRUE(link.has_value());
     EXPECT_EQ(link->sync_error, "token_revoked");

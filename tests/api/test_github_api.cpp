@@ -364,7 +364,9 @@ TEST_F(GithubApiTest, DisconnectRemovesLinkReposAndMutes) {
     ASSERT_EQ(resp->statusCode(), k204NoContent) << resp->body();
     EXPECT_EQ(github.revokes, 1) << "the token is revoked at GitHub";
     EXPECT_FALSE(links.get(kAnna).has_value());
-    EXPECT_EQ(Repositories::Github::RepoRepository().list(kAnna, {"all"})["total"], 0);
+    Repositories::Github::RepoRepository::Filter every;
+    every.view = "all";
+    EXPECT_EQ(Repositories::Github::RepoRepository().list(kAnna, every)["total"], 0);
     EXPECT_TRUE(Repositories::Github::MuteRepository().all(kAnna).empty());
     EXPECT_FALSE(body_of(status(anna))["data"]["linked"].get<bool>());
 }
