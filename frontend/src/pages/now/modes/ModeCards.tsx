@@ -1,15 +1,32 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { MONEY_PROBE, TRAVEL_PROBE } from '@/hooks/moduleProbes';
+import { useModuleOn } from '@/hooks/useModuleProbe';
 import { useMoneySettings } from '@/hooks/useMoney';
-import { useCounters, useCrossings, useTrip, useTrips } from '@/hooks/useTravel';
+import {
+  useCounters,
+  useCrossings,
+  useRecentCrossings,
+  useTrip,
+  useTrips,
+} from '@/hooks/useTravel';
 import { api } from '@/lib/api/client';
 import type { Today } from '@/lib/now/types';
 import { CURRENCY_OF } from '@/lib/now/currency';
 import { countryName } from '@/lib/travel';
 
 import { hhmm, type NowDay } from '../ribbon/layout';
-import { MODE_KEY, arrival, flightsToday, hourIn, minutesUntil, modeOf, type Mode } from './modes';
+import {
+  MODE_KEY,
+  arrival,
+  flightsToday,
+  hourIn,
+  minutesUntil,
+  modeNeeds,
+  modeOf,
+  type Mode,
+} from './modes';
 import './modes.css';
 
 function readPin(): string | null {
@@ -44,7 +61,10 @@ export function ModeCards({
   today,
   day,
   tz,
+  shareCrossings = false,
 }: {
+  /** Ani is on and reads every crossing already: use that list instead of a short page. */
+  shareCrossings?: boolean;
   now: Date;
   date: string;
   tz: string;
@@ -52,18 +72,48 @@ export function ModeCards({
   day: NowDay | undefined;
 }) {
   const [pin, setPin] = useState<string | null>(readPin);
-  const trips = useTrips();
-  const travelling = (trips.data ?? []).find((t) => t.start_date === date || t.end_date === date);
+  const travelOn = useModuleOn('travel', TRAVEL_PROBE, true);
+  const moneyOn = useModuleOn('money', MONEY_PROBE, true);
+  const hour = hourIn(now, tz);
+  // Each read waits until the mode can use it: no trips without a trip today,
+  // no crossings once a flight wins, the rest only for the mode that shows them.
+  const first = modeNeeds(
+    pin,
+    travelOn,
+    today !== undefined,
+    today?.travel?.next_trip,
+    false,
+    false,
+  );
+  const trips = useTrips('USD', first.trips);
+  const travelling = first.trips
+    ? (trips.data ?? []).find((t) => t.start_date === date || t.end_date === date)
+    : undefined;
   const trip = useTrip(travelling?.id ?? '', 'USD');
   const flights = travelling ? flightsToday(trip.data, date) : [];
-  const crossings = useCrossings();
-  const arrived = arrival(crossings.data, date);
-  const counters = useCounters(date);
-  const view = useMoneySettings().data?.view_currency ?? 'KZT';
+  const tripsSettled = !trips.isPending && (!travelling || !trip.isPending);
+  const need = modeNeeds(
+    pin,
+    travelOn,
+    today !== undefined,
+    today?.travel?.next_trip,
+    flights.length > 0,
+    tripsSettled,
+  );
+  // Ani reads the whole history anyway (anniversaries): share it rather than add a call.
+  const recent = useRecentCrossings(need.crossings && !shareCrossings);
+  const all = useCrossings(need.crossings && shareCrossings);
+  const crossings = shareCrossings ? all : recent;
+  const arrived = need.crossings ? arrival(crossings.data, date) : null;
+  const mode: Mode | null = modeOf(hour, flights.length > 0, !!arrived, pin);
+  const counters = useCounters(date, mode === 'arrive' && !!arrived);
+  const view =
+    useMoneySettings(mode === 'arrive' && !!arrived && moneyOn === true).data?.view_currency ??
+    'KZT';
   const local = arrived ? CURRENCY_OF[arrived.to_country] : undefined;
   const rate = useQuery({
     queryKey: ['now', 'mode-rate', local, view, date],
-    enabled: !!local && local !== view,
+    enabled: mode === 'arrive' && !!local && local !== view && moneyOn === true,
     staleTime: 60 * 60_000,
     queryFn: async ({ signal }) =>
       (
@@ -75,6 +125,7 @@ export function ModeCards({
   });
   const waiting = useQuery({
     queryKey: ['telegram', 'waiting'],
+    enabled: mode === 'evening',
     staleTime: 10 * 60_000,
     retry: false,
     queryFn: async ({ signal }) =>
@@ -82,7 +133,6 @@ export function ModeCards({
         .data,
   });
 
-  const mode: Mode | null = modeOf(hourIn(now, tz), flights.length > 0, !!arrived, pin);
   if (!mode) return null;
   const hide = () => {
     try {

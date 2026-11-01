@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
+import { NOW_RIBBON, qk } from '@/lib/api/queryKeys';
 import type {
   PracticeClient,
   PracticeClientInput,
@@ -145,6 +145,6 @@ export function useAddNextStep(onSuccess?: () => void) {
   return useApiMutation(
     async (body: TaskInput) =>
       (await api.postJson<{ data: Task }>('/api/v1/tasks/items', { body })).data,
-    { invalidate: [qk.tasks.all(), ...WRITES, qk.now.all()], onSuccess },
+    { invalidate: [qk.tasks.all(), ...WRITES, ...NOW_RIBBON], onSuccess },
   );
 }

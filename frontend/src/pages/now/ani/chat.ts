@@ -15,8 +15,56 @@ import type { components } from '@/lib/api/schema.gen';
 export type Turn = components['schemas']['AniTurn'];
 export type Action = components['schemas']['AniAction'];
 
-/** How often an open turn is read again. */
+/** How often an open turn is read again at first. */
 export const POLL_MS = 1000;
+/** For how long the first, quick reads go on; a turn usually ends within it. */
+export const POLL_FAST_FOR_MS = 10_000;
+/** How often a turn still open after that is read (a sleeping agent wakes in about 30 s). */
+export const POLL_SLOW_MS = 5000;
+
+/** The wait before the next read of a turn watched for @p elapsed ms. */
+export function pollDelay(elapsed: number): number {
+  return elapsed < POLL_FAST_FOR_MS ? POLL_MS : POLL_SLOW_MS;
+}
+
+/**
+ * Read a turn again and again: every second for ten seconds, then every five.
+ * One read at a time (the next waits for the last to settle). While the tab is
+ * hidden nothing is read; showing it again reads at once. Returns the stop.
+ */
+export function pollTurn(read: () => Promise<unknown>): () => void {
+  const started = Date.now();
+  let timer: number | undefined;
+  let stopped = false;
+  let reading = false;
+  const hidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
+  const schedule = () => {
+    if (stopped) return;
+    window.clearTimeout(timer);
+    timer = window.setTimeout(tick, pollDelay(Date.now() - started));
+  };
+  const tick = () => {
+    timer = undefined;
+    if (stopped || reading || hidden()) return;
+    reading = true;
+    read()
+      .catch(() => {})
+      .finally(() => {
+        reading = false;
+        schedule();
+      });
+  };
+  const onVisible = () => {
+    if (!hidden() && timer === undefined && !reading) tick();
+  };
+  document.addEventListener('visibilitychange', onVisible);
+  schedule();
+  return () => {
+    stopped = true;
+    window.clearTimeout(timer);
+    document.removeEventListener('visibilitychange', onVisible);
+  };
+}
 /** The longest message, in characters (the API checks the same). */
 export const TEXT_MAX = 4000;
 

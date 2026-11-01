@@ -2,13 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
+import { NOW_RIBBON, qk } from '@/lib/api/queryKeys';
 import { loadProjectTasks, type Project, type ProjectInput, type Task } from '@/lib/tasks';
 
 const BASE = '/api/v1/tasks/projects';
 
 /** A project write changes task and note rows (their project name) and the counts. */
-const WRITES = [qk.tasks.all(), qk.now.all(), qk.notes.all()] as const;
+const WRITES = [qk.tasks.all(), ...NOW_RIBBON, qk.notes.all()] as const;
 
 /** Projects of a kind ("" both), in their order. */
 export function useProjects(kind: '' | 'project' | 'course' = '') {

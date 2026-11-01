@@ -1176,6 +1176,47 @@ void MoneyController::periodReport(const HttpRequestPtr& req, Callback&& callbac
     });
 }
 
+void MoneyController::monthReports(const HttpRequestPtr& req, Callback&& callback) {
+    API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
+    if (refused_tz(req, callback)) {
+        return;
+    }
+    const std::string today = local_today(req, &Repositories::Zones::today_in, today_utc());
+    const std::string year = req->getParameter("year").empty() ? today.substr(0, 4) : req->getParameter("year");
+    if (year.size() != 4 || !is_calendar_date(year + "-01-01")) {
+        callback(ErrorResponse::bad_request("invalid_query", "year must be four digits like 2026"));
+        return;
+    }
+    const std::string as_if = req->getParameter("as_if");
+    if (!as_if.empty() && !std::regex_match(as_if, kCodeRe)) {
+        callback(ErrorResponse::bad_request("invalid_currency", "as_if must be an ISO code"));
+        return;
+    }
+    // Every month of a past year, this year's up to the running month, none of a coming year.
+    const std::string this_year = today.substr(0, 4);
+    const int last = year < this_year ? 12 : year == this_year ? std::stoi(today.substr(5, 2)) : 0;
+    with_repo_errors(callback, "money.monthReports", [&] {
+        const std::string target = as_if.empty() ? view_currency(owner).value_or("") : as_if;
+        json months = json::array();
+        for (int m = 1; m <= last; ++m) {
+            const std::string month = year + (m < 10 ? "-0" : "-") + std::to_string(m);
+            const auto range = Money::Period::of(Money::Period::Kind::month, month + "-01");
+            // The same numbers as GET /reports/period for that month, cut to the totals.
+            const json r = Repo::ReportBuilder::build(owner, Money::Period::Kind::month, "month", range, today, target);
+            json totals;
+            if (r.contains("as_if")) {
+                const json& a = r["as_if"];
+                totals = {{"currency", a["currency"]},
+                          {"income", a["income"]},
+                          {"expense", a["expense"]},
+                          {"partial", a["partial"]}};
+            }
+            months.push_back({{"month", month}, {"from", range.from}, {"to", range.to}, {"as_if", totals}});
+        }
+        callback(Response::ok(json{{"data", months}}));
+    });
+}
+
 void MoneyController::summary(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::money_enabled(), "money", req, callback, owner);
     if (refused_tz(req, callback)) {

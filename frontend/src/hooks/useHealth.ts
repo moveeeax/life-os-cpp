@@ -90,7 +90,7 @@ export function useSyncRun(id: number | null) {
       const run = (await api.getJson<{ data: SyncRun }>(path)).data;
       if (isFinalStatus(run.status)) {
         void qc.invalidateQueries({ queryKey: qk.health.all() });
-        void qc.invalidateQueries({ queryKey: qk.now.all() });
+        void qc.invalidateQueries({ queryKey: qk.now.days() });
       }
       return run;
     },

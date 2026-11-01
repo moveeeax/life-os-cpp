@@ -3,6 +3,8 @@ import { Outlet, useLocation } from 'react-router';
 
 import '@fontsource-variable/outfit';
 
+import { keepsNow } from '@/pages/now/wide';
+
 import { Backdrop } from './Backdrop';
 import { GlassAccountMenu } from './GlassAccountMenu';
 import { GlassNav } from './GlassNav';
@@ -37,9 +39,9 @@ function useMatch(query: string): boolean {
 export function GlassShell() {
   const { pathname } = useLocation();
   const onNow = pathname === '/now';
-  const nowOn = useGlassNav().nowOn === true;
+  const nowOn = useGlassNav().nowOn;
   const wide = useMatch(KEEP_QUERY);
-  const keep = nowOn && wide;
+  const keep = keepsNow(wide, nowOn);
   return (
     <div
       className="glass dark font-outfit"

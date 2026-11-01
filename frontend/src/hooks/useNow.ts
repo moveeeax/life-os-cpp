@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
+import { NOW_RIBBON, qk } from '@/lib/api/queryKeys';
 import {
   cacheKey,
   pruneDays,
@@ -34,7 +34,10 @@ async function del(path: string, query?: Record<string, string>): Promise<void> 
 }
 
 /** The focus moves a task, so a focus write refreshes Tasks too. */
-const AFTER_FOCUS = [qk.now.all(), qk.tasks.all()] as const;
+const AFTER_FOCUS = [...NOW_RIBBON, qk.tasks.all()] as const;
+/** An admin wallpaper write moves the wallpaper lists; a sound write the sound lists. */
+const WALLPAPER_WRITES = [qk.now.wallpaperLists(), qk.now.adminWallpapers()] as const;
+const SOUND_WRITES = [qk.now.sounds(), qk.now.adminSounds()] as const;
 
 /**
  * The day's digest. The last answer for this user and day paints first
@@ -198,13 +201,13 @@ export function useCreateWallpaper() {
 export function useWallpaperReady() {
   return useApiMutation(
     async (id: string) => (await api.postJson<{ data: Wallpaper }>(`${ADMIN}/${id}/ready`)).data,
-    { invalidate: [qk.now.all()] },
+    { invalidate: WALLPAPER_WRITES },
   );
 }
 
 export function useDeleteWallpaper() {
   return useApiMutation((id: string) => del(`${ADMIN}/${id}`), {
-    invalidate: [qk.now.all()],
+    invalidate: WALLPAPER_WRITES,
   });
 }
 
@@ -247,12 +250,12 @@ export function useCreateSound() {
 export function useSoundReady() {
   return useApiMutation(
     async (id: string) => (await api.postJson<{ data: Sound }>(`${SOUNDS_ADMIN}/${id}/ready`)).data,
-    { invalidate: [qk.now.all()] },
+    { invalidate: SOUND_WRITES },
   );
 }
 
 export function useDeleteSound() {
   return useApiMutation((id: string) => del(`${SOUNDS_ADMIN}/${id}`), {
-    invalidate: [qk.now.all()],
+    invalidate: SOUND_WRITES,
   });
 }

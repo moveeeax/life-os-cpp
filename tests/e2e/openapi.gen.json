@@ -12709,6 +12709,61 @@
      }
     }
    },
+   "MoneyMonthTotals": {
+    "type": "object",
+    "required": [
+     "month",
+     "from",
+     "to",
+     "as_if"
+    ],
+    "properties": {
+     "month": {
+      "type": "string",
+      "description": "YYYY-MM"
+     },
+     "from": {
+      "type": "string",
+      "format": "date"
+     },
+     "to": {
+      "type": "string",
+      "format": "date"
+     },
+     "as_if": {
+      "description": "The month's totals converted into the as_if currency, as in the period report; null with no as_if currency",
+      "oneOf": [
+       {
+        "type": "null"
+       },
+       {
+        "type": "object",
+        "required": [
+         "currency",
+         "income",
+         "expense",
+         "partial"
+        ],
+        "properties": {
+         "currency": {
+          "type": "string"
+         },
+         "income": {
+          "type": "number"
+         },
+         "expense": {
+          "type": "number"
+         },
+         "partial": {
+          "type": "boolean",
+          "description": "Some currency had no rate"
+         }
+        }
+       }
+      ]
+     }
+    }
+   },
    "MoneyReport": {
     "type": "object",
     "required": [
@@ -23649,6 +23704,112 @@
      },
      "400": {
       "description": "A bad period or currency",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Not authenticated",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "The principal is not a user account (no_user_account)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Money module disabled",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/money/reports/months": {
+   "get": {
+    "summary": "The months of a year with their \"as if\" totals, one call for the month strip",
+    "description": "Every month of a past year, this year's months up to the running one (in tz), none of a coming year. Each month's as_if block holds the totals that the period report gives for that month; it is null when there is no as_if currency.",
+    "tags": [
+     "money"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "year",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9]{4}$"
+      },
+      "description": "The year; this year in tz by default"
+     },
+     {
+      "name": "as_if",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "pattern": "^[A-Z]{3}$"
+      },
+      "description": "Defaults to the settings' view_currency"
+     },
+     {
+      "name": "tz",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "default": "UTC"
+      },
+      "description": "IANA zone of the caller: this year and this month are counted there; a name that is not a zone answers 400 invalid_query"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The months, January first",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/MoneyMonthTotals"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "A bad year, currency or zone",
       "content": {
        "application/json": {
         "schema": {
@@ -39837,7 +39998,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 602616,
-  "source_fnv1a64": "048681e053316522"
+  "source_bytes": 605411,
+  "source_fnv1a64": "d24b411abccac90d"
  }
 }

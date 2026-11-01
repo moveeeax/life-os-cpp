@@ -42,7 +42,7 @@ import { ModeCards } from './modes/ModeCards';
 import { Board } from './widgets/Board';
 import { useNowDay } from './ribbon/layout';
 import { Ribbon } from './ribbon/Ribbon';
-import { KEEP_FROM, useWide } from './wide';
+import { KEEP_FROM, keepsNow, useWide } from './wide';
 import './now.css';
 
 /** The current time, updated on the minute. */
@@ -77,7 +77,7 @@ export function NowPage() {
   // answered (a module still asking would count as on and win the redirect).
   if (nav.nowOn === false) return nav.settled ? <Navigate to={homeOf(nav.items)} replace /> : null;
   // On a wide screen the shell keeps Now on every tab (NowKept): the route itself draws nothing.
-  if (kept && nav.nowOn) return null;
+  if (keepsNow(kept, nav.nowOn)) return null;
   return <NowScreen />;
 }
 
@@ -220,7 +220,14 @@ function NowScreen({ away = false }: { away?: boolean }) {
             player.play();
           }}
         />
-        <ModeCards now={now} date={date} today={data} day={nowDay.data} tz={tz} />
+        <ModeCards
+          now={now}
+          date={date}
+          today={data}
+          day={nowDay.data}
+          tz={tz}
+          shareCrossings={showAni}
+        />
         <Board widgets={settings.data?.widgets ?? []} today={data} date={date} tz={tz} />
         {today.isError && (
           <span className="n-note">

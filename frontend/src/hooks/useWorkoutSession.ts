@@ -9,7 +9,7 @@ import {
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { browserStore as browserStorage } from '@/lib/browserStore';
 import { ApiClientError, api, apiErrorMessage } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
+import { NOW_RIBBON, qk } from '@/lib/api/queryKeys';
 import {
   backoffMs,
   dropFromQueue,
@@ -193,8 +193,8 @@ export function usePatchSession(id: string, onDone?: (session: WorkoutSession) =
     async (body: WorkoutSessionPatch) =>
       (await api.patchJson<{ data: WorkoutSession }>(`${BASE}/sessions/${id}`, { body })).data,
     {
-      // A finished session ticks a workout habit and the Habits plate of Now.
-      invalidate: [qk.workout.sessions(), qk.workout.heartRate(id), qk.habits.all(), qk.now.all()],
+      // A finished session ticks a workout habit and the Habits plate of Now, and sits on the ribbon.
+      invalidate: [qk.workout.sessions(), qk.workout.heartRate(id), qk.habits.all(), ...NOW_RIBBON],
       onSuccess: (session) => {
         cacheSession(qc, session);
         onDone?.(session);
@@ -206,7 +206,7 @@ export function usePatchSession(id: string, onDone?: (session: WorkoutSession) =
 export function useDeleteSession(id: string, onDone: () => void) {
   const qc = useQueryClient();
   return useApiMutation(() => api.deleteJson<unknown>(`${BASE}/sessions/${id}`), {
-    invalidate: [qk.workout.sessions(), qk.habits.all(), qk.now.all()],
+    invalidate: [qk.workout.sessions(), qk.habits.all(), ...NOW_RIBBON],
     onSuccess: () => {
       qc.removeQueries({ queryKey: qk.workout.session(id) });
       qc.setQueryData<WorkoutSession | null>(qk.workout.active(), (s) => (s?.id === id ? null : s));
