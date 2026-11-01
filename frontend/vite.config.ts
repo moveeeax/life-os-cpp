@@ -26,5 +26,16 @@ export default defineConfig({
     // source. Dev/preview still get inline maps via
     // Vite's defaults. Override with VITE_SOURCEMAP=1 for local debugging.
     sourcemap: process.env.VITE_SOURCEMAP === '1',
+    rolldownOptions: {
+      output: {
+        // A chunk is named after its first module, so apexcharts came out as
+        // "chartTheme" (lib/chartTheme.ts); name it after the library. Only
+        // the file name changes, not what goes into the chunk.
+        chunkFileNames: (chunk) =>
+          chunk.moduleIds.some((id) => id.includes('/node_modules/apexcharts/'))
+            ? 'assets/apexcharts-[hash].js'
+            : 'assets/[name]-[hash].js',
+      },
+    },
   },
 });
