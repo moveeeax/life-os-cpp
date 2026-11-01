@@ -645,6 +645,18 @@ select.k-input option {
   display: inline-grid;
   place-items: center;
 }
+/* The arrows and the small Add links keep their look and get a hit area of
+   32 px (WCAG 2.2, 2.5.8). */
+.k-stepper button,
+.k-link.k-add {
+  position: relative;
+}
+.k-stepper button::before,
+.k-link.k-add::before {
+  content: '';
+  position: absolute;
+  inset: min(0px, (100% - 32px) / 2);
+}
 
 .k-warn-text {
   color: var(--g-warn);

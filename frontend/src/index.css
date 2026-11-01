@@ -252,3 +252,35 @@
   :is(.apexcharts-series, .apexcharts-yaxis-label, .apexcharts-datalabels, .apexcharts-tooltip) {
   filter: blur(7px);
 }
+
+/* A phone: iOS Safari zooms the page into any field under 16 px when it takes
+   the focus and leaves it zoomed, so every text field is at least 16 px
+   there. Fields drawn larger on purpose keep their size. */
+@media (max-width: 640px) {
+  input:not(
+      [type='checkbox'],
+      [type='radio'],
+      [type='range'],
+      [type='color'],
+      [type='file'],
+      [type='button'],
+      [type='submit'],
+      [type='reset'],
+      [type='image']
+    ):not(.n-input, .k-big, .s-input, .text-base, .text-lg, .text-xl, .text-2xl, .text-3xl),
+  textarea:not(.text-base, .text-lg, .text-xl, .text-2xl, .text-3xl),
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* A small control keeps its look and gets a hit area of 32 px (at least the
+   24 px of WCAG 2.2, 2.5.8): an invisible ring around it. */
+.k-hit {
+  position: relative;
+}
+.k-hit::before {
+  content: '';
+  position: absolute;
+  inset: min(0px, (100% - 32px) / 2);
+}
