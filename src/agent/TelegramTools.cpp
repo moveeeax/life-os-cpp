@@ -11,6 +11,7 @@
 #include <spdlog/spdlog.h>
 
 #include "agent/Tools.hpp"
+#include "repositories/UserRepository.hpp"
 #include "repositories/telegram/LinkRepository.hpp"
 #include "storage/S3Presign.hpp"
 #include "telegram/Gateway.hpp"
@@ -79,7 +80,12 @@ std::string url_of(const std::string& api_url, const json& req) {
 
 bool available(const std::string& owner) {
     try {
-        return ::Telegram::settings().has_value() && Repositories::Telegram::LinkRepository().of(owner).has_value();
+        if (!::Telegram::settings().has_value() || !Repositories::Telegram::LinkRepository().of(owner).has_value()) {
+            return false;
+        }
+        // The routes serve the linked user only while they are an administrator.
+        const auto user = Repositories::UserRepository().find(owner);
+        return user && user->is_admin();
     } catch (const std::exception& e) {
         spdlog::warn("ani agent: the Telegram link was not read: {}", e.what());
         return false;

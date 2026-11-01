@@ -63,14 +63,15 @@ public:
     }
 
     /// The user's turns created in the last @p seconds: the rate limit.
-    int count_since(const std::string& owner, int seconds) {
+    int count_since(const std::string& owner, int seconds, bool hooks = false) {
+        // The person's turns (chat and MCP) and the webhook's are counted apart.
+        const std::string origin = hooks ? "origin = 'hook'" : "origin <> 'hook'";
         return Database::get().execute_read([&](auto& txn) {
             return txn
-                .exec_params(
-                    "SELECT count(*) FROM ani_turns WHERE owner_id = $1::uuid AND created_at > now() - "
-                    "make_interval(secs => $2)",
-                    owner,
-                    seconds)[0][0]
+                .exec_params("SELECT count(*) FROM ani_turns WHERE owner_id = $1::uuid AND " + origin +
+                                 " AND created_at > now() - make_interval(secs => $2)",
+                             owner,
+                             seconds)[0][0]
                 .template as<int>();
         });
     }

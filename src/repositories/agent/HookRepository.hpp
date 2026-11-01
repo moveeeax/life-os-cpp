@@ -1,9 +1,13 @@
 /**
  * @file HookRepository.hpp
  * @brief ani_hooks (migration 062): each user's webhook token. The token is
- *        kept as is (the settings page shows the URL at any time); what it
- *        unlocks is small: Ani says, wears or plays something, or hands an
- *        event to the user's agent, which only proposes changes.
+ *        kept as is (the settings page shows the URL at any time). It lets
+ *        anyone who holds it make Ani say, wear or play something, and hand
+ *        an event to the user's agent. That webhook turn reads the person's
+ *        data with her read tools, but changes nothing by itself: it is
+ *        offered only the proposals the person confirms (agent/Tools.hpp
+ *        may_offer), runs in a session apart from the chat, and the
+ *        event's text is defanged (agent/Hook.hpp).
  */
 
 #pragma once

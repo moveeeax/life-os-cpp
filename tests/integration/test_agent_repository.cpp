@@ -172,6 +172,11 @@ TEST_F(AgentRepositoryTest, ATurnRunsOnceAndOneAtATime) {
     EXPECT_TRUE(turns.fail(next_id, "busy"));
     EXPECT_EQ((*turns.get(kAnna, next_id))["error"], "busy");
     EXPECT_EQ(turns.count_since(kAnna, 3600), 2);
+
+    // Webhook turns are counted apart: a busy Telegram never spends the chat's hour.
+    ASSERT_TRUE(turns.open(kAnna, "[telegram] x", "UTC", "hook").has_value());
+    EXPECT_EQ(turns.count_since(kAnna, 3600), 2);
+    EXPECT_EQ(turns.count_since(kAnna, 3600, /*hooks=*/true), 1);
 }
 
 TEST_F(AgentRepositoryTest, AStaleOpenTurnDoesNotLockTheChat) {

@@ -370,4 +370,25 @@ std::string redact(std::string_view path) {
     return std::string(path.substr(0, kPrefix.size() + 10));
 }
 
+std::string defanged(std::string_view text) {
+    std::string out;
+    out.reserve(text.size());
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        const char c = text[i];
+        if (c == '[') {
+            out += '(';
+        } else if (c == ']') {
+            out += ')';
+        } else if (c == '\r' || c == '\n') {
+            if (c == '\r' && i + 1 < text.size() && text[i + 1] == '\n') {
+                ++i;
+            }
+            out += " / ";
+        } else {
+            out += c;
+        }
+    }
+    return out;
+}
+
 }  // namespace Agent::Hook

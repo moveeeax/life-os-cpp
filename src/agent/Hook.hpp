@@ -90,4 +90,10 @@ bool is_silent(std::string_view reply);
 /// @p path with a webhook token cut to its first 10 characters, for logs.
 std::string redact(std::string_view path);
 
+/// Text someone else wrote (a webhook event, a Telegram message or a chat
+/// title) made safe to put into a turn: square brackets become round ones
+/// and line breaks " / ", so it cannot fake a "[Life OS ...]" line or a
+/// "[chat <id>]" label of the lines around it.
+std::string defanged(std::string_view text);
+
 }  // namespace Agent::Hook
