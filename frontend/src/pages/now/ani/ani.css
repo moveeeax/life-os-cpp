@@ -197,25 +197,6 @@
   color: var(--g-ink-faint);
 }
 
-/* With Ani on: the dock starts right of her ledge, Links moves under Add. */
-.n-now[data-ani] .n-dock {
-  left: max(220px, 50vw - 500px);
-  transform: none;
-  width: min(1000px, 100vw - 360px);
-}
-.n-now[data-ani] .c-panel.c-dock {
-  left: calc(max(220px, 50vw - 500px) + min(1000px, 100vw - 360px) / 2);
-}
-.n-now[data-ani] .n-bl {
-  bottom: auto;
-  top: calc(max(14px, env(safe-area-inset-top, 0px)) + 106px);
-}
-.n-now[data-ani] .c-panel.c-bl {
-  bottom: auto;
-  top: calc(max(14px, env(safe-area-inset-top, 0px)) + 164px);
-  --c-origin: top left;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .ani-canvas,
   .ani-main,
@@ -627,7 +608,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ani-chat,
-  .ani-dots::after {
+  .ani-dots::after,
+  .ani-say,
+  .ani-mic[data-state='hearing'],
+  .ani-think,
+  .ani-think-puff {
     animation: none;
   }
 }
