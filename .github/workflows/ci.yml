@@ -742,6 +742,7 @@ jobs:
             exit 0
           fi
           printf 'changed files:\n%s\n' "$changed"
+          printf '%s\n' "$changed" > changed-files.txt
           if printf '%s\n' "$changed" | grep -qE "$RELEVANT"; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           else
@@ -799,16 +800,41 @@ jobs:
         # master run 32594916143; ~70% is readability-identifier-naming.
         # Checks come from .clang-tidy in the repo root (mounted read-only):
         # bugprone-*, performance-*, portability-*, clang-analyzer-*.
+        # On a pull request only the translation units the PR touches are
+        # checked: the changed src/*.cpp files, plus the .cpp next to a changed
+        # header. The whole tree (36 minutes on two cores, measured
+        # 2026-11-01) runs nightly in sanitizers-nightly.yml and on every push
+        # to master. A PR that changes only headers without a sibling .cpp,
+        # or whose file list could not be read, falls back to the whole tree.
         if: steps.scope.outputs.relevant == 'true'
         continue-on-error: true
         run: |
+          targets=""
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ] && [ -s changed-files.txt ]; then
+            cpp=$(grep -E '^src/.*\.cpp$' changed-files.txt || true)
+            siblings=$(grep -E '^src/.*\.hpp$' changed-files.txt | sed 's/\.hpp$/.cpp/' || true)
+            orphan_headers=$(for h in $siblings; do [ -f "$h" ] || echo "$h"; done)
+            for f in $cpp $siblings; do [ -f "$f" ] && targets="$targets /app/$f"; done
+            # shellcheck disable=SC2086  # the list is split on purpose
+            targets=$(printf '%s\n' $targets | sort -u | tr '\n' ' ')
+            if [ -n "$orphan_headers" ] && [ -z "$cpp" ]; then
+              echo "headers without a sibling .cpp changed: checking the whole tree"
+              targets=""
+            fi
+          fi
+          if [ -z "$targets" ]; then
+            targets="/app/src/"
+            echo "clang-tidy over the whole tree"
+          else
+            echo "clang-tidy over:$targets"
+          fi
           docker run --rm \
               -v "$PWD":/src \
               -v "$PWD/.clang-tidy":/app/.clang-tidy:ro \
               --entrypoint /bin/bash \
               life-os-cpp-ci:builder -c "
                   apt-get update -qq && apt-get install -y -qq clang-tidy >/dev/null && \
-                  run-clang-tidy -p /app/build -quiet -header-filter='src/.*' /app/src/ \
+                  run-clang-tidy -p /app/build -quiet -header-filter='src/.*' $targets \
                       | tee /src/clang-tidy.log
               "
 
