@@ -96,6 +96,16 @@ protected:
             txn.exec("DELETE FROM telegram_link");
             return true;
         });
+        // The linked user must still be an administrator by their role in the database.
+        Database::get().execute_write([](auto& txn) {
+            txn.exec_params(
+                "INSERT INTO users (id, email, confirmed, role_id) VALUES ($1::uuid, $2, TRUE, "
+                "(SELECT id FROM roles WHERE name = 'Administrator')) "
+                "ON CONFLICT (id) DO UPDATE SET role_id = EXCLUDED.role_id",
+                std::string(kAnna),
+                std::string(kAnna) + "@example.test");
+            return true;
+        });
         ASSERT_TRUE(LinkRepository().set(kAnna, "555", "anna")) << "Anna's account is the linked one";
         Net::Http::install_for_testing(&gateway);
     }

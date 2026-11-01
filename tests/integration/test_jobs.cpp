@@ -471,8 +471,8 @@ TEST_F(JobsIntegrationTest, AnOrphanWithoutALeaseIsRequeued) {
     EXPECT_EQ(list(Jobs::queue_key("orphanq")), std::vector<std::string>{job.id});
     EXPECT_EQ(Jobs::get().get_status(job.id)->status, "pending");
 
-    // A leased id belongs to the reaper.
-    auto leased = picked("orphanq", "orphan-pod-1");
+    // A leased id belongs to the reaper (its own queue: the requeued orphan waits on orphanq).
+    auto leased = picked("orphanq-leased", "orphan-pod-1");
     EXPECT_EQ(Jobs::get().recover_orphans(now + 200 * 1000, "orphan-*"), 0);
     EXPECT_EQ(list(Jobs::processing_key("orphan-pod-1")), std::vector<std::string>{leased.id});
     Jobs::get().complete(leased.id, json::object());
