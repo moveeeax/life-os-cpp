@@ -10,11 +10,12 @@
 #include <algorithm>
 #include <cstddef>
 #include <string>
+#include <string_view>
 
 namespace Utils::Utf8 {
 
 /// Code points of a UTF-8 string (bytes that are not continuation bytes).
-inline std::size_t length(const std::string& text) {
+inline std::size_t length(std::string_view text) {
     std::size_t n = 0;
     for (const unsigned char c : text) {
         if ((c & 0xC0) != 0x80) {
@@ -38,6 +39,15 @@ inline std::string cut(const std::string& text, std::size_t max_points) {
         i += width;
     }
     return text.substr(0, std::min(i, text.size()));
+}
+
+/// @p text when it has at most @p max_points code points, else its first
+/// @p max_points followed by @p ellipsis: a preview that says it was cut.
+inline std::string clip(const std::string& text, std::size_t max_points, std::string_view ellipsis = "\xE2\x80\xA6") {
+    if (length(text) <= max_points) {
+        return text;
+    }
+    return cut(text, max_points) + std::string(ellipsis);
 }
 
 }  // namespace Utils::Utf8

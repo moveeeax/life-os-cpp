@@ -7,6 +7,7 @@
 
 #include <chrono>
 #include <exception>
+#include <optional>
 #include <string>
 
 #include <drogon/drogon.h>
@@ -25,6 +26,7 @@
 #include "repositories/now/DayRepository.hpp"
 #include "utils/ErrorResponse.hpp"
 #include "utils/Modules.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Api {
 
@@ -37,13 +39,30 @@ long long now_unix() {
         .count();
 }
 
+/// ?tz=: UTC when absent, else an IANA zone; nullopt (answered 400) when it names none,
+/// as /today does, so a typo does not move the day silently.
+std::optional<std::string> zone_of(const HttpRequestPtr& req, const NowDayController::Callback& callback) {
+    const std::string tz = req->getParameter("tz");
+    if (tz.empty()) {
+        return std::string("UTC");
+    }
+    if (!Repositories::Zones::is_zone(tz)) {
+        callback(ErrorResponse::bad_request("invalid_query", "tz must be an IANA zone like Asia/Almaty"));
+        return std::nullopt;
+    }
+    return tz;
+}
+
 }  // namespace
 
 void NowDayController::day(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::now_enabled(), "now", req, callback, owner);
     const std::string date = req->getParameter("date");
-    const std::string tz_in = req->getParameter("tz");
-    const std::string tz = Repositories::Zones::is_zone(tz_in) ? tz_in : "UTC";
+    const auto zone = zone_of(req, callback);
+    if (!zone) {
+        return;
+    }
+    const std::string& tz = *zone;
     if (!Fields::is_calendar_date(date)) {
         callback(ErrorResponse::bad_request("invalid_date", "date is a day as YYYY-MM-DD"));
         return;
@@ -88,8 +107,11 @@ void NowDayController::day(const HttpRequestPtr& req, Callback&& callback) {
 
 void NowDayController::focusStats(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::now_enabled(), "now", req, callback, owner);
-    const std::string tz_in = req->getParameter("tz");
-    const std::string tz = Repositories::Zones::is_zone(tz_in) ? tz_in : "UTC";
+    const auto zone = zone_of(req, callback);
+    if (!zone) {
+        return;
+    }
+    const std::string& tz = *zone;
     try {
         callback(Response::ok(json{{"data", Repositories::Now::DayRepository().focus_stats(owner, tz)}}));
     } catch (const std::exception& e) {
@@ -104,8 +126,9 @@ void NowDayController::addFocus(const HttpRequestPtr& req, Callback&& callback) 
     if (!parse_object(req, body, callback)) {
         return;
     }
-    const std::string started = body.value("started_at", std::string());
-    const std::string ended = body.value("ended_at", std::string());
+    // Not a string is the same bad time as a bad string: 400, never a type_error.
+    const std::string started = Validation::opt_string(body, "started_at").value_or("");
+    const std::string ended = Validation::opt_string(body, "ended_at").value_or("");
     const auto a = Calendar::parse_time(started);
     const auto b = Calendar::parse_time(ended);
     const long long now = now_unix();
@@ -122,7 +145,13 @@ void NowDayController::addFocus(const HttpRequestPtr& req, Callback&& callback) 
         callback(ErrorResponse::bad_request("invalid_minutes", "minutes is 1 up to the session's length"));
         return;
     }
-    const std::string label = body.value("label", std::string()).substr(0, 200);
+    // Null or absent is no label; 200 characters, never half a character (invalid UTF-8 fails the insert).
+    const auto label_in = Fields::text_or_empty(body, "label");
+    if (!label_in) {
+        callback(ErrorResponse::bad_request("invalid_label", "label is text"));
+        return;
+    }
+    const std::string label = Utils::Utf8::cut(*label_in, 200);
     try {
         const std::string id =
             Repositories::Now::DayRepository().add_focus(owner, started, ended, static_cast<int>(minutes), label);

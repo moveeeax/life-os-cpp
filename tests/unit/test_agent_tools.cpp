@@ -104,6 +104,41 @@ TEST(AgentTools, ArgumentsOfTheWrongShapeAreDropped) {
     EXPECT_EQ(c->path, "/api/v1/habits");
 }
 
+// 2026-02-30 has the shape of a day but is none: dropped like "tomorrow"; 2028-02-29 is a day.
+TEST(AgentTools, ADayThatDoesNotExistIsDropped) {
+    auto c = T::route("today", json{{"date", "2026-02-30"}}, "UTC");
+    EXPECT_EQ(c->query, (Query{{"tz", "UTC"}}));
+    c = T::route("tasks_of_day", json{{"date", "2026-13-01"}}, "UTC");
+    EXPECT_EQ(c->query, (Query{{"tz", "UTC"}}));
+    c = T::route("today", json{{"date", "2028-02-29"}}, "UTC");
+    EXPECT_EQ(c->query, (Query{{"date", "2028-02-29"}, {"tz", "UTC"}}));
+
+    std::string refusal;
+    Agent::CalendarTools::request_of("calendar_free", json{{"date", "2026-04-31"}}, "UTC", refusal);
+    EXPECT_FALSE(refusal.empty()) << "April has 30 days";
+    refusal.clear();
+    Agent::CalendarTools::request_of(
+        "calendar_events", json{{"from", "2026-02-28"}, {"to", "2026-02-29"}}, "UTC", refusal);
+    EXPECT_FALSE(refusal.empty()) << "2026 is not a leap year";
+}
+
+// A long query of Cyrillic words is cut by characters, not bytes, so it stays valid UTF-8.
+TEST(AgentTools, ALongQueryIsCutByCharacters) {
+    std::string words;
+    for (int i = 0; i < 150; ++i) {
+        words += "\xD0\xB6";  // "ж"
+    }
+    words = "a" + words;  // 1 + 300 bytes: a 200-byte cut would split the 100th letter
+    const auto c = T::route("find_tasks", json{{"query", words}}, "UTC");
+    std::string q;
+    for (const auto& [k, v] : c->query) {
+        if (k == "q") {
+            q = v;
+        }
+    }
+    EXPECT_EQ(q.size(), 1u + 2u * 199u) << "200 characters: the a and 199 letters";
+}
+
 TEST(AgentTools, CompactDropsIdsAndEmptiness) {
     const auto in = json::parse(R"({
         "id": "t1", "goal_id": "g1", "title": "Паспорт", "note": null, "tags": [], "errors": {"x": 1},

@@ -9,7 +9,8 @@
  *        source, a series of the metrics catalog (metrics/Catalog.hpp), meets
  *        it that day: the value at least or at most the goal, or, for a
  *        presence entry without a goal (a weigh-in, a session, a mood), any
- *        value at all. A daily habit streaks over consecutive done days ending
+ *        value at all. On a ledger source (money, practice, tasks) with an
+ *        at-most goal, a closed day without a row counts as 0. A daily habit streaks over consecutive done days ending
  *        yesterday, plus today when today is done; a weekly habit (Monday to Sunday) over
  *        consecutive weeks with at least per_week done days, ending last week,
  *        plus this week when met. An open today or week never breaks a streak.
@@ -126,6 +127,23 @@ inline bool meets(const Habit& h, double value) {
     return h.direction == Direction::AtMost ? value <= *h.goal : value >= *h.goal;
 }
 
+/**
+ * Whether a closed day without a value of the source counts as 0 for @p h: an at-most
+ * goal on a ledger that writes a row only when something happens (money spent or
+ * earned, practice income or expenses, tasks done). "Spend at most 5000 a day" is
+ * met best on a day with no spending at all. A food diary is not a ledger: a day
+ * with nothing logged is a day not kept, so food stays not done.
+ */
+inline bool empty_day_is_zero(const Habit& h) {
+    if (!h.source || h.source->def == nullptr || !h.goal || h.direction != Direction::AtMost) {
+        return false;
+    }
+    const auto& d = *h.source->def;
+    const bool ledger =
+        d.gate == Metrics::Gate::Money || d.gate == Metrics::Gate::Practice || d.gate == Metrics::Gate::Tasks;
+    return ledger && (d.reduce == Metrics::Reduce::Sum || d.reduce == Metrics::Reduce::Count);
+}
+
 /// The catalog ids @p habits read, each once, sorted: habits sharing a source
 /// have it read once per window.
 inline std::vector<std::string> distinct_sources(const std::vector<Habit>& habits) {
@@ -148,6 +166,18 @@ inline bool check_counts(const Habit& h, const std::optional<double>& value) {
 }
 /// Source values: day -> the value of the habit's source that day.
 using Values = std::map<Day, double>;
+
+/// @p autos with a 0 on each day of [@p from, @p to] that has no value, when
+/// empty_day_is_zero(@p h); unchanged otherwise. The caller passes closed days
+/// only (today is still open) that the source was read for.
+inline void fill_empty_days(const Habit& h, Values& autos, Day from, Day to) {
+    if (!empty_day_is_zero(h)) {
+        return;
+    }
+    for (Day d = from; d <= to; d += std::chrono::days{1}) {
+        autos.emplace(d, 0.0);
+    }
+}
 
 struct DayState {
     bool done = false;

@@ -5,15 +5,15 @@
 
 #include "agent/Tools.hpp"
 
-#include <regex>
-
 #include <spdlog/spdlog.h>
 
 #include "repositories/UserRepository.hpp"
 #include "security/Auth.hpp"
 #include "security/Jwt.hpp"
 #include "storage/S3Presign.hpp"
+#include "utils/Date.hpp"
 #include "utils/Time.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Agent::Tools {
 
@@ -42,11 +42,10 @@ std::string text_arg(const json& args, const char* key) {
     return it != args.end() && it->is_string() ? it->get<std::string>() : std::string();
 }
 
-/// A day argument; anything that is not YYYY-MM-DD is dropped.
+/// A day argument; anything that is not a real YYYY-MM-DD day is dropped.
 std::string day_arg(const json& args, const char* key) {
-    static const std::regex kDayRe("^\\d{4}-\\d{2}-\\d{2}$");
     const std::string v = text_arg(args, key);
-    return std::regex_match(v, kDayRe) ? v : std::string();
+    return Utils::Date::is_ymd(v) ? v : std::string();
 }
 
 void put(Call& c, const char* key, const std::string& value) {
@@ -105,7 +104,7 @@ std::optional<Call> route(const std::string& name, const json& raw, const std::s
     } else if (name == "find_tasks") {
         c.path = "/api/v1/tasks/items";
         c.query.emplace_back("limit", "20");
-        put(c, "q", text_arg(args, "query").substr(0, 200));
+        put(c, "q", Utils::Utf8::cut(text_arg(args, "query"), 200));
         put(c, "status", text_arg(args, "status"));
     } else if (name == "goals") {
         c.path = "/api/v1/goals";

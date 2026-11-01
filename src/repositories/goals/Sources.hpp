@@ -5,7 +5,9 @@
  *        with its check-ins, and why the series cannot be read when it cannot
  *        (docs/superpowers/specs/2026-10-20-metric-sources-design.md §3, §4).
  *        An unreadable source is never an error: the check-ins alone drive
- *        the progress then.
+ *        the progress then. A summed source (steps, income, tasks done) gives
+ *        the running total from start_date (Progress::running_totals); a
+ *        source of a state (weight, a balance) gives the day's value.
  */
 
 #pragma once
@@ -40,6 +42,10 @@ public:
     Sources(std::string owner, std::string tz, std::uint32_t permissions)
         : owner_(std::move(owner)), tz_(std::move(tz)), permissions_(permissions) {}
 
+    /// With the caller's access already built (GET /today builds it once for habits and goals).
+    Sources(std::string owner, std::string tz, Repositories::Metrics::Access access)
+        : owner_(std::move(owner)), tz_(std::move(tz)), permissions_(0), access_(std::move(access)) {}
+
     struct Read {
         std::vector<::Goals::Progress::Point> points;
         /// null when the goal has no source or the source is readable, else
@@ -49,8 +55,10 @@ public:
 
     /**
      * The points of the goal @p row (a GoalRepository row) up to @p date: the days
-     * of its source from start_date to @p date merged with @p checkins, a check-in
-     * winning on its date. A goal without a source has its check-ins only.
+     * of its source from start_date to @p date (to tomorrow in UTC at most: no
+     * source has rows past today in any zone) merged with @p checkins, a check-in
+     * winning on its date. A summed source gives running totals from start_value.
+     * A goal without a source has its check-ins only.
      */
     Read points(const nlohmann::json& row,
                 const std::string& date,
@@ -62,6 +70,12 @@ public:
             const Repositories::Metrics::Why why = read_into(series, source->get<std::string>(), row, date);
             if (why != Repositories::Metrics::Why::Ok) {
                 out.why = std::string(Repositories::Metrics::why_name(why));
+            }
+            const auto ref = ::Metrics::parse(source->get<std::string>());
+            if (ref && ref->def != nullptr && summed(*ref->def)) {
+                const auto start = row.find("start_value");
+                series = ::Goals::Progress::running_totals(
+                    series, start != row.end() && start->is_number() ? start->get<double>() : 0.0);
             }
         }
         out.points = ::Goals::Progress::merge(series, checkins);
@@ -75,6 +89,11 @@ public:
             out.push_back({{"date", p.date}, {"value", p.value}, {"from", p.from_source ? "source" : "checkin"}});
         }
         return out;
+    }
+
+    /// Whether the days of @p d add up (a day holds that day's amount), so a goal counts their sum.
+    static bool summed(const ::Metrics::Def& d) {
+        return d.reduce == ::Metrics::Reduce::Sum || d.reduce == ::Metrics::Reduce::Count;
     }
 
 private:
@@ -102,7 +121,11 @@ private:
             return why;
         }
         const ::Habits::Day start = ::Habits::day_of(row.at("start_date").get<std::string>());
-        const ::Habits::Day end = ::Habits::day_of(date);
+        // ?date= may be as late as 2100: past tomorrow (UTC) there are no rows, only windows of
+        // empty queries (a goal from 2000 read at 2100-12-31 cost about 92 of them).
+        const ::Habits::Day tomorrow =
+            std::chrono::floor<std::chrono::days>(std::chrono::system_clock::now()) + std::chrono::days{1};
+        const ::Habits::Day end = std::min(::Habits::day_of(date), tomorrow);
         for (::Habits::Day lo = start; lo <= end; lo += std::chrono::days{kWindowDays}) {
             const ::Habits::Day hi = std::min(end, lo + std::chrono::days{kWindowDays - 1});
             const auto s = Repositories::Metrics::read(owner_, *ref, lo, hi, tz_, access());

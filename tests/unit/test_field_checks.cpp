@@ -1,7 +1,8 @@
 /**
  * @file test_field_checks.cpp
  * @brief The checks in src/api/FieldChecks.hpp: significant
- *        digits of a JSON number, the 15-digit cap, opt_int not narrowing.
+ *        digits of a JSON number, the 15-digit cap, opt_int not narrowing,
+ *        text_or_empty refusing another type.
  */
 
 #include <gtest/gtest.h>
@@ -57,4 +58,14 @@ TEST(FieldChecksInt, AnIntegerPastTheIntRangeIsNotNarrowed) {
     EXPECT_EQ(opt_int(json{{"d", 2147483647}}, "d"), 2147483647);
     EXPECT_FALSE(opt_int(json{{"d", 1.5}}, "d").has_value());
     EXPECT_FALSE(opt_int(json::object(), "d").has_value());
+}
+
+TEST(FieldChecksText, AnotherTypeIsRefusedNotThrown) {
+    using Api::Fields::text_or_empty;
+    EXPECT_EQ(text_or_empty(json{{"t", "x"}}, "t"), "x");
+    EXPECT_EQ(text_or_empty(json::object(), "t"), "") << "absent";
+    EXPECT_EQ(text_or_empty(json{{"t", nullptr}}, "t"), "") << "null is unset";
+    EXPECT_FALSE(text_or_empty(json{{"t", 42}}, "t").has_value());
+    EXPECT_FALSE(text_or_empty(json{{"t", false}}, "t").has_value());
+    EXPECT_FALSE(text_or_empty(json{{"t", json::array()}}, "t").has_value());
 }

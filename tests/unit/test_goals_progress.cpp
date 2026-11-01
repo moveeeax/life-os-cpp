@@ -141,3 +141,28 @@ TEST(GoalsProgress, CheckinWinsOnItsDate) {
     EXPECT_EQ(points[2].date, "2026-10-04");
     EXPECT_FALSE(points[2].from_source);
 }
+
+TEST(GoalsProgress, ASummedSourceCountsItsRunningTotal) {
+    using Goals::Progress::running_totals;
+    // "Earn 1 000 000" from 0 on practice income: 300 000, 200 000 and 100 000 on three
+    // payment days give 300 000, 500 000, 600 000; current is 600 000, not the last 100 000.
+    const Goal g = number_goal(0.0, 1000000.0, "2026-09-01", "2026-12-31");
+    const std::map<std::string, double> income{
+        {"2026-09-10", 300000.0}, {"2026-09-25", 200000.0}, {"2026-10-05", 100000.0}};
+    const auto totals = running_totals(income, 0.0);
+    ASSERT_EQ(totals.size(), 3u);
+    EXPECT_DOUBLE_EQ(totals.at("2026-09-25"), 500000.0);
+    const auto p = compute(g, "2026-10-08", values_of(merge(totals, {})), Counts{0, 0});
+    EXPECT_DOUBLE_EQ(p["current"].get<double>(), 600000.0);
+    EXPECT_DOUBLE_EQ(p["progress"].get<double>(), 0.6);
+    EXPECT_EQ(p["current_date"], "2026-10-05");
+
+    // From a start value: 10 000 steps done before the goal; a day without a number adds nothing.
+    const std::map<std::string, double> steps{
+        {"2026-10-01", 4000.0}, {"2026-10-02", std::numeric_limits<double>::quiet_NaN()}, {"2026-10-03", 6000.0}};
+    const auto from_start = running_totals(steps, 10000.0);
+    ASSERT_EQ(from_start.size(), 2u) << "a day without a number is no point";
+    EXPECT_DOUBLE_EQ(from_start.at("2026-10-01"), 14000.0);
+    EXPECT_DOUBLE_EQ(from_start.at("2026-10-03"), 20000.0);
+    EXPECT_TRUE(running_totals({}, 5.0).empty());
+}

@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -22,6 +23,9 @@
 #include "api/MetricsController.hpp"
 #include "database/Database.hpp"
 #include "domain/Role.hpp"
+#include "habits/Habits.hpp"
+#include "repositories/habits/Days.hpp"
+#include "repositories/metrics/Series.hpp"
 #include "test_helpers.hpp"
 
 using json = nlohmann::json;
@@ -312,6 +316,57 @@ TEST_F(MetricsApiTest, ForeignSourceIsNotYours) {
     r = series(reader(kAnna), "food:kcal", "2026-10-01", "2026-10-01");
     ASSERT_EQ(r->statusCode(), k200OK);
     EXPECT_EQ(body_of(r)["why"], "module_off");
+}
+
+// The bank recounts the 1500 lunch by +40 a day later: the adjustment row has no category of
+// its own, and counts in the category of the expense it adjusts, as the money report does.
+TEST_F(MetricsApiTest, ACategorySeriesCountsTheBanksAdjustment) {
+    sql(std::string("INSERT INTO money_transactions (owner_id, type, date, account_id, amount, adjusts_id, name) "
+                    "SELECT owner_id, 'fx_adjustment', '2026-10-02', account_id, 40, id, 'Recount' FROM "
+                    "money_transactions WHERE owner_id = '") +
+        kAnna + "' AND name = 'Lunch'");
+    auto r = series(reader(kAnna), std::string("money:expense:KZT:") + kAnnaFood, "2026-10-01", "2026-10-02");
+    ASSERT_EQ(r->statusCode(), k200OK) << std::string(r->body());
+    json body = body_of(r);
+    ASSERT_EQ(body["data"].size(), 2U) << body.dump();
+    EXPECT_DOUBLE_EQ(body["data"][0]["value"].get<double>(), 1500);
+    EXPECT_EQ(body["data"][1]["date"], "2026-10-02");
+    EXPECT_DOUBLE_EQ(body["data"][1]["value"].get<double>(), 40);
+    r = series(reader(kAnna), "money:expense:KZT", "2026-10-02", "2026-10-02");
+    ASSERT_EQ(body_of(r)["data"].size(), 1U);
+    EXPECT_DOUBLE_EQ(body_of(r)["data"][0]["value"].get<double>(), 40) << "the whole currency agrees";
+}
+
+// "Spend at most 5000 KZT a day", made on 2026-09-28: the days without spending are done
+// (value 0), the 1500 lunch is done, the day before the habit is not, today is open.
+TEST_F(MetricsApiTest, AnAtMostSpendingHabitIsDoneOnADayWithoutSpending) {
+    sql(std::string("INSERT INTO habits (owner_id, name, schedule, source, goal, direction, created_at) VALUES ('") +
+        kAnna + "', 'Spend less', 'daily', 'money:expense:KZT', 5000, 'at_most', '2026-09-28T10:00:00Z')");
+    const auto access = Repositories::Metrics::access_of(kAnna, Domain::Permission::kGeneral);
+    const auto day = [](const char* t) { return ::Habits::day_of(t); };
+    const auto all = Repositories::Habits::evaluate(
+        kAnna, day("2026-09-27"), day("2026-10-03"), day("2026-10-03"), "UTC", access, true);
+    const Repositories::Habits::Evaluated* spend = nullptr;
+    for (const auto& e : all) {
+        if (e.habit["name"] == "Spend less") {
+            spend = &e;
+        }
+    }
+    ASSERT_NE(spend, nullptr);
+    EXPECT_FALSE(spend->no_data);
+    std::map<std::string, ::Habits::DayState> by_day;
+    for (const auto& [d, s] : spend->days) {
+        by_day[::Habits::text_of(d)] = s;
+    }
+    EXPECT_FALSE(by_day["2026-09-27"].done) << "before the habit there was nothing to keep";
+    EXPECT_TRUE(by_day["2026-09-28"].done);
+    EXPECT_TRUE(by_day["2026-09-30"].done) << "no spending at all is the best day";
+    ASSERT_TRUE(by_day["2026-09-30"].value.has_value());
+    EXPECT_DOUBLE_EQ(*by_day["2026-09-30"].value, 0);
+    EXPECT_TRUE(by_day["2026-10-01"].done) << "1500 <= 5000";
+    EXPECT_TRUE(by_day["2026-10-02"].done);
+    EXPECT_FALSE(by_day["2026-10-03"].done) << "today is still open";
+    EXPECT_EQ(spend->streak, 5) << "2026-09-28 .. 2026-10-02";
 }
 
 TEST_F(MetricsOffTest, ModulesOffAnswer404) {

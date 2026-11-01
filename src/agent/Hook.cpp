@@ -11,17 +11,13 @@
 #include <utility>
 
 #include "now/Voice.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Agent::Hook {
 
 namespace {
 
 using json = nlohmann::json;
-
-std::size_t chars(std::string_view s) {
-    return static_cast<std::size_t>(
-        std::count_if(s.begin(), s.end(), [](char c) { return (static_cast<unsigned char>(c) & 0xC0) != 0x80; }));
-}
 
 std::string_view trim(std::string_view s) {
     const auto a = s.find_first_not_of(" \t\r\n");
@@ -38,7 +34,7 @@ std::optional<std::string> text_of(const json& v, std::size_t max, bool lines) {
         return std::nullopt;
     }
     const std::string_view t = trim(v.get_ref<const std::string&>());
-    if (t.empty() || chars(t) > max) {
+    if (t.empty() || Utils::Utf8::length(t) > max) {
         return std::nullopt;
     }
     for (const char ch : t) {
@@ -318,7 +314,7 @@ std::variant<Item, Error> parse(std::string_view body, std::string_view content_
         const std::string id = it->is_number_integer() ? std::to_string(it->get<long long>())
                                : it->is_string()       ? it->get<std::string>()
                                                        : "";
-        if (id.empty() || chars(id) > kIdMax) {
+        if (id.empty() || Utils::Utf8::length(id) > kIdMax) {
             return bad("invalid_id", "id is 1 to 200 characters");
         }
         item.source_id = id;

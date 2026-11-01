@@ -24,6 +24,8 @@
 #include "repositories/agent/ActionRepository.hpp"
 #include "storage/S3Presign.hpp"
 #include "utils/Crypto.hpp"
+#include "utils/Date.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Agent::Actions {
 
@@ -59,30 +61,17 @@ std::string text_arg(const json& args, const char* key) {
     return v.substr(first, v.find_last_not_of(" \t\r\n") - first + 1);
 }
 
-/// A day argument; anything that is not YYYY-MM-DD is dropped.
+/// A day argument; anything that is not a real YYYY-MM-DD day is dropped.
 std::string day_arg(const json& args, const char* key) {
-    static const std::regex kDayRe("^\\d{4}-\\d{2}-\\d{2}$");
     const std::string v = text_arg(args, key);
-    return std::regex_match(v, kDayRe) ? v : std::string();
+    return Utils::Date::is_ymd(v) ? v : std::string();
 }
 
-std::size_t length(const std::string& s) {
-    std::size_t n = 0;
-    for (const unsigned char c : s) {
-        n += (c & 0xC0) != 0x80 ? 1 : 0;
-    }
-    return n;
-}
+using Utils::Utf8::length;
 
 /// The first @p max characters of @p s, with an ellipsis when it was longer.
 std::string cut(const std::string& s, std::size_t max) {
-    std::size_t n = 0;
-    for (std::size_t i = 0; i < s.size(); ++i) {
-        if ((static_cast<unsigned char>(s[i]) & 0xC0) != 0x80 && n++ == max) {
-            return s.substr(0, i) + "…";
-        }
-    }
-    return s;
+    return Utils::Utf8::clip(s, max);
 }
 
 std::string refusal(const char* error, const std::string& message, json extra = json::object()) {
