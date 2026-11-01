@@ -145,7 +145,7 @@ beforeEach(() => {
   vi.spyOn(api, 'getJson').mockImplementation(async () => ({ data: { waiting: inbox.waiting } }));
   localStorage.clear();
   localStorage.setItem('now:ani', '1');
-  vi.useFakeTimers({ now: new Date(2026, 9, 26, 15, 0) });
+  vi.useFakeTimers({ now: new Date('2026-10-26T15:00:00+05:00') });
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -231,7 +231,7 @@ describe('AniCorner', () => {
   });
 
   it('asks about the day in the evening, and the bubble opens the chat', async () => {
-    vi.setSystemTime(new Date(2026, 9, 26, 21, 30));
+    vi.setSystemTime(new Date('2026-10-26T21:30:00+05:00'));
     await mount();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(90_000);
@@ -429,7 +429,7 @@ describe('AniCorner', () => {
   });
 
   it('offers to move the open tasks to tomorrow in the evening', async () => {
-    vi.setSystemTime(new Date(2026, 9, 26, 21, 30));
+    vi.setSystemTime(new Date('2026-10-26T21:30:00+05:00'));
     const patch = vi.spyOn(api, 'patchJson').mockResolvedValue({ data: {} });
     const t: Today = {
       ...base,
