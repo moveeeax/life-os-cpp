@@ -9762,6 +9762,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/money/reports/months": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The months of a year with their "as if" totals, one call for the month strip
+         * @description Every month of a past year, this year's months up to the running one (in tz), none of a coming year. Each month's as_if block holds the totals that the period report gives for that month; it is null when there is no as_if currency.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The year; this year in tz by default */
+                    year?: string;
+                    /** @description Defaults to the settings' view_currency */
+                    as_if?: string;
+                    /** @description IANA zone of the caller: this year and this month are counted there; a name that is not a zone answers 400 invalid_query */
+                    tz?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The months, January first */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MoneyMonthTotals"][];
+                        };
+                    };
+                };
+                /** @description A bad year, currency or zone */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Money module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/money/reports/balances": {
         parameters: {
             query?: never;
@@ -28531,6 +28615,22 @@ export interface components {
             unconverted: number;
             rates: Record<string, never>;
             source: string;
+        };
+        MoneyMonthTotals: {
+            /** @description YYYY-MM */
+            month: string;
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** @description The month's totals converted into the as_if currency, as in the period report; null with no as_if currency */
+            as_if: null | {
+                currency: string;
+                income: number;
+                expense: number;
+                /** @description Some currency had no rate */
+                partial: boolean;
+            };
         };
         MoneyReport: {
             period: {

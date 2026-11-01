@@ -1,29 +1,64 @@
 import { QueryClient, type InfiniteData } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 
-import { qk } from '@/lib/api/queryKeys';
+import { NOW_DIGEST, NOW_RIBBON, qk } from '@/lib/api/queryKeys';
 
 import { GOAL_WRITES } from './useGoals';
 import { FOOD_DIARY_WRITES } from './useFood';
 import { HABIT_WRITES } from './useHabits';
 import { firstPageOnly, MONEY_WRITES, ROW_WRITES, TRANSFER_WRITES } from './useMoney';
+import { TRAVEL_WRITES } from './useTravel';
 
 // Now's digest (useToday) carries goals, food and money: a write in a section
-// must refresh it too, or Now shows the old numbers for up to a minute.
+// must refresh it too, or Now shows the old numbers for up to a minute. Now
+// stays mounted under every tab, so the write refreshes the digest only, not
+// the whole ['now'] prefix (settings, weather, sounds, wallpapers and the
+// Google-backed ribbon day).
 describe('section writes refresh Now', () => {
-  const now = JSON.stringify(qk.now.all());
-  for (const [name, keys] of [
+  const covers = (keys: readonly (readonly unknown[])[], key: readonly unknown[]) =>
+    keys.some((p) => p.every((v, i) => key[i] === v));
+  const lists = [
     ['goals', GOAL_WRITES],
     ['food diary', FOOD_DIARY_WRITES],
     ['money', MONEY_WRITES],
     ['ledger rows', ROW_WRITES],
     ['transfers', TRANSFER_WRITES],
     ['habits', HABIT_WRITES],
-  ] as const) {
-    it(name, () => {
-      expect(keys.map((k) => JSON.stringify(k))).toContain(now);
+    ['travel', TRAVEL_WRITES],
+  ] as const;
+  for (const [name, keys] of lists) {
+    it(`${name}: the digest, not the rest of Now`, () => {
+      expect(covers(keys, qk.now.today('2026-11-01', 'Asia/Almaty'))).toBe(true);
+      expect(covers(keys, qk.now.day('2026-11-01', 'Asia/Almaty'))).toBe(false);
+      expect(covers(keys, qk.now.settings())).toBe(false);
+      expect(covers(keys, qk.now.weather())).toBe(false);
+      expect(covers(keys, qk.now.sounds())).toBe(false);
+      expect(covers(keys, qk.now.wallpapers('desktop'))).toBe(false);
     });
   }
+
+  it('a write that moves timed tasks or workouts refreshes the ribbon day too', () => {
+    expect(covers(NOW_RIBBON, qk.now.today('2026-11-01', 'UTC'))).toBe(true);
+    expect(covers(NOW_RIBBON, qk.now.day('2026-11-01', 'UTC'))).toBe(true);
+    expect(covers(NOW_RIBBON, qk.now.settings())).toBe(false);
+    expect(covers(NOW_DIGEST, qk.now.day('2026-11-01', 'UTC'))).toBe(false);
+  });
+
+  it('a habit write marks the digest stale and leaves the other Now queries alone', async () => {
+    const qc = new QueryClient();
+    for (const key of [
+      qk.now.today('2026-11-01', 'UTC'),
+      qk.now.day('2026-11-01', 'UTC'),
+      qk.now.settings(),
+      qk.now.weather(),
+    ])
+      qc.setQueryData(key, 0);
+    await Promise.all(HABIT_WRITES.map((k) => qc.invalidateQueries({ queryKey: k })));
+    expect(qc.getQueryState(qk.now.today('2026-11-01', 'UTC'))?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(qk.now.day('2026-11-01', 'UTC'))?.isInvalidated).toBe(false);
+    expect(qc.getQueryState(qk.now.settings())?.isInvalidated).toBe(false);
+    expect(qc.getQueryState(qk.now.weather())?.isInvalidated).toBe(false);
+  });
 });
 
 describe('money writes refresh only what they change', () => {

@@ -25,6 +25,7 @@ import {
   stepsRecord,
   tabTip,
   tripHello,
+  nextSpendGroup,
   unusualSpend,
   windDownNow,
   wishDue,
@@ -445,21 +446,16 @@ export function useLife2({
         });
         return;
       }
-      for (const t of arr(d.spends)) {
-        if (
-          t.type !== 'expense' ||
-          !t.category_id ||
-          !once(`spend:${t.id}`) ||
-          (t.note ?? '').includes('разовая')
-        )
-          continue;
-        mark(`spend:${t.id}`, '9999');
+      // One history read a tick, for every spend of one category and currency.
+      const group = nextSpendGroup(arr(d.spends), (id) => once(`spend:${id}`));
+      if (group) {
+        for (const t of group.items) mark(`spend:${t.id}`, '9999');
         try {
           const hist = (
             await api.getJson<{ data: Tx[] }>('/api/v1/money/transactions', {
               query: {
-                category: t.category_id,
-                currency: t.currency,
+                category: group.category,
+                currency: group.currency,
                 from: shift(day, -90),
                 to: shift(day, -1),
                 status: 'posted',
@@ -467,29 +463,28 @@ export function useLife2({
               },
             })
           ).data;
-          const odd = unusualSpend(
-            t.amount,
-            hist.filter((x) => x.type === 'expense').map((x) => x.amount),
-          );
-          if (!odd || quietRef.current()) continue;
-          const what = t.name || t.merchant || 'трата';
-          sayRef.current({
-            text: `«${what}» заметно больше обычного для этой категории. Это разовая?`,
-            kind: 'hello',
-            chips: [
-              {
-                label: 'Да, разовая',
-                run: () =>
-                  void api
-                    .patchJson(`/api/v1/money/transactions/${t.id}`, {
-                      body: { note: t.note ? `${t.note} · разовая` : 'разовая' },
-                    })
-                    .catch(() => undefined),
-              },
-              { label: 'Нет', run: () => undefined },
-            ],
-          });
-          return;
+          const usual = hist.filter((x) => x.type === 'expense').map((x) => x.amount);
+          const t = group.items.find((x) => unusualSpend(x.amount, usual));
+          if (t && !quietRef.current()) {
+            const what = t.name || t.merchant || 'трата';
+            sayRef.current({
+              text: `«${what}» заметно больше обычного для этой категории. Это разовая?`,
+              kind: 'hello',
+              chips: [
+                {
+                  label: 'Да, разовая',
+                  run: () =>
+                    void api
+                      .patchJson(`/api/v1/money/transactions/${t.id}`, {
+                        body: { note: t.note ? `${t.note} · разовая` : 'разовая' },
+                      })
+                      .catch(() => undefined),
+                },
+                { label: 'Нет', run: () => undefined },
+              ],
+            });
+            return;
+          }
         } catch {
           // The money module is off or the call failed: nothing to ask.
         }

@@ -132,6 +132,10 @@ export const qk = {
     days: () => ['now', 'today'] as const,
     today: (date: string, tz: string) => ['now', 'today', date, tz] as const,
     day: (date: string, tz: string) => ['now', 'day', date, tz] as const,
+    /** Every ribbon day (GET /now/day, which also asks Google for the calendar). */
+    ribbon: () => ['now', 'day'] as const,
+    /** Every device's wallpaper list. */
+    wallpaperLists: () => ['now', 'wallpapers'] as const,
     wallpapers: (device: string) => ['now', 'wallpapers', device] as const,
     adminWallpapers: () => ['now', 'admin-wallpapers'] as const,
     sounds: () => ['now', 'sounds'] as const,
@@ -249,3 +253,15 @@ export const qk = {
     },
   },
 } as const;
+
+/**
+ * What a write in another section refreshes on Now. Now stays mounted under
+ * every tab, so a write must not refetch the whole ['now'] prefix (settings,
+ * weather, sounds, wallpapers and the Google-backed ribbon day).
+ *
+ * NOW_DIGEST: the /today digest only (habits, goals, food, money, travel, health).
+ */
+export const NOW_DIGEST = [qk.now.days()] as const;
+
+/** NOW_RIBBON: the digest and the ribbon day, for writes that move timed tasks, workouts or focus. */
+export const NOW_RIBBON = [qk.now.days(), qk.now.ribbon()] as const;

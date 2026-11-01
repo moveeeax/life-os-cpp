@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { ApiClientError } from '@/lib/api/client';
 
 import {
-  POLL_MS,
+  pollTurn,
   actionState,
   cancelAction,
   clearChat,
@@ -141,21 +141,18 @@ export function AniChat({
   useEffect(() => {
     if (!watched || !watching) return;
     const id = watched.id;
-    const timer = window.setInterval(() => {
-      readTurn(id)
-        .then((t) => {
-          setTurns((all) => all?.map((x) => (x.id === t.id ? t : x)) ?? all);
-          // Two reads in flight can both see it done: each reply is spoken once.
-          // A webhook or MCP turn's answer is played by her inbox (and kept
-          // back under Hide numbers), not here.
-          if (t.status === 'done' && fromUser(t) && soundRef.current && !spoken.current.has(t.id)) {
-            spoken.current.add(t.id);
-            replyRef.current?.(t);
-          }
-        })
-        .catch(() => {});
-    }, POLL_MS);
-    return () => window.clearInterval(timer);
+    return pollTurn(() =>
+      readTurn(id).then((t) => {
+        setTurns((all) => all?.map((x) => (x.id === t.id ? t : x)) ?? all);
+        // Two reads in flight can both see it done: each reply is spoken once.
+        // A webhook or MCP turn's answer is played by her inbox (and kept
+        // back under Hide numbers), not here.
+        if (t.status === 'done' && fromUser(t) && soundRef.current && !spoken.current.has(t.id)) {
+          spoken.current.add(t.id);
+          replyRef.current?.(t);
+        }
+      }),
+    );
   }, [watched?.id, watching]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

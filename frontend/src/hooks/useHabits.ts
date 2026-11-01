@@ -4,7 +4,7 @@ import { useApiMutation } from '@/hooks/useApiMutation';
 import { HABITS_PROBE } from '@/hooks/moduleProbes';
 import { useModuleOn } from '@/hooks/useModuleProbe';
 import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
+import { NOW_DIGEST, qk } from '@/lib/api/queryKeys';
 import type {
   Habit,
   HabitCheck,
@@ -26,7 +26,7 @@ export function habitsZone(): string {
  * A habit write moves the section, Now's digest (the Habits plate) and the metrics
  * catalog (each manual habit is a series there).
  */
-export const HABIT_WRITES = [qk.habits.all(), qk.now.all(), qk.metrics.all()] as const;
+export const HABIT_WRITES = [qk.habits.all(), ...NOW_DIGEST, qk.metrics.all()] as const;
 
 export function useHabits(archived = false) {
   return useQuery({

@@ -1,6 +1,5 @@
 import {
   useInfiniteQuery,
-  useQueries,
   useQuery,
   useQueryClient,
   type InfiniteData,
@@ -11,7 +10,7 @@ import { useApiMutation } from '@/hooks/useApiMutation';
 import { useBatchMutation } from '@/hooks/useBatchMutation';
 import { useParseJob } from '@/hooks/useParseJob';
 import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
+import { NOW_DIGEST, qk } from '@/lib/api/queryKeys';
 import type { components } from '@/lib/api/schema.gen';
 import { isDay, shiftDay, type AcceptLine } from '@/lib/ledger';
 import type {
@@ -51,7 +50,7 @@ const BASE = '/api/v1/money';
  * invalidates the whole section and Now's digest: names and scales show up
  * everywhere.
  */
-export const MONEY_WRITES = [qk.money.all(), qk.now.all()] as const;
+export const MONEY_WRITES = [qk.money.all(), ...NOW_DIGEST] as const;
 const ALL = MONEY_WRITES;
 
 const part = (name: string) => ['money', name] as const;
@@ -72,7 +71,7 @@ export const ROW_WRITES = [
   part('summary'),
   part('merchants'),
   part('merchant-memory'),
-  qk.now.all(),
+  ...NOW_DIGEST,
 ] as const;
 
 /** A transfer moves balances and the summary; the rows and the reports do not count it. */
@@ -81,7 +80,7 @@ export const TRANSFER_WRITES = [
   part('balances'),
   part('accounts'),
   part('summary'),
-  qk.now.all(),
+  ...NOW_DIGEST,
 ] as const;
 
 /**
@@ -282,29 +281,33 @@ export function useReport(
   });
 }
 
-/** The month reports of a year up to `months` (January is 1), for the ledger's month strip. */
-export function useMonthReports(year: number, months: number, asIf?: string) {
-  return useQueries({
-    queries: Array.from({ length: months }, (_, i) => {
-      const date = `${year}-${String(i + 1).padStart(2, '0')}-01`;
-      return {
-        queryKey: qk.money.report('month', date, asIf ?? ''),
-        queryFn: async ({ signal }: { signal: AbortSignal }) =>
-          (
-            await api.getJson<{ data: Report }>(`${BASE}/reports/period`, {
-              query: { kind: 'month', date, as_if: asIf || undefined },
-              signal,
-            })
-          ).data,
-        staleTime: 5 * 60_000,
-      };
-    }),
+export type MonthTotals = components['schemas']['MoneyMonthTotals'];
+
+/**
+ * The months of a year with their "as if" totals, for the ledger's month
+ * strip: one call (GET /money/reports/months) instead of one period report per
+ * month. Under ['money', 'report'], so a row write refreshes it with the reports.
+ */
+export function useMonthTotals(year: number, enabled = true, asIf?: string) {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  return useQuery({
+    queryKey: qk.money.report('months', String(year), asIf ?? ''),
+    enabled,
+    staleTime: 5 * 60_000,
+    queryFn: async ({ signal }) =>
+      (
+        await api.getJson<{ data: MonthTotals[] }>(`${BASE}/reports/months`, {
+          query: { year: String(year), tz, as_if: asIf || undefined },
+          signal,
+        })
+      ).data,
   });
 }
 
-export function useMoneySettings() {
+export function useMoneySettings(enabled = true) {
   return useQuery({
     queryKey: qk.money.settings(),
+    enabled,
     queryFn: async ({ signal }) =>
       (
         await api.getJson<{ data: Settings & { llm_available?: boolean } }>(`${BASE}/settings`, {

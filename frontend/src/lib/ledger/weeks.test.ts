@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Transaction } from './types';
-import { convertSum, groupByWeek, median, periodWeeks, tone, toneColor } from './weeks';
+import { convertSum, groupByWeek, median, monthSpent, periodWeeks, tone, toneColor } from './weeks';
+
+describe('monthSpent', () => {
+  it('lays the months of one call on the strip, January first, null where a month is missing', () => {
+    const totals = [
+      { month: '2026-01', as_if: { expense: 120 } },
+      { month: '2026-03', as_if: { expense: 300 } },
+      { month: '2026-02', as_if: null },
+    ];
+    expect(monthSpent(totals, 2026, 4)).toEqual([120, null, 300, null]);
+    expect(monthSpent(undefined, 2026, 2)).toEqual([null, null]);
+    expect(monthSpent(totals, 2025, 1)).toEqual([null]);
+    expect(monthSpent(totals, 2026, 0)).toEqual([]);
+  });
+});
 
 const row = (
   id: string,

@@ -1,6 +1,37 @@
 import { describe, expect, it } from 'vitest';
 
-import { arrival, flightsToday, hourIn, minutesUntil, modeOf } from './modes';
+import { arrival, flightsToday, hourIn, minutesUntil, modeNeeds, modeOf } from './modes';
+
+describe('modeNeeds', () => {
+  const trip = (days_to: number) => ({ start_date: '2026-11-01', days_to });
+
+  it('reads nothing pinned off or to a time of day, with travel off, or before the digest', () => {
+    const none = { trips: false, crossings: false };
+    expect(modeNeeds('off', true, true, trip(0), false, false)).toEqual(none);
+    expect(modeNeeds('morning', true, true, trip(0), false, false)).toEqual(none);
+    expect(modeNeeds('evening', true, true, trip(0), false, false)).toEqual(none);
+    expect(modeNeeds(null, false, true, trip(0), false, false)).toEqual(none);
+    expect(modeNeeds(null, undefined, true, trip(0), false, false)).toEqual(none);
+    expect(modeNeeds(null, true, false, undefined, false, false)).toEqual(none);
+  });
+
+  it('reads trips only while a trip runs or starts today', () => {
+    expect(modeNeeds(null, true, true, trip(0), false, false).trips).toBe(true);
+    expect(modeNeeds(null, true, true, trip(-3), false, false).trips).toBe(true);
+    expect(modeNeeds(null, true, true, trip(5), false, false).trips).toBe(false);
+    expect(modeNeeds(null, true, true, null, false, false).trips).toBe(false);
+    expect(modeNeeds('arrive', true, true, trip(0), false, false).trips).toBe(false);
+  });
+
+  it('reads the newest crossings once no flight wins', () => {
+    expect(modeNeeds(null, true, true, trip(5), false, false).crossings).toBe(true);
+    expect(modeNeeds(null, true, true, trip(0), false, false).crossings).toBe(false);
+    expect(modeNeeds(null, true, true, trip(0), false, true).crossings).toBe(true);
+    expect(modeNeeds(null, true, true, trip(0), true, true).crossings).toBe(false);
+    expect(modeNeeds('flight', true, true, trip(5), false, true).crossings).toBe(false);
+    expect(modeNeeds('arrive', true, true, null, false, false).crossings).toBe(true);
+  });
+});
 
 describe('modes', () => {
   it('ModeOfEachSituation', () => {
