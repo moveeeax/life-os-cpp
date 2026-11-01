@@ -7,8 +7,9 @@ here was learned the expensive way on self-hosted runners.
 
 ## Hosted-runner profile (the default in this repo)
 
-- **Heavy jobs run in parallel.** `build-and-test`, `clang-tidy`, `sanitizers`
-  and `tsan` each get their own VM, so parallelism costs nothing; each pulls
+- **Heavy jobs run in parallel.** `build-and-test` and `clang-tidy` each get
+  their own VM (`sanitizers` and `tsan` moved to `sanitizers-nightly.yml` on
+  2026-11-01: nightly on master and by hand before a release), so parallelism costs nothing; each pulls
   builder layers from the gha/GHCR caches independently. Serializing them on
   hosted runners only stretches the wall clock.
 - **Heavy jobs self-scope; cheap jobs stay unconditional.** The expensive

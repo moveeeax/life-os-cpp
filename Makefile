@@ -139,6 +139,12 @@ test:              ## Run all tests in Docker (rebuild image, ~2 min cold)
 	$(COMPOSE) $(ENV) --profile test run --rm -e TEST_BINARY=life_os_cpp_tests_integration test-runner
 	@$(MAKE) --no-print-directory test-e2e
 
+test-ci:           ## Full suite on the test image already loaded (CI builds it with buildx; no compose build)
+	@docker image inspect $${TEST_IMAGE:-life-os-cpp:test-latest} >/dev/null 2>&1 || { echo "test-ci: image $${TEST_IMAGE:-life-os-cpp:test-latest} is not loaded; run make test"; exit 1; }
+	$(COMPOSE) $(ENV) --profile test run --rm -e TEST_BINARY=life_os_cpp_tests_unit test-runner
+	$(COMPOSE) $(ENV) --profile test run --rm -e TEST_BINARY=life_os_cpp_tests_integration test-runner
+	$(COMPOSE) $(ENV) --profile test run --rm -e TEST_BINARY=life_os_cpp_e2e test-runner
+
 test-e2e:          ## Run the HTTP end-to-end binary (real Drogon server + client)
 	$(COMPOSE) $(ENV) --profile test run --rm -e TEST_BINARY=life_os_cpp_e2e test-runner
 
