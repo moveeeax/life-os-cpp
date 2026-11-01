@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793441472500,
+  "lastUpdate": 1793531035714,
   "repoUrl": "https://github.com/moveeeax/life-os-cpp",
   "entries": {
     "Throughput": [
@@ -479,6 +479,38 @@ window.BENCHMARK_DATA = {
           {
             "name": "jobs req/s",
             "value": 13991.26,
+            "unit": "req/s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Michael Tarassov",
+            "username": "moveeeax",
+            "email": "michael@tarassov.me"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "ae7f3e2b9c9477268d9237fe8b1625c6e050f8c5",
+          "message": "chore(release): 1.56.0 (#231)",
+          "timestamp": "2026-10-31T22:48:15Z",
+          "url": "https://github.com/moveeeax/life-os-cpp/commit/ae7f3e2b9c9477268d9237fe8b1625c6e050f8c5"
+        },
+        "date": 1793531035185,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "healthz req/s",
+            "value": 39215.47,
+            "unit": "req/s"
+          },
+          {
+            "name": "jobs req/s",
+            "value": 8149.62,
             "unit": "req/s"
           }
         ]
