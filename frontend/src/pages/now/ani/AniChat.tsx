@@ -8,6 +8,7 @@ import {
   cancelAction,
   clearChat,
   confirmAction,
+  confirmWords,
   editable,
   deleteTurn,
   TEXT_MAX,
@@ -410,7 +411,7 @@ export function AniChat({
                             onChange={(e) => setRewording({ id: a.id, text: e.target.value })}
                           />
                         ) : (
-                          <span className="num">{a.summary}</span>
+                          <span className="num">{confirmWords(a)}</span>
                         )}
                         {state == null ? (
                           <span className="ani-act-btns">

@@ -46,9 +46,12 @@ export function PrivacyPage() {
               When you connect Google Calendar, Life OS asks Google for access to your calendar so
               that your events appear on the Now page and Ani, the assistant on that page, can tell
               you about your day and free time. It reads your events when a page or Ani needs them
-              and does not keep copies of them. It creates, moves or deletes an event only when you
-              do it yourself or confirm a change Ani proposes. The access token is kept on the
-              server, encrypted, and is deleted and revoked at Google when you press Disconnect.
+              and keeps no copy of your calendar. What Ani reads or says about an event (its title,
+              time or place) can stay in her conversation history: in her chat on Now until you
+              clear it, and in her agent's saved conversation until your account is deleted. It
+              creates, moves or deletes an event only when you do it yourself or confirm a change
+              Ani proposes. The access token is kept on the server, encrypted, and is deleted and
+              revoked at Google when you press Disconnect.
             </p>
             <p>{LIMITED_USE}</p>
           </Section>

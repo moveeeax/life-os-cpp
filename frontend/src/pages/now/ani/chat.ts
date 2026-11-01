@@ -199,3 +199,14 @@ export function chatOf(summary: string): string | null {
   const m = /^Send to (.+?): «/.exec(summary) ?? /^Edit your message in (.+?) to «/.exec(summary);
   return m ? m[1] : null;
 }
+
+/**
+ * What the person confirms, in words. The summary of a Telegram proposal cuts
+ * its message at 300 characters, while the whole text is what gets sent, so
+ * that one shows the summary's head ("Send to Анна: ") with the whole text.
+ */
+export function confirmWords(a: Pick<Action, 'summary' | 'text'>): string {
+  if (a.text == null) return a.summary;
+  const at = a.summary.indexOf('«' + Array.from(a.text).slice(0, 20).join(''));
+  return at >= 0 ? `${a.summary.slice(0, at)}«${a.text}»` : `${a.summary} ${a.text}`;
+}
