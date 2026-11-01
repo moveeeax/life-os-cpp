@@ -165,6 +165,15 @@ const PracticeMonthPage = lazy(() =>
 const PracticeClientsPage = lazy(() =>
   import('@/pages/practice/Clients').then((m) => ({ default: m.PracticeClientsPage })),
 );
+const GithubAttentionPage = lazy(() =>
+  import('@/pages/github/List').then((m) => ({ default: m.GithubAttentionPage })),
+);
+const GithubAllPage = lazy(() =>
+  import('@/pages/github/List').then((m) => ({ default: m.GithubAllPage })),
+);
+const GithubArchivedPage = lazy(() =>
+  import('@/pages/github/List').then((m) => ({ default: m.GithubArchivedPage })),
+);
 const TravelRulesPage = lazy(() =>
   import('@/pages/travel/Rules').then((m) => ({ default: m.TravelRulesPage })),
 );
@@ -452,6 +461,16 @@ export const routes: RouteEntry[] = [
   {
     path: '/practice/clients',
     element: <PracticeClientsPage />,
+    guard: 'confirmed',
+    layout: 'shell',
+  },
+
+  // ── GitHub — any confirmed user; the module switch is the only gate ──────
+  { path: '/github', element: <GithubAttentionPage />, guard: 'confirmed', layout: 'shell' },
+  { path: '/github/all', element: <GithubAllPage />, guard: 'confirmed', layout: 'shell' },
+  {
+    path: '/github/archived',
+    element: <GithubArchivedPage />,
     guard: 'confirmed',
     layout: 'shell',
   },
