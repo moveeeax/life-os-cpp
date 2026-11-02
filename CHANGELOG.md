@@ -6,6 +6,12 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.58.5] - 2026-11-02
+
+### Changed
+- Bare has eleven of Ani's twelve poses, the sitting and lying ones included; only the arms-behind-the-head one stays dressed.
+- The arm64 release image compiles against a warm compiler cache: a workflow builds the builder stage on an arm64 runner after every change to the sources (CI compiles on amd64 only, so the arm64 release build started cold every time, 44 minutes for 1.58.4 against 8 on amd64). A release commit's restamp of the generated spec copy no longer counts as a source change either.
+
 ## [1.58.4] - 2026-11-02
 
 ### Added
