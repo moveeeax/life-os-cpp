@@ -96,6 +96,22 @@ jobs:
               changed=$(printf '%s\n' "$changed" | grep -vx 'CMakeLists.txt' || true)
             fi
           fi
+          # The same for the generated spec copy: a release restamps its
+          # version and the spec's hash, which the e2e binary only reads.
+          if printf '%s\n' "$changed" | grep -qx 'tests/e2e/openapi.gen.json'; then
+            if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+              lines=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
+                --jq '.[] | select(.filename == "tests/e2e/openapi.gen.json") | .patch' | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            else
+              base="$PUSH_BEFORE"
+              if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then base="HEAD^"; fi
+              lines=$(git diff "$base" "$GITHUB_SHA" -- tests/e2e/openapi.gen.json 2>/dev/null | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            fi
+            if [ -n "$lines" ] && ! printf '%s\n' "$lines" | grep -vqE '^[+-][[:space:]]*"(version|source_fnv1a64)":'; then
+              echo "tests/e2e/openapi.gen.json changed only its version and hash: not counted"
+              changed=$(printf '%s\n' "$changed" | grep -vx 'tests/e2e/openapi.gen.json' || true)
+            fi
+          fi
           if printf '%s\n' "$changed" | grep -qE "$RELEVANT"; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           else
@@ -352,6 +368,22 @@ jobs:
               changed=$(printf '%s\n' "$changed" | grep -vx 'CMakeLists.txt' || true)
             fi
           fi
+          # The same for the generated spec copy: a release restamps its
+          # version and the spec's hash, which the e2e binary only reads.
+          if printf '%s\n' "$changed" | grep -qx 'tests/e2e/openapi.gen.json'; then
+            if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+              lines=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
+                --jq '.[] | select(.filename == "tests/e2e/openapi.gen.json") | .patch' | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            else
+              base="$PUSH_BEFORE"
+              if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then base="HEAD^"; fi
+              lines=$(git diff "$base" "$GITHUB_SHA" -- tests/e2e/openapi.gen.json 2>/dev/null | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            fi
+            if [ -n "$lines" ] && ! printf '%s\n' "$lines" | grep -vqE '^[+-][[:space:]]*"(version|source_fnv1a64)":'; then
+              echo "tests/e2e/openapi.gen.json changed only its version and hash: not counted"
+              changed=$(printf '%s\n' "$changed" | grep -vx 'tests/e2e/openapi.gen.json' || true)
+            fi
+          fi
           if printf '%s\n' "$changed" | grep -qE "$RELEVANT"; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           else
@@ -470,6 +502,22 @@ jobs:
             if [ -n "$lines" ] && ! printf '%s\n' "$lines" | grep -vqE '^[+-][[:space:]]*project\('; then
               echo "CMakeLists.txt changed only its project(VERSION ...) line: not counted"
               changed=$(printf '%s\n' "$changed" | grep -vx 'CMakeLists.txt' || true)
+            fi
+          fi
+          # The same for the generated spec copy: a release restamps its
+          # version and the spec's hash, which the e2e binary only reads.
+          if printf '%s\n' "$changed" | grep -qx 'tests/e2e/openapi.gen.json'; then
+            if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+              lines=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
+                --jq '.[] | select(.filename == "tests/e2e/openapi.gen.json") | .patch' | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            else
+              base="$PUSH_BEFORE"
+              if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then base="HEAD^"; fi
+              lines=$(git diff "$base" "$GITHUB_SHA" -- tests/e2e/openapi.gen.json 2>/dev/null | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            fi
+            if [ -n "$lines" ] && ! printf '%s\n' "$lines" | grep -vqE '^[+-][[:space:]]*"(version|source_fnv1a64)":'; then
+              echo "tests/e2e/openapi.gen.json changed only its version and hash: not counted"
+              changed=$(printf '%s\n' "$changed" | grep -vx 'tests/e2e/openapi.gen.json' || true)
             fi
           fi
           if printf '%s\n' "$changed" | grep -qE "$RELEVANT"; then
@@ -723,6 +771,22 @@ jobs:
               changed=$(printf '%s\n' "$changed" | grep -vx 'CMakeLists.txt' || true)
             fi
           fi
+          # The same for the generated spec copy: a release restamps its
+          # version and the spec's hash, which the e2e binary only reads.
+          if printf '%s\n' "$changed" | grep -qx 'tests/e2e/openapi.gen.json'; then
+            if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+              lines=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
+                --jq '.[] | select(.filename == "tests/e2e/openapi.gen.json") | .patch' | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            else
+              base="$PUSH_BEFORE"
+              if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then base="HEAD^"; fi
+              lines=$(git diff "$base" "$GITHUB_SHA" -- tests/e2e/openapi.gen.json 2>/dev/null | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            fi
+            if [ -n "$lines" ] && ! printf '%s\n' "$lines" | grep -vqE '^[+-][[:space:]]*"(version|source_fnv1a64)":'; then
+              echo "tests/e2e/openapi.gen.json changed only its version and hash: not counted"
+              changed=$(printf '%s\n' "$changed" | grep -vx 'tests/e2e/openapi.gen.json' || true)
+            fi
+          fi
           if printf '%s\n' "$changed" | grep -qE "$RELEVANT"; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           else
@@ -832,6 +896,22 @@ jobs:
             if [ -n "$lines" ] && ! printf '%s\n' "$lines" | grep -vqE '^[+-][[:space:]]*project\('; then
               echo "CMakeLists.txt changed only its project(VERSION ...) line: not counted"
               changed=$(printf '%s\n' "$changed" | grep -vx 'CMakeLists.txt' || true)
+            fi
+          fi
+          # The same for the generated spec copy: a release restamps its
+          # version and the spec's hash, which the e2e binary only reads.
+          if printf '%s\n' "$changed" | grep -qx 'tests/e2e/openapi.gen.json'; then
+            if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+              lines=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
+                --jq '.[] | select(.filename == "tests/e2e/openapi.gen.json") | .patch' | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            else
+              base="$PUSH_BEFORE"
+              if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then base="HEAD^"; fi
+              lines=$(git diff "$base" "$GITHUB_SHA" -- tests/e2e/openapi.gen.json 2>/dev/null | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            fi
+            if [ -n "$lines" ] && ! printf '%s\n' "$lines" | grep -vqE '^[+-][[:space:]]*"(version|source_fnv1a64)":'; then
+              echo "tests/e2e/openapi.gen.json changed only its version and hash: not counted"
+              changed=$(printf '%s\n' "$changed" | grep -vx 'tests/e2e/openapi.gen.json' || true)
             fi
           fi
           printf '%s\n' "$changed" > changed-files.txt
