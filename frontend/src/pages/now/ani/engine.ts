@@ -1158,12 +1158,17 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
         ? loadVmdClip(`${url}.vmd`, (n) => baseP[n]?.clone(), mesh!)
         : loadClip(`${url}.vrma`, (n) => BIND[n].clone());
     })().catch(() => null));
-  const play = { clip: null as Clip | null, name: '', t0: 0, w: 0, next: 6 };
+  const play = { clip: null as Clip | null, name: '', t0: 0, w: 0, next: 6, keys: [] as string[] };
   async function playClip(name: string) {
     if (!mesh || walk.state !== 'here' || still) return false;
     const c = await clipOf(name);
     if (!c || disposed || walk.state !== 'here') return false;
-    Object.assign(play, { clip: c, name, t0: clock.getElapsedTime() - (CLIPS[name].from ?? 0) });
+    Object.assign(play, {
+      clip: c,
+      name,
+      t0: clock.getElapsedTime() - (CLIPS[name].from ?? 0),
+      keys: [...c.sample(0).rotations.keys()],
+    });
     return true;
   }
   function applyClip(now: number, dt: number) {
@@ -1347,6 +1352,12 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     const t = still ? 0 : now;
     const dt = Math.min(0.05, now - lastT);
     lastT = now;
+
+    // The bones the last clip turned start the frame at their bind values:
+    // the director poses only some of them and never the waist, so a lying
+    // pose used to leave her bent double once it had ended.
+    for (const n of play.keys) B[n]?.quaternion.copy(baseQ[n]);
+    if (play.keys.length) B['センター'].position.copy(baseP['センター']);
 
     // Her ledge, read again: the page may have moved.
     const ft = opts.feet();
