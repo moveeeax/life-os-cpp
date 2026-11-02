@@ -80,6 +80,8 @@ export interface Ani {
   sulk(seconds: number): void;
   /** Plays one of her clips (wave, idle_happy, spin, peace...). */
   act(name: string): void;
+  /** The next pose of her outfit's set, not the one she holds (a tap on her belly). */
+  nextPose(): void;
   /** Her mood shows in her face: -1 a little cross, 0 as usual, 1 happy. */
   mood(level: -1 | 0 | 1): void;
   /** Stops what she is saying. */
@@ -1788,6 +1790,11 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     act(name) {
       wake();
       if (CLIPS[name]) void playClip(name);
+    },
+    nextPose() {
+      wake();
+      const pool = posesFor(outfit).filter((n) => n !== play.name);
+      if (pool.length) void playClip(pool[Math.floor(Math.random() * pool.length)]);
     },
     mood(level) {
       wake();

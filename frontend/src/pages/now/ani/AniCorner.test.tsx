@@ -81,6 +81,7 @@ vi.mock('./engine', () => ({
       glance: vi.fn(),
       sulk: vi.fn(),
       act: vi.fn(),
+      nextPose: vi.fn(),
       mood: vi.fn(),
       hush: vi.fn(),
       cover: vi.fn(),
@@ -246,6 +247,14 @@ describe('AniCorner', () => {
     await mount();
     act(() => engine.opts!.onDoubleTap?.());
     expect(document.querySelector('.ani-chat')).not.toBeNull();
+  });
+
+  it('BellyPose: a tap on her belly strikes the next pose, a tap on her head does not', async () => {
+    await mount();
+    act(() => engine.opts!.onTap?.({ part: 'belly', side: null }, { x: 0, y: 0 }));
+    expect(engine.ani!.nextPose).toHaveBeenCalledTimes(1);
+    act(() => engine.opts!.onTap?.({ part: 'head', side: null }, { x: 0, y: 0 }));
+    expect(engine.ani!.nextPose).toHaveBeenCalledTimes(1);
   });
 
   it('GiveToAni: dropped text gets her buttons to keep it or put it in the inbox', async () => {

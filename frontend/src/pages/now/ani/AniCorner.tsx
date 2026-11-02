@@ -959,6 +959,8 @@ export function AniCorner({
               talkRef.current?.interrupt();
               return;
             }
+            // A tap on her belly: the next pose of her set.
+            if (z.part === 'belly') made?.nextPose();
             const a = toucher.current.tap(z, at);
             if (a) answer.current(a);
           },
