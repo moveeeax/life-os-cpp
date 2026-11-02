@@ -1205,6 +1205,15 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     ['左手首', 0.5],
     ['右手首', 0.5],
   ];
+  // 腰キャンセル左/右: the legs hang on these, and in MMD they undo the
+  // waist's turn (a grant of -1 from 腰), so the legs stay where their own
+  // rotations put them whatever the waist does. MMDLoader leaves grants to
+  // the animation helper; this one the engine applies itself.
+  function cancelWaist() {
+    const w = B['腰']?.quaternion;
+    if (!w) return;
+    for (const n of ['腰キャンセル左', '腰キャンセル右']) B[n]?.quaternion.copy(w).invert();
+  }
   function ground(m: THREE.SkinnedMesh) {
     if (!play.clip || play.w <= 0.001) return;
     m.updateMatrixWorld(true);
@@ -1453,6 +1462,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       move(side + '足ＩＫ', -sgn * 0.25 * f, 0.25 * f + lift, 0.55 * f);
     }
     for (const n of LEG) B[n].quaternion.copy(baseQ[n]);
+    cancelWaist();
     m.updateMatrixWorld(true);
     ik?.update();
     // The skin and the colliders hang on the D bones, copies of the plain
@@ -1595,6 +1605,10 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
 
     if (!still) watchDwell(now);
     applyClip(now, dt);
+    // A clip is the one thing that turns her waist: the legs' cancel bones
+    // follow it, or the legs would turn with the waist (the lying poses
+    // stood on their heads).
+    cancelWaist();
     ground(m);
 
     // Cloth, hair and the chest last, on the finished pose.
