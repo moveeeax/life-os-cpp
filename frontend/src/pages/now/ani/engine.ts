@@ -232,7 +232,9 @@ const WAVE_FROM = 2.3;
 // greeting starts sitting on the floor). kind: a plain VMD made for the
 // model, played as it is (the rest are VRMA, retargeted) and loaded when
 // first picked; the VRMA ones load at mount.
-const CLIPS: Record<string, { file: string; from?: number; kind?: 'vmd' }> = {
+// turn: her yaw while the clip plays (a lying pose along the ledge, not along
+// the line of sight, where the camera shows the top of her head).
+const CLIPS: Record<string, { file: string; from?: number; kind?: 'vmd'; turn?: number }> = {
   show: { file: 'VRMA_01' },
   greet: { file: 'VRMA_02', from: 2.3 },
   peace: { file: 'VRMA_03' },
@@ -248,6 +250,10 @@ const EMOTES = ['show', 'peace', 'spin', 'pose', 'shoot', 'idle_happy', 'idle_ca
 // The owner's Rurune poses, VMD under poses2/, each held for 6 s (the old
 // Pic♡Pix poses are still in the bucket under poses/, not played any more).
 for (const n of RURUNE) CLIPS[n] = { file: `poses2/${n}`, kind: 'vmd' };
+// The lying ones turn so she lies along the ledge, head by its edge, legs
+// into the screen; z2 (the crawl) faces the other way in its file.
+for (const n of ['rurune_z1', 'rurune_z3', 'rurune_z4']) CLIPS[n].turn = Math.PI / 2;
+CLIPS.rurune_z2.turn = -Math.PI / 2;
 
 // Files under the base.
 const BODY_PMX = 'v2/Ani.pmx';
@@ -1382,13 +1388,16 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       lookPitch = Math.atan2(dy, Math.hypot(dx, DEPTH));
     }
     // The body takes most of a turn, unless a clip leads.
+    const clipTurn = play.clip ? CLIPS[play.name]?.turn : undefined;
     const faceWant = sulking
       ? FACE + SULK
-      : target
-        ? play.clip
-          ? FACE
-          : THREE.MathUtils.clamp(lookYaw * 0.85, -1.25, 1.25)
-        : REST;
+      : clipTurn !== undefined
+        ? clipTurn
+        : target
+          ? play.clip
+            ? FACE
+            : THREE.MathUtils.clamp(lookYaw * 0.85, -1.25, 1.25)
+          : REST;
     face += (faceWant - face) * Math.min(1, dt * 2.5);
 
     // Where she stands and which way she faces.
