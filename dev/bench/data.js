@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793620337458,
+  "lastUpdate": 1793620340549,
   "repoUrl": "https://github.com/moveeeax/life-os-cpp",
   "entries": {
     "Throughput": [
@@ -1457,6 +1457,63 @@ window.BENCHMARK_DATA = {
           {
             "name": "idle RSS",
             "value": 4.9,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Michael Tarassov",
+            "username": "moveeeax",
+            "email": "michael@tarassov.me"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "3980b1a6267dd4b8fb02a1d6fc2da984ce02a504",
+          "message": "chore(release): 1.57.1 (#238)\n\n* ci: clang-tidy skips a pull request that changes no source\n\n* chore(release): 1.57.1",
+          "timestamp": "2026-11-01T17:15:01Z",
+          "url": "https://github.com/moveeeax/life-os-cpp/commit/3980b1a6267dd4b8fb02a1d6fc2da984ce02a504"
+        },
+        "date": 1793620339571,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "healthz p50",
+            "value": 4.42,
+            "unit": "ms"
+          },
+          {
+            "name": "healthz p99",
+            "value": 18.54,
+            "unit": "ms"
+          },
+          {
+            "name": "jobs p50",
+            "value": 22.41,
+            "unit": "ms"
+          },
+          {
+            "name": "jobs p99",
+            "value": 46.8,
+            "unit": "ms"
+          },
+          {
+            "name": "runtime image size",
+            "value": 118.8,
+            "unit": "MB"
+          },
+          {
+            "name": "cold start to /ready",
+            "value": 923,
+            "unit": "ms"
+          },
+          {
+            "name": "idle RSS",
+            "value": 5.1,
             "unit": "MB"
           }
         ]
