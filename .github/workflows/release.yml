@@ -225,6 +225,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3.12.0
 
+      - name: Expose Actions cache env for sccache
+        # The same compiler cache CI fills (BuildKit secrets, never ARGs):
+        # without it every release compiled the tree from scratch on both
+        # architectures, 28 min on amd64 and 46 on arm64 for v1.58.2.
+        uses: crazy-max/ghaction-github-runtime@3cb05d89e1f492524af3d41a1c98c83bc3025124  # v3.1.0
+
       # Push by digest only: merge-staging stitches the per-arch digests into
       # the :<version>-staging index, so a half-built release never gets a tag.
       - name: Build and push app image (by digest)
@@ -238,7 +244,13 @@ jobs:
           # APP_VERSION stamps the tag into the binary (Core::version(),
           # GET /health) — without it the image reports the baked CMake
           # fallback, which went three releases stale before anyone noticed.
-          build-args: APP_VERSION=${{ steps.ver.outputs.version }}
+          # ENABLE_WERROR=ON as in CI, so the sccache keys match CI's objects.
+          build-args: |
+            APP_VERSION=${{ steps.ver.outputs.version }}
+            ENABLE_WERROR=ON
+          secrets: |
+            actions_results_url=${{ env.ACTIONS_RESULTS_URL }}
+            actions_runtime_token=${{ env.ACTIONS_RUNTIME_TOKEN }}
           # runtime-base installs the runtime packages with apt-get. Replayed
           # from the gha cache while ubuntu:24.04 keeps its tag's digest, that
           # layer keeps the package versions of its first build, misses every
@@ -259,7 +271,13 @@ jobs:
           file: docker/Dockerfile
           target: worker-runtime
           platforms: linux/${{ matrix.arch }}
-          build-args: APP_VERSION=${{ steps.ver.outputs.version }}
+          # ENABLE_WERROR=ON as in CI, so the sccache keys match CI's objects.
+          build-args: |
+            APP_VERSION=${{ steps.ver.outputs.version }}
+            ENABLE_WERROR=ON
+          secrets: |
+            actions_results_url=${{ env.ACTIONS_RESULTS_URL }}
+            actions_runtime_token=${{ env.ACTIONS_RUNTIME_TOKEN }}
           no-cache-filters: runtime-base
           outputs: type=image,name=${{ env.IMAGE_NAME }}-worker,push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ matrix.cache }}

@@ -78,6 +78,24 @@ jobs:
             exit 0
           fi
           printf 'changed files:\n%s\n' "$changed"
+          # A release bump of CMakeLists.txt, where only the project(VERSION
+          # ...) line moved, builds nothing new: the tag passes the version
+          # as APP_VERSION anyway. It is not counted, so a frontend-only
+          # release does not rebuild and lint the whole tree.
+          if printf '%s\n' "$changed" | grep -qx 'CMakeLists.txt'; then
+            if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+              lines=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
+                --jq '.[] | select(.filename == "CMakeLists.txt") | .patch' | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            else
+              base="$PUSH_BEFORE"
+              if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then base="HEAD^"; fi
+              lines=$(git diff "$base" "$GITHUB_SHA" -- CMakeLists.txt 2>/dev/null | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            fi
+            if [ -n "$lines" ] && ! printf '%s\n' "$lines" | grep -vqE '^[+-][[:space:]]*project\('; then
+              echo "CMakeLists.txt changed only its project(VERSION ...) line: not counted"
+              changed=$(printf '%s\n' "$changed" | grep -vx 'CMakeLists.txt' || true)
+            fi
+          fi
           if printf '%s\n' "$changed" | grep -qE "$RELEVANT"; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           else
@@ -316,6 +334,24 @@ jobs:
             exit 0
           fi
           printf 'changed files:\n%s\n' "$changed"
+          # A release bump of CMakeLists.txt, where only the project(VERSION
+          # ...) line moved, builds nothing new: the tag passes the version
+          # as APP_VERSION anyway. It is not counted, so a frontend-only
+          # release does not rebuild and lint the whole tree.
+          if printf '%s\n' "$changed" | grep -qx 'CMakeLists.txt'; then
+            if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+              lines=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
+                --jq '.[] | select(.filename == "CMakeLists.txt") | .patch' | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            else
+              base="$PUSH_BEFORE"
+              if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then base="HEAD^"; fi
+              lines=$(git diff "$base" "$GITHUB_SHA" -- CMakeLists.txt 2>/dev/null | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            fi
+            if [ -n "$lines" ] && ! printf '%s\n' "$lines" | grep -vqE '^[+-][[:space:]]*project\('; then
+              echo "CMakeLists.txt changed only its project(VERSION ...) line: not counted"
+              changed=$(printf '%s\n' "$changed" | grep -vx 'CMakeLists.txt' || true)
+            fi
+          fi
           if printf '%s\n' "$changed" | grep -qE "$RELEVANT"; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           else
@@ -418,6 +454,24 @@ jobs:
             exit 0
           fi
           printf 'changed files:\n%s\n' "$changed"
+          # A release bump of CMakeLists.txt, where only the project(VERSION
+          # ...) line moved, builds nothing new: the tag passes the version
+          # as APP_VERSION anyway. It is not counted, so a frontend-only
+          # release does not rebuild and lint the whole tree.
+          if printf '%s\n' "$changed" | grep -qx 'CMakeLists.txt'; then
+            if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+              lines=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
+                --jq '.[] | select(.filename == "CMakeLists.txt") | .patch' | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            else
+              base="$PUSH_BEFORE"
+              if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then base="HEAD^"; fi
+              lines=$(git diff "$base" "$GITHUB_SHA" -- CMakeLists.txt 2>/dev/null | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            fi
+            if [ -n "$lines" ] && ! printf '%s\n' "$lines" | grep -vqE '^[+-][[:space:]]*project\('; then
+              echo "CMakeLists.txt changed only its project(VERSION ...) line: not counted"
+              changed=$(printf '%s\n' "$changed" | grep -vx 'CMakeLists.txt' || true)
+            fi
+          fi
           if printf '%s\n' "$changed" | grep -qE "$RELEVANT"; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           else
@@ -651,6 +705,24 @@ jobs:
             exit 0
           fi
           printf 'changed files:\n%s\n' "$changed"
+          # A release bump of CMakeLists.txt, where only the project(VERSION
+          # ...) line moved, builds nothing new: the tag passes the version
+          # as APP_VERSION anyway. It is not counted, so a frontend-only
+          # release does not rebuild and lint the whole tree.
+          if printf '%s\n' "$changed" | grep -qx 'CMakeLists.txt'; then
+            if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+              lines=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
+                --jq '.[] | select(.filename == "CMakeLists.txt") | .patch' | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            else
+              base="$PUSH_BEFORE"
+              if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then base="HEAD^"; fi
+              lines=$(git diff "$base" "$GITHUB_SHA" -- CMakeLists.txt 2>/dev/null | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            fi
+            if [ -n "$lines" ] && ! printf '%s\n' "$lines" | grep -vqE '^[+-][[:space:]]*project\('; then
+              echo "CMakeLists.txt changed only its project(VERSION ...) line: not counted"
+              changed=$(printf '%s\n' "$changed" | grep -vx 'CMakeLists.txt' || true)
+            fi
+          fi
           if printf '%s\n' "$changed" | grep -qE "$RELEVANT"; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           else
@@ -744,6 +816,24 @@ jobs:
             exit 0
           fi
           printf 'changed files:\n%s\n' "$changed"
+          # A release bump of CMakeLists.txt, where only the project(VERSION
+          # ...) line moved, builds nothing new: the tag passes the version
+          # as APP_VERSION anyway. It is not counted, so a frontend-only
+          # release does not rebuild and lint the whole tree.
+          if printf '%s\n' "$changed" | grep -qx 'CMakeLists.txt'; then
+            if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+              lines=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
+                --jq '.[] | select(.filename == "CMakeLists.txt") | .patch' | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            else
+              base="$PUSH_BEFORE"
+              if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then base="HEAD^"; fi
+              lines=$(git diff "$base" "$GITHUB_SHA" -- CMakeLists.txt 2>/dev/null | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            fi
+            if [ -n "$lines" ] && ! printf '%s\n' "$lines" | grep -vqE '^[+-][[:space:]]*project\('; then
+              echo "CMakeLists.txt changed only its project(VERSION ...) line: not counted"
+              changed=$(printf '%s\n' "$changed" | grep -vx 'CMakeLists.txt' || true)
+            fi
+          fi
           printf '%s\n' "$changed" > changed-files.txt
           if printf '%s\n' "$changed" | grep -qE "$RELEVANT"; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
