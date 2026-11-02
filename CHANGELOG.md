@@ -6,6 +6,14 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.58.4] - 2026-11-02
+
+### Added
+- A tap on Ani's belly makes her strike the next pose of her set, besides what she says about the day's food.
+
+### Changed
+- A release builds faster: the release images compile with the same compiler cache CI fills (they used to compile the whole tree from scratch on both architectures, 28 and 46 minutes for 1.58.2), and the version bump of CMakeLists.txt in a release commit no longer counts as a source change, so a frontend-only release skips the C++ jobs and the whole-tree clang-tidy that the tag used to wait for.
+
 ## [1.58.3] - 2026-11-02
 
 ### Fixed
