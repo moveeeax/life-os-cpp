@@ -1,8 +1,11 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js';
 
 /*
- * VRM Animation (.vrma) clips played on the MMD skeleton.
+ * Motion clips played on the MMD skeleton: VRM Animations (.vrma), retargeted
+ * from a humanoid, and plain VMD files made for this very model (loadVmdClip
+ * at the end).
  *
  * A VRMA clip animates a humanoid whose rest pose is a T-pose. Some files
  * rest at identity rotations, others (exported from Blender) carry rest
@@ -201,4 +204,100 @@ export async function loadClip(
       return out;
     },
   };
+}
+
+/*
+ * VMD clips. A VMD made for this PMX names its bones and keys their local
+ * rotations and offsets, in MMD's frame; MMDLoader turns it into an
+ * AnimationClip in three's frame, as it did the model, with a track
+ * `.bones[<name>].quaternion` and `.bones[<name>].position` per bone the
+ * skeleton has. Nothing is retargeted: the rotations go on as they are.
+ */
+
+/** A pose keyed on one frame is held this long (s). */
+export const POSE_HOLD = 6;
+const CENTER = 'センター';
+const TRACK = /^\.bones\[([^\]]+)\]\.(quaternion|position)$/;
+
+/**
+ * A clip over the tracks MMDLoader built. bind(name) is a bone's local bind
+ * position, undefined for a bone the model does not have: its tracks are
+ * skipped. The offset is センター's position against its bind; the other
+ * bones keep their bind positions. Past the last key a track holds its
+ * value, so a one-key pose stands for the whole duration.
+ */
+export function clipFromTracks(
+  tracks: THREE.KeyframeTrack[],
+  bind: (bone: string) => THREE.Vector3 | undefined,
+  duration: number,
+): Clip {
+  const rot = new Map<string, THREE.Interpolant>();
+  let pos: THREE.Interpolant | undefined;
+  let centre: THREE.Vector3 | undefined;
+  for (const tr of tracks) {
+    const m = TRACK.exec(tr.name);
+    if (!m) continue;
+    const [, bone, prop] = m;
+    const b = bind(bone);
+    if (!b) continue;
+    if (prop === 'quaternion') rot.set(bone, tr.createInterpolant());
+    else if (bone === CENTER) {
+      pos = tr.createInterpolant();
+      centre = b.clone();
+    }
+  }
+  const out: ClipPose = { rotations: new Map(), offset: new THREE.Vector3() };
+  for (const bone of rot.keys()) out.rotations.set(bone, new THREE.Quaternion());
+  return {
+    duration,
+    sample(t) {
+      for (const [bone, it] of rot)
+        out.rotations
+          .get(bone)!
+          .fromArray(it.evaluate(t) as unknown as number[])
+          .normalize();
+      if (pos && centre) out.offset.fromArray(pos.evaluate(t) as unknown as number[]).sub(centre);
+      else out.offset.set(0, 0, 0);
+      return out;
+    },
+  };
+}
+
+/**
+ * Loads a VMD made for the model. bind(name) as for clipFromTracks; the
+ * mesh gives the bone names. MMDLoader keeps the tracks of the bones its
+ * object has and adds each bone's position, as it stands, to the VMD's
+ * offsets: a bare skeleton of the model's bones at their bind positions
+ * stands in for the mesh, which may be mid-pose when the file arrives. A
+ * one-frame pose (duration 0) is held for POSE_HOLD s.
+ */
+export function loadVmdClip(
+  url: string,
+  bind: (bone: string) => THREE.Vector3 | undefined,
+  mesh: THREE.SkinnedMesh,
+): Promise<Clip> {
+  const bones: THREE.Bone[] = [];
+  for (const { name } of mesh.skeleton.bones) {
+    const b = bind(name);
+    if (!b) continue;
+    const bone = new THREE.Bone();
+    bone.name = name;
+    bone.position.copy(b);
+    bones.push(bone);
+  }
+  const stand = new THREE.SkinnedMesh();
+  stand.skeleton = new THREE.Skeleton(bones);
+  stand.morphTargetDictionary = {};
+  return new Promise((ok, fail) =>
+    new MMDLoader().loadAnimation(
+      url,
+      stand,
+      (a) => {
+        const anim = a as THREE.AnimationClip;
+        ok(clipFromTracks(anim.tracks, bind, anim.duration > 0 ? anim.duration : POSE_HOLD));
+      },
+      undefined,
+      fail,
+    ),
+  );
 }

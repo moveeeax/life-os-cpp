@@ -2,15 +2,16 @@ import * as THREE from 'three';
 import { CCDIKSolver, type IK } from 'three/examples/jsm/animation/CCDIKSolver.js';
 import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js';
 
-import { loadClip, type Clip } from './motion';
+import { loadClip, loadVmdClip, type Clip } from './motion';
+import { posesFor, RURUNE } from './poses';
 import { createSprings, type Collider, type SpringGroup, type Springs } from './springs';
 import { createVoice } from './voice';
 import { zoneOf, type Zone } from './zones';
 
 /*
  * Ani on Now: the PMX model, posed every frame by a small director (weight
- * from one leg to the other, glances, blinks), the VRoid VRMA clips and the
- * Pic♡Pix standing poses and a few Mixamo gestures over it, spring bones for
+ * from one leg to the other, glances, blinks), the VRoid VRMA clips, the
+ * Rurune poses made for her and a few Mixamo gestures over it, spring bones for
  * the skirt, hair and ribbons, a damped jiggle for the chest and seat, and
  * the arms kept out of the body.
  *
@@ -225,8 +226,10 @@ const RISE = 0.5;
 const WAVE_FROM = 2.3;
 
 // Motion clips from pixiv's VRoid VRMA pack; from: seconds to skip (the
-// greeting starts sitting on the floor).
-const CLIPS: Record<string, { file: string; from?: number }> = {
+// greeting starts sitting on the floor). kind: a plain VMD made for the
+// model, played as it is (the rest are VRMA, retargeted) and loaded when
+// first picked; the VRMA ones load at mount.
+const CLIPS: Record<string, { file: string; from?: number; kind?: 'vmd' }> = {
   show: { file: 'VRMA_01' },
   greet: { file: 'VRMA_02', from: 2.3 },
   peace: { file: 'VRMA_03' },
@@ -239,18 +242,9 @@ const CLIPS: Record<string, { file: string; from?: number }> = {
 for (const n of ['idle_happy', 'idle_cat', 'wave']) CLIPS[n] = { file: `mixamo/${n}` };
 // No squat: on her ledge it read as hanging in the air.
 const EMOTES = ['show', 'peace', 'spin', 'pose', 'shoot', 'idle_happy', 'idle_cat', 'wave'];
-// Standing poses from the Pic♡Pix Free Pose set (Unity humanoid poses baked
-// to VRMA, each held for 6 s), under poses/pose<n>. Poses 20 to 29 sit or
-// kneel on a floor (hips 0.15 to 0.47 m against 0.95 standing), 16 and 17
-// are caught mid-jump, 18 kneels and 30 sits on a chair that is not there:
-// on her glass ledge they read as hanging in the air, so they are not used.
-const POSES: string[] = [];
-const OFF_LEDGE = new Set([16, 17, 18, 30]);
-for (let n = 1; n <= 30; n++) {
-  if ((n >= 20 && n <= 29) || OFF_LEDGE.has(n)) continue;
-  POSES.push(`pose${n}`);
-  CLIPS[`pose${n}`] = { file: `poses/pose${n}` };
-}
+// The owner's Rurune poses, VMD under poses2/, each held for 6 s (the old
+// Pic♡Pix poses are still in the bucket under poses/, not played any more).
+for (const n of RURUNE) CLIPS[n] = { file: `poses2/${n}`, kind: 'vmd' };
 
 // Files under the base.
 const BODY_PMX = 'v2/Ani.pmx';
@@ -748,7 +742,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     // The model's own leg IK: the feet stay put while the hips sway.
     ik = new CCDIKSolver(m, mmd.iks);
     // The moves load now; a pose loads when she first picks it.
-    for (const name of Object.keys(CLIPS)) if (!POSES.includes(name)) void clipOf(name);
+    for (const [name, c] of Object.entries(CLIPS)) if (c.kind !== 'vmd') void clipOf(name);
     // v2 has rigid bodies for its hair and chest only; the clothes' bones
     // have theirs in v1. Made under reduced motion too (they rest there,
     // see frame), so turning it off later brings the sway back.
@@ -1146,9 +1140,15 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
   // Clips: one now and then, faded in and out over the procedural pose.
   const loaded: Record<string, Promise<Clip | null> | undefined> = {};
   const clipOf = (name: string) =>
-    (loaded[name] ??= loadClip(`${opts.base}${MOTIONS}${CLIPS[name].file}.vrma`, (n) =>
-      BIND[n].clone(),
-    ).catch(() => null));
+    (loaded[name] ??= (() => {
+      const c = CLIPS[name];
+      const url = `${opts.base}${MOTIONS}${c.file}`;
+      // A VMD keys the bones' own local values: against their bind positions.
+      // A VRMA is fitted by the bones' places in the model.
+      return c.kind === 'vmd'
+        ? loadVmdClip(`${url}.vmd`, (n) => baseP[n]?.clone(), mesh!)
+        : loadClip(`${url}.vrma`, (n) => BIND[n].clone());
+    })().catch(() => null));
   const play = { clip: null as Clip | null, name: '', t0: 0, w: 0, next: 6 };
   async function playClip(name: string) {
     if (!mesh || walk.state !== 'here' || still) return false;
@@ -1180,9 +1180,11 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     for (const n of LEG) B[n + 'D'].quaternion.copy(B[n].quaternion);
   }
   // A clip may lift both feet off the floor (a pose struck in a jump, a
-  // sit without a chair): while one plays, she is moved down (or up) until
-  // her lowest point rests on the ledge. The points: the ankles and toes at
-  // their bind height, the knees and the seat with a little flesh round them.
+  // sit without a chair) or lay her down on it (the Rurune z poses): while
+  // one plays, she is moved down (or up) until her lowest point rests on
+  // the ledge. The points: the ankles and toes at their bind height; the
+  // knees, the seat, the head, the trunk, the elbows and the wrists with a
+  // little flesh round them (model units, about 8 cm each).
   const CONTACTS: [string, number | null][] = [
     ['左足首D', null],
     ['右足首D', null],
@@ -1192,6 +1194,13 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     ['右ひざD', 0.6],
     ['Buttock_L', 1.0],
     ['Buttock_R', 1.0],
+    ['頭', 1.3],
+    ['上半身', 1.5],
+    ['上半身2', 1.5],
+    ['左ひじ', 0.5],
+    ['右ひじ', 0.5],
+    ['左手首', 0.5],
+    ['右手首', 0.5],
   ];
   function ground(m: THREE.SkinnedMesh) {
     if (!play.clip || play.w <= 0.001) return;
@@ -1229,8 +1238,9 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       now > touch.coverUntil &&
       now > touch.hugUntil
     ) {
-      // Every other time or so she strikes a pose instead of a move.
-      const pool = (Math.random() < 0.5 ? POSES : EMOTES).filter((n) => n !== play.name);
+      // Every other time or so she strikes a pose instead of a move; which
+      // poses depends on what she wears now.
+      const pool = (Math.random() < 0.5 ? posesFor(outfit) : EMOTES).filter((n) => n !== play.name);
       play.next = now + 1e9; // set again when the clip ends
       void playClip(pool[Math.floor(Math.random() * pool.length)]).then((ok) => {
         if (!ok) play.next = now + 10;

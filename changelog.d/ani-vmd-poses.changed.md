@@ -1,0 +1,1 @@
+Ani's poses are a new set of twelve made for her own model and played as they are (plain VMD): eight standing and four lying on the floor of her ledge, where her head, trunk, elbows and wrists now rest on it like her feet do. Bare keeps six of the standing ones. The old Pic♡Pix poses are no longer played.
