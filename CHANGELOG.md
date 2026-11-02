@@ -6,6 +6,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.58.0] - 2026-11-02
+
+### Changed
+- Ani's poses are a new set of twelve made for her own model and played as they are (plain VMD): eight standing and four lying on the floor of her ledge, where her head, trunk, elbows and wrists now rest on it like her feet do. Bare keeps six of the standing ones. The old Pic♡Pix poses are no longer played.
+
 ## [1.57.1] - 2026-11-01
 
 ### Changed
