@@ -14,19 +14,9 @@ export const RURUNE = ['c1', 'c2', 'c3', 'c4', 't1', 't2', 't3', 't4', 'z1', 'z2
   (n) => `rurune_${n}`,
 );
 
-// Bare keeps the standing poses t1, t3 and t4: the sitting and lying ones
-// have the knees apart, and t2 is the arms-behind-the-head one.
-const DRESSED_ONLY = new Set([
-  'rurune_c1',
-  'rurune_c2',
-  'rurune_c3',
-  'rurune_c4',
-  'rurune_t2',
-  'rurune_z1',
-  'rurune_z2',
-  'rurune_z3',
-  'rurune_z4',
-]);
+// Bare has every pose but t2, the arms-behind-the-head one (the owner's
+// choice of 2026-11-02).
+const DRESSED_ONLY = new Set(['rurune_t2']);
 
 /** The poses she may strike in this outfit. */
 export function posesFor(outfit: Outfit): string[] {

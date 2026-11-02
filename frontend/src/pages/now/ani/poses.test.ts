@@ -8,8 +8,9 @@ describe('posesFor', () => {
     for (const o of ['p1', 'p2', 'lingerie'] as const) expect(posesFor(o)).toEqual(RURUNE);
   });
 
-  it('keeps three standing ones for bare: no sitting, no floor, no arms behind the head', () => {
-    expect(posesFor('bare')).toEqual(['rurune_t1', 'rurune_t3', 'rurune_t4']);
+  it('gives bare every pose but the arms-behind-the-head one', () => {
+    expect(posesFor('bare')).toEqual(RURUNE.filter((n) => n !== 'rurune_t2'));
+    expect(posesFor('bare')).toHaveLength(11);
   });
 
   it('hands out copies', () => {
