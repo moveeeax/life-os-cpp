@@ -19,7 +19,7 @@ import { zoneOf, type Zone } from './zones';
  * height in CSS px), standing on her ledge, so she can face whatever she
  * looks at: she turns to the cursor while it moves, to the end of the text
  * while the user types in the focus field, and stands as usual looking
- * straight ahead when the cursor rests (STILL s) or is over her.
+ * straight ahead, turned straight, when the cursor rests (STILL s) or is over her.
  *
  * The body is v2/Ani.pmx, in lingerie. The dress and the slip come from
  * clothes/Ani.pmx, the first model on the same skeleton (the same 628 bones in
@@ -211,10 +211,13 @@ const SULK = 2.7;
 
 // The PMX is about 21.8 units tall.
 const MODEL_HEIGHT = 21.8;
-// Her turn when she looks ahead.
+// Her turn while a clip leads or she sulks.
 const FACE = 0.25;
-// A cursor still this long (s) is let go of.
-const STILL = 5;
+// Her turn when she looks ahead on her own: straight at the screen.
+const REST = 0;
+// A cursor still this long (s) is let go of: she turns straight and looks
+// ahead until it moves again.
+const STILL = 10;
 // Going: a wave goodbye (the greeting clip from WAVE_FROM), then she fades
 // out over the last FADE_OUT s of LEAVE. Coming back: she fades in over
 // FADE_IN s rising RISE from below, then greets.
@@ -1372,9 +1375,11 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     // The body takes most of a turn, unless a clip leads.
     const faceWant = sulking
       ? FACE + SULK
-      : target && !play.clip
-        ? THREE.MathUtils.clamp(lookYaw * 0.85, -1.25, 1.25)
-        : FACE;
+      : target
+        ? play.clip
+          ? FACE
+          : THREE.MathUtils.clamp(lookYaw * 0.85, -1.25, 1.25)
+        : REST;
     face += (faceWant - face) * Math.min(1, dt * 2.5);
 
     // Where she stands and which way she faces.
