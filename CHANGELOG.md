@@ -6,6 +6,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.58.3] - 2026-11-02
+
+### Fixed
+- When one of Ani's poses ends, every bone it turned goes back to where it was, so a lying pose no longer leaves her bent double at the waist with her legs standing once it is over.
+
 ## [1.58.2] - 2026-11-02
 
 ### Changed
