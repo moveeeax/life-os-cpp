@@ -7,16 +7,20 @@ import type { Outfit } from './engine';
 
 /**
  * The owner's Rurune set, made for her own model (poses2/rurune_<n>.vmd,
- * one frame each): c1 to c4 and t1 to t4 stand, z1 to z4 lie on the floor.
+ * one frame each): t1 to t4 stand, c1 to c4 sit or squat with the knees
+ * apart, z1 to z4 lie on the floor.
  */
 export const RURUNE = ['c1', 'c2', 'c3', 'c4', 't1', 't2', 't3', 't4', 'z1', 'z2', 'z3', 'z4'].map(
   (n) => `rurune_${n}`,
 );
 
-// Bare, the owner's choice: c2 and t2 (arms behind the head) and the lying
-// poses stay dressed.
+// Bare keeps the standing poses t1, t3 and t4: the sitting and lying ones
+// have the knees apart, and t2 is the arms-behind-the-head one.
 const DRESSED_ONLY = new Set([
+  'rurune_c1',
   'rurune_c2',
+  'rurune_c3',
+  'rurune_c4',
   'rurune_t2',
   'rurune_z1',
   'rurune_z2',
