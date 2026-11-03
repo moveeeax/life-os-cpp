@@ -68,7 +68,7 @@ inline json assemble(const std::vector<Part>& parts, json focus) {
 }
 
 /// {late_count, first_late: {id, title, due} | null, late: up to 5 {id, title, due} oldest first,
-/// today: [{id, title, status}], inbox_count}.
+/// today: [{id, title, status}] (open due on the date, then closed on the date), inbox_count}.
 inline json tasks_block(const ::Tasks::Agenda::Groups& g, std::string_view date, long inbox_count) {
     json first_late;
     for (const auto& row : g.late) {
@@ -76,11 +76,18 @@ inline json tasks_block(const ::Tasks::Agenda::Groups& g, std::string_view date,
             first_late = json{{"id", row["id"]}, {"title", row["title"]}, {"due", row.value("due", "")}};
         }
     }
+    // The day's tasks: the open ones due on the date, then the ones closed on
+    // it (whatever their due): Ani's evening word counts "done X of Y" on this
+    // list, and her reward day needs the closed ones, which the agenda keeps
+    // in done_today rather than soon.
     json today = json::array();
     for (const auto& row : g.soon) {
         if (row.value("due", "") == date) {
             today.push_back(json{{"id", row["id"]}, {"title", row["title"]}, {"status", row.value("status", "open")}});
         }
+    }
+    for (const auto& row : g.done_today) {
+        today.push_back(json{{"id", row["id"]}, {"title", row["title"]}, {"status", "done"}});
     }
     std::vector<json> late(g.late.begin(), g.late.end());
     std::stable_sort(

@@ -65,6 +65,18 @@ TEST(NowToday, TasksBlockTakesTheOldestLateAndTodaysOnly) {
     EXPECT_EQ(b["first_late"]["due"], "2026-10-01");
     ASSERT_EQ(b["today"].size(), 1u);
     EXPECT_EQ(b["today"][0], (json{{"id", "c"}, {"title", "Call the bank"}, {"status", "open"}}));
+}
+
+TEST(NowToday, TasksBlockListsTheTasksClosedOnTheDayAfterTheOpenOnes) {
+    ::Tasks::Agenda::Groups g;
+    g.soon = {json{{"id", "c"}, {"title", "Call the bank"}, {"due", "2026-10-12"}}};
+    g.done_today = {json{{"id", "d"}, {"title", "Report"}, {"due", "2026-10-11"}, {"status", "done"}},
+                    json{{"id", "e"}, {"title", "Walk"}, {"status", "done"}}};
+    const json b = Now::Today::tasks_block(g, "2026-10-12", 3);
+    ASSERT_EQ(b["today"].size(), 3u);
+    EXPECT_EQ(b["today"][0]["status"], "open");
+    EXPECT_EQ(b["today"][1], (json{{"id", "d"}, {"title", "Report"}, {"status", "done"}}));
+    EXPECT_EQ(b["today"][2]["status"], "done");
     EXPECT_EQ(b["inbox_count"], 3);
 }
 
