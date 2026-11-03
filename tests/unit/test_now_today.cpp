@@ -72,7 +72,7 @@ TEST(NowToday, TasksBlockListsTheTasksClosedOnTheDayAfterTheOpenOnes) {
     g.soon = {json{{"id", "c"}, {"title", "Call the bank"}, {"due", "2026-10-12"}}};
     g.done_today = {json{{"id", "d"}, {"title", "Report"}, {"due", "2026-10-11"}, {"status", "done"}},
                     json{{"id", "e"}, {"title", "Walk"}, {"status", "done"}}};
-    const json b = Now::Today::tasks_block(g, "2026-10-12", 0);
+    const json b = Now::Today::tasks_block(g, "2026-10-12", 3);
     ASSERT_EQ(b["today"].size(), 3u);
     EXPECT_EQ(b["today"][0]["status"], "open");
     EXPECT_EQ(b["today"][1], (json{{"id", "d"}, {"title", "Report"}, {"status", "done"}}));
