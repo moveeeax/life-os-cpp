@@ -1,7 +1,7 @@
 /**
  * Ani's second set of her own lines, as pure decisions (useLife plays them):
  * the question of the day, follow-ups and wishes from her facts, the mood
- * mirror, bedtime, a lighter habit after a broken streak, personal records,
+ * mirror, bedtime, a lighter habit after a broken streak,
  * what to eat at each meal, an unusual spend, a hello abroad, the steps
  * guess, the birthday and a tip for the open tab.
  */
@@ -138,28 +138,7 @@ export function brokenStreakOf(habits: readonly HabitDays[], today: string): str
 }
 
 /** Last night is the longest of the month (and longer than any other). */
-export function sleepRecord(sleeps: readonly Sleep[]): string | null {
-  const nights = sleeps.filter((s) => !s.is_nap);
-  if (nights.length < 7) return null;
-  const last = nights.reduce((a, b) => (a.end_at > b.end_at ? a : b));
-  if (nights.some((s) => s !== last && s.duration_minutes >= last.duration_minutes)) return null;
-  const h = Math.floor(last.duration_minutes / 60);
-  const m = last.duration_minutes % 60;
-  return `Рекорд месяца: самый длинный сон, ${h} ч ${m} мин.`;
-}
-
 /** Yesterday's steps are the most of the month. */
-export function stepsRecord(
-  series: readonly { date: string; value: number | null }[],
-  today: string,
-): string | null {
-  const yesterday = shift(today, -1);
-  const y = series.find((p) => p.date === yesterday)?.value;
-  const others = series.filter((p) => p.date !== yesterday && p.value != null).map((p) => p.value!);
-  if (y == null || others.length < 7 || others.some((v) => v >= y)) return null;
-  return `Рекорд месяца по шагам: вчера ${new Intl.NumberFormat('ru-RU').format(Math.round(y))}.`;
-}
-
 export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 /** The local hours when she offers a meal. */
 export const MEAL_HOURS: Record<Meal, number> = { breakfast: 8, lunch: 13, snack: 16, dinner: 19 };

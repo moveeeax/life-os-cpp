@@ -1,4 +1,5 @@
 import type { Today } from '@/lib/now/types';
+import { REWARD } from './poses';
 
 import type { Ani } from './engine';
 import type { Zone } from './zones';
@@ -88,6 +89,40 @@ const SULK_S = 10;
 const FORGIVE_S = 30;
 
 const pick = <T>(xs: readonly T[], n: number) => xs[n % xs.length];
+
+// An earned day: a task of today closed (`some`), every one of them (`all`).
+export type Earned = 'no' | 'some' | 'all';
+export function earnedOf(today: Today | undefined): Earned {
+  const all = today?.tasks?.today ?? [];
+  const done = all.filter((t) => t.status === 'done').length;
+  if (done === 0) return 'no';
+  return done === all.length ? 'all' : 'some';
+}
+// Off-limits taps on an earned day: she joins in instead of minding. Lines
+// in turn; a reward pose (poses.ts REWARD) at most once per REWARD_EVERY_S,
+// and from the first tap when every task is done.
+const EARNED_1 = [
+  'Ты сегодня закрыл дело. Ладно, сегодня можно.',
+  'Хм. За сделанное положено. Но не наглей.',
+  'Я видела, ты справился. Так и быть.',
+];
+const EARNED_2 = ['Раз так… смотри.', 'Ну держи. Заслужил.', 'Только для тебя. И только сегодня.'];
+const EARNED_ALL = [
+  'Весь план закрыт. Сегодня я вся твоя.',
+  'Ты всё сделал. Проси что хочешь.',
+  'План в нуле. Вот и моя награда тебе.',
+];
+const EARNED_WAIT = ['Дай отдышаться.', 'Не всё сразу. Закрой ещё одно.', 'Подожди, я ещё тут.'];
+const EARNED_HOLD = ['Я же уже. Смотри, не трогай.', 'Тише. Так и быть, ещё минутку.'];
+/** She offers it herself when the day's last task closes (once a day; AniCorner). */
+export const EARNED_OFFER = 'Последнее дело закрыто. Хочешь, покажу кое-что?';
+const REWARD_EVERY_S = { some: 45, all: 30 } as const;
+// A reward pose holds this long (the clip's 6 s and its fade).
+const REWARD_POSE_S = 7;
+// The second tap counts within this long after the first.
+const REWARD_WINDOW_S = 30;
+// After a pose, taps within this long skip the let-through line.
+const REWARD_AGAIN_S = 5 * 60;
 const grams = (g: number) => `${Math.round(g)} г`;
 const steps = (n: number) => n.toLocaleString('ru-RU');
 
@@ -131,6 +166,14 @@ export function createToucher({
   let coverUntil = -1e9;
   let staredAt = -1e9;
   let stares = 0;
+  // The earned-day taps: their count in the window, the last pose and when.
+  let rewardTaps = 0;
+  let rewardAt = -1e9;
+  let rewardPoseAt = -1e9;
+  let rewardLast = '';
+  let rewardLines = 0;
+  let rewardMoodDay = '';
+  const epoch = Date.now() - clock();
 
   const again = (key: string, within: number, now: number) => {
     const n = now - (lastAt[key] ?? -1e9) < within * 1000 ? (count[key] ?? 0) + 1 : 1;
@@ -225,6 +268,41 @@ export function createToucher({
       case 'seat':
       case 'hips':
       case 'skirt': {
+        const earned = hidden() ? 'no' : earnedOf(today());
+        if (earned !== 'no') {
+          // Earned: no offence, she joins in.
+          if (now - rewardAt > REWARD_WINDOW_S * 1000) rewardTaps = 0;
+          rewardTaps += 1;
+          rewardAt = now;
+          rewardLines += 1;
+          const day = new Date(clock() + epoch).toDateString();
+          const mood = rewardMoodDay !== day ? 1 : 0;
+          rewardMoodDay = day;
+          a.blush(bare() ? 10 : 6);
+          a.glance(at.x, at.y, 1.5);
+          if (now < rewardPoseAt + REWARD_POSE_S * 1000) {
+            a.feel('shy', 2);
+            return { text: pick(EARNED_HOLD, rewardLines), mood };
+          }
+          // The let-through line: the first tap of a window, unless she posed
+          // within the last REWARD_AGAIN_S (then the taps go on where they were).
+          const first =
+            earned === 'some' && rewardTaps === 1 && now - rewardPoseAt > REWARD_AGAIN_S * 1000;
+          if (first) {
+            a.feel('happy', 3);
+            return { text: pick(EARNED_1, rewardLines), mood };
+          }
+          if (now - rewardPoseAt < REWARD_EVERY_S[earned] * 1000) {
+            a.feel('shy', 2);
+            return { text: pick(EARNED_WAIT, rewardLines), mood };
+          }
+          const pool = REWARD.filter((n) => n !== rewardLast);
+          rewardLast = pool[rewardLines % pool.length];
+          rewardPoseAt = now;
+          a.feel('happy', 4);
+          a.act(rewardLast);
+          return { text: pick(earned === 'all' ? EARNED_ALL : EARNED_2, rewardLines), mood };
+        }
         if (now - offendedAt > FORGIVE_S * 1000) offended = 0;
         offended += 1;
         offendedAt = now;

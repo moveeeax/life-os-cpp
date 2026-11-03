@@ -3,7 +3,7 @@ import { CCDIKSolver, type IK } from 'three/examples/jsm/animation/CCDIKSolver.j
 import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js';
 
 import { loadClip, loadVmdClip, type Clip } from './motion';
-import { posesFor, RURUNE } from './poses';
+import { posesFor, RURUNE_ALL } from './poses';
 import { createSprings, type Collider, type SpringGroup, type Springs } from './springs';
 import { createVoice } from './voice';
 import { zoneOf, type Zone } from './zones';
@@ -251,7 +251,7 @@ for (const n of ['idle_happy', 'idle_cat', 'wave']) CLIPS[n] = { file: `mixamo/$
 const EMOTES = ['show', 'peace', 'spin', 'pose', 'shoot', 'idle_happy', 'idle_cat', 'wave'];
 // The owner's Rurune poses, VMD under poses2/, each held for 6 s (the old
 // Pic♡Pix poses are still in the bucket under poses/, not played any more).
-for (const n of RURUNE) CLIPS[n] = { file: `poses2/${n}`, kind: 'vmd' };
+for (const n of RURUNE_ALL) CLIPS[n] = { file: `poses2/${n}`, kind: 'vmd' };
 // The lying ones turn so she lies along the ledge, head by its edge, legs
 // into the screen; z2 (the crawl) faces the other way in its file.
 for (const n of ['rurune_z1', 'rurune_z3', 'rurune_z4']) CLIPS[n].turn = Math.PI / 2;

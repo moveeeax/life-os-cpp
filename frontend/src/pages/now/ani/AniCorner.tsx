@@ -18,11 +18,10 @@ import { useInbox, type Play } from './inbox';
 import { moodLevel, moodOf, moveMood } from './mood';
 import type { Talk, TalkState } from './talk';
 import { useAni, type AniOutfit } from './state';
-import { createToucher, say, type Answer } from './touch';
+import { createToucher, EARNED_OFFER, earnedOf, say, type Answer } from './touch';
 import { AniOffers } from './AniOffers';
 import { useLife } from './useLife';
 import { useLife2 } from './useLife2';
-import { Shelf } from './Shelf';
 import { ACT_EVENT, type Act } from '@/lib/now/act';
 import { readGive } from '@/lib/now/drag';
 import { FACT_MAX, firstFreeSlot, topCategory } from './give';
@@ -63,6 +62,8 @@ function HangerIcon() {
 // Recorded ahead with the voice she talks in (OpenAI TTS, marin), under
 // v2/voice/: the hellos of the hour (greet.ts), the taps' lines
 // (touch.ts) and this one.
+/** The day the reward offer was made (localStorage): once a day. */
+const OFFER_KEY = 'now:ani:offer';
 const DIZZY: Answer = { text: 'Ой, голова кружится.', recorded: 'dizzy' };
 
 /** The hello of this hour, recorded. */
@@ -758,6 +759,27 @@ export function AniCorner({
       const before = acts.current;
       acts.current = [...before, a].slice(-100);
       if (quietRef.current || calling.current) return;
+      // The day's last task closed: she offers the reward herself, once a day.
+      if (a.kind === 'task_done' && earnedOf(contextRef.current.today) === 'all') {
+        const day = new Date().toDateString();
+        let shown = '';
+        try {
+          shown = localStorage.getItem(OFFER_KEY) ?? '';
+        } catch {
+          /* no storage: the offer may repeat */
+        }
+        if (shown !== day) {
+          try {
+            localStorage.setItem(OFFER_KEY, day);
+          } catch {
+            /* ignore */
+          }
+          engine.current?.feel('happy', 3);
+          engine.current?.act('peace');
+          void answer.current({ text: EARNED_OFFER, kind: 'hello', mood: 1 });
+          return;
+        }
+      }
       const r = reactionTo(a, { hour: new Date().getHours(), today: before });
       if (!r || !gate.current.allow(Date.now())) return;
       if (r.feel) engine.current?.feel(r.feel, 2.5);
@@ -1211,14 +1233,6 @@ export function AniCorner({
         </div>
       ) : null}
       <div ref={ledgeRef} className="ani-ledge" data-wardrobe={wardrobe ? '' : undefined}>
-        <Shelf
-          on={ready && ani.here}
-          date={context.date}
-          tz={context.tz}
-          hidden={hideNums}
-          sleepMinutes={context.today?.health?.sleep_minutes}
-          hour={new Date().getHours()}
-        />
         {waiting > 0 ? (
           <span
             className="ani-inbox"
