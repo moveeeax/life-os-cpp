@@ -50,7 +50,7 @@ RUN wget -q -O /tmp/db.tar.gz \
 # Unprivileged base: master + workers run as the non-root "nginx" user (uid
 # 101) and the server listens on 8080, so the image runs under a restrictive
 # podSecurityContext (runAsNonRoot) without a privileged port or root pidfile.
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.30-alpine AS runtime
 
 # The base image lags the Alpine security fixes (OpenSSL CVE-2026-31789 in 1.23.0);
 # the release scan fails on a fixable CRITICAL, so take the fixed packages here.
