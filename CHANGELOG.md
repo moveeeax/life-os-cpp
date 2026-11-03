@@ -6,6 +6,14 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.59.0] - 2026-11-03
+
+### Added
+- Ani's reward poses: on a day with a task closed, a tap on the places she usually minds no longer offends her; she lets the first one through with a word, strikes a reward pose (the squat, the crawl or the lying one) on the next, and asks to wait between poses (45 s, 30 s once every task of the day is done, when the first tap already earns the pose). When the day's last task closes she offers it herself, once a day. Hide numbers keeps her old answers.
+
+### Changed
+- Ani's shelf on her ledge (the plant, the books, the cups, the coffee and the country postcard) and her morning records of the month (sleep, steps) are gone. Of her twelve poses only one plays on its own now; the squat and two lying ones wait for a reward mechanic, the other eight are shelved. A version bump alone no longer warms the arm64 compiler cache, so it does not queue behind a release build.
+
 ## [1.58.5] - 2026-11-02
 
 ### Changed
