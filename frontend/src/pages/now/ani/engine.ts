@@ -3,7 +3,7 @@ import { CCDIKSolver, type IK } from 'three/examples/jsm/animation/CCDIKSolver.j
 import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js';
 
 import { loadClip, loadVmdClip, type Clip } from './motion';
-import { posesFor, RURUNE_ALL } from './poses';
+import { PACK_ALL, PLAIN_DAY, posesFor, RURUNE_ALL, TURN, type PoseContext } from './poses';
 import { createSprings, type Collider, type SpringGroup, type Springs } from './springs';
 import { createVoice } from './voice';
 import { zoneOf, type Zone } from './zones';
@@ -56,6 +56,8 @@ export interface AniOptions {
   onDwell?: (z: Zone, at: { x: number; y: number }) => void;
   /** Two taps on her in quick succession (after the first one's answer). */
   onDoubleTap?: () => void;
+  /** How the day goes, for the choice of her poses (poses.ts); a plain day without it. */
+  poseContext?: () => PoseContext;
 }
 
 /** A face she makes for a while, over her own. */
@@ -252,6 +254,9 @@ const EMOTES = ['show', 'peace', 'spin', 'pose', 'shoot', 'idle_happy', 'idle_ca
 // The owner's Rurune poses, VMD under poses2/, each held for 6 s (the old
 // Pic♡Pix poses are still in the bucket under poses/, not played any more).
 for (const n of RURUNE_ALL) CLIPS[n] = { file: `poses2/${n}`, kind: 'vmd' };
+// The pack poses, VMD under poses3/ (poses.ts), the lying ones turned.
+for (const n of PACK_ALL) CLIPS[n] = { file: `poses3/${n}`, kind: 'vmd', turn: TURN[n] };
+
 // The lying ones turn so she lies along the ledge, head by its edge, legs
 // into the screen; z2 (the crawl) faces the other way in its file.
 for (const n of ['rurune_z1', 'rurune_z3', 'rurune_z4']) CLIPS[n].turn = Math.PI / 2;
@@ -1161,6 +1166,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
         : loadClip(`${url}.vrma`, (n) => BIND[n].clone());
     })().catch(() => null));
   const play = { clip: null as Clip | null, name: '', t0: 0, w: 0, next: 6, keys: [] as string[] };
+  const poseContext = () => opts.poseContext?.() ?? PLAIN_DAY;
   async function playClip(name: string) {
     if (!mesh || walk.state !== 'here' || still) return false;
     const c = await clipOf(name);
@@ -1264,8 +1270,10 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       now > touch.hugUntil
     ) {
       // Every other time or so she strikes a pose instead of a move; which
-      // poses depends on what she wears now.
-      const pool = (Math.random() < 0.5 ? posesFor(outfit) : EMOTES).filter((n) => n !== play.name);
+      // poses depends on what she wears and how the day goes.
+      const pool = (Math.random() < 0.5 ? posesFor(outfit, poseContext()) : EMOTES).filter(
+        (n) => n !== play.name,
+      );
       play.next = now + 1e9; // set again when the clip ends
       void playClip(pool[Math.floor(Math.random() * pool.length)]).then((ok) => {
         if (!ok) play.next = now + 10;
@@ -1793,7 +1801,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     },
     nextPose() {
       wake();
-      const pool = posesFor(outfit).filter((n) => n !== play.name);
+      const pool = posesFor(outfit, poseContext()).filter((n) => n !== play.name);
       if (pool.length) void playClip(pool[Math.floor(Math.random() * pool.length)]);
     },
     mood(level) {
