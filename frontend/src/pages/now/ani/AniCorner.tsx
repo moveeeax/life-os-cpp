@@ -354,6 +354,9 @@ export function AniCorner({
   // Her answers to taps on her body read the day as it is now.
   const contextRef = useRef(context);
   contextRef.current = context;
+  // When a focus session ended and a task closed (ms): her poses follow (poses.ts).
+  const focusEndedAt = useRef(-Infinity);
+  const taskDoneAt = useRef(-Infinity);
   const toucher = useRef(
     createToucher({
       ani: () => engine.current,
@@ -715,6 +718,7 @@ export function AniCorner({
   useEffect(() => {
     if (!ready || !afterFocus) return;
     onAfterFocus?.();
+    focusEndedAt.current = Date.now();
     // Sent off her ledge: no word, and none later when she comes back.
     if (!ani.here) return;
     engine.current?.feel('happy', 3);
@@ -758,6 +762,7 @@ export function AniCorner({
       acts.current = acts.current.filter((x) => new Date(x.at).toDateString() === today);
       const before = acts.current;
       acts.current = [...before, a].slice(-100);
+      if (a.kind === 'task_done') taskDoneAt.current = Date.now();
       if (quietRef.current || calling.current) return;
       // The day's last task closed: she offers the reward herself, once a day.
       if (a.kind === 'task_done' && earnedOf(contextRef.current.today) === 'all') {
@@ -972,6 +977,17 @@ export function AniCorner({
           },
           outfit: mountRef.current.outfit,
           present: mountRef.current.here,
+          // How the day goes, for the pool her idle poses come from.
+          poseContext: () => {
+            const c = contextRef.current;
+            return {
+              mood: moodLevel(moodOf(c.date)),
+              hour: clockIn(c.tz).hour,
+              sinceFocus: (Date.now() - focusEndedAt.current) / 1000,
+              sinceTask: (Date.now() - taskDoneAt.current) / 1000,
+              late: (c.today?.tasks?.late_count ?? 0) > 0,
+            };
+          },
           onReady: () => setReady(true),
           onError: () => setFailed(true),
           // A tap answers by where it landed (touch.ts).
