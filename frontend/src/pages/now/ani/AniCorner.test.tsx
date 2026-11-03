@@ -256,6 +256,41 @@ describe('AniCorner', () => {
     expect(engine.ani!.nextPose).toHaveBeenCalledTimes(1);
   });
 
+  it("RewardOffer: the day's last task closed, she offers the reward once", async () => {
+    localStorage.removeItem('now:ani:offer');
+    await mount({
+      ...base,
+      tasks: {
+        late_count: 0,
+        first_late: null,
+        late: [],
+        inbox_count: 0,
+        today: [{ id: 't1', title: 'Отчёт', status: 'done' }],
+      },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    const done = () =>
+      window.dispatchEvent(
+        new CustomEvent('life:act', {
+          detail: { kind: 'task_done', title: 'Отчёт', at: Date.now() },
+        }),
+      );
+    await act(async () => {
+      done();
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(bubble()).toMatch(/Последнее дело закрыто/);
+    expect(engine.ani!.act).toHaveBeenCalledWith('peace');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+      done();
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(bubble() ?? '').not.toMatch(/Последнее дело закрыто/);
+  });
+
   it('GiveToAni: dropped text gets her buttons to keep it or put it in the inbox', async () => {
     await mount();
     const hit = document.querySelector('.ani-hit')!;
