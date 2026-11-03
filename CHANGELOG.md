@@ -6,6 +6,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.59.2] - 2026-11-03
+
+### Fixed
+- The day's task list in the Now digest carries the tasks closed on the day too, after the open ones, so Ani's evening "done X of Y" counts them and her reward day starts once a task is closed (it never did on production: the closed tasks sit in the agenda's done_today, not in soon, and the list came out empty).
+
 ## [1.59.1] - 2026-11-03
 
 ### Fixed
