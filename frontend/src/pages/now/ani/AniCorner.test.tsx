@@ -47,7 +47,6 @@ const bareLinks = {
 };
 const fetchAniBare = vi.fn(() => Promise.resolve(bareLinks));
 vi.mock('./useLife', () => ({ useLife: () => {} }));
-vi.mock('./Shelf', () => ({ Shelf: () => null }));
 vi.mock('./useLife2', () => ({
   // The test reaches her own lines through the say the corner hands over.
   useLife2: (o: { say: (a: unknown) => void }) => {

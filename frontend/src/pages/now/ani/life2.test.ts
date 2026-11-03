@@ -12,8 +12,6 @@ import {
   nightOf,
   questionOfDay,
   QUESTIONS,
-  sleepRecord,
-  stepsRecord,
   tabTip,
   tripHello,
   nextSpendGroup,
@@ -77,23 +75,6 @@ describe("Ani's life, part two", () => {
     expect(
       brokenStreakOf([{ ...h, days: days([true, false, true, false]) }], '2026-10-31'),
     ).toBeNull();
-  });
-
-  it('PersonalRecords: the longest night and the most steps of the month', () => {
-    const nights = Array.from({ length: 8 }, (_, i) => ({
-      ...night(`2026-10-${10 + i}`, '23:00', 400),
-      end_at: `2026-10-${11 + i}T07:00:00Z`,
-    }));
-    nights[7].duration_minutes = 560;
-    expect(sleepRecord(nights)).toMatch(/9 ч 20 мин/);
-    nights[2].duration_minutes = 600;
-    expect(sleepRecord(nights)).toBeNull();
-    const series = Array.from({ length: 10 }, (_, i) => ({
-      date: `2026-10-${21 + i}`,
-      value: 6000,
-    }));
-    series[9].value = 14000;
-    expect(stepsRecord(series, '2026-10-31')).toMatch(/14\s000/);
   });
 
   it('WhatToEat: two protein-rich recent products that fit the kcal left', () => {

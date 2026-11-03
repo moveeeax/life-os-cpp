@@ -22,7 +22,6 @@ import { createToucher, say, type Answer } from './touch';
 import { AniOffers } from './AniOffers';
 import { useLife } from './useLife';
 import { useLife2 } from './useLife2';
-import { Shelf } from './Shelf';
 import { ACT_EVENT, type Act } from '@/lib/now/act';
 import { readGive } from '@/lib/now/drag';
 import { FACT_MAX, firstFreeSlot, topCategory } from './give';
@@ -1211,14 +1210,6 @@ export function AniCorner({
         </div>
       ) : null}
       <div ref={ledgeRef} className="ani-ledge" data-wardrobe={wardrobe ? '' : undefined}>
-        <Shelf
-          on={ready && ani.here}
-          date={context.date}
-          tz={context.tz}
-          hidden={hideNums}
-          sleepMinutes={context.today?.health?.sleep_minutes}
-          hour={new Date().getHours()}
-        />
         {waiting > 0 ? (
           <span
             className="ani-inbox"

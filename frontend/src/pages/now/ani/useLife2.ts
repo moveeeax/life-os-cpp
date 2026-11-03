@@ -24,8 +24,6 @@ import {
   moodLow,
   nightOf,
   questionOfDay,
-  sleepRecord,
-  stepsRecord,
   tabTip,
   tripHello,
   nextSpendGroup,
@@ -327,17 +325,6 @@ export function useLife2({
         mark('bedtimeMorning', day);
         if (line) {
           sayRef.current({ text: line, kind: 'brief' });
-          return;
-        }
-      }
-      if (morning && age >= 120 && d.got.sleeps && d.got.steps && !hidden && once('records')) {
-        mark('records', day);
-        const line = sleepRecord(arr(d.sleeps)) ?? stepsRecord(arr(d.steps), day);
-        if (line) {
-          addMoment(day, line);
-          e?.feel('happy', 3);
-          e?.act('peace');
-          sayRef.current({ text: line, mood: 1, kind: 'hello' });
           return;
         }
       }
