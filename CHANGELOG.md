@@ -6,6 +6,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.60.0] - 2026-11-03
+
+### Added
+- Ani strikes 66 new poses picked from nine pose packs, in pools by how the day goes: calm standing ones by day, brighter ones in a good mood and for ten minutes after a task closes, slumped ones on a cross day or with late tasks, sitting on the ledge's edge for twenty minutes after a focus session, asleep from 23:00 to 6:00 (bare she rests instead of lying down). A tap on her belly cycles the pool of the moment. Three of the pack poses join the reward set of an earned day.
+
 ## [1.59.2] - 2026-11-03
 
 ### Fixed
