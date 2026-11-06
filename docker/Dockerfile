@@ -218,7 +218,10 @@ FROM ubuntu:24.04 AS runtime-base
 
 # Runtime dependencies (noble ships GCC 13 libstdc++ in main, no PPA needed).
 # t64 transition renamed libssl3 → libssl3t64 and libhiredis0.14 → libhiredis1.1.0.
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# The upgrade takes the security fixes the base image does not carry yet (apt
+# 2.8.3 failed the release scan with CVE-2026-109518, fixed in 2.8.4ubuntu0.1).
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
+    apt-get install -y --no-install-recommends \
     libstdc++6 \
     libssl3t64 \
     libpq5 \
