@@ -1,1 +1,0 @@
-Ani's reward mode: closed tasks no longer let off-limits taps through or play the six reward poses, and she no longer offers "покажу кое-что" when the day's last task closes. Off-limits taps get the same answer on any day.

@@ -6,6 +6,26 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.61.0] - 2026-11-06
+
+### Changed
+- Only site rows can be dropped on Ani: a task, a transaction, a note and a calendar event. Selected text, links, images and files are let go, her figure lights up only while such a row is dragged, and the browser shows no drop target for anything else.
+- CI: GitHub Actions bumped to current majors, still pinned by commit SHA:
+  checkout v7.0.1, cache v6.1.0, upload-artifact v7.0.2, download-artifact
+  v8.0.2, setup-node v7.1.0, docker/build-push-action v7.4.0,
+  docker/login-action v4.7.0, docker/setup-buildx-action v4.4.1,
+  crazy-max/ghaction-github-runtime v4.0.0, softprops/action-gh-release v3.0.3,
+  cosign-installer v4.1.3, sbom-action/download-syft v0.24.3 and
+  github-action-benchmark v1.22.2 (all node24).
+- vcpkg builtin-baseline and the Dockerfile `VCPKG_REF` moved together from
+  c4aad28 (2026-05-01) to microsoft/vcpkg master 5d68747 (2026-11-04):
+  drogon 1.9.12 to 1.9.14, opentelemetry-cpp 1.26.0 to 1.30.0, libpqxx 8.0.1
+  to 8.0.2, gtest 1.17.0 to 1.18.0, fmt 12.1.0 to 12.2.0.
+
+### Removed
+- Ani's reward mode: closed tasks no longer let off-limits taps through or play the six reward poses, and she no longer offers "покажу кое-что" when the day's last task closes. Off-limits taps get the same answer on any day.
+- Ani's Lingerie and Bare outfits: the wardrobe on Now keeps the dress and the slip, a stored Lingerie or Bare falls back to the dress, the 18+ switch is gone from the account page, the webhook and MCP refuse `lingerie` and `bare` with 422 `unknown_outfit`, and migration 080 turns bare off for everyone. `GET /api/v1/ani/bare` answers 410 `bare_removed` and `AniPrefs.bare` is always false; both are deprecated in the spec and go in a later release together with the `ani_prefs.bare_on_at` column.
+
 ## [1.60.0] - 2026-11-03
 
 ### Added
