@@ -1,0 +1,1 @@
+Runtime images take the pending Ubuntu security updates (`apt-get upgrade` in the runtime base): apt 2.8.3 in ubuntu:24.04 failed the 1.61.0 release scan with CVE-2026-109518 (HIGH), fixed in 2.8.4ubuntu0.1.
