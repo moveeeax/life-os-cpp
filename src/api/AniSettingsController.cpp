@@ -29,7 +29,6 @@
 #include "repositories/agent/PrefsRepository.hpp"
 #include "repositories/agent/ReminderRepository.hpp"
 #include "security/Audit.hpp"
-#include "storage/ObjectStore.hpp"
 #include "utils/Config.hpp"
 #include "utils/ErrorResponse.hpp"
 #include "utils/Utf8.hpp"
@@ -79,44 +78,29 @@ void AniSettingsController::savePrefs(const HttpRequestPtr& req, Callback&& call
     if (!parse_object(req, body, callback)) {
         return;
     }
-    const auto bare_it = body.find("bare");
     const auto muted_it = body.find("muted");
-    if ((bare_it == body.end() && muted_it == body.end()) || (bare_it != body.end() && !bare_it->is_boolean())) {
-        callback(ErrorResponse::bad_request("invalid_body", "bare must be true or false, or muted a list"));
+    if (muted_it == body.end()) {
+        callback(ErrorResponse::bad_request("invalid_body", "muted is a list of line kinds"));
         return;
     }
     // The kinds of her own lines the page can mute ("Not about this" on Now).
     static const std::set<std::string> kKinds = {
         "brief", "evening", "break", "stretch", "hello", "telegram", "webhook", "reminder", "calendar"};
+    if (!muted_it->is_array() || muted_it->size() > kKinds.size()) {
+        callback(ErrorResponse::bad_request("invalid_muted", "muted is a list of line kinds"));
+        return;
+    }
     std::vector<std::string> muted;
-    if (muted_it != body.end()) {
-        if (!muted_it->is_array() || muted_it->size() > kKinds.size()) {
+    for (const auto& k : *muted_it) {
+        if (!k.is_string() || kKinds.count(k.get<std::string>()) == 0) {
             callback(ErrorResponse::bad_request("invalid_muted", "muted is a list of line kinds"));
             return;
         }
-        for (const auto& k : *muted_it) {
-            if (!k.is_string() || kKinds.count(k.get<std::string>()) == 0) {
-                callback(ErrorResponse::bad_request("invalid_muted", "muted is a list of line kinds"));
-                return;
-            }
-            muted.push_back(k.get<std::string>());
-        }
-    }
-    if (bare_it != body.end() && bare_it->get<bool>()) {
-        const auto adult_it = body.find("adult");
-        if (!(adult_it != body.end() && adult_it->is_boolean() && adult_it->get<bool>())) {
-            callback(ErrorResponse::unprocessable("adult_required", "the bare outfit is only for adults"));
-            return;
-        }
+        muted.push_back(k.get<std::string>());
     }
     try {
         Repositories::Agent::PrefsRepository repo;
-        if (bare_it != body.end()) {
-            repo.set_bare(owner, bare_it->get<bool>());
-        }
-        if (muted_it != body.end()) {
-            repo.set_muted(owner, muted);
-        }
+        repo.set_muted(owner, muted);
         callback(Response::ok(json{{"data", repo.get(owner)}}));
     } catch (const std::exception& e) {
         spdlog::error("ani.prefs save failed: {}", e.what());
@@ -237,29 +221,8 @@ void AniSettingsController::removeDeal(const HttpRequestPtr& req, Callback&& cal
 
 void AniSettingsController::bare(const HttpRequestPtr& req, Callback&& callback) {
     ANI_SETTINGS_GUARD(req, callback, owner);
-    try {
-        if (!Repositories::Agent::PrefsRepository().get(owner).value("bare", false)) {
-            callback(ErrorResponse::forbidden("bare_off", "the bare outfit is off in Ani's settings"));
-            return;
-        }
-        Storage::ObjectStore* store = Storage::object_store();
-        if (store == nullptr) {
-            callback(ErrorResponse::service_unavailable("storage_unavailable", "file storage is not configured"));
-            return;
-        }
-        const std::string model = store->private_key("ani", kBareFolder, "Ani.pmx");
-        const std::string texture = store->private_key("ani", kBareFolder, "kanata_body.png");
-        auto resp = Response::ok(json{{"data",
-                                       {{"model_url", store->download_url(model, kLinkSeconds, "inline")},
-                                        {"texture_url", store->download_url(texture, kLinkSeconds, "inline")},
-                                        {"expires_in", kLinkSeconds}}}});
-        // The links are bearer credentials for two minutes: no cache keeps them.
-        resp->addHeader("Cache-Control", "no-store");
-        callback(resp);
-    } catch (const std::exception& e) {
-        spdlog::error("ani.bare failed: {}", e.what());
-        callback(ErrorResponse::service_unavailable("storage_unavailable", "file storage did not answer"));
-    }
+    (void)owner;
+    callback(ErrorResponse::make({k410Gone, "bare_removed", "the bare outfit was removed"}));
 }
 
 void AniSettingsController::webhook(const HttpRequestPtr& req, Callback&& callback) {

@@ -35,7 +35,7 @@ session may.
 | Tool | What it does |
 |---|---|
 | `ani_say` | She says a line on Now (1-200 characters). |
-| `ani_outfit` | p1, p2, lingerie, or bare (only while bare is on in her settings). |
+| `ani_outfit` | p1 (the dress) or p2 (the slip). |
 | `ani_act` | One of her moves: show, greet, peace, shoot, spin, pose, idle_happy, idle_cat, wave. |
 | `ani_event` | An event for her agent; she says something about it or stays silent. |
 | `ani_mood` | Her face takes a mood for a while: -1, 0 or 1 (`seconds` 60-3600, default 600). |

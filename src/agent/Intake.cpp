@@ -59,10 +59,6 @@ bool within_rate(const std::string& owner) {
 }
 
 std::variant<Accepted, Refused> accept(const std::string& owner, Hook::Item item, const std::string& via) {
-    if (item.kind == "outfit" && item.payload.value("outfit", "") == "bare" &&
-        !Repositories::Agent::PrefsRepository().get(owner).value("bare", false)) {
-        return Refused{422, "bare_off", "the bare outfit is off in Ani's settings"};
-    }
     const bool event = item.kind == "event";
     if (event) {
         if (auto refused = agent_refusal(owner)) {

@@ -95,7 +95,7 @@ TEST_F(AniMcpTools, SayGoesToInbox) {
 
 TEST_F(AniMcpTools, ToolErrorsAreResults) {
     EXPECT_EQ(call("ani_say", {{"text", std::string(300, 'a')}})["isError"], true) << "over 200 characters";
-    EXPECT_EQ(call("ani_outfit", {{"outfit", "bare"}})["isError"], true) << "bare is off";
+    EXPECT_EQ(call("ani_outfit", {{"outfit", "bare"}})["isError"], true) << "bare is gone";
     EXPECT_EQ(call("ani_act", {{"name", "moonwalk"}})["isError"], true) << "not one of her moves";
     for (int i = 0; i < Agent::Hook::kCallsPerHour; ++i)
         Agent::Intake::within_rate(kAnna);

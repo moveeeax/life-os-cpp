@@ -45,8 +45,7 @@ TEST(AniHookParse, ValidItems) {
 
     const auto outfit = ok({{"type", "outfit"}, {"outfit", "p1"}});
     EXPECT_EQ(outfit.payload, json({{"outfit", "p1"}}));
-    EXPECT_EQ(ok({{"type", "outfit"}, {"outfit", "bare"}}).payload, json({{"outfit", "bare"}}))
-        << "bare is checked against the user's switch by the controller";
+    EXPECT_EQ(ok({{"type", "outfit"}, {"outfit", "p2"}}).payload, json({{"outfit", "p2"}}));
 
     EXPECT_EQ(ok({{"type", "act"}, {"name", "wave"}}).payload, json({{"name", "wave"}}));
 
@@ -75,6 +74,8 @@ TEST(AniHookParse, ValuesNotAllowedAre422) {
     const auto cape = bad(json({{"type", "outfit"}, {"outfit", "cape"}}).dump());
     EXPECT_EQ(cape.status, 422);
     EXPECT_EQ(cape.code, "unknown_outfit");
+    for (const char* gone : {"lingerie", "bare"})
+        EXPECT_EQ(bad(json({{"type", "outfit"}, {"outfit", gone}}).dump()).code, "unknown_outfit");
     const auto dance = bad(json({{"type", "act"}, {"name", "pole"}}).dump());
     EXPECT_EQ(dance.status, 422);
     EXPECT_EQ(dance.code, "unknown_act");

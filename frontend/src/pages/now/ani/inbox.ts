@@ -36,7 +36,7 @@ const ACT_FRESH_MS = 10 * 60_000;
 /** More lines than this at once: she says first that they piled up. */
 const BACKLOG_LINES = 3;
 
-const OUTFITS: readonly string[] = ['p1', 'p2', 'lingerie', 'bare'];
+const OUTFITS: readonly string[] = ['p1', 'p2'];
 
 const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
 

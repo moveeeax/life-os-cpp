@@ -6,13 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
-  useAniPrefs,
   useAniMcpKeys,
   useAniWebhook,
   useCreateAniMcpKey,
   useRevokeAniMcpKey,
   useRotateAniWebhook,
-  useSaveAniPrefs,
   type AniWebhook,
 } from '@/hooks/useAni';
 
@@ -22,69 +20,6 @@ const EVENT = `curl -X POST "$URL" -H 'Content-Type: application/json' \\
   -d '{"type":"event","source":"telegram","text":"Маша: созвон через 10 минут?"}'`;
 
 const when = (iso: string) => new Date(iso).toLocaleString();
-
-/** The bare outfit: off by default; on only after the user says they are 18+. */
-function BareSwitch() {
-  const prefs = useAniPrefs();
-  const save = useSaveAniPrefs();
-  const [asking, setAsking] = useState(false);
-  const on = prefs.data?.bare ?? false;
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-4">
-        <div className="text-sm">
-          <div id="ani-bare-label" className="font-medium">
-            Bare outfit
-          </div>
-          <div className="text-muted-foreground">
-            Adds Bare to her wardrobe on Now. Hidden while Hide numbers is on.
-          </div>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={on}
-          aria-labelledby="ani-bare-label"
-          disabled={!prefs.isSuccess || save.isPending}
-          onClick={() => (on ? save.mutate(false) : setAsking(true))}
-          className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors disabled:opacity-50 ${
-            on ? 'bg-primary' : 'bg-muted'
-          }`}
-        >
-          <span
-            className={`absolute top-0.5 left-0 size-4.5 rounded-full bg-white shadow transition-transform ${
-              on ? 'translate-x-5.5' : 'translate-x-0.5'
-            }`}
-          />
-        </button>
-      </div>
-      {asking && (
-        <div className="space-y-3 rounded-md border p-4" role="group" aria-label="Turn on Bare">
-          <p className="text-sm">
-            Only for adults. The model shows her without clothes. Are you 18 or older?
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <Button
-              disabled={save.isPending}
-              onClick={() => save.mutate(true, { onSuccess: () => setAsking(false) })}
-            >
-              I am 18 or older
-            </Button>
-            <Button variant="outline" onClick={() => setAsking(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
-      {save.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{save.error}</AlertDescription>
-        </Alert>
-      )}
-    </div>
-  );
-}
 
 /** The URL with Copy and Replace, examples, and the last calls (no texts). */
 function Webhook({ hook }: { hook: AniWebhook }) {
@@ -254,11 +189,10 @@ export function AniSettingsCard() {
       <CardHeader>
         <CardTitle>Ani</CardTitle>
         <CardDescription>
-          Her wardrobe, a webhook other systems use to talk to you through her, and her MCP.
+          A webhook other systems use to talk to you through her, and her MCP.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <BareSwitch />
         {hook.data && <Webhook hook={hook.data} />}
         <Mcp />
         <AniFacts />

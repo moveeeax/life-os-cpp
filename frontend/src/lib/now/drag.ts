@@ -1,6 +1,7 @@
 /**
  * What can be dragged onto Ani: a row of the site carries one of these as
- * JSON under GIVE_TYPE; selected text arrives as text/plain by itself.
+ * JSON under GIVE_TYPE. Nothing else is hers: links, images, files and
+ * selected text are let go.
  */
 export const GIVE_TYPE = 'application/x-life-give';
 
@@ -22,18 +23,22 @@ export function giveProps(give: Give) {
   };
 }
 
-/** What a drop carries: a site row, plain text, or nothing Ani takes. */
-export function readGive(dt: DataTransfer): Give | { kind: 'text'; text: string } | null {
+const KINDS: readonly string[] = ['task', 'transaction', 'note', 'event'];
+
+/** The drag carries a site row for her (its data is unreadable before the drop, its type is not). */
+export function carriesGive(dt: DataTransfer | null): boolean {
+  return dt != null && Array.from(dt.types).includes(GIVE_TYPE);
+}
+
+/** What a drop carries: a site row of a kind she takes, or nothing. */
+export function readGive(dt: DataTransfer): Give | null {
   const raw = dt.getData(GIVE_TYPE);
-  if (raw) {
-    try {
-      const g = JSON.parse(raw) as Give;
-      if (g && typeof g === 'object' && typeof g.kind === 'string' && typeof g.id === 'string')
-        return g;
-    } catch {
-      return null;
-    }
+  if (!raw) return null;
+  try {
+    const g = JSON.parse(raw) as Give;
+    if (g && typeof g === 'object' && KINDS.includes(g.kind) && typeof g.id === 'string') return g;
+  } catch {
+    /* not hers */
   }
-  const text = dt.getData('text/plain').trim();
-  return text ? { kind: 'text', text: text.slice(0, 500) } : null;
+  return null;
 }

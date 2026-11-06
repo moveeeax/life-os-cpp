@@ -29,7 +29,6 @@
 #include "repositories/agent/AgentRepository.hpp"
 #include "repositories/agent/HookRepository.hpp"
 #include "repositories/agent/InboxRepository.hpp"
-#include "repositories/agent/PrefsRepository.hpp"
 #include "test_helpers.hpp"
 
 using json = nlohmann::json;
@@ -170,12 +169,14 @@ TEST_F(AniHookApi, BadBodiesAreRefused) {
     EXPECT_EQ(waiting(), 0);
 }
 
-TEST_F(AniHookApi, BareOffRefused) {
-    auto off = hook(json{{"type", "outfit"}, {"outfit", "bare"}});
-    EXPECT_EQ(off->statusCode(), k422UnprocessableEntity) << std::string(off->body());
-    EXPECT_EQ(body_of(off)["error"], "bare_off");
-    Repositories::Agent::PrefsRepository().set_bare(kAnna, true);
-    EXPECT_EQ(hook(json{{"type", "outfit"}, {"outfit", "bare"}})->statusCode(), k202Accepted);
+TEST_F(AniHookApi, RemovedOutfitsRefused) {
+    for (const char* gone : {"bare", "lingerie"}) {
+        auto r = hook(json{{"type", "outfit"}, {"outfit", gone}});
+        EXPECT_EQ(r->statusCode(), k422UnprocessableEntity) << std::string(r->body());
+        EXPECT_EQ(body_of(r)["error"], "unknown_outfit");
+    }
+    EXPECT_EQ(hook(json{{"type", "outfit"}, {"outfit", "p2"}})->statusCode(), k202Accepted);
+    EXPECT_EQ(waiting(), 1);
 }
 
 TEST_F(AniHookApi, DuplicateId409) {

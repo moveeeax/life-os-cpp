@@ -77,13 +77,6 @@ TEST_F(AniIntake, RepeatedIdIsRefused) {
     EXPECT_EQ(std::get<Intake::Refused>(again).code, "duplicate");
 }
 
-TEST_F(AniIntake, BareWhileOffIsRefused) {
-    const auto got = Intake::accept(kAnna, item({{"type", "outfit"}, {"outfit", "bare"}}), "mcp");
-    ASSERT_TRUE(std::holds_alternative<Intake::Refused>(got));
-    EXPECT_EQ(std::get<Intake::Refused>(got).status, 422);
-    EXPECT_EQ(std::get<Intake::Refused>(got).code, "bare_off");
-}
-
 TEST_F(AniIntake, FullBacklogIsRefused) {
     InboxRepository inbox;
     for (int i = 0; i < Agent::Hook::kPendingMax; ++i)

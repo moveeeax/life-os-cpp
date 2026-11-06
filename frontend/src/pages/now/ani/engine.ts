@@ -21,13 +21,13 @@ import { zoneOf, type Zone } from './zones';
  * while the user types in the focus field, and stands as usual looking
  * straight ahead, turned straight, when the cursor rests (STILL s) or is over her.
  *
- * The body is v2/Ani.pmx, in lingerie. The dress and the slip come from
+ * The body is v2/Ani.pmx, its own lingerie hidden. The dress and the slip come from
  * clothes/Ani.pmx, the first model on the same skeleton (the same 628 bones in
  * the same order at the same places): its clothes are skinned to the v2
  * skeleton as they are.
  */
 
-export type Outfit = 'p1' | 'p2' | 'lingerie' | 'bare';
+export type Outfit = 'p1' | 'p2';
 
 export interface AniOptions {
   /** Folder of v1/ and v2/ (ends with a slash). */
@@ -43,8 +43,6 @@ export interface AniOptions {
   /** Where her head is on screen (CSS px), every frame: for her speech bubble. */
   onHead?: (x: number, y: number) => void;
   outfit: Outfit;
-  /** The bare body (signed links): mounted instead of the dressed one. */
-  bare?: { model: string; texture: string };
   present: boolean;
   onReady?: () => void;
   onError?: (e: unknown) => void;
@@ -88,7 +86,7 @@ export interface Ani {
   mood(level: -1 | 0 | 1): void;
   /** Stops what she is saying. */
   hush(): void;
-  /** Covers herself with her hands for `seconds` (bare). */
+  /** Covers herself with her hands for `seconds`. */
   cover(seconds: number): void;
   /** Her cheeks go pink for `seconds`, fading at the end. */
   blush(seconds: number): void;
@@ -258,23 +256,11 @@ for (const n of RURUNE_ALL) CLIPS[n] = { file: `poses2/${n}`, kind: 'vmd' };
 for (const n of PACK_ALL) CLIPS[n] = { file: `poses3/${n}`, kind: 'vmd', turn: TURN[n] };
 
 // The lying ones turn so she lies along the ledge, head by its edge, legs
-// into the screen; z2 (the crawl) faces the other way in its file.
-for (const n of ['rurune_z1', 'rurune_z3', 'rurune_z4']) CLIPS[n].turn = Math.PI / 2;
-CLIPS.rurune_z2.turn = -Math.PI / 2;
+// into the screen.
+for (const n of ['rurune_z1', 'rurune_z3']) CLIPS[n].turn = Math.PI / 2;
 
 // Files under the base.
 const BODY_PMX = 'v2/Ani.pmx';
-// The MMD morph names the engine uses, and their English names.
-const MORPH_EN: Record<string, string> = {
-  まばたき: 'Blink',
-  笑い: 'Smile Eyes',
-  あ: 'A',
-  い: 'I',
-  う: 'U',
-  え: 'E',
-  お: 'O',
-};
-// Bare: her head on another body (outfits are made for v2's, so it has none).
 // The dressed v1 model and its textures. v1/ in the bucket holds another
 // variant of it (every garment at alpha 0, other body and outfit textures),
 // cached as immutable, so the dressed one has its own folder.
@@ -297,8 +283,11 @@ const P1 = [
 const P2 = ['P2-Glove(Hide)', 'P2-Top(Hide)', 'P2-Panties(Hide)', 'P2-Skirt'];
 // Worn with either v1 outfit.
 const SHARED = ['Shared-Socks-Lace', 'Shared-Collar', 'Shared-Boots', 'Hair-Band'];
-// The v2 body's own lingerie.
+// The v2 body's own lingerie, never shown: she wears a v1 outfit over it.
 const LINGERIE = ['Lingerie'];
+// A transparent 1x1 PNG in place of the lingerie texture.
+const BLANK_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 const LEG = ['左足', '右足', '左ひざ', '右ひざ', '左足首', '右足首'];
 
 const smooth = (a: number) => a * a * (3 - 2 * a);
@@ -583,20 +572,17 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     }
     return null;
   }
-  // The files are PNG where the PMX names BMP textures. The bare model and
-  // its body texture come by signed links; its head textures are v2's.
+  // The files are PNG where the PMX names BMP textures. The lingerie is never
+  // shown and its texture is gone from the bucket: a blank pixel stands in.
   const manager = new THREE.LoadingManager();
   manager.setURLModifier((u) =>
-    opts.bare && /kanata_body\.png$/i.test(u) ? opts.bare.texture : u.replace(/\.bmp$/i, '.png'),
+    /lingerie\.(png|bmp)$/i.test(u) ? BLANK_PNG : u.replace(/\.bmp$/i, '.png'),
   );
   const loader = new MMDLoader(manager);
   const fetchModel = (l: MMDLoader, url: string) =>
     new Promise<THREE.SkinnedMesh>((ok, fail) => l.load(url, ok, undefined, fail));
   const load = (file: string) => fetchModel(loader, `${opts.base}${file}`);
-  const body = opts.bare
-    ? fetchModel(new MMDLoader(manager).setResourcePath(`${opts.base}v2/`), opts.bare.model)
-    : load(BODY_PMX);
-  Promise.all([body, load(CLOTHES_PMX)]).then(
+  Promise.all([load(BODY_PMX), load(CLOTHES_PMX)]).then(
     ([m, v1]) => {
       if (disposed) return;
       setUp(m, v1);
@@ -708,10 +694,6 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       baseP[b.name] = b.position.clone();
     }
     morphs = { ...(m.morphTargetDictionary ?? {}) };
-    // A model with English morph names (the bare one): the MMD names the
-    // engine uses find them too.
-    for (const [jp, en] of Object.entries(MORPH_EN))
-      if (morphs[jp] == null && morphs[en] != null) morphs[jp] = morphs[en];
     m.updateMatrixWorld(true);
     addBlush(m);
     // v1's clothes on the v2 skeleton: v1's skin indices name the same bones.
@@ -797,7 +779,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
         mat.opacity = 1;
       }
       if (SHARED.includes(mat.name)) {
-        mat.visible = o !== 'lingerie' && o !== 'bare';
+        mat.visible = true;
         mat.opacity = 1;
       }
       if (P2.includes(mat.name)) {
@@ -806,13 +788,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
       }
     }
     for (const mat of mesh.material as THREE.Material[])
-      if (LINGERIE.includes(mat.name)) {
-        mat.visible = o === 'lingerie';
-        // It lies on the skin: seen from the side the skin would win near ties.
-        mat.polygonOffset = true;
-        mat.polygonOffsetFactor = -1;
-        mat.polygonOffsetUnits = -4;
-      }
+      if (LINGERIE.includes(mat.name)) mat.visible = false;
     // Only the worn skirt swings.
     if (springs) {
       springs.off = new Set(['p1', 'p2'].filter((g) => g !== o));
@@ -1271,7 +1247,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     ) {
       // Every other time or so she strikes a pose instead of a move; which
       // poses depends on what she wears and how the day goes.
-      const pool = (Math.random() < 0.5 ? posesFor(outfit, poseContext()) : EMOTES).filter(
+      const pool = (Math.random() < 0.5 ? posesFor(poseContext()) : EMOTES).filter(
         (n) => n !== play.name,
       );
       play.next = now + 1e9; // set again when the clip ends
@@ -1500,7 +1476,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     for (const n of LEG) B[n + 'D'].quaternion.copy(B[n].quaternion);
 
     // Arms: the wrists go to a point on the skirt's flare (by the thighs in
-    // the slip and the lingerie) by two-bone IK, kept out of the body.
+    // the slip) by two-bone IK, kept out of the body.
     const W = at('下半身');
     // Covering: one hand over her chest, the other low in front.
     touch.coverW += ((now < touch.coverUntil ? 1 : 0) - touch.coverW) * Math.min(1, dt * 5);
@@ -1801,7 +1777,7 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     },
     nextPose() {
       wake();
-      const pool = posesFor(outfit, poseContext()).filter((n) => n !== play.name);
+      const pool = posesFor(poseContext()).filter((n) => n !== play.name);
       if (pool.length) void playClip(pool[Math.floor(Math.random() * pool.length)]);
     },
     mood(level) {

@@ -8,14 +8,13 @@ import { api } from '@/lib/api/client';
 import { AniSettingsCard } from './AniSettingsCard';
 
 /**
- * Ani's card on /account: the bare switch asks the 18+ question before it
- * sends anything; the webhook URL copies and is replaced only after a confirm.
+ * Ani's card on /account: the webhook URL copies and is replaced only after
+ * a confirm.
  */
 
 const URL1 = 'https://life.test/api/v1/ani/hook/aniwh_' + 'a'.repeat(48);
 const URL2 = 'https://life.test/api/v1/ani/hook/aniwh_' + 'b'.repeat(48);
 
-let bare = false;
 let keys: { id: string; name: string; prefix: string; scope: string; created_at: string }[] = [];
 let reminders: {
   id: string;
@@ -27,7 +26,6 @@ let reminders: {
 }[] = [];
 
 beforeEach(() => {
-  bare = false;
   reminders = [
     {
       id: 'r1',
@@ -55,7 +53,7 @@ beforeEach(() => {
     },
   ];
   vi.spyOn(api, 'getJson').mockImplementation(async (path: string) => {
-    if (path === '/api/v1/ani/prefs') return { data: { bare, muted: [] } };
+    if (path === '/api/v1/ani/prefs') return { data: { muted: [] } };
     if (path === '/api/v1/ani/facts') return { data: [] };
     if (path === '/api/v1/ani/webhook')
       return {
@@ -78,10 +76,7 @@ beforeEach(() => {
     if (path === '/api/v1/ani/reminders') return { data: reminders };
     throw new Error('unexpected ' + path);
   });
-  vi.spyOn(api, 'putJson').mockImplementation(async (_p: string, opts?: { body?: unknown }) => {
-    bare = (opts?.body as { bare: boolean }).bare;
-    return { data: { bare } };
-  });
+  vi.spyOn(api, 'putJson').mockResolvedValue({ data: { muted: [] } });
   vi.spyOn(api, 'postJson').mockImplementation(async (path: string) => {
     if (path === '/api/v1/ani/reminders') return { data: { id: 'r2' } };
     if (path === '/api/v1/account/api-keys')
@@ -113,30 +108,10 @@ function renderCard() {
 }
 
 describe('AniSettingsCard', () => {
-  it('sends bare on with adult only after the 18+ confirm', async () => {
+  it('has no wardrobe switch', async () => {
     renderCard();
-    const sw = await screen.findByRole('switch', { name: /bare outfit/i });
-    await waitFor(() => expect((sw as HTMLButtonElement).disabled).toBe(false));
-    fireEvent.click(sw);
-    expect(api.putJson).not.toHaveBeenCalled();
-    expect(screen.getByText(/only for adults/i)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /i am 18/i }));
-    await waitFor(() =>
-      expect(api.putJson).toHaveBeenCalledWith('/api/v1/ani/prefs', {
-        body: { bare: true, adult: true },
-      }),
-    );
-  });
-
-  it('turns bare off without a question', async () => {
-    bare = true;
-    renderCard();
-    const sw = await screen.findByRole('switch', { name: /bare outfit/i });
-    await waitFor(() => expect(sw.getAttribute('aria-checked')).toBe('true'));
-    fireEvent.click(sw);
-    await waitFor(() =>
-      expect(api.putJson).toHaveBeenCalledWith('/api/v1/ani/prefs', { body: { bare: false } }),
-    );
+    await screen.findByLabelText(/webhook url/i);
+    expect(screen.queryByRole('switch', { name: /bare/i })).toBeNull();
   });
 
   it('copies the webhook url', async () => {

@@ -5,7 +5,7 @@ import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import { clockIn } from '@/lib/dates';
 
-import { fetchAniBare, useAniPrefs, useMuteKind } from '@/hooks/useAni';
+import { useAniPrefs, useMuteKind } from '@/hooks/useAni';
 import type { NowWeather, Today } from '@/lib/now/types';
 
 import { AniChat, SpeakerIcon } from './AniChat';
@@ -18,13 +18,13 @@ import { useInbox, type Play } from './inbox';
 import { moodLevel, moodOf, moveMood } from './mood';
 import type { Talk, TalkState } from './talk';
 import { useAni, type AniOutfit } from './state';
-import { createToucher, EARNED_OFFER, earnedOf, say, type Answer } from './touch';
+import { createToucher, say, type Answer } from './touch';
 import { AniOffers } from './AniOffers';
 import { useLife } from './useLife';
 import { useLife2 } from './useLife2';
 import { ACT_EVENT, type Act } from '@/lib/now/act';
-import { readGive } from '@/lib/now/drag';
-import { FACT_MAX, firstFreeSlot, topCategory } from './give';
+import { carriesGive, readGive } from '@/lib/now/drag';
+import { firstFreeSlot, topCategory } from './give';
 import { reactionTo, ReactionGate } from './reactions';
 import { useRefresh } from './refresh';
 import { HOLD_KEY, eventOfLine, quietKind, snooze, type LineKind } from './lines';
@@ -63,7 +63,6 @@ function HangerIcon() {
 // v2/voice/: the hellos of the hour (greet.ts), the taps' lines
 // (touch.ts) and this one.
 /** The day the reward offer was made (localStorage): once a day. */
-const OFFER_KEY = 'now:ani:offer';
 const DIZZY: Answer = { text: 'Ой, голова кружится.', recorded: 'dizzy' };
 
 /** The hello of this hour, recorded. */
@@ -152,20 +151,12 @@ const TALK_WORDS: Record<TalkState, string> = {
   speaking: 'Speaking',
 };
 
-// Cold while bare: from COLD_FROM to COLD_TO o'clock; the first shiver after
-// COLD_FIRST_MS bare, the next COLD_EVERY_MS later, then she dresses.
-const COLD_FROM = 21;
 /** How long a question's buttons stay (the server keeps it open as long). */
 const ASK_OPEN_MS = 15 * 60_000;
-const COLD_TO = 6;
-const COLD_FIRST_MS = 90_000;
-const COLD_EVERY_MS = 4 * 60_000;
 
 const OUTFITS: { id: AniOutfit; label: string }[] = [
   { id: 'p1', label: 'Dress' },
   { id: 'p2', label: 'Slip' },
-  { id: 'lingerie', label: 'Lingerie' },
-  { id: 'bare', label: 'Bare' },
 ];
 
 /** What she knows when a conversation starts. */
@@ -234,9 +225,7 @@ export function AniCorner({
   // Bumped when a voice question reaches her agent: the chat opens, or loads again.
   const [chatKey, setChatKey] = useState(0);
   const ledgeRef = useRef<HTMLDivElement>(null);
-  // The first state the engine starts from; later changes go through calls.
-  // Hide numbers (a shared screen): she is not shown bare, the lingerie
-  // stands in until it is off again.
+  // Hide numbers (a shared screen): her webhook items and cards wait.
   const [hideNums, setHideNums] = useState(() =>
     document.documentElement.classList.contains('hide-numbers'),
   );
@@ -246,20 +235,9 @@ export function AniCorner({
     mo.observe(root, { attributes: true, attributeFilter: ['class'] });
     return () => mo.disconnect();
   }, []);
-  // Bare only while it is on in her settings (server side, 18+).
-  const prefs = useAniPrefs();
-  const bareOn = prefs.data?.bare === true;
-  const bareHidden = hideNums || !bareOn;
-  const shown: AniOutfit = ani.outfit === 'bare' && bareHidden ? 'lingerie' : ani.outfit;
-  // A stored bare outfit waits for the settings, so she is not mounted twice.
-  const waitPrefs = ani.outfit === 'bare' && prefs.isPending;
-  const outfitRef = useRef(shown);
-  outfitRef.current = shown;
-  // Bare is another model: switching to or from it mounts her again, as she
-  // is now (the engine starts from these).
-  const body = shown === 'bare' ? 'bare' : 'dressed';
-  const mountRef = useRef({ outfit: shown, here: ani.here });
-  mountRef.current = { outfit: shown, here: ani.here };
+  // The first state the engine starts from; later changes go through calls.
+  const mountRef = useRef({ outfit: ani.outfit, here: ani.here });
+  mountRef.current = { outfit: ani.outfit, here: ani.here };
   const [said, setSaid] = useState<string | null>(null);
   const [talk, setTalk] = useState<TalkState | null>(null);
   const talkRef = useRef<Talk | null>(null);
@@ -363,7 +341,6 @@ export function AniCorner({
       today: () => contextRef.current.today,
       focusField: () => document.querySelector<HTMLInputElement>('.n-input'),
       hidden: () => document.documentElement.classList.contains('hide-numbers'),
-      bare: () => outfitRef.current === 'bare',
     }),
   );
   const sayTimer = useRef(0);
@@ -383,6 +360,8 @@ export function AniCorner({
   // The line that brought the proposals stays in their bubble; writing an own reply keeps it open.
   const [offerLine, setOfferLine] = useState<string | null>(null);
   const [writing, setWriting] = useState(false);
+  // The kinds of her lines muted in her settings (server side).
+  const prefs = useAniPrefs();
   const mutedRef = useRef<string[]>([]);
   mutedRef.current = prefs.data?.muted ?? [];
   const muteKind = useMuteKind();
@@ -533,9 +512,6 @@ export function AniCorner({
     };
   }, []);
 
-  // Bare in the evening and at night she gets cold: after a while she hugs
-  // herself and shivers, later once more, and then goes to dress (the
-  // lingerie). Checked every 20 s while she is here and nothing else goes on.
   // Her outfit change, set once wear() is defined below.
   const wearRef = useRef<(o: AniOutfit) => void>(() => {});
 
@@ -643,47 +619,6 @@ export function AniCorner({
       }
     },
   );
-  const busyRef = useRef(busy);
-  busyRef.current = busy;
-  useEffect(() => {
-    let since = 0;
-    let shivers = 0;
-    let last = 0;
-    const id = window.setInterval(() => {
-      const now = Date.now();
-      const h = new Date().getHours();
-      const cold = h >= COLD_FROM || h < COLD_TO;
-      if (
-        !cold ||
-        outfitRef.current !== 'bare' ||
-        !hereRef.current ||
-        calling.current ||
-        busyRef.current ||
-        document.visibilityState !== 'visible'
-      ) {
-        since = 0;
-        shivers = 0;
-        return;
-      }
-      if (!since) since = now;
-      if (now - since < COLD_FIRST_MS || now - last < COLD_EVERY_MS) return;
-      if (now - lastSaidAt.current < 15_000) return;
-      last = now;
-      shivers += 1;
-      const e = engine.current;
-      e?.hug(5);
-      e?.feel('shy', 3);
-      if (shivers === 1) {
-        answer.current({ text: 'Брр… прохладно.', mood: 0 });
-        return;
-      }
-      answer.current({ text: 'Холодно. Пойду оденусь.', mood: 0 });
-      since = 0;
-      shivers = 0;
-      window.setTimeout(() => wearRef.current('lingerie'), 4500);
-    }, 20_000);
-    return () => clearInterval(id);
-  }, []);
 
   // Her first hello: once a day in this browser, with a thing from the day
   // (late tasks, rain, the night's sleep); after a focus session, a break.
@@ -764,27 +699,6 @@ export function AniCorner({
       acts.current = [...before, a].slice(-100);
       if (a.kind === 'task_done') taskDoneAt.current = Date.now();
       if (quietRef.current || calling.current) return;
-      // The day's last task closed: she offers the reward herself, once a day.
-      if (a.kind === 'task_done' && earnedOf(contextRef.current.today) === 'all') {
-        const day = new Date().toDateString();
-        let shown = '';
-        try {
-          shown = localStorage.getItem(OFFER_KEY) ?? '';
-        } catch {
-          /* no storage: the offer may repeat */
-        }
-        if (shown !== day) {
-          try {
-            localStorage.setItem(OFFER_KEY, day);
-          } catch {
-            /* ignore */
-          }
-          engine.current?.feel('happy', 3);
-          engine.current?.act('peace');
-          void answer.current({ text: EARNED_OFFER, kind: 'hello', mood: 1 });
-          return;
-        }
-      }
       const r = reactionTo(a, { hour: new Date().getHours(), today: before });
       if (!r || !gate.current.allow(Date.now())) return;
       if (r.feel) engine.current?.feel(r.feel, 2.5);
@@ -878,41 +792,12 @@ export function AniCorner({
       setChat(true);
       return;
     }
-    if (g.kind === 'event') {
-      setChatSeed(`Помоги подготовиться к встрече «${g.title}»: `);
-      setChat(true);
-      return;
-    }
-    const text = g.text.slice(0, FACT_MAX);
-    said(`«${text.length > 60 ? `${text.slice(0, 60)}…` : text}». Что с этим сделать?`, [
-      {
-        label: 'Запомнить',
-        run: () =>
-          void api
-            .postJson('/api/v1/ani/facts', { body: { text } })
-            .then(() => {
-              refresh('fact');
-              done('Запомнила.');
-            })
-            .catch(() => done('Не получилось запомнить.')),
-      },
-      {
-        label: 'Во входящие',
-        run: () =>
-          void api
-            .postJson('/api/v1/tasks/notes', { body: { text: g.text } })
-            .then(() => {
-              refresh('add_note');
-              done('Положила во входящие задач.');
-            })
-            .catch(() => done('Не получилось.')),
-      },
-      { label: 'Отмена', run: () => undefined },
-    ]);
+    setChatSeed(`Помоги подготовиться к встрече «${g.title}»: `);
+    setChat(true);
   };
-  // Lit while something is dragged anywhere on the page.
+  // Lit while a site row she takes is dragged anywhere on the page.
   useEffect(() => {
-    const start = () => setTaking(true);
+    const start = (e: DragEvent) => setTaking(carriesGive(e.dataTransfer));
     const stop = () => setTaking(false);
     window.addEventListener('dragstart', start);
     window.addEventListener('dragend', stop);
@@ -941,27 +826,13 @@ export function AniCorner({
     const canvas = canvasRef.current;
     const hit = hitRef.current;
     if (!canvas || !hit) return;
-    if (waitPrefs) return;
     let gone = false;
     let made: Ani | null = null;
-    // The bare model comes by short signed links; without them, the lingerie.
-    const links =
-      body === 'bare'
-        ? fetchAniBare().then(
-            (l) => ({ model: l.model_url, texture: l.texture_url }),
-            () => null,
-          )
-        : Promise.resolve(undefined);
-    void Promise.all([import('./engine'), links]).then(([{ mountAni }, bare]) => {
+    void import('./engine').then(({ mountAni }) => {
       if (gone) return;
-      if (bare === null) {
-        setAni({ outfit: 'lingerie' });
-        return;
-      }
       try {
         made = mountAni(canvas, {
           base,
-          bare,
           hit,
           height: 340,
           // The middle of her ledge's top edge.
@@ -1003,11 +874,6 @@ export function AniCorner({
             if (a) answer.current(a);
           },
           onSpin: () => answer.current(DIZZY),
-          // The cursor resting on her body (bare): "eyes up".
-          onDwell: (z, at) => {
-            const a = toucher.current.stare(z, at);
-            if (a) answer.current(a);
-          },
           // A double tap opens the chat with her agent.
           onDoubleTap: () => {
             made?.hush();
@@ -1027,9 +893,7 @@ export function AniCorner({
       engine.current = null;
       setReady(false);
     };
-    // setAni is stable.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [base, body, waitPrefs]);
+  }, [base]);
 
   useEffect(() => {
     if (!wardrobe) return;
@@ -1073,24 +937,10 @@ export function AniCorner({
     setWardrobe(false);
     const e = engine.current;
     if (busy || !e || o === ani.outfit) return;
-    const next: AniOutfit = o === 'bare' && bareHidden ? 'lingerie' : o;
-    if ((next === 'bare') !== (shown === 'bare')) {
-      // The other model: she leaves, and comes back in it.
-      const swap = () => {
-        setAni({ outfit: o, here: true });
-        setBusy(null);
-      };
-      if (!ani.here) swap();
-      else {
-        setBusy('changing');
-        e.present(false, swap);
-      }
-      return;
-    }
     setAni({ outfit: o });
     if (!ani.here) {
       // Away: she comes back already changed.
-      e.setOutfit(next);
+      e.setOutfit(o);
       setAni({ here: true });
       setBusy('arriving');
       e.present(true, () => setBusy(null));
@@ -1098,7 +948,7 @@ export function AniCorner({
     }
     setBusy('changing');
     e.present(false, () => {
-      e.setOutfit(next);
+      e.setOutfit(o);
       e.present(true, () => setBusy(null));
     });
   };
@@ -1206,11 +1056,13 @@ export function AniCorner({
         data-away={ani.here ? undefined : ''}
         data-taking={taking && ani.here ? '' : undefined}
         onDragOver={(e) => {
-          if (!ani.here) return;
+          if (!ani.here || !carriesGive(e.dataTransfer)) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = 'copy';
         }}
-        onDragEnter={() => engine.current?.act('show')}
+        onDragEnter={(e) => {
+          if (ani.here && carriesGive(e.dataTransfer)) engine.current?.act('show');
+        }}
         onDrop={(e) => {
           e.preventDefault();
           void onGive(e.dataTransfer);
@@ -1260,7 +1112,7 @@ export function AniCorner({
         {wardrobe ? (
           <div className="ani-wardrobe" role="group" aria-label="Outfit">
             <span className="ani-k">Outfit</span>
-            {OUTFITS.filter((o) => !(bareHidden && o.id === 'bare')).map((o) => (
+            {OUTFITS.map((o) => (
               <button
                 key={o.id}
                 type="button"

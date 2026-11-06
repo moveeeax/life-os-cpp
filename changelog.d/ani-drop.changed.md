@@ -1,0 +1,1 @@
+Only site rows can be dropped on Ani: a task, a transaction, a note and a calendar event. Selected text, links, images and files are let go, her figure lights up only while such a row is dragged, and the browser shows no drop target for anything else.

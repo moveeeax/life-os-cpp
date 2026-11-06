@@ -3,7 +3,7 @@
  * @brief What Ani's personal webhook takes (api/AniHookController.hpp): one
  *        item per request, checked here without any I/O.
  *          say:    {"type":"say","text":<a spoken line, now/Voice.hpp line_ok>}
- *          outfit: {"type":"outfit","outfit":"p1"|"p2"|"lingerie"|"bare"}
+ *          outfit: {"type":"outfit","outfit":"p1"|"p2"}
  *          act:    {"type":"act","name":<one of kActs>}
  *          event:  {"type":"event","text":1-2000,"source"?:1-60,"title"?:1-60}
  *          mood:   {"type":"mood","level":-1|0|1,"seconds"?:60-3600}
@@ -51,7 +51,7 @@ inline constexpr std::size_t kIdMax = 200;
 inline constexpr std::array<std::string_view, 9> kActs = {
     "show", "greet", "peace", "shoot", "spin", "pose", "idle_happy", "idle_cat", "wave"};
 
-inline constexpr std::array<std::string_view, 4> kOutfits = {"p1", "p2", "lingerie", "bare"};
+inline constexpr std::array<std::string_view, 2> kOutfits = {"p1", "p2"};
 
 /// An ask waits for the page this long unless it says otherwise.
 inline constexpr int kAskTtlDefault = 3600;

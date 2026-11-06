@@ -1,8 +1,9 @@
 /**
  * @file PrefsRepository.hpp
- * @brief ani_prefs (migration 062): Ani's settings kept on the server. The
- *        bare outfit is on while bare_on_at is set (the user said they are an
- *        adult when they turned it on). hold_until (migration 064): nothing
+ * @brief ani_prefs (migration 062): Ani's settings kept on the server: the
+ *        kinds of her lines muted. bare_on_at (the removed bare outfit) is
+ *        cleared by migration 080 and no longer read; a later release drops
+ *        it. hold_until (migration 064): nothing
  *        is handed to the page before then.
  */
 
@@ -20,28 +21,16 @@ namespace Repositories::Agent {
 
 class PrefsRepository {
 public:
-    /// {"bare": bool}; a user without a row has everything off.
+    /// {"bare": false, "muted": [kinds]}; a user without a row has nothing muted. bare stays in
+    /// the shape, always false, until a later release drops it from the spec.
     nlohmann::json get(const std::string& owner) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params(
-                "SELECT bare_on_at IS NOT NULL, array_to_json(muted)::text FROM ani_prefs WHERE owner_id = $1::uuid",
-                owner);
+            auto r =
+                txn.exec_params("SELECT array_to_json(muted)::text FROM ani_prefs WHERE owner_id = $1::uuid", owner);
             return nlohmann::json{
-                {"bare", !r.empty() && r[0][0].template as<bool>()},
+                {"bare", false},
                 {"muted",
-                 r.empty() ? nlohmann::json::array() : nlohmann::json::parse(r[0][1].template as<std::string>())}};
-        });
-    }
-
-    void set_bare(const std::string& owner, bool on) {
-        Database::get().execute_write([&](auto& txn) {
-            txn.exec_params(
-                "INSERT INTO ani_prefs (owner_id, bare_on_at) VALUES ($1::uuid, CASE WHEN $2 THEN now() END) "
-                "ON CONFLICT (owner_id) DO UPDATE SET bare_on_at = CASE WHEN $2 THEN COALESCE(ani_prefs.bare_on_at, "
-                "now()) END",
-                owner,
-                on);
-            return true;
+                 r.empty() ? nlohmann::json::array() : nlohmann::json::parse(r[0][0].template as<std::string>())}};
         });
     }
 

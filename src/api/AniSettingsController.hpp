@@ -1,11 +1,9 @@
 /**
  * @file AniSettingsController.hpp
- * @brief Ani's settings kept on the server, for the signed-in user: the bare
- *        outfit switch (on only with "adult": true) and the two short signed
- *        links its model loads from the private part of the bucket; the
- *        user's webhook URL (made on first read, replaceable) with the last
- *        calls. Works with the agent off; a browser session only (an API
- *        key gets 401).
+ * @brief Ani's settings kept on the server, for the signed-in user: the kinds
+ *        of her lines muted (GET /ani/bare answers 410 since the bare outfit
+ *        was removed; the route goes in a later release); the user's webhook URL (made on first read, replaceable) with
+ * the last calls. Works with the agent off; a browser session only (an API key gets 401).
  */
 
 #pragma once
@@ -29,8 +27,8 @@ public:
     ADD_METHOD_TO(AniSettingsController::editFact, "/api/v1/ani/facts/{id}", Patch);
     ADD_METHOD_TO(AniSettingsController::removeFact, "/api/v1/ani/facts/{id}", Delete);
     ADD_METHOD_TO(AniSettingsController::deals, "/api/v1/ani/deals", Get);
-    ADD_METHOD_TO(AniSettingsController::removeDeal, "/api/v1/ani/deals/{id}", Delete);
     ADD_METHOD_TO(AniSettingsController::bare, "/api/v1/ani/bare", Get);
+    ADD_METHOD_TO(AniSettingsController::removeDeal, "/api/v1/ani/deals/{id}", Delete);
     ADD_METHOD_TO(AniSettingsController::webhook, "/api/v1/ani/webhook", Get);
     ADD_METHOD_TO(AniSettingsController::rotateWebhook, "/api/v1/ani/webhook/rotate", Post);
     ADD_METHOD_TO(AniSettingsController::reminders, "/api/v1/ani/reminders", Get);
@@ -40,12 +38,9 @@ public:
 
     using Callback = std::function<void(const HttpResponsePtr&)>;
 
-    /// The bare model's links live this long.
-    static constexpr long kLinkSeconds = 120;
-    /// Where the bare model lives: <prefix>private/ani/bare-v1/. New files get a new folder.
-    static constexpr const char* kBareFolder = "bare-v1";
-
     void prefs(const HttpRequestPtr& req, Callback&& callback);
+    /// 410 bare_removed: kept only until a later release drops the route from the spec.
+    void bare(const HttpRequestPtr& req, Callback&& callback);
     /// Her recurring reminders (agent/Reminders.hpp): list, add (at most 20), remove.
     void reminders(const HttpRequestPtr& req, Callback&& callback);
     void addReminder(const HttpRequestPtr& req, Callback&& callback);
@@ -58,7 +53,6 @@ public:
     void addFact(const HttpRequestPtr& req, Callback&& callback);
     void editFact(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
     void removeFact(const HttpRequestPtr& req, Callback&& callback, const std::string& id);
-    void bare(const HttpRequestPtr& req, Callback&& callback);
     void webhook(const HttpRequestPtr& req, Callback&& callback);
     void rotateWebhook(const HttpRequestPtr& req, Callback&& callback);
 };
