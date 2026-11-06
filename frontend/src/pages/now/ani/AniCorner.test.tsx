@@ -38,14 +38,6 @@ vi.mock('./chat', async (orig) => ({
   wakeAgent: vi.fn(() => Promise.resolve()),
 }));
 
-// Ani's server settings: the bare switch, and the bare model's signed links.
-const prefs = { bare: false };
-const bareLinks = {
-  model_url: 'https://s3.test/private/Ani.pmx?sig',
-  texture_url: 'https://s3.test/private/k.png?sig',
-  expires_in: 120,
-};
-const fetchAniBare = vi.fn(() => Promise.resolve(bareLinks));
 vi.mock('./useLife', () => ({ useLife: () => {} }));
 vi.mock('./useLife2', () => ({
   // The test reaches her own lines through the say the corner hands over.
@@ -55,8 +47,7 @@ vi.mock('./useLife2', () => ({
 }));
 
 vi.mock('@/hooks/useAni', () => ({
-  useAniPrefs: () => ({ data: { ...prefs }, isPending: false, isSuccess: true }),
-  fetchAniBare: () => fetchAniBare(),
+  useAniPrefs: () => ({ data: { muted: [] }, isPending: false, isSuccess: true }),
   useMuteKind: () => () => {},
 }));
 
@@ -150,8 +141,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   document.documentElement.classList.remove('hide-numbers');
-  prefs.bare = false;
-  fetchAniBare.mockClear();
   cleanup();
   vi.useRealTimers();
   engine.opts = null;
@@ -256,8 +245,7 @@ describe('AniCorner', () => {
     expect(engine.ani!.nextPose).toHaveBeenCalledTimes(1);
   });
 
-  it("RewardOffer: the day's last task closed, she offers the reward once", async () => {
-    localStorage.removeItem('now:ani:offer');
+  it("NoRewardOffer: the day's last task closed, she offers nothing", async () => {
     await mount({
       ...base,
       tasks: {
@@ -281,26 +269,38 @@ describe('AniCorner', () => {
       done();
       await vi.advanceTimersByTimeAsync(10);
     });
-    expect(bubble()).toMatch(/Последнее дело закрыто/);
-    expect(engine.ani!.act).toHaveBeenCalledWith('peace');
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(60_000);
-      done();
-      await vi.advanceTimersByTimeAsync(10);
-    });
-    expect(bubble() ?? '').not.toMatch(/Последнее дело закрыто/);
+    expect(bubble() ?? '').not.toMatch(/Последнее дело закрыто|покажу/);
   });
 
-  it('GiveToAni: dropped text gets her buttons to keep it or put it in the inbox', async () => {
+  it('GiveToAni: text, links and files are not hers, a site row is', async () => {
     await mount();
-    const hit = document.querySelector('.ani-hit')!;
-    const data: Record<string, string> = { 'text/plain': 'Анна любит пионы' };
     await act(async () => {
-      fireEvent.drop(hit, { dataTransfer: { getData: (t: string) => data[t] ?? '' } });
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    const hit = document.querySelector('.ani-hit')!;
+    const text: Record<string, string> = { 'text/plain': 'Анна любит пионы' };
+    const textDrag = { types: ['text/plain'], getData: (t: string) => text[t] ?? '' };
+    // dragover not cancelled: the browser shows no drop here.
+    expect(fireEvent.dragOver(hit, { dataTransfer: textDrag })).toBe(true);
+    await act(async () => {
+      fireEvent.drop(hit, { dataTransfer: textDrag });
       await vi.advanceTimersByTimeAsync(10);
     });
-    expect(screen.getByRole('button', { name: 'Запомнить' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Во входящие' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Запомнить' })).toBeNull();
+    expect(engine.ani!.act).not.toHaveBeenCalledWith('peace');
+    const row: Record<string, string> = {
+      'application/x-life-give': JSON.stringify({ kind: 'event', id: 'e1', title: 'Созвон' }),
+    };
+    const rowDrag = {
+      types: ['application/x-life-give', 'text/plain'],
+      getData: (t: string) => row[t] ?? '',
+    };
+    expect(fireEvent.dragOver(hit, { dataTransfer: rowDrag })).toBe(false);
+    await act(async () => {
+      fireEvent.drop(hit, { dataTransfer: rowDrag });
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(engine.ani!.act).toHaveBeenCalledWith('peace');
   });
 
   it('ReactsToActs: a closed goal on the site gets her word', async () => {
@@ -349,34 +349,13 @@ describe('AniCorner', () => {
     }
   });
 
-  it('mounts the bare model from the given URLs', async () => {
-    prefs.bare = true;
+  it('has only the dress and the slip in the wardrobe', async () => {
     await mount();
     fireEvent.click(screen.getByRole('button', { name: 'Outfit' }));
-    fireEvent.click(screen.getByRole('button', { name: /bare/i }));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(10);
-    });
-    expect(fetchAniBare).toHaveBeenCalledTimes(1);
-    expect(engine.opts?.outfit).toBe('bare');
-    expect(engine.opts?.bare).toEqual({
-      model: bareLinks.model_url,
-      texture: bareLinks.texture_url,
-    });
-    // Back in clothes: the dressed model, no links.
-    fireEvent.click(screen.getByRole('button', { name: 'Outfit' }));
-    fireEvent.click(screen.getByRole('button', { name: /lingerie/i }));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(10);
-    });
-    expect(engine.opts?.bare).toBeUndefined();
-  });
-
-  it('has no Bare in the wardrobe while the switch is off', async () => {
-    await mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Outfit' }));
-    expect(screen.queryByRole('button', { name: /bare/i })).toBeNull();
-    expect(screen.getByRole('button', { name: /lingerie/i })).toBeTruthy();
+    const worn = screen
+      .getByRole('group', { name: 'Outfit' })
+      .querySelectorAll('button[aria-pressed]');
+    expect([...worn].map((b) => b.textContent?.replace('✓', '').trim())).toEqual(['Dress', 'Slip']);
   });
 
   const hookSay = (text: string) => ({

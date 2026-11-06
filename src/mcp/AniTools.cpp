@@ -298,10 +298,8 @@ Server ani_server(const std::string& owner, Scheduler after) {
          schema({{"text", {{"type", "string"}, {"minLength", 1}, {"maxLength", 200}}}, {"id", kId}, {"ttl", kTtl}},
                 {"text"})},
         {"ani_outfit",
-         "Ani changes her outfit (bare only while the user turned it on).",
-         schema(
-             {{"outfit", {{"type", "string"}, {"enum", {"p1", "p2", "lingerie", "bare"}}}}, {"id", kId}, {"ttl", kTtl}},
-             {"outfit"})},
+         "Ani changes her outfit: p1 the dress, p2 the slip.",
+         schema({{"outfit", {{"type", "string"}, {"enum", {"p1", "p2"}}}}, {"id", kId}, {"ttl", kTtl}}, {"outfit"})},
         {"ani_act",
          "Ani plays one of her moves.",
          schema({{"name", {{"type", "string"}, {"enum", acts()}}}, {"id", kId}, {"ttl", kTtl}}, {"name"})},

@@ -7,7 +7,6 @@ import { qk } from '@/lib/api/queryKeys';
 import type { components } from '@/lib/api/schema.gen';
 
 export type AniPrefs = components['schemas']['AniPrefs'];
-export type AniBare = components['schemas']['AniBare'];
 export type AniWebhook = components['schemas']['AniWebhook'];
 export type ApiKey = components['schemas']['ApiKey'];
 export type ApiKeyCreated = components['schemas']['ApiKeyCreated'];
@@ -16,7 +15,7 @@ const PREFS = '/api/v1/ani/prefs';
 const WEBHOOK = '/api/v1/ani/webhook';
 const KEYS = '/api/v1/account/api-keys';
 
-/** Ani's settings kept on the server (the bare outfit switch). */
+/** Ani's settings kept on the server (the kinds of her lines muted). */
 export function useAniPrefs(enabled = true) {
   return useQuery({
     queryKey: qk.ani.prefs(),
@@ -44,24 +43,6 @@ export function useMuteKind() {
     },
     [qc],
   );
-}
-
-/** Turns bare on (with the user's 18+ word) or off. */
-export function useSaveAniPrefs() {
-  return useApiMutation(
-    async (bare: boolean) =>
-      (
-        await api.putJson<{ data: AniPrefs }>(PREFS, {
-          body: bare ? { bare: true, adult: true } : { bare: false },
-        })
-      ).data,
-    { invalidate: [qk.ani.prefs()] },
-  );
-}
-
-/** Two short signed links to the bare model; a 403 when bare is off. */
-export async function fetchAniBare(): Promise<AniBare> {
-  return (await api.getJson<{ data: AniBare }>('/api/v1/ani/bare')).data;
 }
 
 /** The user's webhook URL (made on first read) and its last calls. */

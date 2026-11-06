@@ -1,7 +1,5 @@
-import type { Outfit } from './engine';
-
 /*
- * The poses Ani may strike on her own, by outfit and by how the day goes.
+ * The poses Ani may strike on her own, by how the day goes.
  * The clips themselves (files, loading) are the engine's; this is only the
  * choice.
  */
@@ -12,18 +10,12 @@ import type { Outfit } from './engine';
  * on its own (the owner's pick of 2026-11-03).
  */
 export const RURUNE = ['rurune_t2'];
-/**
- * Reward poses: c1 squats, z2 crawls, z4 lies, and from the packs p4_02,
- * p4_13 and p4_14 (on her back, legs up); played only when earned, never
- * by the idle picker.
- */
-export const REWARD = ['rurune_c1', 'rurune_z2', 'rurune_z4', 'p4_02', 'p4_13', 'p4_14'];
 /** Shelved, in the bucket and loadable, out of every pool. */
 export const RURUNE_SHELVED = ['c2', 'c3', 'c4', 't1', 't3', 't4', 'z1', 'z3'].map(
   (n) => `rurune_${n}`,
 );
 /** Every Rurune clip the engine registers. */
-export const RURUNE_ALL = [...RURUNE, 'rurune_c1', 'rurune_z2', 'rurune_z4', ...RURUNE_SHELVED];
+export const RURUNE_ALL = [...RURUNE, ...RURUNE_SHELVED];
 
 /**
  * The owner's pick of 2026-11-03 from nine pose packs (poses3/<id>.vmd, one
@@ -116,13 +108,16 @@ for (const n of [
   'p2_16',
 ])
   TURN[n] = Math.PI / 2;
-for (const n of ['p4_01', 'p4_02', 'p4_03', 'p4_04', 'p4_06', 'p4_13', 'p4_14', 'p4_15', 'p4_16'])
-  TURN[n] = -Math.PI / 2;
+for (const n of ['p4_01', 'p4_03', 'p4_04', 'p4_06', 'p4_15', 'p4_16']) TURN[n] = -Math.PI / 2;
 for (const n of ['p3_18', 'p3_21']) TURN[n] = Math.PI;
 
 /** Every pack pose the engine registers (poses3/<id>.vmd). */
 export const PACK_ALL = [
-  ...new Set([...Object.values(POOLS).flat(), ...REWARD].filter((n) => /^p\d_\d\d$/.test(n))),
+  ...new Set(
+    Object.values(POOLS)
+      .flat()
+      .filter((n) => /^p\d_\d\d$/.test(n)),
+  ),
 ];
 
 /** How the day goes, for the choice of a pool. */
@@ -156,10 +151,9 @@ export const BRIGHT_AFTER_TASK_S = 10 * 60;
 export const NIGHT_FROM = 23;
 export const NIGHT_TO = 6;
 
-/** The pool of the moment. Bare she does not lie down for the night (she gets cold): she rests. */
-export function poolFor(outfit: Outfit, ctx: PoseContext): Pool {
-  const night = ctx.hour >= NIGHT_FROM || ctx.hour < NIGHT_TO;
-  if (night) return outfit === 'bare' ? 'rest' : 'night';
+/** The pool of the moment. */
+export function poolFor(ctx: PoseContext): Pool {
+  if (ctx.hour >= NIGHT_FROM || ctx.hour < NIGHT_TO) return 'night';
   if (ctx.sinceFocus < REST_AFTER_FOCUS_S) return 'rest';
   if (ctx.sinceTask < BRIGHT_AFTER_TASK_S || ctx.mood === 1) return 'bright';
   if (ctx.mood === -1 || ctx.late) return 'low';
@@ -167,6 +161,6 @@ export function poolFor(outfit: Outfit, ctx: PoseContext): Pool {
 }
 
 /** The poses she may strike on her own now (a copy). */
-export function posesFor(outfit: Outfit, ctx: PoseContext = PLAIN_DAY): string[] {
-  return [...POOLS[poolFor(outfit, ctx)]];
+export function posesFor(ctx: PoseContext = PLAIN_DAY): string[] {
+  return [...POOLS[poolFor(ctx)]];
 }

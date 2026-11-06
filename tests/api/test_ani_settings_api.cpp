@@ -1,9 +1,7 @@
 /**
  * @file test_ani_settings_api.cpp
- * @brief Ani's settings on the server: the bare outfit is off until the user
- *        turns it on saying they are an adult; then the model and its body
- *        texture come as short signed links to the private part of the
- *        bucket, never cached. The webhook URL is made on the first read and
+ * @brief Ani's settings on the server: the kinds of her lines muted; the
+ *        removed bare outfit is always off and its route answers 410. The webhook URL is made on the first read and
  *        changes when replaced. A browser session only (an API key gets 401).
  */
 
@@ -22,7 +20,6 @@
 #include "api/AniSettingsController.hpp"
 #include "database/Database.hpp"
 #include "domain/Role.hpp"
-#include "storage/ObjectStore.hpp"
 #include "test_helpers.hpp"
 
 using json = nlohmann::json;
@@ -43,40 +40,9 @@ Security::Auth::AuthPrincipal principal(const char* who, bool via_key = false) {
 using TestHelpers::body_of;
 using Fn = std::function<void(const HttpRequestPtr&, Api::AniSettingsController::Callback&&)>;
 
-/// Signs links and remembers which keys it signed.
-class FakeStore : public Storage::ObjectStore {
-public:
-    mutable std::vector<std::pair<std::string, long>> signed_downloads;  // key, seconds
-
-    std::string upload_url(const std::string& key, const std::string&, long long) const override {
-        return "https://fake/public-put/" + key;
-    }
-    Storage::ObjectInfo head(const std::string&) const override { return {true, 1}; }
-    void remove(const std::string&) const override {}
-    std::string public_url(const std::string& key) const override { return "https://cdn.test/" + key; }
-    std::string key_for(const std::string& folder, const std::string& id, const std::string& name) const override {
-        return "life-os/" + folder + "/" + id + "/" + name;
-    }
-    std::string private_key(const std::string& owner, const std::string& id, const std::string& name) const override {
-        return "life-os/private/" + owner + "/" + id + "/" + name;
-    }
-    std::string private_upload_url(const std::string& key, const std::string&, long long) const override {
-        return "https://fake/put/" + key;
-    }
-    std::string private_put_url(const std::string& key, long) const override {
-        return "https://fake/private-put/" + key;
-    }
-    std::string download_url(const std::string& key, long seconds, const std::string&) const override {
-        signed_downloads.emplace_back(key, seconds);
-        return "https://fake/get/" + key + "?X-Amz-Expires=" + std::to_string(seconds);
-    }
-    bool publicly_readable(const std::string&) const override { return false; }
-};
-
 class AniSettingsApi : public TestHelpers::CoreBackedTest {
 protected:
     Api::AniSettingsController c;
-    FakeStore store;
 
     std::string config_file_name() const override { return "ani_settings_api_test_config.json"; }
 
@@ -91,12 +57,6 @@ protected:
             txn.exec_params("DELETE FROM ani_reminders WHERE owner_id = $1::uuid", std::string(kAnna));
             return true;
         });
-        Storage::install_object_store_for_testing(&store);
-    }
-
-    void TearDown() override {
-        Storage::install_object_store_for_testing(nullptr);
-        TestHelpers::CoreBackedTest::TearDown();
     }
 
     HttpResponsePtr call(
@@ -119,10 +79,6 @@ protected:
         return call(
             Put, body, [&](auto req, auto cb) { c.savePrefs(req, std::move(cb)); }, "/api/v1/ani/prefs");
     }
-    HttpResponsePtr get_bare() {
-        return call(
-            Get, json::object(), [&](auto req, auto cb) { c.bare(req, std::move(cb)); }, "/api/v1/ani/bare");
-    }
     HttpResponsePtr get_hook() {
         return call(
             Get, json::object(), [&](auto req, auto cb) { c.webhook(req, std::move(cb)); }, "/api/v1/ani/webhook");
@@ -137,39 +93,21 @@ TEST_F(AniSettingsApi, PrefsDefaultOff) {
     EXPECT_EQ(body_of(r)["data"], json({{"bare", false}, {"muted", json::array()}}));
 }
 
-TEST_F(AniSettingsApi, BareNeedsAdult) {
-    auto r = put_prefs(json{{"bare", true}});
-    EXPECT_EQ(r->statusCode(), k422UnprocessableEntity) << std::string(r->body());
-    EXPECT_EQ(body_of(r)["error"], "adult_required");
-    EXPECT_EQ(body_of(get_prefs())["data"]["bare"], false);
-
-    auto bad = put_prefs(json{{"bare", "yes"}});
-    EXPECT_EQ(bad->statusCode(), k400BadRequest) << std::string(bad->body());
-}
-
-TEST_F(AniSettingsApi, BareOnGivesPresignedUrls) {
-    auto on = put_prefs(json{{"bare", true}, {"adult", true}});
-    ASSERT_EQ(on->statusCode(), k200OK) << std::string(on->body());
-    EXPECT_EQ(body_of(on)["data"]["bare"], true);
-
-    auto r = get_bare();
+TEST_F(AniSettingsApi, MutedIsSaved) {
+    auto r = put_prefs(json{{"muted", {"brief", "webhook"}}});
     ASSERT_EQ(r->statusCode(), k200OK) << std::string(r->body());
-    const json d = body_of(r)["data"];
-    EXPECT_EQ(d["model_url"], "https://fake/get/life-os/private/ani/bare-v1/Ani.pmx?X-Amz-Expires=120");
-    EXPECT_EQ(d["texture_url"], "https://fake/get/life-os/private/ani/bare-v1/kanata_body.png?X-Amz-Expires=120");
-    EXPECT_EQ(d["expires_in"], 120);
-    EXPECT_EQ(r->getHeader("Cache-Control"), "no-store");
-
-    auto off = put_prefs(json{{"bare", false}});
-    ASSERT_EQ(off->statusCode(), k200OK);
-    EXPECT_EQ(get_bare()->statusCode(), k403Forbidden);
+    EXPECT_EQ(body_of(get_prefs())["data"], json({{"bare", false}, {"muted", {"brief", "webhook"}}}));
+    EXPECT_EQ(put_prefs(json{{"muted", {"poems"}}})->statusCode(), k400BadRequest);
 }
 
-TEST_F(AniSettingsApi, BareOffIs403) {
-    auto r = get_bare();
-    EXPECT_EQ(r->statusCode(), k403Forbidden) << std::string(r->body());
-    EXPECT_EQ(body_of(r)["error"], "bare_off");
-    EXPECT_TRUE(store.signed_downloads.empty()) << "nothing signed while off";
+TEST_F(AniSettingsApi, BareIsGone) {
+    // The old switch is not a setting any more: without muted the body says nothing.
+    auto r = put_prefs(json{{"bare", true}, {"adult", true}});
+    EXPECT_EQ(r->statusCode(), k400BadRequest) << std::string(r->body());
+    EXPECT_EQ(body_of(get_prefs())["data"]["bare"], false);
+    auto gone = call(Get, json::object(), [&](auto req, auto cb) { c.bare(req, std::move(cb)); });
+    EXPECT_EQ(gone->statusCode(), k410Gone) << std::string(gone->body());
+    EXPECT_EQ(body_of(gone)["error"], "bare_removed");
 }
 
 TEST_F(AniSettingsApi, ApiKeyRefused) {

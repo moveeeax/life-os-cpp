@@ -169,13 +169,15 @@ describe('planBacklog', () => {
       planBacklog(
         [
           item({ kind: 'outfit', say: null, payload: { outfit: 'p1' }, created_at: at(30) }),
-          item({ kind: 'outfit', say: null, payload: { outfit: 'lingerie' }, created_at: at(20) }),
+          item({ kind: 'outfit', say: null, payload: { outfit: 'p2' }, created_at: at(20) }),
+          // An outfit since removed is not hers any more.
+          item({ kind: 'outfit', say: null, payload: { outfit: 'bare' }, created_at: at(10) }),
           item({ say: 'Ок' }),
         ],
         NOW,
       ),
     ).toEqual([
-      { kind: 'outfit', outfit: 'lingerie' },
+      { kind: 'outfit', outfit: 'p2' },
       { kind: 'say', text: 'Ок', line: 'webhook' },
     ]);
   });

@@ -32,9 +32,7 @@ function setUp(today: Today = base) {
   document.body.append(field);
   let now = 0;
   let hide = false;
-  let bare = false;
   const t = createToucher({
-    bare: () => bare,
     ani: () => ani,
     today: () => today,
     focusField: () => field,
@@ -45,11 +43,7 @@ function setUp(today: Today = base) {
     now += wait;
     return t.tap({ part, side }, { x: 100, y: 400 })?.text;
   };
-  const stare = (part: Part, wait = 3000) => {
-    now += wait;
-    return t.stare({ part, side: null }, { x: 100, y: 400 })?.text ?? null;
-  };
-  return { ani, field, tap, stare, hideNumbers: () => (hide = true), undress: () => (bare = true) };
+  return { ani, field, tap, hideNumbers: () => (hide = true) };
 }
 
 describe('createToucher', () => {
@@ -224,32 +218,9 @@ describe('answers', () => {
   it('keep every fixed line short enough for the voice line route', () => {
     for (const text of Object.values(SAID)) expect([...text].length).toBeLessThanOrEqual(200);
   });
-
-  it('bare, covers herself and goes pink, and turns away the third time', () => {
-    const t = setUp();
-    t.undress();
-    expect(t.tap('chest')).toBe('Ой! Я же без всего…');
-    expect(t.ani.cover).toHaveBeenCalledWith(3);
-    expect(t.ani.blush).toHaveBeenCalled();
-    // A tap on the arm she covers herself with counts as on her chest.
-    expect(t.tap('forearm', 'right', 1000)).toBe('Не смотри так. Смущаешь.');
-    expect(t.tap('seat', null, 1000)).toBe('Всё, отвернусь. Сам виноват.');
-    expect(t.ani.sulk).toHaveBeenCalled();
-  });
-
-  it('catches a look resting on her body, bare only and not too often', () => {
-    const t = setUp();
-    expect(t.stare('chest')).toBeNull();
-    t.undress();
-    expect(t.stare('hand')).toBeNull();
-    expect(t.stare('chest')).toBe('Глаза выше.');
-    expect(t.ani.feel).toHaveBeenCalledWith('squint', 2.5);
-    expect(t.stare('hips', 10_000)).toBeNull();
-    expect(t.stare('hips', 20_000)).toBe('Я всё вижу.');
-  });
 });
 
-describe('an earned day', () => {
+describe('a day with tasks done', () => {
   const withTasks = (statuses: ('open' | 'done')[]): Today => ({
     ...base,
     tasks: {
@@ -261,49 +232,15 @@ describe('an earned day', () => {
     },
   });
 
-  it('EarnedSome: the first tap is let through, the second strikes a reward pose, then she asks to wait', () => {
-    const t = setUp(withTasks(['done', 'open']));
-    const first = t.tap('chest');
-    expect(first).toMatch(/закрыл дело|положено|справился/);
-    expect(t.ani.act).not.toHaveBeenCalled();
-    expect(t.ani.sulk).not.toHaveBeenCalled();
-    const second = t.tap('seat', null, 5000);
-    expect(second).toMatch(/смотри|Заслужил|для тебя/);
-    expect(t.ani.act).toHaveBeenCalledTimes(1);
-    expect(['rurune_c1', 'rurune_z2', 'rurune_z4']).toContain(t.ani.act.mock.calls[0][0]);
-    // During the pose: hold; after it, within the cooldown: wait; no second pose.
-    expect(t.tap('hips', null, 2000)).toMatch(/уже|минутку/);
-    expect(t.tap('hips', null, 10_000)).toMatch(/отдышаться|сразу|Подожди/);
-    expect(t.ani.act).toHaveBeenCalledTimes(1);
-    // The cooldown over: another pose, not the same one.
-    expect(t.tap('skirt', null, 46_000)).toMatch(/смотри|Заслужил|для тебя/);
-    expect(t.ani.act).toHaveBeenCalledTimes(2);
-    expect(t.ani.act.mock.calls[1][0]).not.toBe(t.ani.act.mock.calls[0][0]);
-  });
-
-  it('EarnedAll: every task done, the first tap already strikes a pose with the warm lines', () => {
+  it('every task done: off limits stays off limits, no pose', () => {
     const t = setUp(withTasks(['done', 'done']));
-    expect(t.tap('chest')).toMatch(/вся твоя|Проси|награда/);
-    expect(t.ani.act).toHaveBeenCalledTimes(1);
+    expect(t.tap('chest')).toBe(SAID.hands);
+    expect(t.ani.act).not.toHaveBeenCalled();
   });
 
-  it('NotEarned: without a task done the old answer stands', () => {
+  it('without a task done the answer is the same', () => {
     const t = setUp(withTasks(['open']));
     expect(t.tap('chest')).toBe(SAID.hands);
     expect(t.ani.act).not.toHaveBeenCalled();
-  });
-
-  it('EarnedHidden: Hide numbers keeps the old answer', () => {
-    const t = setUp(withTasks(['done']));
-    t.hideNumbers();
-    expect(t.tap('chest')).toBe(SAID.hands);
-  });
-
-  it('EarnedBare: bare she blushes longer and does not cover', () => {
-    const t = setUp(withTasks(['done']));
-    t.undress();
-    t.tap('chest');
-    expect(t.ani.blush).toHaveBeenCalledWith(10);
-    expect(t.ani.cover).not.toHaveBeenCalled();
   });
 });

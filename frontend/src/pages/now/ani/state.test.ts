@@ -18,13 +18,13 @@ describe('aniBase', () => {
 });
 
 describe('useAni', () => {
-  it('is off by default, here and in lingerie, and remembers a change', () => {
+  it('is off by default, here and in the dress, and remembers a change', () => {
     const { result } = renderHook(() => useAni());
-    expect(result.current[0]).toEqual({ on: false, here: true, outfit: 'lingerie' });
+    expect(result.current[0]).toEqual({ on: false, here: true, outfit: 'p1' });
     act(() => result.current[1]({ on: true, outfit: 'p2' }));
     expect(result.current[0]).toEqual({ on: true, here: true, outfit: 'p2' });
     expect(localStorage.getItem('now:ani')).toBe('1');
     expect(localStorage.getItem('now:ani:outfit')).toBe('p2');
-    act(() => result.current[1]({ on: false, outfit: 'lingerie' }));
+    act(() => result.current[1]({ on: false, outfit: 'p1' }));
   });
 });

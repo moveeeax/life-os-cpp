@@ -15640,7 +15640,7 @@ export interface paths {
         };
         /**
          * Ani's settings kept on the server
-         * @description Whether the bare outfit is on for the caller. Refused for API keys.
+         * @description The kinds of her lines the caller muted (bare is always false: the bare outfit was removed in 1.61.0). Refused for API keys.
          */
         get: {
             parameters: {
@@ -15672,8 +15672,8 @@ export interface paths {
             };
         };
         /**
-         * Turn the bare outfit on or off
-         * @description Turning it on needs "adult": true, the user's word that they are an adult (422 adult_required without it). Refused for API keys.
+         * Mute kinds of her lines
+         * @description Replaces the list of muted kinds; a body without muted is 400. bare and adult are no longer read (the bare outfit was removed in 1.61.0). Refused for API keys.
          */
         put: {
             parameters: {
@@ -15685,10 +15685,17 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
+                        /**
+                         * @deprecated
+                         * @description Not read since 1.61.0
+                         */
                         bare?: boolean;
-                        /** @description Required (true) to turn bare on */
+                        /**
+                         * @deprecated
+                         * @description Not read since 1.61.0
+                         */
                         adult?: boolean;
-                        /** @description The kinds of her lines to mute (replaces the list); bare or muted, or both */
+                        /** @description The kinds of her lines to mute (replaces the list) */
                         muted?: ("brief" | "evening" | "break" | "stretch" | "hello" | "telegram" | "webhook" | "reminder" | "calendar")[];
                     };
                 };
@@ -15705,7 +15712,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description bare is missing or not a boolean */
+                /** @description muted is missing or not a list of line kinds */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -15719,7 +15726,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description adult_required: bare on without "adult": true */
+                /** @description Not returned since 1.61.0 */
                 422: {
                     headers: {
                         [name: string]: unknown;
@@ -16038,8 +16045,9 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Short signed links to the bare outfit's model
-         * @description Two presigned GET links (the model and its body texture) to the private part of the bucket, valid two minutes; the page loads them at once. 403 bare_off while the bare outfit is off. Never cached. Refused for API keys.
+         * Removed, the bare outfit is gone
+         * @deprecated
+         * @description The bare outfit was removed in 1.61.0: 410 bare_removed for everyone; the path goes in a later release. Refused for API keys.
          */
         get: {
             parameters: {
@@ -16068,14 +16076,21 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description bare_off: the bare outfit is off */
+                /** @description Not returned since 1.61.0 */
                 403: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description File storage is not configured or did not answer */
+                /** @description bare_removed: the bare outfit was removed */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not returned since 1.61.0 */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -19146,7 +19161,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description A value that is not allowed (an unknown outfit or move; bare_off) */
+                /** @description A value that is not allowed (an unknown outfit or move) */
                 422: {
                     headers: {
                         [name: string]: unknown;
@@ -27091,7 +27106,10 @@ export interface components {
             error: string | null;
         };
         AniPrefs: {
-            /** @description The bare outfit is on */
+            /**
+             * @deprecated
+             * @description Always false: the bare outfit was removed in 1.61.0; the field goes in a later release
+             */
             bare: boolean;
             /** @description Kinds of her own lines the user muted on Now */
             muted?: ("brief" | "evening" | "break" | "stretch" | "hello" | "telegram" | "webhook" | "reminder" | "calendar")[];
@@ -27108,6 +27126,10 @@ export interface components {
             /** Format: date-time */
             created_at: string;
         };
+        /**
+         * @deprecated
+         * @description Not served since 1.61.0 (GET /api/v1/ani/bare answers 410)
+         */
         AniBare: {
             /** @description Presigned GET of the model (PMX) */
             model_url: string;
@@ -27360,7 +27382,7 @@ export interface components {
             /** Format: date-time */
             next_at: string;
         };
-        /** @description say: text (1-200 characters). outfit: outfit (p1, p2, lingerie, or bare when the user turned it on). act: name (one of her moves). event: text (1-2000), source and title (1-60 each). mood: level (-1, 0, 1), seconds (60-3600). remind: text and in_seconds (60-604800) or at (ISO-8601). ask: text, options (1-4 of 1-30 characters), callback (https; the answer is POSTed there). focus: action (start with minutes 1-180, or stop). card: title (1-60), text (up to 200), url (https), seconds (5-120). wallpaper, sound: which (an id; sound also off). hold: minutes (0-480). Any type may carry id (the sender's id, a repeat within 24 hours is refused) and ttl (seconds to wait for the page; default 86400, at most 604800). */
+        /** @description say: text (1-200 characters). outfit: outfit (p1 the dress, p2 the slip; lingerie and bare were removed in 1.61.0 and get 422 unknown_outfit). act: name (one of her moves). event: text (1-2000), source and title (1-60 each). mood: level (-1, 0, 1), seconds (60-3600). remind: text and in_seconds (60-604800) or at (ISO-8601). ask: text, options (1-4 of 1-30 characters), callback (https; the answer is POSTed there). focus: action (start with minutes 1-180, or stop). card: title (1-60), text (up to 200), url (https), seconds (5-120). wallpaper, sound: which (an id; sound also off). hold: minutes (0-480). Any type may carry id (the sender's id, a repeat within 24 hours is refused) and ttl (seconds to wait for the page; default 86400, at most 604800). */
         AniHookItem: {
             /** @enum {string} */
             type: "say" | "outfit" | "act" | "event" | "mood" | "remind" | "ask" | "focus" | "card" | "wallpaper" | "sound" | "hold";

@@ -4941,7 +4941,8 @@
     "properties": {
      "bare": {
       "type": "boolean",
-      "description": "The bare outfit is on"
+      "deprecated": true,
+      "description": "Always false: the bare outfit was removed in 1.61.0; the field goes in a later release"
      },
      "muted": {
       "type": "array",
@@ -4995,6 +4996,8 @@
    },
    "AniBare": {
     "type": "object",
+    "deprecated": true,
+    "description": "Not served since 1.61.0 (GET /api/v1/ani/bare answers 410)",
     "required": [
      "model_url",
      "texture_url",
@@ -5803,7 +5806,7 @@
     "required": [
      "type"
     ],
-    "description": "say: text (1-200 characters). outfit: outfit (p1, p2, lingerie, or bare when the user turned it on). act: name (one of her moves). event: text (1-2000), source and title (1-60 each). mood: level (-1, 0, 1), seconds (60-3600). remind: text and in_seconds (60-604800) or at (ISO-8601). ask: text, options (1-4 of 1-30 characters), callback (https; the answer is POSTed there). focus: action (start with minutes 1-180, or stop). card: title (1-60), text (up to 200), url (https), seconds (5-120). wallpaper, sound: which (an id; sound also off). hold: minutes (0-480). Any type may carry id (the sender's id, a repeat within 24 hours is refused) and ttl (seconds to wait for the page; default 86400, at most 604800).",
+    "description": "say: text (1-200 characters). outfit: outfit (p1 the dress, p2 the slip; lingerie and bare were removed in 1.61.0 and get 422 unknown_outfit). act: name (one of her moves). event: text (1-2000), source and title (1-60 each). mood: level (-1, 0, 1), seconds (60-3600). remind: text and in_seconds (60-604800) or at (ISO-8601). ask: text, options (1-4 of 1-30 characters), callback (https; the answer is POSTed there). focus: action (start with minutes 1-180, or stop). card: title (1-60), text (up to 200), url (https), seconds (5-120). wallpaper, sound: which (an id; sound also off). hold: minutes (0-480). Any type may carry id (the sender's id, a repeat within 24 hours is refused) and ttl (seconds to wait for the page; default 86400, at most 604800).",
     "properties": {
      "type": {
       "type": "string",
@@ -30464,7 +30467,7 @@
   "/api/v1/ani/prefs": {
    "get": {
     "summary": "Ani's settings kept on the server",
-    "description": "Whether the bare outfit is on for the caller. Refused for API keys.",
+    "description": "The kinds of her lines the caller muted (bare is always false: the bare outfit was removed in 1.61.0). Refused for API keys.",
     "tags": [
      "ani"
     ],
@@ -30498,8 +30501,8 @@
     }
    },
    "put": {
-    "summary": "Turn the bare outfit on or off",
-    "description": "Turning it on needs \"adult\": true, the user's word that they are an adult (422 adult_required without it). Refused for API keys.",
+    "summary": "Mute kinds of her lines",
+    "description": "Replaces the list of muted kinds; a body without muted is 400. bare and adult are no longer read (the bare outfit was removed in 1.61.0). Refused for API keys.",
     "tags": [
      "ani"
     ],
@@ -30516,11 +30519,14 @@
         "type": "object",
         "properties": {
          "bare": {
-          "type": "boolean"
+          "type": "boolean",
+          "deprecated": true,
+          "description": "Not read since 1.61.0"
          },
          "adult": {
           "type": "boolean",
-          "description": "Required (true) to turn bare on"
+          "deprecated": true,
+          "description": "Not read since 1.61.0"
          },
          "muted": {
           "type": "array",
@@ -30538,7 +30544,7 @@
             "calendar"
            ]
           },
-          "description": "The kinds of her lines to mute (replaces the list); bare or muted, or both"
+          "description": "The kinds of her lines to mute (replaces the list)"
          }
         }
        }
@@ -30565,13 +30571,13 @@
       }
      },
      "400": {
-      "description": "bare is missing or not a boolean"
+      "description": "muted is missing or not a list of line kinds"
      },
      "401": {
       "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "422": {
-      "description": "adult_required: bare on without \"adult\": true"
+      "description": "Not returned since 1.61.0"
      }
     }
    }
@@ -30862,8 +30868,9 @@
   },
   "/api/v1/ani/bare": {
    "get": {
-    "summary": "Short signed links to the bare outfit's model",
-    "description": "Two presigned GET links (the model and its body texture) to the private part of the bucket, valid two minutes; the page loads them at once. 403 bare_off while the bare outfit is off. Never cached. Refused for API keys.",
+    "summary": "Removed, the bare outfit is gone",
+    "deprecated": true,
+    "description": "The bare outfit was removed in 1.61.0: 410 bare_removed for everyone; the path goes in a later release. Refused for API keys.",
     "tags": [
      "ani"
     ],
@@ -30895,10 +30902,13 @@
       "description": "Not authenticated, or an API key (key_not_allowed)"
      },
      "403": {
-      "description": "bare_off: the bare outfit is off"
+      "description": "Not returned since 1.61.0"
+     },
+     "410": {
+      "description": "bare_removed: the bare outfit was removed"
      },
      "503": {
-      "description": "File storage is not configured or did not answer"
+      "description": "Not returned since 1.61.0"
      }
     }
    }
@@ -33763,7 +33773,7 @@
       "description": "The body is over 8 KB"
      },
      "422": {
-      "description": "A value that is not allowed (an unknown outfit or move; bare_off)"
+      "description": "A value that is not allowed (an unknown outfit or move)"
      },
      "429": {
       "description": "Over 120 calls an hour, 50 waiting items (backlog), or the agent budget (agent_budget)"
@@ -40898,7 +40908,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 622804,
-  "source_fnv1a64": "7e6110dd84fdca92"
+  "source_bytes": 623109,
+  "source_fnv1a64": "e46847a67bbe88ad"
  }
 }

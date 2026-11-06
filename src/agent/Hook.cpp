@@ -265,7 +265,7 @@ std::variant<Item, Error> item_of(const json& body) {
     if (type == "outfit") {
         const json& o = body.value("outfit", json());
         if (!o.is_string() || !one_of(kOutfits, o.get<std::string>())) {
-            return Error{422, "unknown_outfit", "outfit is p1, p2, lingerie or bare"};
+            return Error{422, "unknown_outfit", "outfit is p1 or p2"};
         }
         return Item{"outfit", json{{"outfit", o}}, std::nullopt, kTtlDefault};
     }
