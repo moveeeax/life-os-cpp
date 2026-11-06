@@ -285,6 +285,9 @@ const P2 = ['P2-Glove(Hide)', 'P2-Top(Hide)', 'P2-Panties(Hide)', 'P2-Skirt'];
 const SHARED = ['Shared-Socks-Lace', 'Shared-Collar', 'Shared-Boots', 'Hair-Band'];
 // The v2 body's own lingerie, never shown: she wears a v1 outfit over it.
 const LINGERIE = ['Lingerie'];
+// A transparent 1x1 PNG in place of the lingerie texture.
+const BLANK_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 const LEG = ['左足', '右足', '左ひざ', '右ひざ', '左足首', '右足首'];
 
 const smooth = (a: number) => a * a * (3 - 2 * a);
@@ -569,9 +572,12 @@ export function mountAni(canvas: HTMLCanvasElement, opts: AniOptions): Ani {
     }
     return null;
   }
-  // The files are PNG where the PMX names BMP textures.
+  // The files are PNG where the PMX names BMP textures. The lingerie is never
+  // shown and its texture is gone from the bucket: a blank pixel stands in.
   const manager = new THREE.LoadingManager();
-  manager.setURLModifier((u) => u.replace(/\.bmp$/i, '.png'));
+  manager.setURLModifier((u) =>
+    /lingerie\.(png|bmp)$/i.test(u) ? BLANK_PNG : u.replace(/\.bmp$/i, '.png'),
+  );
   const loader = new MMDLoader(manager);
   const fetchModel = (l: MMDLoader, url: string) =>
     new Promise<THREE.SkinnedMesh>((ok, fail) => l.load(url, ok, undefined, fail));
