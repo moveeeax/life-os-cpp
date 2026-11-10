@@ -338,3 +338,4 @@ github/jobs -> repositories/github
 github/jobs -> utils
 core -> github
 core -> github/jobs
+agent -> money

@@ -24,6 +24,7 @@ import {
   type Action,
   type Turn,
 } from './chat';
+import { ActionWords } from './ActionWords';
 import { useRefresh } from './refresh';
 
 /** A bin: clear the chat. */
@@ -429,7 +430,7 @@ export function AniChat({
                             onChange={(e) => setRewording({ id: a.id, text: e.target.value })}
                           />
                         ) : (
-                          <span className="num">{confirmWords(a)}</span>
+                          <ActionWords action={a} words={confirmWords(a)} />
                         )}
                         {state == null ? (
                           <span className="ani-act-btns">

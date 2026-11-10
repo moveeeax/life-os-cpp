@@ -4910,8 +4910,11 @@
        "calendar_add",
        "calendar_move",
        "calendar_remove",
-       "journal_note"
-      ]
+       "journal_note",
+       "add_food",
+       "add_spend"
+      ],
+      "description": "add_food: entries of one meal in the food diary; add_spend: posted expenses, each in its account's currency"
      },
      "summary": {
       "type": "string",
@@ -31128,7 +31131,7 @@
   "/api/v1/ani/actions/{id}/confirm": {
    "post": {
     "summary": "Confirm a change Ani's agent proposed",
-    "description": "The agent's write tools (a new task, closing a task, ticking a habit, a note to the inbox) only propose; this queues the change for the worker, which makes it as the caller through this API. The turn shows the action's status. A Telegram message (tg_send, tg_edit) may come with the caller's own text, which replaces the proposed one. Refused for API keys.",
+    "description": "The agent's write tools (a new task, closing a task, ticking a habit, a note to the inbox, a meal for the food diary, expenses for the ledger) only propose; this queues the change for the worker, which makes it as the caller through this API. The turn shows the action's status. A Telegram message (tg_send, tg_edit) may come with the caller's own text, which replaces the proposed one. Refused for API keys.",
     "tags": [
      "ani"
     ],
@@ -41700,7 +41703,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 636134,
-  "source_fnv1a64": "eda86a939bc81f00"
+  "source_bytes": 636340,
+  "source_fnv1a64": "2aca9118d90aaf28"
  }
 }

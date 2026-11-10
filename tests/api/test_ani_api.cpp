@@ -5,12 +5,17 @@
  *        stay), his wake and his clear touch only his own rows, and an API
  *        key gets 401 key_not_allowed on the page's own routes. The API runs
  *        without the upstream model key and the proxy URL, as in
- *        production, where only the ani worker holds them.
+ *        production, where only the ani worker holds them. And a meal or
+ *        expenses she proposes: the worker writes them through the real food
+ *        and money routes once, a second run or a declined one writes nothing.
  */
 
 #include <functional>
+#include <stdexcept>
 #include <string>
 #include <utility>
+#include <variant>
+#include <vector>
 
 #include <drogon/HttpRequest.h>
 #include <drogon/HttpResponse.h>
@@ -18,8 +23,12 @@
 
 #include <nlohmann/json.hpp>
 
+#include "agent/Actions.hpp"
 #include "api/AniController.hpp"
+#include "api/FoodController.hpp"
+#include "api/MoneyController.hpp"
 #include "database/Database.hpp"
+#include "net/Http.hpp"
 #include "repositories/agent/ActionRepository.hpp"
 #include "repositories/agent/AgentRepository.hpp"
 #include "repositories/agent/TurnRepository.hpp"
@@ -51,6 +60,9 @@ protected:
         cfg["ani"]["agent"]["proxy_url"] = "";
         // The voice key only lets the speech route reach its owner check; no audio is fetched.
         cfg["now"]["ani_voice"]["api_key"] = "sk-voice-test";
+        // A meal or expenses she proposes are written through these modules' routes.
+        cfg["food"]["enabled"] = true;
+        cfg["money"]["enabled"] = true;
     }
 
     void SetUp() override {
@@ -191,4 +203,197 @@ TEST_F(AniApi, AnApiKeyIsRefusedOnThePagesRoutes) {
     EXPECT_EQ(ActionRepository().get(kAnna, a)->value("status", ""), "pending");
     EXPECT_FALSE(AgentRepository().get(kAnna).has_value()) << "the key woke nothing";
     EXPECT_EQ(TurnRepository().count_since(kAnna, 3600), 1) << "only the turn of the proposal";
+}
+
+namespace {
+
+const std::string kSite = "http://api.test";
+
+/// Answers the worker's requests with the real food and money routes, as Anna.
+struct InProcess : Net::Http::Transport {
+    Api::MoneyController money;
+    Api::FoodController food;
+
+    Net::Http::Response get(const std::string&, const std::vector<std::pair<std::string, std::string>>&) override {
+        throw std::runtime_error("not expected");
+    }
+    Net::Http::Response post_json(const std::string&,
+                                  const std::string&,
+                                  const std::vector<std::pair<std::string, std::string>>&,
+                                  long) override {
+        throw std::runtime_error("not expected");
+    }
+
+    static std::string decoded(const std::string& v) {
+        std::string out;
+        for (std::size_t i = 0; i < v.size(); ++i) {
+            if (v[i] == '%' && i + 2 < v.size()) {
+                out.push_back(static_cast<char>(std::stoi(v.substr(i + 1, 2), nullptr, 16)));
+                i += 2;
+            } else {
+                out.push_back(v[i]);
+            }
+        }
+        return out;
+    }
+
+    Net::Http::Response send(const Net::Http::Request& r) override {
+        const std::string rest = r.url.substr(kSite.size());
+        const auto mark = rest.find('?');
+        const std::string path = rest.substr(0, mark);
+        const auto who = TestHelpers::user(kAnna);
+        HttpRequestPtr req;
+        if (r.method == "GET") {
+            req = TestHelpers::authed(who, Get);
+            std::string query = mark == std::string::npos ? "" : rest.substr(mark + 1);
+            while (!query.empty()) {
+                const auto amp = query.find('&');
+                const std::string pair = query.substr(0, amp);
+                req->setParameter(pair.substr(0, pair.find('=')), decoded(pair.substr(pair.find('=') + 1)));
+                query = amp == std::string::npos ? "" : query.substr(amp + 1);
+            }
+        } else {
+            req = TestHelpers::authed_json(who, json::parse(r.body), Post);
+        }
+        TestHelpers::AwaitedResponse answer;
+        if (r.method == "GET" && path == "/api/v1/money/accounts") {
+            money.listAccounts(req, answer.callback());
+        } else if (r.method == "GET" && path == "/api/v1/money/categories") {
+            money.listCategories(req, answer.callback());
+        } else if (r.method == "GET" && path == "/api/v1/money/currencies") {
+            money.listCurrencies(req, answer.callback());
+        } else if (r.method == "GET" && path == "/api/v1/money/merchants") {
+            money.merchants(req, answer.callback());
+        } else if (path == "/api/v1/money/accounts") {
+            money.createAccount(req, answer.callback());
+        } else if (path == "/api/v1/money/categories") {
+            money.createCategory(req, answer.callback());
+        } else if (path == "/api/v1/money/transactions/batch") {
+            money.createTransactions(req, answer.callback());
+        } else if (path == "/api/v1/food/entries/batch") {
+            food.createEntries(req, answer.callback());
+        } else {
+            return {404, R"({"error":"not_found"})"};
+        }
+        const auto res = answer.get();
+        return res ? Net::Http::Response{static_cast<long>(res->statusCode()), std::string(res->body())}
+                   : Net::Http::Response{500, "{}"};
+    }
+
+    json data(const std::string& method, const std::string& path, const json& body = json::object()) {
+        Net::Http::Request r;
+        r.method = method;
+        r.url = kSite + path;
+        r.body = body.dump();
+        const auto res = send(r);
+        EXPECT_LT(res.status, 300) << path << " " << res.body;
+        return json::parse(res.body)["data"];
+    }
+};
+
+long long rows_of(const char* table) {
+    return Database::get().execute_read([&](auto& txn) {
+        return txn
+            .exec_params(std::string("SELECT count(*) FROM ") + table + " WHERE owner_id = $1::uuid",
+                         std::string(kAnna))[0][0]
+            .template as<long long>();
+    });
+}
+
+}  // namespace
+
+TEST_F(AniApi, AConfirmedMealOrSpendIsWrittenOnceAndADeclinedOneNever) {
+    namespace A = ::Agent::Actions;
+    Database::get().execute_write([](auto& txn) {
+        txn.exec_params(
+            "INSERT INTO users (id, email, confirmed, role_id) "
+            "VALUES ($1::uuid, $2, TRUE, (SELECT id FROM roles ORDER BY id LIMIT 1)) ON CONFLICT DO NOTHING",
+            std::string(kAnna),
+            std::string(kAnna) + "@example.test");
+        for (const char* table : {"food_entries",
+                                  "money_transactions",
+                                  "money_merchants",
+                                  "money_categories",
+                                  "money_accounts",
+                                  "money_currencies"}) {
+            txn.exec_params(std::string("DELETE FROM ") + table + " WHERE owner_id = $1::uuid", std::string(kAnna));
+        }
+        return true;
+    });
+    InProcess site;
+    site.data("GET", "/api/v1/money/currencies");  // the first list seeds the owner's currencies
+    const std::string account = site.data(
+        "POST", "/api/v1/money/accounts", {{"name", "Kaspi Gold"}, {"currency", "KZT"}, {"opening_balance", 0}})["id"];
+    const std::string taxi = site.data("POST", "/api/v1/money/categories", {{"name", "Такси"}})["id"];
+
+    const auto propose = [&](const char* tool, const json& args) {
+        auto p = A::propose(site, kSite, "jwt", "UTC", "2026-11-10", tool, args);
+        EXPECT_TRUE(std::holds_alternative<A::Proposal>(p))
+            << (std::holds_alternative<std::string>(p) ? std::get<std::string>(p) : "");
+        return std::holds_alternative<A::Proposal>(p) ? std::get<A::Proposal>(p) : A::Proposal{};
+    };
+    const auto spend = propose("add_spend",
+                               json{{"lines",
+                                     json::array({json{{"amount", 1600},
+                                                       {"currency", "KZT"},
+                                                       {"name", "Такси"},
+                                                       {"merchant", "Yandex Go"},
+                                                       {"category_id", taxi}}})}});
+    EXPECT_EQ(spend.summary, "Spend: Такси 1600 KZT (Kaspi Gold), 2026-11-10");
+    EXPECT_EQ(spend.request["body"]["transactions"][0]["account_id"], account) << "the only KZT account";
+    const json lunch = json::parse(R"({"meal":"lunch","lines":[
+        {"name":"Плов","grams":350,"kcal":560,"protein_g":18,"fat_g":22,"carbs_g":70},
+        {"name":"Чай","kcal":90,"protein_g":0,"fat_g":0,"carbs_g":22}]})");
+    const auto meal = propose("add_food", lunch);
+    const auto other = propose("add_food", lunch);
+
+    TurnRepository turns;
+    const std::string turn = (*turns.open(kAnna, "Обед и такси", "UTC"))["id"];
+    turns.start(turn);
+    turns.finish(turn, "Записать?", json::array());
+    ActionRepository actions;
+    const std::string s = actions.add(kAnna, turn, spend.kind, spend.summary, spend.request);
+    const std::string m = actions.add(kAnna, turn, meal.kind, meal.summary, meal.request);
+    const std::string o = actions.add(kAnna, turn, other.kind, other.summary, other.request);
+
+    const auto anna = TestHelpers::user(kAnna);
+    const auto shown = call(anna, Get, json::object(), [&](auto req, auto cb) { c.turn(req, std::move(cb), turn); });
+    ASSERT_EQ(shown->statusCode(), k200OK) << std::string(shown->body());
+    TestHelpers::expect_2xx_matches_schema(shown, Get, "/api/v1/ani/turns/{id}");
+    EXPECT_EQ(body_of(shown)["data"]["actions"][0]["kind"], "add_spend");
+    EXPECT_EQ(body_of(shown)["data"]["actions"][1]["kind"], "add_food");
+
+    // The worker's steps of the job ani_action (process_action), with the site in process.
+    const auto run = [&](const std::string& id) {
+        if (!actions.start(id)) {
+            return false;
+        }
+        actions.finish(id, A::execute(site, kSite, "jwt", (*actions.for_worker(id))["request"]));
+        return true;
+    };
+    // Confirmed as the route does it; the job it queues is played by run().
+    ASSERT_EQ(actions.answer(kAnna, s, true), ActionRepository::Answer::Done);
+    ASSERT_EQ(actions.answer(kAnna, m, true), ActionRepository::Answer::Done);
+    EXPECT_TRUE(run(s));
+    EXPECT_TRUE(run(m));
+    EXPECT_EQ(actions.get(kAnna, s)->value("status", ""), "done") << actions.get(kAnna, s)->dump();
+    EXPECT_EQ(actions.get(kAnna, m)->value("status", ""), "done") << actions.get(kAnna, m)->dump();
+    EXPECT_EQ(rows_of("money_transactions"), 1);
+    EXPECT_EQ(rows_of("food_entries"), 2);
+
+    const auto again =
+        call(anna, Post, json::object(), [&](auto req, auto cb) { c.confirmAction(req, std::move(cb), s); });
+    EXPECT_EQ(again->statusCode(), k409Conflict) << std::string(again->body());
+    EXPECT_EQ(body_of(again)["error"], "action_answered");
+    EXPECT_FALSE(run(s)) << "a second job of a done action writes nothing";
+    EXPECT_FALSE(run(m));
+    EXPECT_NE(A::execute(site, kSite, "jwt", spend.request), "")
+        << "even the same request sent again: the ledger has its external ids";
+    EXPECT_EQ(rows_of("money_transactions"), 1);
+    EXPECT_EQ(rows_of("food_entries"), 2);
+
+    const auto no = call(anna, Post, json::object(), [&](auto req, auto cb) { c.cancelAction(req, std::move(cb), o); });
+    ASSERT_EQ(no->statusCode(), k200OK) << std::string(no->body());
+    EXPECT_FALSE(run(o)) << "a declined meal is never run";
+    EXPECT_EQ(rows_of("food_entries"), 2);
 }
