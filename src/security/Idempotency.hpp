@@ -18,6 +18,8 @@
 #pragma once
 
 #include <cstddef>
+#include <string>
+#include <vector>
 
 #include <drogon/HttpRequest.h>
 #include <drogon/HttpResponse.h>
@@ -50,6 +52,7 @@ void shutdown();
 inline constexpr const char* kKeyAttr = "_idemp_cache_key";
 inline constexpr const char* kHashAttr = "_idemp_body_hash";
 inline constexpr const char* kLockKeyAttr = "_idemp_lock_key";
+inline constexpr const char* kSeenAttr = "_idemp_seen_key";
 
 /**
  * @brief Pre-handling check. Returns a response to short-circuit the handler
@@ -64,5 +67,17 @@ drogon::HttpResponsePtr pre_handle(const drogon::HttpRequestPtr& req);
  *        Only 2xx responses are cached — errors may be transient.
  */
 void post_handle(const drogon::HttpRequestPtr& req, const drogon::HttpResponsePtr& resp);
+
+/// Most keys one seen() call takes (GET /api/v1/idempotency/seen).
+inline constexpr std::size_t kSeenMax = 100;
+
+/**
+ * @brief Which of @p keys the caller's earlier mutating requests were answered
+ *        2xx under, within ttl_sec. post_handle leaves a marker per key and
+ *        principal (whatever method and path the request had), so an offline
+ *        queue can tell an applied write from one still in flight. Empty when
+ *        the middleware is off or Redis fails (fail-open, like the rest).
+ */
+std::vector<std::string> seen(const drogon::HttpRequestPtr& req, const std::vector<std::string>& keys);
 
 }  // namespace Security::Idempotency

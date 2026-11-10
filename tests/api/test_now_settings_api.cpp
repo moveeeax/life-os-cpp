@@ -230,7 +230,7 @@ TEST_F(NowSettingsApiTest, TheWeatherDownIsA503AndIsNotAskedAgainAtOnce) {
     }
 }
 
-TEST_F(NowSettingsApiTest, TheNoteOfADayIsStoredButNotOnToday) {
+TEST_F(NowSettingsApiTest, TheNoteOfADayIsStoredAndOnToday) {
     EXPECT_EQ(call(&Api::TodayController::putNote, Put, {{"date", kDay}, {"text", ""}})->statusCode(), k400BadRequest);
     ASSERT_EQ(call(&Api::TodayController::putNote, Put, {{"date", kDay}, {"text", "Pack"}})->statusCode(), k200OK);
     ASSERT_EQ(call(&Api::TodayController::putNote, Put, {{"date", kDay}, {"text", "Pack the adapter"}})->statusCode(),
@@ -240,7 +240,7 @@ TEST_F(NowSettingsApiTest, TheNoteOfADayIsStoredButNotOnToday) {
     EXPECT_FALSE(Repositories::Now::NoteRepository().get(kBoris, kDay)) << "the note is the owner's only";
     auto t = call(&Api::TodayController::today, Get, json::object(), {{"date", kDay}, {"tz", "Asia/Almaty"}});
     ASSERT_EQ(t->statusCode(), k200OK) << std::string(t->body());
-    EXPECT_FALSE(body_of(t)["data"].contains("note")) << "the Now screen no longer reads the note";
+    EXPECT_EQ(body_of(t)["data"]["note"], "Pack the adapter") << "the iOS client reads the note from today";
     EXPECT_EQ(call(&Api::TodayController::deleteNote, Delete, json::object(), {{"date", kDay}})->statusCode(),
               k204NoContent);
     EXPECT_FALSE(Repositories::Now::NoteRepository().get(kAnna, kDay));
