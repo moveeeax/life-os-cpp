@@ -736,7 +736,9 @@ json every_tool() {
                              "remember",
                              "forget",
                              "promise",
-                             "drop_promise"}) {
+                             "drop_promise",
+                             "set_cue",
+                             "clear_cue"}) {
         tools.push_back(json{{"type", "function"}, {"function", {{"name", name}}}});
     }
     return tools;
@@ -757,7 +759,8 @@ TEST(AgentTools, AWebhookTurnOnlyReadsAndProposes) {
     EXPECT_EQ(names_of(T::offered("user", all)), names_of(all)) << "the person's own turns keep every tool";
 
     const auto hook = names_of(T::offered("hook", all));
-    for (const char* gone : {"remember", "forget", "promise", "drop_promise", "tg_react", "tg_mark_read"}) {
+    for (const char* gone :
+         {"remember", "forget", "promise", "drop_promise", "set_cue", "clear_cue", "tg_react", "tg_mark_read"}) {
         EXPECT_EQ(hook.count(gone), 0u) << gone << " acts at once";
     }
     for (const char* kept : {"today",

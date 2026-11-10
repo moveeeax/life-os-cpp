@@ -29,6 +29,7 @@
 #include "api/AdminBillingController.hpp"
 #include "api/AdminController.hpp"
 #include "api/AniController.hpp"
+#include "api/AniCuesController.hpp"
 #include "api/AniHookController.hpp"
 #include "api/AniMcpController.hpp"
 #include "api/AniSettingsController.hpp"
