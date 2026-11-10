@@ -1504,6 +1504,24 @@ components:
         days: { type: integer, minimum: 1, maximum: 127, description: Weekday bitmask, Monday = 1 .. Sunday = 64 }
         tz: { type: string }
         next_at: { type: string, format: date-time }
+    AniCue:
+      type: object
+      required: [id, screen, text, action, expires_at]
+      properties:
+        id: { type: string, description: 'Stable for a rule and a day; agent-<uuid> for a cue her agent wrote' }
+        screen: { type: string, enum: [today, food, body, money] }
+        text: { type: string, description: Her line, in Russian }
+        action:
+          description: The button, or null for a line without one
+          oneOf:
+            - type: object
+              required: [label, kind]
+              properties:
+                label: { type: string }
+                kind: { type: string, enum: [food, spend, task, water, measure, set], description: What the button opens }
+                payload: { type: object, additionalProperties: true, description: 'What it fills in, e.g. {"meal": "lunch"}' }
+            - { type: 'null' }
+        expires_at: { type: string, format: date-time, description: The next local midnight }
     AniHookItem:
       type: object
       required: [type]
@@ -11735,6 +11753,56 @@ paths:
         '204': { description: Removed }
         '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
         '404': { description: No such reminder }
+  /api/v1/ani/cues:
+    get:
+      summary: Ani's cues for the screens of the app on a local day
+      description: >-
+        Her lines with an optional button, computed on the server from the
+        day's food diary, calendar, sleep, tape measurements and month of
+        money (the rules the iOS app ran itself: a meeting in 15-60 minutes
+        at lunch time with lunch not written, the latest meal due and not
+        written, a night under six hours, the tape not used for over 10
+        days, the first category over its budget), then the cues her agent
+        wrote for the day (set_cue), at most one per screen. A cue sent away
+        with dismiss is left out until the next local day. A source whose
+        module is off, or that fails, stays quiet. Ids are stable for a rule
+        and a day (meeting-soon, meal-missing-breakfast, -lunch or -dinner,
+        sleep-short, measure-stale, budget-over; agent-<uuid> for hers).
+        Refused for API keys.
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: date, in: query, description: 'The local day, YYYY-MM-DD; default today in tz', schema: { type: string, format: date } }
+        - { name: tz, in: query, description: The caller's IANA zone (UTC when absent), schema: { type: string } }
+      responses:
+        '200':
+          description: The cues, the rules' first in their order, then hers
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/AniCue' } }
+        '400': { description: 'A date or zone that is not one (invalid_query)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+  /api/v1/ani/cues/{id}/dismiss:
+    post:
+      summary: Hide a cue until the next local day
+      description: >-
+        The cue of that id is left out of GET /ani/cues for the rest of the
+        local day (date and tz as there). Again is a no-op. Refused for API keys.
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, maxLength: 64 } }
+        - { name: date, in: query, description: 'The local day, YYYY-MM-DD; default today in tz', schema: { type: string, format: date } }
+        - { name: tz, in: query, description: The caller's IANA zone (UTC when absent), schema: { type: string } }
+      responses:
+        '204': { description: Hidden for the day }
+        '400': { description: 'A date or zone that is not one (invalid_query)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'No such cue (cue_not_found): not a rule id, or not an agent cue of that day' }
   /api/v1/ani/webhook/rotate:
     post:
       summary: Replace the caller's Ani webhook URL

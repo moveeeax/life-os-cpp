@@ -359,6 +359,8 @@ public:
         "github_mutes",
         "github_repos",
         "github_links",
+        "ani_cue_dismissals",
+        "ani_cues",
     };
 
     /// The foreign keys of the billing tables (migration 007, ON DELETE

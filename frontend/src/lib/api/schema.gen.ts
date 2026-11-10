@@ -19041,6 +19041,131 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ani/cues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ani's cues for the screens of the app on a local day
+         * @description Her lines with an optional button, computed on the server from the day's food diary, calendar, sleep, tape measurements and month of money (the rules the iOS app ran itself: a meeting in 15-60 minutes at lunch time with lunch not written, the latest meal due and not written, a night under six hours, the tape not used for over 10 days, the first category over its budget), then the cues her agent wrote for the day (set_cue), at most one per screen. A cue sent away with dismiss is left out until the next local day. A source whose module is off, or that fails, stays quiet. Ids are stable for a rule and a day (meeting-soon, meal-missing-breakfast, -lunch or -dinner, sleep-short, measure-stale, budget-over; agent-<uuid> for hers). Refused for API keys.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The local day, YYYY-MM-DD; default today in tz */
+                    date?: string;
+                    /** @description The caller's IANA zone (UTC when absent) */
+                    tz?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The cues, the rules' first in their order, then hers */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniCue"][];
+                        };
+                    };
+                };
+                /** @description A date or zone that is not one (invalid_query) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ani/cues/{id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hide a cue until the next local day
+         * @description The cue of that id is left out of GET /ani/cues for the rest of the local day (date and tz as there). Again is a no-op. Refused for API keys.
+         */
+        post: {
+            parameters: {
+                query?: {
+                    /** @description The local day, YYYY-MM-DD; default today in tz */
+                    date?: string;
+                    /** @description The caller's IANA zone (UTC when absent) */
+                    tz?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Hidden for the day */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description A date or zone that is not one (invalid_query) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated, or an API key (key_not_allowed) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No such cue (cue_not_found): not a rule id, or not an agent cue of that day */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ani/webhook/rotate": {
         parameters: {
             query?: never;
@@ -27381,6 +27506,32 @@ export interface components {
             tz: string;
             /** Format: date-time */
             next_at: string;
+        };
+        AniCue: {
+            /** @description Stable for a rule and a day; agent-<uuid> for a cue her agent wrote */
+            id: string;
+            /** @enum {string} */
+            screen: "today" | "food" | "body" | "money";
+            /** @description Her line */
+            text: string;
+            /** @description The button, or null for a line without one */
+            action: {
+                label: string;
+                /**
+                 * @description What the button opens
+                 * @enum {string}
+                 */
+                kind: "food" | "spend" | "task" | "water" | "measure" | "set";
+                /** @description What it fills in, e.g. {"meal": "lunch"} */
+                payload?: {
+                    [key: string]: unknown;
+                };
+            } | null;
+            /**
+             * Format: date-time
+             * @description The next local midnight
+             */
+            expires_at: string;
         };
         /** @description say: text (1-200 characters). outfit: outfit (p1 the dress, p2 the slip; lingerie and bare were removed in 1.61.0 and get 422 unknown_outfit). act: name (one of her moves). event: text (1-2000), source and title (1-60 each). mood: level (-1, 0, 1), seconds (60-3600). remind: text and in_seconds (60-604800) or at (ISO-8601). ask: text, options (1-4 of 1-30 characters), callback (https; the answer is POSTed there). focus: action (start with minutes 1-180, or stop). card: title (1-60), text (up to 200), url (https), seconds (5-120). wallpaper, sound: which (an id; sound also off). hold: minutes (0-480). Any type may carry id (the sender's id, a repeat within 24 hours is refused) and ttl (seconds to wait for the page; default 86400, at most 604800). */
         AniHookItem: {

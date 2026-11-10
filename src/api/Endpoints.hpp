@@ -383,6 +383,8 @@ inline const std::vector<EndpointInfo>& get_endpoints() {
         {"GET", "/api/v1/ani/reminders", "Ani: the user's recurring reminders"},
         {"POST", "/api/v1/ani/reminders", "Ani: add a recurring reminder (at most 20)"},
         {"DELETE", "/api/v1/ani/reminders/{id}", "Ani: remove a recurring reminder"},
+        {"GET", "/api/v1/ani/cues", "Ani: her cues for the screens of the app on a local day"},
+        {"POST", "/api/v1/ani/cues/{id}/dismiss", "Ani: hide a cue until the next local day"},
         {"POST", "/api/v1/ani/webhook/rotate", "Ani: replace the caller's webhook URL"},
         {"POST", "/api/v1/ani/hook/{token}", "Ani: webhook for other systems, token in the path (public)"},
         {"POST", "/api/v1/ani/hook", "Ani: webhook for other systems, token in X-Ani-Hook-Token (public)"},

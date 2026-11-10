@@ -16,6 +16,7 @@
 
 #include "agent/Actions.hpp"
 #include "agent/CalendarTools.hpp"
+#include "agent/CueTools.hpp"
 #include "agent/DealTools.hpp"
 #include "agent/FactTools.hpp"
 #include "agent/Gateway.hpp"
@@ -382,6 +383,10 @@ json process_turn(const json& payload) {
                     tools.push_back(t);
                 }
                 run = DealTools::runner(owner, tz, std::move(run));
+                for (const auto& t : CueTools::definitions()) {
+                    tools.push_back(t);
+                }
+                run = CueTools::runner(owner, tz, std::move(run));
                 const bool calendar = CalendarTools::available(owner);
                 if (calendar) {
                     for (const auto& t : CalendarTools::definitions()) {
