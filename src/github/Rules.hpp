@@ -80,8 +80,17 @@ inline std::string counted(int n, const char* one, const char* many) {
 }  // namespace detail
 
 /**
- * @brief The verdict: a JSON array of {rule, detail} in rule order, without
- *        the rules in @p muted. Empty for an archived repository.
+ * @brief The verdict: a JSON array of {rule, detail, code, ...} in rule order,
+ *        without the rules in @p muted. Empty for an archived repository.
+ *
+ *        detail is the English line; code and the numbers next to it let a
+ *        client say it in its own words:
+ *          checks   failing_checks  branch (the default branch, null when unknown)
+ *          alerts   open_alerts     count
+ *          prs      open_prs        count
+ *          issues   open_issues     count
+ *          hygiene  missing_basics  missing (description, license, readme, in that order)
+ *          stale    never_pushed, or no_recent_push with months (whole 30-day months since the push)
  * @param now Unix seconds (the stale rule compares pushed_at to it).
  */
 inline nlohmann::json attention(const RepoFacts& f, const std::set<std::string>& muted, long long now) {
@@ -89,51 +98,67 @@ inline nlohmann::json attention(const RepoFacts& f, const std::set<std::string>&
     if (f.archived) {
         return out;
     }
-    const auto add = [&](std::string_view rule, std::string detail) {
+    const auto add = [&](std::string_view rule, std::string detail, std::string_view code, nlohmann::json fields) {
         if (muted.count(std::string(rule)) == 0) {
-            out.push_back({{"rule", std::string(rule)}, {"detail", std::move(detail)}});
+            nlohmann::json item = {
+                {"rule", std::string(rule)}, {"detail", std::move(detail)}, {"code", std::string(code)}};
+            item.update(fields);
+            out.push_back(std::move(item));
         }
     };
     if (f.checks == "failure") {
         add(kRuleChecks,
             f.default_branch.empty() ? std::string("checks fail on the default branch")
-                                     : "checks fail on " + f.default_branch);
+                                     : "checks fail on " + f.default_branch,
+            "failing_checks",
+            {{"branch", f.default_branch.empty() ? nlohmann::json() : nlohmann::json(f.default_branch)}});
     }
     if (f.open_alerts > 0) {
-        add(kRuleAlerts, detail::counted(f.open_alerts, "open Dependabot alert", "open Dependabot alerts"));
+        add(kRuleAlerts,
+            detail::counted(f.open_alerts, "open Dependabot alert", "open Dependabot alerts"),
+            "open_alerts",
+            {{"count", f.open_alerts}});
     }
     if (f.open_prs > 0) {
-        add(kRulePrs, detail::counted(f.open_prs, "open pull request", "open pull requests"));
+        add(kRulePrs,
+            detail::counted(f.open_prs, "open pull request", "open pull requests"),
+            "open_prs",
+            {{"count", f.open_prs}});
     }
     if (f.open_issues > 0) {
-        add(kRuleIssues, detail::counted(f.open_issues, "open issue", "open issues"));
+        add(kRuleIssues,
+            detail::counted(f.open_issues, "open issue", "open issues"),
+            "open_issues",
+            {{"count", f.open_issues}});
     }
     if (f.is_public) {
-        std::string missing;
-        const auto miss = [&](const char* what) {
-            if (!missing.empty()) {
-                missing += ", ";
+        std::string line;
+        nlohmann::json missing = nlohmann::json::array();
+        const auto miss = [&](const char* what, const char* id) {
+            if (!line.empty()) {
+                line += ", ";
             }
-            missing += what;
+            line += what;
+            missing.push_back(id);
         };
         if (f.description.empty()) {
-            miss("no description");
+            miss("no description", "description");
         }
         if (f.license.empty()) {
-            miss("no license");
+            miss("no license", "license");
         }
         if (!f.has_readme) {
-            miss("no README");
+            miss("no README", "readme");
         }
-        if (!missing.empty()) {
-            add(kRuleHygiene, missing);
+        if (!line.empty()) {
+            add(kRuleHygiene, line, "missing_basics", {{"missing", missing}});
         }
     }
     if (!f.pushed_at) {
-        add(kRuleStale, "never pushed");
+        add(kRuleStale, "never pushed", "never_pushed", nlohmann::json::object());
     } else if (now - *f.pushed_at >= kStaleSeconds) {
         const long long months = (now - *f.pushed_at) / (30LL * 86400);
-        add(kRuleStale, "no push for " + std::to_string(months) + " months");
+        add(kRuleStale, "no push for " + std::to_string(months) + " months", "no_recent_push", {{"months", months}});
     }
     return out;
 }

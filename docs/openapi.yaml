@@ -1429,6 +1429,17 @@ components:
       properties:
         rule: { $ref: '#/components/schemas/GithubRule' }
         detail: { type: string, description: 'Why, in a few words: "3 open issues", "no license, no README", "no push for 14 months"' }
+        code:
+          type: string
+          enum: [failing_checks, open_alerts, open_prs, open_issues, missing_basics, never_pushed, no_recent_push]
+          description: 'What fired, for a client that words it itself: failing_checks (checks) with branch, open_alerts (alerts), open_prs (prs) and open_issues (issues) with count, missing_basics (hygiene) with missing, never_pushed or no_recent_push (stale, the latter with months). Absent on a verdict stored before the field existed, until the next sync of the repository (every six hours) or a mute change recomputes it'
+        branch: { type: [string, 'null'], description: 'failing_checks: the default branch, null when unknown' }
+        count: { type: integer, minimum: 1, description: 'open_alerts, open_prs, open_issues: how many are open' }
+        missing:
+          type: array
+          items: { type: string, enum: [description, license, readme] }
+          description: 'missing_basics: what the repository lacks, in this order'
+        months: { type: integer, minimum: 12, description: 'no_recent_push: whole 30-day months since the last push' }
     GithubStatus:
       type: object
       required: [configured, linked, login, scopes, linked_at, synced_at, sync_error, org_hint]

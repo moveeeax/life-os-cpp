@@ -27414,6 +27414,19 @@ export interface components {
             rule: components["schemas"]["GithubRule"];
             /** @description Why, in a few words: "3 open issues", "no license, no README", "no push for 14 months" */
             detail: string;
+            /**
+             * @description What fired, for a client that words it itself: failing_checks (checks) with branch, open_alerts (alerts), open_prs (prs) and open_issues (issues) with count, missing_basics (hygiene) with missing, never_pushed or no_recent_push (stale, the latter with months). Absent on a verdict stored before the field existed, until the next sync of the repository (every six hours) or a mute change recomputes it
+             * @enum {string}
+             */
+            code?: "failing_checks" | "open_alerts" | "open_prs" | "open_issues" | "missing_basics" | "never_pushed" | "no_recent_push";
+            /** @description failing_checks: the default branch, null when unknown */
+            branch?: string | null;
+            /** @description open_alerts, open_prs, open_issues: how many are open */
+            count?: number;
+            /** @description missing_basics: what the repository lacks, in this order */
+            missing?: ("description" | "license" | "readme")[];
+            /** @description no_recent_push: whole 30-day months since the last push */
+            months?: number;
         };
         GithubStatus: {
             /** @description The server has a GitHub OAuth App and a seal key */
