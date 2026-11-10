@@ -128,6 +128,12 @@ public:
             &translate);
     }
 
+    /// One entry inside the caller's transaction; returns its id.
+    template <typename Txn>
+    static std::string create_in(Txn& txn, const std::string& owner, const Input& in) {
+        return insert_in(txn, owner, in);
+    }
+
     /// All in one transaction: a refused line writes nothing.
     nlohmann::json create_many(const std::string& owner, const std::vector<Input>& inputs) {
         return detail::translate_sql(

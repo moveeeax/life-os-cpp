@@ -53,6 +53,7 @@
 #include "api/MoneyController.hpp"
 #include "api/NotesController.hpp"
 #include "api/NowDayController.hpp"
+#include "api/ParseController.hpp"
 #include "api/PracticeController.hpp"
 #include "api/ProjectsController.hpp"
 #include "api/SoundsController.hpp"

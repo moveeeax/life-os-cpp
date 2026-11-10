@@ -1864,6 +1864,75 @@ components:
         accepted_at: { type: [string, 'null'], format: date-time }
         created_at: { type: string, format: date-time }
         finished_at: { type: [string, 'null'], format: date-time }
+        apply: { type: boolean, description: The worker creates the lines as open tasks itself when the job ends }
+        applied: { $ref: '#/components/schemas/ParseApplied' }
+    ParseApplied:
+      type: [object, 'null']
+      description: >-
+        What the worker created for a job asked to apply its rows, null for any other job. The job reads as
+        accepted. `error: apply_failed` means applying failed and nothing was created: the lines wait for the
+        accept route. A key appears for the kinds the parse covers.
+      properties:
+        money:
+          type: array
+          description: The ledger rows; posted on the request's account, the account the parse named, or the one open account of the line's currency, else pending (in the inbox)
+          items: { type: object, required: [id, status], properties: { id: { type: string, format: uuid }, status: { type: string, enum: [posted, pending] } } }
+        tasks:
+          type: array
+          description: The open tasks created
+          items: { type: object, required: [id], properties: { id: { type: string, format: uuid } } }
+        food:
+          type: array
+          description: The diary entries created, on the job's date and meal
+          items: { type: object, required: [id], properties: { id: { type: string, format: uuid } } }
+        water:
+          type: [object, 'null']
+          description: The water added to the job's day
+          properties: { ml: { type: integer } }
+        skipped:
+          type: array
+          description: Lines that could not become a row (a spend with no open account at all, reason no_account); they stay in the job's lines
+          items: { type: object, required: [kind, line, reason], properties: { kind: { type: string }, line: { type: integer, description: Index in the kind's lines }, reason: { type: string } } }
+        error: { type: string, enum: [apply_failed] }
+    UnifiedParseJob:
+      type: object
+      required: [id, status, text, meal, date, apply, account_id, result, applied, error, model, prompt_tokens, completion_tokens, created_at, finished_at]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [queued, running, done, failed] }
+        text: { type: string }
+        meal: { $ref: '#/components/schemas/FoodMeal' }
+        date: { type: string, format: date }
+        apply: { type: boolean }
+        account_id: { type: [string, 'null'], format: uuid }
+        result:
+          type: [object, 'null']
+          description: >-
+            The rows per kind when done, each in the format of that module's own parse. `jobs` holds the id of the
+            finished job each kind was filed as in its module (null for a kind with no rows): accept money lines
+            with POST /api/v1/money/parse/{jobs.money}/accept, tasks with POST /api/v1/tasks/parse/{jobs.tasks}/accept,
+            food with POST /api/v1/food/entries/batch, water with POST /api/v1/food/water. `errors` names a kind whose
+            part of the answer broke that module's rules and was dropped.
+          required: [food, money, tasks, water, jobs, errors]
+          properties:
+            food: { type: array, items: { $ref: '#/components/schemas/FoodParseLine' } }
+            money: { type: array, items: { $ref: '#/components/schemas/MoneyParseLine' } }
+            tasks: { type: array, items: { $ref: '#/components/schemas/TaskParseLine' } }
+            water: { type: [object, 'null'], properties: { ml: { type: integer, minimum: 1, maximum: 5000 } } }
+            jobs:
+              type: object
+              properties:
+                food: { type: [string, 'null'], format: uuid }
+                money: { type: [string, 'null'], format: uuid }
+                tasks: { type: [string, 'null'], format: uuid }
+            errors: { type: object, additionalProperties: { type: string } }
+        applied: { $ref: '#/components/schemas/ParseApplied' }
+        error: { type: [string, 'null'], description: "code and message when failed; codes: not_configured, provider_refused, provider_error_<status>, provider_unavailable, invalid_answer, internal_error, queue_unavailable, queue_gave_up" }
+        model: { type: [string, 'null'] }
+        prompt_tokens: { type: [integer, 'null'] }
+        completion_tokens: { type: [integer, 'null'] }
+        created_at: { type: string, format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
     # Mirrors ErrorResponse::make in src/utils/ErrorResponse.cpp — every
     # error body carries `error` AND the numeric `status` (message/extras
     # optional). The schema used to omit `status`; the e2e schema validation
@@ -3296,6 +3365,9 @@ components:
         accepted_at: { type: [string, 'null'], format: date-time }
         created_at: { type: string, format: date-time }
         finished_at: { type: [string, 'null'], format: date-time }
+        apply: { type: boolean, description: The worker posts the lines itself when the job ends (text jobs only) }
+        account_id: { type: [string, 'null'], format: uuid, description: The account the request asked the lines to be posted on }
+        applied: { $ref: '#/components/schemas/ParseApplied' }
     MoneyAdvisorReportSummary:
       type: object
       required: [id, period, period_start, period_end, status, error, model, created_at, finished_at]
@@ -8170,21 +8242,28 @@ paths:
   /api/v1/money/parse:
     post:
       summary: Send a bank mail, an SMS or a list of purchases to the LLM parse job
+      description: >-
+        With apply the worker posts the lines itself when the job ends, so a client can queue the request offline
+        and make no further call: each line goes on account_id, else the account the parse named, else the one open
+        account of its currency, and is posted when it has a category; any other line is created pending in the
+        inbox. GET /api/v1/money/parse/{id} then holds the created ids in `applied`. The job keeps the request's
+        Idempotency-Key: a retry with the same key answers with the same job and creates nothing more.
       tags: [money]
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: hint_date defaults to today there; a name that is not a zone answers 400 invalid_query' }
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string, maxLength: 200 }, description: 'Kept on the job: a retry with the same key gets the same job back' }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 8000 }, hint_date: { type: string, format: date, description: The date of a line without one; defaults to today in tz (UTC without it) } } }
+            schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 8000 }, hint_date: { type: string, format: date, description: The date of a line without one; defaults to today in tz (UTC without it) }, apply: { type: boolean, default: false, description: The worker posts the lines itself when the job ends }, account_id: { type: [string, 'null'], format: uuid, description: 'With apply, the account the lines are posted on; one that is not an open account of the caller is passed over' } } }
       responses:
         '202':
           description: Queued
           content:
             application/json:
-              schema: { type: object, required: [data], properties: { data: { type: object, required: [id, status], properties: { id: { type: string, format: uuid }, status: { type: string, enum: [queued] } } } } }
+              schema: { type: object, required: [data], properties: { data: { type: object, required: [id, status], properties: { id: { type: string, format: uuid }, status: { type: string, enum: [queued, running, done, failed], description: 'queued for a new job; a retry with the same Idempotency-Key answers with its job as it is now' } } } } }
         '400':
           description: Validation failed
           content:
@@ -9420,24 +9499,129 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-  /api/v1/tasks/parse:
+  /api/v1/parse:
     post:
-      summary: Queue one phrase for the tasks_parse job
-      tags: [tasks]
+      summary: One phrase to the rows of every kind it holds, in one job and one model call
+      description: >-
+        The unified parse: food eaten, money spent or received, things to do and water drunk, read from one phrase
+        ("кофе 1200 и творог 200 г, завтра позвонить маме" gives one spend, one food line and one task). The rows come
+        back per kind in the format of each module's own parse, and each kind is filed as a finished job of its module,
+        so the module's accept route takes them. With apply the worker creates the rows itself when the job ends:
+        spends as POST /api/v1/money/parse with apply does, open tasks, diary entries on date and meal, the water of
+        date. The kinds are those of the module parses that are on and set up. One phrase holds one of the caller's
+        three places for open unified parses, separate from the module parses' own three. The job keeps the request's
+        Idempotency-Key: a retry with the same key answers with the same job and creates nothing more.
+      tags: [parse]
       security: [{ BearerAuth: [] }]
       parameters:
-        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there' }
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller when the body has no tz' }
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string, maxLength: 200 }, description: 'Kept on the job: a retry with the same key gets the same job back' }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 2000 }, hint_date: { type: string, format: date, description: The reference day of the parse; defaults to today in tz, else UTC }, note_id: { type: string, format: uuid } } }
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, minLength: 1, maxLength: 2000 }
+                meal: { $ref: '#/components/schemas/FoodMeal', description: 'The meal of the food rows; defaults by the hour in tz when the request arrives (breakfast 4-11, lunch 11-16, dinner 16-22, else snack; snack without tz)' }
+                date: { type: string, format: date, description: The day of the rows; defaults to today in tz, else UTC }
+                tz: { type: string, description: IANA zone of the caller; a name that is not a zone answers 400 }
+                apply: { type: boolean, default: false, description: The worker creates the rows itself when the job ends }
+                account_id: { type: [string, 'null'], format: uuid, description: 'With apply, the account the spends are posted on; one that is not an open account of the caller is passed over' }
       responses:
         '202':
           description: Queued
           content:
             application/json:
-              schema: { type: object, required: [data], properties: { data: { type: object, required: [id, status], properties: { id: { type: string, format: uuid }, status: { type: string } } } } }
+              schema: { type: object, required: [data], properties: { data: { type: object, required: [id, status], properties: { id: { type: string, format: uuid }, status: { type: string, enum: [queued, running, done, failed], description: 'queued for a new job; a retry with the same Idempotency-Key answers with its job as it is now' } } } } }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: The food, money and tasks modules are all off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: Three unified parses of the caller are still open (too_many_parses)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: No module parse is set up (not_configured), or the queue or storage is down
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/parse/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: A unified parse job and its rows per kind
+      tags: [parse]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The job
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { $ref: '#/components/schemas/UnifiedParseJob' } } }
+        '400':
+          description: id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The principal is not a user account (no_user_account)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: The modules are all off, or the job is not the caller's (parse_job)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/tasks/parse:
+    post:
+      summary: Queue one phrase for the tasks_parse job
+      description: >-
+        With apply the worker creates the lines as open tasks itself when the job ends (the note, if any, is archived
+        as an accept does); GET /api/v1/tasks/parse/{id} then holds their ids in `applied`. The job keeps the
+        request's Idempotency-Key: a retry with the same key answers with the same job and creates nothing more.
+      tags: [tasks]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: tz, in: query, schema: { type: string, default: UTC }, description: 'IANA zone of the caller: the default day is today there' }
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string, maxLength: 200 }, description: 'Kept on the job: a retry with the same key gets the same job back' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 2000 }, hint_date: { type: string, format: date, description: The reference day of the parse; defaults to today in tz, else UTC }, note_id: { type: string, format: uuid }, apply: { type: boolean, default: false, description: The worker creates the tasks itself when the job ends } } }
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: { type: object, required: [data], properties: { data: { type: object, required: [id, status], properties: { id: { type: string, format: uuid }, status: { type: string, description: 'queued for a new job; a retry with the same Idempotency-Key answers with its job as it is now' } } } } }
         '400':
           description: Validation failed
           content:

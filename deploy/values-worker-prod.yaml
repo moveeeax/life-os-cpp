@@ -63,12 +63,12 @@ worker:
   id: ""
   # The worker pulls only the listed queues: without fitness_sync, sync jobs
   # would pile up in Redis silently. Mail is off, its queues are not subscribed.
-  types: "fitness_sync,leetcode_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,now_media_sweep,files_sweep,github_sync"
+  types: "fitness_sync,leetcode_sync,food_parse,money_rates,money_parse,money_advisor,tasks_parse,unified_parse,now_media_sweep,files_sweep,github_sync"
   # One sync per system by construction.
   concurrency: 1
   # The parses the user waits for on screen get a thread of their own, so
   # they never queue behind a fitness sync on the shared one.
-  priorityTypes: "food_parse,money_parse,tasks_parse"
+  priorityTypes: "food_parse,money_parse,tasks_parse,unified_parse"
 
 jobs:
   enabled: true

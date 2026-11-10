@@ -3,13 +3,16 @@
  * @brief money_parse_jobs: a text or a receipt photo on its way through the
  *        LLM, the lines it produced, and whether the user accepted them. The
  *        photo travels as base64 between the API and SQL (decode/encode in the
- *        query) and is cleared on every terminal state.
+ *        query) and is cleared on every terminal state. A text job created
+ *        with apply is posted by the worker itself when it ends (`applied`).
  */
 
 #pragma once
 
+#include <exception>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include <nlohmann/json.hpp>
 
@@ -36,21 +39,92 @@ public:
                                const std::string& text,
                                const std::string& hint_date,
                                InTxn&& in_txn) {
+        bool replayed = false;
+        return create_text(owner, text, hint_date, Apply{}, replayed, std::forward<InTxn>(in_txn));
+    }
+
+    /// What a text parse may ask for besides the text: the worker posts the
+    /// lines itself when the job ends (on @p account_id when it is an open
+    /// account of the owner's), and the request's Idempotency-Key.
+    struct Apply {
+        bool apply = false;
+        std::optional<std::string> account_id;
+        std::optional<std::string> idempotency_key;
+    };
+
+    /// As above; a job the owner already created with the same Idempotency-Key
+    /// is returned instead, with @p replayed set and @p in_txn not run (no
+    /// second queue job, no slot taken).
+    template <typename InTxn>
+    nlohmann::json create_text(const std::string& owner,
+                               const std::string& text,
+                               const std::string& hint_date,
+                               const Apply& a,
+                               bool& replayed,
+                               InTxn&& in_txn) {
+        replayed = false;
         return detail::translate_sql(
             [&] {
                 return Database::get().execute_write([&](auto& txn) {
+                    if (a.idempotency_key) {
+                        if (const auto id = JobRows::keyed_in(txn, kTable, owner, *a.idempotency_key)) {
+                            replayed = true;
+                            return *find_in(txn, owner, *id);
+                        }
+                    }
+                    // A concurrent request with the same key waits on the index and then finds its row.
                     auto r = txn.exec_params(
-                        "INSERT INTO money_parse_jobs (owner_id, kind, text, hint_date) "
-                        "VALUES ($1::uuid, 'text', $2, $3::date) RETURNING id::text",
+                        "INSERT INTO money_parse_jobs (owner_id, kind, text, hint_date, auto_apply, account_id, "
+                        " idempotency_key) VALUES ($1::uuid, 'text', $2, $3::date, $4, $5::uuid, $6) "
+                        "ON CONFLICT (owner_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING "
+                        "RETURNING id::text",
                         owner,
                         text,
-                        hint_date);
+                        hint_date,
+                        a.apply,
+                        a.account_id,
+                        a.idempotency_key);
+                    if (r.empty()) {
+                        replayed = true;
+                        return *find_in(txn, owner, *JobRows::keyed_in(txn, kTable, owner, *a.idempotency_key));
+                    }
                     const std::string id = r[0][0].template as<std::string>();
                     in_txn(txn, id);
                     return *find_in(txn, owner, id);
                 });
             },
             &detail::translate);
+    }
+
+    /// A finished text job of the unified parse (POST /parse): its money lines,
+    /// for the accept route or, with @p applied, already posted. Returns the id.
+    template <typename Txn>
+    static std::string insert_done_in(Txn& txn,
+                                      const std::string& owner,
+                                      const std::string& text,
+                                      const std::string& hint_date,
+                                      const nlohmann::json& lines,
+                                      const std::string& model,
+                                      bool apply) {
+        auto r = txn.exec_params(
+            "INSERT INTO money_parse_jobs (owner_id, kind, text, hint_date, status, attempts, started_at, result, "
+            " model, auto_apply, finished_at) VALUES ($1::uuid, 'text', $2, $3::date, 'done', 1, now(), $4::jsonb, "
+            " $5, $6, now()) RETURNING id::text",
+            owner,
+            text,
+            hint_date,
+            lines.dump(),
+            model,
+            apply);
+        return r[0][0].template as<std::string>();
+    }
+
+    /// What the worker created for an applied job; the job reads as accepted from now on.
+    template <typename Txn>
+    static void mark_applied_in(Txn& txn, const std::string& id, const nlohmann::json& applied) {
+        txn.exec_params("UPDATE money_parse_jobs SET applied = $2::jsonb, accepted_at = now() WHERE id = $1::uuid",
+                        id,
+                        applied.dump());
     }
 
     /// @param image_base64 the bytes of the photo, base64 (no data: prefix).
@@ -141,6 +215,56 @@ public:
         });
     }
 
+    /// finish() and, for a job created with apply, @p apply(txn, owner, account_id)
+    /// in the same transaction: the job turns done exactly once (the claim fences
+    /// the update), so the rows it posts are posted once, whatever redelivers the
+    /// job. When the apply throws, the job is still finished, without the rows
+    /// and with `applied: {error}`, so the lines wait for an accept by hand
+    /// instead of being lost.
+    template <typename ApplyFn>
+    void finish_applying(const std::string& id,
+                         int attempt,
+                         const nlohmann::json& lines,
+                         const std::string& model,
+                         std::optional<int> prompt_tokens,
+                         std::optional<int> completion_tokens,
+                         ApplyFn&& apply) {
+        const auto close = [&](auto& txn) {
+            return txn.exec_params(
+                "UPDATE money_parse_jobs SET status = 'done', result = $2::jsonb, error = NULL, model = $3, "
+                " prompt_tokens = $4, completion_tokens = $5, image = NULL, finished_at = now() WHERE id = $1::uuid" +
+                    JobRows::while_claimed(6) + " RETURNING owner_id::text, auto_apply, account_id::text",
+                id,
+                lines.dump(),
+                model,
+                prompt_tokens,
+                completion_tokens,
+                attempt);
+        };
+        try {
+            Database::get().execute_write([&](auto& txn) {
+                auto r = close(txn);
+                if (r.empty() || !r[0][1].template as<bool>()) {
+                    return true;
+                }
+                const std::optional<std::string> account =
+                    r[0][2].is_null() ? std::nullopt : std::optional<std::string>(r[0][2].template as<std::string>());
+                mark_applied_in(txn, id, apply(txn, r[0][0].template as<std::string>(), account));
+                return true;
+            });
+        } catch (const std::exception&) {
+            Database::get().execute_write([&](auto& txn) {
+                auto r = close(txn);
+                if (!r.empty() && r[0][1].template as<bool>()) {
+                    txn.exec_params("UPDATE money_parse_jobs SET applied = $2::jsonb WHERE id = $1::uuid",
+                                    id,
+                                    nlohmann::json{{"error", "apply_failed"}}.dump());
+                }
+                return true;
+            });
+        }
+    }
+
     /// @p error is stored as "<code>: <message>".
     void fail(const std::string& id, const std::string& code, const std::string& message, int attempt = 0) {
         Database::get().execute_write([&](auto& txn) {
@@ -184,7 +308,7 @@ private:
             "SELECT row_to_json(t) FROM (SELECT id, kind, " + JobRows::shown_status() +
                 " AS status, text, hint_date::text AS hint_date, result, " + JobRows::shown_error() +
                 " AS error, "
-                " model, prompt_tokens, completion_tokens, "
+                " model, prompt_tokens, completion_tokens, auto_apply AS apply, account_id, applied, "
                 " " SQL_ISO_UTC("accepted_at") " AS accepted_at, "
                 " " SQL_ISO_UTC("created_at") " AS created_at, "
                 " " SQL_ISO_UTC("finished_at") " AS finished_at "

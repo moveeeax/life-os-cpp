@@ -51,6 +51,30 @@ using Chat::Retryable;
 using Chat::usage;
 }  // namespace detail
 
+/// What the request carries about the user: their items (so the model prefers
+/// them over guesses) and the profile note. The unified parse sends the same.
+struct PromptContext {
+    std::set<std::string> own_ids;
+    nlohmann::json items = nlohmann::json::array();
+    std::string profile_note;
+
+    nlohmann::json message(const std::string& meal, const std::string& date) const {
+        return {{"meal", meal}, {"date", date}, {"profile_note", profile_note}, {"items", items}};
+    }
+};
+
+inline PromptContext prompt_context(const std::string& owner) {
+    PromptContext ctx;
+    for (const auto& item : Repositories::ItemRepository().for_prompt(owner, kItemsInPrompt)) {
+        ctx.own_ids.insert(item["id"].get<std::string>());
+        ctx.items.push_back(item);
+    }
+    if (const auto profile = Repositories::GoalsRepository().load(owner)) {
+        ctx.profile_note = profile->value("profile_note", std::string());
+    }
+    return ctx;
+}
+
 inline nlohmann::json process_job(const nlohmann::json& payload) {
     const std::string job_id = payload.value("job_id", std::string());
     Repositories::ParseJobRepository jobs;
@@ -102,23 +126,9 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     };
 
     try {
-        // The user's items, so the model prefers them over guesses.
-        nlohmann::json items = nlohmann::json::array();
-        std::set<std::string> own_ids;
-        for (const auto& item : Repositories::ItemRepository().for_prompt(owner, kItemsInPrompt)) {
-            own_ids.insert(item["id"].get<std::string>());
-            items.push_back(item);
-        }
-        std::string profile_note;
-        if (const auto profile = Repositories::GoalsRepository().load(owner)) {
-            profile_note = profile->value("profile_note", std::string());
-        }
-
-        const nlohmann::json user_message{{"text", job->value("text", std::string())},
-                                          {"meal", job->value("meal", std::string())},
-                                          {"date", job->value("date", std::string())},
-                                          {"profile_note", profile_note},
-                                          {"items", items}};
+        const auto ctx = prompt_context(owner);
+        nlohmann::json user_message = ctx.message(job->value("meal", std::string()), job->value("date", std::string()));
+        user_message["text"] = job->value("text", std::string());
         nlohmann::json request{{"model", settings->model},
                                {"messages",
                                 {{{"role", "system"}, {"content", settings->prompt}},
@@ -156,7 +166,7 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         }
         std::vector<Food::Parse::Line> lines;
         try {
-            lines = Food::Parse::parse_answer(content, own_ids);
+            lines = Food::Parse::parse_answer(content, ctx.own_ids);
         } catch (const Food::Parse::Invalid& e) {
             return failed("invalid_answer", e.what());
         }

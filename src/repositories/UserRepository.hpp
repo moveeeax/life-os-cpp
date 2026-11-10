@@ -296,6 +296,7 @@ public:
         "money_parse_jobs",
         "money_advisor_reports",
         "task_parse_jobs",
+        "parse_jobs",
         "task_notes",
         "task_items",
         "goal_checkins",

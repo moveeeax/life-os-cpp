@@ -216,6 +216,8 @@ inline const std::vector<EndpointInfo>& get_endpoints() {
         {"POST", "/api/v1/tasks/parse", "Tasks: queue one phrase for the tasks_parse job"},
         {"GET", "/api/v1/tasks/parse/{id}", "Tasks: a parse job and its draft lines"},
         {"POST", "/api/v1/tasks/parse/{id}/accept", "Tasks: create the edited draft lines as tasks"},
+        {"POST", "/api/v1/parse", "Parse: one phrase to food, money and task rows in one job"},
+        {"GET", "/api/v1/parse/{id}", "Parse: a unified parse job and its rows per kind"},
         {"GET", "/api/v1/goals", "Goals: the caller's goals with their progress at a date"},
         {"POST", "/api/v1/goals", "Goals: create a goal"},
         {"GET", "/api/v1/goals/{id}", "Goals: one goal with check-ins, sections, tasks and milestones"},

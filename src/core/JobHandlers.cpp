@@ -17,6 +17,7 @@
 #include "leetcode/jobs/Register.hpp"
 #include "money/jobs/Register.hpp"
 #include "now/jobs/Register.hpp"
+#include "parse/jobs/Register.hpp"
 #include "tasks/jobs/Register.hpp"
 
 namespace Core {
@@ -33,6 +34,7 @@ void register_job_handlers() {
     LeetCode::register_jobs(d);
     Money::register_jobs(d);
     Now::register_jobs(d);
+    UnifiedParse::register_jobs(d);
     Tasks::register_jobs(d);
 }
 

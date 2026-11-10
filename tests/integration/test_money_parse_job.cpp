@@ -24,7 +24,9 @@
 #include "repositories/money/AccountRepository.hpp"
 #include "repositories/money/CategoryRepository.hpp"
 #include "repositories/money/CurrencyRepository.hpp"
+#include "repositories/money/Errors.hpp"
 #include "repositories/money/ParseJobRepository.hpp"
+#include "repositories/money/TransactionRepository.hpp"
 #include "test_helpers.hpp"
 
 using json = nlohmann::json;
@@ -315,6 +317,154 @@ TEST_F(MoneyParseJobTest, TheOpenJobCapHoldsUnderConcurrentCreates) {
     EXPECT_EQ(jobs.open_count(kAnna), Repositories::JobRows::kOpenMax) << "a refused insert rolled back";
     EXPECT_THROW(create(kAnna), Repositories::JobRows::SlotsTaken);
     EXPECT_NO_THROW(create(kBoris));
+}
+
+// ── apply: the worker posts the lines itself ────────────────────────────────
+
+namespace {
+
+/// The owner's ledger rows, oldest first.
+json ledger(const char* owner) {
+    return Database::get().execute_read([&](auto& txn) {
+        auto r = txn.exec_params(
+            "SELECT COALESCE(json_agg(json_build_object('id', id, 'account_id', account_id, 'status', status, "
+            " 'category_id', category_id, 'source', source, 'amount', amount) ORDER BY created_at), '[]'::json) "
+            "FROM money_transactions WHERE owner_id = $1::uuid",
+            std::string(owner));
+        return json::parse(r[0][0].template as<std::string>());
+    });
+}
+
+}  // namespace
+
+TEST_F(MoneyParseJobTest, ApplyPostsTheLinesOnceWhateverRedeliversTheJob) {
+    provider.replies.push_back({200, completion(good_lines())});
+    Repositories::Money::ParseJobRepository::Apply a;
+    a.apply = true;
+    bool replayed = false;
+    const std::string id =
+        jobs.create_text(kAnna, "кофе 1200", "2026-10-07", a, replayed, [](auto&, const std::string&) {})["id"]
+            .get<std::string>();
+    EXPECT_EQ(run(id)["status"], "done");
+
+    const json rows = ledger(kAnna);
+    ASSERT_EQ(rows.size(), 1u);
+    EXPECT_EQ(rows[0]["status"], "posted") << "the parse named the account and the category";
+    EXPECT_EQ(rows[0]["account_id"], kaspi["id"]);
+    EXPECT_EQ(rows[0]["source"], "text");
+    const json job = *jobs.get(kAnna, id);
+    EXPECT_TRUE(job["apply"].get<bool>());
+    ASSERT_EQ(job["applied"]["money"].size(), 1u);
+    EXPECT_EQ(job["applied"]["money"][0]["id"], rows[0]["id"]);
+    EXPECT_EQ(job["applied"]["money"][0]["status"], "posted");
+    EXPECT_FALSE(job["accepted_at"].is_null()) << "an applied job reads as accepted";
+
+    EXPECT_EQ(run(id)["status"], "done") << "a redelivery finds the job done";
+    jobs.finish_applying(id, 1, good_lines()["lines"], "late", 1, 1, [&](auto&, const std::string&, const auto&) {
+        ADD_FAILURE() << "a late finish must not apply again";
+        return json::object();
+    });
+    EXPECT_EQ(ledger(kAnna).size(), 1u) << "one spend, not two";
+    EXPECT_THROW(Repositories::Money::TransactionRepository().accept_parse(kAnna, id, {}),
+                 Repositories::Money::AlreadyAccepted)
+        << "the lines cannot be accepted a second time by hand";
+}
+
+TEST_F(MoneyParseJobTest, ApplyTakesTheRequestsAccountThenTheOnlyOneOfTheCurrency) {
+    json lines = good_lines();
+    lines["lines"][0].erase("account_id");
+    provider.replies.push_back({200, completion(lines)});
+    Repositories::Money::ParseJobRepository::Apply a;
+    a.apply = true;
+    bool replayed = false;
+    const auto job = [&](const Repositories::Money::ParseJobRepository::Apply& with) {
+        return jobs
+            .create_text(kAnna, "кофе 1200", "2026-10-07", with, replayed, [](auto&, const std::string&) {})["id"]
+            .get<std::string>();
+    };
+    EXPECT_EQ(run(job(a))["status"], "done");
+    ASSERT_EQ(ledger(kAnna).size(), 1u);
+    EXPECT_EQ(ledger(kAnna)[0]["account_id"], kaspi["id"]) << "the one open KZT account";
+    EXPECT_EQ(ledger(kAnna)[0]["status"], "posted");
+
+    Repositories::Money::AccountRepository::Input h;
+    h.name = "Halyk";
+    h.currency = "KZT";
+    const json halyk = Repositories::Money::AccountRepository().create(kAnna, h);
+    a.account_id = halyk["id"].get<std::string>();
+    provider.replies.push_back({200, completion(good_lines())});
+    EXPECT_EQ(run(job(a))["status"], "done");
+    ASSERT_EQ(ledger(kAnna).size(), 2u);
+    EXPECT_EQ(ledger(kAnna)[1]["account_id"], halyk["id"]) << "the request's account comes before the parse's";
+    EXPECT_EQ(ledger(kAnna)[1]["status"], "posted");
+}
+
+TEST_F(MoneyParseJobTest, ApplyLeavesWhatItCannotPlacePendingNotLost) {
+    Repositories::Money::AccountRepository::Input h;
+    h.name = "Halyk";
+    h.currency = "KZT";
+    Repositories::Money::AccountRepository().create(kAnna, h);
+    // Two KZT accounts and none named: the account is not known. No category: it is not known either.
+    provider.replies.push_back(
+        {200, completion(json{{"lines", {{{"amount", 1200}, {"name", "Кофе"}, {"merchant", "Coffee Boom"}}}}})});
+    Repositories::Money::ParseJobRepository::Apply a;
+    a.apply = true;
+    bool replayed = false;
+    const std::string id =
+        jobs.create_text(kAnna, "кофе 1200", "2026-10-07", a, replayed, [](auto&, const std::string&) {})["id"]
+            .get<std::string>();
+    EXPECT_EQ(run(id)["status"], "done");
+    const json rows = ledger(kAnna);
+    ASSERT_EQ(rows.size(), 1u);
+    EXPECT_EQ(rows[0]["status"], "pending") << "it waits in the inbox";
+    EXPECT_TRUE(rows[0]["category_id"].is_null());
+    EXPECT_EQ((*jobs.get(kAnna, id))["applied"]["money"][0]["status"], "pending");
+    EXPECT_THROW(Repositories::Money::TransactionRepository().confirm(kAnna, rows[0]["id"].get<std::string>()),
+                 Repositories::Money::Invariant)
+        << "a row without a category is not posted";
+}
+
+TEST_F(MoneyParseJobTest, ApplyWithNoOpenAccountKeepsTheLinesInTheJob) {
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params("UPDATE money_accounts SET archived = true WHERE owner_id = $1::uuid", std::string(kAnna));
+        return true;
+    });
+    json lines = good_lines();
+    lines["lines"][0].erase("account_id");
+    provider.replies.push_back({200, completion(lines)});
+    Repositories::Money::ParseJobRepository::Apply a;
+    a.apply = true;
+    bool replayed = false;
+    const std::string id =
+        jobs.create_text(kAnna, "кофе 1200", "2026-10-07", a, replayed, [](auto&, const std::string&) {})["id"]
+            .get<std::string>();
+    EXPECT_EQ(run(id)["status"], "done");
+    EXPECT_EQ(ledger(kAnna).size(), 0u);
+    const json job = *jobs.get(kAnna, id);
+    ASSERT_EQ(job["applied"]["skipped"].size(), 1u);
+    EXPECT_EQ(job["applied"]["skipped"][0]["reason"], "no_account");
+    EXPECT_EQ(job["result"].size(), 1u) << "the line stays in the job";
+}
+
+TEST_F(MoneyParseJobTest, TheSameIdempotencyKeyFindsTheSameJob) {
+    Repositories::Money::ParseJobRepository::Apply a;
+    a.apply = true;
+    a.idempotency_key = "queue-entry-7";
+    bool replayed = false;
+    int queued = 0;
+    const auto create = [&] {
+        return jobs.create_text(
+            kAnna, "кофе 1200", "2026-10-07", a, replayed, [&](auto&, const std::string&) { ++queued; })["id"];
+    };
+    const json first = create();
+    EXPECT_FALSE(replayed);
+    const json second = create();
+    EXPECT_TRUE(replayed);
+    EXPECT_EQ(first, second);
+    EXPECT_EQ(queued, 1) << "one queue job";
+    ASSERT_TRUE(Repositories::JobRows::keyed(Repositories::Money::ParseJobRepository::kTable, kAnna, "queue-entry-7"));
+    EXPECT_FALSE(Repositories::JobRows::keyed(Repositories::Money::ParseJobRepository::kTable, kBoris, "queue-entry-7"))
+        << "a key is the owner's own";
 }
 
 TEST(MoneyParseHandler, IsRegisteredAmongBuiltins) {

@@ -41,4 +41,14 @@ inline std::optional<std::string> today_in(const std::string& tz) {
     });
 }
 
+/// The hour of the clock in @p tz now, 0..23; nullopt when @p tz is not a zone.
+inline std::optional<int> hour_in(const std::string& tz) {
+    if (!is_zone(tz)) {
+        return std::nullopt;
+    }
+    return Database::get().execute_read([&](auto& txn) {
+        return txn.exec_params("SELECT extract(hour FROM now() AT TIME ZONE $1)::int", tz)[0][0].template as<int>();
+    });
+}
+
 }  // namespace Repositories::Zones
