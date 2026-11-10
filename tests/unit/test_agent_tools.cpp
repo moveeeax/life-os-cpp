@@ -227,7 +227,8 @@ TEST(AgentTools, ThePrefaceTellsOfProposalsAndWhatBecameOfThem) {
                                                   {"summary":"Tick «Зарядка» for today","status":"cancelled"}])"));
     EXPECT_NE(p.find("(today, tasks_of_day, find_tasks, goals, habits, notes, sleep, money, food)"), std::string::npos)
         << "the write tools are not in the read list";
-    EXPECT_NE(p.find("Changes (create_task, complete_task, check_habit, add_note, journal_note) are only proposed"),
+    EXPECT_NE(p.find("Changes (create_task, complete_task, check_habit, add_note, journal_note, add_food, add_spend) "
+                     "are only proposed"),
               std::string::npos);
     EXPECT_NE(p.find("Add the task «Молоко»: done. Tick «Зарядка» for today: cancelled by the person."),
               std::string::npos);
@@ -282,7 +283,8 @@ TEST(AgentActions, EveryWriteToolIsKnown) {
         EXPECT_FALSE(d["function"]["parameters"]["required"].empty());
     }
     EXPECT_EQ(names,
-              (std::set<std::string>{"create_task", "complete_task", "check_habit", "add_note", "journal_note"}));
+              (std::set<std::string>{
+                  "create_task", "complete_task", "check_habit", "add_note", "journal_note", "add_food", "add_spend"}));
     for (const auto& n : names) {
         EXPECT_TRUE(A::is_write(n)) << n;
     }
@@ -497,6 +499,141 @@ TEST(AgentActions, TheDiaryIsAJournalNoteOfTheDay) {
     EXPECT_EQ(refused(propose(site, "journal_note", json{{"title", "x"}}))["error"], "invalid");
 }
 
+TEST(AgentActions, AMealIsOneBatchOfDiaryEntries) {
+    Site site;
+    const auto p = std::get<A::Proposal>(propose(site, "add_food", json::parse(R"({"meal":"lunch","lines":[
+            {"name":"Плов","grams":350,"kcal":560,"protein_g":18,"fat_g":22,"carbs_g":70},
+            {"name":"Чай","kcal":90.4,"protein_g":0,"fat_g":0,"carbs_g":22.5,"item_id":null}]})")));
+    EXPECT_EQ(p.kind, "add_food");
+    EXPECT_EQ(p.summary, "Lunch: Плов 350 g, Чай (650 kcal), 2026-10-26") << "the title, then the day";
+    EXPECT_EQ(p.request["method"], "POST");
+    EXPECT_EQ(p.request["path"], "/api/v1/food/entries/batch");
+    const json& entries = p.request["body"]["entries"];
+    ASSERT_EQ(entries.size(), 2U);
+    EXPECT_EQ(entries[0], json::parse(R"({"date":"2026-10-26","meal":"lunch","name":"Плов","grams":350.0,
+        "kcal":560.0,"protein_g":18.0,"fat_g":22.0,"carbs_g":70.0})"));
+    EXPECT_FALSE(entries[1].contains("grams"));
+    EXPECT_FALSE(entries[1].contains("item_id"));
+    EXPECT_TRUE(site.sent.empty()) << "nothing to look up";
+
+    const auto product = std::get<A::Proposal>(
+        propose(site, "add_food", json::parse(R"({"meal":"snack","date":"2026-10-25","lines":[{"name":"Творог",
+            "item_id":"11111111-1111-4111-8111-111111111111","grams":200,"kcal":240,"protein_g":36,"fat_g":10,
+            "carbs_g":6}]})")));
+    EXPECT_EQ(product.request["body"]["entries"][0]["item_id"], "11111111-1111-4111-8111-111111111111");
+    EXPECT_EQ(product.request["body"]["entries"][0]["date"], "2026-10-25");
+
+    const auto bad = [&](const char* args) { return refused(propose(site, "add_food", json::parse(args)))["error"]; };
+    EXPECT_EQ(bad(R"({"meal":"brunch","lines":[{"name":"x","kcal":1,"protein_g":0,"fat_g":0,"carbs_g":0}]})"),
+              "invalid");
+    EXPECT_EQ(bad(R"({"meal":"lunch","lines":[]})"), "invalid");
+    EXPECT_EQ(bad(R"({"meal":"lunch","lines":[{"name":"x","kcal":1}]})"), "invalid") << "the macros too";
+    EXPECT_EQ(bad(R"({"meal":"lunch","lines":[{"name":"x","kcal":20000,"protein_g":0,"fat_g":0,"carbs_g":0}]})"),
+              "invalid");
+    EXPECT_EQ(bad(R"({"meal":"lunch","lines":[{"name":"x","item_id":"11111111-1111-4111-8111-111111111111",
+                  "kcal":1,"protein_g":0,"fat_g":0,"carbs_g":0}]})"),
+              "invalid")
+        << "a product needs its grams";
+    EXPECT_EQ(bad(R"({"meal":"lunch","lines":[{"name":"x","item_id":"nope","grams":1,"kcal":1,"protein_g":0,
+                  "fat_g":0,"carbs_g":0}]})"),
+              "invalid");
+}
+
+namespace {
+
+/// Two KZT accounts (one archived), two USD ones, three categories and remembered merchants.
+void stock_money(Site& site) {
+    site.answers = {
+        {kApi + "/api/v1/money/accounts",
+         {200, R"({"data":[{"id":"a-kzt","name":"Kaspi Gold","currency":"KZT","archived":false},
+                          {"id":"a-old","name":"Old card","currency":"KZT","archived":true},
+                          {"id":"a-usd","name":"Wise","currency":"USD","archived":false},
+                          {"id":"a-usd2","name":"Cash","currency":"USD","archived":false}]})"}},
+        {kApi + "/api/v1/money/categories",
+         {200, R"({"data":[{"id":"c-taxi","name":"Такси","kind":"expense","archived":false},
+                          {"id":"c-food","name":"Еда","kind":"expense","archived":false},
+                          {"id":"c-pay","name":"Зарплата","kind":"income","archived":false}]})"}},
+        {kApi + "/api/v1/money/currencies",
+         {200, R"({"data":[{"code":"KZT","decimals":0},{"code":"USD","decimals":2}]})"}},
+        {kApi + "/api/v1/money/merchants?q=Yandex",
+         {200, R"({"data":[{"merchant_key":"yandex go","category_id":"c-taxi","account_id":"a-kzt"},
+                          {"merchant_key":"yandex go eats","category_id":"c-food","account_id":null}]})"}},
+        {kApi + "/api/v1/money/merchants?q=Starbucks",
+         {200, R"({"data":[{"merchant_key":"starbucks","category_id":"c-food","account_id":"a-usd2"}]})"}},
+        {kApi + "/api/v1/money/merchants", {200, R"({"data":[]})"}},
+    };
+}
+
+}  // namespace
+
+TEST(AgentActions, ExpensesArePostedInTheirAccountsCurrency) {
+    Site site;
+    stock_money(site);
+    const auto p = std::get<A::Proposal>(
+        propose(site,
+                "add_spend",
+                json::parse(R"({"lines":[{"amount":1600,"currency":"KZT","name":"Такси","merchant":"Yandex Go"},
+                                 {"amount":4.5,"currency":"USD","name":"Кофе","merchant":"Starbucks"}]})")));
+    EXPECT_EQ(p.kind, "add_spend");
+    EXPECT_EQ(p.summary, "Spend: Такси 1600 KZT, Кофе 4.5 USD (Kaspi Gold, Cash), 2026-10-26");
+    EXPECT_EQ(p.request["path"], "/api/v1/money/transactions/batch");
+    const json& rows = p.request["body"]["transactions"];
+    ASSERT_EQ(rows.size(), 2U);
+    EXPECT_EQ(rows[0]["type"], "expense");
+    EXPECT_EQ(rows[0]["date"], "2026-10-26");
+    EXPECT_EQ(rows[0]["account_id"], "a-kzt") << "the only open KZT account; the archived one is not offered";
+    EXPECT_EQ(rows[0]["category_id"], "c-taxi") << "remembered for the merchant";
+    EXPECT_EQ(rows[0]["amount"], 1600.0);
+    EXPECT_EQ(rows[0]["merchant"], "Yandex Go");
+    EXPECT_EQ(rows[1]["account_id"], "a-usd2") << "two USD accounts: the merchant's last one";
+    EXPECT_EQ(rows[1]["amount"], 4.5) << "never converted";
+    const std::string id0 = rows[0]["external_id"];
+    EXPECT_EQ(id0.rfind("ani-", 0), 0U);
+    EXPECT_NE(id0, rows[1]["external_id"].get<std::string>()) << "an id per row: the ledger refuses a second write";
+    EXPECT_EQ(site.sent[0].url, kApi + "/api/v1/money/accounts?archived=true");
+}
+
+TEST(AgentActions, AnExpenseWithoutItsAccountOrCategoryIsRefusedWithTheChoices) {
+    Site site;
+    stock_money(site);
+    const auto spend = [&](const char* line) {
+        return refused(propose(site, "add_spend", json{{"lines", json::array({json::parse(line)})}}));
+    };
+    auto r = spend(R"({"amount":10,"currency":"USD","name":"Обед","category_id":"c-food"})");
+    EXPECT_EQ(r["error"], "ambiguous");
+    EXPECT_EQ(r["accounts"].size(), 2U) << "the USD accounts to pick from";
+
+    r = spend(R"({"amount":10,"currency":"EUR","name":"Обед","category_id":"c-food"})");
+    EXPECT_EQ(r["error"], "no_account") << "no pending row: the ledger has no row without an account";
+    EXPECT_EQ(r["accounts"].size(), 3U) << "every open account";
+
+    r = spend(R"({"amount":10,"currency":"USD","name":"Обед","category_id":"c-food","account_id":"a-kzt"})");
+    EXPECT_EQ(r["error"], "currency") << "a KZT account does not take a USD amount";
+    EXPECT_EQ(r["accounts"].size(), 2U);
+
+    r = spend(R"({"amount":10,"currency":"USD","name":"Обед","account_id":"a-usd"})");
+    EXPECT_EQ(r["error"], "no_category");
+    EXPECT_EQ(r["categories"], json::parse(R"([{"id":"c-taxi","name":"Такси"},{"id":"c-food","name":"Еда"}])"));
+    EXPECT_EQ(
+        spend(R"({"amount":10,"currency":"USD","name":"Обед","account_id":"a-usd","category_id":"c-pay"})")["error"],
+        "not_found")
+        << "an income category is not an expense's";
+    EXPECT_EQ(spend(R"({"amount":10.5,"currency":"KZT","name":"Обед","category_id":"c-food"})")["error"], "invalid")
+        << "KZT has no decimals";
+    EXPECT_EQ(spend(R"({"amount":0,"currency":"KZT","name":"Обед","category_id":"c-food"})")["error"], "invalid");
+    EXPECT_EQ(spend(R"({"amount":5,"currency":"kzt","name":"Обед","category_id":"c-food"})")["error"], "invalid");
+
+    const auto archived = std::get<A::Proposal>(propose(
+        site, "add_spend", json::parse(R"({"date":"2026-10-20","lines":[{"amount":500,"currency":"KZT","name":"Обед",
+            "category_id":"c-food","account_id":"a-old"}]})")));
+    EXPECT_EQ(archived.request["body"]["transactions"][0]["account_id"], "a-old") << "named, it is used";
+    EXPECT_EQ(archived.summary, "Spend: Обед 500 KZT (Old card), 2026-10-20");
+
+    site.answers = {};
+    EXPECT_EQ(spend(R"({"amount":5,"currency":"KZT","name":"Обед"})")["error"], "unavailable")
+        << "money is off or the API did not answer";
+}
+
 TEST(AgentActions, CalendarChangesAreProposalsInThePersonsTime) {
     for (const auto& d : A::calendar_definitions()) {
         EXPECT_TRUE(A::is_write(d["function"]["name"].get<std::string>()));
@@ -599,7 +736,9 @@ json every_tool() {
                              "remember",
                              "forget",
                              "promise",
-                             "drop_promise"}) {
+                             "drop_promise",
+                             "set_cue",
+                             "clear_cue"}) {
         tools.push_back(json{{"type", "function"}, {"function", {{"name", name}}}});
     }
     return tools;
@@ -620,7 +759,8 @@ TEST(AgentTools, AWebhookTurnOnlyReadsAndProposes) {
     EXPECT_EQ(names_of(T::offered("user", all)), names_of(all)) << "the person's own turns keep every tool";
 
     const auto hook = names_of(T::offered("hook", all));
-    for (const char* gone : {"remember", "forget", "promise", "drop_promise", "tg_react", "tg_mark_read"}) {
+    for (const char* gone :
+         {"remember", "forget", "promise", "drop_promise", "set_cue", "clear_cue", "tg_react", "tg_mark_read"}) {
         EXPECT_EQ(hook.count(gone), 0u) << gone << " acts at once";
     }
     for (const char* kept : {"today",

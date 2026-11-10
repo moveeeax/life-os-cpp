@@ -62,6 +62,19 @@ describe('AniOffers', () => {
     await waitFor(() => expect(chat.confirmAction).toHaveBeenCalledTimes(2));
   });
 
+  it('a meal and expenses show their title with the day under it', async () => {
+    turnWith([
+      act('f', 'add_food', 'Lunch: Плов 350 g (650 kcal), 2026-11-10'),
+      act('s', 'add_spend', 'Spend: Такси 1600 KZT (Kaspi Gold), 2026-11-10'),
+    ]);
+    render(<AniOffers turn="t1" onDone={() => {}} />);
+    expect(await screen.findByText('Lunch: Плов 350 g (650 kcal)')).toBeTruthy();
+    expect(screen.getByText('Spend: Такси 1600 KZT (Kaspi Gold)')).toBeTruthy();
+    expect(screen.getAllByText('Tue, Nov 10')).toHaveLength(2);
+    fireEvent.click(screen.getAllByText('Yes')[0]);
+    await waitFor(() => expect(chat.confirmAction).toHaveBeenCalledWith('f'));
+  });
+
   it('says it is done when nothing is pending', async () => {
     turnWith([]);
     const done = vi.fn();

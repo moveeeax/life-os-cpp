@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
+import { ActionWords } from './ActionWords';
 import {
   cancelAction,
   chatOf,
@@ -219,7 +220,7 @@ export function AniOffers({
             )}
             {changes.map((a) => (
               <span key={a.id} className="ani-offer-row">
-                <span className="ani-offer-text num">{a.summary}</span>
+                <ActionWords action={a} className="ani-offer-text" />
                 <button
                   type="button"
                   className="ani-offer-main"

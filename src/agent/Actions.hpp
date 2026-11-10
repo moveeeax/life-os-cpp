@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <variant>
 
@@ -25,6 +26,8 @@ namespace Agent::Actions {
 inline constexpr const char* kActionJob = "ani_action";
 /// Proposals per turn.
 inline constexpr int kMaxPerTurn = 3;
+/// Lines of one food or spend proposal.
+inline constexpr std::size_t kMaxLines = 20;
 
 /// The write tools as the gateway takes them.
 nlohmann::json definitions();

@@ -320,11 +320,12 @@ components:
       description: 'Why the series has no data for the caller: its module is off, the fitness read permission is missing, no Mi account is linked, or the id names a currency, category or habit that is not the caller''s. Null when it is available.'
     MetricEntry:
       type: object
-      required: [id, module, label, unit, reduce, presence, available, why]
+      required: [id, module, label, label_ru, unit, reduce, presence, available, why]
       properties:
         id: { type: string, description: 'The catalog id with its parameters: fitness:steps, money:expense:KZT, money:expense:KZT:<category uuid>, habits:<habit uuid>' }
         module: { type: string, enum: [fitness, food, habits, tape, workout, tasks, money, practice, leetcode], description: The section the series comes from }
         label: { type: string }
+        label_ru: { type: string, description: 'The label in Russian: Шаги, "Расходы, KZT"; a habit''s own name for habits:<uuid>' }
         unit: { type: string, description: 'kg, h, min, kcal, g, cm, bpm, %; the currency for money and practice; the habit''s own unit; empty for a count without one' }
         reduce: { type: string, enum: [sum, last, avg, min, max, count], description: How the rows of a day become its value }
         presence: { type: boolean, description: 'A day with a value counts by itself (a weigh-in, a mood, a session): a habit on it needs no goal' }
@@ -387,7 +388,7 @@ components:
         note: { type: string, maxLength: 500 }
     Today:
       type: object
-      required: [focus, errors]
+      required: [focus, note, errors]
       description: 'A section key is absent when its module is off, the caller has nothing there, or it failed (then it is in errors)'
       properties:
         travel:
@@ -576,6 +577,7 @@ components:
           oneOf:
             - { $ref: '#/components/schemas/Focus' }
             - { type: 'null' }
+        note: { type: [string, 'null'], description: 'The note of the day (PUT /api/v1/today/note); null when there is none' }
         errors: { type: array, items: { type: string } }
     Sound:
       type: object
@@ -1262,7 +1264,7 @@ components:
       required: [id, kind, summary, status, error]
       properties:
         id: { type: string, format: uuid }
-        kind: { type: string, enum: [create_task, complete_task, check_habit, add_note, tg_send, tg_edit, calendar_add, calendar_move, calendar_remove, journal_note] }
+        kind: { type: string, enum: [create_task, complete_task, check_habit, add_note, tg_send, tg_edit, calendar_add, calendar_move, calendar_remove, journal_note, add_food, add_spend], description: 'add_food: entries of one meal in the food diary; add_spend: posted expenses, each in its account''s currency' }
         summary: { type: string, description: 'What the user confirms, in words' }
         text: { type: [string, 'null'], description: 'The message of a Telegram proposal (tg_send, tg_edit), which the user may change on Confirm; null for the other kinds' }
         status:
@@ -1428,6 +1430,17 @@ components:
       properties:
         rule: { $ref: '#/components/schemas/GithubRule' }
         detail: { type: string, description: 'Why, in a few words: "3 open issues", "no license, no README", "no push for 14 months"' }
+        code:
+          type: string
+          enum: [failing_checks, open_alerts, open_prs, open_issues, missing_basics, never_pushed, no_recent_push]
+          description: 'What fired, for a client that words it itself: failing_checks (checks) with branch, open_alerts (alerts), open_prs (prs) and open_issues (issues) with count, missing_basics (hygiene) with missing, never_pushed or no_recent_push (stale, the latter with months). Absent on a verdict stored before the field existed, until the next sync of the repository (every six hours) or a mute change recomputes it'
+        branch: { type: [string, 'null'], description: 'failing_checks: the default branch, null when unknown' }
+        count: { type: integer, minimum: 1, description: 'open_alerts, open_prs, open_issues: how many are open' }
+        missing:
+          type: array
+          items: { type: string, enum: [description, license, readme] }
+          description: 'missing_basics: what the repository lacks, in this order'
+        months: { type: integer, minimum: 12, description: 'no_recent_push: whole 30-day months since the last push' }
     GithubStatus:
       type: object
       required: [configured, linked, login, scopes, linked_at, synced_at, sync_error, org_hint]
@@ -1504,6 +1517,24 @@ components:
         days: { type: integer, minimum: 1, maximum: 127, description: Weekday bitmask, Monday = 1 .. Sunday = 64 }
         tz: { type: string }
         next_at: { type: string, format: date-time }
+    AniCue:
+      type: object
+      required: [id, screen, text, action, expires_at]
+      properties:
+        id: { type: string, description: 'Stable for a rule and a day; agent-<uuid> for a cue her agent wrote' }
+        screen: { type: string, enum: [today, food, body, money] }
+        text: { type: string, description: Her line, in Russian }
+        action:
+          description: The button, or null for a line without one
+          oneOf:
+            - type: object
+              required: [label, kind]
+              properties:
+                label: { type: string }
+                kind: { type: string, enum: [food, spend, task, water, measure, set], description: What the button opens }
+                payload: { type: object, additionalProperties: true, description: 'What it fills in, e.g. {"meal": "lunch"}' }
+            - { type: 'null' }
+        expires_at: { type: string, format: date-time, description: The next local midnight }
     AniHookItem:
       type: object
       required: [type]
@@ -2616,12 +2647,19 @@ components:
               avg_pace_sec_per_km: { type: number, nullable: true }
               max_pace_sec_per_km: { type: number, nullable: true }
               total_steps: { type: integer, nullable: true }
+    FitnessGoals:
+      type: object
+      required: [steps, steps_set]
+      properties:
+        steps: { type: integer, minimum: 1000, maximum: 100000, description: 'The daily steps goal in effect: the caller''s, else the default 8000' }
+        steps_set: { type: boolean, description: 'False while the caller has set none and steps is the default' }
     SummaryListResponse:
       type: object
-      required: [data, count, total]
+      required: [data, count, total, steps_goal]
       properties:
         count: { type: integer }
         total: { type: integer, description: "Rows in the whole range, ignoring limit/offset" }
+        steps_goal: { type: integer, description: 'The caller''s daily steps goal (GET /api/v1/fitness/goals), 8000 when unset' }
         data:
           type: array
           items:
@@ -3239,6 +3277,52 @@ components:
         date: { type: string, format: date }
         ml: { type: integer, minimum: 0, maximum: 20000 }
         goal_ml: { type: integer, description: '2000 until the person sets one' }
+
+    FoodPlanMealInput:
+      type: object
+      required: [time, title, kcal, meal]
+      properties:
+        time: { type: string, pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$', description: 'Local time, HH:MM ("8:30" is stored as "08:30")' }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        kcal: { type: number, minimum: 0, maximum: 10000 }
+        protein_g: { type: [number, 'null'], minimum: 0, maximum: 1000 }
+        meal: { type: string, enum: [breakfast, lunch, dinner, snack], description: 'The diary meal this row stands for' }
+
+    FoodPlanMeal:
+      type: object
+      required: [time, title, kcal, meal]
+      properties:
+        time: { type: string, description: HH:MM }
+        title: { type: string }
+        kcal: { type: number }
+        protein_g: { type: number, description: 'Absent when the plan does not say' }
+        meal: { type: string, enum: [breakfast, lunch, dinner, snack] }
+
+    FoodPlanRow:
+      type: object
+      required: [time, title, kcal, meal, eaten]
+      properties:
+        time: { type: string, description: HH:MM }
+        title: { type: string }
+        kcal: { type: number }
+        protein_g: { type: number, description: 'Absent when the plan does not say' }
+        meal: { type: string, enum: [breakfast, lunch, dinner, snack] }
+        eaten: { type: boolean, description: 'The diary has an entry of this meal on the day' }
+
+    FoodPlanDay:
+      type: object
+      required: [data, date, source]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/FoodPlanRow' }, description: Sorted by time }
+        date: { type: string, format: date }
+        source: { type: string, enum: [day, template, none], description: "The day's own plan, its weekday's template, or nothing" }
+
+    FoodPlanTemplate:
+      type: object
+      required: [weekday, meals]
+      properties:
+        weekday: { type: integer, minimum: 1, maximum: 7, description: '1 = Monday ... 7 = Sunday' }
+        meals: { type: array, items: { $ref: '#/components/schemas/FoodPlanMeal' }, description: Sorted by time }
 
     FoodWeek:
       type: object
@@ -4201,6 +4285,32 @@ paths:
         '401': { description: Not authenticated }
         '404': { description: No such key (or not yours) }
 
+  /api/v1/idempotency/seen:
+    get:
+      summary: Which of the caller's Idempotency-Keys the server already applied
+      description: >-
+        A mutating request carrying an Idempotency-Key that was answered 2xx
+        leaves a marker for its key and caller, kept idempotency.ttl_sec (24 h
+        by default). An offline queue asks with its pending keys before it lays
+        them over a screen's answer, so a write in flight is not counted twice.
+        Only the caller's own keys are seen; none while the middleware is off.
+      tags: [account]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: keys, in: query, required: true, schema: { type: string }, description: 'Comma-separated keys, 1 to 100, each up to 200 characters' }
+      responses:
+        '200':
+          description: The keys already applied, in the order asked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { type: string } }
+        '400': { description: 'No keys, more than 100, or a key over 200 characters (invalid_query)' }
+        '401': { description: Not authenticated }
+
   # ── Admin (require Permission::ADMINISTER) ────────────────────────────────
   /api/v1/admin/users:
     get:
@@ -4786,6 +4896,58 @@ paths:
         '401': { description: Not authenticated }
         '403': { description: 'The principal is not a user account (no_user_account); no fitness permission is needed' }
         '404': { description: 'Fitness module disabled, or not the caller''s measurement' }
+  /api/v1/fitness/goals:
+    get:
+      summary: Your daily steps goal
+      description: 'The caller''s own setting: no linked Mi account and no fitness permission needed. 8000 steps while unset.'
+      tags: [fitness]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The goals
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/FitnessGoals' }
+        '401': { description: Not authenticated }
+        '403': { description: 'The principal is not a user account (no_user_account); no fitness permission is needed' }
+        '404': { description: Fitness module disabled }
+        '503': { description: Database unavailable }
+    put:
+      summary: Set or clear your daily steps goal
+      tags: [fitness]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [steps]
+              properties:
+                steps: { type: [integer, 'null'], minimum: 1000, maximum: 100000, description: Null clears the goal back to the default 8000 }
+      responses:
+        '200':
+          description: The goals after the change
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/FitnessGoals' }
+        '400':
+          description: invalid_steps
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { description: Not authenticated }
+        '403': { description: 'The principal is not a user account (no_user_account); no fitness permission is needed' }
+        '404': { description: Fitness module disabled }
+        '503': { description: Database unavailable }
   /api/v1/fitness/workouts:
     get:
       summary: Workouts
@@ -7003,6 +7165,162 @@ paths:
                       goal_ml: { type: integer }
         '400':
           description: invalid_ml
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Food module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/food/plan:
+    get:
+      summary: The meal plan of a day, eaten marked from the diary
+      description: "The day's own plan when one is set, else the template of its weekday, else nothing. A row is eaten when the diary has an entry of its meal on that day."
+      tags: [food]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: date, in: query, schema: { type: string, format: date }, description: 'The local day; today in tz by default' }
+        - { name: tz, in: query, schema: { type: string, default: UTC } }
+      responses:
+        '200':
+          description: The day's plan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FoodPlanDay' }
+        '400':
+          description: invalid_date
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Food module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    put:
+      summary: Set the meal plan of one day, over its weekday template
+      tags: [food]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date, meals]
+              properties:
+                date: { type: string, format: date }
+                meals: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/FoodPlanMealInput' }, description: 'An empty array plans nothing for the day' }
+      responses:
+        '200':
+          description: The day's plan after it
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FoodPlanDay' }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Food module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Drop a day's own plan; its weekday template applies again
+      tags: [food]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: date, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: The day's plan after it (fine when the day had none)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FoodPlanDay' }
+        '400':
+          description: invalid_date
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Food module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/food/plan/template:
+    get:
+      summary: The meal plan templates of the seven weekdays
+      tags: [food]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Monday to Sunday; a weekday without a template has no meals
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/FoodPlanTemplate' } }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Food module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    put:
+      summary: Replace the meal plan template of a weekday
+      tags: [food]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [weekday, meals]
+              properties:
+                weekday: { type: integer, minimum: 1, maximum: 7, description: '1 = Monday ... 7 = Sunday' }
+                meals: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/FoodPlanMealInput' }, description: 'An empty array drops the template' }
+      responses:
+        '200':
+          description: The weekday's template after it
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/FoodPlanTemplate' }
+        '400':
+          description: Validation failed
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -10261,7 +10579,7 @@ paths:
         '503': { description: 'Storage not configured or not answering (storage_not_configured, storage_error)' }
   /api/v1/today:
     get:
-      summary: The day's digest for the Now screen and the focus of the day
+      summary: The day's digest for the Now screen, the focus and the note of the day
       tags: [now]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -10621,7 +10939,8 @@ paths:
       summary: Confirm a change Ani's agent proposed
       description: >-
         The agent's write tools (a new task, closing a task, ticking a habit,
-        a note to the inbox) only propose; this queues the change for the
+        a note to the inbox, a meal for the food diary, expenses for the
+        ledger) only propose; this queues the change for the
         worker, which makes it as the caller through this API. The turn shows
         the action's status. A Telegram message (tg_send, tg_edit) may come
         with the caller's own text, which replaces the proposed one. Refused
@@ -11919,6 +12238,56 @@ paths:
         '204': { description: Removed }
         '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
         '404': { description: No such reminder }
+  /api/v1/ani/cues:
+    get:
+      summary: Ani's cues for the screens of the app on a local day
+      description: >-
+        Her lines with an optional button, computed on the server from the
+        day's food diary, calendar, sleep, tape measurements and month of
+        money (the rules the iOS app ran itself: a meeting in 15-60 minutes
+        at lunch time with lunch not written, the latest meal due and not
+        written, a night under six hours, the tape not used for over 10
+        days, the first category over its budget), then the cues her agent
+        wrote for the day (set_cue), at most one per screen. A cue sent away
+        with dismiss is left out until the next local day. A source whose
+        module is off, or that fails, stays quiet. Ids are stable for a rule
+        and a day (meeting-soon, meal-missing-breakfast, -lunch or -dinner,
+        sleep-short, measure-stale, budget-over; agent-<uuid> for hers).
+        Refused for API keys.
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: date, in: query, description: 'The local day, YYYY-MM-DD; default today in tz', schema: { type: string, format: date } }
+        - { name: tz, in: query, description: The caller's IANA zone (UTC when absent), schema: { type: string } }
+      responses:
+        '200':
+          description: The cues, the rules' first in their order, then hers
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/AniCue' } }
+        '400': { description: 'A date or zone that is not one (invalid_query)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+  /api/v1/ani/cues/{id}/dismiss:
+    post:
+      summary: Hide a cue until the next local day
+      description: >-
+        The cue of that id is left out of GET /ani/cues for the rest of the
+        local day (date and tz as there). Again is a no-op. Refused for API keys.
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, maxLength: 64 } }
+        - { name: date, in: query, description: 'The local day, YYYY-MM-DD; default today in tz', schema: { type: string, format: date } }
+        - { name: tz, in: query, description: The caller's IANA zone (UTC when absent), schema: { type: string } }
+      responses:
+        '204': { description: Hidden for the day }
+        '400': { description: 'A date or zone that is not one (invalid_query)' }
+        '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
+        '404': { description: 'No such cue (cue_not_found): not a rule id, or not an agent cue of that day' }
   /api/v1/ani/webhook/rotate:
     post:
       summary: Replace the caller's Ani webhook URL

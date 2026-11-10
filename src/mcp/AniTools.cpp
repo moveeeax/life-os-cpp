@@ -204,8 +204,11 @@ json chat(const std::string& owner, const json& args) {
 }
 
 /// The MCP's proposal tools and the write tools of her agent they stand for.
-const std::vector<std::pair<std::string, std::string>> kProposals = {
-    {"ani_task", "create_task"}, {"ani_habit", "check_habit"}, {"ani_note", "add_note"}};
+const std::vector<std::pair<std::string, std::string>> kProposals = {{"ani_task", "create_task"},
+                                                                     {"ani_habit", "check_habit"},
+                                                                     {"ani_note", "add_note"},
+                                                                     {"ani_food", "add_food"},
+                                                                     {"ani_spend", "add_spend"}};
 
 /// The input schema of one of her agent's write tools.
 json write_schema(const std::string& tool) {
@@ -388,6 +391,14 @@ Server ani_server(const std::string& owner, Scheduler after) {
          "Proposes to tick a habit (today unless a date is given) or add an amount; confirmed by the user on Now.",
          write_schema("check_habit")},
         {"ani_note", "Proposes a note to the user's inbox; confirmed by the user on Now.", write_schema("add_note")},
+        {"ani_food",
+         "Proposes food diary entries of one meal (a line per dish with its numbers); confirmed by the user on Now.",
+         write_schema("add_food")},
+        {"ani_spend",
+         "Proposes posted expenses, each amount in its account's currency (never converted); the account is "
+         "account_id, else the merchant's last one, else the only open account of the currency, and an answer "
+         "without one lists the accounts to pick from. Confirmed by the user on Now.",
+         write_schema("add_spend")},
         {"ani_reminders", "Her recurring reminders: text, local time, weekdays.", schema(json::object())},
         {"ani_reminder_add",
          "A recurring reminder: she says the text at a local time on the given weekdays (Monday = 1; default every "

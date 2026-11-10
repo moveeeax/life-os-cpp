@@ -134,6 +134,8 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
         };
         const auto focus = FocusRepository().get(owner, date);
         json data = ::Now::Today::assemble(parts, focus ? focus_out(owner, *focus) : json());
+        const auto note = Repositories::Now::NoteRepository().get(owner, date);
+        data["note"] = note ? json(*note) : json();
         callback(Response::ok(json{{"data", data}}));
     });
 }

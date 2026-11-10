@@ -371,6 +371,36 @@ or the seal key was rotated (the user links again); an empty organisation,
 which is `org_hint` above rather than an error; a rate limit or a GitHub
 outage, which the next scheduled run retries on its own.
 
+## Idempotency on prod {#idempotency}
+
+The iOS client sends `Idempotency-Key` (the id of its queue entry) with every
+queued write and repeats it after a dropped connection; without the
+middleware a repeat after a lost answer writes a second row. Prod has it on
+(`idempotency.enabled: true` in `deploy/values-prod.yaml`). To check a running
+release:
+
+```sh
+kubectl --context oci-k3s -n life-os get deploy life-os-cpp \
+  -o jsonpath='{range .spec.template.spec.containers[0].env[?(@.name=="IDEMPOTENCY_ENABLED")]}{.value}{"\n"}{end}'
+kubectl --context oci-k3s -n life-os logs deploy/life-os-cpp | grep 'Idempotency middleware initialized'
+```
+
+The first prints `true`, the log line says `enabled=true`. The behaviour check
+writes to a real diary, so take a day you then clean up, and a full-scope key:
+
+```sh
+K=$(uuidgen); D=2026-01-01
+for i in 1 2; do
+  curl -s -D- -o /dev/null -X POST https://life-os.tarassov.me/api/v1/food/water \
+    -H "Authorization: Bearer $LIFE_OS_KEY" -H "Idempotency-Key: $K" \
+    -H 'Content-Type: application/json' -d "{\"date\":\"$D\",\"add_ml\":250}" | grep -i idempotent
+done
+curl -s "https://life-os.tarassov.me/api/v1/idempotency/seen?keys=$K" -H "Authorization: Bearer $LIFE_OS_KEY"
+```
+
+The second POST carries `X-Idempotent-Replayed: true`, the day has 250 ml,
+not 500, and `idempotency/seen` returns the key.
+
 ## Backups {#backup}
 
 Production data lives in the CloudNativePG cluster `postgresql` in namespace

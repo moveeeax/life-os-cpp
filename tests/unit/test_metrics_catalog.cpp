@@ -138,3 +138,18 @@ TEST(MetricsCatalog, CanonicalRoundTrips) {
     }
     EXPECT_EQ(Metrics::canonical(Metrics::Ref{}), "");
 }
+
+TEST(MetricsCatalog, EveryEntryHasARussianLabel) {
+    std::set<std::string> seen;
+    for (const auto& d : Metrics::catalog()) {
+        EXPECT_FALSE(d.label_ru.empty()) << d.id;
+        EXPECT_NE(d.label_ru, d.label) << "not translated: " << d.id;
+        EXPECT_TRUE(seen.insert(std::string(d.label_ru)).second) << "the same Russian label twice: " << d.label_ru;
+    }
+    // The wording the iOS client used before the field (HabitsSetup.seriesTitle).
+    EXPECT_EQ(Metrics::find("fitness:steps")->label_ru, "Шаги");
+    EXPECT_EQ(Metrics::find("fitness:sleep_duration")->label_ru, "Время в кровати");
+    EXPECT_EQ(Metrics::find("fitness:weight")->label_ru, "Взвешивание");
+    EXPECT_EQ(Metrics::find("food:kcal")->label_ru, "Калории из еды");
+    EXPECT_EQ(Metrics::find("tape:waist")->label_ru, "Талия");
+}
