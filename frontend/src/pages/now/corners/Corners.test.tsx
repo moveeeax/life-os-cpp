@@ -35,6 +35,7 @@ const today: Today = {
   },
   goals: [],
   focus: null,
+  note: null,
   errors: [],
 };
 

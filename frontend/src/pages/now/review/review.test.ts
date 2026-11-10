@@ -68,6 +68,7 @@ describe('groupsOf', () => {
         ],
       },
       focus: null,
+      note: null,
       errors: [],
     };
     const g = groupsOf(today);

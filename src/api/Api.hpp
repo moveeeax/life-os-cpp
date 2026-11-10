@@ -44,6 +44,7 @@
 #include "api/GoalsController.hpp"
 #include "api/HabitsController.hpp"
 #include "api/HealthController.hpp"
+#include "api/IdempotencyController.hpp"
 #include "api/JobsController.hpp"
 #include "api/LeetCodeController.hpp"
 #include "api/MeasurementsController.hpp"

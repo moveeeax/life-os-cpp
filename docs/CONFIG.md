@@ -107,6 +107,14 @@ for example); where it does, the Notes column says so.
 | `IDEMPOTENCY_MAX_RESPONSE_KB` | `idempotency.max_response_kb` | int | `256` | Skip caching oversized responses (no replay) |
 | `IDEMPOTENCY_LOCK_TTL_SEC` | `idempotency.lock_ttl_sec` | int | `30` | In-flight lock for concurrent same-key requests |
 
+Off in `config/config.json` and in the chart's defaults, on in
+`deploy/values-prod.yaml`. A local run keeps it off on purpose: resending a
+request by hand with the same key would get the stored answer back instead of
+reaching the handler. Turn it on locally (`IDEMPOTENCY_ENABLED=true`, Redis up)
+when testing a client's offline queue. With Redis unreachable the middleware
+fails open and every retry reaches the handler. The prod check is in
+`docs/RUNBOOK.md` ([Idempotency on prod](RUNBOOK.md#idempotency)).
+
 ## Docs / Swagger UI
 
 | Env | JSON key | Type | Default | Notes |

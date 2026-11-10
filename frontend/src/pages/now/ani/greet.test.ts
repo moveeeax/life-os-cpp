@@ -8,6 +8,7 @@ const base: Today = {
   tasks: { late_count: 0, first_late: null, late: [], today: [], inbox_count: 0 },
   goals: [],
   focus: null,
+  note: null,
   errors: [],
 };
 const health = (sleep_minutes: number | null): Today['health'] => ({

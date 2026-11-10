@@ -14,6 +14,7 @@ const day = (statuses: ('open' | 'in_progress' | 'done')[]): Today => ({
   },
   goals: [],
   focus: null,
+  note: null,
   errors: [],
 });
 
