@@ -6,6 +6,27 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.62.0] - 2026-11-11
+
+### Added
+- Ani's cues for the app's screens on the server: `GET /api/v1/ani/cues?date=&tz=` returns her lines with an optional button (`{id, screen, text, action: {label, kind, payload?} | null, expires_at}`), computed by the rules the iOS app ran itself (a meeting soon without lunch, the latest meal due and not written, a short night, the tape not used for over 10 days, a category over its budget; `src/agent/Cues.hpp`), plus one cue per screen her agent writes with the new `set_cue` and `clear_cue` tools; `POST /api/v1/ani/cues/{id}/dismiss` hides a cue until the next local day (migration 082, `ani_cue_dismissals` and `ani_cues`).
+- Ani's agent and her MCP (`ani_food`, `ani_spend`) can propose a meal for the food diary (`add_food`: date, meal and dish lines with their numbers) and posted expenses (`add_spend`: amount, currency, account, category, name and merchant per line), confirmed with one Yes on Now like the other kinds and written once through `POST /api/v1/food/entries/batch` and `POST /api/v1/money/transactions/batch`. An amount stays in its account's currency: an account of another currency is refused, and without `account_id` the account is the merchant's last one or the only open account of the currency; when neither is found the proposal is refused with the accounts to pick from, since the ledger keeps no row without an account. Both kinds show on Now as a title with the day under it; migration 084 adds them to `ani_actions`.
+- A daily steps goal of the caller's own: `GET /api/v1/fitness/goals` answers `{steps, steps_set}` (8000 steps while unset) and `PUT /api/v1/fitness/goals` takes `steps` from 1000 to 100000, or null to go back to the default. It lives in the new owner table `fitness_goals` (migration 085), not on the Mi account, so unlinking the band keeps it, and it needs neither the fitness permission nor a linked band. `GET /api/v1/fitness/summary` carries it as `steps_goal`.
+- Food meal plan (migration 081): a template per weekday (`PUT /api/v1/food/plan/template`)
+  and an override for one day (`PUT` and `DELETE /api/v1/food/plan`); `GET /api/v1/food/plan?date=`
+  answers the day's override, else its weekday's template, sorted by time, each row `eaten` when the
+  diary has an entry of the same meal that day.
+- Every GitHub attention item (`attention[]` of the repositories) carries a machine `code` and its numbers next to the English `detail`, so a client can word it itself: `failing_checks` with `branch`, `open_alerts`, `open_prs` and `open_issues` with `count`, `missing_basics` with `missing` (description, license, readme), `never_pushed`, and `no_recent_push` with `months`. A verdict stored earlier gets them at the next sync of the repository (every six hours) or a mute change.
+- `GET /api/v1/idempotency/seen?keys=k1,k2` answers which of the caller's
+  Idempotency-Keys the server already applied (up to 100 per call, kept
+  `idempotency.ttl_sec`), so an offline queue stops counting a write in flight
+  twice; `docs/RUNBOOK.md` gains the check that the middleware is on in prod.
+- `GET /api/v1/metrics` gives every series a `label_ru` next to `label`: the Russian name of each of the 61 catalog entries (the wording the iOS client used in `HabitsSetup.seriesTitle` where it had one), "Расходы, KZT" and "Расходы: <category>, KZT" for money, and the habit's own name for `habits:<uuid>`. `label` stays English, so the site does not change.
+- One parse for a whole phrase: `POST /api/v1/parse {text, meal?, date?, tz?, apply?, account_id?}` reads food, spends, tasks and water from one phrase in one job and one model call (the module prompts as sections of one prompt), returns the rows per kind in each module's own format and files each kind as a finished job of its module, so the module accept routes take them; it holds one of three places of its own, not one in each module. `apply: true` on it, on `POST /api/v1/money/parse` and on `POST /api/v1/tasks/parse` makes the worker create the rows itself when the job ends (a spend on `account_id`, else the account the parse named, else the one open account of its currency, else pending in the inbox; tasks open), with the created ids in the job's `applied`; the rows are created once per job, and the job keeps the request's `Idempotency-Key`, so a retried POST gets the same job back (migration 083).
+- `GET /api/v1/today` carries the note of the day as `note` (a string, or null
+  when there is none), so a client reads back what `PUT /api/v1/today/note`
+  wrote from another device.
+
 ## [1.61.1] - 2026-11-06
 
 ### Security
