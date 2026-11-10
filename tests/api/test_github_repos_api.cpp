@@ -297,6 +297,8 @@ TEST_F(GithubReposApiTest, ViewsCountsAndOwners) {
     EXPECT_EQ(page["counts"], (json{{"attention", 3}, {"all", 4}, {"archived", 1}}));
     EXPECT_EQ(rules_of(page["data"][0]["attention"]), (std::vector<std::string>{"issues"}));
     EXPECT_EQ(page["data"][0]["attention"][0]["detail"], "3 open issues");
+    EXPECT_EQ(page["data"][0]["attention"][0]["code"], "open_issues");
+    EXPECT_EQ(page["data"][0]["attention"][0]["count"], 3);
     EXPECT_EQ(rules_of(page["data"][1]["attention"]), (std::vector<std::string>{"prs", "hygiene"}));
     EXPECT_EQ(rules_of(page["data"][2]["attention"]), (std::vector<std::string>{"stale"}));
 

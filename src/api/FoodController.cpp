@@ -42,6 +42,7 @@
 #include "repositories/food/GoalsRepository.hpp"
 #include "repositories/food/ItemRepository.hpp"
 #include "repositories/food/ParseJobRepository.hpp"
+#include "repositories/food/PlanRepository.hpp"
 #include "repositories/food/WaterRepository.hpp"
 #include "utils/ErrorResponse.hpp"
 #include "utils/Modules.hpp"
@@ -59,6 +60,7 @@ constexpr std::size_t kNoteMax = 500;
 constexpr std::size_t kProfileNoteMax = 1000;
 constexpr std::size_t kParseTextMax = 2000;
 constexpr std::size_t kBatchMax = 50;
+constexpr std::size_t kPlanMealsMax = 20;
 constexpr std::size_t kServingLabelMax = 60;
 constexpr double kServingGramsMax = 5000;
 constexpr std::size_t kServingsMax = 20;
@@ -149,6 +151,65 @@ json product_json(const Food::Off::Product& p) {
     return out;
 }
 
+/// Validates one plan row; fills @p out with {time "HH:MM", title, kcal, protein_g?, meal}.
+/// "8:30" is taken as "08:30" so the times sort as text.
+bool plan_meal(Validation::Errors& errs, const json& body, const std::string& prefix, json& out) {
+    if (!body.is_object()) {
+        errs.add(prefix.substr(0, prefix.size() - 1), "invalid", "must be an object");
+        return false;
+    }
+    static const std::regex kTime(R"(^([01]?\d|2[0-3]):[0-5]\d$)");
+    Validation::Errors local;
+    Validation::require_string(local, body, "time");
+    Validation::regex_match(local, body, "time", kTime, "HH:MM");
+    Validation::require_string(local, body, "title");
+    text_length(local, body, "title", 1, kNameMax);
+    Validation::require_string(local, body, "meal");
+    Validation::one_of(local, body, "meal", kMeals);
+    Validation::require(local, body, "kcal");
+    number_range(local, body, "kcal", 0, kKcalMax);
+    number_range(local, body, "protein_g", 0, kMacroMax);
+    if (local.any()) {
+        for (const auto& e : local.errors_json()) {
+            errs.add(prefix + e.value("field", ""), e.value("code", ""), e.value("message", ""));
+        }
+        return false;
+    }
+    std::string time = body["time"].get<std::string>();
+    if (time.size() == 4) {
+        time.insert(0, "0");
+    }
+    out = json{{"time", time}, {"title", body["title"]}, {"kcal", body["kcal"]}, {"meal", body["meal"]}};
+    if (body.contains("protein_g") && !body["protein_g"].is_null()) {
+        out["protein_g"] = body["protein_g"];
+    }
+    return true;
+}
+
+/// `meals` of a plan body: at most kPlanMealsMax rows, sorted by time (stable). Nullopt after adding errors.
+std::optional<json> plan_meals(Validation::Errors& errs, const json& body) {
+    if (!body.contains("meals") || !body["meals"].is_array() || body["meals"].size() > kPlanMealsMax) {
+        errs.add("meals", "invalid", "must be an array of at most 20 meals");
+        return std::nullopt;
+    }
+    std::vector<json> rows;
+    std::size_t index = 0;
+    for (const auto& m : body["meals"]) {
+        json row;
+        if (plan_meal(errs, m, "meals[" + std::to_string(index) + "].", row)) {
+            rows.push_back(std::move(row));
+        }
+        ++index;
+    }
+    if (errs.any()) {
+        return std::nullopt;
+    }
+    std::stable_sort(rows.begin(), rows.end(), [](const json& a, const json& b) {
+        return a["time"].get<std::string>() < b["time"].get<std::string>();
+    });
+    return json(rows);
+}
+
 /// Validates one entry body; fills @p out. Returns false after adding errors.
 bool entry_input(Validation::Errors& errs,
                  const json& body,
@@ -227,6 +288,12 @@ bool entry_input(Validation::Errors& errs,
         out.estimated = true;
     }
     return true;
+}
+
+/// The plan of @p date as the GET answers it: {data: rows with eaten, date, source}.
+json plan_answer(const std::string& owner, const std::string& date) {
+    const json day = Repositories::PlanRepository().day(owner, date);
+    return json{{"data", day["meals"]}, {"date", date}, {"source", day["source"]}};
 }
 
 }  // namespace
@@ -599,6 +666,87 @@ void FoodController::waterGoal(const HttpRequestPtr& req, Callback&& callback) {
     with_repo_errors(callback, "food.waterGoal", [&] {
         Repositories::WaterRepository().set_goal(owner, static_cast<int>(ml->get<long long>()));
         callback(Response::ok(json{{"data", {{"goal_ml", ml->get<long long>()}}}}));
+    });
+}
+
+void FoodController::plan(const HttpRequestPtr& req, Callback&& callback) {
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
+    const std::string today = local_today(req, &Repositories::Zones::today_in, today_utc());
+    const std::string date = req->getParameter("date").empty() ? today : req->getParameter("date");
+    if (!is_calendar_date(date)) {
+        callback(ErrorResponse::bad_request("invalid_date", "date must be a calendar day as YYYY-MM-DD"));
+        return;
+    }
+    with_repo_errors(callback, "food.plan", [&] { callback(Response::ok(plan_answer(owner, date))); });
+}
+
+void FoodController::putPlan(const HttpRequestPtr& req, Callback&& callback) {
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    if (!body.is_object()) {
+        callback(ErrorResponse::bad_request("invalid_body", "body must be an object with date and meals"));
+        return;
+    }
+    Validation::Errors errs;
+    Validation::require_string(errs, body, "date");
+    date_field(errs, body, "date");
+    const auto meals = plan_meals(errs, body);
+    if (errs.any() || !meals) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    const std::string date = body["date"].get<std::string>();
+    with_repo_errors(callback, "food.putPlan", [&] {
+        Repositories::PlanRepository().put_day(owner, date, meals->dump());
+        callback(Response::ok(plan_answer(owner, date)));
+    });
+}
+
+void FoodController::deletePlan(const HttpRequestPtr& req, Callback&& callback) {
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
+    const std::string date = req->getParameter("date");
+    if (!is_calendar_date(date)) {
+        callback(ErrorResponse::bad_request("invalid_date", "date must be a calendar day as YYYY-MM-DD"));
+        return;
+    }
+    with_repo_errors(callback, "food.deletePlan", [&] {
+        Repositories::PlanRepository().remove_day(owner, date);
+        callback(Response::ok(plan_answer(owner, date)));
+    });
+}
+
+void FoodController::planTemplates(const HttpRequestPtr& req, Callback&& callback) {
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
+    with_repo_errors(callback, "food.planTemplates", [&] {
+        callback(Response::ok(json{{"data", Repositories::PlanRepository().templates(owner)}}));
+    });
+}
+
+void FoodController::putPlanTemplate(const HttpRequestPtr& req, Callback&& callback) {
+    API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
+    json body;
+    if (!Validation::parse_body(req, body, callback)) {
+        return;
+    }
+    if (!body.is_object()) {
+        callback(ErrorResponse::bad_request("invalid_body", "body must be an object with weekday and meals"));
+        return;
+    }
+    Validation::Errors errs;
+    Validation::require(errs, body, "weekday");
+    Validation::int_range(errs, body, "weekday", 1, 7);
+    const auto meals = plan_meals(errs, body);
+    if (errs.any() || !meals) {
+        callback(Validation::response_400(errs));
+        return;
+    }
+    const int weekday = body["weekday"].get<int>();
+    with_repo_errors(callback, "food.putPlanTemplate", [&] {
+        Repositories::PlanRepository().put_template(owner, weekday, meals->dump());
+        callback(Response::ok(json{{"data", {{"weekday", weekday}, {"meals", *meals}}}}));
     });
 }
 

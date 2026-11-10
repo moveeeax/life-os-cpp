@@ -319,6 +319,7 @@ public:
         "day_note",
         "mood_checkins",
         "tape_measurements",
+        "fitness_goals",
         "habit_checks",
         "habits",
         "notes",
@@ -359,6 +360,8 @@ public:
         "github_mutes",
         "github_repos",
         "github_links",
+        "food_plan_templates",
+        "food_plan_days",
     };
 
     /// The foreign keys of the billing tables (migration 007, ON DELETE

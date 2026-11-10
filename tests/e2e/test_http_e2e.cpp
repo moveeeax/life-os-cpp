@@ -585,6 +585,23 @@ TEST(HttpE2E, IdempotencyKeyReplaysResponse) {
     // The 422 comes from the middleware; the spec of this operation does not
     // list it, so the body is checked by hand.
     EXPECT_EQ(body_of(r3)["error"], "idempotency_key_conflict") << r3->getBody();
+
+    // The applied key is seen by its caller only; an unknown key is not.
+    const auto seen = [](const SessionCookies& who) {
+        auto req = HttpRequest::newHttpRequest();
+        req->setPath("/api/v1/idempotency/seen");
+        req->setParameter("keys", "e2e-key-001,e2e-key-never");
+        attach_session(req, who);
+        return send(req);
+    };
+    auto mine = seen(sc);
+    ASSERT_EQ(mine->statusCode(), k200OK) << mine->getBody();
+    expect_matches_schema(mine, "GET", "/api/v1/idempotency/seen");
+    EXPECT_EQ(body_of(mine)["data"], json::array({"e2e-key-001"}));
+    auto other = register_and_login("e2e-idem-other@example.com", "password-e2e-1");
+    auto theirs = seen(other);
+    ASSERT_EQ(theirs->statusCode(), k200OK) << theirs->getBody();
+    EXPECT_EQ(body_of(theirs)["data"], json::array());
 }
 
 TEST(HttpE2E, AuthPublicRoutesAreNeverReplayed) {

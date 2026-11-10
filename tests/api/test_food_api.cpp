@@ -1,7 +1,7 @@
 /**
  * @file test_food_api.cpp
  * @brief Food module routes: products, the diary, goals, Open Food Facts,
- *        two users apart, the module switch.
+ *        the meal plan, two users apart, the module switch.
  */
 
 #include <cstdint>
@@ -89,7 +89,7 @@ protected:
         Database::get().execute_write([](auto& txn) {
             txn.exec(
                 "TRUNCATE TABLE food_entries, food_items, food_goals, mi_accounts, body_measurements, "
-                "daily_activity");
+                "daily_activity, food_plan_templates, food_plan_days");
             for (const char* id : {kAnna, kBoris}) {
                 txn.exec_params(
                     "INSERT INTO users (id, email, confirmed, role_id) "
@@ -133,6 +133,11 @@ protected:
             {&Api::FoodController::createEntry, "/api/v1/food/entries"},
             {&Api::FoodController::createEntries, "/api/v1/food/entries/batch"},
             {&Api::FoodController::parseStart, "/api/v1/food/parse"},
+            {&Api::FoodController::plan, "/api/v1/food/plan"},
+            {&Api::FoodController::putPlan, "/api/v1/food/plan"},
+            {&Api::FoodController::deletePlan, "/api/v1/food/plan"},
+            {&Api::FoodController::planTemplates, "/api/v1/food/plan/template"},
+            {&Api::FoodController::putPlanTemplate, "/api/v1/food/plan/template"},
         };
         for (const auto& [handler, path] : kPaths)
             if (handler == h)
@@ -571,6 +576,137 @@ TEST_F(FoodApiTest, FromOffCopiesAProductOnce) {
               k404NotFound);
     EXPECT_EQ(call_json(&Api::FoodController::itemFromOff, user(kAnna), json{{"code", "abc"}})->statusCode(),
               k400BadRequest);
+}
+
+// ── plan ─────────────────────────────────────────────────────────────────────
+
+TEST_F(FoodApiTest, PlanReadsTheDayThenItsWeekdayAndMarksEatenFromTheDiary) {
+    // 2026-11-10 is a Tuesday (weekday 2).
+    const json tuesday = json::array({
+        json{{"time", "19:30"}, {"title", "Fish, potatoes"}, {"kcal", 560}, {"meal", "dinner"}},
+        json{{"time", "8:30"}, {"title", "Oats, berries"}, {"kcal", 540}, {"protein_g", 30}, {"meal", "breakfast"}},
+        json{{"time", "13:00"}, {"title", "Chicken, rice"}, {"kcal", 680}, {"meal", "lunch"}},
+    });
+    const auto put =
+        call_json(&Api::FoodController::putPlanTemplate, user(kAnna), json{{"weekday", 2}, {"meals", tuesday}}, Put);
+    ASSERT_EQ(put->statusCode(), k200OK) << put->body();
+    const json saved = body_of(put)["data"];
+    EXPECT_EQ(saved["weekday"], 2);
+    ASSERT_EQ(saved["meals"].size(), 3u);
+    EXPECT_EQ(saved["meals"][0]["time"], "08:30") << "padded and sorted by time";
+    EXPECT_EQ(saved["meals"][2]["time"], "19:30");
+
+    const json templates = body_of(call(&Api::FoodController::planTemplates, user(kAnna), Get))["data"];
+    ASSERT_EQ(templates.size(), 7u);
+    EXPECT_EQ(templates[1]["meals"].size(), 3u);
+    EXPECT_TRUE(templates[0]["meals"].empty());
+
+    ASSERT_EQ(call_json(&Api::FoodController::createEntry,
+                        user(kAnna),
+                        json{{"date", "2026-11-10"}, {"meal", "breakfast"}, {"name", "Oats"}, {"kcal", 500}})
+                  ->statusCode(),
+              k201Created);
+    const auto resp = call(&Api::FoodController::plan, user(kAnna), Get, {{"date", "2026-11-10"}});
+    ASSERT_EQ(resp->statusCode(), k200OK) << resp->body();
+    const json day = body_of(resp);
+    EXPECT_EQ(day["source"], "template");
+    EXPECT_EQ(day["date"], "2026-11-10");
+    ASSERT_EQ(day["data"].size(), 3u);
+    EXPECT_EQ(day["data"][0]["title"], "Oats, berries");
+    EXPECT_EQ(day["data"][0]["protein_g"], 30);
+    EXPECT_EQ(day["data"][0]["eaten"], true);
+    EXPECT_EQ(day["data"][1]["eaten"], false);
+    EXPECT_FALSE(day["data"][1].contains("protein_g"));
+
+    EXPECT_EQ(body_of(call(&Api::FoodController::plan, user(kAnna), Get, {{"date", "2026-11-17"}}))["data"].size(), 3u)
+        << "every Tuesday";
+    const json wednesday = body_of(call(&Api::FoodController::plan, user(kAnna), Get, {{"date", "2026-11-11"}}));
+    EXPECT_EQ(wednesday["source"], "none");
+    EXPECT_TRUE(wednesday["data"].empty());
+    EXPECT_TRUE(body_of(call(&Api::FoodController::plan, user(kBoris), Get, {{"date", "2026-11-10"}}))["data"].empty())
+        << "another owner";
+
+    // An override for one Tuesday; the next one keeps the template.
+    const auto over = call_json(
+        &Api::FoodController::putPlan,
+        user(kAnna),
+        json{{"date", "2026-11-10"},
+             {"meals", json::array({json{{"time", "12:00"}, {"title", "Soup"}, {"kcal", 300}, {"meal", "lunch"}}})}},
+        Put);
+    ASSERT_EQ(over->statusCode(), k200OK) << over->body();
+    EXPECT_EQ(body_of(over)["source"], "day");
+    ASSERT_EQ(body_of(over)["data"].size(), 1u);
+    EXPECT_EQ(body_of(over)["data"][0]["eaten"], false) << "no lunch in the diary";
+    EXPECT_EQ(body_of(call(&Api::FoodController::plan, user(kAnna), Get, {{"date", "2026-11-17"}}))["source"],
+              "template");
+
+    // An empty override is a day planned with nothing.
+    call_json(&Api::FoodController::putPlan, user(kAnna), json{{"date", "2026-11-10"}, {"meals", json::array()}}, Put);
+    const json empty = body_of(call(&Api::FoodController::plan, user(kAnna), Get, {{"date", "2026-11-10"}}));
+    EXPECT_EQ(empty["source"], "day");
+    EXPECT_TRUE(empty["data"].empty());
+
+    const auto dropped = call(&Api::FoodController::deletePlan, user(kAnna), Delete, {{"date", "2026-11-10"}});
+    ASSERT_EQ(dropped->statusCode(), k200OK) << dropped->body();
+    EXPECT_EQ(body_of(dropped)["source"], "template");
+    EXPECT_EQ(body_of(dropped)["data"].size(), 3u);
+    EXPECT_EQ(call(&Api::FoodController::deletePlan, user(kAnna), Delete, {{"date", "2026-11-10"}})->statusCode(),
+              k200OK)
+        << "dropping nothing is fine";
+
+    // An empty template drops it.
+    call_json(&Api::FoodController::putPlanTemplate, user(kAnna), json{{"weekday", 2}, {"meals", json::array()}}, Put);
+    EXPECT_EQ(body_of(call(&Api::FoodController::plan, user(kAnna), Get, {{"date", "2026-11-10"}}))["source"], "none");
+}
+
+TEST_F(FoodApiTest, PlanInputIsValidated) {
+    const json lunch{{"time", "13:00"}, {"title", "Rice"}, {"kcal", 600}, {"meal", "lunch"}};
+    const auto put_day = [&](const json& b) {
+        return call_json(&Api::FoodController::putPlan, user(kAnna), b, Put)->statusCode();
+    };
+    const auto put_template = [&](const json& b) {
+        return call_json(&Api::FoodController::putPlanTemplate, user(kAnna), b, Put)->statusCode();
+    };
+    const auto with = [&](const char* field, const json& value) {
+        json m = lunch;
+        if (value.is_discarded()) {
+            m.erase(field);
+        } else {
+            m[field] = value;
+        }
+        return json{{"date", "2026-11-10"}, {"meals", json::array({m})}};
+    };
+    EXPECT_EQ(put_day(json{{"date", "2026-11-10"}, {"meals", json::array({lunch})}}), k200OK);
+    EXPECT_EQ(put_day(json{{"meals", json::array({lunch})}}), k400BadRequest) << "date required";
+    EXPECT_EQ(put_day(json{{"date", "2026-02-30"}, {"meals", json::array({lunch})}}), k400BadRequest);
+    EXPECT_EQ(put_day(json{{"date", "2026-11-10"}}), k400BadRequest) << "meals required";
+    EXPECT_EQ(put_day(json{{"date", "2026-11-10"}, {"meals", "lunch"}}), k400BadRequest);
+    EXPECT_EQ(put_day(with("time", "24:00")), k400BadRequest);
+    EXPECT_EQ(put_day(with("time", "13:5")), k400BadRequest);
+    EXPECT_EQ(put_day(with("time", json::value_t::discarded)), k400BadRequest);
+    EXPECT_EQ(put_day(with("title", "")), k400BadRequest);
+    EXPECT_EQ(put_day(with("title", std::string(201, 'x'))), k400BadRequest);
+    EXPECT_EQ(put_day(with("kcal", -1)), k400BadRequest);
+    EXPECT_EQ(put_day(with("kcal", "600")), k400BadRequest);
+    EXPECT_EQ(put_day(with("kcal", json::value_t::discarded)), k400BadRequest);
+    EXPECT_EQ(put_day(with("protein_g", 1001)), k400BadRequest);
+    EXPECT_EQ(put_day(with("meal", "brunch")), k400BadRequest);
+    EXPECT_EQ(put_day(with("meal", json::value_t::discarded)), k400BadRequest);
+    EXPECT_EQ(put_day(json{{"date", "2026-11-10"}, {"meals", json::array({lunch, 5})}}), k400BadRequest);
+    EXPECT_EQ(put_day(json{{"date", "2026-11-10"}, {"meals", json(std::vector<json>(21, lunch))}}), k400BadRequest)
+        << "at most 20 meals";
+    const auto bad = call_json(&Api::FoodController::putPlan, user(kAnna), with("meal", "brunch"), Put);
+    EXPECT_EQ(body_of(bad)["errors"][0]["field"], "meals[0].meal") << bad->body();
+
+    EXPECT_EQ(put_template(json{{"weekday", 7}, {"meals", json::array({lunch})}}), k200OK);
+    EXPECT_EQ(put_template(json{{"weekday", 0}, {"meals", json::array({lunch})}}), k400BadRequest);
+    EXPECT_EQ(put_template(json{{"weekday", 8}, {"meals", json::array({lunch})}}), k400BadRequest);
+    EXPECT_EQ(put_template(json{{"weekday", 1.5}, {"meals", json::array({lunch})}}), k400BadRequest);
+    EXPECT_EQ(put_template(json{{"meals", json::array({lunch})}}), k400BadRequest) << "weekday required";
+
+    EXPECT_EQ(call(&Api::FoodController::plan, user(kAnna), Get, {{"date", "junk"}})->statusCode(), k400BadRequest);
+    EXPECT_EQ(call(&Api::FoodController::deletePlan, user(kAnna), Delete)->statusCode(), k400BadRequest)
+        << "date required";
 }
 
 // ── guards ───────────────────────────────────────────────────────────────────

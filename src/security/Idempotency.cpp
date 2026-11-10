@@ -58,6 +58,26 @@ std::string lock_key(const std::string& ck) {
     return ck + ":lock";
 }
 
+// The "this key was applied" marker behind seen(): per principal and key only,
+// since the caller asking does not know (or care) which route the key went to.
+std::string seen_key(const std::string& principal, const std::string& idem_key) {
+    return "idemp-seen:" + principal + ":" + idem_key;
+}
+
+// Scope the entry to the caller: the auth middleware has already stamped
+// the principal by now (idempotency runs after auth). When auth is off
+// every caller is "anon", so fold the peer IP into the scope — otherwise
+// two different real users sharing an Idempotency-Key would cross-replay
+// each other's cached responses (a data leak under the AUTH_MODE=none
+// default). With auth on, the principal subject is unique and used as-is.
+// The IP is the shared trusted resolver's (honours rate_limit.trust_proxy):
+// behind the ingress the raw peer is the proxy, the same for every caller.
+std::string principal_scope(const drogon::HttpRequestPtr& req) {
+    if (auto p = Security::Auth::principal_of(req); p && !p->subject.empty())
+        return p->subject;
+    return "anon:" + Security::RateLimit::client_ip(req);
+}
+
 /// Global middleware configuration. File-local on purpose: everything outside
 /// this TU reaches it through initialize() / is_initialized() / config() /
 /// shutdown() below (nothing else ever referenced it directly when it was an
@@ -211,19 +231,7 @@ drogon::HttpResponsePtr pre_handle(const drogon::HttpRequestPtr& req) {
     }
 
     const std::string body_hash = Utils::Crypto::sha256_hex(body);
-    // Scope the entry to the caller: the auth middleware has already stamped
-    // the principal by now (idempotency runs after auth). When auth is off
-    // every caller is "anon", so fold the peer IP into the scope — otherwise
-    // two different real users sharing an Idempotency-Key would cross-replay
-    // each other's cached responses (a data leak under the AUTH_MODE=none
-    // default). With auth on, the principal subject is unique and used as-is.
-    // The IP is the shared trusted resolver's (honours rate_limit.trust_proxy):
-    // behind the ingress the raw peer is the proxy, the same for every caller.
-    std::string principal;
-    if (auto p = Security::Auth::principal_of(req); p && !p->subject.empty())
-        principal = p->subject;
-    else
-        principal = "anon:" + Security::RateLimit::client_ip(req);
+    const std::string principal = principal_scope(req);
     const std::string ck = cache_key(principal, std::string(req->getMethodString()), req->path(), key);
 
     if (auto stored = read_stored_entry(ck)) {
@@ -261,6 +269,7 @@ drogon::HttpResponsePtr pre_handle(const drogon::HttpRequestPtr& req) {
     req->attributes()->insert(kKeyAttr, ck);
     req->attributes()->insert(kHashAttr, body_hash);
     req->attributes()->insert(kLockKeyAttr, lk);
+    req->attributes()->insert(kSeenAttr, seen_key(principal, key));
     return {};
 }
 
@@ -317,6 +326,15 @@ void post_handle(const drogon::HttpRequestPtr& req, const drogon::HttpResponsePt
     const int status = static_cast<int>(resp->statusCode());
     if (status < 200 || status >= 300)
         return;
+    // The write is applied: mark the key before anything below can skip the
+    // replay entry (an oversized response is still an applied write).
+    if (req->attributes()->find(kSeenAttr)) {
+        try {
+            Cache::get().set(req->attributes()->get<std::string>(kSeenAttr), "1", config().ttl_sec);
+        } catch (const std::exception& e) {
+            spdlog::warn("idempotency: seen marker write failed: {}", e.what());
+        }
+    }
     // Refuse to cache oversized responses — Redis memory is precious and
     // a 10MiB file download with 24h TTL would eat it. Drop the entry
     // silently (with a warn log); the client will re-execute on retry.
@@ -360,6 +378,20 @@ void post_handle(const drogon::HttpRequestPtr& req, const drogon::HttpResponsePt
     } catch (const std::exception& e) {
         spdlog::warn("idempotency: cache write failed: {}", e.what());
     }
+}
+
+std::vector<std::string> seen(const drogon::HttpRequestPtr& req, const std::vector<std::string>& keys) {
+    std::vector<std::string> out;
+    if (!is_initialized() || !config().enabled || !Cache::is_initialized())
+        return out;
+    const std::string principal = principal_scope(req);
+    // exists() is fail-open (false on a Redis error): a key it cannot read
+    // is reported unseen, which leaves the client counting its queue as before.
+    for (const auto& k : keys) {
+        if (Cache::get().exists(seen_key(principal, k)))
+            out.push_back(k);
+    }
+    return out;
 }
 
 }  // namespace Security::Idempotency
