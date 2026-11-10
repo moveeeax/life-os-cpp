@@ -2548,12 +2548,19 @@ components:
               avg_pace_sec_per_km: { type: number, nullable: true }
               max_pace_sec_per_km: { type: number, nullable: true }
               total_steps: { type: integer, nullable: true }
+    FitnessGoals:
+      type: object
+      required: [steps, steps_set]
+      properties:
+        steps: { type: integer, minimum: 1000, maximum: 100000, description: 'The daily steps goal in effect: the caller''s, else the default 8000' }
+        steps_set: { type: boolean, description: 'False while the caller has set none and steps is the default' }
     SummaryListResponse:
       type: object
-      required: [data, count, total]
+      required: [data, count, total, steps_goal]
       properties:
         count: { type: integer }
         total: { type: integer, description: "Rows in the whole range, ignoring limit/offset" }
+        steps_goal: { type: integer, description: 'The caller''s daily steps goal (GET /api/v1/fitness/goals), 8000 when unset' }
         data:
           type: array
           items:
@@ -4715,6 +4722,58 @@ paths:
         '401': { description: Not authenticated }
         '403': { description: 'The principal is not a user account (no_user_account); no fitness permission is needed' }
         '404': { description: 'Fitness module disabled, or not the caller''s measurement' }
+  /api/v1/fitness/goals:
+    get:
+      summary: Your daily steps goal
+      description: 'The caller''s own setting: no linked Mi account and no fitness permission needed. 8000 steps while unset.'
+      tags: [fitness]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The goals
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/FitnessGoals' }
+        '401': { description: Not authenticated }
+        '403': { description: 'The principal is not a user account (no_user_account); no fitness permission is needed' }
+        '404': { description: Fitness module disabled }
+        '503': { description: Database unavailable }
+    put:
+      summary: Set or clear your daily steps goal
+      tags: [fitness]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [steps]
+              properties:
+                steps: { type: [integer, 'null'], minimum: 1000, maximum: 100000, description: Null clears the goal back to the default 8000 }
+      responses:
+        '200':
+          description: The goals after the change
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/FitnessGoals' }
+        '400':
+          description: invalid_steps
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { description: Not authenticated }
+        '403': { description: 'The principal is not a user account (no_user_account); no fitness permission is needed' }
+        '404': { description: Fitness module disabled }
+        '503': { description: Database unavailable }
   /api/v1/fitness/workouts:
     get:
       summary: Workouts

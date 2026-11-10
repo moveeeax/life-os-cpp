@@ -2717,6 +2717,141 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/v1/fitness/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Your daily steps goal
+         * @description The caller's own setting: no linked Mi account and no fitness permission needed. 8000 steps while unset.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The goals */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FitnessGoals"];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account); no fitness permission is needed */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Fitness module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /** Set or clear your daily steps goal */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Null clears the goal back to the default 8000 */
+                        steps: number | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description The goals after the change */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FitnessGoals"];
+                        };
+                    };
+                };
+                /** @description invalid_steps */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account); no fitness permission is needed */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Fitness module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fitness/workouts": {
         parameters: {
             query?: never;
@@ -28322,10 +28457,18 @@ export interface components {
                 total_steps: number | null;
             }[];
         };
+        FitnessGoals: {
+            /** @description The daily steps goal in effect: the caller's, else the default 8000 */
+            steps: number;
+            /** @description False while the caller has set none and steps is the default */
+            steps_set: boolean;
+        };
         SummaryListResponse: {
             count: number;
             /** @description Rows in the whole range, ignoring limit/offset */
             total: number;
+            /** @description The caller's daily steps goal (GET /api/v1/fitness/goals), 8000 when unset */
+            steps_goal: number;
             data: {
                 /** Format: date */
                 date: string;

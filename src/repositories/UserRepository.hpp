@@ -319,6 +319,7 @@ public:
         "day_note",
         "mood_checkins",
         "tape_measurements",
+        "fitness_goals",
         "habit_checks",
         "habits",
         "notes",
