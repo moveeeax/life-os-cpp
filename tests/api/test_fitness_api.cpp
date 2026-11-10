@@ -23,6 +23,7 @@
 #include "fitness/xiaomi/Service.hpp"
 #include "jobs/Jobs.hpp"
 #include "repositories/fitness/ActivityRepository.hpp"
+#include "repositories/fitness/GoalsRepository.hpp"
 #include "repositories/fitness/MiAccountRepository.hpp"
 #include "repositories/fitness/SamplesRepository.hpp"
 #include "repositories/fitness/SleepRepository.hpp"
@@ -601,6 +602,25 @@ TEST_F(DataApiTest, SummaryJoinsTheDay) {
     EXPECT_EQ(row["sleep_duration_minutes"], 450);
     EXPECT_EQ(row["sleep_score"], 77);
     EXPECT_EQ(row["resting_bpm"], 55);
+}
+
+TEST_F(DataApiTest, SummaryCarriesTheStepsGoal) {
+    seed_activity("2026-09-21", 5000);
+    Database::get().execute_write([](auto& txn) {
+        txn.exec_params("DELETE FROM fitness_goals WHERE owner_id = $1::uuid", std::string(kTestUserId));
+        return true;
+    });
+    const auto goal = [&] {
+        HttpResponsePtr resp;
+        controller.summary(ranged("2026-09-21", "2026-09-21"), [&](const HttpResponsePtr& r) { resp = r; });
+        EXPECT_NE(resp, nullptr);
+        EXPECT_EQ(resp->statusCode(), k200OK) << resp->body();
+        TestHelpers::expect_2xx_matches_schema(resp, "GET", "/api/v1/fitness/summary");
+        return body_of(resp)["steps_goal"];
+    };
+    EXPECT_EQ(goal(), 8000) << "the default while unset";
+    Repositories::Fitness::GoalsRepository().set_steps(kTestUserId, 12000);
+    EXPECT_EQ(goal(), 12000);
 }
 
 TEST_F(DataApiTest, CoverageReportsPerTypeBounds) {

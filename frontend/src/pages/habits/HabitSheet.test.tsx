@@ -17,6 +17,7 @@ const entry = (over: Partial<MetricEntry>): MetricEntry => ({
   id: 'food:kcal',
   module: 'food',
   label: 'Calories eaten',
+  label_ru: 'Калории из еды',
   unit: 'kcal',
   reduce: 'sum',
   presence: false,

@@ -37,6 +37,7 @@
 #include "fitness/xiaomi/Regions.hpp"
 #include "fitness/xiaomi/Service.hpp"
 #include "jobs/Jobs.hpp"
+#include "repositories/fitness/GoalsRepository.hpp"
 #include "repositories/fitness/MiAccountRepository.hpp"
 #include "repositories/fitness/SyncRunRepository.hpp"
 #include "utils/BlockingPool.hpp"
@@ -659,11 +660,16 @@ void FitnessController::summary(const HttpRequestPtr& req, std::function<void(co
     // region's zone: the activity date is local (same rule as the sync
     // range bounds).
     const long long offset = Repositories::region_offset_seconds(owner);
-    respond_page(
-        [q, offset, account] {
-            return Repositories::HealthReadRepository(account).summary(q.from, q.to, q.limit, q.offset, offset);
-        },
-        callback);
+    try {
+        const auto page = Repositories::HealthReadRepository(account).summary(q.from, q.to, q.limit, q.offset, offset);
+        // The goal the steps compare with, so a client needs no second read.
+        const int steps_goal = Repositories::Fitness::GoalsRepository().steps(owner);
+        callback(Response::ok(
+            json{{"data", page.rows}, {"count", page.rows.size()}, {"total", page.total}, {"steps_goal", steps_goal}}));
+    } catch (const std::exception& e) {
+        spdlog::warn("fitness data read unavailable: {}", e.what());
+        callback(ErrorResponse::service_unavailable("data_unavailable"));
+    }
 }
 
 void FitnessController::abnormalHeartBeat(const HttpRequestPtr& req,

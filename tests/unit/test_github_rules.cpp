@@ -72,6 +72,45 @@ TEST(GithubRules, EveryRuleInOrder) {
     EXPECT_EQ(v[5]["detail"], "no push for 13 months");
 }
 
+TEST(GithubRules, EveryItemCarriesItsCodeAndNumbers) {
+    Github::RepoFacts f;
+    f.full_name = "moveeeax/old";
+    f.is_public = true;
+    f.license = "MIT";
+    f.checks = "failure";
+    f.default_branch = "main";
+    f.open_alerts = 2;
+    f.open_prs = 1;
+    f.open_issues = 3;
+    f.pushed_at = kNow - 400LL * 86400;
+    const auto v = Github::attention(f, {}, kNow);
+    ASSERT_EQ(v.size(), 6u);
+    EXPECT_EQ(
+        v[0],
+        (nlohmann::json{
+            {"rule", "checks"}, {"detail", "checks fail on main"}, {"code", "failing_checks"}, {"branch", "main"}}));
+    EXPECT_EQ(v[1]["code"], "open_alerts");
+    EXPECT_EQ(v[1]["count"], 2);
+    EXPECT_EQ(v[2]["code"], "open_prs");
+    EXPECT_EQ(v[2]["count"], 1);
+    EXPECT_EQ(v[3]["code"], "open_issues");
+    EXPECT_EQ(v[3]["count"], 3);
+    EXPECT_EQ(v[4]["code"], "missing_basics");
+    EXPECT_EQ(v[4]["missing"], (nlohmann::json{"description", "readme"}));
+    EXPECT_EQ(v[4]["detail"], "no description, no README");
+    EXPECT_EQ(v[5]["code"], "no_recent_push");
+    EXPECT_EQ(v[5]["months"], 13);
+
+    f = tidy();
+    f.checks = "failure";
+    f.default_branch.clear();
+    f.pushed_at.reset();
+    const auto w = Github::attention(f, {}, kNow);
+    ASSERT_EQ(w.size(), 2u);
+    EXPECT_TRUE(w[0]["branch"].is_null()) << "the default branch unknown";
+    EXPECT_EQ(w[1], (nlohmann::json{{"rule", "stale"}, {"detail", "never pushed"}, {"code", "never_pushed"}}));
+}
+
 TEST(GithubRules, PendingOrNoChecksAreNotFailures) {
     auto f = tidy();
     f.checks = "pending";

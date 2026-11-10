@@ -10,6 +10,7 @@ const entry = (over: Partial<MetricEntry>): MetricEntry => ({
   id: 'fitness:steps',
   module: 'fitness',
   label: 'Steps',
+  label_ru: 'Шаги',
   unit: 'steps',
   reduce: 'sum',
   presence: false,

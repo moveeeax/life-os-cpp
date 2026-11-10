@@ -29,6 +29,9 @@ const AFTER: Record<Changed, Keys> = {
   // Her own unusual-spend check reads today's rows under its own key.
   transaction: [...ROW_WRITES, ['ani', 'life', 'tx-today']],
   food: [...FOOD_DIARY_WRITES, ['ani', 'life', 'food-day']],
+  // A meal or expenses she proposed: the same sections as her own chips.
+  add_food: [...FOOD_DIARY_WRITES, ['ani', 'life', 'food-day']],
+  add_spend: [...ROW_WRITES, ['ani', 'life', 'tx-today']],
   check_habit: HABIT_WRITES,
   fact: [qk.ani.facts()],
   journal_note: [qk.notes.all()],

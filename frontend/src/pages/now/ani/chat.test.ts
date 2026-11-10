@@ -14,6 +14,7 @@ import {
   loadTurns,
   refusal,
   sendMessage,
+  titleAndDay,
   type Action,
   type Turn,
 } from './chat';
@@ -136,5 +137,20 @@ describe('confirmWords', () => {
     expect(confirmWords({ summary: 'Send to Bob: «старый»', text: 'новый' })).toBe(
       'Send to Bob: «старый» новый',
     );
+  });
+});
+
+describe('titleAndDay', () => {
+  it('splits a meal or expenses into the title and the day, and leaves the other kinds whole', () => {
+    expect(
+      titleAndDay({ kind: 'add_food', summary: 'Lunch: Плов 350 g, Чай (650 kcal), 2026-11-10' }),
+    ).toEqual({ title: 'Lunch: Плов 350 g, Чай (650 kcal)', day: '2026-11-10' });
+    expect(
+      titleAndDay({ kind: 'add_spend', summary: 'Spend: Такси 1600 KZT (Kaspi Gold), 2026-11-09' }),
+    ).toEqual({ title: 'Spend: Такси 1600 KZT (Kaspi Gold)', day: '2026-11-09' });
+    expect(
+      titleAndDay({ kind: 'create_task', summary: 'Add the task «Х», due 2026-11-10' }),
+    ).toBeNull();
+    expect(titleAndDay({ kind: 'add_food', summary: 'Lunch without a day' })).toBeNull();
   });
 });
