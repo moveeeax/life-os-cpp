@@ -2775,6 +2775,141 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/v1/fitness/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Your daily steps goal
+         * @description The caller's own setting: no linked Mi account and no fitness permission needed. 8000 steps while unset.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The goals */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FitnessGoals"];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account); no fitness permission is needed */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Fitness module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /** Set or clear your daily steps goal */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Null clears the goal back to the default 8000 */
+                        steps: number | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description The goals after the change */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FitnessGoals"];
+                        };
+                    };
+                };
+                /** @description invalid_steps */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The principal is not a user account (no_user_account); no fitness permission is needed */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Fitness module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Database unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fitness/workouts": {
         parameters: {
             query?: never;
@@ -26318,6 +26453,8 @@ export interface components {
              */
             module: "fitness" | "food" | "habits" | "tape" | "workout" | "tasks" | "money" | "practice" | "leetcode";
             label: string;
+            /** @description The label in Russian: Шаги, "Расходы, KZT"; a habit's own name for habits:<uuid> */
+            label_ru: string;
             /** @description kg, h, min, kcal, g, cm, bpm, %; the currency for money and practice; the habit's own unit; empty for a count without one */
             unit: string;
             /**
@@ -27626,6 +27763,19 @@ export interface components {
             rule: components["schemas"]["GithubRule"];
             /** @description Why, in a few words: "3 open issues", "no license, no README", "no push for 14 months" */
             detail: string;
+            /**
+             * @description What fired, for a client that words it itself: failing_checks (checks) with branch, open_alerts (alerts), open_prs (prs) and open_issues (issues) with count, missing_basics (hygiene) with missing, never_pushed or no_recent_push (stale, the latter with months). Absent on a verdict stored before the field existed, until the next sync of the repository (every six hours) or a mute change recomputes it
+             * @enum {string}
+             */
+            code?: "failing_checks" | "open_alerts" | "open_prs" | "open_issues" | "missing_basics" | "never_pushed" | "no_recent_push";
+            /** @description failing_checks: the default branch, null when unknown */
+            branch?: string | null;
+            /** @description open_alerts, open_prs, open_issues: how many are open */
+            count?: number;
+            /** @description missing_basics: what the repository lacks, in this order */
+            missing?: ("description" | "license" | "readme")[];
+            /** @description no_recent_push: whole 30-day months since the last push */
+            months?: number;
         };
         GithubStatus: {
             /** @description The server has a GitHub OAuth App and a seal key */
@@ -28669,10 +28819,18 @@ export interface components {
                 total_steps: number | null;
             }[];
         };
+        FitnessGoals: {
+            /** @description The daily steps goal in effect: the caller's, else the default 8000 */
+            steps: number;
+            /** @description False while the caller has set none and steps is the default */
+            steps_set: boolean;
+        };
         SummaryListResponse: {
             count: number;
             /** @description Rows in the whole range, ignoring limit/offset */
             total: number;
+            /** @description The caller's daily steps goal (GET /api/v1/fitness/goals), 8000 when unset */
+            steps_goal: number;
             data: {
                 /** Format: date */
                 date: string;

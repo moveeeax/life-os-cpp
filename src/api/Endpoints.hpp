@@ -86,6 +86,8 @@ inline const std::vector<EndpointInfo>& get_endpoints() {
         {"POST", "/api/v1/fitness/measurements", "Fitness: add girths measured by hand"},
         {"PATCH", "/api/v1/fitness/measurements/{id}", "Fitness: edit a measurement by hand"},
         {"DELETE", "/api/v1/fitness/measurements/{id}", "Fitness: delete a measurement by hand"},
+        {"GET", "/api/v1/fitness/goals", "Fitness: your daily steps goal (8000 when unset)"},
+        {"PUT", "/api/v1/fitness/goals", "Fitness: set or clear your daily steps goal"},
         {"GET", "/api/v1/fitness/workouts", "Fitness: workouts for a date range"},
         {"GET", "/api/v1/fitness/summary", "Fitness: per-day summary (steps, sleep, resting heart rate)"},
         {"GET", "/api/v1/fitness/abnormal-heart-beat", "Fitness: abnormal heart beat events for a date range"},

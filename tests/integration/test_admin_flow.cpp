@@ -247,6 +247,7 @@ void seed_module_rows(const std::string& owner) {
         run("INSERT INTO travel_documents (owner_id, holder, kind, valid_until) "
             "VALUES ($1::uuid, 'Mikhail', 'passport', '2030-01-21')");
         run("INSERT INTO now_settings (owner_id, city, latitude, longitude) VALUES ($1::uuid, 'Almaty', 43.25, 76.91)");
+        run("INSERT INTO fitness_goals (owner_id, steps) VALUES ($1::uuid, 9000)");
         run("INSERT INTO day_note (owner_id, date, text) VALUES ($1::uuid, '2026-10-01', 'Call the bank')");
         run("WITH h AS (INSERT INTO habits (owner_id, name, schedule) VALUES ($1::uuid, 'Meditation', 'daily') "
             " RETURNING id) "

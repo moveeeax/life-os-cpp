@@ -39,6 +39,7 @@
 #include "api/CalendarController.hpp"
 #include "api/FilesController.hpp"
 #include "api/FitnessController.hpp"
+#include "api/FitnessGoalsController.hpp"
 #include "api/FoodController.hpp"
 #include "api/GithubController.hpp"
 #include "api/GoalsController.hpp"

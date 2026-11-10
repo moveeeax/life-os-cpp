@@ -196,10 +196,14 @@ TEST_F(MetricsApiTest, CatalogListsExpandedEntries) {
     EXPECT_EQ(steps["unit"], "steps");
     EXPECT_EQ(steps["reduce"], "sum");
     EXPECT_EQ(steps["presence"], false);
+    EXPECT_EQ(steps["label"], "Steps");
+    EXPECT_EQ(steps["label_ru"], "Шаги");
     EXPECT_EQ(entry_of(list, "fitness:weight")["presence"], true);
 
     const json kzt = entry_of(list, "money:expense:KZT");
     EXPECT_EQ(kzt["unit"], "KZT");
+    EXPECT_EQ(kzt["label_ru"], "Расходы, KZT");
+    EXPECT_EQ(entry_of(list, std::string("money:expense:KZT:") + kAnnaFood)["label_ru"], "Расходы: Food, KZT");
     EXPECT_EQ(kzt["available"], true);
     EXPECT_TRUE(kzt["why"].is_null());
     EXPECT_TRUE(has(list, "money:income:KZT"));
@@ -212,6 +216,7 @@ TEST_F(MetricsApiTest, CatalogListsExpandedEntries) {
 
     const json water = entry_of(list, std::string("habits:") + kWater);
     EXPECT_EQ(water["label"], "Water");
+    EXPECT_EQ(water["label_ru"], "Water") << "a habit keeps its own name";
     EXPECT_EQ(water["unit"], "l");
     int habits = 0;
     for (const auto& e : list) {

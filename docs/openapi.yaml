@@ -320,11 +320,12 @@ components:
       description: 'Why the series has no data for the caller: its module is off, the fitness read permission is missing, no Mi account is linked, or the id names a currency, category or habit that is not the caller''s. Null when it is available.'
     MetricEntry:
       type: object
-      required: [id, module, label, unit, reduce, presence, available, why]
+      required: [id, module, label, label_ru, unit, reduce, presence, available, why]
       properties:
         id: { type: string, description: 'The catalog id with its parameters: fitness:steps, money:expense:KZT, money:expense:KZT:<category uuid>, habits:<habit uuid>' }
         module: { type: string, enum: [fitness, food, habits, tape, workout, tasks, money, practice, leetcode], description: The section the series comes from }
         label: { type: string }
+        label_ru: { type: string, description: 'The label in Russian: Шаги, "Расходы, KZT"; a habit''s own name for habits:<uuid>' }
         unit: { type: string, description: 'kg, h, min, kcal, g, cm, bpm, %; the currency for money and practice; the habit''s own unit; empty for a count without one' }
         reduce: { type: string, enum: [sum, last, avg, min, max, count], description: How the rows of a day become its value }
         presence: { type: boolean, description: 'A day with a value counts by itself (a weigh-in, a mood, a session): a habit on it needs no goal' }
@@ -1429,6 +1430,17 @@ components:
       properties:
         rule: { $ref: '#/components/schemas/GithubRule' }
         detail: { type: string, description: 'Why, in a few words: "3 open issues", "no license, no README", "no push for 14 months"' }
+        code:
+          type: string
+          enum: [failing_checks, open_alerts, open_prs, open_issues, missing_basics, never_pushed, no_recent_push]
+          description: 'What fired, for a client that words it itself: failing_checks (checks) with branch, open_alerts (alerts), open_prs (prs) and open_issues (issues) with count, missing_basics (hygiene) with missing, never_pushed or no_recent_push (stale, the latter with months). Absent on a verdict stored before the field existed, until the next sync of the repository (every six hours) or a mute change recomputes it'
+        branch: { type: [string, 'null'], description: 'failing_checks: the default branch, null when unknown' }
+        count: { type: integer, minimum: 1, description: 'open_alerts, open_prs, open_issues: how many are open' }
+        missing:
+          type: array
+          items: { type: string, enum: [description, license, readme] }
+          description: 'missing_basics: what the repository lacks, in this order'
+        months: { type: integer, minimum: 12, description: 'no_recent_push: whole 30-day months since the last push' }
     GithubStatus:
       type: object
       required: [configured, linked, login, scopes, linked_at, synced_at, sync_error, org_hint]
@@ -2548,12 +2560,19 @@ components:
               avg_pace_sec_per_km: { type: number, nullable: true }
               max_pace_sec_per_km: { type: number, nullable: true }
               total_steps: { type: integer, nullable: true }
+    FitnessGoals:
+      type: object
+      required: [steps, steps_set]
+      properties:
+        steps: { type: integer, minimum: 1000, maximum: 100000, description: 'The daily steps goal in effect: the caller''s, else the default 8000' }
+        steps_set: { type: boolean, description: 'False while the caller has set none and steps is the default' }
     SummaryListResponse:
       type: object
-      required: [data, count, total]
+      required: [data, count, total, steps_goal]
       properties:
         count: { type: integer }
         total: { type: integer, description: "Rows in the whole range, ignoring limit/offset" }
+        steps_goal: { type: integer, description: 'The caller''s daily steps goal (GET /api/v1/fitness/goals), 8000 when unset' }
         data:
           type: array
           items:
@@ -4787,6 +4806,58 @@ paths:
         '401': { description: Not authenticated }
         '403': { description: 'The principal is not a user account (no_user_account); no fitness permission is needed' }
         '404': { description: 'Fitness module disabled, or not the caller''s measurement' }
+  /api/v1/fitness/goals:
+    get:
+      summary: Your daily steps goal
+      description: 'The caller''s own setting: no linked Mi account and no fitness permission needed. 8000 steps while unset.'
+      tags: [fitness]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The goals
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/FitnessGoals' }
+        '401': { description: Not authenticated }
+        '403': { description: 'The principal is not a user account (no_user_account); no fitness permission is needed' }
+        '404': { description: Fitness module disabled }
+        '503': { description: Database unavailable }
+    put:
+      summary: Set or clear your daily steps goal
+      tags: [fitness]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [steps]
+              properties:
+                steps: { type: [integer, 'null'], minimum: 1000, maximum: 100000, description: Null clears the goal back to the default 8000 }
+      responses:
+        '200':
+          description: The goals after the change
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/FitnessGoals' }
+        '400':
+          description: invalid_steps
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { description: Not authenticated }
+        '403': { description: 'The principal is not a user account (no_user_account); no fitness permission is needed' }
+        '404': { description: Fitness module disabled }
+        '503': { description: Database unavailable }
   /api/v1/fitness/workouts:
     get:
       summary: Workouts
