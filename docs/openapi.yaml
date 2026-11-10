@@ -3171,6 +3171,52 @@ components:
         ml: { type: integer, minimum: 0, maximum: 20000 }
         goal_ml: { type: integer, description: '2000 until the person sets one' }
 
+    FoodPlanMealInput:
+      type: object
+      required: [time, title, kcal, meal]
+      properties:
+        time: { type: string, pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$', description: 'Local time, HH:MM ("8:30" is stored as "08:30")' }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        kcal: { type: number, minimum: 0, maximum: 10000 }
+        protein_g: { type: [number, 'null'], minimum: 0, maximum: 1000 }
+        meal: { type: string, enum: [breakfast, lunch, dinner, snack], description: 'The diary meal this row stands for' }
+
+    FoodPlanMeal:
+      type: object
+      required: [time, title, kcal, meal]
+      properties:
+        time: { type: string, description: HH:MM }
+        title: { type: string }
+        kcal: { type: number }
+        protein_g: { type: number, description: 'Absent when the plan does not say' }
+        meal: { type: string, enum: [breakfast, lunch, dinner, snack] }
+
+    FoodPlanRow:
+      type: object
+      required: [time, title, kcal, meal, eaten]
+      properties:
+        time: { type: string, description: HH:MM }
+        title: { type: string }
+        kcal: { type: number }
+        protein_g: { type: number, description: 'Absent when the plan does not say' }
+        meal: { type: string, enum: [breakfast, lunch, dinner, snack] }
+        eaten: { type: boolean, description: 'The diary has an entry of this meal on the day' }
+
+    FoodPlanDay:
+      type: object
+      required: [data, date, source]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/FoodPlanRow' }, description: Sorted by time }
+        date: { type: string, format: date }
+        source: { type: string, enum: [day, template, none], description: "The day's own plan, its weekday's template, or nothing" }
+
+    FoodPlanTemplate:
+      type: object
+      required: [weekday, meals]
+      properties:
+        weekday: { type: integer, minimum: 1, maximum: 7, description: '1 = Monday ... 7 = Sunday' }
+        meals: { type: array, items: { $ref: '#/components/schemas/FoodPlanMeal' }, description: Sorted by time }
+
     FoodWeek:
       type: object
       required: [from, days, targets]
@@ -6931,6 +6977,162 @@ paths:
                       goal_ml: { type: integer }
         '400':
           description: invalid_ml
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Food module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/food/plan:
+    get:
+      summary: The meal plan of a day, eaten marked from the diary
+      description: "The day's own plan when one is set, else the template of its weekday, else nothing. A row is eaten when the diary has an entry of its meal on that day."
+      tags: [food]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: date, in: query, schema: { type: string, format: date }, description: 'The local day; today in tz by default' }
+        - { name: tz, in: query, schema: { type: string, default: UTC } }
+      responses:
+        '200':
+          description: The day's plan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FoodPlanDay' }
+        '400':
+          description: invalid_date
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Food module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    put:
+      summary: Set the meal plan of one day, over its weekday template
+      tags: [food]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date, meals]
+              properties:
+                date: { type: string, format: date }
+                meals: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/FoodPlanMealInput' }, description: 'An empty array plans nothing for the day' }
+      responses:
+        '200':
+          description: The day's plan after it
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FoodPlanDay' }
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Food module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Drop a day's own plan; its weekday template applies again
+      tags: [food]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: date, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: The day's plan after it (fine when the day had none)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FoodPlanDay' }
+        '400':
+          description: invalid_date
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Food module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/food/plan/template:
+    get:
+      summary: The meal plan templates of the seven weekdays
+      tags: [food]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Monday to Sunday; a weekday without a template has no meals
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/FoodPlanTemplate' } }
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Food module disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    put:
+      summary: Replace the meal plan template of a weekday
+      tags: [food]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [weekday, meals]
+              properties:
+                weekday: { type: integer, minimum: 1, maximum: 7, description: '1 = Monday ... 7 = Sunday' }
+                meals: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/FoodPlanMealInput' }, description: 'An empty array drops the template' }
+      responses:
+        '200':
+          description: The weekday's template after it
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/FoodPlanTemplate' }
+        '400':
+          description: Validation failed
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
