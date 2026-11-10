@@ -1,8 +1,9 @@
 /**
  * @file ParseJob.hpp
  * @brief tasks_parse job handler: one phrase to the LLM, the checked draft
- *        lines into the job row. Nothing becomes a task here: the user
- *        accepts the lines afterwards.
+ *        lines into the job row. The user accepts the lines afterwards,
+ *        unless the job was created with apply: then the worker creates
+ *        them as open tasks itself (tasks/jobs/ParseApply.hpp).
  *
  * Payload: {job_id, owner_id, max_attempts}. The request carries the phrase,
  * the hint date and the six areas; the open task titles of the last 30 days
@@ -32,11 +33,22 @@
 #include "tasks/Fields.hpp"
 #include "tasks/Llm.hpp"
 #include "tasks/ParseAnswer.hpp"
+#include "tasks/jobs/ParseApply.hpp"
 #include "utils/Modules.hpp"
 
 namespace Jobs::TasksParse {
 
 inline constexpr const char* kJobType = "tasks_parse";
+
+/// What the request carries besides the phrase: the hint date and the six
+/// areas. The unified parse sends the same.
+inline nlohmann::json prompt_context(const std::string& hint_date) {
+    nlohmann::json areas = nlohmann::json::array();
+    for (const auto a : ::Tasks::Fields::kAreas) {
+        areas.push_back(std::string(a));
+    }
+    return {{"hint_date", hint_date}, {"areas", areas}};
+}
 
 inline nlohmann::json process_job(const nlohmann::json& payload) {
     if (!payload.contains("job_id") || !payload["job_id"].is_string() || payload["job_id"].get<std::string>().empty()) {
@@ -88,12 +100,8 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     try {
         const std::string hint_date = job->value("hint_date", std::string());
         const std::set<std::string> open_titles = Repositories::Tasks::TaskRepository().open_titles(owner);
-        nlohmann::json areas = nlohmann::json::array();
-        for (const auto a : ::Tasks::Fields::kAreas) {
-            areas.push_back(std::string(a));
-        }
-        const nlohmann::json user_message{
-            {"hint_date", hint_date}, {"areas", areas}, {"text", job->value("text", std::string())}};
+        nlohmann::json user_message = prompt_context(hint_date);
+        user_message["text"] = job->value("text", std::string());
         const std::string model = settings->model;
         const nlohmann::json request{{"model", model},
                                      {"messages",
@@ -123,12 +131,15 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         } catch (const ::Tasks::Parse::Invalid& e) {
             return failed("invalid_answer", e.what());
         }
-        jobs.finish(job_id,
-                    attempt,
-                    ::Tasks::Parse::to_json(lines),
-                    body.contains("model") && body["model"].is_string() ? body["model"].get<std::string>() : model,
-                    Chat::usage(body, "prompt_tokens"),
-                    Chat::usage(body, "completion_tokens"));
+        // A job created with apply creates its tasks in the transaction that closes it.
+        jobs.finish_applying(
+            job_id,
+            attempt,
+            ::Tasks::Parse::to_json(lines),
+            body.contains("model") && body["model"].is_string() ? body["model"].get<std::string>() : model,
+            Chat::usage(body, "prompt_tokens"),
+            Chat::usage(body, "completion_tokens"),
+            [&](auto& txn, const std::string& row_owner) { return apply_in(txn, row_owner, lines); });
         return {{"job_id", job_id}, {"status", "done"}, {"lines", lines.size()}};
     } catch (const std::runtime_error& e) {
         // give_up_or_retry's own throw: the queue retries.

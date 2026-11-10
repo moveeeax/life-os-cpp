@@ -1,8 +1,9 @@
 /**
  * @file ParseJob.hpp
  * @brief money_parse job handler: a bank mail, a list or a receipt photo to
- *        the LLM, the checked lines into the job row. Nothing reaches the
- *        ledger here: the user accepts the lines into the inbox afterwards.
+ *        the LLM, the checked lines into the job row. The user accepts the
+ *        lines into the inbox afterwards, unless the text job was created
+ *        with apply: then the worker posts them itself (money/jobs/ParseApply.hpp).
  *
  * Payload: {job_id, owner_id, max_attempts}. The request carries the user's
  * accounts (with the card's last four digits), categories and the merchants
@@ -16,6 +17,7 @@
 #pragma once
 
 #include <map>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -29,6 +31,7 @@
 #include "llm/Chat.hpp"
 #include "money/Llm.hpp"
 #include "money/ParseAnswer.hpp"
+#include "money/jobs/ParseApply.hpp"
 #include "net/Http.hpp"
 #include "repositories/money/AccountRepository.hpp"
 #include "repositories/money/CategoryRepository.hpp"
@@ -41,6 +44,42 @@ namespace Jobs::MoneyParse {
 inline constexpr const char* kJobType = "money_parse";
 /// How many remembered merchants travel with the request, most used first.
 inline constexpr long kMerchantsInPrompt = 300;
+
+/// What the parse request carries about the user: the accounts (with the
+/// card's last four digits), the categories and the merchants the ledger
+/// remembers, and the ids an answer may name. The unified parse sends the same.
+struct PromptContext {
+    std::set<std::string> own_accounts;
+    std::map<std::string, std::string> own_categories;
+    nlohmann::json accounts = nlohmann::json::array();
+    nlohmann::json categories = nlohmann::json::array();
+    nlohmann::json merchants = nlohmann::json::array();
+
+    nlohmann::json message(const std::string& hint_date) const {
+        return {{"hint_date", hint_date}, {"accounts", accounts}, {"categories", categories}, {"merchants", merchants}};
+    }
+};
+
+inline PromptContext prompt_context(const std::string& owner) {
+    PromptContext ctx;
+    for (const auto& a : Repositories::Money::AccountRepository().list(owner, false)) {
+        ctx.own_accounts.insert(a["id"].get<std::string>());
+        ctx.accounts.push_back({{"id", a["id"]},
+                                {"name", a["name"]},
+                                {"bank", a["bank"]},
+                                {"last4", a["last4"]},
+                                {"currency", a["currency"]}});
+    }
+    for (const auto& c : Repositories::Money::CategoryRepository().list(owner, false)) {
+        ctx.own_categories[c["id"].get<std::string>()] = c["kind"].get<std::string>();
+        ctx.categories.push_back({{"id", c["id"]}, {"name", c["name"]}, {"kind", c["kind"]}});
+    }
+    for (const auto& m : Repositories::Money::MerchantRepository().top(owner, kMerchantsInPrompt)) {
+        ctx.merchants.push_back(
+            {{"merchant", m["display_name"]}, {"category_id", m["category_id"]}, {"times", m["times"]}});
+    }
+    return ctx;
+}
 
 inline nlohmann::json process_job(const nlohmann::json& payload) {
     if (!payload.contains("job_id") || !payload["job_id"].is_string() || payload["job_id"].get<std::string>().empty()) {
@@ -90,32 +129,10 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     };
 
     try {
-        std::set<std::string> own_accounts;
-        std::map<std::string, std::string> own_categories;
-        nlohmann::json accounts = nlohmann::json::array();
-        for (const auto& a : Repositories::Money::AccountRepository().list(owner, false)) {
-            own_accounts.insert(a["id"].get<std::string>());
-            accounts.push_back({{"id", a["id"]},
-                                {"name", a["name"]},
-                                {"bank", a["bank"]},
-                                {"last4", a["last4"]},
-                                {"currency", a["currency"]}});
-        }
-        nlohmann::json categories = nlohmann::json::array();
-        for (const auto& c : Repositories::Money::CategoryRepository().list(owner, false)) {
-            own_categories[c["id"].get<std::string>()] = c["kind"].get<std::string>();
-            categories.push_back({{"id", c["id"]}, {"name", c["name"]}, {"kind", c["kind"]}});
-        }
-        nlohmann::json merchants = nlohmann::json::array();
-        for (const auto& m : Repositories::Money::MerchantRepository().top(owner, kMerchantsInPrompt)) {
-            merchants.push_back(
-                {{"merchant", m["display_name"]}, {"category_id", m["category_id"]}, {"times", m["times"]}});
-        }
-
+        const auto ctx = prompt_context(owner);
         const std::string hint_date = job->value("hint_date", std::string());
         const bool receipt = job->value("kind", std::string()) == "receipt";
-        nlohmann::json user_message{
-            {"hint_date", hint_date}, {"accounts", accounts}, {"categories", categories}, {"merchants", merchants}};
+        nlohmann::json user_message = ctx.message(hint_date);
         nlohmann::json user_content;
         std::string model = settings->model;
         if (receipt) {
@@ -157,16 +174,23 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         }
         std::vector<Money::Parse::Line> lines;
         try {
-            lines = Money::Parse::parse_answer(content, hint_date, own_accounts, own_categories);
+            lines = Money::Parse::parse_answer(content, hint_date, ctx.own_accounts, ctx.own_categories);
         } catch (const Money::Parse::Invalid& e) {
             return failed("invalid_answer", e.what());
         }
-        jobs.finish(job_id,
-                    attempt,
-                    Money::Parse::to_json(lines),
-                    body.contains("model") && body["model"].is_string() ? body["model"].get<std::string>() : model,
-                    Chat::usage(body, "prompt_tokens"),
-                    Chat::usage(body, "completion_tokens"));
+        // A text job created with apply posts its lines in the transaction that closes it.
+        jobs.finish_applying(
+            job_id,
+            attempt,
+            Money::Parse::to_json(lines),
+            body.contains("model") && body["model"].is_string() ? body["model"].get<std::string>() : model,
+            Chat::usage(body, "prompt_tokens"),
+            Chat::usage(body, "completion_tokens"),
+            [&](auto& txn, const std::string& row_owner, const std::optional<std::string>& account_id) {
+                nlohmann::json skipped = nlohmann::json::array();
+                nlohmann::json created = apply_in(txn, row_owner, lines, account_id, "text", skipped);
+                return nlohmann::json{{"money", created}, {"skipped", skipped}};
+            });
         return {{"job_id", job_id}, {"status", "done"}, {"lines", lines.size()}};
     } catch (const std::runtime_error& e) {
         // give_up_or_retry's own throw: the queue retries.

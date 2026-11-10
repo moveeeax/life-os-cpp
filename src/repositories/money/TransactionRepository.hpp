@@ -101,6 +101,12 @@ public:
             &detail::translate);
     }
 
+    /// One row inside the caller's transaction, as find() shows it. @throws Invariant.
+    template <typename Txn>
+    static nlohmann::json create_in(Txn& txn, const std::string& owner, const Input& in) {
+        return *find_in(txn, owner, insert_in(txn, owner, in));
+    }
+
     /// The edited lines of a finished parse as pending rows, and the job marked
     /// accepted, in one database transaction. @throws AlreadyAccepted, Invariant.
     nlohmann::json accept_parse(const std::string& owner, const std::string& job_id, const std::vector<Input>& inputs) {

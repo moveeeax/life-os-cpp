@@ -105,6 +105,7 @@ namespace Repo = Repositories::Money;
 
 using Api::Fields::amount_range;
 using Api::Fields::date_field;
+using Api::Fields::idempotency_key;
 using Api::Fields::is_calendar_date;
 using Api::Fields::opt_int;
 using Api::Fields::opt_number;
@@ -1326,16 +1327,39 @@ std::optional<DataUrl> data_url(const std::string& url, std::string& problem) {
     return out;
 }
 
-/// The shared tail of both parse routes: the cap, the row, the job. @p create(repo, in_txn)
-/// inserts the row and runs in_txn(txn, id) inside the same transaction.
+/// The shared tail of both parse routes: the cap, the row, the job. @p create(repo, replayed, in_txn)
+/// inserts the row and runs in_txn(txn, id) inside the same transaction; it sets replayed (and
+/// skips in_txn) when it returns the job an earlier request with the same @p key created.
 template <typename Create>
-void start_parse(const std::string& owner, MoneyController::Callback& callback, Create&& create) {
+void start_parse(const std::string& owner,
+                 MoneyController::Callback& callback,
+                 const std::optional<std::string>& key,
+                 Create&& create) {
     if (!Money::Llm::parse_settings().has_value()) {
         callback(ErrorResponse::service_unavailable("not_configured", "the money parse is not set up on this server"));
         return;
     }
+    const auto accepted = [&](const json& job) {
+        auto resp = Response::ok(json{{"data", {{"id", job["id"]}, {"status", job["status"]}}}});
+        resp->setStatusCode(k202Accepted);
+        callback(resp);
+    };
     Repo::ParseJobRepository repo;
+    // A retry of a request already taken answers with its job, before the cap.
+    if (key) {
+        std::optional<json> earlier;
+        if (!with_repo_errors(callback, "money.parse.keyed", [&] {
+                earlier = Repositories::JobRows::keyed(Repo::ParseJobRepository::kTable, owner, *key);
+            })) {
+            return;
+        }
+        if (earlier) {
+            accepted(*earlier);
+            return;
+        }
+    }
     std::string id;
+    bool replayed = false;
     // The job carries the retry limit it was submitted with.
     const int max_attempts = Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries;
     const auto payload = [&](const std::string& job_id) {
@@ -1354,13 +1378,16 @@ void start_parse(const std::string& owner, MoneyController::Callback& callback, 
                                           json{{"retry_after_sec", 30}}}));
             return;
         }
-        id = create(repo,
-                    [&](auto& txn, const std::string& job_id) {
-                        // The cap again, under the lock: two creates at once cannot both pass the count above.
-                        Repositories::JobRows::hold_slot(txn, Repo::ParseJobRepository::kTable, owner);
-                        via_outbox = Jobs::Outbox::enqueue_if_drained(txn, Jobs::MoneyParse::kJobType, payload(job_id));
-                    })["id"]
-                 .template get<std::string>();
+        const json job = create(repo, replayed, [&](auto& txn, const std::string& job_id) {
+            // The cap again, under the lock: two creates at once cannot both pass the count above.
+            Repositories::JobRows::hold_slot(txn, Repo::ParseJobRepository::kTable, owner);
+            via_outbox = Jobs::Outbox::enqueue_if_drained(txn, Jobs::MoneyParse::kJobType, payload(job_id));
+        });
+        if (replayed) {
+            accepted(job);
+            return;
+        }
+        id = job["id"].template get<std::string>();
     } catch (const Repositories::JobRows::SlotsTaken&) {
         callback(ErrorResponse::make({k429TooManyRequests,
                                       "too_many_parses",
@@ -1417,6 +1444,11 @@ void MoneyController::parseText(const HttpRequestPtr& req, Callback&& callback) 
     Validation::require_string(errs, body, "text");
     text_length(errs, body, "text", 1, kParseTextMax);
     date_field(errs, body, "hint_date");
+    Validation::boolean(errs, body, "apply");
+    if (body.contains("account_id") && !body["account_id"].is_null()) {
+        Validation::uuid(errs, body, "account_id");
+    }
+    const auto key = idempotency_key(req, errs);
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;
@@ -1429,8 +1461,14 @@ void MoneyController::parseText(const HttpRequestPtr& req, Callback&& callback) 
     }
     const auto given_hint = Validation::opt_string(body, "hint_date");
     const std::string hint = given_hint ? *given_hint : local_today(req, &Repositories::Zones::today_in, today_utc());
-    start_parse(owner, callback, [&](Repo::ParseJobRepository& repo, auto&& in_txn) {
-        return repo.create_text(owner, text, hint, in_txn);
+    Repo::ParseJobRepository::Apply apply;
+    apply.apply = body.contains("apply") && body["apply"].is_boolean() && body["apply"].get<bool>();
+    // An account that is not (or no longer) an open one of the caller's is passed over by the worker,
+    // not refused here: a request queued offline must not fail for an account archived since.
+    apply.account_id = Validation::opt_string(body, "account_id");
+    apply.idempotency_key = key;
+    start_parse(owner, callback, key, [&](Repo::ParseJobRepository& repo, bool& replayed, auto&& in_txn) {
+        return repo.create_text(owner, text, hint, apply, replayed, in_txn);
     });
 }
 
@@ -1459,7 +1497,7 @@ void MoneyController::parseReceipt(const HttpRequestPtr& req, Callback&& callbac
     }
     const auto given_hint = Validation::opt_string(body, "hint_date");
     const std::string hint = given_hint ? *given_hint : local_today(req, &Repositories::Zones::today_in, today_utc());
-    start_parse(owner, callback, [&](Repo::ParseJobRepository& repo, auto&& in_txn) {
+    start_parse(owner, callback, std::nullopt, [&](Repo::ParseJobRepository& repo, bool&, auto&& in_txn) {
         return repo.create_receipt(owner, image->payload, image->type, hint, in_txn);
     });
 }

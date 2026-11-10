@@ -17,6 +17,8 @@
 #include "database/Database.hpp"
 #include "jobs/Dispatcher.hpp"
 #include "net/Http.hpp"
+#include "repositories/tasks/Errors.hpp"
+#include "repositories/tasks/InboxRepository.hpp"
 #include "repositories/tasks/ParseJobRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
 #include "tasks/jobs/ParseJob.hpp"
@@ -146,6 +148,40 @@ TEST_F(TasksParseJobTest, TwoLinesAndAnOpenDuplicate) {
     EXPECT_EQ(row["result"][0]["due"], "2026-10-08");
     EXPECT_FALSE(row["result"][0]["possible_duplicate"]);
     EXPECT_TRUE(row["result"][1]["possible_duplicate"]) << "the same title is open already";
+}
+
+TEST_F(TasksParseJobTest, ApplyCreatesOpenTasksOnceAndArchivesTheNote) {
+    const std::string note =
+        Repositories::Tasks::InboxRepository().create(kAnna, "позвонить маме")["id"].get<std::string>();
+    provider.replies.push_back(
+        {200,
+         completion(
+             json{{"lines", {{{"title", "Позвонить маме"}, {"area", "relationships"}, {"due", "2026-10-08"}}}}})});
+    Repositories::Tasks::ParseJobRepository::Apply a;
+    a.apply = true;
+    bool replayed = false;
+    const std::string id =
+        jobs.create(
+                kAnna, "завтра позвонить маме", "2026-10-07", note, a, replayed, [](auto&, const std::string&) {})["id"]
+            .get<std::string>();
+    EXPECT_EQ(run(id)["status"], "done");
+    EXPECT_EQ(run(id)["status"], "done") << "a redelivery finds the job done";
+
+    const json row = *jobs.get(kAnna, id);
+    EXPECT_TRUE(row["apply"].get<bool>());
+    ASSERT_EQ(row["applied"]["tasks"].size(), 1u);
+    EXPECT_FALSE(row["accepted_at"].is_null());
+    const auto task =
+        Repositories::Tasks::TaskRepository().get(kAnna, row["applied"]["tasks"][0]["id"].get<std::string>());
+    ASSERT_TRUE(task.has_value());
+    EXPECT_EQ((*task)["status"], "open");
+    EXPECT_EQ((*task)["due"], "2026-10-08");
+    const long tasks = Database::get().execute_read([&](auto& txn) {
+        return txn.exec_params("SELECT count(*) FROM task_items WHERE owner_id = $1::uuid", std::string(kAnna))[0][0]
+            .template as<long>();
+    });
+    EXPECT_EQ(tasks, 1) << "one task, not two";
+    EXPECT_THROW(Repositories::Tasks::ParseJobRepository().accept(kAnna, id, {}), Repositories::Tasks::AlreadyAccepted);
 }
 
 TEST_F(TasksParseJobTest, AWorkAreaFailsTheAnswer) {

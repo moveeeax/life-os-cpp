@@ -36,16 +36,22 @@ public:
     /// Adds @p delta_ml (negative takes back) to @p date, kept between 0 and 20 000 ml; the day after it.
     nlohmann::json add(const std::string& owner, const std::string& date, int delta_ml) {
         Database::get().execute_write([&](auto& txn) {
-            txn.exec_params(
-                "INSERT INTO food_water (owner_id, day, ml) VALUES ($1::uuid, $2::date, LEAST($4, GREATEST(0, $3))) "
-                "ON CONFLICT (owner_id, day) DO UPDATE SET ml = LEAST($4, GREATEST(0, food_water.ml + $3))",
-                owner,
-                date,
-                delta_ml,
-                kMaxDayMl);
+            add_in(txn, owner, date, delta_ml);
             return true;
         });
         return day(owner, date);
+    }
+
+    /// add() inside the caller's transaction.
+    template <typename Txn>
+    static void add_in(Txn& txn, const std::string& owner, const std::string& date, int delta_ml) {
+        txn.exec_params(
+            "INSERT INTO food_water (owner_id, day, ml) VALUES ($1::uuid, $2::date, LEAST($4, GREATEST(0, $3))) "
+            "ON CONFLICT (owner_id, day) DO UPDATE SET ml = LEAST($4, GREATEST(0, food_water.ml + $3))",
+            owner,
+            date,
+            delta_ml,
+            kMaxDayMl);
     }
 
     /// The day's goal; the goals row is made when there is none yet.

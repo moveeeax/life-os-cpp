@@ -51,6 +51,7 @@ namespace {
 using json = nlohmann::json;
 namespace Repo = Repositories::Tasks;
 using Api::Fields::date_field;
+using Api::Fields::idempotency_key;
 using Api::Fields::is_calendar_date;
 using Api::Fields::text_length;
 using Api::Fields::today_utc;
@@ -552,6 +553,8 @@ void TasksController::parse(const HttpRequestPtr& req, Callback&& callback) {
     if (body.contains("note_id") && !body["note_id"].is_null()) {
         Validation::uuid(errs, body, "note_id");
     }
+    Validation::boolean(errs, body, "apply");
+    const auto key = idempotency_key(req, errs);
     if (!errs.any() && body["text"].get<std::string>().find('\0') != std::string::npos) {
         errs.add("text", "invalid", "must not contain a NUL character");
     }
@@ -567,8 +570,30 @@ void TasksController::parse(const HttpRequestPtr& req, Callback&& callback) {
     const auto given_hint = Validation::opt_string(body, "hint_date");
     const std::string hint = given_hint ? *given_hint : local_today(req, &Repositories::Zones::today_in, today_utc());
     const auto note_id = Validation::opt_string(body, "note_id");
+    Repo::ParseJobRepository::Apply apply;
+    apply.apply = body.contains("apply") && body["apply"].is_boolean() && body["apply"].get<bool>();
+    apply.idempotency_key = key;
+    const auto accepted = [&](const json& job) {
+        auto resp = Response::ok(json{{"data", {{"id", job["id"]}, {"status", job["status"]}}}});
+        resp->setStatusCode(k202Accepted);
+        callback(resp);
+    };
+    // A retry of a request already taken answers with its job, before the cap.
+    if (key) {
+        std::optional<json> earlier;
+        if (!with_repo_errors(callback, "tasks.parse.keyed", [&] {
+                earlier = Repositories::JobRows::keyed(Repo::ParseJobRepository::kTable, owner, *key);
+            })) {
+            return;
+        }
+        if (earlier) {
+            accepted(*earlier);
+            return;
+        }
+    }
     Repo::ParseJobRepository repo;
     std::string id;
+    bool replayed = false;
     // The job carries the retry limit it was submitted with.
     const int max_attempts = Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries;
     const auto payload = [&](const std::string& job_id) {
@@ -587,17 +612,17 @@ void TasksController::parse(const HttpRequestPtr& req, Callback&& callback) {
                                           json{{"retry_after_sec", 30}}}));
             return;
         }
-        id = repo.create(owner,
-                         text,
-                         hint,
-                         note_id,
-                         [&](auto& txn, const std::string& job_id) {
-                             // The cap again, under the lock: two creates at once cannot both pass the count above.
-                             Repositories::JobRows::hold_slot(txn, Repo::ParseJobRepository::kTable, owner);
-                             via_outbox =
-                                 Jobs::Outbox::enqueue_if_drained(txn, Jobs::TasksParse::kJobType, payload(job_id));
-                         })["id"]
-                 .get<std::string>();
+        const json job =
+            repo.create(owner, text, hint, note_id, apply, replayed, [&](auto& txn, const std::string& job_id) {
+                // The cap again, under the lock: two creates at once cannot both pass the count above.
+                Repositories::JobRows::hold_slot(txn, Repo::ParseJobRepository::kTable, owner);
+                via_outbox = Jobs::Outbox::enqueue_if_drained(txn, Jobs::TasksParse::kJobType, payload(job_id));
+            });
+        if (replayed) {
+            accepted(job);
+            return;
+        }
+        id = job["id"].get<std::string>();
     } catch (const Repositories::JobRows::SlotsTaken&) {
         callback(ErrorResponse::make({k429TooManyRequests,
                                       "too_many_parses",

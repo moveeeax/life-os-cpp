@@ -56,6 +56,29 @@ public:
         });
     }
 
+    /// A finished job of the unified parse (POST /parse): its food lines, read
+    /// back like any food parse. Returns the id.
+    template <typename Txn>
+    static std::string insert_done_in(Txn& txn,
+                                      const std::string& owner,
+                                      const std::string& text,
+                                      const std::string& meal,
+                                      const std::string& date,
+                                      const nlohmann::json& lines,
+                                      const std::string& model) {
+        auto r = txn.exec_params(
+            "INSERT INTO food_parse_jobs (owner_id, text, meal, date, status, attempts, started_at, result, model, "
+            " finished_at) VALUES ($1::uuid, $2, $3, $4::date, 'done', 1, now(), $5::jsonb, $6, now()) "
+            "RETURNING id::text",
+            owner,
+            text,
+            meal,
+            date,
+            lines.dump(),
+            model);
+        return r[0][0].template as<std::string>();
+    }
+
     /// The job as its owner sees it; nullopt for another owner's job.
     std::optional<nlohmann::json> get(const std::string& owner, const std::string& id) {
         return Database::get().execute_read([&](auto& txn) { return find_in(txn, owner, id); });

@@ -10405,14 +10405,20 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Send a bank mail, an SMS or a list of purchases to the LLM parse job */
+        /**
+         * Send a bank mail, an SMS or a list of purchases to the LLM parse job
+         * @description With apply the worker posts the lines itself when the job ends, so a client can queue the request offline and make no further call: each line goes on account_id, else the account the parse named, else the one open account of its currency, and is posted when it has a category; any other line is created pending in the inbox. GET /api/v1/money/parse/{id} then holds the created ids in `applied`. The job keeps the request's Idempotency-Key: a retry with the same key answers with the same job and creates nothing more.
+         */
         post: {
             parameters: {
                 query?: {
                     /** @description IANA zone of the caller: hint_date defaults to today there; a name that is not a zone answers 400 invalid_query */
                     tz?: string;
                 };
-                header?: never;
+                header?: {
+                    /** @description Kept on the job: a retry with the same key gets the same job back */
+                    "Idempotency-Key"?: string;
+                };
                 path?: never;
                 cookie?: never;
             };
@@ -10425,6 +10431,16 @@ export interface paths {
                          * @description The date of a line without one; defaults to today in tz (UTC without it)
                          */
                         hint_date?: string;
+                        /**
+                         * @description The worker posts the lines itself when the job ends
+                         * @default false
+                         */
+                        apply?: boolean;
+                        /**
+                         * Format: uuid
+                         * @description With apply, the account the lines are posted on; one that is not an open account of the caller is passed over
+                         */
+                        account_id?: string | null;
                     };
                 };
             };
@@ -10439,8 +10455,11 @@ export interface paths {
                             data: {
                                 /** Format: uuid */
                                 id: string;
-                                /** @enum {string} */
-                                status: "queued";
+                                /**
+                                 * @description queued for a new job; a retry with the same Idempotency-Key answers with its job as it is now
+                                 * @enum {string}
+                                 */
+                                status: "queued" | "running" | "done" | "failed";
                             };
                         };
                     };
@@ -13406,7 +13425,7 @@ export interface paths {
         };
         trace?: never;
     };
-    "/api/v1/tasks/parse": {
+    "/api/v1/parse": {
         parameters: {
             query?: never;
             header?: never;
@@ -13415,14 +13434,20 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Queue one phrase for the tasks_parse job */
+        /**
+         * One phrase to the rows of every kind it holds, in one job and one model call
+         * @description The unified parse: food eaten, money spent or received, things to do and water drunk, read from one phrase ("кофе 1200 и творог 200 г, завтра позвонить маме" gives one spend, one food line and one task). The rows come back per kind in the format of each module's own parse, and each kind is filed as a finished job of its module, so the module's accept route takes them. With apply the worker creates the rows itself when the job ends: spends as POST /api/v1/money/parse with apply does, open tasks, diary entries on date and meal, the water of date. The kinds are those of the module parses that are on and set up. One phrase holds one of the caller's three places for open unified parses, separate from the module parses' own three. The job keeps the request's Idempotency-Key: a retry with the same key answers with the same job and creates nothing more.
+         */
         post: {
             parameters: {
                 query?: {
-                    /** @description IANA zone of the caller: the default day is today there */
+                    /** @description IANA zone of the caller when the body has no tz */
                     tz?: string;
                 };
-                header?: never;
+                header?: {
+                    /** @description Kept on the job: a retry with the same key gets the same job back */
+                    "Idempotency-Key"?: string;
+                };
                 path?: never;
                 cookie?: never;
             };
@@ -13430,13 +13455,25 @@ export interface paths {
                 content: {
                     "application/json": {
                         text: string;
+                        /** @description The meal of the food rows; defaults by the hour in tz when the request arrives (breakfast 4-11, lunch 11-16, dinner 16-22, else snack; snack without tz) */
+                        meal?: components["schemas"]["FoodMeal"];
                         /**
                          * Format: date
-                         * @description The reference day of the parse; defaults to today in tz
+                         * @description The day of the rows; defaults to today in tz
                          */
-                        hint_date?: string;
-                        /** Format: uuid */
-                        note_id?: string;
+                        date?: string;
+                        /** @description IANA zone of the caller; a name that is not a zone answers 400 */
+                        tz?: string;
+                        /**
+                         * @description The worker creates the rows itself when the job ends
+                         * @default false
+                         */
+                        apply?: boolean;
+                        /**
+                         * Format: uuid
+                         * @description With apply, the account the spends are posted on; one that is not an open account of the caller is passed over
+                         */
+                        account_id?: string | null;
                     };
                 };
             };
@@ -13451,6 +13488,212 @@ export interface paths {
                             data: {
                                 /** Format: uuid */
                                 id: string;
+                                /**
+                                 * @description queued for a new job; a retry with the same Idempotency-Key answers with its job as it is now
+                                 * @enum {string}
+                                 */
+                                status: "queued" | "running" | "done" | "failed";
+                            };
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The food, money and tasks modules are all off */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Three unified parses of the caller are still open (too_many_parses) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No module parse is set up (not_configured), or the queue or storage is down */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/parse/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** A unified parse job and its rows per kind */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The job */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["UnifiedParseJob"];
+                        };
+                    };
+                };
+                /** @description id is not a UUID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The principal is not a user account (no_user_account) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The modules are all off, or the job is not the caller's (parse_job) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/parse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue one phrase for the tasks_parse job
+         * @description With apply the worker creates the lines as open tasks itself when the job ends (the note, if any, is archived as an accept does); GET /api/v1/tasks/parse/{id} then holds their ids in `applied`. The job keeps the request's Idempotency-Key: a retry with the same key answers with the same job and creates nothing more.
+         */
+        post: {
+            parameters: {
+                query?: {
+                    /** @description IANA zone of the caller: the default day is today there */
+                    tz?: string;
+                };
+                header?: {
+                    /** @description Kept on the job: a retry with the same key gets the same job back */
+                    "Idempotency-Key"?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        text: string;
+                        /**
+                         * Format: date
+                         * @description The reference day of the parse; defaults to today in tz
+                         */
+                        hint_date?: string;
+                        /** Format: uuid */
+                        note_id?: string;
+                        /**
+                         * @description The worker creates the tasks itself when the job ends
+                         * @default false
+                         */
+                        apply?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Queued */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @description queued for a new job; a retry with the same Idempotency-Key answers with its job as it is now */
                                 status: string;
                             };
                         };
@@ -28437,6 +28680,85 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             finished_at: string | null;
+            /** @description The worker creates the lines as open tasks itself when the job ends */
+            apply?: boolean;
+            applied?: components["schemas"]["ParseApplied"];
+        };
+        /** @description What the worker created for a job asked to apply its rows, null for any other job. The job reads as accepted. `error: apply_failed` means applying failed and nothing was created: the lines wait for the accept route. A key appears for the kinds the parse covers. */
+        ParseApplied: {
+            /** @description The ledger rows; posted on the request's account, the account the parse named, or the one open account of the line's currency, else pending (in the inbox, under a guessed category when the parse named none) */
+            money?: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                status: "posted" | "pending";
+            }[];
+            /** @description The open tasks created */
+            tasks?: {
+                /** Format: uuid */
+                id: string;
+            }[];
+            /** @description The diary entries created, on the job's date and meal */
+            food?: {
+                /** Format: uuid */
+                id: string;
+            }[];
+            /** @description The water added to the job's day */
+            water?: {
+                ml?: number;
+            } | null;
+            /** @description Lines that could not become a row (a spend with no open account at all, reason no_account, or no category of its kind, reason no_category); they stay in the job's lines */
+            skipped?: {
+                kind: string;
+                /** @description Index in the kind's lines */
+                line: number;
+                reason: string;
+            }[];
+            /** @enum {string} */
+            error?: "apply_failed";
+        } | null;
+        UnifiedParseJob: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            status: "queued" | "running" | "done" | "failed";
+            text: string;
+            meal: components["schemas"]["FoodMeal"];
+            /** Format: date */
+            date: string;
+            apply: boolean;
+            /** Format: uuid */
+            account_id: string | null;
+            /** @description The rows per kind when done, each in the format of that module's own parse. `jobs` holds the id of the finished job each kind was filed as in its module (null for a kind with no rows): accept money lines with POST /api/v1/money/parse/{jobs.money}/accept, tasks with POST /api/v1/tasks/parse/{jobs.tasks}/accept, food with POST /api/v1/food/entries/batch, water with POST /api/v1/food/water. `errors` names a kind whose part of the answer broke that module's rules and was dropped. */
+            result: {
+                food: components["schemas"]["FoodParseLine"][];
+                money: components["schemas"]["MoneyParseLine"][];
+                tasks: components["schemas"]["TaskParseLine"][];
+                water: {
+                    ml?: number;
+                } | null;
+                jobs: {
+                    /** Format: uuid */
+                    food?: string | null;
+                    /** Format: uuid */
+                    money?: string | null;
+                    /** Format: uuid */
+                    tasks?: string | null;
+                };
+                errors: {
+                    [key: string]: string;
+                };
+            } | null;
+            applied: components["schemas"]["ParseApplied"];
+            /** @description code and message when failed; codes: not_configured, provider_refused, provider_error_<status>, provider_unavailable, invalid_answer, internal_error, queue_unavailable, queue_gave_up */
+            error: string | null;
+            model: string | null;
+            prompt_tokens: number | null;
+            completion_tokens: number | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            finished_at: string | null;
         };
         Error: {
             error: string;
@@ -29719,6 +30041,14 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             finished_at: string | null;
+            /** @description The worker posts the lines itself when the job ends (text jobs only) */
+            apply?: boolean;
+            /**
+             * Format: uuid
+             * @description The account the request asked the lines to be posted on
+             */
+            account_id?: string | null;
+            applied?: components["schemas"]["ParseApplied"];
         };
         MoneyAdvisorReportSummary: {
             /** Format: uuid */

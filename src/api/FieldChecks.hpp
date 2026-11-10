@@ -15,6 +15,8 @@
 #include <stdexcept>
 #include <string>
 
+#include <drogon/HttpRequest.h>
+
 #include <nlohmann/json.hpp>
 
 #include "api/Validation.hpp"
@@ -173,6 +175,24 @@ inline std::string today_utc() {
                   static_cast<unsigned>(ymd.month()),
                   static_cast<unsigned>(ymd.day()));
     return out;
+}
+
+/// The longest Idempotency-Key a parse job keeps on its row.
+inline constexpr std::size_t kIdempotencyKeyMax = 200;
+
+/// The request's Idempotency-Key for a parse that keeps it on its job row (a
+/// retried POST finds its job, with or without the Redis middleware); nullopt
+/// when absent. A key longer than kIdempotencyKeyMax is refused through @p errs.
+inline std::optional<std::string> idempotency_key(const drogon::HttpRequestPtr& req, Validation::Errors& errs) {
+    const std::string& key = req->getHeader("Idempotency-Key");
+    if (key.empty()) {
+        return std::nullopt;
+    }
+    if (key.size() > kIdempotencyKeyMax) {
+        errs.add("Idempotency-Key", "too_long", "max length " + std::to_string(kIdempotencyKeyMax));
+        return std::nullopt;
+    }
+    return key;
 }
 
 }  // namespace Api::Fields

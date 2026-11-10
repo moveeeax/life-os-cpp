@@ -1,8 +1,8 @@
 /**
  * @file JobRows.hpp
  * @brief The life cycle the LLM job tables share (food, money and tasks parse
- *        jobs, money advisor reports): the claim, the requeue, what counts as
- *        open, and the status a worker reads back.
+ *        jobs, the unified parse, money advisor reports): the claim, the
+ *        requeue, what counts as open, and the status a worker reads back.
  *
  * A row goes queued -> running (one more attempt) -> done | failed, or back to
  * queued for an outage the queue retries. A `running` row older than
@@ -23,6 +23,8 @@
 #include <stdexcept>
 #include <string>
 
+#include <nlohmann/json.hpp>
+
 #include "database/Database.hpp"
 
 namespace Repositories::JobRows {
@@ -31,7 +33,9 @@ namespace Repositories::JobRows {
 /// provider call is capped well below it.
 inline constexpr const char* kStaleRunning = "10 minutes";
 
-/// Queued or running jobs one user may have per module before a new one is refused.
+/// Queued or running jobs one user may have per table before a new one is refused.
+/// The unified parse (parse_jobs) has its own kOpenMax: one phrase holds one place
+/// there and none in the module tables, whose rows it files already done.
 inline constexpr long kOpenMax = 3;
 
 /// queued (or stale running) -> running, one more attempt. Returns the
@@ -105,6 +109,21 @@ inline long open_count(const char* table, const std::string& owner) {
     });
 }
 
+/// The id of the owner's job created with the Idempotency-Key @p key, inside
+/// the caller's transaction; nullopt when there is none. Only the parse tables
+/// that keep the key (money, tasks, the unified parse) are asked.
+template <typename Txn>
+std::optional<std::string> keyed_in(Txn& txn, const char* table, const std::string& owner, const std::string& key) {
+    auto r = txn.exec_params(
+        std::string("SELECT id::text FROM ") + table + " WHERE owner_id = $1::uuid AND idempotency_key = $2",
+        owner,
+        key);
+    if (r.empty()) {
+        return std::nullopt;
+    }
+    return r[0][0].template as<std::string>();
+}
+
 /// Thrown by hold_slot: the owner already has kOpenMax open jobs in the table.
 struct SlotsTaken : std::runtime_error {
     SlotsTaken() : std::runtime_error("too_many_parses") {}
@@ -170,6 +189,24 @@ inline std::string shown_error() {
            " THEN 'worker_lost: the worker stopped while running the job'"
            " WHEN status = 'queued' AND " +
            stale_sql() + " THEN 'queue_lost: the job never reached a worker' ELSE error END";
+}
+
+/// {id, status} of the owner's job created with the Idempotency-Key @p key,
+/// the status as a reader sees it; nullopt when there is none. A retried POST
+/// answers with it instead of queueing a second job, and before the open-job
+/// cap: the retry of a request already taken is not a new parse.
+inline std::optional<nlohmann::json> keyed(const char* table, const std::string& owner, const std::string& key) {
+    return Database::get().execute_read([&](auto& txn) -> std::optional<nlohmann::json> {
+        auto r = txn.exec_params(std::string("SELECT id::text, ") + shown_status() + " FROM " + table +
+                                     " WHERE owner_id = $1::uuid AND idempotency_key = $2",
+                                 owner,
+                                 key);
+        if (r.empty()) {
+            return std::nullopt;
+        }
+        return nlohmann::json{{"id", r[0][0].template as<std::string>()},
+                              {"status", r[0][1].template as<std::string>()}};
+    });
 }
 
 }  // namespace Repositories::JobRows
