@@ -1875,7 +1875,7 @@ components:
       properties:
         money:
           type: array
-          description: The ledger rows; posted on the request's account, the account the parse named, or the one open account of the line's currency, else pending (in the inbox)
+          description: The ledger rows; posted on the request's account, the account the parse named, or the one open account of the line's currency, else pending (in the inbox, under a guessed category when the parse named none)
           items: { type: object, required: [id, status], properties: { id: { type: string, format: uuid }, status: { type: string, enum: [posted, pending] } } }
         tasks:
           type: array
@@ -1891,7 +1891,7 @@ components:
           properties: { ml: { type: integer } }
         skipped:
           type: array
-          description: Lines that could not become a row (a spend with no open account at all, reason no_account); they stay in the job's lines
+          description: Lines that could not become a row (a spend with no open account at all, reason no_account, or no category of its kind, reason no_category); they stay in the job's lines
           items: { type: object, required: [kind, line, reason], properties: { kind: { type: string }, line: { type: integer, description: Index in the kind's lines }, reason: { type: string } } }
         error: { type: string, enum: [apply_failed] }
     UnifiedParseJob:

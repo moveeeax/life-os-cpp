@@ -28033,7 +28033,7 @@ export interface components {
         };
         /** @description What the worker created for a job asked to apply its rows, null for any other job. The job reads as accepted. `error: apply_failed` means applying failed and nothing was created: the lines wait for the accept route. A key appears for the kinds the parse covers. */
         ParseApplied: {
-            /** @description The ledger rows; posted on the request's account, the account the parse named, or the one open account of the line's currency, else pending (in the inbox) */
+            /** @description The ledger rows; posted on the request's account, the account the parse named, or the one open account of the line's currency, else pending (in the inbox, under a guessed category when the parse named none) */
             money?: {
                 /** Format: uuid */
                 id: string;
@@ -28054,7 +28054,7 @@ export interface components {
             water?: {
                 ml?: number;
             } | null;
-            /** @description Lines that could not become a row (a spend with no open account at all, reason no_account); they stay in the job's lines */
+            /** @description Lines that could not become a row (a spend with no open account at all, reason no_account, or no category of its kind, reason no_category); they stay in the job's lines */
             skipped?: {
                 kind: string;
                 /** @description Index in the kind's lines */

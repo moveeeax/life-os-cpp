@@ -10,8 +10,9 @@
  * created pending, so it waits in the inbox instead of being lost: on the
  * account the merchant memory last saw for its merchant, else the account of
  * the last posted row, else the first open account; with no category it waits
- * without one (confirm asks for it). Only a user with no open account at all
- * gets nothing: the line is reported in `skipped` and stays in the job.
+ * under a guessed one (detail::waiting_category). Only a user with no open
+ * account, or no category of the line's kind, gets nothing: the line is
+ * reported in `skipped` and stays in the job.
  */
 
 #pragma once
@@ -122,6 +123,44 @@ std::optional<std::string> waiting_account(Txn& txn,
     return std::nullopt;
 }
 
+/// The category a pending line without one waits under (every income and
+/// expense row has one): the merchant's remembered category, else the one of
+/// the owner's last posted row of the type, else the first open category of
+/// the kind. The inbox lets the person change it before posting.
+template <typename Txn>
+std::optional<std::string> waiting_category(Txn& txn, const std::string& owner, const ::Money::Parse::Line& line) {
+    const auto first = [](const pqxx::result& r) -> std::optional<std::string> {
+        if (r.empty() || r[0][0].is_null()) {
+            return std::nullopt;
+        }
+        return r[0][0].template as<std::string>();
+    };
+    const std::string key = ::Money::merchant_key(line.merchant);
+    if (!key.empty()) {
+        if (auto id = first(txn.exec_params(
+                "SELECT m.category_id::text FROM money_merchants m JOIN money_categories c ON c.id = m.category_id "
+                "WHERE m.owner_id = $1::uuid AND m.merchant_key = $2 AND c.kind = $3 AND NOT c.archived",
+                owner,
+                key,
+                line.type))) {
+            return id;
+        }
+    }
+    if (auto id = first(txn.exec_params(
+            "SELECT t.category_id::text FROM money_transactions t JOIN money_categories c ON c.id = t.category_id "
+            "WHERE t.owner_id = $1::uuid AND t.status = 'posted' AND t.type = $2 AND c.kind = $2 AND NOT c.archived "
+            "ORDER BY t.date DESC, t.created_at DESC LIMIT 1",
+            owner,
+            line.type))) {
+        return id;
+    }
+    return first(txn.exec_params(
+        "SELECT id::text FROM money_categories WHERE owner_id = $1::uuid AND kind = $2 AND NOT archived "
+        "ORDER BY position, name LIMIT 1",
+        owner,
+        line.type));
+}
+
 }  // namespace detail
 
 /**
@@ -155,7 +194,6 @@ nlohmann::json apply_in(Txn& txn,
         in.fx_note = l.fx_note;
         in.note = l.note;
         in.source = source;
-        in.pending_without_category = true;
         const auto posting = detail::posting_account(open, l, requested_account);
         // The checks below throw before any statement fails, so the transaction stays usable.
         if (posting && l.category_id) {
@@ -176,6 +214,13 @@ nlohmann::json apply_in(Txn& txn,
         }
         in.account_id = *waiting;
         in.status = "pending";
+        if (!in.category_id) {
+            in.category_id = detail::waiting_category(txn, owner, l);
+        }
+        if (!in.category_id) {
+            skipped.push_back({{"kind", "money"}, {"line", i}, {"reason", "no_category"}});
+            continue;
+        }
         try {
             const auto row = TransactionRepository::create_in(txn, owner, in);
             out.push_back({{"id", row["id"]}, {"status", "pending"}});

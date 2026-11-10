@@ -48,9 +48,6 @@ public:
         std::string source = "manual";
         std::string status = "posted";
         std::optional<std::string> external_id;
-        /// Only an applied parse sets it: a pending income or expense may wait in
-        /// the inbox without a category, and confirm() asks for one first.
-        bool pending_without_category = false;
     };
 
     struct Patch {
@@ -285,18 +282,9 @@ public:
         });
     }
 
-    /// pending -> posted; the merchant memory learns from it now. @throws NotFound,
-    /// Invariant for an income or expense still without a category.
+    /// pending -> posted; the merchant memory learns from it now. @throws NotFound.
     nlohmann::json confirm(const std::string& owner, const std::string& id) {
         return Database::get().execute_write([&](auto& txn) {
-            auto bare = txn.exec_params(
-                "SELECT 1 FROM money_transactions WHERE owner_id = $1::uuid AND id = $2::uuid AND status = 'pending' "
-                " AND type <> 'fx_adjustment' AND category_id IS NULL",
-                owner,
-                id);
-            if (!bare.empty()) {
-                throw Invariant("pick a category before posting the row");
-            }
             auto r = txn.exec_params(
                 "UPDATE money_transactions SET status = 'posted' "
                 "WHERE owner_id = $1::uuid AND id = $2::uuid AND status = 'pending' RETURNING id",
@@ -453,12 +441,10 @@ private:
             if (in.adjusts_id.has_value()) {
                 throw Invariant("only an adjustment points at another row");
             }
-            if (!in.category_id.has_value() && !(in.pending_without_category && in.status == "pending")) {
+            if (!in.category_id.has_value()) {
                 throw Invariant("an " + in.type + " needs a category");
             }
-            if (in.category_id.has_value()) {
-                check_category(txn, owner, in.type, *in.category_id);
-            }
+            check_category(txn, owner, in.type, *in.category_id);
             if (in.amount <= 0) {
                 throw Invariant("amount must be above 0");
             }

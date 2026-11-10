@@ -166,7 +166,10 @@ protected:
         return Jobs::UnifiedParse::process_job(job->payload);
     }
 
-    bool queue_empty(const char* type) { return !Jobs::get().pick({type}, 1).has_value(); }
+    bool queue_empty(const char* type) {
+        const auto depth = Jobs::get().queue_depth_by_type();
+        return !depth.count(type) || depth.at(type) == 0;
+    }
 
     long count(const std::string& sql) {
         return Database::get().execute_read(

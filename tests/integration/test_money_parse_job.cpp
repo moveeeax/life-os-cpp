@@ -417,11 +417,11 @@ TEST_F(MoneyParseJobTest, ApplyLeavesWhatItCannotPlacePendingNotLost) {
     const json rows = ledger(kAnna);
     ASSERT_EQ(rows.size(), 1u);
     EXPECT_EQ(rows[0]["status"], "pending") << "it waits in the inbox";
-    EXPECT_TRUE(rows[0]["category_id"].is_null());
+    EXPECT_EQ(rows[0]["category_id"], food["id"]) << "the one expense category, to be checked in the inbox";
     EXPECT_EQ((*jobs.get(kAnna, id))["applied"]["money"][0]["status"], "pending");
-    EXPECT_THROW(Repositories::Money::TransactionRepository().confirm(kAnna, rows[0]["id"].get<std::string>()),
-                 Repositories::Money::Invariant)
-        << "a row without a category is not posted";
+    EXPECT_EQ(Repositories::Money::TransactionRepository().confirm(kAnna, rows[0]["id"].get<std::string>())["status"],
+              "posted")
+        << "the person posts it from the inbox";
 }
 
 TEST_F(MoneyParseJobTest, ApplyWithNoOpenAccountKeepsTheLinesInTheJob) {
