@@ -15493,7 +15493,7 @@ export interface paths {
         put?: never;
         /**
          * Confirm a change Ani's agent proposed
-         * @description The agent's write tools (a new task, closing a task, ticking a habit, a note to the inbox) only propose; this queues the change for the worker, which makes it as the caller through this API. The turn shows the action's status. A Telegram message (tg_send, tg_edit) may come with the caller's own text, which replaces the proposed one. Refused for API keys.
+         * @description The agent's write tools (a new task, closing a task, ticking a habit, a note to the inbox, a meal for the food diary, expenses for the ledger) only propose; this queues the change for the worker, which makes it as the caller through this API. The turn shows the action's status. A Telegram message (tg_send, tg_edit) may come with the caller's own text, which replaces the proposed one. Refused for API keys.
          */
         post: {
             parameters: {
@@ -27091,8 +27091,11 @@ export interface components {
         AniAction: {
             /** Format: uuid */
             id: string;
-            /** @enum {string} */
-            kind: "create_task" | "complete_task" | "check_habit" | "add_note" | "tg_send" | "tg_edit" | "calendar_add" | "calendar_move" | "calendar_remove" | "journal_note";
+            /**
+             * @description add_food: entries of one meal in the food diary; add_spend: posted expenses, each in its account's currency
+             * @enum {string}
+             */
+            kind: "create_task" | "complete_task" | "check_habit" | "add_note" | "tg_send" | "tg_edit" | "calendar_add" | "calendar_move" | "calendar_remove" | "journal_note" | "add_food" | "add_spend";
             /** @description What the user confirms, in words */
             summary: string;
             /** @description The message of a Telegram proposal (tg_send, tg_edit), which the user may change on Confirm; null for the other kinds */

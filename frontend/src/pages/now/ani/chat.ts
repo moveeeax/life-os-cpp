@@ -285,3 +285,16 @@ export function confirmWords(a: Pick<Action, 'summary' | 'text'>): string {
   const at = a.summary.indexOf('«' + Array.from(a.text).slice(0, 20).join(''));
   return at >= 0 ? `${a.summary.slice(0, at)}«${a.text}»` : `${a.summary} ${a.text}`;
 }
+
+/**
+ * A meal or expenses she proposes, as two lines: the title and the day the
+ * summary ends with ("Lunch: Плов 350 g (650 kcal), 2026-11-10"). Null for
+ * the other kinds, which stay one line.
+ */
+export function titleAndDay(
+  a: Pick<Action, 'kind' | 'summary'>,
+): { title: string; day: string } | null {
+  if (a.kind !== 'add_food' && a.kind !== 'add_spend') return null;
+  const m = /^(.*), (\d{4}-\d{2}-\d{2})$/s.exec(a.summary);
+  return m ? { title: m[1], day: m[2] } : null;
+}

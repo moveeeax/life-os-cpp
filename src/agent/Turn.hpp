@@ -63,7 +63,7 @@ struct Sent {
 Sent send(const std::string& owner, const std::string& text, const std::string& tz, const std::string& origin = "user");
 
 /// Opens an MCP turn proposing a change with one of her agent's write tools
-/// (@p tool: create_task, check_habit or add_note; @p args as the tool takes
+/// (@p tool: create_task, check_habit, add_note, add_food or add_spend; @p args as the tool takes
 /// them). The worker resolves it without the agent; the user confirms the
 /// proposal under the turn on Now.
 Sent propose(const std::string& owner, const std::string& tool, const nlohmann::json& args);
