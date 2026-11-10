@@ -25971,6 +25971,8 @@ export interface components {
              */
             module: "fitness" | "food" | "habits" | "tape" | "workout" | "tasks" | "money" | "practice" | "leetcode";
             label: string;
+            /** @description The label in Russian: Шаги, "Расходы, KZT"; a habit's own name for habits:<uuid> */
+            label_ru: string;
             /** @description kg, h, min, kcal, g, cm, bpm, %; the currency for money and practice; the habit's own unit; empty for a count without one */
             unit: string;
             /**

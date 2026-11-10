@@ -52,10 +52,12 @@ json why_json(Why w) {
     return w == Why::Ok ? json() : json(std::string(Repositories::Metrics::why_name(w)));
 }
 
-json entry(const ::Metrics::Ref& r, const std::string& label, const std::string& unit, Why why) {
+json entry(
+    const ::Metrics::Ref& r, const std::string& label, const std::string& label_ru, const std::string& unit, Why why) {
     return {{"id", ::Metrics::canonical(r)},
             {"module", std::string(r.def->module)},
             {"label", label},
+            {"label_ru", label_ru},
             {"unit", unit},
             {"reduce", std::string(::Metrics::reduce_name(r.def->reduce))},
             {"presence", r.def->presence},
@@ -77,18 +79,19 @@ void MetricsController::list(const HttpRequestPtr& req, Callback&& callback) {
             // The parameters below are the owner's own: only the gate can stop them.
             const Why why = Repositories::Metrics::gate_available(def, access);
             const std::string label(def.label);
+            const std::string label_ru(def.label_ru);
             ::Metrics::Ref r;
             r.def = &def;
             switch (def.param) {
                 case ::Metrics::Param::None:
-                    out.push_back(entry(r, label, std::string(def.unit), why));
+                    out.push_back(entry(r, label, label_ru, std::string(def.unit), why));
                     break;
                 case ::Metrics::Param::Currency: {
                     const auto& currencies =
                         def.gate == ::Metrics::Gate::Money ? choices.money_currencies : choices.practice_currencies;
                     for (const auto& c : currencies) {
                         r.currency = c;
-                        out.push_back(entry(r, label + ", " + c, c, why));
+                        out.push_back(entry(r, label + ", " + c, label_ru + ", " + c, c, why));
                     }
                     break;
                 }
@@ -97,14 +100,15 @@ void MetricsController::list(const HttpRequestPtr& req, Callback&& callback) {
                         for (const auto& cat : choices.categories) {
                             r.currency = c;
                             r.category_id = cat.id;
-                            out.push_back(entry(r, "Expenses: " + cat.name + ", " + c, c, why));
+                            out.push_back(entry(
+                                r, "Expenses: " + cat.name + ", " + c, "Расходы: " + cat.name + ", " + c, c, why));
                         }
                     }
                     break;
                 case ::Metrics::Param::Habit:
                     for (const auto& h : choices.habits) {
                         r.habit_id = h.id;
-                        out.push_back(entry(r, h.name, h.unit, why));
+                        out.push_back(entry(r, h.name, h.name, h.unit, why));
                     }
                     break;
             }

@@ -1,0 +1,1 @@
+`GET /api/v1/metrics` gives every series a `label_ru` next to `label`: the Russian name of each of the 61 catalog entries (the wording the iOS client used in `HabitsSetup.seriesTitle` where it had one), "Расходы, KZT" and "Расходы: <category>, KZT" for money, and the habit's own name for `habits:<uuid>`. `label` stays English, so the site does not change.

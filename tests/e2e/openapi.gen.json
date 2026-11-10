@@ -1113,6 +1113,7 @@
      "id",
      "module",
      "label",
+     "label_ru",
      "unit",
      "reduce",
      "presence",
@@ -1141,6 +1142,10 @@
      },
      "label": {
       "type": "string"
+     },
+     "label_ru": {
+      "type": "string",
+      "description": "The label in Russian: Шаги, \"Расходы, KZT\"; a habit's own name for habits:<uuid>"
      },
      "unit": {
       "type": "string",
@@ -40908,7 +40913,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 623109,
-  "source_fnv1a64": "684dd86afcc23f99"
+  "source_bytes": 623263,
+  "source_fnv1a64": "936c241820b251ec"
  }
 }

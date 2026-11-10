@@ -320,11 +320,12 @@ components:
       description: 'Why the series has no data for the caller: its module is off, the fitness read permission is missing, no Mi account is linked, or the id names a currency, category or habit that is not the caller''s. Null when it is available.'
     MetricEntry:
       type: object
-      required: [id, module, label, unit, reduce, presence, available, why]
+      required: [id, module, label, label_ru, unit, reduce, presence, available, why]
       properties:
         id: { type: string, description: 'The catalog id with its parameters: fitness:steps, money:expense:KZT, money:expense:KZT:<category uuid>, habits:<habit uuid>' }
         module: { type: string, enum: [fitness, food, habits, tape, workout, tasks, money, practice, leetcode], description: The section the series comes from }
         label: { type: string }
+        label_ru: { type: string, description: 'The label in Russian: Шаги, "Расходы, KZT"; a habit''s own name for habits:<uuid>' }
         unit: { type: string, description: 'kg, h, min, kcal, g, cm, bpm, %; the currency for money and practice; the habit''s own unit; empty for a count without one' }
         reduce: { type: string, enum: [sum, last, avg, min, max, count], description: How the rows of a day become its value }
         presence: { type: boolean, description: 'A day with a value counts by itself (a weigh-in, a mood, a session): a habit on it needs no goal' }
