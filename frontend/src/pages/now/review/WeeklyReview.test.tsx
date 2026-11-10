@@ -32,6 +32,7 @@ const today: Today = {
   ],
   habits: { done: 0, total: 1, left: [], week: [{ name: 'Вода', done: 3, per_week: 7 }] },
   focus: null,
+  note: null,
   errors: [],
 };
 

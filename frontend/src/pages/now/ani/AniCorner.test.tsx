@@ -87,6 +87,7 @@ const base: Today = {
   tasks: { late_count: 0, first_late: null, late: [], today: [], inbox_count: 0 },
   goals: [],
   focus: null,
+  note: null,
   errors: [],
 };
 const DATE = '2026-10-26';
