@@ -1,6 +1,7 @@
 /**
  * @file FoodController.hpp
- * @brief Food module routes: products, the diary, goals, Open Food Facts.
+ * @brief Food module routes: products, the diary, goals, water, the meal plan,
+ *        Open Food Facts.
  *
  * Every route needs the module switch (Core::food_enabled()) and a user
  * account: rows belong to the caller. No permission bit: Food has no
@@ -44,6 +45,11 @@ public:
     ADD_METHOD_TO(FoodController::water, "/api/v1/food/water", Get);
     ADD_METHOD_TO(FoodController::addWater, "/api/v1/food/water", Post);
     ADD_METHOD_TO(FoodController::waterGoal, "/api/v1/food/water/goal", Put);
+    ADD_METHOD_TO(FoodController::plan, "/api/v1/food/plan", Get);
+    ADD_METHOD_TO(FoodController::putPlan, "/api/v1/food/plan", Put);
+    ADD_METHOD_TO(FoodController::deletePlan, "/api/v1/food/plan", Delete);
+    ADD_METHOD_TO(FoodController::planTemplates, "/api/v1/food/plan/template", Get);
+    ADD_METHOD_TO(FoodController::putPlanTemplate, "/api/v1/food/plan/template", Put);
     METHOD_LIST_END
 
     using Callback = std::function<void(const HttpResponsePtr&)>;
@@ -65,6 +71,14 @@ public:
     void water(const HttpRequestPtr& req, Callback&& callback);
     void addWater(const HttpRequestPtr& req, Callback&& callback);
     void waterGoal(const HttpRequestPtr& req, Callback&& callback);
+
+    /// The meal plan of a day (its override, else its weekday's template) with `eaten` from the diary;
+    /// the day's override set or dropped; the seven weekday templates read and one replaced.
+    void plan(const HttpRequestPtr& req, Callback&& callback);
+    void putPlan(const HttpRequestPtr& req, Callback&& callback);
+    void deletePlan(const HttpRequestPtr& req, Callback&& callback);
+    void planTemplates(const HttpRequestPtr& req, Callback&& callback);
+    void putPlanTemplate(const HttpRequestPtr& req, Callback&& callback);
     void week(const HttpRequestPtr& req, Callback&& callback);
     void createEntry(const HttpRequestPtr& req, Callback&& callback);
     void createEntries(const HttpRequestPtr& req, Callback&& callback);
