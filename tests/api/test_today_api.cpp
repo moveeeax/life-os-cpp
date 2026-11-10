@@ -109,7 +109,7 @@ protected:
         if (::testing::Test::IsSkipped())
             return;
         Database::get().execute_write([](auto& txn) {
-            txn.exec("TRUNCATE TABLE day_focus, task_parse_jobs, task_notes, task_items, goal_items CASCADE");
+            txn.exec("TRUNCATE TABLE day_focus, day_note, task_parse_jobs, task_notes, task_items, goal_items CASCADE");
             txn.exec(
                 "DELETE FROM travel_trips WHERE owner_id IN ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaae7', "
                 "'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbe7')");
@@ -351,6 +351,18 @@ TEST_F(TodayApiTest, PuttingAgainReplacesAndClearsDone) {
     EXPECT_EQ(del->statusCode(), k204NoContent);
     EXPECT_TRUE(today()["focus"].is_null());
     EXPECT_EQ(tick(true)->statusCode(), k404NotFound) << "no focus to tick";
+}
+
+TEST_F(TodayApiTest, TheDigestCarriesTheNoteOfTheDay) {
+    EXPECT_TRUE(today()["note"].is_null());
+    auto put = call(&Api::TodayController::putNote, kAnna, Put, json{{"date", kDay}, {"text", "Позвонить маме"}});
+    ASSERT_EQ(put->statusCode(), k200OK) << std::string(put->body());
+    EXPECT_EQ(today()["note"], "Позвонить маме");
+    EXPECT_TRUE(today(kBoris)["note"].is_null()) << "the note is Anna's";
+
+    auto del = call(&Api::TodayController::deleteNote, kAnna, Delete, json::object(), {{"date", kDay}});
+    EXPECT_EQ(del->statusCode(), k204NoContent);
+    EXPECT_TRUE(today()["note"].is_null());
 }
 
 TEST_F(TodayApiTest, EachUserHasTheirOwnFocus) {

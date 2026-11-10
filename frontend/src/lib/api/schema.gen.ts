@@ -1115,6 +1115,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/idempotency/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which of the caller's Idempotency-Keys the server already applied
+         * @description A mutating request carrying an Idempotency-Key that was answered 2xx leaves a marker for its key and caller, kept idempotency.ttl_sec (24 h by default). An offline queue asks with its pending keys before it lays them over a screen's answer, so a write in flight is not counted twice. Only the caller's own keys are seen; none while the middleware is off.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Comma-separated keys, 1 to 100, each up to 200 characters */
+                    keys: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The keys already applied, in the order asked */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: string[];
+                        };
+                    };
+                };
+                /** @description No keys, more than 100, or a key over 200 characters (invalid_query) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -7496,6 +7554,295 @@ export interface paths {
                     };
                 };
                 /** @description invalid_ml */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The meal plan of a day, eaten marked from the diary
+         * @description The day's own plan when one is set, else the template of its weekday, else nothing. A row is eaten when the diary has an entry of its meal on that day.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The local day; today in tz by default */
+                    date?: string;
+                    tz?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The day's plan */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodPlanDay"];
+                    };
+                };
+                /** @description invalid_date */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        /** Set the meal plan of one day, over its weekday template */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        date: string;
+                        /** @description An empty array plans nothing for the day */
+                        meals: components["schemas"]["FoodPlanMealInput"][];
+                    };
+                };
+            };
+            responses: {
+                /** @description The day's plan after it */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodPlanDay"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /** Drop a day's own plan; its weekday template applies again */
+        delete: {
+            parameters: {
+                query: {
+                    date: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The day's plan after it (fine when the day had none) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoodPlanDay"];
+                    };
+                };
+                /** @description invalid_date */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/food/plan/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The meal plan templates of the seven weekdays */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Monday to Sunday; a weekday without a template has no meals */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FoodPlanTemplate"][];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Food module disabled */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        /** Replace the meal plan template of a weekday */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description 1 = Monday ... 7 = Sunday */
+                        weekday: number;
+                        /** @description An empty array drops the template */
+                        meals: components["schemas"]["FoodPlanMealInput"][];
+                    };
+                };
+            };
+            responses: {
+                /** @description The weekday's template after it */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["FoodPlanTemplate"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -14605,7 +14952,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The day's digest for the Now screen and the focus of the day */
+        /** The day's digest for the Now screen, the focus and the note of the day */
         get: {
             parameters: {
                 query?: {
@@ -26328,6 +26675,8 @@ export interface components {
                 top: string[];
             };
             focus: components["schemas"]["Focus"] | null;
+            /** @description The note of the day (PUT /api/v1/today/note); null when there is none */
+            note: string | null;
             errors: string[];
         };
         Sound: {
@@ -29027,6 +29376,57 @@ export interface components {
             ml: number;
             /** @description 2000 until the person sets one */
             goal_ml: number;
+        };
+        FoodPlanMealInput: {
+            /** @description Local time, HH:MM ("8:30" is stored as "08:30") */
+            time: string;
+            title: string;
+            kcal: number;
+            protein_g?: number | null;
+            /**
+             * @description The diary meal this row stands for
+             * @enum {string}
+             */
+            meal: "breakfast" | "lunch" | "dinner" | "snack";
+        };
+        FoodPlanMeal: {
+            /** @description HH:MM */
+            time: string;
+            title: string;
+            kcal: number;
+            /** @description Absent when the plan does not say */
+            protein_g?: number;
+            /** @enum {string} */
+            meal: "breakfast" | "lunch" | "dinner" | "snack";
+        };
+        FoodPlanRow: {
+            /** @description HH:MM */
+            time: string;
+            title: string;
+            kcal: number;
+            /** @description Absent when the plan does not say */
+            protein_g?: number;
+            /** @enum {string} */
+            meal: "breakfast" | "lunch" | "dinner" | "snack";
+            /** @description The diary has an entry of this meal on the day */
+            eaten: boolean;
+        };
+        FoodPlanDay: {
+            /** @description Sorted by time */
+            data: components["schemas"]["FoodPlanRow"][];
+            /** Format: date */
+            date: string;
+            /**
+             * @description The day's own plan, its weekday's template, or nothing
+             * @enum {string}
+             */
+            source: "day" | "template" | "none";
+        };
+        FoodPlanTemplate: {
+            /** @description 1 = Monday ... 7 = Sunday */
+            weekday: number;
+            /** @description Sorted by time */
+            meals: components["schemas"]["FoodPlanMeal"][];
         };
         FoodWeek: {
             /** Format: date */
