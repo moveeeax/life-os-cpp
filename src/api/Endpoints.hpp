@@ -49,6 +49,7 @@ inline const std::vector<EndpointInfo>& get_endpoints() {
         {"GET", "/api/v1/account/api-keys", "List your API keys"},
         {"POST", "/api/v1/account/api-keys", "Create an API key (secret shown once)"},
         {"DELETE", "/api/v1/account/api-keys/{id}", "Revoke an API key"},
+        {"GET", "/api/v1/idempotency/seen", "Which of the caller's Idempotency-Keys the server already applied"},
         {"GET", "/api/v1/admin/users", "Admin: list users"},
         {"POST", "/api/v1/admin/users", "Admin: create a user"},
         {"POST", "/api/v1/admin/invite", "Admin: invite a user via email"},

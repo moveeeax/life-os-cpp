@@ -1115,6 +1115,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/idempotency/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which of the caller's Idempotency-Keys the server already applied
+         * @description A mutating request carrying an Idempotency-Key that was answered 2xx leaves a marker for its key and caller, kept idempotency.ttl_sec (24 h by default). An offline queue asks with its pending keys before it lays them over a screen's answer, so a write in flight is not counted twice. Only the caller's own keys are seen; none while the middleware is off.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Comma-separated keys, 1 to 100, each up to 200 characters */
+                    keys: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The keys already applied, in the order asked */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: string[];
+                        };
+                    };
+                };
+                /** @description No keys, more than 100, or a key over 200 characters (invalid_query) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -14470,7 +14528,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The day's digest for the Now screen and the focus of the day */
+        /** The day's digest for the Now screen, the focus and the note of the day */
         get: {
             parameters: {
                 query?: {
@@ -26191,6 +26249,8 @@ export interface components {
                 top: string[];
             };
             focus: components["schemas"]["Focus"] | null;
+            /** @description The note of the day (PUT /api/v1/today/note); null when there is none */
+            note: string | null;
             errors: string[];
         };
         Sound: {

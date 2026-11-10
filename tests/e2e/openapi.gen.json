@@ -1416,6 +1416,7 @@
     "type": "object",
     "required": [
      "focus",
+     "note",
      "errors"
     ],
     "description": "A section key is absent when its module is off, the caller has nothing there, or it failed (then it is in errors)",
@@ -2015,6 +2016,13 @@
         "type": "null"
        }
       ]
+     },
+     "note": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "The note of the day (PUT /api/v1/today/note); null when there is none"
      },
      "errors": {
       "type": "array",
@@ -14236,6 +14244,60 @@
      },
      "404": {
       "description": "No such key (or not yours)"
+     }
+    }
+   }
+  },
+  "/api/v1/idempotency/seen": {
+   "get": {
+    "summary": "Which of the caller's Idempotency-Keys the server already applied",
+    "description": "A mutating request carrying an Idempotency-Key that was answered 2xx leaves a marker for its key and caller, kept idempotency.ttl_sec (24 h by default). An offline queue asks with its pending keys before it lays them over a screen's answer, so a write in flight is not counted twice. Only the caller's own keys are seen; none while the middleware is off.",
+    "tags": [
+     "account"
+    ],
+    "security": [
+     {
+      "BearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "keys",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "Comma-separated keys, 1 to 100, each up to 200 characters"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The keys already applied, in the order asked",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "data"
+         ],
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "No keys, more than 100, or a key over 200 characters (invalid_query)"
+     },
+     "401": {
+      "description": "Not authenticated"
      }
     }
    }
@@ -29481,7 +29543,7 @@
   },
   "/api/v1/today": {
    "get": {
-    "summary": "The day's digest for the Now screen and the focus of the day",
+    "summary": "The day's digest for the Now screen, the focus and the note of the day",
     "tags": [
      "now"
     ],
@@ -40908,7 +40970,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 623109,
-  "source_fnv1a64": "684dd86afcc23f99"
+  "source_bytes": 624496,
+  "source_fnv1a64": "249d63e36657462c"
  }
 }
