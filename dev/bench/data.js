@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794397120497,
+  "lastUpdate": 1794397123744,
   "repoUrl": "https://github.com/moveeeax/life-os-cpp",
   "entries": {
     "Throughput": [
@@ -2253,6 +2253,63 @@ window.BENCHMARK_DATA = {
           {
             "name": "cold start to /ready",
             "value": 883,
+            "unit": "ms"
+          },
+          {
+            "name": "idle RSS",
+            "value": 4.9,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Michael Tarassov",
+            "username": "moveeeax",
+            "email": "michael@tarassov.me"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "179fa083556acfe68a9fc96356cb2ca0169c4890",
+          "message": "chore(release): 1.62.0 (#274)",
+          "timestamp": "2026-11-10T20:10:12Z",
+          "url": "https://github.com/moveeeax/life-os-cpp/commit/179fa083556acfe68a9fc96356cb2ca0169c4890"
+        },
+        "date": 1794397123179,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "healthz p50",
+            "value": 3.73,
+            "unit": "ms"
+          },
+          {
+            "name": "healthz p99",
+            "value": 11.34,
+            "unit": "ms"
+          },
+          {
+            "name": "jobs p50",
+            "value": 21.51,
+            "unit": "ms"
+          },
+          {
+            "name": "jobs p99",
+            "value": 47.08,
+            "unit": "ms"
+          },
+          {
+            "name": "runtime image size",
+            "value": 49.7,
+            "unit": "MB"
+          },
+          {
+            "name": "cold start to /ready",
+            "value": 967,
             "unit": "ms"
           },
           {
