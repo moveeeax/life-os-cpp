@@ -91,3 +91,28 @@
   background: transparent;
   opacity: 0.7;
 }
+
+/* The rows of the documents widget: a name and a date each. */
+.w-docs {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+}
+.w-docs li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.w-docs li span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.w-docs li span:last-child {
+  flex: none;
+  color: var(--g-ink-soft);
+}

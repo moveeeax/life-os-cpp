@@ -229,6 +229,9 @@ spec:
             # travel module — master switch
             - name: TRAVEL_ENABLED
               value: {{ .Values.travel.enabled | quote }}
+            # travel module — days ahead the Now screen warns about an expiring document
+            - name: TRAVEL_DOCUMENTS_WARN_DAYS
+              value: {{ .Values.travel.documentsWarnDays | quote }}
             # habits module — master switch
             - name: HABITS_ENABLED
               value: {{ .Values.habits.enabled | quote }}

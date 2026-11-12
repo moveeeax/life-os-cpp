@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { api, ApiClientError } from '@/lib/api/client';
 
+import type { Today } from '@/lib/now/types';
+
 import { Board } from './Board';
 
 afterEach(() => {
@@ -85,5 +87,69 @@ describe('Board', () => {
     mount('calendar_week', failWith(500, 'internal'));
     expect(await screen.findByText('—')).toBeTruthy();
     expect(screen.queryByText('Not connected')).toBeNull();
+  });
+
+  it('ExpiringDocuments: the soonest countdown, a name and a date per row, the rest counted', () => {
+    const doc = (
+      id: string,
+      holder: string,
+      kind: 'passport' | 'visa',
+      valid_until: string,
+      days_left: number,
+    ) => ({
+      id,
+      holder,
+      kind,
+      valid_until,
+      days_left,
+    });
+    const today = {
+      focus: null,
+      note: null,
+      errors: [],
+      documents: [
+        doc('a', 'Anna', 'passport', '2026-10-30', -1),
+        doc('b', 'Boris', 'visa', '2026-12-31', 61),
+        doc('c', 'Anna', 'visa', '2027-02-01', 93),
+        doc('d', 'Boris', 'passport', '2027-04-01', 152),
+      ],
+    } as Today;
+    const qc = new QueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <Board
+          widgets={[{ kind: 'documents' }]}
+          today={today}
+          date="2026-10-31"
+          tz="Asia/Tashkent"
+        />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByText('ran out')).toBeTruthy();
+    expect(screen.getByText("Anna's passport")).toBeTruthy();
+    expect(screen.getByText('Dec 31')).toBeTruthy();
+    expect(screen.getByText('Feb 1, 2027')).toBeTruthy();
+    expect(screen.queryByText("Boris's passport")).toBeNull();
+    expect(screen.getByText('and 1 more')).toBeTruthy();
+  });
+
+  it('ExpiringDocuments: nothing expiring, and a dash when the part failed', () => {
+    const qc = new QueryClient();
+    const mountWith = (t: Partial<Today>) =>
+      render(
+        <QueryClientProvider client={qc}>
+          <Board
+            widgets={[{ kind: 'documents' }]}
+            today={{ focus: null, note: null, errors: [], ...t } as Today}
+            date="2026-10-31"
+            tz="Asia/Tashkent"
+          />
+        </QueryClientProvider>,
+      );
+    mountWith({});
+    expect(screen.getByText('Nothing expiring')).toBeTruthy();
+    cleanup();
+    mountWith({ errors: ['documents'] });
+    expect(screen.getByText('—')).toBeTruthy();
   });
 });

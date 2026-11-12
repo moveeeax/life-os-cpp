@@ -26912,6 +26912,18 @@ export interface components {
                     left: number;
                 }[];
             };
+            /** @description Travel documents valid until at most TRAVEL_DOCUMENTS_WARN_DAYS (default 180) after the day, the soonest first, then by holder; the number is left out. Only each holder's latest passport and latest insurance count, and they stay listed once run out; a visa or another document that has run out is not listed. Absent when none or when the travel module is off */
+            documents?: {
+                /** Format: uuid */
+                id: string;
+                holder: string;
+                /** @enum {string} */
+                kind: "passport" | "visa" | "insurance" | "other";
+                /** Format: date */
+                valid_until: string;
+                /** @description Days from the day to valid_until; negative once it has run out */
+                days_left: number;
+            }[];
             /** @description The Habits plate: habits done today of the active ones (a weekly habit counts when done today or its week is met), the open daily habits, the weekly ones this week */
             habits?: {
                 done: number;
@@ -27868,7 +27880,7 @@ export interface components {
         };
         NowWidget: {
             /** @enum {string} */
-            kind: "series" | "calendar_week" | "habits" | "spend" | "telegram" | "trip" | "water" | "protein";
+            kind: "series" | "calendar_week" | "habits" | "spend" | "telegram" | "trip" | "water" | "protein" | "documents";
             /** @description A metrics catalog id, for series only */
             source?: string;
         };

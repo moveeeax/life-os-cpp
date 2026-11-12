@@ -281,10 +281,13 @@ goals:
   enabled: false
 
 # ---------------------------------------------------------------
-# travel module — border crossings, day counters and trips. Env var set: TRAVEL_ENABLED.
+# travel module — border crossings, day counters and trips. Env var set: TRAVEL_ENABLED,
+# TRAVEL_DOCUMENTS_WARN_DAYS.
 # ---------------------------------------------------------------
 travel:
   enabled: false
+  # A document valid until at most this many days ahead shows on Now; below 0 shows none.
+  documentsWarnDays: 180
 
 # ---------------------------------------------------------------
 # habits module — habits ticked by hand or from Mi Fitness and Training. Env var set: HABITS_ENABLED.

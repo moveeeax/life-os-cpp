@@ -295,6 +295,7 @@ inline constexpr ConfigKey tasks_enabled{"tasks.enabled", "TASKS_ENABLED"};
 inline constexpr ConfigKey tasks_llm_prompt_parse{"tasks.llm.prompt_parse", "TASKS_LLM_PROMPT_PARSE"};
 
 // --- travel ---
+inline constexpr ConfigKey travel_documents_warn_days{"travel.documents_warn_days", "TRAVEL_DOCUMENTS_WARN_DAYS"};
 inline constexpr ConfigKey travel_enabled{"travel.enabled", "TRAVEL_ENABLED"};
 
 // --- worker ---

@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { mealAt, quickFoods, sparkPoints, trendWords, weekRange, widgetKey } from './widgets';
+import {
+  documentLeft,
+  documentName,
+  mealAt,
+  quickFoods,
+  sparkPoints,
+  trendWords,
+  weekRange,
+  widgetKey,
+} from './widgets';
 
 describe('widgets', () => {
   it('words a trend against the days before', () => {
@@ -38,5 +47,18 @@ describe('water and protein', () => {
 
   it('a meal by the hour of the day', () => {
     expect([7, 12, 19, 23].map(mealAt)).toEqual(['breakfast', 'lunch', 'dinner', 'snack']);
+  });
+});
+
+describe('documents', () => {
+  it('ExpiringDocumentWords: a countdown and whose document it is', () => {
+    expect([-3, 0, 1, 80].map(documentLeft)).toEqual([
+      'ran out',
+      'today',
+      'tomorrow',
+      'in 80 days',
+    ]);
+    expect(documentName({ holder: 'Anna', kind: 'passport' })).toBe("Anna's passport");
+    expect(documentName({ holder: 'Boris', kind: 'other' })).toBe("Boris's document");
   });
 });

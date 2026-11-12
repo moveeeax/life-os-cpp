@@ -6,13 +6,18 @@
  *        insurance must not end during the trip. Only each holder's latest
  *        passport counts, and a visa that ended before the trip is an old one:
  *        neither warns. Other documents are not checked.
+ *
+ *        Without a trip, expiring() lists the documents that run out within a
+ *        number of days of today, for the Now screen: a renewal takes weeks.
  */
 
 #pragma once
 
+#include <algorithm>
 #include <chrono>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "travel/Days.hpp"
@@ -68,6 +73,59 @@ inline std::vector<DocumentWarning> warnings(const std::vector<Document>& docs,
             out.push_back({d.id, "expires_during_trip"});
         }
     }
+    return out;
+}
+
+/// A document that runs out soon; @c days_left is negative once it has.
+struct ExpiringDocument {
+    std::string document_id;
+    std::string valid_until;
+    std::string holder;
+    int days_left = 0;
+};
+
+/// The default of travel.documents_warn_days: six months, the passport rule.
+inline constexpr int kDocumentsWarnDays = 180;
+
+/// The documents of @p docs valid until at most @p warn_days after @p today,
+/// the soonest first (then by holder). A passport or an insurance is renewed
+/// by a newer one of the same holder, so only that holder's latest of the kind
+/// counts, and it still warns once it has run out: nothing replaces it yet. A
+/// visa or another document stands alone (two visas are two countries), and
+/// one that has run out is an old one, so it is quiet. Nothing with
+/// @p warn_days below zero.
+inline std::vector<ExpiringDocument> expiring(const std::vector<Document>& docs,
+                                              const std::string& today,
+                                              int warn_days) {
+    std::vector<ExpiringDocument> out;
+    if (warn_days < 0) {
+        return out;
+    }
+    const auto renewed = [](const std::string& kind) { return kind == "passport" || kind == "insurance"; };
+    std::map<std::pair<std::string, std::string>, Day> latest;
+    for (const auto& d : docs) {
+        if (renewed(d.kind)) {
+            const Day valid = day_of(d.valid_until);
+            auto [it, fresh] = latest.try_emplace({d.holder, d.kind}, valid);
+            if (!fresh && it->second < valid) {
+                it->second = valid;
+            }
+        }
+    }
+    const Day now = day_of(today);
+    for (const auto& d : docs) {
+        const Day valid = day_of(d.valid_until);
+        const int left = static_cast<int>((valid - now).count());
+        if (left > warn_days) {
+            continue;
+        }
+        if (renewed(d.kind) ? valid == latest.at({d.holder, d.kind}) : left >= 0) {
+            out.push_back({d.id, d.valid_until, d.holder, left});
+        }
+    }
+    std::stable_sort(out.begin(), out.end(), [](const ExpiringDocument& a, const ExpiringDocument& b) {
+        return a.days_left != b.days_left ? a.days_left < b.days_left : a.holder < b.holder;
+    });
     return out;
 }
 
