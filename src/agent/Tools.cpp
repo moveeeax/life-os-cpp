@@ -63,7 +63,8 @@ void put(Call& c, const char* key, const std::string& value) {
 json definitions() {
     return json::array({
         tool("today",
-             "The person's day on the Now page: tasks, goals, food, money, health, travel, habits and the focus.",
+             "The person's day on the Now page: tasks, goals, food, money, health, travel, documents running "
+             "out, habits and the focus.",
              object({{"date", kDay}})),
         tool("tasks_of_day",
              "Tasks of a day: overdue, due that day, dated later, someday, and done that day.",

@@ -302,6 +302,7 @@ outage can never affect the money path.
 | Env | JSON key | Type | Default | Notes |
 |---|---|---|---|---|
 | `TRAVEL_ENABLED` | `travel.enabled` | bool | `false` | Master switch for the travel module (`Core::travel_enabled()`): border crossings, day counters for tax residency, Schengen and visa limits, trips with a day plan, packing tasks and linked spends. Routes stay registered, handlers 404 while off. Every confirmed user has it for their own data. |
+| `TRAVEL_DOCUMENTS_WARN_DAYS` | `travel.documents_warn_days` | int | `180` | Days ahead the `documents` part of `/api/v1/today` (the Documents widget on Now) lists a document: one valid until at most this many days after the day shows, the soonest first, holder and kind without the number. Only each holder's latest passport and latest insurance count, and they keep showing once run out; a visa or another document that has run out is quiet. Below `0` the part is never shown. Read by the API pod. |
 
 ## Habits module
 

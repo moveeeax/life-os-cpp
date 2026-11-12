@@ -218,6 +218,8 @@ tasks/now -> tasks
 travel -> utils
 travel/now -> now
 travel/now -> repositories/travel
+travel/now -> travel
+travel/now -> utils
 repositories/tasks -> database
 repositories/tasks -> repositories
 repositories/tasks -> tasks

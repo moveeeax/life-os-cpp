@@ -294,7 +294,8 @@
     }
   },
   "travel": {
-    "enabled": "${TRAVEL_ENABLED:-false}"
+    "enabled": "${TRAVEL_ENABLED:-false}",
+    "documents_warn_days": "${TRAVEL_DOCUMENTS_WARN_DAYS:-180}"
   },
   "habits": {
     "enabled": "${HABITS_ENABLED:-false}"

@@ -1488,6 +1488,46 @@
        }
       }
      },
+     "documents": {
+      "type": "array",
+      "description": "Travel documents valid until at most TRAVEL_DOCUMENTS_WARN_DAYS (default 180) after the day, the soonest first, then by holder; the number is left out. Only each holder's latest passport and latest insurance count, and they stay listed once run out; a visa or another document that has run out is not listed. Absent when none or when the travel module is off",
+      "items": {
+       "type": "object",
+       "required": [
+        "id",
+        "holder",
+        "kind",
+        "valid_until",
+        "days_left"
+       ],
+       "properties": {
+        "id": {
+         "type": "string",
+         "format": "uuid"
+        },
+        "holder": {
+         "type": "string"
+        },
+        "kind": {
+         "type": "string",
+         "enum": [
+          "passport",
+          "visa",
+          "insurance",
+          "other"
+         ]
+        },
+        "valid_until": {
+         "type": "string",
+         "format": "date"
+        },
+        "days_left": {
+         "type": "integer",
+         "description": "Days from the day to valid_until; negative once it has run out"
+        }
+       }
+      }
+     },
      "habits": {
       "type": "object",
       "required": [
@@ -4680,7 +4720,8 @@
        "telegram",
        "trip",
        "water",
-       "protein"
+       "protein",
+       "documents"
       ]
      },
      "source": {
@@ -42507,7 +42548,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 652399,
-  "source_fnv1a64": "e4f92d40690ac04c"
+  "source_bytes": 653314,
+  "source_fnv1a64": "83de7a15e166dc8d"
  }
 }

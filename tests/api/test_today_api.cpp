@@ -117,6 +117,9 @@ protected:
                 "DELETE FROM travel_rules WHERE owner_id IN ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaae7', "
                 "'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbe7')");
             txn.exec(
+                "DELETE FROM travel_documents WHERE owner_id IN ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaae7', "
+                "'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbe7')");
+            txn.exec(
                 "DELETE FROM money_transactions WHERE owner_id IN ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaae7', "
                 "'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbe7')");
             txn.exec(
@@ -467,6 +470,29 @@ TEST_F(TodayApiTest, TheNextTripCountsDown) {
     EXPECT_EQ(d["travel"]["next_trip"]["name"], "Thailand");
     EXPECT_EQ(d["travel"]["next_trip"]["days_to"], 19) << "from Oct 12 to Oct 31";
     EXPECT_FALSE(today(kBoris).contains("travel")) << "nothing to show for Boris";
+}
+
+// The documents running out within 180 days of Oct 12, the soonest first, without the number.
+TEST_F(TodayApiTest, ExpiringDocumentsAreListedWithoutTheirNumber) {
+    Database::get().execute_write([](auto& txn) {
+        txn.exec_params(
+            "INSERT INTO travel_documents (owner_id, holder, kind, number, valid_until) VALUES "
+            "($1::uuid, 'Anna', 'passport', 'N1234567', '2027-02-01'), "
+            "($1::uuid, 'Anna', 'visa', 'V1', '2026-12-31'), "
+            "($1::uuid, 'Anna', 'insurance', 'I1', '2028-01-01')",
+            std::string(kAnna));
+        return true;
+    });
+    const json d = today();
+    ASSERT_TRUE(d.contains("documents")) << d.dump();
+    ASSERT_EQ(d["documents"].size(), 2U) << d.dump();
+    EXPECT_EQ(d["documents"][0]["kind"], "visa");
+    EXPECT_EQ(d["documents"][0]["days_left"], 80) << "from Oct 12 to Dec 31";
+    EXPECT_EQ(d["documents"][1]["kind"], "passport");
+    EXPECT_EQ(d["documents"][1]["holder"], "Anna");
+    EXPECT_EQ(d["documents"][1]["valid_until"], "2027-02-01");
+    EXPECT_FALSE(d["documents"][1].contains("number"));
+    EXPECT_FALSE(today(kBoris).contains("documents")) << "nothing to show for Boris";
 }
 
 namespace {

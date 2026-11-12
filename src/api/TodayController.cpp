@@ -129,6 +129,7 @@ void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
             {"money", Core::money_enabled(), [&] { return ::Money::digest(owner, date); }},
             {"health", Core::fitness_enabled() && fitness_read, [&] { return ::Fitness::digest(owner, date); }},
             {"travel", Core::travel_enabled(), [&] { return ::Travel::digest(owner, date); }},
+            {"documents", Core::travel_enabled(), [&] { return ::Travel::documents_digest(owner, date); }},
             {"habits", Core::habits_enabled(), [&] { return ::Habits::digest(owner, date, tz, access_once()); }},
             {"github", Core::github_enabled(), [&] { return ::Github::digest(owner); }},
         };

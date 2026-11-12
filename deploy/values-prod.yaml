@@ -178,6 +178,7 @@ goals:
 
 travel:
   enabled: true
+  documentsWarnDays: 180
 
 habits:
   enabled: true

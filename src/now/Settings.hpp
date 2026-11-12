@@ -134,8 +134,8 @@ inline std::optional<std::string> links_problem(const nlohmann::json& links, nlo
 }
 
 inline constexpr std::size_t kWidgetsMax = 6;
-inline constexpr std::array<std::string_view, 8> kWidgetKinds = {
-    "series", "calendar_week", "habits", "spend", "telegram", "trip", "water", "protein"};
+inline constexpr std::array<std::string_view, 9> kWidgetKinds = {
+    "series", "calendar_week", "habits", "spend", "telegram", "trip", "water", "protein", "documents"};
 
 /// What is wrong with a widget list, or nullopt; @p clean then holds what to
 /// store: at most six {kind} or {kind: "series", source: <catalog id>}, no

@@ -1,4 +1,5 @@
 import type { components } from '@/lib/api/schema.gen';
+import { DOCUMENT_KIND } from '@/lib/travel';
 
 export type Widget = components['schemas']['NowWidget'];
 export const WIDGETS_MAX = 6;
@@ -12,6 +13,7 @@ export const FIXED: Record<Exclude<Widget['kind'], 'series'>, string> = {
   trip: 'Next trip',
   water: 'Water today',
   protein: 'Protein today',
+  documents: 'Documents',
 };
 
 export const widgetKey = (w: Widget) => (w.kind === 'series' ? `series:${w.source}` : w.kind);
@@ -87,4 +89,22 @@ export function quickFoods<
 /** The meal a one-tap entry goes to by the local hour. */
 export function mealAt(hour: number): 'breakfast' | 'lunch' | 'dinner' | 'snack' {
   return hour < 11 ? 'breakfast' : hour < 16 ? 'lunch' : hour < 22 ? 'dinner' : 'snack';
+}
+
+export type ExpiringDocument = NonNullable<components['schemas']['Today']['documents']>[number];
+
+/** How many expiring documents the widget lists; the rest are counted. */
+export const DOCUMENTS_SHOWN = 3;
+
+/** The countdown of a document: "in 80 days", "tomorrow", "today", "ran out". */
+export function documentLeft(daysLeft: number): string {
+  if (daysLeft < 0) return 'ran out';
+  if (daysLeft === 0) return 'today';
+  if (daysLeft === 1) return 'tomorrow';
+  return `in ${daysLeft} days`;
+}
+
+/** Whose document of which kind: "Anna's passport". */
+export function documentName(d: Pick<ExpiringDocument, 'holder' | 'kind'>): string {
+  return `${d.holder}'s ${(DOCUMENT_KIND[d.kind] ?? 'Document').toLowerCase()}`;
 }

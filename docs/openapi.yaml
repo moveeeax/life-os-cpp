@@ -414,6 +414,18 @@ components:
                 properties:
                   rule: { type: string }
                   left: { type: integer, description: "Days left, or days until an over threshold is met" }
+        documents:
+          type: array
+          description: 'Travel documents valid until at most TRAVEL_DOCUMENTS_WARN_DAYS (default 180) after the day, the soonest first, then by holder; the number is left out. Only each holder''s latest passport and latest insurance count, and they stay listed once run out; a visa or another document that has run out is not listed. Absent when none or when the travel module is off'
+          items:
+            type: object
+            required: [id, holder, kind, valid_until, days_left]
+            properties:
+              id: { type: string, format: uuid }
+              holder: { type: string }
+              kind: { type: string, enum: [passport, visa, insurance, other] }
+              valid_until: { type: string, format: date }
+              days_left: { type: integer, description: 'Days from the day to valid_until; negative once it has run out' }
         habits:
           type: object
           required: [done, total, left, week]
@@ -1199,7 +1211,7 @@ components:
       type: object
       required: [kind]
       properties:
-        kind: { type: string, enum: [series, calendar_week, habits, spend, telegram, trip, water, protein] }
+        kind: { type: string, enum: [series, calendar_week, habits, spend, telegram, trip, water, protein, documents] }
         source: { type: string, description: 'A metrics catalog id, for series only' }
     NowSettingsInput:
       type: object

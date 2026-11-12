@@ -119,6 +119,32 @@ public:
         return out;
     }
 
+    /// [{id, holder, kind, valid_until, days_left}] of the documents running out within
+    /// @p warn_days of @p today (Travel::expiring), the soonest first; the number stays out.
+    nlohmann::json expiring(const std::string& owner, const std::string& today, int warn_days) {
+        const auto rows = list(owner);
+        std::vector<::Travel::Document> docs;
+        for (const auto& row : rows) {
+            docs.push_back({row["id"].get<std::string>(),
+                            row["holder"].get<std::string>(),
+                            row["kind"].get<std::string>(),
+                            row["valid_until"].get<std::string>()});
+        }
+        nlohmann::json out = nlohmann::json::array();
+        for (const auto& e : ::Travel::expiring(docs, today, warn_days)) {
+            for (const auto& row : rows) {
+                if (row["id"] == e.document_id) {
+                    out.push_back({{"id", e.document_id},
+                                   {"holder", row["holder"]},
+                                   {"kind", row["kind"]},
+                                   {"valid_until", row["valid_until"]},
+                                   {"days_left", e.days_left}});
+                }
+            }
+        }
+        return out;
+    }
+
 private:
     static constexpr const char* kColumns =
         "id, holder, kind, number, to_char(valid_until, 'YYYY-MM-DD') AS valid_until, note";

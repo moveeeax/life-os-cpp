@@ -8,10 +8,14 @@ import { api, ApiClientError } from '@/lib/api/client';
 import { shiftDays } from '@/lib/dates';
 import { qk } from '@/lib/api/queryKeys';
 import { formatTotal } from '@/lib/networth';
+import { shortDay } from '@/lib/travel';
 import type { Today } from '@/lib/now/types';
 
 import { hourIn } from '../modes/modes';
 import {
+  documentLeft,
+  documentName,
+  DOCUMENTS_SHOWN,
   FIXED,
   GLASS_ML,
   mealAt,
@@ -331,6 +335,41 @@ function TelegramWidget() {
   );
 }
 
+/**
+ * The documents running out soon (the documents part of the digest), the
+ * soonest first: its countdown on top, a name and a date per row.
+ */
+function DocumentsWidget({ today, date }: { today: Today | undefined; date: string }) {
+  const docs = today?.documents ?? [];
+  const more = docs.length - DOCUMENTS_SHOWN;
+  return (
+    <Frame
+      k={FIXED.documents}
+      v={
+        !today || today.errors.includes('documents') ? (
+          '—'
+        ) : docs.length === 0 ? (
+          'Nothing expiring'
+        ) : (
+          <span className="num">{documentLeft(docs[0].days_left)}</span>
+        )
+      }
+      s={more > 0 ? <span className="num">and {more} more</span> : undefined}
+    >
+      {docs.length > 0 && (
+        <ul className="w-docs">
+          {docs.slice(0, DOCUMENTS_SHOWN).map((d) => (
+            <li key={d.id}>
+              <span>{documentName(d)}</span>
+              <span className="num">{shortDay(d.valid_until, date)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Frame>
+  );
+}
+
 /** The widget board of Now: what the person put on it in Arrange, in order. */
 export function Board({
   widgets,
@@ -355,6 +394,7 @@ export function Board({
         if (w.kind === 'telegram') return <TelegramWidget key={key} />;
         if (w.kind === 'water') return <WaterWidget key={key} date={date} />;
         if (w.kind === 'protein') return <ProteinWidget key={key} date={date} tz={tz} />;
+        if (w.kind === 'documents') return <DocumentsWidget key={key} today={today} date={date} />;
         if (w.kind === 'habits') {
           const h = today?.habits;
           return (

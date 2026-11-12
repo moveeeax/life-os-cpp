@@ -236,10 +236,12 @@ goals:
   enabled: false
 
 # ---------------------------------------------------------------
-# travel module — keep in sync with the life-os-cpp chart. Env var set: TRAVEL_ENABLED
+# travel module — keep in sync with the life-os-cpp chart. Env var set: TRAVEL_ENABLED,
+# TRAVEL_DOCUMENTS_WARN_DAYS
 # ---------------------------------------------------------------
 travel:
   enabled: false
+  documentsWarnDays: 180
 
 # ---------------------------------------------------------------
 # habits module — keep in sync with the life-os-cpp chart. Env var set: HABITS_ENABLED
