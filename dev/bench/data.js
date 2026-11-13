@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794569650344,
+  "lastUpdate": 1794569652645,
   "repoUrl": "https://github.com/moveeeax/life-os-cpp",
   "entries": {
     "Throughput": [
@@ -2436,6 +2436,63 @@ window.BENCHMARK_DATA = {
           {
             "name": "idle RSS",
             "value": 5.4,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Michael Tarassov",
+            "username": "moveeeax",
+            "email": "michael@tarassov.me"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "9e96e58c2851f3e9a74040e7c65a4a2f1cf2d83d",
+          "message": "Warn about expiring documents on Now (#275)\n\nGET /api/v1/today gets a documents part: the travel documents valid until\nat most TRAVEL_DOCUMENTS_WARN_DAYS (default 180) days ahead, soonest\nfirst, without the number. Only each holder's latest passport and latest\ninsurance count and they keep showing once run out; a visa or another\ndocument that has run out stays quiet. A Documents widget on Now lists\nthe first three.",
+          "timestamp": "2026-11-12T08:36:58Z",
+          "url": "https://github.com/moveeeax/life-os-cpp/commit/9e96e58c2851f3e9a74040e7c65a4a2f1cf2d83d"
+        },
+        "date": 1794569652178,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "healthz p50",
+            "value": 2.24,
+            "unit": "ms"
+          },
+          {
+            "name": "healthz p99",
+            "value": 7.07,
+            "unit": "ms"
+          },
+          {
+            "name": "jobs p50",
+            "value": 10.78,
+            "unit": "ms"
+          },
+          {
+            "name": "jobs p99",
+            "value": 22.07,
+            "unit": "ms"
+          },
+          {
+            "name": "runtime image size",
+            "value": 53.7,
+            "unit": "MB"
+          },
+          {
+            "name": "cold start to /ready",
+            "value": 809,
+            "unit": "ms"
+          },
+          {
+            "name": "idle RSS",
+            "value": 4.9,
             "unit": "MB"
           }
         ]
