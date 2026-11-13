@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794484577145,
+  "lastUpdate": 1794569650344,
   "repoUrl": "https://github.com/moveeeax/life-os-cpp",
   "entries": {
     "Throughput": [
@@ -863,6 +863,38 @@ window.BENCHMARK_DATA = {
           {
             "name": "jobs req/s",
             "value": 15770.27,
+            "unit": "req/s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Michael Tarassov",
+            "username": "moveeeax",
+            "email": "michael@tarassov.me"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "9e96e58c2851f3e9a74040e7c65a4a2f1cf2d83d",
+          "message": "Warn about expiring documents on Now (#275)\n\nGET /api/v1/today gets a documents part: the travel documents valid until\nat most TRAVEL_DOCUMENTS_WARN_DAYS (default 180) days ahead, soonest\nfirst, without the number. Only each holder's latest passport and latest\ninsurance count and they keep showing once run out; a visa or another\ndocument that has run out stays quiet. A Documents widget on Now lists\nthe first three.",
+          "timestamp": "2026-11-12T08:36:58Z",
+          "url": "https://github.com/moveeeax/life-os-cpp/commit/9e96e58c2851f3e9a74040e7c65a4a2f1cf2d83d"
+        },
+        "date": 1794569649531,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "healthz req/s",
+            "value": 83526.72,
+            "unit": "req/s"
+          },
+          {
+            "name": "jobs req/s",
+            "value": 18042.09,
             "unit": "req/s"
           }
         ]
