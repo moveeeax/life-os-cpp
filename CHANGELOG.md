@@ -6,6 +6,14 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.64.0] - 2026-11-14
+
+### Added
+- `PUT /food/plan/template` takes an optional `date` and then answers with `day`, the plan of that day after the write (read from the primary), so a client showing a day that follows the template need not read it again from a replica.
+
+### Changed
+- Production turns the general per-user request limit off in effect (`rateLimit.requests` 100000 a minute in `deploy/values-prod.yaml`, was 240); `enabled` stays true so the login, rejected-credentials and auth-path budgets still apply.
+
 ## [1.63.0] - 2026-11-14
 
 ### Added

@@ -1,1 +1,0 @@
-Production turns the general per-user request limit off in effect (`rateLimit.requests` 100000 a minute in `deploy/values-prod.yaml`, was 240); `enabled` stays true so the login, rejected-credentials and auth-path budgets still apply.
