@@ -739,6 +739,7 @@ void FoodController::putPlanTemplate(const HttpRequestPtr& req, Callback&& callb
     Validation::Errors errs;
     Validation::require(errs, body, "weekday");
     Validation::int_range(errs, body, "weekday", 1, 7);
+    date_field(errs, body, "date");
     const auto meals = plan_meals(errs, body);
     if (errs.any() || !meals) {
         callback(Validation::response_400(errs));
@@ -747,7 +748,13 @@ void FoodController::putPlanTemplate(const HttpRequestPtr& req, Callback&& callb
     const int weekday = body["weekday"].get<int>();
     with_repo_errors(callback, "food.putPlanTemplate", [&] {
         Repositories::PlanRepository().put_template(owner, weekday, meals->dump());
-        callback(Response::ok(json{{"data", {{"weekday", weekday}, {"meals", *meals}}}}));
+        json answer{{"data", {{"weekday", weekday}, {"meals", *meals}}}};
+        // The day the client shows may follow this template: its plan after
+        // the write, so that the client need not read it from a replica.
+        if (body.contains("date") && body["date"].is_string()) {
+            answer["day"] = plan_answer(owner, body["date"].get<std::string>(), /*from_primary=*/true);
+        }
+        callback(Response::ok(std::move(answer)));
     });
 }
 

@@ -22175,6 +22175,12 @@
            "$ref": "#/components/schemas/FoodPlanMealInput"
           },
           "description": "An empty array drops the template"
+         },
+         "date": {
+          "type": "string",
+          "format": "date",
+          "nullable": true,
+          "description": "A day to answer with as `day`: its plan after the write, whether it follows this template or not"
          }
         }
        }
@@ -22183,7 +22189,7 @@
     },
     "responses": {
      "200": {
-      "description": "The weekday's template after it",
+      "description": "The weekday's template after it, and the plan of `date` when the request named one",
       "content": {
        "application/json": {
         "schema": {
@@ -22194,6 +22200,9 @@
          "properties": {
           "data": {
            "$ref": "#/components/schemas/FoodPlanTemplate"
+          },
+          "day": {
+           "$ref": "#/components/schemas/FoodPlanDay"
           }
          }
         }
@@ -42548,7 +42557,7 @@
  "x-generated": {
   "by": "scripts/gen-openapi-json.sh",
   "source": "docs/openapi.yaml",
-  "source_bytes": 653314,
-  "source_fnv1a64": "491e057f6acf9432"
+  "source_bytes": 653615,
+  "source_fnv1a64": "bfc0f6a8dcb68c4b"
  }
 }

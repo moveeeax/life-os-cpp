@@ -7321,9 +7321,10 @@ paths:
               properties:
                 weekday: { type: integer, minimum: 1, maximum: 7, description: '1 = Monday ... 7 = Sunday' }
                 meals: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/FoodPlanMealInput' }, description: 'An empty array drops the template' }
+                date: { type: string, format: date, nullable: true, description: "A day to answer with as `day`: its plan after the write, whether it follows this template or not" }
       responses:
         '200':
-          description: The weekday's template after it
+          description: The weekday's template after it, and the plan of `date` when the request named one
           content:
             application/json:
               schema:
@@ -7331,6 +7332,7 @@ paths:
                 required: [data]
                 properties:
                   data: { $ref: '#/components/schemas/FoodPlanTemplate' }
+                  day: { $ref: '#/components/schemas/FoodPlanDay' }
         '400':
           description: Validation failed
           content:

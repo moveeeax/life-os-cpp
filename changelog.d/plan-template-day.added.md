@@ -1,0 +1,1 @@
+`PUT /food/plan/template` takes an optional `date` and then answers with `day`, the plan of that day after the write (read from the primary), so a client showing a day that follows the template need not read it again from a replica.
