@@ -7827,11 +7827,16 @@ export interface paths {
                         weekday: number;
                         /** @description An empty array drops the template */
                         meals: components["schemas"]["FoodPlanMealInput"][];
+                        /**
+                         * Format: date
+                         * @description A day to answer with as `day`: its plan after the write, whether it follows this template or not
+                         */
+                        date?: string | null;
                     };
                 };
             };
             responses: {
-                /** @description The weekday's template after it */
+                /** @description The weekday's template after it, and the plan of `date` when the request named one */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7839,6 +7844,7 @@ export interface paths {
                     content: {
                         "application/json": {
                             data: components["schemas"]["FoodPlanTemplate"];
+                            day?: components["schemas"]["FoodPlanDay"];
                         };
                     };
                 };
