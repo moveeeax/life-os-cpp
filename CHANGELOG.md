@@ -6,6 +6,14 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.63.0] - 2026-11-14
+
+### Added
+- Travel documents running out soon show on Now without a trip: `GET /api/v1/today` carries a `documents` part (holder, kind, `valid_until` and `days_left`, never the number) for every document valid until at most `TRAVEL_DOCUMENTS_WARN_DAYS` (default 180) days ahead, the soonest first, and the new Documents widget lists the first three. Only each holder's latest passport and latest insurance count, and they keep showing once run out; a visa or another document that has run out stays quiet.
+
+### Fixed
+- The answers to `PUT /api/v1/fitness/goals` and to `PUT` and `DELETE /api/v1/food/plan` are read from the primary. They were read through a replica, which may not have the write yet, so the answer could say the value from before the write.
+
 ## [1.62.0] - 2026-11-11
 
 ### Added
