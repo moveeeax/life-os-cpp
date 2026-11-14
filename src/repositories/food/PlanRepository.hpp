@@ -23,8 +23,10 @@ namespace Repositories {
 class PlanRepository {
 public:
     /// {source: "day" | "template" | "none", meals: [... with eaten]} of @p date.
-    nlohmann::json day(const std::string& owner, const std::string& date) {
-        return Database::get().execute_read([&](auto& txn) {
+    /// @p from_primary forces the primary (read-after-write: the answer to a
+    /// PUT or DELETE of the day).
+    nlohmann::json day(const std::string& owner, const std::string& date, bool from_primary = false) {
+        auto query = [&](auto& txn) {
             auto r = txn.exec_params(
                 "WITH d AS (SELECT meals FROM food_plan_days WHERE owner_id = $1::uuid AND day = $2::date), "
                 "t AS (SELECT meals FROM food_plan_templates WHERE owner_id = $1::uuid "
@@ -39,9 +41,13 @@ public:
                 "FROM p",
                 owner,
                 date);
+            if (r.empty()) {
+                return nlohmann::json{{"source", "none"}, {"meals", nlohmann::json::array()}};
+            }
             return nlohmann::json{{"source", r[0][0].template as<std::string>()},
                                   {"meals", nlohmann::json::parse(r[0][1].template as<std::string>())}};
-        });
+        };
+        return from_primary ? Database::get().execute_read_primary(query) : Database::get().execute_read(query);
     }
 
     /// The seven weekdays in order, [{weekday, meals}]; a weekday without a template has [].
