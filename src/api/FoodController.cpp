@@ -291,8 +291,9 @@ bool entry_input(Validation::Errors& errs,
 }
 
 /// The plan of @p date as the GET answers it: {data: rows with eaten, date, source}.
-json plan_answer(const std::string& owner, const std::string& date) {
-    const json day = Repositories::PlanRepository().day(owner, date);
+/// @p from_primary right after a write of the day: a replica may not have it yet.
+json plan_answer(const std::string& owner, const std::string& date, bool from_primary = false) {
+    const json day = Repositories::PlanRepository().day(owner, date, from_primary);
     return json{{"data", day["meals"]}, {"date", date}, {"source", day["source"]}};
 }
 
@@ -701,7 +702,7 @@ void FoodController::putPlan(const HttpRequestPtr& req, Callback&& callback) {
     const std::string date = body["date"].get<std::string>();
     with_repo_errors(callback, "food.putPlan", [&] {
         Repositories::PlanRepository().put_day(owner, date, meals->dump());
-        callback(Response::ok(plan_answer(owner, date)));
+        callback(Response::ok(plan_answer(owner, date, /*from_primary=*/true)));
     });
 }
 
@@ -714,7 +715,7 @@ void FoodController::deletePlan(const HttpRequestPtr& req, Callback&& callback) 
     }
     with_repo_errors(callback, "food.deletePlan", [&] {
         Repositories::PlanRepository().remove_day(owner, date);
-        callback(Response::ok(plan_answer(owner, date)));
+        callback(Response::ok(plan_answer(owner, date, /*from_primary=*/true)));
     });
 }
 

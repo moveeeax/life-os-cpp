@@ -58,7 +58,8 @@ void FitnessGoalsController::put(const HttpRequestPtr& req, Callback&& callback)
     with_repo_errors(callback, "fitness.goals.put", [&] {
         GoalsRepository repo;
         repo.set_steps(owner, value);
-        callback(Response::ok(json{{"data", repo.get(owner)}}));
+        // From the primary: a replica may not have the write yet.
+        callback(Response::ok(json{{"data", repo.get(owner, /*from_primary=*/true)}}));
     });
 }
 
