@@ -1,1 +1,0 @@
-The answers to `PUT /api/v1/fitness/goals` and to `PUT` and `DELETE /api/v1/food/plan` are read from the primary. They were read through a replica, which may not have the write yet, so the answer could say the value from before the write.
