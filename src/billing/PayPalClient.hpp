@@ -128,8 +128,8 @@ std::string cents_to_decimal_string(std::int64_t cents);
 std::string find_header_ci(const std::map<std::string, std::string>& headers, const std::string& name);
 
 /// RFC 3986 percent-encode a single path segment (order ids are opaque
-/// PayPal-generated strings; this is defense-in-depth, mirrors
-/// S3Storage::uri_encode_path).
+/// PayPal-generated strings; this is defense-in-depth). Forwards to
+/// Utils::Strings::percent_encode, the encoder S3 signing uses too.
 std::string url_encode_segment(const std::string& s);
 
 /// Best-effort extraction of PayPal's structured error fields from a

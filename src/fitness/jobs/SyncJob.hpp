@@ -23,6 +23,7 @@
 
 #include "fitness/sync/SyncService.hpp"
 #include "fitness/xiaomi/Errors.hpp"
+#include "fitness/xiaomi/Regions.hpp"
 #include "fitness/xiaomi/Service.hpp"
 #include "jobs/Job.hpp"
 #include "jobs/Jobs.hpp"
@@ -30,6 +31,7 @@
 #include "repositories/fitness/SyncRunRepository.hpp"
 #include "repositories/workout/SessionRepository.hpp"
 #include "utils/Config.hpp"
+#include "utils/Date.hpp"
 #include "utils/Modules.hpp"
 
 namespace Jobs::FitnessSync {
@@ -66,20 +68,11 @@ inline long enqueue_recent(const Repositories::MiAccountRepository::Linked& acco
     if (window_days < 1) {
         window_days = 1;
     }
-    const long long offset = (account.region.empty() || account.region == "cn") ? 8 * 3600 : 0;
+    const long long offset = Xiaomi::offset_seconds(account.region);
 
     const auto day = [](long long epoch) {
-        const std::chrono::sys_days d{
-            std::chrono::floor<std::chrono::days>(std::chrono::sys_seconds{std::chrono::seconds{epoch}})};
-        const std::chrono::year_month_day ymd{d};
-        char out[16];
-        std::snprintf(out,
-                      sizeof(out),
-                      "%04d-%02u-%02u",
-                      static_cast<int>(ymd.year()),
-                      static_cast<unsigned>(ymd.month()),
-                      static_cast<unsigned>(ymd.day()));
-        return std::string(out);
+        return Utils::Date::format_ymd(
+            std::chrono::floor<std::chrono::days>(std::chrono::sys_seconds{std::chrono::seconds{epoch}}));
     };
     const std::string to = day(now_epoch + offset);
     const std::string from = day(now_epoch + offset - 86400LL * (window_days - 1));

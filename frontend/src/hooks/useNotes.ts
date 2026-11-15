@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { useApiMutation } from '@/hooks/useApiMutation';
+import { useDeleteEntity, useSaveEntity } from '@/hooks/crud';
 import { NOTES_PROBE } from '@/hooks/moduleProbes';
 import { useModuleOn } from '@/hooks/useModuleProbe';
 import { api } from '@/lib/api/client';
@@ -54,18 +54,9 @@ export function useNote(id: string) {
 }
 
 export function useSaveNote(id: string | null, onSuccess?: (n: Note) => void) {
-  return useApiMutation(
-    async (body: NoteInput) =>
-      id
-        ? (await api.patchJson<{ data: Note }>(`${BASE}/${id}`, { body })).data
-        : (await api.postJson<{ data: Note }>(BASE, { body })).data,
-    { invalidate: WRITES, onSuccess },
-  );
+  return useSaveEntity<NoteInput, Note>(BASE, id, { invalidate: WRITES, onSuccess });
 }
 
 export function useDeleteNote(onSuccess?: () => void) {
-  return useApiMutation((id: string) => api.deleteJson<unknown>(`${BASE}/${id}`), {
-    invalidate: WRITES,
-    onSuccess,
-  });
+  return useDeleteEntity(BASE, { invalidate: WRITES, onSuccess });
 }

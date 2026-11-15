@@ -14,6 +14,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/JsonRows.hpp"
 #include "repositories/RepoErrors.hpp"
 #include "repositories/SqlErrors.hpp"
 
@@ -98,20 +99,19 @@ public:
             if (r.empty()) {
                 throw WallpaperNotFound();
             }
-            return true;
         });
     }
 
     /// Pending rows created more than @p older_than_seconds ago, oldest first, at most @p limit.
     nlohmann::json stale_pending(int older_than_seconds, int limit) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
-                                         " FROM wallpapers WHERE status = 'pending' "
-                                         " AND created_at < now() - make_interval(secs => $1::float8) "
-                                         " ORDER BY created_at, id LIMIT $2) t",
-                                     older_than_seconds,
-                                     limit);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
+            return Repositories::JsonRows::many(txn,
+                                                "SELECT " + std::string(kColumns) +
+                                                    " FROM wallpapers WHERE status = 'pending' "
+                                                    " AND created_at < now() - make_interval(secs => $1::float8) "
+                                                    " ORDER BY created_at, id LIMIT $2",
+                                                older_than_seconds,
+                                                limit);
         });
     }
 
@@ -136,11 +136,11 @@ public:
     /// The ready rows of one device, oldest first.
     nlohmann::json list_ready(const std::string& device) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
-                                         " FROM wallpapers WHERE status = 'ready' AND device = $1 "
-                                         " ORDER BY created_at, id) t",
-                                     device);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
+            return Repositories::JsonRows::many(txn,
+                                                "SELECT " + std::string(kColumns) +
+                                                    " FROM wallpapers WHERE status = 'ready' AND device = $1 "
+                                                    " ORDER BY created_at, id",
+                                                device);
         });
     }
 
@@ -151,7 +151,6 @@ public:
             if (r.empty()) {
                 throw WallpaperNotFound();
             }
-            return true;
         });
     }
 
@@ -161,20 +160,15 @@ private:
         "status, created_by::text AS created_by, created_at";
 
     static void translate(std::string_view sqlstate) {
-        if (sqlstate == "23514") {  // check_violation
+        if (Repositories::detail::is_check_violation(sqlstate)) {
             throw WallpaperInvariant();
         }
     }
 
     template <typename Txn>
     static std::optional<nlohmann::json> find_in(Txn& txn, const std::string& id) {
-        auto r = txn.exec_params(
-            "SELECT row_to_json(t) FROM (SELECT " + std::string(kColumns) + " FROM wallpapers WHERE id = $1::uuid) t",
-            id);
-        if (r.empty()) {
-            return std::nullopt;
-        }
-        return nlohmann::json::parse(r[0][0].template as<std::string>());
+        return Repositories::JsonRows::one(
+            txn, "SELECT " + std::string(kColumns) + " FROM wallpapers WHERE id = $1::uuid", id);
     }
 };
 

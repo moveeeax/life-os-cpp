@@ -40,7 +40,7 @@ void FitnessGoalsController::get(const HttpRequestPtr& req, Callback&& callback)
 void FitnessGoalsController::put(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::fitness_enabled(), "fitness", req, callback, owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     const auto steps = body.find("steps");

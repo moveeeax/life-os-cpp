@@ -56,6 +56,22 @@ inline bool is_fk_violation(std::string_view ss) {
     return ss == "23503" || ss == "23001";
 }
 
+/// A CHECK constraint the row breaks (check_violation).
+inline bool is_check_violation(std::string_view ss) {
+    return ss == "23514";
+}
+
+/// A date or time PostgreSQL could not read: datetime_field_overflow or
+/// invalid_datetime_format.
+inline bool is_bad_datetime(std::string_view ss) {
+    return ss == "22008" || ss == "22007";
+}
+
+/// A unique index the row collides with (unique_violation).
+inline bool is_unique_violation(std::string_view ss) {
+    return ss == "23505";
+}
+
 /// throw_on for the foreign-key case: both SQLSTATEs above throw E.
 template <typename E>
 auto throw_on_fk() {

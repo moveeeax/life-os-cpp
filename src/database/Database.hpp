@@ -17,6 +17,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 #include <opentelemetry/trace/provider.h>
@@ -516,9 +517,16 @@ public:
                     // The proxy records every statement onto the db.* span
                     // (placeholders only — exec_params keeps values out).
                     detail::TracingTxn<TxnT> traced(txn, _span.span_);
-                    auto result = func(traced);
-                    txn.commit();
-                    return result;
+                    // A void body is a statement with nothing to answer;
+                    // it commits the same way, without a dummy result.
+                    if constexpr (std::is_void_v<decltype(func(traced))>) {
+                        func(traced);
+                        txn.commit();
+                    } else {
+                        auto result = func(traced);
+                        txn.commit();
+                        return result;
+                    }
                 } catch (const std::exception& e) {
                     if (!classifier(e)) {
                         spdlog::error("[{}] transaction failed: {}", span_name, e.what());
@@ -645,6 +653,17 @@ public:
             spdlog::warn("execute_read via replica failed ({}); falling back to primary", e.what());
             return execute_read_primary(std::forward<Func>(func));
         }
+    }
+
+    /// Routed read: execute_read_primary when @p from_primary (read-after-write),
+    /// execute_read otherwise. Pure forwarding, so a fake still observes the
+    /// "primary" or "replica" label of the entry point taken.
+    template <typename Func>
+    auto execute_read(bool from_primary, Func&& func)
+        -> decltype(func(std::declval<detail::TracingTxn<pqxx::read_transaction>&>())) {
+        if (from_primary)
+            return execute_read_primary(std::forward<Func>(func));
+        return execute_read(std::forward<Func>(func));
     }
 
 protected:

@@ -225,3 +225,11 @@ TEST(AniHookParse, HoldRange) {
     EXPECT_EQ(bad(R"({"type":"hold","minutes":481})").code, "invalid_minutes");
     EXPECT_EQ(bad(R"({"type":"hold"})").code, "invalid_minutes");
 }
+
+TEST(AniHookParse, AnUnknownTypeNamesEveryType) {
+    const auto e = bad(R"({"type":"dance"})");
+    EXPECT_EQ(e.status, 400);
+    EXPECT_EQ(e.code, "invalid_type");
+    EXPECT_EQ(e.message, "type is say, outfit, act, event, mood, remind, ask, focus, card, wallpaper, sound or hold");
+    EXPECT_EQ(bad(R"({"text":"no type"})").code, "invalid_type");
+}

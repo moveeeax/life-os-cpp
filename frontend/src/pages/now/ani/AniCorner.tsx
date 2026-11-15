@@ -3,32 +3,33 @@ import { useContext, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
-import { clockIn } from '@/lib/dates';
+import { clockIn, shiftDays } from '@/lib/dates';
 
-import { useAniPrefs, useMuteKind } from '@/hooks/useAni';
-import type { NowWeather, Today } from '@/lib/now/types';
+import { useAniPrefs, useMuteKind } from '@/hooks/useAniPrefs';
+import { numbersHidden, useHideNumbers } from '@/hooks/useHideNumbers';
+import { fetchTelegramWaiting } from '@/hooks/useTelegram';
+import { HOLD_KEY, useAni, type AniOutfit } from '@/lib/now/ani';
+import type { NowDay, NowWeather, Today } from '@/lib/now/types';
 
 import { AniChat, SpeakerIcon } from './AniChat';
 import { soundOn, speechUrl, useSound } from './chat';
 import type { Ani } from './engine';
-import { REVIEW_EVENT } from '../review/review';
-import { evening, tomorrowOf, waitingWords, type Waiting } from './evening';
+import { evening, waitingWords, type Waiting } from './evening';
 import { greeting, HELLO, hourOf } from './greet';
 import { useInbox, type Play } from './inbox';
 import { moodLevel, moodOf, moveMood } from './mood';
 import type { Talk, TalkState } from './talk';
-import { useAni, type AniOutfit } from './state';
 import { createToucher, say, type Answer } from './touch';
 import { AniOffers } from './AniOffers';
 import { useLife } from './useLife';
 import { useLife2 } from './useLife2';
-import { ACT_EVENT, type Act } from '@/lib/now/act';
+import { ACT_EVENT, REVIEW_EVENT, type Act } from '@/lib/now/act';
 import { carriesGive, readGive } from '@/lib/now/drag';
 import { firstFreeSlot, topCategory } from './give';
 import { reactionTo, ReactionGate } from './reactions';
 import { useRefresh } from './refresh';
-import { HOLD_KEY, eventOfLine, quietKind, snooze, type LineKind } from './lines';
-import { RIBBON_POINT, type NowDay } from '../ribbon/layout';
+import { eventOfLine, quietKind, snooze, type LineKind } from './lines';
+import { RIBBON_POINT } from '../ribbon/layout';
 import './ani.css';
 
 function holdToTalk(): boolean {
@@ -62,7 +63,6 @@ function HangerIcon() {
 // Recorded ahead with the voice she talks in (OpenAI TTS, marin), under
 // v2/voice/: the hellos of the hour (greet.ts), the taps' lines
 // (touch.ts) and this one.
-/** The day the reward offer was made (localStorage): once a day. */
 const DIZZY: Answer = { text: 'Ой, голова кружится.', recorded: 'dizzy' };
 
 /** The hello of this hour, recorded. */
@@ -93,8 +93,6 @@ function setDayOf(key: string, day: string) {
 }
 const helloDay = () => dayOf(HELLO_KEY);
 const setHelloDay = (day: string) => setDayOf(HELLO_KEY, day);
-/** Hide numbers is on (a shared screen). */
-const numbersHidden = () => document.documentElement.classList.contains('hide-numbers');
 /** A text with a digit in it: under Hide numbers it is blurred and not said aloud. */
 const hasNumber = (text: string) => /\d/.test(text);
 
@@ -226,15 +224,7 @@ export function AniCorner({
   const [chatKey, setChatKey] = useState(0);
   const ledgeRef = useRef<HTMLDivElement>(null);
   // Hide numbers (a shared screen): her webhook items and cards wait.
-  const [hideNums, setHideNums] = useState(() =>
-    document.documentElement.classList.contains('hide-numbers'),
-  );
-  useEffect(() => {
-    const root = document.documentElement;
-    const mo = new MutationObserver(() => setHideNums(root.classList.contains('hide-numbers')));
-    mo.observe(root, { attributes: true, attributeFilter: ['class'] });
-    return () => mo.disconnect();
-  }, []);
+  const [hideNums] = useHideNumbers();
   // The first state the engine starts from; later changes go through calls.
   const mountRef = useRef({ outfit: ani.outfit, here: ani.here });
   mountRef.current = { outfit: ani.outfit, here: ani.here };
@@ -340,7 +330,7 @@ export function AniCorner({
       ani: () => engine.current,
       today: () => contextRef.current.today,
       focusField: () => document.querySelector<HTMLInputElement>('.n-input'),
-      hidden: () => document.documentElement.classList.contains('hide-numbers'),
+      hidden: numbersHidden,
     }),
   );
   const sayTimer = useRef(0);
@@ -465,17 +455,16 @@ export function AniCorner({
         setDayOf(EVENING_KEY, c.date);
         // Telegram answers still owed go after the day's line (none without Telegram).
         // Through the cache Now's Telegram widget reads, so the two agree.
-        const read = async () =>
-          (await api.getJson<{ data: Waiting[] }>('/api/v1/telegram/waiting')).data;
+        // A fresher read than the widget's ten minutes: the list as of this evening.
         void (
           qcRef.current
             ? qcRef.current.fetchQuery({
                 queryKey: qk.telegramWaiting(),
-                queryFn: read,
+                queryFn: () => fetchTelegramWaiting(),
                 staleTime: 60_000,
                 retry: false,
               })
-            : read()
+            : fetchTelegramWaiting()
         )
           .then((r) => (Array.isArray(r) ? r : []))
           .catch(() => [] as Waiting[])
@@ -484,7 +473,7 @@ export function AniCorner({
             // The day's tasks first: done of all, and an offer to move the rest.
             const sum = evening(c.today, numbersHidden());
             if (sum) {
-              if (sum.move.length > 0) setMoveOffer({ ids: sum.move, due: tomorrowOf(c.date) });
+              if (sum.move.length > 0) setMoveOffer({ ids: sum.move, due: shiftDays(c.date, 1) });
               answer.current({ text: owed ? `${sum.text} ${owed}` : sum.text, kind: 'evening' });
               return;
             }

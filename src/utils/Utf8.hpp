@@ -50,4 +50,19 @@ inline std::string clip(const std::string& text, std::size_t max_points, std::st
     return cut(text, max_points) + std::string(ellipsis);
 }
 
+/// The first @p max_bytes bytes of UTF-8 @p text, stepped back to the start of
+/// a character so none is cut in half: a byte limit (a column, a request
+/// field) rather than a code point one.
+inline std::string prefix_bytes(const std::string& text, std::size_t max_bytes) {
+    if (text.size() <= max_bytes) {
+        return text;
+    }
+    std::size_t end = max_bytes;
+    // Step back over continuation bytes (10xxxxxx) to the start of a character.
+    while (end > 0 && (static_cast<unsigned char>(text[end]) & 0xC0) == 0x80) {
+        --end;
+    }
+    return text.substr(0, end);
+}
+
 }  // namespace Utils::Utf8

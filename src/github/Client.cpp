@@ -12,6 +12,10 @@
 
 #include <spdlog/spdlog.h>
 
+#include "utils/Base64.hpp"
+#include "utils/Strings.hpp"
+#include "utils/Time.hpp"
+
 namespace Github {
 
 namespace {
@@ -68,40 +72,6 @@ query($login: String!, $after: String, $first: Int!) {
 
 constexpr const char* kLoginQuery = "query { viewer { login } }";
 
-std::string lower(std::string s) {
-    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
-    return s;
-}
-
-/// Standard base64 with padding (RFC 4648 section 4), for the Basic credentials of the revoke call.
-std::string base64(const std::string& in) {
-    static constexpr char kAlphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    std::string out;
-    std::size_t i = 0;
-    while (i + 2 < in.size()) {
-        const unsigned n = (static_cast<unsigned char>(in[i]) << 16) | (static_cast<unsigned char>(in[i + 1]) << 8) |
-                           static_cast<unsigned char>(in[i + 2]);
-        out += kAlphabet[(n >> 18) & 63];
-        out += kAlphabet[(n >> 12) & 63];
-        out += kAlphabet[(n >> 6) & 63];
-        out += kAlphabet[n & 63];
-        i += 3;
-    }
-    if (i + 1 == in.size()) {
-        const unsigned n = static_cast<unsigned char>(in[i]) << 16;
-        out += kAlphabet[(n >> 18) & 63];
-        out += kAlphabet[(n >> 12) & 63];
-        out += "==";
-    } else if (i + 2 == in.size()) {
-        const unsigned n = (static_cast<unsigned char>(in[i]) << 16) | (static_cast<unsigned char>(in[i + 1]) << 8);
-        out += kAlphabet[(n >> 18) & 63];
-        out += kAlphabet[(n >> 12) & 63];
-        out += kAlphabet[(n >> 6) & 63];
-        out += '=';
-    }
-    return out;
-}
-
 std::vector<std::pair<std::string, std::string>> api_headers(const std::string& token) {
     return {{"Authorization", "Bearer " + token},
             {"Accept", "application/vnd.github+json"},
@@ -146,7 +116,7 @@ std::optional<Failure> failure_of(const Net::Http::Response& r) {
         return Failure{"rate_limited", answered};
     }
     if (r.status == 403) {
-        const std::string body = lower(r.body);
+        const std::string body = Utils::Strings::ascii_lower(r.body);
         if (body.find("rate limit") != std::string::npos || body.find("abuse") != std::string::npos) {
             return Failure{"rate_limited", answered + " (rate limit)"};
         }
@@ -215,18 +185,7 @@ std::optional<Failure> paginate(std::vector<Repo>& into, Page&& page) {
 }  // namespace
 
 std::string encode(const std::string& s) {
-    std::string out;
-    for (const unsigned char c : s) {
-        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' ||
-            c == '.' || c == '~') {
-            out += static_cast<char>(c);
-        } else {
-            char buf[4];
-            std::snprintf(buf, sizeof(buf), "%%%02X", c);
-            out += buf;
-        }
-    }
-    return out;
+    return Utils::Strings::percent_encode(s);
 }
 
 std::string auth_url(const Settings& s, const std::string& state) {
@@ -279,7 +238,7 @@ bool revoke(Net::Http::Transport& t, const Settings& s, const std::string& token
     r.url = std::string(kApiUrl) + "/applications/" + encode(s.client_id) + "/token";
     r.body = json{{"access_token", token}}.dump();
     r.content_type = "application/json";
-    r.headers = {{"Authorization", "Basic " + base64(s.client_id + ":" + s.client_secret)},
+    r.headers = {{"Authorization", "Basic " + Utils::Base64::encode(s.client_id + ":" + s.client_secret)},
                  {"Accept", "application/vnd.github+json"},
                  {"X-GitHub-Api-Version", kApiVersion},
                  {"User-Agent", kUserAgent}};
@@ -391,7 +350,7 @@ std::optional<Repo> repo_of(const json& node) {
     if (r.full_name.empty() || r.owner.empty()) {
         return std::nullopt;
     }
-    const std::string visibility = lower(text(node, "visibility"));
+    const std::string visibility = Utils::Strings::ascii_lower(text(node, "visibility"));
     r.visibility = visibility == "public" || visibility == "internal" ? visibility : "private";
     r.fork = node.value("isFork", false);
     r.archived = node.value("isArchived", false);
@@ -461,59 +420,12 @@ RepoFacts facts_of(const Repo& r) {
 }
 
 std::optional<long long> parse_time(const std::string& s) {
-    // YYYY-MM-DDTHH:MM:SS, then Z or an offset; GitHub writes Z.
-    const auto digits = [&](std::size_t at, std::size_t n, int& out) {
-        if (at + n > s.size()) {
-            return false;
-        }
-        int v = 0;
-        for (std::size_t i = at; i < at + n; ++i) {
-            if (s[i] < '0' || s[i] > '9') {
-                return false;
-            }
-            v = v * 10 + (s[i] - '0');
-        }
-        out = v;
-        return true;
-    };
-    int y = 0, mo = 0, d = 0, h = 0, mi = 0, se = 0;
-    if (s.size() < 20 || !digits(0, 4, y) || s[4] != '-' || !digits(5, 2, mo) || s[7] != '-' || !digits(8, 2, d) ||
-        s[10] != 'T' || !digits(11, 2, h) || s[13] != ':' || !digits(14, 2, mi) || s[16] != ':' || !digits(17, 2, se) ||
-        mo < 1 || mo > 12 || d < 1 || d > 31) {
+    // GitHub writes Z; Utils::Time::parse_rfc3339 also takes an offset.
+    const auto t = Utils::Time::parse_rfc3339(s);
+    if (!t) {
         return std::nullopt;
     }
-    std::size_t at = 19;
-    if (at < s.size() && s[at] == '.') {
-        ++at;
-        while (at < s.size() && s[at] >= '0' && s[at] <= '9') {
-            ++at;
-        }
-    }
-    long long offset = 0;
-    if (at < s.size() && (s[at] == 'Z' || s[at] == 'z')) {
-        ++at;
-    } else if (at < s.size() && (s[at] == '+' || s[at] == '-')) {
-        int oh = 0, om = 0;
-        if (!digits(at + 1, 2, oh) || at + 3 >= s.size() || s[at + 3] != ':' || !digits(at + 4, 2, om)) {
-            return std::nullopt;
-        }
-        offset = (oh * 3600LL + om * 60LL) * (s[at] == '-' ? -1 : 1);
-        at += 6;
-    } else {
-        return std::nullopt;
-    }
-    if (at != s.size()) {
-        return std::nullopt;
-    }
-    // Days since 1970-01-01 of a civil date (Howard Hinnant's algorithm).
-    long long yy = y;
-    yy -= mo <= 2;
-    const long long era = (yy >= 0 ? yy : yy - 399) / 400;
-    const unsigned yoe = static_cast<unsigned>(yy - era * 400);
-    const unsigned doy = (153 * (static_cast<unsigned>(mo) + (mo > 2 ? -3 : 9)) + 2) / 5 + static_cast<unsigned>(d) - 1;
-    const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    const long long days = era * 146097 + static_cast<long long>(doe) - 719468;
-    return days * 86400 + h * 3600LL + mi * 60LL + se - offset;
+    return static_cast<long long>(*t);
 }
 
 std::variant<Pull, Failure> pull(Net::Http::Transport& t, const std::string& token) {

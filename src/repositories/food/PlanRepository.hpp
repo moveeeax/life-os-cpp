@@ -47,7 +47,7 @@ public:
             return nlohmann::json{{"source", r[0][0].template as<std::string>()},
                                   {"meals", nlohmann::json::parse(r[0][1].template as<std::string>())}};
         };
-        return from_primary ? Database::get().execute_read_primary(query) : Database::get().execute_read(query);
+        return Database::get().execute_read(from_primary, query);
     }
 
     /// The seven weekdays in order, [{weekday, meals}]; a weekday without a template has [].
@@ -89,7 +89,6 @@ public:
                 owner,
                 date,
                 meals_json);
-            return true;
         });
     }
 
@@ -97,7 +96,6 @@ public:
     void remove_day(const std::string& owner, const std::string& date) {
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params("DELETE FROM food_plan_days WHERE owner_id = $1::uuid AND day = $2::date", owner, date);
-            return true;
         });
     }
 };

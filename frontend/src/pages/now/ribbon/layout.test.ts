@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { blocksOf, nextEvent, nextWords, pctOf, pinsOf, type NowDay } from './layout';
+import type { NowDay } from '@/lib/now/types';
+
+import { blocksOf, nextEvent, nextWords, pctOf, pinsOf } from './layout';
 
 const TZ = 'Asia/Tashkent';
 const day: NowDay = {

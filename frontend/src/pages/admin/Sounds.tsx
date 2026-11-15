@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from 'react';
 
-import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { useAdminSounds, useCreateSound, useDeleteSound, useSoundReady } from '@/hooks/useNow';
 import { apiErrorMessage } from '@/lib/api/client';
 import type { AdminSound, SoundCreate } from '@/lib/now';
@@ -47,7 +47,7 @@ export function SoundsSection() {
   const [title, setTitle] = useState('');
   const [progress, setProgress] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<AdminSound | null>(null);
+  const deleting = useConfirmDelete<AdminSound>();
   const [inputKey, setInputKey] = useState(0);
 
   const pick = (f: File | null) => {
@@ -184,7 +184,7 @@ export function SoundsSection() {
                   {s.status === 'ready' && (
                     <audio controls preload="none" src={s.url} className="h-8 max-w-full" />
                   )}
-                  <Button variant="ghost" onClick={() => setDeleting(s)}>
+                  <Button variant="ghost" onClick={() => deleting.ask(s)}>
                     Delete
                   </Button>
                 </li>
@@ -194,16 +194,13 @@ export function SoundsSection() {
           {remove.error && <p className="text-sm text-destructive">{remove.error}</p>}
         </CardContent>
       </Card>
-      {deleting && (
-        <ConfirmDialog
-          title="Delete this sound?"
-          description="It goes from the bucket and from focus mode."
-          confirmLabel="Delete"
-          destructive
-          busy={remove.isPending}
-          onConfirm={() => remove.mutate(deleting.id, { onSuccess: () => setDeleting(null) })}
-          onClose={() => setDeleting(null)}
-        />
+      {deleting.dialog(
+        remove,
+        () => ({
+          title: 'Delete this sound?',
+          description: 'It goes from the bucket and from focus mode.',
+        }),
+        { closeOnSuccess: true },
       )}
     </section>
   );

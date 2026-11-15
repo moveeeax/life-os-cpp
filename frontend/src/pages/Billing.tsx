@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { CreditCard } from 'lucide-react';
 
 import { DataTable, type Column } from '@/components/DataTable';
@@ -7,10 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useApiMutation } from '@/hooks/useApiMutation';
 import { useErrorToast } from '@/hooks/useErrorToast';
-import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
+import { useBillingPackages, useTopup, useWalletPage } from '@/hooks/useBilling';
 import type { BillingPackage, PublicWalletEntry } from '@/lib/api/types';
 import { formatDateTime } from '@/lib/dates';
 import { creditsForAmount, dollarsToCents, formatCents } from '@/lib/money';
@@ -52,35 +49,19 @@ function KindBadge({ kind }: { kind: PublicWalletEntry['kind'] }) {
 }
 
 export function BillingPage() {
-  const packagesQ = useQuery({
-    queryKey: qk.billing.packages(),
-    queryFn: () => api.getJson('/api/v1/billing/packages'),
-  });
+  const packagesQ = useBillingPackages();
 
   const [historyPage, setHistoryPage] = useState(1);
   const historyOffset = (historyPage - 1) * HISTORY_PER_PAGE;
-  const walletQ = useQuery({
-    queryKey: qk.billing.wallet(historyPage),
-    queryFn: () =>
-      api.getJson('/api/v1/billing/wallet', {
-        query: { limit: HISTORY_PER_PAGE, offset: historyOffset },
-      }),
-    placeholderData: keepPreviousData,
-  });
+  const walletQ = useWalletPage(historyPage, HISTORY_PER_PAGE, historyOffset);
 
   const [customAmount, setCustomAmount] = useState('');
 
-  const topup = useApiMutation(
-    (vars: { package_id?: string; amount_cents?: number }) =>
-      api.postJson('/api/v1/billing/topup', { body: vars }),
-    {
-      // The whole point of a successful call is to leave the page for
-      // PayPal, so there's nothing left here to invalidate.
-      onSuccess: (res) => {
-        window.location.href = res.data.approve_url;
-      },
-    },
-  );
+  // The whole point of a successful call is to leave the page for PayPal,
+  // so there's nothing left here to invalidate.
+  const topup = useTopup((approveUrl) => {
+    window.location.href = approveUrl;
+  });
   useErrorToast(topup.error);
 
   const bounds = packagesQ.data;

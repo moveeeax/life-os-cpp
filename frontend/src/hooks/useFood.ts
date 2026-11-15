@@ -1,9 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type UseQueryOptions } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { useParseJob } from '@/hooks/useParseJob';
 import { api } from '@/lib/api/client';
 import { NOW_DIGEST, qk } from '@/lib/api/queryKeys';
+import type { components } from '@/lib/api/schema.gen';
 import type {
   FoodDay,
   FoodEntry,
@@ -226,5 +227,22 @@ export function useFoodParse() {
     pollMs: PARSE_POLL_MS,
     deadlineMs: PARSE_DEADLINE_MS,
     notConfigured: 'Text parsing is not configured on the server.',
+  });
+}
+
+export type FoodWater = components['schemas']['FoodWater'];
+
+/** The water of @p date (Now's widget and Ani's lines share the key). */
+export function useWater(
+  date: string,
+  options: Omit<UseQueryOptions<FoodWater>, 'queryKey' | 'queryFn'> = {},
+) {
+  return useQuery({
+    queryKey: qk.food.water(date),
+    retry: false,
+    queryFn: async ({ signal }) =>
+      (await api.getJson<{ data: FoodWater }>('/api/v1/food/water', { query: { date }, signal }))
+        .data,
+    ...options,
   });
 }

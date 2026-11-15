@@ -52,6 +52,22 @@ std::variant<Input, std::string> parse(const nlohmann::json& body, const std::st
     return in;
 }
 
+std::optional<nlohmann::json> add(const std::string& owner, const Input& in, const std::string& via) {
+    auto made = Repositories::Agent::ReminderRepository().add(owner, in.text, in.at, in.days, in.tz);
+    if (made) {
+        Security::Audit::record(owner, "ani.reminder.add", "ani_reminder", (*made)["id"], nlohmann::json{{"via", via}});
+    }
+    return made;
+}
+
+bool remove(const std::string& owner, const std::string& id, const std::string& via) {
+    if (!Repositories::Agent::ReminderRepository().remove(owner, id)) {
+        return false;
+    }
+    Security::Audit::record(owner, "ani.reminder.remove", "ani_reminder", id, nlohmann::json{{"via", via}});
+    return true;
+}
+
 nlohmann::json process_due(const nlohmann::json& /*payload*/) {
     int said = 0;
     Repositories::Agent::InboxRepository inbox;

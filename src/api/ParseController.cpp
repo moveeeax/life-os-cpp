@@ -18,6 +18,7 @@
 #include "api/FieldChecks.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
+#include "api/ParseJobStart.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "jobs/Jobs.hpp"
@@ -44,13 +45,6 @@ const std::vector<std::string> kMeals = {"breakfast", "lunch", "dinner", "snack"
 
 bool any_module_on() {
     return Core::food_enabled() || Core::money_enabled() || Core::tasks_enabled();
-}
-
-HttpResponsePtr too_many() {
-    return ErrorResponse::make({k429TooManyRequests,
-                                "too_many_parses",
-                                "wait for your running parses to finish",
-                                json{{"retry_after_sec", 30}}});
 }
 
 }  // namespace
@@ -116,82 +110,17 @@ void ParseController::start(const HttpRequestPtr& req, Callback&& callback) {
     apply.apply = body.contains("apply") && body["apply"].is_boolean() && body["apply"].get<bool>();
     apply.account_id = Validation::opt_string(body, "account_id");
     apply.idempotency_key = key;
-
-    const auto accepted = [&](const json& job) {
-        auto resp = Response::ok(json{{"data", {{"id", job["id"]}, {"status", job["status"]}}}});
-        resp->setStatusCode(k202Accepted);
-        callback(resp);
-    };
-    // A retry of a request already taken answers with its job, before the cap.
-    if (key) {
-        std::optional<json> earlier;
-        if (!with_repo_errors(
-                callback, "parse.keyed", [&] { earlier = Repositories::JobRows::keyed(Repo::kTable, owner, *key); })) {
-            return;
-        }
-        if (earlier) {
-            accepted(*earlier);
-            return;
-        }
-    }
-    Repo repo;
-    std::string id;
-    bool replayed = false;
-    // The job carries the retry limit it was submitted with.
-    const int max_attempts = Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries;
-    const auto payload = [&](const std::string& job_id) {
-        return json{{"job_id", job_id}, {"owner_id", owner}, {"max_attempts", max_attempts}};
-    };
-    // The job rides the row's transaction as an outbox row when a drain is configured
-    // (Jobs::Outbox::enqueue_if_drained), as in the module parses.
-    bool via_outbox = false;
-    try {
-        // One phrase is one job and one place among the kOpenMax open unified parses; it takes
-        // no place in the module parses' own caps (its child rows are filed already done).
-        if (repo.open_count(owner) >= Repositories::JobRows::kOpenMax) {
-            callback(too_many());
-            return;
-        }
-        const json job =
-            repo.create(owner, text, meal, date, apply, replayed, [&](auto& txn, const std::string& job_id) {
-                // The cap again, under the lock: two creates at once cannot both pass the count above.
-                Repositories::JobRows::hold_slot(txn, Repo::kTable, owner);
-                via_outbox = Jobs::Outbox::enqueue_if_drained(txn, UnifiedParse::kJobType, payload(job_id));
-            });
-        if (replayed) {
-            accepted(job);
-            return;
-        }
-        id = job["id"].get<std::string>();
-    } catch (const Repositories::JobRows::SlotsTaken&) {
-        callback(too_many());
-        return;
-    } catch (const std::exception&) {
-        // The server's DETAIL would quote the phrase: no message.
-        spdlog::warn("unified parse create failed");
-        callback(ErrorResponse::service_unavailable("storage_unavailable"));
-        return;
-    }
-    try {
-        if (!via_outbox) {
-            if (!Jobs::is_initialized()) {
-                throw std::runtime_error("the job queue is not initialized");
-            }
-            Jobs::get().submit(UnifiedParse::kJobType, payload(id));
-        }
-    } catch (const std::exception& e) {
-        spdlog::warn("unified parse enqueue unavailable: {}", e.what());
-        try {
-            repo.fail(id, "queue_unavailable", "the job queue did not take the job");
-        } catch (const std::exception& inner) {
-            spdlog::warn("unified parse {}: could not mark failed: {}", id, inner.what());
-        }
-        callback(ErrorResponse::service_unavailable("queue_unavailable"));
-        return;
-    }
-    auto resp = Response::ok(json{{"data", {{"id", id}, {"status", "queued"}}}});
-    resp->setStatusCode(k202Accepted);
-    callback(resp);
+    // One phrase is one job and one place among the kOpenMax open unified parses; it takes
+    // no place in the module parses' own caps (its child rows are filed already done).
+    start_parse_job<Repo>(
+        owner,
+        callback,
+        key,
+        ParseJobSpec{Repo::kTable, UnifiedParse::kJobType, "unified parse", "parse.keyed"},
+        [&](Repo& repo, bool& replayed, auto&& in_txn) {
+            return repo.create(owner, text, meal, date, apply, replayed, in_txn);
+        },
+        no_create_errors);
 }
 
 void ParseController::status(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {

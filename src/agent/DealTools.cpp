@@ -11,6 +11,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include "agent/ToolArgs.hpp"
 #include "repositories/agent/DealRepository.hpp"
 #include "security/Audit.hpp"
 #include "utils/Utf8.hpp"
@@ -21,10 +22,7 @@ namespace {
 
 using json = nlohmann::json;
 
-json tool(const char* name, const char* description, json parameters) {
-    return json{{"type", "function"},
-                {"function", {{"name", name}, {"description", description}, {"parameters", std::move(parameters)}}}};
-}
+using ToolArgs::tool;
 
 using Utils::Utf8::length;
 
@@ -78,9 +76,7 @@ Gateway::ToolRunner runner(const std::string& owner, const std::string& tz, Gate
             return rest(name, raw);
         }
         const json args = raw.is_object() ? raw : json::object();
-        const auto str = [&](const char* k) {
-            return args.contains(k) && args[k].is_string() ? args[k].get<std::string>() : std::string();
-        };
+        const auto str = [&](const char* k) { return ToolArgs::text_arg(args, k); };
         try {
             Repositories::Agent::DealRepository deals;
             if (name == "promise") {
@@ -89,39 +85,37 @@ Gateway::ToolRunner runner(const std::string& owner, const std::string& tz, Gate
                 const long long target =
                     args.contains("target") && args["target"].is_number_integer() ? args["target"].get<long long>() : 0;
                 if (text.empty() || length(text) > 200) {
-                    return json{{"error", "invalid"}, {"message", "the promise is 1 to 200 characters"}}.dump();
+                    return ToolArgs::refusal("invalid", "the promise is 1 to 200 characters");
                 }
                 if (kind != "workouts" && kind != "focus_minutes" && kind != "habit") {
-                    return json{{"error", "invalid"}, {"message", "kind is workouts, focus_minutes or habit"}}.dump();
+                    return ToolArgs::refusal("invalid", "kind is workouts, focus_minutes or habit");
                 }
                 if (target < 1 || target > 10000) {
-                    return json{{"error", "invalid"}, {"message", "target is 1 to 10000"}}.dump();
+                    return ToolArgs::refusal("invalid", "target is 1 to 10000");
                 }
                 std::optional<std::string> habit;
                 if (kind == "habit") {
                     habit = deals.habit_named(owner, str("habit"));
                     if (!habit) {
-                        return json{{"error", "unknown_habit"}, {"message", "no habit of theirs has that name"}}.dump();
+                        return ToolArgs::refusal("unknown_habit", "no habit of theirs has that name");
                     }
                 }
                 const auto id = deals.add(owner, tz, text, kind, static_cast<int>(target), habit);
                 if (!id) {
-                    return json{{"error", "too_many"},
-                                {"message", "this week holds five promises already: drop one first"}}
-                        .dump();
+                    return ToolArgs::refusal("too_many", "this week holds five promises already: drop one first");
                 }
                 Security::Audit::record(owner, "ani.deal.add", "ani_deal", *id);
                 return json{{"promised", *id}}.dump();
             }
             const std::string id = str("id");
             if (!deals.remove(owner, id)) {
-                return json{{"error", "not_found"}, {"message", "no promise of this week has that id"}}.dump();
+                return ToolArgs::refusal("not_found", "no promise of this week has that id");
             }
             Security::Audit::record(owner, "ani.deal.remove", "ani_deal", id);
             return json{{"dropped", true}}.dump();
         } catch (const std::exception& e) {
             spdlog::warn("ani agent: the deal tool {} failed: {}", name, e.what());
-            return json{{"error", "failed"}, {"message", "it was not kept"}}.dump();
+            return ToolArgs::refusal("failed", "it was not kept");
         }
     };
 }

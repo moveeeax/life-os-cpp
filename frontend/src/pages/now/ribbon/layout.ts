@@ -1,10 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-
-import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
-import type { components } from '@/lib/api/schema.gen';
-
-export type NowDay = components['schemas']['NowDay'];
+import { minutesIn } from '@/lib/dates';
+import type { NowDay } from '@/lib/now/types';
 
 /** The ribbon's hours: 08:00 to 23:00 local. */
 export const RIBBON_FROM = 8;
@@ -34,19 +29,6 @@ export interface Pin {
   done: boolean;
 }
 
-/** Minutes past local midnight of @p ms in @p tz. */
-export function localMinutes(ms: number, tz: string): number {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: tz,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(new Date(ms));
-  const h = Number(parts.find((p) => p.type === 'hour')?.value ?? 0);
-  const m = Number(parts.find((p) => p.type === 'minute')?.value ?? 0);
-  return h * 60 + m;
-}
-
 /** The ribbon's 0..100 of local minutes; outside the hours it is clipped. */
 export function pctOf(minutes: number): number {
   const v = ((minutes - RIBBON_FROM * 60) / ((RIBBON_TO - RIBBON_FROM) * 60)) * 100;
@@ -69,8 +51,8 @@ function span(
   id?: string,
 ): Block | null {
   // Minutes of the day; a side on another day sits at the ribbon's edge.
-  const am = localDay(a, tz) < date ? 0 : localMinutes(a, tz);
-  const bm = localDay(b, tz) > date ? 24 * 60 : localMinutes(b, tz);
+  const am = localDay(a, tz) < date ? 0 : minutesIn(tz, a);
+  const bm = localDay(b, tz) > date ? 24 * 60 : minutesIn(tz, b);
   const left = pctOf(am);
   const right = pctOf(bm);
   if (right <= left) return null;
@@ -196,23 +178,3 @@ export function freeAt(blocks: Block[], pct: number): Block | null {
 
 /** Ani points at a block of the ribbon with this event (detail: the calendar event's id). */
 export const RIBBON_POINT = 'now:ribbon:point';
-
-/** HH:MM of @p ms in @p tz. */
-export const hhmm = (ms: number, tz: string) =>
-  new Intl.DateTimeFormat('en-GB', {
-    timeZone: tz,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(new Date(ms));
-
-export function useNowDay(date: string, tz: string) {
-  return useQuery({
-    queryKey: qk.now.day(date, tz),
-    staleTime: 60_000,
-    refetchInterval: 5 * 60_000,
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: NowDay }>('/api/v1/now/day', { query: { date, tz }, signal }))
-        .data,
-  });
-}

@@ -2,7 +2,7 @@
 export * from './types';
 export * from './projects';
 export * from './repeat';
-import { daysBetween, formatDay, isDay, todayLocal } from '@/lib/dates';
+import { daysBetween, formatDay, isDay } from '@/lib/dates';
 
 import type { Area, Effort } from './types';
 
@@ -67,9 +67,6 @@ export function parseErrorText(error: string | null | undefined): string {
   };
   return words[code] ?? 'The phrase could not be read.';
 }
-
-/** Today in the browser's zone. */
-export const localToday = (): string => todayLocal();
 
 export function localZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';

@@ -209,4 +209,80 @@ inline std::optional<nlohmann::json> keyed(const char* table, const std::string&
     });
 }
 
+/// Closes the row as failed, the error stored as "<code>: <message>" (the code
+/// alone without a message): before the claim (@p attempt 0) an open row, after
+/// it only the holder's (while_open). @p extra_set continues the SET list
+/// (", image = NULL"), spelled in code like @p table.
+inline void fail(const char* table,
+                 const std::string& id,
+                 const std::string& code,
+                 const std::string& message,
+                 int attempt,
+                 const char* extra_set = "") {
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params(std::string("UPDATE ") + table + " SET status = 'failed', error = $2" + extra_set +
+                            ", finished_at = now() WHERE id = $1::uuid" + while_open(3),
+                        id,
+                        message.empty() ? code : code + ": " + message,
+                        attempt);
+        return true;
+    });
+}
+
+/// The UPDATE that closes a parse job's row as done with its lines, for the
+/// holder of the attempt only: $1 id, $2 lines, $3 model, $4 and $5 the token
+/// counts, $6 the attempt. @p extra_set as in fail().
+inline std::string finish_sql(const char* table, const char* extra_set = "") {
+    return std::string("UPDATE ") + table +
+           " SET status = 'done', result = $2::jsonb, error = NULL, model = $3, "
+           " prompt_tokens = $4, completion_tokens = $5" +
+           extra_set + ", finished_at = now() WHERE id = $1::uuid" + while_claimed(6);
+}
+
+/// finish_sql() run on its own.
+inline void finish(const char* table,
+                   const std::string& id,
+                   int attempt,
+                   const nlohmann::json& lines,
+                   const std::string& model,
+                   std::optional<int> prompt_tokens,
+                   std::optional<int> completion_tokens,
+                   const char* extra_set = "") {
+    Database::get().execute_write([&](auto& txn) {
+        txn.exec_params(
+            finish_sql(table, extra_set), id, lines.dump(), model, prompt_tokens, completion_tokens, attempt);
+        return true;
+    });
+}
+
+/**
+ * The calls a job repository forwards to this file under its own table:
+ * `class X : public JobRows::JobTable<X>` with `static constexpr const char*
+ * kTable`. A table whose fail clears more (money's photo) declares its own
+ * fail(), which hides this one.
+ */
+template <typename Derived>
+class JobTable {
+public:
+    /// queued (or stale running) -> running, one more attempt; 0 when not claimable.
+    int start(const std::string& id) { return JobRows::start(Derived::kTable, id); }
+
+    /// The row's status now; nullopt when the row is gone.
+    std::optional<std::string> status(const std::string& id) { return JobRows::status(Derived::kTable, id); }
+
+    /// running -> queued, for an outage the queue will retry; only by the holder of @p attempt.
+    void requeue(const std::string& id, int attempt) { JobRows::requeue(Derived::kTable, id, attempt); }
+
+    /// Milliseconds until a running row may be claimed again; 0 when it is not running.
+    long long stale_in_ms(const std::string& id) { return JobRows::stale_in_ms(Derived::kTable, id); }
+
+    /// Jobs of the owner that are queued or running (a stale queued or running row is not counted).
+    long open_count(const std::string& owner) { return JobRows::open_count(Derived::kTable, owner); }
+
+    /// @p error is stored as "<code>: <message>"; the code is what the page reads.
+    void fail(const std::string& id, const std::string& code, const std::string& message, int attempt = 0) {
+        JobRows::fail(Derived::kTable, id, code, message, attempt);
+    }
+};
+
 }  // namespace Repositories::JobRows

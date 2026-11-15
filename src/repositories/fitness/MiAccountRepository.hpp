@@ -178,7 +178,6 @@ public:
                 nonce_b64,
                 credentials.region,
                 region_detected);
-            return true;
         });
     }
 
@@ -262,7 +261,6 @@ public:
                 "UPDATE mi_accounts SET status = 'ok', last_ok_at = now(), last_error = NULL "
                 "WHERE owner_id = $1::uuid",
                 owner_id);
-            return true;
         });
     }
 
@@ -381,7 +379,7 @@ inline long long region_offset_seconds(const std::string& owner) {
     } catch (const std::exception&) {
         // An unreachable database is reported by the query that follows.
     }
-    return (region.empty() || region == "cn") ? 8 * 3600 : 0;
+    return Xiaomi::offset_seconds(region);
 }
 
 }  // namespace Repositories

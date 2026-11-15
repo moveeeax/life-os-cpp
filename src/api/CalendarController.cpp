@@ -21,6 +21,7 @@
 #include <nlohmann/json.hpp>
 
 #include "api/CalendarCache.hpp"
+#include "api/Caller.hpp"
 #include "api/FieldChecks.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
@@ -32,8 +33,6 @@
 #include "repositories/calendar/LinkRepository.hpp"
 #include "security/Audit.hpp"
 #include "security/Auth.hpp"
-#include "security/SessionCookies.hpp"
-#include "security/SessionStore.hpp"
 #include "utils/ErrorResponse.hpp"
 #include "utils/Seal.hpp"
 #include "utils/Utf8.hpp"
@@ -58,8 +57,7 @@ drogon::HttpResponsePtr problem(const Calendar::Problem& p) {
 }
 
 std::string tz_of(const HttpRequestPtr& req) {
-    const std::string tz = req->getParameter("tz");
-    return Repositories::Zones::is_zone(tz) ? tz : "UTC";
+    return zone_or_utc(req, &Repositories::Zones::is_zone);
 }
 
 bool event_id_ok(const std::string& id) {
@@ -83,30 +81,6 @@ std::optional<std::pair<std::string, std::string>> span_of(const json& body,
         return std::nullopt;
     }
     return std::make_pair(start, end);
-}
-
-/// The user signed in on this browser (the access cookie; SameSite=Lax rides the top-level return from
-/// Google), or "" when there is none. The callback path is public, so the middleware did not resolve it.
-std::string session_of(const HttpRequestPtr& req) {
-    if (!Security::Auth::is_initialized()) {
-        return "";
-    }
-    const auto& auth = Security::Auth::get();
-    const auto& cfg = auth.config();
-    const std::string token = Security::Auth::extract_access_token(req, cfg.cookies);
-    if (token.empty()) {
-        return "";
-    }
-    try {
-        std::string err;
-        const auto p = auth.verify_jwt(token, err);
-        if (!p || p->subject.empty() || Security::Sessions::access_revoked(cfg.cookies, p->subject, p->raw_claims)) {
-            return "";
-        }
-        return p->subject;
-    } catch (const std::exception&) {
-        return "";
-    }
 }
 
 void redirect(const CalendarController::Callback& callback, const std::string& outcome) {
@@ -153,7 +127,7 @@ void CalendarController::oauthCallback(const HttpRequestPtr& req, Callback&& cal
     }
     std::optional<std::string> owner;
     try {
-        owner = LinkRepository().take_state(req->getParameter("state"), session_of(req));
+        owner = LinkRepository().take_state(req->getParameter("state"), signed_in_user(req));
     } catch (const std::exception& e) {
         spdlog::error("calendar.callback failed: {}", e.what());
         redirect(callback, "error");
@@ -256,12 +230,7 @@ void CalendarController::freeSlots(const HttpRequestPtr& req, Callback&& callbac
         callback(ErrorResponse::bad_request("invalid_date", "date is a day as YYYY-MM-DD"));
         return;
     }
-    int min = 30;
-    try {
-        if (!req->getParameter("min").empty()) {
-            min = std::clamp(std::stoi(req->getParameter("min")), 5, 480);
-        }
-    } catch (const std::exception&) {}
+    const int min = clamp_int(req->getParameter("min"), 30, 5, 480);
     const std::string tz = tz_of(req);
     Outbound::run(std::move(callback), "calendar.free", [owner, date, tz, min](const Callback& reply) {
         LinkRepository links;

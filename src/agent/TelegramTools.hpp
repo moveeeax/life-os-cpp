@@ -30,6 +30,10 @@ nlohmann::json definitions();
 /// Whether @p name is one of them.
 bool is_telegram(const std::string& name);
 
+/// Whether @p name is one of them that only reads (tg_chats, tg_history,
+/// tg_search): those a webhook turn offers (Tools::may_offer).
+bool is_offered_in_hook(const std::string& name);
+
 /// The site request a call of @p name becomes: {method, path, query: [[k, v]...], body}; a refusal text instead.
 nlohmann::json request_of(const std::string& name, const nlohmann::json& args, std::string& refusal);
 

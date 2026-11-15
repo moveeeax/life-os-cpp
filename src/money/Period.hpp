@@ -35,15 +35,7 @@ inline sys_days day_of(std::string_view text) {
 }
 
 inline std::string text_of(sys_days d) {
-    const year_month_day ymd{d};
-    char buf[32];  // room for any int year: GCC checks the worst case
-    std::snprintf(buf,
-                  sizeof buf,
-                  "%04d-%02u-%02u",
-                  static_cast<int>(ymd.year()),
-                  static_cast<unsigned>(ymd.month()),
-                  static_cast<unsigned>(ymd.day()));
-    return buf;
+    return Utils::Date::format_ymd(d);
 }
 
 inline sys_days month_start(sys_days d) {

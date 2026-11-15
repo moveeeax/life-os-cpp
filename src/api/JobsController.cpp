@@ -16,6 +16,7 @@
 #include <nlohmann/json.hpp>
 
 #include "api/Guards.hpp"
+#include "api/HandlerSupport.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "jobs/Jobs.hpp"
@@ -47,7 +48,7 @@ void JobsController::submitJob(const HttpRequestPtr& req, std::function<void(con
     API_REQUIRE_JOBS_READY(callback);
     try {
         json body;
-        if (!Validation::parse_body(req, body, callback))
+        if (!parse_object(req, body, callback))
             return;
 
         Validation::Errors errs;

@@ -7,10 +7,10 @@ import { useMetrics } from '@/hooks/useMetrics';
 import { useDeleteGoal, useGoal, useGoals, useSaveGoal } from '@/hooks/useGoals';
 import { formatValue, KIND_LABEL, paceWord, weeklyPace, type Goal, type Tone } from '@/lib/goals';
 import { parseAmount } from '@/lib/amounts';
-import { formatDay } from '@/lib/dates';
+import { formatDay, todayLocal } from '@/lib/dates';
 import { goalBody, goalForm, goalPatch, type GoalFormValues } from '@/lib/goals/bodies';
 import { entryOf } from '@/lib/metrics';
-import { AREAS, areaOf, localToday } from '@/lib/tasks';
+import { AREAS, areaOf } from '@/lib/tasks';
 import { cn } from '@/lib/utils';
 
 import {
@@ -167,7 +167,7 @@ function GoalRow({
 
 /** A new goal, or an edit of @p goal: the edit sends only what changed (kind stays). */
 export function GoalForm({ goal, onClose }: { goal?: Goal; onClose: () => void }) {
-  const today = localToday();
+  const today = todayLocal();
   const [f, setF] = useState<GoalFormValues>(() =>
     goal
       ? goalForm(goal)
@@ -378,7 +378,7 @@ export function GoalForm({ goal, onClose }: { goal?: Goal; onClose: () => void }
 
 /** The person's goals: active ones open in place; done and dropped folded. */
 export function GoalsPage() {
-  const today = localToday();
+  const today = todayLocal();
   const active = useGoals('active', today);
   const done = useGoals('done', today);
   const dropped = useGoals('dropped', today);

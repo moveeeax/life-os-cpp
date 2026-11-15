@@ -146,6 +146,8 @@ export const qk = {
     /** One unit of the arrival currency in the view currency (the trip mode card, Ani's hello abroad). */
     arrivalRate: (from: string, to: string, date: string) =>
       ['now', 'mode-rate', from, to, date] as const,
+    /** Focus minutes this week and the longest run (Ani's achievements). */
+    focusStats: (tz: string) => ['now', 'focus-stats', tz] as const,
     wallpapers: (device: string) => ['now', 'wallpapers', device] as const,
     adminWallpapers: () => ['now', 'admin-wallpapers'] as const,
     sounds: () => ['now', 'sounds'] as const,

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 
-import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { useErrorToast } from '@/hooks/useErrorToast';
 import { useClients, useDeleteClient } from '@/hooks/usePractice';
 import { amountsLine, type PracticeClient } from '@/lib/practice';
@@ -15,8 +15,8 @@ export function PracticeClientsPage() {
   const clients = useClients();
   const [editing, setEditing] = useState<PracticeClient | 'new' | null>(null);
   const [dealFor, setDealFor] = useState<PracticeClient | null>(null);
-  const [deleting, setDeleting] = useState<PracticeClient | null>(null);
-  const remove = useDeleteClient(() => setDeleting(null));
+  const deleting = useConfirmDelete<PracticeClient>();
+  const remove = useDeleteClient(deleting.close);
   useErrorToast(remove.error);
   const list = clients.data ?? [];
   return (
@@ -80,7 +80,7 @@ export function PracticeClientsPage() {
                 <button
                   type="button"
                   className="k-link k-error-text"
-                  onClick={() => setDeleting(c)}
+                  onClick={() => deleting.ask(c)}
                 >
                   Delete
                 </button>
@@ -96,17 +96,11 @@ export function PracticeClientsPage() {
         />
       )}
       {dealFor && <DealSheet clientId={dealFor.id} onClose={() => setDealFor(null)} />}
-      {deleting && (
-        <ConfirmDialog
-          title={`Delete ${deleting.name}?`}
-          description="A client with deals stays until its deals are gone; its payments stay, without the client."
-          confirmLabel="Delete"
-          destructive
-          busy={remove.isPending}
-          onConfirm={() => remove.mutate(deleting.id)}
-          onClose={() => setDeleting(null)}
-        />
-      )}
+      {deleting.dialog(remove, (d) => ({
+        title: `Delete ${d.name}?`,
+        description:
+          'A client with deals stays until its deals are gone; its payments stay, without the client.',
+      }))}
     </PracticeFrame>
   );
 }

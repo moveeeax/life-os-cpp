@@ -7,7 +7,7 @@ import {
   fetchAllPages,
   formatDelta,
   inRange,
-  localDate,
+  dayOfInstant,
   mean,
   nights,
   parseRange,
@@ -40,15 +40,15 @@ const session = (over: Partial<SleepSession>): SleepSession => ({
   ...over,
 });
 
-describe('localDate', () => {
+describe('dayOfInstant', () => {
   it('moves a late-evening UTC instant to the next day in a zone ahead of UTC', () => {
-    expect(localDate('2026-10-01T19:30:00+00:00', 420)).toBe('2026-10-02');
+    expect(dayOfInstant('2026-10-01T19:30:00+00:00', 420)).toBe('2026-10-02');
   });
   it('moves an early-morning UTC instant to the previous day in a zone behind UTC', () => {
-    expect(localDate('2026-10-01T02:00:00+00:00', -300)).toBe('2026-09-30');
+    expect(dayOfInstant('2026-10-01T02:00:00+00:00', -300)).toBe('2026-09-30');
   });
   it('keeps the date at offset zero', () => {
-    expect(localDate('2026-10-01T23:59:59+00:00', 0)).toBe('2026-10-01');
+    expect(dayOfInstant('2026-10-01T23:59:59+00:00', 0)).toBe('2026-10-01');
   });
 });
 

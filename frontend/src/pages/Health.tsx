@@ -13,6 +13,7 @@ import {
   useWorkouts,
 } from '@/hooks/useHealth';
 import { LinkMiNotice } from '@/components/LinkMiNotice';
+import { todayLocal } from '@/lib/dates';
 import { apiErrorMessage } from '@/lib/api/client';
 import { useMe } from '@/hooks/useMe';
 import { useMiAccount } from '@/hooks/useMiAccount';
@@ -23,16 +24,15 @@ import {
   PRESETS,
   alignToDays,
   dailyStats,
+  dayOfInstant,
   daysInRange,
   formatDelta,
   formatMinutes,
   inRange,
-  localDate,
   mean,
   nights,
   parseRange,
   rangeHeadline,
-  today,
   validCustomRange,
   weightChange,
   type DateRange,
@@ -77,7 +77,7 @@ function Tiles({ range }: { range: DateRange }) {
   const sleep = mean(rows.map((r) => r.sleep_duration_minutes));
   const resting = mean(rows.map((r) => r.resting_bpm));
   const weight = weightChange(
-    (body.data ?? []).filter((r) => inRange(localDate(r.timestamp), range)),
+    (body.data ?? []).filter((r) => inRange(dayOfInstant(r.timestamp), range)),
   );
 
   const pending = '…';
@@ -176,7 +176,7 @@ function Charts({ range }: { range: DateRange }) {
     (stress.data ?? []).map((s) => ({ timestamp: s.timestamp, value: s.stress_score })),
   ).filter((s) => inRange(s.date, range));
   // Several weigh-ins on one day: the last one of the day stands for it.
-  const weighIns = (body.data ?? []).filter((r) => inRange(localDate(r.timestamp), range));
+  const weighIns = (body.data ?? []).filter((r) => inRange(dayOfInstant(r.timestamp), range));
 
   return (
     <>
@@ -388,7 +388,7 @@ function Charts({ range }: { range: DateRange }) {
                 data: alignToDays(
                   days,
                   weighIns,
-                  (r) => localDate(r.timestamp),
+                  (r) => dayOfInstant(r.timestamp),
                   (r) => r.weight_kg,
                 ),
               },
@@ -399,7 +399,7 @@ function Charts({ range }: { range: DateRange }) {
                 data: alignToDays(
                   days,
                   weighIns,
-                  (r) => localDate(r.timestamp),
+                  (r) => dayOfInstant(r.timestamp),
                   (r) => r.muscle_mass_kg,
                 ),
               },
@@ -411,7 +411,7 @@ function Charts({ range }: { range: DateRange }) {
                 data: alignToDays(
                   days,
                   weighIns,
-                  (r) => localDate(r.timestamp),
+                  (r) => dayOfInstant(r.timestamp),
                   (r) => r.body_fat_pct,
                 ),
               },
@@ -426,8 +426,8 @@ function Charts({ range }: { range: DateRange }) {
 function Tables({ range }: { range: DateRange }) {
   const spo2 = useSpo2(range);
   const workouts = useWorkouts(range);
-  const spo2Rows = (spo2.data ?? []).filter((r) => inRange(localDate(r.timestamp), range));
-  const workoutRows = (workouts.data ?? []).filter((r) => inRange(localDate(r.start_at), range));
+  const spo2Rows = (spo2.data ?? []).filter((r) => inRange(dayOfInstant(r.timestamp), range));
+  const workoutRows = (workouts.data ?? []).filter((r) => inRange(dayOfInstant(r.start_at), range));
   const when = (iso: string) =>
     new Date(iso).toLocaleString('en-US', {
       month: 'short',
@@ -505,7 +505,7 @@ const dateInput = 'k-input k-compact';
 
 function PeriodPicker() {
   const [params, setParams] = useSearchParams();
-  const end = today();
+  const end = todayLocal();
   const range = parseRange(params, end);
 
   // The date inputs edit a draft. A date input reports every keystroke (a
@@ -611,7 +611,7 @@ export function HealthPage() {
     );
   }
 
-  const parsed = parseRange(params, today());
+  const parsed = parseRange(params, todayLocal());
   const { from, to } = parsed;
   const range = { from, to };
   const headline = rangeHeadline(parsed);

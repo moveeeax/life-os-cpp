@@ -10,10 +10,11 @@
 
 #include <spdlog/spdlog.h>
 
+#include "agent/SiteApi.hpp"
+#include "agent/ToolArgs.hpp"
 #include "agent/Tools.hpp"
 #include "repositories/UserRepository.hpp"
 #include "repositories/telegram/LinkRepository.hpp"
-#include "storage/S3Presign.hpp"
 #include "telegram/Gateway.hpp"
 
 namespace Agent::TelegramTools {
@@ -22,58 +23,20 @@ namespace {
 
 using json = nlohmann::json;
 
-json object(json properties, json required = json::array()) {
-    json schema = {{"type", "object"}, {"properties", std::move(properties)}, {"additionalProperties", false}};
-    if (!required.empty()) {
-        schema["required"] = std::move(required);
-    }
-    return schema;
-}
-
-json tool(const char* name, const char* description, json parameters) {
-    return json{{"type", "function"},
-                {"function", {{"name", name}, {"description", description}, {"parameters", std::move(parameters)}}}};
-}
+using ToolArgs::object;
+using ToolArgs::text_arg;
+using ToolArgs::tool;
 
 const json kId = {{"type", "string"}, {"description", "An id as tg_chats, tg_history or tg_search give it"}};
 
 /// An id argument (a string or a whole number); empty when it is not a Telegram id.
 std::string id_arg(const json& args, const char* key) {
-    const auto it = args.find(key);
-    if (it == args.end()) {
-        return {};
-    }
-    std::string v;
-    if (it->is_string()) {
-        v = it->get<std::string>();
-    } else if (it->is_number_integer()) {
-        v = std::to_string(it->get<long long>());
-    }
-    return ::Telegram::valid_id(v) ? v : std::string();
-}
-
-std::string text_arg(const json& args, const char* key) {
-    const auto it = args.find(key);
-    return it != args.end() && it->is_string() ? it->get<std::string>() : std::string();
+    return ToolArgs::tg_id(args, key);
 }
 
 std::string number_arg(const json& args, const char* key, int max) {
-    const auto it = args.find(key);
-    if (it == args.end() || !it->is_number_integer()) {
-        return {};
-    }
-    const long long n = it->get<long long>();
-    return n >= 1 && n <= max ? std::to_string(n) : std::string();
-}
-
-std::string url_of(const std::string& api_url, const json& req) {
-    std::string url = api_url + req.value("path", std::string());
-    char sep = '?';
-    for (const auto& kv : req.value("query", json::array())) {
-        url += sep + kv[0].get<std::string>() + "=" + Storage::S3::uri_encode(kv[1].get<std::string>(), true);
-        sep = '&';
-    }
-    return url;
+    const auto n = ToolArgs::int_arg(args, key, 1, max);
+    return n ? std::to_string(*n) : std::string();
 }
 
 }  // namespace
@@ -128,10 +91,14 @@ bool is_telegram(const std::string& name) {
            name == "tg_mark_read";
 }
 
+bool is_offered_in_hook(const std::string& name) {
+    return name == "tg_chats" || name == "tg_history" || name == "tg_search";
+}
+
 json request_of(const std::string& name, const json& raw, std::string& refusal) {
     const json args = raw.is_object() ? raw : json::object();
     auto refuse = [&](const std::string& message) {
-        refusal = json{{"error", "invalid"}, {"message", message}}.dump();
+        refusal = ToolArgs::refusal("invalid", message);
         return json();
     };
     if (name == "tg_chats") {
@@ -192,7 +159,7 @@ json request_of(const std::string& name, const json& raw, std::string& refusal) 
         return json{
             {"method", "POST"}, {"path", "/api/v1/telegram/chats/" + chat + "/read"}, {"body", {{"message_ids", ids}}}};
     }
-    refusal = json{{"error", "unknown_tool"}, {"message", "there is no tool " + name}}.dump();
+    refusal = ToolArgs::refusal("unknown_tool", "there is no tool " + name);
     return json();
 }
 
@@ -210,27 +177,7 @@ Gateway::ToolRunner runner(Net::Http::Transport& transport,
         if (!refusal.empty()) {
             return refusal;
         }
-        Net::Http::Request r;
-        r.method = req.value("method", "GET");
-        r.url = url_of(api_url, req);
-        r.headers = {{"Authorization", "Bearer " + access_token}, {"Accept", "application/json"}};
-        if (req.contains("body")) {
-            r.body = req["body"].dump();
-            r.content_type = "application/json";
-        }
-        r.timeout_seconds = 20;
-        try {
-            const auto res = transport.send(r);
-            const auto body = json::parse(res.body, nullptr, /*allow_exceptions=*/false);
-            if (res.status == 200 && body.is_object() && body.contains("data")) {
-                // Unlike the other tools the ids stay: they are what she reacts and replies with.
-                return body["data"].dump();
-            }
-            return Tools::result_text(res);
-        } catch (const Net::Http::TransportError& e) {
-            spdlog::warn("ani agent: the tool {} got no answer: {}", name, e.what());
-            return json{{"error", "unavailable"}, {"message", "Life OS did not answer"}}.dump();
-        }
+        return SiteApi::tool_result(transport, api_url, access_token, req, /*keep_ids=*/true, name);
     };
 }
 

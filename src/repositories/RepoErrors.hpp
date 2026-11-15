@@ -80,4 +80,20 @@ private:
     std::string message_;
 };
 
+// ── shared domain errors ────────────────────────────────────────────────────
+// Errors whose code and message are the same in several modules. Each module
+// re-exports them with a using-declaration (Repositories::Tasks::InvalidDate
+// and so on), so catch sites and qualified names do not change.
+
+/// A parse that is not finished, or whose lines were accepted already.
+struct AlreadyAccepted : ConflictError {
+    AlreadyAccepted()
+        : ConflictError("already_accepted", "the parse is not finished or its lines were accepted already") {}
+};
+
+/// A date PostgreSQL could not read (SqlErrors.hpp's is_bad_datetime).
+struct InvalidDate : ValidationError {
+    InvalidDate() : ValidationError("invalid_date", "not a valid date") {}
+};
+
 }  // namespace Repositories

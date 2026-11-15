@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
@@ -12,10 +12,12 @@ import {
   type AdminWallpaper,
   type Device,
   type Focus,
+  type FocusStats,
   type Sound,
   type SoundCreate,
   type FocusInput,
   type NowSettings,
+  type NowDay,
   type NowSettingsInput,
   type NowWeather,
   type Today,
@@ -257,5 +259,63 @@ export function useSoundReady() {
 export function useDeleteSound() {
   return useApiMutation((id: string) => del(`${SOUNDS_ADMIN}/${id}`), {
     invalidate: SOUND_WRITES,
+  });
+}
+
+/** The ribbon's day: calendar events, free windows, focus, workouts and timed tasks. */
+export function useNowDay(date: string, tz: string) {
+  return useQuery({
+    queryKey: qk.now.day(date, tz),
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+    queryFn: async ({ signal }) =>
+      (await api.getJson<{ data: NowDay }>('/api/v1/now/day', { query: { date, tz }, signal }))
+        .data,
+  });
+}
+
+type ReadOptions<T> = Omit<UseQueryOptions<T>, 'queryKey' | 'queryFn'>;
+
+/** Focus minutes this week and the longest run, counted in @p tz. */
+export function useFocusStats(tz: string, options: ReadOptions<FocusStats> = {}) {
+  return useQuery({
+    queryKey: qk.now.focusStats(tz),
+    retry: false,
+    staleTime: 10 * 60_000,
+    queryFn: async ({ signal }) =>
+      (
+        await api.getJson<{ data: FocusStats }>('/api/v1/now/focus-stats', {
+          query: { tz },
+          signal,
+        })
+      ).data,
+    ...options,
+  });
+}
+
+/**
+ * One unit of the arrival currency @p local in the view currency @p view on
+ * @p date (the trip mode card and Ani's hello abroad share the read). Off
+ * without a local currency or when it is the view currency.
+ */
+export function useArrivalRate(
+  local: string | undefined,
+  view: string,
+  date: string,
+  options: Omit<ReadOptions<{ amount: number }>, 'enabled'> & { enabled?: boolean } = {},
+) {
+  const { enabled = true, ...rest } = options;
+  return useQuery({
+    queryKey: qk.now.arrivalRate(local ?? '', view, date),
+    staleTime: 60 * 60_000,
+    queryFn: async ({ signal }) =>
+      (
+        await api.getJson<{ data: { amount: number } }>('/api/v1/money/rates/convert', {
+          query: { amount: 1, from: local ?? '', to: view, date },
+          signal,
+        })
+      ).data,
+    ...rest,
+    enabled: enabled && !!local && local !== view,
   });
 }

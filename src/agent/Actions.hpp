@@ -13,6 +13,7 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <variant>
 
@@ -42,6 +43,17 @@ nlohmann::json calendar_definitions();
 
 /// Whether @p name is one of the write tools.
 bool is_write(const std::string& name);
+
+/// The families of write tools, each given to a turn on its own condition:
+/// the core ones while the person's day is known, the Telegram ones to the
+/// user Telegram serves, the calendar ones while the calendar is linked.
+enum class Family { Core, Telegram, Calendar };
+
+/// The family of the write tool @p name; nullopt when it is not one.
+std::optional<Family> family_of(const std::string& name);
+
+/// The input schema of the write tool @p name; null when it is not one.
+nlohmann::json schema_of(const std::string& name);
 
 /// What a write call becomes: the kind, the words the user confirms and the
 /// request, {method, path, query: [[k, v]...], body}.

@@ -15,6 +15,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/JsonRows.hpp"
 #include "repositories/LikePattern.hpp"
 #include "repositories/RepoErrors.hpp"
 
@@ -199,15 +200,12 @@ private:
 
     template <typename Txn>
     static std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& id) {
-        auto r = txn.exec_params("SELECT row_to_json(t) FROM (SELECT " + std::string(kColumns) +
-                                     " FROM exercises e WHERE e.id = $2 "
-                                     "AND (e.source = 'library' OR e.owner_id = $1::uuid)) t",
-                                 owner,
-                                 id);
-        if (r.empty()) {
-            return std::nullopt;
-        }
-        return nlohmann::json::parse(r[0][0].template as<std::string>());
+        return Repositories::JsonRows::one(txn,
+                                           "SELECT " + std::string(kColumns) +
+                                               " FROM exercises e WHERE e.id = $2 "
+                                               "AND (e.source = 'library' OR e.owner_id = $1::uuid)",
+                                           owner,
+                                           id);
     }
 };
 

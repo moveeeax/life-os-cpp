@@ -18,6 +18,7 @@
 
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
+#include "api/MediaSupport.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "repositories/now/WallpaperRepository.hpp"
@@ -42,20 +43,6 @@ const std::vector<std::string> kKinds = {"video", "image"};
 const std::vector<std::string> kDevices = {"desktop", "phone"};
 const std::vector<std::string> kVideoTypes = {"video/mp4", "video/webm"};
 const std::vector<std::string> kImageTypes = {"image/jpeg", "image/webp"};
-
-/// The module switch, then the store; nullptr (answered) when either is missing.
-Storage::ObjectStore* store_or_answer(const WallpapersController::Callback& callback) {
-    if (!Core::now_enabled()) {
-        callback(ErrorResponse::not_found("now"));
-        return nullptr;
-    }
-    Storage::ObjectStore* store = Storage::object_store();
-    if (store == nullptr) {
-        callback(ErrorResponse::service_unavailable("storage_not_configured",
-                                                    "the wallpaper storage is not configured (docs/wallpapers.md)"));
-    }
-    return store;
-}
 
 std::string extension_of(const std::string& content_type) {
     if (content_type == "video/mp4") {
@@ -100,15 +87,10 @@ json public_row(const Storage::ObjectStore& store, const json& row) {
                 {"height", row["height"]}};
 }
 
-json upload_of(const std::string& url, const std::string& content_type) {
-    return json{{"url", url},
-                {"headers", {{"Content-Type", content_type}, {"Cache-Control", Storage::kImmutableCacheControl}}}};
-}
-
 }  // namespace
 
 void WallpapersController::listWallpapers(const HttpRequestPtr& req, Callback&& callback) {
-    Storage::ObjectStore* store = store_or_answer(callback);
+    Storage::ObjectStore* store = Media::store_or_answer(callback, "wallpaper");
     if (store == nullptr) {
         return;
     }
@@ -128,7 +110,7 @@ void WallpapersController::listWallpapers(const HttpRequestPtr& req, Callback&& 
 }
 
 void WallpapersController::listAdmin(const HttpRequestPtr& req, Callback&& callback) {
-    Storage::ObjectStore* store = store_or_answer(callback);
+    Storage::ObjectStore* store = Media::store_or_answer(callback, "wallpaper");
     if (store == nullptr) {
         return;
     }
@@ -146,7 +128,7 @@ void WallpapersController::listAdmin(const HttpRequestPtr& req, Callback&& callb
 }
 
 void WallpapersController::createWallpaper(const HttpRequestPtr& req, Callback&& callback) {
-    Storage::ObjectStore* store = store_or_answer(callback);
+    Storage::ObjectStore* store = Media::store_or_answer(callback, "wallpaper");
     if (store == nullptr) {
         return;
     }
@@ -205,19 +187,20 @@ void WallpapersController::createWallpaper(const HttpRequestPtr& req, Callback&&
         in.height = opt_side(body, "height");
         in.created_by = admin;
         repo.create(in);
-        json data{{"id", in.id},
-                  {"upload", upload_of(store->upload_url(in.object_key, in.content_type, in.bytes), in.content_type)},
-                  {"poster_upload", nullptr}};
+        json data{
+            {"id", in.id},
+            {"upload", Media::upload_of(store->upload_url(in.object_key, in.content_type, in.bytes), in.content_type)},
+            {"poster_upload", nullptr}};
         if (in.poster_key) {
             data["poster_upload"] =
-                upload_of(store->upload_url(*in.poster_key, "image/jpeg", *in.poster_bytes), "image/jpeg");
+                Media::upload_of(store->upload_url(*in.poster_key, "image/jpeg", *in.poster_bytes), "image/jpeg");
         }
         callback(Response::created(json{{"data", data}}));
     });
 }
 
 void WallpapersController::markReady(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    Storage::ObjectStore* store = store_or_answer(callback);
+    Storage::ObjectStore* store = Media::store_or_answer(callback, "wallpaper");
     if (store == nullptr) {
         return;
     }
@@ -232,11 +215,7 @@ void WallpapersController::markReady(const HttpRequestPtr& req, Callback&& callb
             throw Repositories::Now::WallpaperNotFound();
         }
         const auto missing = [&](const json& key, const json& bytes) {
-            if (!key.is_string()) {
-                return false;
-            }
-            const auto info = store->head(key.get<std::string>());
-            return !info.exists || info.bytes != bytes.get<long long>();
+            return key.is_string() && !Media::object_matches(*store, key.get<std::string>(), bytes.get<long long>());
         };
         std::string what;
         try {
@@ -246,8 +225,7 @@ void WallpapersController::markReady(const HttpRequestPtr& req, Callback&& callb
                 what = "the poster";
             }
         } catch (const std::exception& e) {
-            spdlog::warn("wallpapers.ready: the store did not answer: {}", e.what());
-            callback(ErrorResponse::service_unavailable("storage_error", "the storage did not answer; try again"));
+            Media::storage_error(callback, "wallpapers.ready", e);
             return;
         }
         if (!what.empty()) {
@@ -260,7 +238,7 @@ void WallpapersController::markReady(const HttpRequestPtr& req, Callback&& callb
 }
 
 void WallpapersController::deleteWallpaper(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
-    Storage::ObjectStore* store = store_or_answer(callback);
+    Storage::ObjectStore* store = Media::store_or_answer(callback, "wallpaper");
     if (store == nullptr) {
         return;
     }
@@ -274,21 +252,11 @@ void WallpapersController::deleteWallpaper(const HttpRequestPtr& req, Callback&&
         if (!row) {
             throw Repositories::Now::WallpaperNotFound();
         }
-        // The row leaves the players first: if the store or the final DELETE fails, a pending
-        // row stays behind for the media sweep, never a ready row pointing at a gone object.
-        repo.mark_pending(id);
-        try {
-            store->remove((*row)["object_key"].get<std::string>());
-            if ((*row)["poster_key"].is_string()) {
-                store->remove((*row)["poster_key"].get<std::string>());
-            }
-        } catch (const std::exception& e) {
-            spdlog::warn("wallpapers.delete: the store did not answer: {}", e.what());
-            callback(ErrorResponse::service_unavailable("storage_error", "the storage did not answer; try again"));
-            return;
+        std::vector<std::string> keys{(*row)["object_key"].get<std::string>()};
+        if ((*row)["poster_key"].is_string()) {
+            keys.push_back((*row)["poster_key"].get<std::string>());
         }
-        repo.remove(id);
-        no_content(callback);
+        Media::remove_then_delete(repo, *store, id, keys, callback, "wallpapers.delete");
     });
 }
 

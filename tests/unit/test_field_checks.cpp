@@ -2,9 +2,15 @@
  * @file test_field_checks.cpp
  * @brief The checks in src/api/FieldChecks.hpp: significant
  *        digits of a JSON number, the 15-digit cap, opt_int not narrowing,
- *        text_or_empty refusing another type.
+ *        text_or_empty refusing another type, a time of day, a currency
+ *        code, the tri-state patch reader and the ?date= of a route.
  */
 
+#include <optional>
+#include <string>
+
+#include <drogon/HttpRequest.h>
+#include <drogon/HttpResponse.h>
 #include <gtest/gtest.h>
 
 #include <nlohmann/json.hpp>
@@ -68,4 +74,70 @@ TEST(FieldChecksText, AnotherTypeIsRefusedNotThrown) {
     EXPECT_FALSE(text_or_empty(json{{"t", 42}}, "t").has_value());
     EXPECT_FALSE(text_or_empty(json{{"t", false}}, "t").has_value());
     EXPECT_FALSE(text_or_empty(json{{"t", json::array()}}, "t").has_value());
+}
+
+TEST(FieldChecksTime, HhMmWithAnOptionalOneDigitHour) {
+    using Api::Fields::is_hhmm;
+    EXPECT_TRUE(is_hhmm("00:00"));
+    EXPECT_TRUE(is_hhmm("23:59"));
+    EXPECT_FALSE(is_hhmm("24:00"));
+    EXPECT_FALSE(is_hhmm("12:60"));
+    EXPECT_FALSE(is_hhmm("8:30")) << "two digits by default";
+    EXPECT_TRUE(is_hhmm("8:30", /*allow_single_digit_hour=*/true));
+    EXPECT_FALSE(is_hhmm("", true));
+}
+
+TEST(FieldChecksCurrency, ThreeUpperCaseLettersAndTheCallersExample) {
+    using Api::Fields::currency_code;
+    Api::Validation::Errors ok;
+    currency_code(ok, json{{"c", "KZT"}}, "c", "KZT");
+    currency_code(ok, json{{"c", nullptr}}, "c", "KZT");
+    currency_code(ok, json::object(), "c", "KZT");
+    EXPECT_FALSE(ok.any()) << "a code, null and absent all pass";
+    Api::Validation::Errors bad;
+    currency_code(bad, json{{"c", "usd"}}, "c", "USD");
+    currency_code(bad, json{{"d", 840}}, "d", "USD");
+    ASSERT_EQ(bad.items().size(), 2u);
+    EXPECT_EQ(bad.items()[0].code, "bad_format");
+    EXPECT_EQ(bad.items()[0].message, "expected an ISO code like USD");
+}
+
+TEST(FieldChecksPatch, AbsentNullAndText) {
+    using Api::Fields::patch_text;
+    EXPECT_FALSE(patch_text(json::object(), "f").has_value()) << "absent: leave it";
+    const auto cleared = patch_text(json{{"f", nullptr}}, "f");
+    ASSERT_TRUE(cleared.has_value());
+    EXPECT_FALSE(cleared->has_value()) << "null: clear it";
+    const auto set = patch_text(json{{"f", "x"}}, "f");
+    ASSERT_TRUE(set.has_value() && set->has_value());
+    EXPECT_EQ(**set, "x");
+}
+
+namespace {
+
+drogon::HttpRequestPtr with_date(const std::string& date) {
+    auto req = drogon::HttpRequest::newHttpRequest();
+    if (!date.empty()) {
+        req->setParameter("date", date);
+    }
+    return req;
+}
+
+std::optional<std::string> no_zone(const std::string&) {
+    return std::nullopt;
+}
+
+}  // namespace
+
+TEST(FieldChecksDay, TheGivenDayOrTodayAndA400ForAnImpossibleOne) {
+    drogon::HttpResponsePtr answered;
+    const auto cb = [&](const drogon::HttpResponsePtr& r) { answered = r; };
+    EXPECT_EQ(Api::Fields::day_param(with_date("2026-02-28"), cb, no_zone), "2026-02-28");
+    EXPECT_FALSE(answered);
+    EXPECT_EQ(Api::Fields::day_param(with_date(""), cb, no_zone), Api::Fields::today_utc());
+    EXPECT_FALSE(answered);
+    EXPECT_FALSE(Api::Fields::day_param(with_date("2026-02-30"), cb, no_zone).has_value());
+    ASSERT_TRUE(answered);
+    EXPECT_EQ(answered->statusCode(), drogon::k400BadRequest);
+    EXPECT_EQ(json::parse(std::string(answered->body()))["error"], "invalid_query");
 }

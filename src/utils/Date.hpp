@@ -1,15 +1,17 @@
 /**
  * @file Date.hpp
- * @brief The one "YYYY-MM-DD" parser of the app: strict shape, a real
- *        calendar day, nothing else. Dates travel as text everywhere (JSON,
- *        SQL), and this is where they become a day.
+ * @brief The one "YYYY-MM-DD" parser and formatter of the app: strict shape,
+ *        a real calendar day, nothing else. Dates travel as text everywhere
+ *        (JSON, SQL), and this is where they become a day and back.
  */
 
 #pragma once
 
 #include <chrono>
 #include <cstddef>
+#include <cstdio>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 
 namespace Utils::Date {
@@ -46,6 +48,34 @@ inline bool is_ymd(std::string_view text) {
     } catch (const std::invalid_argument&) {
         return false;
     }
+}
+
+/// @p d as YYYY-MM-DD (the year zero-padded to four digits).
+inline std::string format_ymd(std::chrono::year_month_day d) {
+    char buf[32];  // room for any int year: GCC checks the worst case
+    std::snprintf(buf,
+                  sizeof buf,
+                  "%04d-%02u-%02u",
+                  static_cast<int>(d.year()),
+                  static_cast<unsigned>(d.month()),
+                  static_cast<unsigned>(d.day()));
+    return buf;
+}
+
+/// @p d as YYYY-MM-DD.
+inline std::string format_ymd(std::chrono::sys_days d) {
+    return format_ymd(std::chrono::year_month_day{d});
+}
+
+/// Today's date in UTC as YYYY-MM-DD.
+inline std::string today_utc() {
+    return format_ymd(std::chrono::floor<std::chrono::days>(std::chrono::system_clock::now()));
+}
+
+/// The YYYY-MM-DD day @p n days after @p ymd (before it when @p n is negative).
+/// @throws std::invalid_argument when @p ymd is not YYYY-MM-DD (parse_ymd).
+inline std::string add_days(std::string_view ymd, int n) {
+    return format_ymd(std::chrono::sys_days{parse_ymd(ymd)} + std::chrono::days{n});
 }
 
 }  // namespace Utils::Date

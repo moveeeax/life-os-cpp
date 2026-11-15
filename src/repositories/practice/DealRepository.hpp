@@ -14,6 +14,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/JsonRows.hpp"
 #include "repositories/SqlTime.hpp"
 #include "repositories/practice/Errors.hpp"
 
@@ -145,23 +146,22 @@ public:
                     .empty()) {
                 throw NotFound("deal");
             }
-            return true;
         });
     }
 
     /// The owner's deals, open stages first (kStages order), the latest touched first within a stage.
     nlohmann::json list(const std::string& owner, const Filter& f) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params(
-                "SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
+            return Repositories::JsonRows::many(
+                txn,
+                "SELECT " + std::string(kColumns) +
                     " FROM practice_deals d WHERE d.owner_id = $1::uuid AND ($2 = '' OR d.stage = $2) "
                     " AND ($3 = '' OR d.client_id = NULLIF($3, '')::uuid) "
                     " ORDER BY array_position(ARRAY['lead', 'negotiation', 'active', 'done', 'lost'], d.stage), "
-                    " d.updated_at DESC) t",
+                    " d.updated_at DESC",
                 owner,
                 f.stage,
                 f.client);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
         });
     }
 
@@ -179,14 +179,11 @@ private:
 
     template <typename Txn>
     static std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& id) {
-        auto r = txn.exec_params("SELECT row_to_json(t) FROM (SELECT " + std::string(kColumns) +
-                                     " FROM practice_deals d WHERE d.owner_id = $1::uuid AND d.id = $2::uuid) t",
-                                 owner,
-                                 id);
-        if (r.empty()) {
-            return std::nullopt;
-        }
-        return nlohmann::json::parse(r[0][0].template as<std::string>());
+        return Repositories::JsonRows::one(txn,
+                                           "SELECT " + std::string(kColumns) +
+                                               " FROM practice_deals d WHERE d.owner_id = $1::uuid AND d.id = $2::uuid",
+                                           owner,
+                                           id);
     }
 };
 

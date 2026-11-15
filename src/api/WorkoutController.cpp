@@ -16,6 +16,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "api/FieldChecks.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
 #include "api/RequestUtils.hpp"
@@ -33,6 +34,10 @@ using json = nlohmann::json;
 
 namespace {
 
+using Api::Fields::number_range;
+using Api::Fields::opt_int;
+using Api::Fields::opt_number;
+
 constexpr std::size_t kNameMax = 120;
 constexpr std::size_t kNoteMax = 2000;
 constexpr std::size_t kListMax = 30;
@@ -46,7 +51,6 @@ const std::vector<std::string> kSetKinds = {"work", "warmup"};
 
 /// An ISO 8601 instant with an explicit zone; the database checks the calendar.
 const std::regex kTimestampRe(R"(^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$)");
-const std::regex kDateRe(R"(^\d{4}-\d{2}-\d{2}$)");
 
 const std::vector<std::string> kTrackingModes = {"weight_reps", "bodyweight_reps", "duration", "distance_duration"};
 
@@ -104,35 +108,6 @@ void timestamp(Validation::Errors& errs, const json& body, const std::string& fi
     }
 }
 
-/// Optional number within [lo, hi]; null is "unset".
-void number_range(Validation::Errors& errs, const json& body, const std::string& field, double lo, double hi) {
-    if (!body.contains(field) || body[field].is_null()) {
-        return;
-    }
-    if (!body[field].is_number()) {
-        errs.add(field, "not_number", "must be a number");
-        return;
-    }
-    const double v = body[field].get<double>();
-    if (!(v >= lo && v <= hi)) {
-        errs.add(field, "out_of_range", "must be in " + json(lo).dump() + ".." + json(hi).dump());
-    }
-}
-
-std::optional<double> opt_number(const json& body, const std::string& field) {
-    if (body.contains(field) && body[field].is_number()) {
-        return body[field].get<double>();
-    }
-    return std::nullopt;
-}
-
-std::optional<int> opt_int(const json& body, const std::string& field) {
-    if (body.contains(field) && body[field].is_number_integer()) {
-        return body[field].get<int>();
-    }
-    return std::nullopt;
-}
-
 }  // namespace
 
 // ── exercises ────────────────────────────────────────────────────────────────
@@ -182,7 +157,7 @@ void WorkoutController::createExercise(const HttpRequestPtr& req, Callback&& cal
         Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
 
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -190,12 +165,8 @@ void WorkoutController::createExercise(const HttpRequestPtr& req, Callback&& cal
     Validation::string_length(errs, body, "name", 1, kNameMax);
     Validation::require_string(errs, body, "tracking_mode");
     Validation::one_of(errs, body, "tracking_mode", kTrackingModes);
-    if (body.contains("category")) {
-        Validation::string_length(errs, body, "category", 1, kNameMax);
-    }
-    if (body.contains("equipment")) {
-        Validation::string_length(errs, body, "equipment", 0, kNameMax);
-    }
+    Validation::string_length(errs, body, "category", 1, kNameMax);
+    Validation::string_length(errs, body, "equipment", 0, kNameMax);
     string_list(errs, body, "primary_muscles");
     string_list(errs, body, "secondary_muscles");
     string_list(errs, body, "instructions");
@@ -223,25 +194,15 @@ void WorkoutController::updateExercise(const HttpRequestPtr& req, Callback&& cal
         Core::workout_enabled(), "workout", req, callback, Domain::Permission::kFitnessRead, owner);
 
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
-    if (body.contains("name")) {
-        Validation::string_length(errs, body, "name", 1, kNameMax);
-    }
-    if (body.contains("category")) {
-        Validation::string_length(errs, body, "category", 1, kNameMax);
-    }
-    if (body.contains("equipment")) {
-        Validation::string_length(errs, body, "equipment", 0, kNameMax);
-    }
-    if (body.contains("tracking_mode")) {
-        Validation::one_of(errs, body, "tracking_mode", kTrackingModes);
-    }
-    if (body.contains("archived")) {
-        Validation::boolean(errs, body, "archived");
-    }
+    Validation::string_length(errs, body, "name", 1, kNameMax);
+    Validation::string_length(errs, body, "category", 1, kNameMax);
+    Validation::string_length(errs, body, "equipment", 0, kNameMax);
+    Validation::one_of(errs, body, "tracking_mode", kTrackingModes);
+    Validation::boolean(errs, body, "archived");
     string_list(errs, body, "primary_muscles");
     string_list(errs, body, "secondary_muscles");
     string_list(errs, body, "instructions");
@@ -306,18 +267,14 @@ void WorkoutController::putRoutine(const HttpRequestPtr& req, Callback&& callbac
     }
 
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
     Validation::require_string(errs, body, "name");
     Validation::string_length(errs, body, "name", 1, kNameMax);
-    if (body.contains("note")) {
-        Validation::string_length(errs, body, "note", 0, kNoteMax);
-    }
-    if (body.contains("weekday") && !body["weekday"].is_null()) {
-        Validation::int_range(errs, body, "weekday", 1, 7);
-    }
+    Validation::string_length(errs, body, "note", 0, kNoteMax);
+    Validation::int_range(errs, body, "weekday", 1, 7);
 
     json exercises = json::array();
     if (!body.contains("exercises") || !body["exercises"].is_array()) {
@@ -401,13 +358,11 @@ void WorkoutController::startSession(const HttpRequestPtr& req, Callback&& callb
 
     // The body is optional: no body starts an empty session.
     json body = json::object();
-    if (!req->body().empty() && !Validation::parse_body(req, body, callback)) {
+    if (!req->body().empty() && !parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
-    if (body.contains("routine_id") && !body["routine_id"].is_null()) {
-        Validation::uuid(errs, body, "routine_id");
-    }
+    Validation::uuid(errs, body, "routine_id");
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;
@@ -465,21 +420,15 @@ void WorkoutController::patchSession(const HttpRequestPtr& req, Callback&& callb
     }
 
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
-    if (body.contains("name")) {
-        Validation::string_length(errs, body, "name", 0, kNameMax);
-    }
-    if (body.contains("note")) {
-        Validation::string_length(errs, body, "note", 0, kNoteMax);
-    }
+    Validation::string_length(errs, body, "name", 0, kNameMax);
+    Validation::string_length(errs, body, "note", 0, kNoteMax);
     timestamp(errs, body, "started_at");
     timestamp(errs, body, "finished_at");
-    if (body.contains("finish")) {
-        Validation::boolean(errs, body, "finish");
-    }
+    Validation::boolean(errs, body, "finish");
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;
@@ -518,7 +467,7 @@ void WorkoutController::addSessionExercise(const HttpRequestPtr& req, Callback&&
     }
 
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -573,7 +522,7 @@ void WorkoutController::putSet(const HttpRequestPtr& req, Callback&& callback, c
     }
 
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     // Ranges mirror the CHECKs of workout_sets (migration 019).
@@ -584,9 +533,7 @@ void WorkoutController::putSet(const HttpRequestPtr& req, Callback&& callback, c
     if (Validation::require(errs, body, "position")) {
         Validation::int_range(errs, body, "position", 1, 1000);
     }
-    if (body.contains("kind")) {
-        Validation::one_of(errs, body, "kind", kSetKinds);
-    }
+    Validation::one_of(errs, body, "kind", kSetKinds);
     number_range(errs, body, "weight_kg", 0, 2000);
     Validation::int_range(errs, body, "reps", 0, 10000);
     Validation::int_range(errs, body, "duration_seconds", 0, 86400);
@@ -644,13 +591,13 @@ void WorkoutController::reconcile(const HttpRequestPtr& req, Callback&& callback
     API_REQUIRE_PERMISSION(req, callback, Domain::Permission::kFitnessSync);
 
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
     for (const char* field : {"from", "to"}) {
         if (Validation::require_string(errs, body, field)) {
-            Validation::regex_match(errs, body, field, kDateRe, "YYYY-MM-DD");
+            Validation::regex_match(errs, body, field, Fields::kDateRe, "YYYY-MM-DD");
         }
     }
     if (errs.any()) {

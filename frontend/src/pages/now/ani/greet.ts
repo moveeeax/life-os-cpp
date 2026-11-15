@@ -1,3 +1,4 @@
+import { partOfDay } from '@/lib/now/greeting';
 import type { NowWeather, Today } from '@/lib/now/types';
 
 /*
@@ -17,8 +18,10 @@ export const HELLO: Record<Hour, string> = {
   night: 'Уже поздно. Может, пора спать?',
 };
 
+/** The part of the day of hour @p h, on the boundaries of Now's greeting (partOfDay). */
 export function hourOf(h: number): Hour {
-  return h < 5 ? 'night' : h < 12 ? 'morning' : h < 18 ? 'day' : h < 23 ? 'evening' : 'night';
+  const part = partOfDay(h);
+  return part === 'afternoon' ? 'day' : part;
 }
 
 // The opening of a hello with more to say.

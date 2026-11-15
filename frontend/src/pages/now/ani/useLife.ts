@@ -1,16 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 
+import { useWater } from '@/hooks/useFood';
+import { useFocusStats } from '@/hooks/useNow';
 import { useCrossings } from '@/hooks/useTravel';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import { clockIn } from '@/lib/dates';
+import { addMoment } from '@/lib/now/ani';
+import { markOn, readMarks, seenOn } from '@/lib/now/once';
 
+import { DIARY_ASK } from './AniChat';
 import type { Ani } from './engine';
 import type { AniContext } from './AniCorner';
 import {
   achievementsOf,
-  addMoment,
   anniversaryOf,
   dealLine,
   energyLine,
@@ -33,25 +37,10 @@ const AFTER_S = { energy: 40, quest: 90, anniversary: 150 } as const;
 /** The evening diary is offered from this local time until 23:00. */
 const DIARY_FROM = { h: 21, m: 30 };
 
-export const DIARY_SEED = 'Давай запишем мой день в дневник.';
-
 const KEY = 'now:ani:life';
 
-function read(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, string>;
-  } catch {
-    return {};
-  }
-}
-
-function mark(k: string, v: string) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify({ ...read(), [k]: v }));
-  } catch {
-    // Remembering it is a convenience: at worst she says it once more.
-  }
-}
+const read = () => readMarks(KEY);
+const mark = (k: string, v: string) => markOn(KEY, k, v);
 
 /**
  * Her own lines through the day, played by the corner: the energy of the
@@ -90,32 +79,8 @@ export function useLife({
       (await api.getJson<{ data: DealView[] }>('/api/v1/ani/deals', { query: { tz }, signal }))
         .data,
   });
-  const focus = useQuery({
-    queryKey: ['now', 'focus-stats', tz],
-    enabled: warmFocus,
-    retry: false,
-    staleTime: 10 * 60_000,
-    queryFn: async ({ signal }) =>
-      (
-        await api.getJson<{ data: { week_minutes: number; longest_minutes: number } }>(
-          '/api/v1/now/focus-stats',
-          { query: { tz }, signal },
-        )
-      ).data,
-  });
-  const water = useQuery({
-    queryKey: ['food', 'water', date],
-    enabled: warmWater,
-    retry: false,
-    staleTime: 60_000,
-    queryFn: async ({ signal }) =>
-      (
-        await api.getJson<{ data: { ml: number } }>('/api/v1/food/water', {
-          query: { date },
-          signal,
-        })
-      ).data,
-  });
+  const focus = useFocusStats(tz, { enabled: warmFocus });
+  const water = useWater(date, { enabled: warmWater, staleTime: 60_000 });
   const crossings = useCrossings();
 
   const live = useRef({
@@ -181,16 +146,7 @@ export function useLife({
 
       // The quest of the day: given once, praised once when it is done.
       // A low mood checked in today (useLife2 marks it): no quest that day, she does not push.
-      const lowMood = (() => {
-        try {
-          return (
-            (JSON.parse(localStorage.getItem('now:ani:life2') ?? '{}') as Record<string, string>)
-              .mood === day
-          );
-        } catch {
-          return false;
-        }
-      })();
+      const lowMood = seenOn('now:ani:life2', 'mood') === day;
       if (!lowMood && age >= AFTER_S.quest && hour >= 7 && hour < 20 && once('quest')) {
         const q = questOf(input);
         mark('quest', day);
@@ -277,7 +233,7 @@ export function useLife({
       const late = hour > DIARY_FROM.h || (hour === DIARY_FROM.h && minute >= DIARY_FROM.m);
       if (late && hour < 23 && once('diary')) {
         mark('diary', day);
-        seedRef.current(DIARY_SEED);
+        seedRef.current(DIARY_ASK);
         sayRef.current({
           text: 'Запишем день в дневник? Нажми на меня, я задам два вопроса.',
           chat: true,

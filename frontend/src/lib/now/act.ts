@@ -5,6 +5,9 @@
  */
 export const ACT_EVENT = 'life:act';
 
+/** Opens the weekly review from anywhere on Now (the account menu). */
+export const REVIEW_EVENT = 'now:review';
+
 export type Act =
   | { kind: 'task_done'; title: string; at: number }
   | {

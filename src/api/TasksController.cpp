@@ -21,6 +21,8 @@
 #include "api/FieldChecks.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
+#include "api/LinkChecks.hpp"
+#include "api/ParseJobStart.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "jobs/Jobs.hpp"
@@ -82,14 +84,6 @@ void nullable_one_of(Validation::Errors& errs,
     }
 }
 
-/// The present-or-null value of a nullable string field: outer empty when absent.
-std::optional<std::optional<std::string>> nullable(const json& body, const std::string& field) {
-    if (!body.contains(field)) {
-        return std::nullopt;
-    }
-    return std::optional<std::optional<std::string>>(std::in_place, Validation::opt_string(body, field));
-}
-
 /// The checks of a task body. @p creating requires title and area and allows external_id.
 void task_fields(Validation::Errors& errs, const json& body, bool creating) {
     if (creating) {
@@ -97,24 +91,17 @@ void task_fields(Validation::Errors& errs, const json& body, bool creating) {
         Validation::require_string(errs, body, "area");
     }
     text_length(errs, body, "title", 1, ::Tasks::Fields::kTitleMax);
-    if (body.contains("area")) {
-        Validation::one_of(errs, body, "area", kAreas);
-    }
+    Validation::one_of(errs, body, "area", kAreas);
     nullable_one_of(errs, body, "effort", kEfforts);
-    if (body.contains("due") && !body["due"].is_null()) {
-        date_field(errs, body, "due");
-    }
+    date_field(errs, body, "due");
     if (body.contains("due_time") && !body["due_time"].is_null()) {
-        static const std::regex kTime("^([01]\\d|2[0-3]):[0-5]\\d$");
-        if (!body["due_time"].is_string() || !std::regex_match(body["due_time"].get<std::string>(), kTime)) {
+        if (!body["due_time"].is_string() || !Fields::is_hhmm(body["due_time"].get<std::string>())) {
             errs.add("due_time", "bad_format", "expected HH:MM");
         }
     }
     text_length(errs, body, "next_step", 0, ::Tasks::Fields::kNextStepMax);
     text_length(errs, body, "note", 0, ::Tasks::Fields::kNoteMax);
-    if (body.contains("status")) {
-        Validation::one_of(errs, body, "status", kStatuses);
-    }
+    Validation::one_of(errs, body, "status", kStatuses);
     if (creating) {
         text_length(errs, body, "external_id", 1, kExternalIdMax);
     }
@@ -208,10 +195,7 @@ void trip_link_fields(Validation::Errors& errs, const json& body, const std::str
     if (errs.any()) {
         return;
     }
-    if (!Core::travel_enabled() ||
-        !Repositories::Travel::TripRepository().get(owner, body["trip_id"].get<std::string>())) {
-        errs.add("trip_id", "not_yours", "the trip is not yours");
-    }
+    Links::trip(errs, body, owner);
 }
 
 /// The project link: a project or course of the caller, or null to unlink.
@@ -223,9 +207,7 @@ void project_link_fields(Validation::Errors& errs, const json& body, const std::
     if (errs.any()) {
         return;
     }
-    if (!Repo::ProjectRepository().owns(owner, body["project_id"].get<std::string>())) {
-        errs.add("project_id", "not_yours", "the project is not yours");
-    }
+    Links::project(errs, body, owner);
 }
 
 /// The deal link: a deal of the caller's practice (a next step of it), or null to unlink.
@@ -237,10 +219,7 @@ void deal_link_fields(Validation::Errors& errs, const json& body, const std::str
     if (errs.any()) {
         return;
     }
-    if (!Core::practice_enabled() ||
-        !Repositories::Practice::DealRepository().client_of(owner, body["deal_id"].get<std::string>())) {
-        errs.add("deal_id", "not_yours", "the deal is not yours");
-    }
+    Links::deal(errs, body, owner);
 }
 
 Repo::TaskRepository::Input task_input(const json& body) {
@@ -396,20 +375,20 @@ void TasksController::updateItem(const HttpRequestPtr& req, Callback&& callback,
     Repo::TaskRepository::Patch p;
     p.title = Validation::opt_string(body, "title");
     p.area = Validation::opt_string(body, "area");
-    p.effort = nullable(body, "effort");
-    p.due = nullable(body, "due");
-    p.due_time = nullable(body, "due_time");
+    p.effort = Fields::patch_text(body, "effort");
+    p.due = Fields::patch_text(body, "due");
+    p.due_time = Fields::patch_text(body, "due_time");
     p.next_step = Validation::opt_string(body, "next_step");
     p.note = Validation::opt_string(body, "note");
     p.status = Validation::opt_string(body, "status");
-    p.source_kind = nullable(body, "source_kind");
-    p.source_ref = nullable(body, "source_ref");
-    p.goal_id = nullable(body, "goal_id");
-    p.goal_section_id = nullable(body, "goal_section_id");
-    p.trip_id = nullable(body, "trip_id");
-    p.project_id = nullable(body, "project_id");
+    p.source_kind = Fields::patch_text(body, "source_kind");
+    p.source_ref = Fields::patch_text(body, "source_ref");
+    p.goal_id = Fields::patch_text(body, "goal_id");
+    p.goal_section_id = Fields::patch_text(body, "goal_section_id");
+    p.trip_id = Fields::patch_text(body, "trip_id");
+    p.project_id = Fields::patch_text(body, "project_id");
     p.repeat = repeat_patch(body);
-    p.deal_id = nullable(body, "deal_id");
+    p.deal_id = Fields::patch_text(body, "deal_id");
     if (p.goal_id.has_value() && !p.goal_section_id.has_value()) {
         // A new goal (or none) does not keep the old goal's section.
         p.goal_section_id = std::optional<std::string>();
@@ -441,12 +420,12 @@ void TasksController::deleteItem(const HttpRequestPtr& req, Callback&& callback,
 
 void TasksController::agenda(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::tasks_enabled(), "tasks", req, callback, owner);
-    const std::string date = request_day(req, &Repositories::Zones::today_in, today_utc());
-    const std::string tz = req->getParameter("tz").empty() ? "UTC" : req->getParameter("tz");
-    if (!is_calendar_date(date)) {
-        callback(ErrorResponse::bad_request("invalid_query", "date must be a calendar day"));
+    const auto day = Fields::day_param(req, callback, &Repositories::Zones::today_in);
+    if (!day) {
         return;
     }
+    const std::string date = *day;
+    const std::string tz = req->getParameter("tz").empty() ? "UTC" : req->getParameter("tz");
     with_repo_errors(callback, "tasks.agenda", [&] {
         if (!Repo::TaskRepository::is_timezone(tz)) {
             callback(ErrorResponse::bad_request("invalid_query", "tz must be an IANA zone like Asia/Bangkok"));
@@ -512,9 +491,7 @@ void TasksController::updateNote(const HttpRequestPtr& req, Callback&& callback,
     }
     Validation::Errors errs;
     text_length(errs, body, "text", 1, ::Tasks::Fields::kNoteTextMax);
-    if (body.contains("status")) {
-        Validation::one_of(errs, body, "status", kNoteStatuses);
-    }
+    Validation::one_of(errs, body, "status", kNoteStatuses);
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;
@@ -573,94 +550,24 @@ void TasksController::parse(const HttpRequestPtr& req, Callback&& callback) {
     Repo::ParseJobRepository::Apply apply;
     apply.apply = body.contains("apply") && body["apply"].is_boolean() && body["apply"].get<bool>();
     apply.idempotency_key = key;
-    const auto accepted = [&](const json& job) {
-        auto resp = Response::ok(json{{"data", {{"id", job["id"]}, {"status", job["status"]}}}});
-        resp->setStatusCode(k202Accepted);
-        callback(resp);
-    };
-    // A retry of a request already taken answers with its job, before the cap.
-    if (key) {
-        std::optional<json> earlier;
-        if (!with_repo_errors(callback, "tasks.parse.keyed", [&] {
-                earlier = Repositories::JobRows::keyed(Repo::ParseJobRepository::kTable, owner, *key);
-            })) {
-            return;
-        }
-        if (earlier) {
-            accepted(*earlier);
-            return;
-        }
-    }
-    Repo::ParseJobRepository repo;
-    std::string id;
-    bool replayed = false;
-    // The job carries the retry limit it was submitted with.
-    const int max_attempts = Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries;
-    const auto payload = [&](const std::string& job_id) {
-        return json{{"job_id", job_id}, {"owner_id", owner}, {"max_attempts", max_attempts}};
-    };
-    // The job rides the row's transaction as an outbox row when a drain is configured
-    // (Jobs::Outbox::enqueue_if_drained): a crash after the commit cannot leave the row
-    // queued with no job behind it. With the drain off (OUTBOX_DRAIN_INTERVAL_SEC=0: the
-    // compose stack, the test suites) the direct submit below follows the commit, as before.
-    bool via_outbox = false;
-    try {
-        if (repo.open_count(owner) >= Repositories::JobRows::kOpenMax) {
-            callback(ErrorResponse::make({k429TooManyRequests,
-                                          "too_many_parses",
-                                          "wait for your running parses to finish",
-                                          json{{"retry_after_sec", 30}}}));
-            return;
-        }
-        const json job =
-            repo.create(owner, text, hint, note_id, apply, replayed, [&](auto& txn, const std::string& job_id) {
-                // The cap again, under the lock: two creates at once cannot both pass the count above.
-                Repositories::JobRows::hold_slot(txn, Repo::ParseJobRepository::kTable, owner);
-                via_outbox = Jobs::Outbox::enqueue_if_drained(txn, Jobs::TasksParse::kJobType, payload(job_id));
-            });
-        if (replayed) {
-            accepted(job);
-            return;
-        }
-        id = job["id"].get<std::string>();
-    } catch (const Repositories::JobRows::SlotsTaken&) {
-        callback(ErrorResponse::make({k429TooManyRequests,
-                                      "too_many_parses",
-                                      "wait for your running parses to finish",
-                                      json{{"retry_after_sec", 30}}}));
-        return;
-    } catch (const Repositories::NotFoundError&) {
-        callback(ErrorResponse::not_found("task_note"));
-        return;
-    } catch (const Repositories::ValidationError& e) {
-        callback(ErrorResponse::bad_request(e.code(), e.message()));
-        return;
-    } catch (const std::exception&) {
-        // The server's DETAIL would quote the phrase: no message.
-        spdlog::warn("tasks parse create failed");
-        callback(ErrorResponse::service_unavailable("storage_unavailable"));
-        return;
-    }
-    try {
-        if (!via_outbox) {
-            if (!Jobs::is_initialized()) {
-                throw std::runtime_error("the job queue is not initialized");
+    start_parse_job<Repo::ParseJobRepository>(
+        owner,
+        callback,
+        key,
+        ParseJobSpec{Repo::ParseJobRepository::kTable, Jobs::TasksParse::kJobType, "tasks parse", "tasks.parse.keyed"},
+        [&](Repo::ParseJobRepository& repo, bool& replayed, auto&& in_txn) {
+            return repo.create(owner, text, hint, note_id, apply, replayed, in_txn);
+        },
+        [](const std::exception& e) -> HttpResponsePtr {
+            // A note_id that is not one of the owner's inbox notes.
+            if (dynamic_cast<const Repositories::NotFoundError*>(&e) != nullptr) {
+                return ErrorResponse::not_found("task_note");
             }
-            Jobs::get().submit(Jobs::TasksParse::kJobType, payload(id));
-        }
-    } catch (const std::exception& e) {
-        spdlog::warn("tasks parse enqueue unavailable: {}", e.what());
-        try {
-            repo.fail(id, "queue_unavailable", "the job queue did not take the job");
-        } catch (const std::exception& inner) {
-            spdlog::warn("tasks parse {}: could not mark failed: {}", id, inner.what());
-        }
-        callback(ErrorResponse::service_unavailable("queue_unavailable"));
-        return;
-    }
-    auto resp = Response::ok(json{{"data", {{"id", id}, {"status", "queued"}}}});
-    resp->setStatusCode(k202Accepted);
-    callback(resp);
+            if (const auto* v = dynamic_cast<const Repositories::ValidationError*>(&e)) {
+                return ErrorResponse::bad_request(v->code(), v->message());
+            }
+            return nullptr;
+        });
 }
 
 void TasksController::parseStatus(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {

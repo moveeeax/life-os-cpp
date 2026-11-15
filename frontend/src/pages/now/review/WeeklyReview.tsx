@@ -4,29 +4,21 @@ import { Link } from 'react-router';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { api } from '@/lib/api/client';
+import { readJson, writeJson } from '@/lib/browserStore';
+import { shiftDays } from '@/lib/dates';
 import { qk } from '@/lib/api/queryKeys';
 import type { Today } from '@/lib/now/types';
 import { Group, Row, Sheet } from '@/shell/kit';
 
-import { tomorrowOf } from '../ani/evening';
 import { closedKey, githubLine, groupsOf, reviewText, weekOf } from './review';
 
 function readClosed(week: string): string[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(closedKey(week)) ?? '[]');
-    return Array.isArray(v) ? v.map(String) : [];
-  } catch {
-    return [];
-  }
+  const v = readJson<unknown>(closedKey(week), []);
+  return Array.isArray(v) ? v.map(String) : [];
 }
 
-function writeClosed(week: string, ids: string[]) {
-  try {
-    localStorage.setItem(closedKey(week), JSON.stringify(ids));
-  } catch {
-    // Private mode: the rows come back on the next open, that is all.
-  }
-}
+// Private mode: the rows come back on the next open, that is all.
+const writeClosed = (week: string, ids: string[]) => writeJson(closedKey(week), ids);
 
 /**
  * The weekly review: late tasks (to today, to tomorrow, done), goals behind
@@ -122,7 +114,7 @@ export function WeeklyReview({
                     type="button"
                     aria-label={`Tomorrow: ${t.title}`}
                     disabled={pending.has(t.id)}
-                    onClick={() => void patch(t.id, { due: tomorrowOf(date) })}
+                    onClick={() => void patch(t.id, { due: shiftDays(date, 1) })}
                   >
                     Tomorrow
                   </button>

@@ -15,21 +15,19 @@
 
 #pragma once
 
-#include <exception>
 #include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <variant>
 #include <vector>
-
-#include <spdlog/spdlog.h>
 
 #include <nlohmann/json.hpp>
 
 #include "food/Http.hpp"
 #include "food/Llm.hpp"
 #include "food/ParseAnswer.hpp"
-#include "jobs/Jobs.hpp"
+#include "jobs/RowJob.hpp"
 #include "llm/Chat.hpp"
 #include "repositories/food/GoalsRepository.hpp"
 #include "repositories/food/ItemRepository.hpp"
@@ -41,15 +39,6 @@ namespace Jobs::FoodParse {
 inline constexpr const char* kJobType = "food_parse";
 /// How many of the user's items travel with the request, newest first.
 inline constexpr long kItemsInPrompt = 200;
-
-namespace detail {
-// The shared chat call (llm/Chat.hpp), under the names this handler used before.
-using Chat::adapt_request;
-using Chat::complete;
-using Chat::provider_message;
-using Chat::Retryable;
-using Chat::usage;
-}  // namespace detail
 
 /// What the request carries about the user: their items (so the model prefers
 /// them over guesses) and the profile note. The unified parse sends the same.
@@ -77,113 +66,58 @@ inline PromptContext prompt_context(const std::string& owner) {
 
 inline nlohmann::json process_job(const nlohmann::json& payload) {
     const std::string job_id = payload.value("job_id", std::string());
-    Repositories::ParseJobRepository jobs;
     if (job_id.empty()) {
         throw std::invalid_argument("food_parse: payload has no job_id");
     }
-    int attempt = 0;  // 0 until the claim: a fail before it is not fenced by an attempt
-    const auto failed = [&](const std::string& code, const std::string& message) {
-        jobs.fail(job_id, code, message, attempt);
-        spdlog::warn("food parse {}: {}", job_id, code);
-        return nlohmann::json{{"job_id", job_id}, {"status", "failed"}, {"error", code}};
-    };
+    Repositories::ParseJobRepository jobs;
+    Jobs::RowJob<Repositories::ParseJobRepository> job(kJobType, "food parse", "job_id", job_id, jobs, payload);
 
     if (!Core::food_enabled()) {
-        return failed("food_disabled", "the food module is off on this worker");
+        return job.failed("food_disabled", "the food module is off on this worker");
     }
     const auto settings = Food::Llm::settings();
     if (!settings.has_value()) {
-        return failed("not_configured", "FOOD_LLM_* settings are missing");
+        return job.failed("not_configured", "FOOD_LLM_* settings are missing");
     }
-    const auto job = jobs.load_for_worker(job_id);
-    if (!job.has_value()) {
+    const auto row = jobs.load_for_worker(job_id);
+    if (!row.has_value()) {
         // Nothing to update: the row is gone.
         return {{"job_id", job_id}, {"status", "missing"}};
     }
-    attempt = jobs.start(job_id);
-    if (attempt == 0) {
-        // A row still `running` is held by another delivery, or by a worker that died less than
-        // JobRows::kStaleRunning ago: the job waits until the row turns stale, without spending an attempt.
-        const auto now = jobs.status(job_id);
-        if (now == "running") {
-            throw Jobs::DeferJob("food_parse: the row is running elsewhere", jobs.stale_in_ms(job_id));
-        }
-        return {{"job_id", job_id}, {"status", now.value_or("missing")}};
+    if (const auto settled = job.claim()) {
+        return *settled;
     }
-    const std::string owner = job->value("owner_id", std::string());
-    // The job carries the retry limit it was submitted with; the worker's own
-    // setting is the fallback for a job enqueued by an older API.
-    const int max_attempts = payload.value(
-        "max_attempts", Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries);
-    // A row that is `running` must end this call as done, failed or queued
-    // again: the page polls it, and a redelivery cannot claim it.
-    const auto give_up_or_retry = [&](const char* code, const std::string& what) -> nlohmann::json {
-        if (attempt >= max_attempts) {
-            return failed(code, what);
-        }
-        jobs.requeue(job_id, attempt);
-        throw std::runtime_error(std::string("food_parse: ") + what);
-    };
+    const std::string owner = row->value("owner_id", std::string());
 
-    try {
+    return job.run([&]() -> nlohmann::json {
         const auto ctx = prompt_context(owner);
-        nlohmann::json user_message = ctx.message(job->value("meal", std::string()), job->value("date", std::string()));
-        user_message["text"] = job->value("text", std::string());
-        nlohmann::json request{{"model", settings->model},
-                               {"messages",
-                                {{{"role", "system"}, {"content", settings->prompt}},
-                                 {{"role", "user"}, {"content", user_message.dump()}}}},
-                               {"max_tokens", settings->max_tokens},
-                               {"temperature", 0},
-                               {"response_format", {{"type", "json_object"}}}};
+        nlohmann::json user_message = ctx.message(row->value("meal", std::string()), row->value("date", std::string()));
+        user_message["text"] = row->value("text", std::string());
 
-        auto& transport = Food::Http::transport();
-        nlohmann::json body;
-        std::string error_code;
+        std::variant<Chat::Answer, Chat::Failure> asked;
         try {
-            body = detail::complete(transport, *settings, request, error_code);
-            // Three optional parameters, so at most three adapted retries.
-            for (int round = 0; round < 3 && error_code == "provider_error_400" && detail::adapt_request(request, body);
-                 ++round) {
-                body = detail::complete(transport, *settings, request, error_code);
-            }
-        } catch (const detail::Retryable& e) {
-            return give_up_or_retry("provider_unavailable", e.what());
+            asked = Chat::ask(Food::Http::transport(), *settings, Chat::json_request(*settings, user_message.dump()));
+        } catch (const Chat::Retryable& e) {
+            return job.give_up_or_retry("provider_unavailable", e.what());
         }
-        if (!error_code.empty()) {
-            return failed(error_code, detail::provider_message(body));
+        if (const auto* failure = std::get_if<Chat::Failure>(&asked)) {
+            return job.failed(failure->code, failure->message);
         }
-
-        std::string content;
-        if (body.contains("choices") && body["choices"].is_array() && !body["choices"].empty() &&
-            body["choices"][0].is_object() && body["choices"][0].contains("message") &&
-            body["choices"][0]["message"].is_object() && body["choices"][0]["message"].contains("content") &&
-            body["choices"][0]["message"]["content"].is_string()) {
-            content = body["choices"][0]["message"]["content"].get<std::string>();
-        }
-        if (content.empty()) {
-            return failed("invalid_answer", "no message content");
-        }
+        const auto& answer = std::get<Chat::Answer>(asked);
         std::vector<Food::Parse::Line> lines;
         try {
-            lines = Food::Parse::parse_answer(content, ctx.own_ids);
+            lines = Food::Parse::parse_answer(answer.content, ctx.own_ids);
         } catch (const Food::Parse::Invalid& e) {
-            return failed("invalid_answer", e.what());
+            return job.failed("invalid_answer", e.what());
         }
-        const std::string model =
-            body.contains("model") && body["model"].is_string() ? body["model"].get<std::string>() : settings->model;
         jobs.finish(job_id,
-                    attempt,
+                    job.attempt(),
                     Food::Parse::to_json(lines),
-                    model,
-                    detail::usage(body, "prompt_tokens"),
-                    detail::usage(body, "completion_tokens"));
+                    answer.model,
+                    answer.prompt_tokens,
+                    answer.completion_tokens);
         return {{"job_id", job_id}, {"status", "done"}, {"lines", lines.size()}};
-    } catch (const std::exception& e) {
-        // A database error or an unexpected shape: the row is still `running`
-        // and must not stay so.
-        return give_up_or_retry("internal_error", e.what());
-    }
+    });
 }
 
 }  // namespace Jobs::FoodParse

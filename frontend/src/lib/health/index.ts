@@ -2,7 +2,7 @@
 // raw samples, night selection, tile statistics and the pagination loop.
 // No React, no fetch: everything here is unit-tested in health.test.ts.
 
-import { shiftDays, todayLocal } from '@/lib/dates';
+import { isDay, shiftDays } from '@/lib/dates';
 
 import type { Page, SleepSession } from './types';
 
@@ -22,30 +22,19 @@ export const MIN_DATE = '2020-01-01';
 /** Longest custom range, in days. Raw samples are aggregated in the browser. */
 export const MAX_RANGE_DAYS = 366;
 
-function isIsoDate(s: string | null): s is string {
-  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  const d = new Date(`${s}T00:00:00Z`);
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
-}
-
-const shiftDate = shiftDays;
-
 /**
  * Calendar date of an instant in a zone `offsetMin` minutes ahead of UTC.
  * Defaults to the browser's zone at that instant.
  */
-export function localDate(iso: string, offsetMin?: number): string {
+export function dayOfInstant(iso: string, offsetMin?: number): string {
   const d = new Date(iso);
   const off = offsetMin ?? -d.getTimezoneOffset();
   return new Date(d.getTime() + off * 60_000).toISOString().slice(0, 10);
 }
 
-/** Today's calendar date in the browser's zone. */
-export const today = (): string => todayLocal();
-
 /** The last `days` days ending on `end`, both ends included. */
 export function rangeForDays(days: number, end: string): DateRange {
-  return { from: shiftDate(end, -(days - 1)), to: end };
+  return { from: shiftDays(end, -(days - 1)), to: end };
 }
 
 /**
@@ -53,7 +42,7 @@ export function rangeForDays(days: number, end: string): DateRange {
  * day, so a local-day range needs the neighbours to be complete at its edges.
  */
 export function widenRange(range: DateRange): DateRange {
-  return { from: shiftDate(range.from, -1), to: shiftDate(range.to, 1) };
+  return { from: shiftDays(range.from, -1), to: shiftDays(range.to, 1) };
 }
 
 /** Whether a calendar date lies inside the range. */
@@ -64,7 +53,7 @@ export function inRange(date: string, range: DateRange): boolean {
 /** Every date of the range in order. */
 export function daysInRange(range: DateRange): string[] {
   const out: string[] = [];
-  for (let d = range.from; d <= range.to; d = shiftDate(d, 1)) out.push(d);
+  for (let d = range.from; d <= range.to; d = shiftDays(d, 1)) out.push(d);
   return out;
 }
 
@@ -74,7 +63,7 @@ export function daysInRange(range: DateRange): string[] {
  * A date input reports a half-typed year such as 0002; that is rejected here.
  */
 export function validCustomRange(from: string | null, to: string | null, end: string): boolean {
-  if (!isIsoDate(from) || !isIsoDate(to)) return false;
+  if (from === null || to === null || !isDay(from) || !isDay(to)) return false;
   if (from > to || from < MIN_DATE || to > end) return false;
   const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS + 1;
   return days <= MAX_RANGE_DAYS;
@@ -121,7 +110,7 @@ export function dailyStats(
   const byDay = new Map<string, { min: number; max: number; sum: number; count: number }>();
   for (const s of samples) {
     if (!Number.isFinite(s.value)) continue;
-    const date = localDate(s.timestamp, offsetMin);
+    const date = dayOfInstant(s.timestamp, offsetMin);
     const cur = byDay.get(date);
     if (cur) {
       cur.min = Math.min(cur.min, s.value);
@@ -157,7 +146,7 @@ export function nights(sessions: SleepSession[], offsetMin?: number): Night[] {
   const best = new Map<string, SleepSession>();
   for (const s of sessions) {
     if (s.is_nap || !s.stages || s.stages.length === 0) continue;
-    const date = localDate(s.end_at, offsetMin);
+    const date = dayOfInstant(s.end_at, offsetMin);
     const cur = best.get(date);
     if (!cur || s.duration_minutes > cur.duration_minutes) best.set(date, s);
   }

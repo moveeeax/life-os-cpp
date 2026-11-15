@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { listQuery, useDeleteEntity, useSaveEntity } from '@/hooks/crud';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
 import { NOW_RIBBON, qk } from '@/lib/api/queryKeys';
@@ -21,54 +22,34 @@ const BASE = '/api/v1/practice';
 const WRITES = [qk.practice.all()] as const;
 
 export function useClients() {
-  return useQuery({
-    queryKey: qk.practice.clients(),
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: PracticeClient[] }>(`${BASE}/clients`, { signal })).data,
-  });
+  return useQuery(listQuery<PracticeClient>(qk.practice.clients(), `${BASE}/clients`));
 }
 
 export function useSaveClient(id: string | null, onSuccess?: (c: PracticeClient) => void) {
-  return useApiMutation(
-    async (body: PracticeClientInput) =>
-      id
-        ? (await api.patchJson<{ data: PracticeClient }>(`${BASE}/clients/${id}`, { body })).data
-        : (await api.postJson<{ data: PracticeClient }>(`${BASE}/clients`, { body })).data,
-    { invalidate: WRITES, onSuccess },
-  );
-}
-
-export function useDeleteClient(onSuccess?: () => void) {
-  return useApiMutation((id: string) => api.deleteJson<unknown>(`${BASE}/clients/${id}`), {
+  return useSaveEntity<PracticeClientInput, PracticeClient>(`${BASE}/clients`, id, {
     invalidate: WRITES,
     onSuccess,
   });
 }
 
+export function useDeleteClient(onSuccess?: () => void) {
+  return useDeleteEntity(`${BASE}/clients`, { invalidate: WRITES, onSuccess });
+}
+
 export function useDeals() {
-  return useQuery({
-    queryKey: qk.practice.deals(),
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: PracticeDeal[] }>(`${BASE}/deals`, { signal })).data,
-  });
+  return useQuery(listQuery<PracticeDeal>(qk.practice.deals(), `${BASE}/deals`));
 }
 
 export function useSaveDeal(id: string | null, onSuccess?: (d: PracticeDeal) => void) {
-  return useApiMutation(
-    async (body: PracticeDealInput) =>
-      id
-        ? (await api.patchJson<{ data: PracticeDeal }>(`${BASE}/deals/${id}`, { body })).data
-        : (await api.postJson<{ data: PracticeDeal }>(`${BASE}/deals`, { body })).data,
-    { invalidate: WRITES, onSuccess },
-  );
+  return useSaveEntity<PracticeDealInput, PracticeDeal>(`${BASE}/deals`, id, {
+    invalidate: WRITES,
+    onSuccess,
+  });
 }
 
 /** A deleted deal leaves its tasks unlinked: the task lists move too. */
 export function useDeleteDeal(onSuccess?: () => void) {
-  return useApiMutation((id: string) => api.deleteJson<unknown>(`${BASE}/deals/${id}`), {
-    invalidate: [...WRITES, qk.tasks.all()],
-    onSuccess,
-  });
+  return useDeleteEntity(`${BASE}/deals`, { invalidate: [...WRITES, qk.tasks.all()], onSuccess });
 }
 
 export interface EntryFilter {
@@ -92,20 +73,14 @@ export function useEntries(filter: EntryFilter) {
 }
 
 export function useSaveEntry(id: string | null, onSuccess?: () => void) {
-  return useApiMutation(
-    async (body: PracticeEntryInput) =>
-      id
-        ? (await api.patchJson<{ data: PracticeEntry }>(`${BASE}/entries/${id}`, { body })).data
-        : (await api.postJson<{ data: PracticeEntry }>(`${BASE}/entries`, { body })).data,
-    { invalidate: WRITES, onSuccess },
-  );
-}
-
-export function useDeleteEntry(onSuccess?: () => void) {
-  return useApiMutation((id: string) => api.deleteJson<unknown>(`${BASE}/entries/${id}`), {
+  return useSaveEntity<PracticeEntryInput, PracticeEntry>(`${BASE}/entries`, id, {
     invalidate: WRITES,
     onSuccess,
   });
+}
+
+export function useDeleteEntry(onSuccess?: () => void) {
+  return useDeleteEntity(`${BASE}/entries`, { invalidate: WRITES, onSuccess });
 }
 
 export function useMonths(year: number) {

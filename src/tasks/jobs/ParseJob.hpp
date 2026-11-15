@@ -19,13 +19,12 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <variant>
 #include <vector>
-
-#include <spdlog/spdlog.h>
 
 #include <nlohmann/json.hpp>
 
-#include "jobs/Jobs.hpp"
+#include "jobs/RowJob.hpp"
 #include "llm/Chat.hpp"
 #include "net/Http.hpp"
 #include "repositories/tasks/ParseJobRepository.hpp"
@@ -54,102 +53,58 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     if (!payload.contains("job_id") || !payload["job_id"].is_string() || payload["job_id"].get<std::string>().empty()) {
         throw std::invalid_argument("tasks_parse: payload has no job_id");
     }
-    const std::string job_id = payload["job_id"].get<std::string>();
     Repositories::Tasks::ParseJobRepository jobs;
-    int attempt = 0;  // 0 until the claim: a fail before it is not fenced by an attempt
-    const auto failed = [&](const std::string& code, const std::string& message) {
-        jobs.fail(job_id, code, message, attempt);
-        spdlog::warn("tasks parse {}: {}", job_id, code);
-        return nlohmann::json{{"job_id", job_id}, {"status", "failed"}, {"error", code}};
-    };
+    Jobs::RowJob<Repositories::Tasks::ParseJobRepository> job(
+        kJobType, "tasks parse", "job_id", payload["job_id"].get<std::string>(), jobs, payload);
 
     if (!Core::tasks_enabled()) {
-        return failed("tasks_disabled", "the tasks module is off on this worker");
+        return job.failed("tasks_disabled", "the tasks module is off on this worker");
     }
     const auto settings = ::Tasks::Llm::parse_settings();
     if (!settings.has_value()) {
-        return failed("not_configured", "TASKS_LLM_PROMPT_PARSE or the provider settings are missing");
+        return job.failed("not_configured", "TASKS_LLM_PROMPT_PARSE or the provider settings are missing");
     }
-    const auto job = jobs.load_for_worker(job_id);
-    if (!job.has_value()) {
-        return {{"job_id", job_id}, {"status", "missing"}};
+    const auto row = jobs.load_for_worker(job.id());
+    if (!row.has_value()) {
+        return {{"job_id", job.id()}, {"status", "missing"}};
     }
-    attempt = jobs.start(job_id);
-    if (attempt == 0) {
-        // A row still `running` is held by another delivery, or by a worker that died less than
-        // JobRows::kStaleRunning ago: the job waits until the row turns stale, without spending an attempt.
-        const auto now = jobs.status(job_id);
-        if (now == "running") {
-            throw Jobs::DeferJob("tasks_parse: the row is running elsewhere", jobs.stale_in_ms(job_id));
-        }
-        return {{"job_id", job_id}, {"status", now.value_or("missing")}};
+    if (const auto settled = job.claim()) {
+        return *settled;
     }
-    const std::string owner = job->value("owner_id", std::string());
-    const int max_attempts =
-        payload.contains("max_attempts") && payload["max_attempts"].is_number_integer()
-            ? payload["max_attempts"].get<int>()
-            : (Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries);
-    const auto give_up_or_retry = [&](const char* code, const std::string& what) -> nlohmann::json {
-        if (attempt >= max_attempts) {
-            return failed(code, what);
-        }
-        jobs.requeue(job_id, attempt);
-        throw std::runtime_error(std::string("tasks_parse: ") + what);
-    };
+    const std::string owner = row->value("owner_id", std::string());
 
-    try {
-        const std::string hint_date = job->value("hint_date", std::string());
+    return job.run([&]() -> nlohmann::json {
+        const std::string hint_date = row->value("hint_date", std::string());
         const std::set<std::string> open_titles = Repositories::Tasks::TaskRepository().open_titles(owner);
         nlohmann::json user_message = prompt_context(hint_date);
-        user_message["text"] = job->value("text", std::string());
-        const std::string model = settings->model;
-        const nlohmann::json request{{"model", model},
-                                     {"messages",
-                                      {{{"role", "system"}, {"content", settings->prompt}},
-                                       {{"role", "user"}, {"content", user_message.dump()}}}},
-                                     {"max_tokens", settings->max_tokens},
-                                     {"temperature", 0},
-                                     {"response_format", {{"type", "json_object"}}}};
+        user_message["text"] = row->value("text", std::string());
 
-        nlohmann::json body;
-        std::string error_code;
+        std::variant<Chat::Answer, Chat::Failure> asked;
         try {
-            body = Chat::complete_adapting(Net::Http::transport(), *settings, request, error_code);
+            asked = Chat::ask(Net::Http::transport(), *settings, Chat::json_request(*settings, user_message.dump()));
         } catch (const Chat::Retryable& e) {
-            return give_up_or_retry("provider_unavailable", e.what());
+            return job.give_up_or_retry("provider_unavailable", e.what());
         }
-        if (!error_code.empty()) {
-            return failed(error_code, Chat::provider_message(body));
+        if (const auto* failure = std::get_if<Chat::Failure>(&asked)) {
+            return job.failed(failure->code, failure->message);
         }
-        const std::string content = Chat::content_of(body);
-        if (content.empty()) {
-            return failed("invalid_answer", "no message content");
-        }
+        const auto& answer = std::get<Chat::Answer>(asked);
         std::vector<::Tasks::Parse::Line> lines;
         try {
-            lines = ::Tasks::Parse::parse_answer(content, open_titles);
+            lines = ::Tasks::Parse::parse_answer(answer.content, open_titles);
         } catch (const ::Tasks::Parse::Invalid& e) {
-            return failed("invalid_answer", e.what());
+            return job.failed("invalid_answer", e.what());
         }
         // A job created with apply creates its tasks in the transaction that closes it.
-        jobs.finish_applying(
-            job_id,
-            attempt,
-            ::Tasks::Parse::to_json(lines),
-            body.contains("model") && body["model"].is_string() ? body["model"].get<std::string>() : model,
-            Chat::usage(body, "prompt_tokens"),
-            Chat::usage(body, "completion_tokens"),
-            [&](auto& txn, const std::string& row_owner) { return apply_in(txn, row_owner, lines); });
-        return {{"job_id", job_id}, {"status", "done"}, {"lines", lines.size()}};
-    } catch (const std::runtime_error& e) {
-        // give_up_or_retry's own throw: the queue retries.
-        if (std::string(e.what()).rfind("tasks_parse: ", 0) == 0) {
-            throw;
-        }
-        return give_up_or_retry("internal_error", e.what());
-    } catch (const std::exception& e) {
-        return give_up_or_retry("internal_error", e.what());
-    }
+        jobs.finish_applying(job.id(),
+                             job.attempt(),
+                             ::Tasks::Parse::to_json(lines),
+                             answer.model,
+                             answer.prompt_tokens,
+                             answer.completion_tokens,
+                             [&](auto& txn, const std::string& row_owner) { return apply_in(txn, row_owner, lines); });
+        return {{"job_id", job.id()}, {"status", "done"}, {"lines", lines.size()}};
+    });
 }
 
 }  // namespace Jobs::TasksParse

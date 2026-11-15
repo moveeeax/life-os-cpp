@@ -16,6 +16,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 
 namespace Repositories::Agent {
 
@@ -43,7 +44,6 @@ public:
                 "jsonb_array_elements_text($2::jsonb))) ON CONFLICT (owner_id) DO UPDATE SET muted = EXCLUDED.muted",
                 owner,
                 list.dump());
-            return true;
         });
     }
 
@@ -56,7 +56,6 @@ public:
                 "EXCLUDED.hold_until",
                 owner,
                 minutes);
-            return true;
         });
     }
 
@@ -64,7 +63,7 @@ public:
     std::optional<std::string> held_until(const std::string& owner) {
         return Database::get().execute_read([&](auto& txn) -> std::optional<std::string> {
             auto r = txn.exec_params(
-                "SELECT to_char(hold_until AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') FROM ani_prefs "
+                "SELECT " SQL_ISO_UTC_Z("hold_until") " FROM ani_prefs "
                 "WHERE owner_id = $1::uuid AND hold_until > now()",
                 owner);
             if (r.empty() || r[0][0].is_null()) {

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { useApiMutation } from '@/hooks/useApiMutation';
+import { useDeleteEntity, useSaveEntity } from '@/hooks/crud';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import type { TapeMeasurement, TapeMeasurementInput } from '@/lib/health/measurements';
@@ -27,18 +27,12 @@ export function useMeasurements(enabled = true) {
 
 /** Add a measurement, or edit one by id. */
 export function useSaveMeasurement(id: string | null, onSuccess?: () => void) {
-  return useApiMutation(
-    async (body: TapeMeasurementInput) =>
-      id
-        ? (await api.patchJson<{ data: TapeMeasurement }>(`${BASE}/${id}`, { body })).data
-        : (await api.postJson<{ data: TapeMeasurement }>(BASE, { body })).data,
-    { invalidate: [qk.health.measurements()], onSuccess },
-  );
-}
-
-export function useDeleteMeasurement(onSuccess?: () => void) {
-  return useApiMutation((id: string) => api.deleteJson<unknown>(`${BASE}/${id}`), {
+  return useSaveEntity<TapeMeasurementInput, TapeMeasurement>(BASE, id, {
     invalidate: [qk.health.measurements()],
     onSuccess,
   });
+}
+
+export function useDeleteMeasurement(onSuccess?: () => void) {
+  return useDeleteEntity(BASE, { invalidate: [qk.health.measurements()], onSuccess });
 }

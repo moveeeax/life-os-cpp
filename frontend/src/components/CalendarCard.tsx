@@ -1,16 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useApiMutation } from '@/hooks/useApiMutation';
-import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
-import type { components } from '@/lib/api/schema.gen';
-
-type Status = components['schemas']['CalendarStatus'];
-const PATH = '/api/v1/calendar';
+import { useCalendarStatus, useConnectCalendar, useDisconnectCalendar } from '@/hooks/useCalendar';
 
 /** What the consent's return (`/account?calendar=…`) says. */
 const OUTCOMES: Record<string, { ok: boolean; text: string }> = {
@@ -32,17 +25,9 @@ export function CalendarCard({
   go?: (url: string) => void;
   search?: string;
 }) {
-  const status = useQuery({
-    queryKey: qk.calendar(),
-    queryFn: async ({ signal }) => (await api.getJson<{ data: Status }>(PATH, { signal })).data,
-  });
-  const connect = useApiMutation(
-    async () => (await api.postJson<{ data: { url: string } }>(`${PATH}/connect`)).data,
-    { onSuccess: (d) => go(d.url) },
-  );
-  const unlink = useApiMutation(async () => await api.deleteJson(PATH), {
-    invalidate: [qk.calendar()],
-  });
+  const status = useCalendarStatus();
+  const connect = useConnectCalendar(go);
+  const unlink = useDisconnectCalendar();
   const [sure, setSure] = useState(false);
   const outcome = OUTCOMES[new URLSearchParams(search).get('calendar') ?? ''];
   const s = status.data;

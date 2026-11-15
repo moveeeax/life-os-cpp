@@ -8,9 +8,9 @@ import { useMe } from '@/hooks/useMe';
 import { useNowSettings } from '@/hooks/useNow';
 import { useWalletSummary } from '@/hooks/useWallet';
 import { Permission, userCan } from '@/lib/auth/permissions';
-import { useAni } from '@/pages/now/ani/state';
+import { useAni } from '@/lib/now/ani';
 
-import { REVIEW_EVENT } from '@/pages/now/review/review';
+import { REVIEW_EVENT } from '@/lib/now/act';
 
 import { ArrangeSheet } from './ArrangeSheet';
 

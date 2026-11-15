@@ -5,7 +5,8 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useNoteList, useNotesEnabled } from '@/hooks/useNotes';
 import { useDeleteProject, useProject, useProjectTasks } from '@/hooks/useProjects';
 import { useCreateTask } from '@/hooks/useTasks';
-import { PROJECT_STATUS, courseProgress, localToday, safeLink } from '@/lib/tasks';
+import { todayLocal } from '@/lib/dates';
+import { PROJECT_STATUS, courseProgress, safeLink } from '@/lib/tasks';
 import { Group, LoadError, Meter, Num, Placeholder, Row, SectionFrame } from '@/shell/kit';
 
 import { NoteSheet } from '../notes/NoteSheet';
@@ -25,7 +26,7 @@ const short = (iso: string | null) =>
 export function LearningCoursePage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
-  const today = localToday();
+  const today = todayLocal();
   const course = useProject(id);
   const steps = useProjectTasks(id);
   const notesOn = useNotesEnabled(true);

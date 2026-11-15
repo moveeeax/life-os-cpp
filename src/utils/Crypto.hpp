@@ -8,7 +8,9 @@
  * Declarations only — the bodies live in Crypto.cpp (compiled once into
  * app_core; docs/ARCHITECTURE.md §4): including this header no longer
  * pulls the OpenSSL headers into the including TU. Only std types survive in
- * the signatures.
+ * the signatures. The one exception is to_hex, which is inline and std-only
+ * so the std-only TUs (observability/Trace.cpp, compiled straight into a
+ * libFuzzer harness) can use it without linking Crypto.cpp.
  */
 
 #pragma once
@@ -19,11 +21,27 @@
 
 namespace Utils::Crypto {
 
-namespace detail {
 /// Lowercase hex encoding of @p n bytes. Single source for random_hex /
-/// sha256_hex — and for the external hex-of-digest callers (Storage's SigV4
-/// signing, Webhooks' HMAC signature header), which is why it is declared
-/// here rather than being file-local to Crypto.cpp.
+/// sha256_hex and for the hex-of-digest callers outside utils (Storage's
+/// SigV4 signing, Webhooks' HMAC signature header, the trace ids).
+inline std::string to_hex(const unsigned char* data, std::size_t n) {
+    static constexpr char kHex[] = "0123456789abcdef";
+    std::string out;
+    out.reserve(n * 2);
+    for (std::size_t i = 0; i < n; ++i) {
+        out.push_back(kHex[data[i] >> 4]);
+        out.push_back(kHex[data[i] & 0xF]);
+    }
+    return out;
+}
+
+/// Lowercase hex encoding of the bytes of @p bytes.
+inline std::string to_hex(std::string_view bytes) {
+    return to_hex(reinterpret_cast<const unsigned char*>(bytes.data()), bytes.size());
+}
+
+namespace detail {
+/// The old name of to_hex, kept as a forwarder for its callers outside utils.
 std::string bytes_to_hex(const unsigned char* data, std::size_t n);
 }  // namespace detail
 

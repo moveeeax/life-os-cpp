@@ -12,8 +12,8 @@ import {
   useSetMiRegion,
   useUnlinkMi,
 } from '@/hooks/useMiAccount';
+import { todayLocal } from '@/lib/dates';
 import { ApiClientError, apiErrorMessage } from '@/lib/api/client';
-import { today } from '@/lib/health';
 import {
   REGIONS,
   formatCountdown,
@@ -97,7 +97,7 @@ function Linked({ status }: { status: MiStatus }) {
   const setRegion = useSetMiRegion();
   const detect = useDetectMiRegion();
   const probe = useProbe();
-  const day = today();
+  const day = todayLocal();
   const busy = unlink.isPending || setRegion.isPending || detect.isPending;
 
   return (

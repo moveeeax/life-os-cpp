@@ -110,6 +110,13 @@ TEST(RequestUtilsTest, LocalTodayFollowsAValidZone) {
         << "a resolver that cannot answer leaves UTC";
 }
 
+TEST(RequestUtilsTest, ZoneOrUtcKeepsOnlyAZone) {
+    const auto almaty = [](const std::string& tz) { return tz == "Asia/Almaty"; };
+    EXPECT_EQ(Api::zone_or_utc(with_params({{"tz", "Asia/Almaty"}}), almaty), "Asia/Almaty");
+    EXPECT_EQ(Api::zone_or_utc(with_params({{"tz", "Mars/Olympus"}}), almaty), "UTC");
+    EXPECT_EQ(Api::zone_or_utc(with_params({}), almaty), "UTC");
+}
+
 TEST(RequestUtilsTest, RequestDayPrefersTheGivenDate) {
     EXPECT_EQ(Api::request_day(with_params({{"date", "2026-09-01"}, {"tz", "Asia/Almaty"}}), almaty_only, "2026-10-14"),
               "2026-09-01");

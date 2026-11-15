@@ -32,7 +32,7 @@ public:
             }
             return r[0][0].template as<int>();
         };
-        return from_primary ? Database::get().execute_read_primary(query) : Database::get().execute_read(query);
+        return Database::get().execute_read(from_primary, query);
     }
 
     /// The steps goal in effect: the owner's, else 8000.
@@ -56,7 +56,6 @@ public:
             } else {
                 txn.exec_params("UPDATE fitness_goals SET steps = NULL WHERE owner_id = $1::uuid", owner);
             }
-            return true;
         });
     }
 };

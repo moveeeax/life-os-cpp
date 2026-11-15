@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 
-import { useMuteKind, type AniPrefs } from './useAni';
+import { useMuteKind, type AniPrefs } from './useAniPrefs';
 
 /** "Not about this": each mute adds to the ones already kept, even before the prefs refetch. */
 

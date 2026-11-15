@@ -183,7 +183,6 @@ public:
             if (r.empty()) {
                 throw NotFound("money_transfer");
             }
-            return true;
         });
     }
 

@@ -17,6 +17,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <drogon/drogon.h>
@@ -27,6 +28,7 @@
 #include "api/FieldChecks.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
+#include "api/ParseJobStart.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "jobs/Jobs.hpp"
@@ -152,19 +154,9 @@ std::optional<std::string> query_param(const HttpRequestPtr& req, const char* na
     return v;
 }
 
+/// An optional currency code field, as every Money body names one.
 void code_field(Validation::Errors& errs, const json& body, const std::string& field) {
-    if (!body.contains(field) || body[field].is_null()) {
-        return;
-    }
-    if (!body[field].is_string() || !std::regex_match(body[field].get<std::string>(), kCodeRe)) {
-        errs.add(field, "bad_format", "expected an ISO code like KZT");
-    }
-}
-
-void uuid_field(Validation::Errors& errs, const json& body, const std::string& field) {
-    if (body.contains(field) && !body[field].is_null()) {
-        Validation::uuid(errs, body, field);
-    }
+    Fields::currency_code(errs, body, field, "KZT");
 }
 
 /// Reads the owner's settings for the "as if" currency the pages remember.
@@ -189,20 +181,16 @@ bool transaction_input(const json& body,
         return false;
     }
     Validation::Errors local;
-    if (body.contains("type")) {
-        Validation::one_of(local, body, "type", kTypes);
-    }
+    Validation::one_of(local, body, "type", kTypes);
     Validation::require_string(local, body, "date");
     date_field(local, body, "date");
-    if (body.contains("time") && !body["time"].is_null()) {
-        Validation::regex_match(local, body, "time", std::regex(R"(^([01]\d|2[0-3]):[0-5]\d$)"), "expected HH:MM");
-    }
+    Validation::regex_match(local, body, "time", Fields::kTimeRe, "expected HH:MM");
     Validation::require_string(local, body, "account_id");
     Validation::uuid(local, body, "account_id");
     Validation::require(local, body, "amount");
     amount_range(local, body, "amount", -kAmountMax, kAmountMax);
-    uuid_field(local, body, "category_id");
-    uuid_field(local, body, "adjusts_id");
+    Validation::uuid(local, body, "category_id");
+    Validation::uuid(local, body, "adjusts_id");
     text_length(local, body, "merchant", 0, kNameMax);
     Validation::require_string(local, body, "name");
     text_length(local, body, "name", 1, kNameMax);
@@ -215,12 +203,8 @@ bool transaction_input(const json& body,
     text_length(local, body, "fx_note", 0, 200);
     text_length(local, body, "trip", 0, 60);
     text_length(local, body, "note", 0, kNoteMax);
-    if (body.contains("source")) {
-        Validation::one_of(local, body, "source", kSources);
-    }
-    if (body.contains("status")) {
-        Validation::one_of(local, body, "status", kStatuses);
-    }
+    Validation::one_of(local, body, "source", kSources);
+    Validation::one_of(local, body, "status", kStatuses);
     text_length(local, body, "external_id", 1, 120);
     if (local.any()) {
         for (const auto& e : local.errors_json()) {
@@ -310,9 +294,7 @@ void MoneyController::upsertCurrency(const HttpRequestPtr& req, Callback&& callb
     Validation::require_string(errs, body, "code");
     code_field(errs, body, "code");
     text_length(errs, body, "name", 0, 60);
-    if (body.contains("role") && !body["role"].is_null()) {
-        Validation::one_of(errs, body, "role", kRoles);
-    }
+    Validation::one_of(errs, body, "role", kRoles);
     Validation::int_range(errs, body, "decimals", 0, 8);
     text_length(errs, body, "minor_unit", 0, 30);
     Validation::boolean(errs, body, "archived");
@@ -354,9 +336,7 @@ void MoneyController::patchCurrency(const HttpRequestPtr& req, Callback&& callba
     }
     Validation::Errors errs;
     text_length(errs, body, "name", 0, 60);
-    if (body.contains("role") && !body["role"].is_null()) {
-        Validation::one_of(errs, body, "role", kRoles);
-    }
+    Validation::one_of(errs, body, "role", kRoles);
     Validation::int_range(errs, body, "decimals", 0, 8);
     text_length(errs, body, "minor_unit", 0, 30);
     Validation::boolean(errs, body, "archived");
@@ -394,13 +374,9 @@ namespace {
 void account_fields(Validation::Errors& errs, const json& body) {
     text_length(errs, body, "name", 1, 120);
     text_length(errs, body, "bank", 0, 60);
-    if (body.contains("kind")) {
-        Validation::one_of(errs, body, "kind", kAccountKinds);
-    }
+    Validation::one_of(errs, body, "kind", kAccountKinds);
     code_field(errs, body, "currency");
-    if (body.contains("last4") && !body["last4"].is_null()) {
-        Validation::regex_match(errs, body, "last4", kLast4Re, "up to four digits");
-    }
+    Validation::regex_match(errs, body, "last4", kLast4Re, "up to four digits");
     amount_range(errs, body, "opening_balance", -kAmountMax, kAmountMax);
     date_field(errs, body, "opening_date");
     Validation::int_range(errs, body, "position", 0, 10000);
@@ -517,12 +493,8 @@ namespace {
 
 void category_fields(Validation::Errors& errs, const json& body) {
     text_length(errs, body, "name", 1, 60);
-    if (body.contains("kind")) {
-        Validation::one_of(errs, body, "kind", kKinds);
-    }
-    if (body.contains("flexibility")) {
-        Validation::one_of(errs, body, "flexibility", kFlex);
-    }
+    Validation::one_of(errs, body, "kind", kKinds);
+    Validation::one_of(errs, body, "flexibility", kFlex);
     amount_range(errs, body, "budget_max", kAmountMin, kAmountMax);
     code_field(errs, body, "budget_currency");
     const bool has_max = body.contains("budget_max") && !body["budget_max"].is_null();
@@ -721,12 +693,10 @@ void MoneyController::updateTransaction(const HttpRequestPtr& req, Callback&& ca
     }
     Validation::Errors errs;
     date_field(errs, body, "date");
-    if (body.contains("time") && !body["time"].is_null()) {
-        Validation::regex_match(errs, body, "time", std::regex(R"(^([01]\d|2[0-3]):[0-5]\d$)"), "expected HH:MM");
-    }
-    uuid_field(errs, body, "account_id");
+    Validation::regex_match(errs, body, "time", Fields::kTimeRe, "expected HH:MM");
+    Validation::uuid(errs, body, "account_id");
     amount_range(errs, body, "amount", -kAmountMax, kAmountMax);
-    uuid_field(errs, body, "category_id");
+    Validation::uuid(errs, body, "category_id");
     text_length(errs, body, "merchant", 0, kNameMax);
     text_length(errs, body, "name", 1, kNameMax);
     amount_range(errs, body, "receipt_amount", kAmountMin, kAmountMax);
@@ -830,8 +800,8 @@ namespace {
 
 void transfer_fields(Validation::Errors& errs, const json& body) {
     date_field(errs, body, "date");
-    uuid_field(errs, body, "from_account_id");
-    uuid_field(errs, body, "to_account_id");
+    Validation::uuid(errs, body, "from_account_id");
+    Validation::uuid(errs, body, "to_account_id");
     amount_range(errs, body, "amount_sent", kAmountMin, kAmountMax);
     amount_range(errs, body, "amount_received", kAmountMin, kAmountMax);
     amount_range(errs, body, "fee", 0, kAmountMax);
@@ -961,7 +931,7 @@ void MoneyController::patchMerchant(const HttpRequestPtr& req, Callback&& callba
     Validation::Errors errs;
     Validation::require_string(errs, body, "merchant_key");
     text_length(errs, body, "merchant_key", 1, 200);
-    uuid_field(errs, body, "category_id");
+    Validation::uuid(errs, body, "category_id");
     if (!body.contains("category_id")) {
         errs.add("category_id", "missing", "category_id (or null) is required");
     }
@@ -1327,9 +1297,10 @@ std::optional<DataUrl> data_url(const std::string& url, std::string& problem) {
     return out;
 }
 
-/// The shared tail of both parse routes: the cap, the row, the job. @p create(repo, replayed, in_txn)
-/// inserts the row and runs in_txn(txn, id) inside the same transaction; it sets replayed (and
-/// skips in_txn) when it returns the job an earlier request with the same @p key created.
+/// The shared tail of both parse routes: the cap, the row, the job (Api::start_parse_job).
+/// @p create(repo, replayed, in_txn) inserts the row and runs in_txn(txn, id) inside the same
+/// transaction; it sets replayed (and skips in_txn) when it returns the job an earlier request
+/// with the same @p key created.
 template <typename Create>
 void start_parse(const std::string& owner,
                  MoneyController::Callback& callback,
@@ -1339,94 +1310,18 @@ void start_parse(const std::string& owner,
         callback(ErrorResponse::service_unavailable("not_configured", "the money parse is not set up on this server"));
         return;
     }
-    const auto accepted = [&](const json& job) {
-        auto resp = Response::ok(json{{"data", {{"id", job["id"]}, {"status", job["status"]}}}});
-        resp->setStatusCode(k202Accepted);
-        callback(resp);
-    };
-    Repo::ParseJobRepository repo;
-    // A retry of a request already taken answers with its job, before the cap.
-    if (key) {
-        std::optional<json> earlier;
-        if (!with_repo_errors(callback, "money.parse.keyed", [&] {
-                earlier = Repositories::JobRows::keyed(Repo::ParseJobRepository::kTable, owner, *key);
-            })) {
-            return;
-        }
-        if (earlier) {
-            accepted(*earlier);
-            return;
-        }
-    }
-    std::string id;
-    bool replayed = false;
-    // The job carries the retry limit it was submitted with.
-    const int max_attempts = Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries;
-    const auto payload = [&](const std::string& job_id) {
-        return json{{"job_id", job_id}, {"owner_id", owner}, {"max_attempts", max_attempts}};
-    };
-    // The job rides the row's transaction as an outbox row when a drain is configured
-    // (Jobs::Outbox::enqueue_if_drained): a crash after the commit cannot leave the row
-    // queued with no job behind it. With the drain off (OUTBOX_DRAIN_INTERVAL_SEC=0: the
-    // compose stack, the test suites) the direct submit below follows the commit, as before.
-    bool via_outbox = false;
-    try {
-        if (repo.open_count(owner) >= Repositories::JobRows::kOpenMax) {
-            callback(ErrorResponse::make({k429TooManyRequests,
-                                          "too_many_parses",
-                                          "wait for your running parses to finish",
-                                          json{{"retry_after_sec", 30}}}));
-            return;
-        }
-        const json job = create(repo, replayed, [&](auto& txn, const std::string& job_id) {
-            // The cap again, under the lock: two creates at once cannot both pass the count above.
-            Repositories::JobRows::hold_slot(txn, Repo::ParseJobRepository::kTable, owner);
-            via_outbox = Jobs::Outbox::enqueue_if_drained(txn, Jobs::MoneyParse::kJobType, payload(job_id));
-        });
-        if (replayed) {
-            accepted(job);
-            return;
-        }
-        id = job["id"].template get<std::string>();
-    } catch (const Repositories::JobRows::SlotsTaken&) {
-        callback(ErrorResponse::make({k429TooManyRequests,
-                                      "too_many_parses",
-                                      "wait for your running parses to finish",
-                                      json{{"retry_after_sec", 30}}}));
-        return;
-    } catch (const Repositories::ValidationError& e) {
-        callback(ErrorResponse::bad_request(e.code(), e.message()));
-        return;
-    } catch (const pqxx::sql_error& e) {
-        // The server's DETAIL would quote the row (the bank text, the photo): the state only.
-        spdlog::warn("money parse create failed: SQLSTATE {}", e.sqlstate());
-        callback(ErrorResponse::service_unavailable("storage_unavailable"));
-        return;
-    } catch (const std::exception&) {
-        spdlog::warn("money parse create failed");
-        callback(ErrorResponse::service_unavailable("storage_unavailable"));
-        return;
-    }
-    try {
-        if (!via_outbox) {
-            if (!Jobs::is_initialized()) {
-                throw std::runtime_error("the job queue is not initialized");
+    start_parse_job<Repo::ParseJobRepository>(
+        owner,
+        callback,
+        key,
+        ParseJobSpec{Repo::ParseJobRepository::kTable, Jobs::MoneyParse::kJobType, "money parse", "money.parse.keyed"},
+        std::forward<Create>(create),
+        [](const std::exception& e) -> HttpResponsePtr {
+            if (const auto* v = dynamic_cast<const Repositories::ValidationError*>(&e)) {
+                return ErrorResponse::bad_request(v->code(), v->message());
             }
-            Jobs::get().submit(Jobs::MoneyParse::kJobType, payload(id));
-        }
-    } catch (const std::exception& e) {
-        spdlog::warn("money parse enqueue unavailable: {}", e.what());
-        try {
-            repo.fail(id, "queue_unavailable", "the job queue did not take the job");
-        } catch (const std::exception& inner) {
-            spdlog::warn("money parse {}: could not mark failed: {}", id, inner.what());
-        }
-        callback(ErrorResponse::service_unavailable("queue_unavailable"));
-        return;
-    }
-    auto resp = Response::ok(json{{"data", {{"id", id}, {"status", "queued"}}}});
-    resp->setStatusCode(k202Accepted);
-    callback(resp);
+            return nullptr;
+        });
 }
 
 }  // namespace

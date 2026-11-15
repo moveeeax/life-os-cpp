@@ -5,11 +5,13 @@
  *        earlier one), a currency without a quote left unconverted and the
  *        total marked partial; the change over a period split into what the
  *        ledger did (at the end rates) and what the rates did (the start
- *        balances re-priced). The two parts add up to the change.
+ *        balances re-priced). The two parts add up to the change. A list of
+ *        dated amounts (a trip's spends) converts each at its own day's rate.
  */
 
 #pragma once
 
+#include <algorithm>
 #include <map>
 #include <optional>
 #include <set>
@@ -78,6 +80,41 @@ inline DayTotal convert_day(const std::map<std::string, double>& balances,
             continue;
         }
         out.total += amount / *rate;
+    }
+    return out;
+}
+
+/// One amount on its day, in its own currency.
+struct Spend {
+    std::string currency;
+    std::string date;  // YYYY-MM-DD
+    double amount = 0;
+};
+
+struct SpendTotal {
+    double amount = 0;
+    bool partial = false;   // a spend without a rate on its day is left out
+    std::string rate_date;  // the earliest quote day used; empty when none was
+};
+
+/// @p spends in @p target, each at its own day's rate (the nearest earlier quote).
+/// USD is the base and needs no quote, so a spend already in @p target adds no rate day.
+inline SpendTotal total_in(const std::vector<Spend>& spends, const Quotes& q, const std::string& target) {
+    SpendTotal out;
+    for (const auto& s : spends) {
+        const auto rate = rate_per_target(q, s.currency, target, s.date);
+        if (!rate || *rate <= 0) {
+            out.partial = true;
+            continue;
+        }
+        out.amount += s.amount / *rate;
+        for (const auto& code : {s.currency, target}) {
+            if (code == "USD" || s.currency == target) {
+                continue;
+            }
+            const std::string used = nearest(q, code, s.date)->date;
+            out.rate_date = out.rate_date.empty() ? used : std::min(out.rate_date, used);
+        }
     }
     return out;
 }

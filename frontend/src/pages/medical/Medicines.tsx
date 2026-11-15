@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { useDeleteMedication, useMedications, usePeople } from '@/hooks/useMedical';
 import { useErrorToast } from '@/hooks/useErrorToast';
 import { formatDay, todayLocal } from '@/lib/dates';
@@ -17,8 +17,8 @@ export function MedicalMedicinesPage() {
   const meds = useMedications();
   const people = usePeople();
   const [editing, setEditing] = useState<MedicalMedication | 'new' | null>(null);
-  const [deleting, setDeleting] = useState<MedicalMedication | null>(null);
-  const remove = useDeleteMedication(() => setDeleting(null));
+  const deleting = useConfirmDelete<MedicalMedication>();
+  const remove = useDeleteMedication(deleting.close);
   useErrorToast(remove.error);
   const { current, past } = splitMedications(meds.data ?? [], today);
   const noPeople = people.isSuccess && people.data.length === 0;
@@ -54,7 +54,7 @@ export function MedicalMedicinesPage() {
         <button type="button" className="k-link" onClick={() => setEditing(m)}>
           Edit
         </button>
-        <button type="button" className="k-link k-error-text" onClick={() => setDeleting(m)}>
+        <button type="button" className="k-link k-error-text" onClick={() => deleting.ask(m)}>
           Delete
         </button>
       </span>
@@ -91,17 +91,10 @@ export function MedicalMedicinesPage() {
           onClose={() => setEditing(null)}
         />
       )}
-      {deleting && (
-        <ConfirmDialog
-          title={`Delete ${deleting.name}?`}
-          description="This cannot be undone."
-          confirmLabel="Delete"
-          destructive
-          busy={remove.isPending}
-          onConfirm={() => remove.mutate(deleting.id)}
-          onClose={() => setDeleting(null)}
-        />
-      )}
+      {deleting.dialog(remove, (d) => ({
+        title: `Delete ${d.name}?`,
+        description: 'This cannot be undone.',
+      }))}
     </MedicalFrame>
   );
 }

@@ -1,8 +1,8 @@
-import { useState, type FormEvent } from 'react';
+import type { FormEvent } from 'react';
 
 import { useSaveProject } from '@/hooks/useProjects';
 import type { Project, ProjectInput } from '@/lib/tasks';
-import { Sheet } from '@/shell/kit';
+import { Sheet, useFormFields } from '@/shell/kit';
 
 /** Create or edit a project, or a course (kind "course": platform, dates, certificate). */
 export function ProjectSheet({
@@ -17,7 +17,7 @@ export function ProjectSheet({
   onSaved?: (p: Project) => void;
 }) {
   const course = kind === 'course';
-  const [f, setF] = useState({
+  const [f, set] = useFormFields({
     name: project?.name ?? '',
     code: project?.code ?? '',
     description: project?.description ?? '',
@@ -34,8 +34,6 @@ export function ProjectSheet({
     onSaved?.(p);
     onClose();
   });
-  const set = (k: keyof typeof f) => (e: { target: { value: string } }) =>
-    setF({ ...f, [k]: e.target.value });
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const body: ProjectInput = {

@@ -137,7 +137,7 @@ EOF
 fi
 
 # ── 2. The routes manifest: a lazy import and a shell route ─────────────
-if grep -qF "path: '${ROUTE}'" "$MANIFEST"; then
+if grep -qF "path: '${ROUTE}'" "$MANIFEST" || grep -qF "shell('${ROUTE}'," "$MANIFEST"; then
     echo "==> manifest already has a route for ${ROUTE} — skipping manifest edit"
 else
     python3 - "$MANIFEST" "$COMPONENT" "$IMPORT_PATH" "$ROUTE" "$GUARD" <<'PY'
@@ -147,19 +147,20 @@ import sys
 path, component, import_path, route, guard = sys.argv[1:]
 text = open(path, encoding="utf-8").read()
 
-lazy = (f"const {component} = lazy(() =>\n"
-        f"  import('{import_path}').then((m) => ({{ default: m.{component} }})),\n"
-        f");\n")
-if f"const {component} = lazy(" not in text:
+lazy = f"const {component} = lazyPage(() => import('{import_path}'), '{component}');\n"
+if f"const {component} = lazyPage(" not in text:
     # After the last top-level lazy page constant.
     last = None
-    for m in re.finditer(r"^const \w+ = lazy\(.*?\);\n", text, re.M | re.S):
+    for m in re.finditer(r"^const \w+ = lazyPage\(.*?\);\n", text, re.M | re.S):
         last = m
     if last is None:
         sys.exit(f"ERROR: no lazy page constant in {path}; add the import by hand")
     text = text[: last.end()] + lazy + text[last.end():]
 
-row = f"  {{ path: '{route}', element: <{component} />, guard: '{guard}', layout: 'shell' }},\n"
+if guard == "confirmed":
+    row = f"  shell('{route}', <{component} />),\n"
+else:
+    row = f"  {{ path: '{route}', element: <{component} />, guard: '{guard}', layout: 'shell' }},\n"
 start = text.find("export const routes")
 end = text.find("\n];", start)
 if start < 0 or end < 0:

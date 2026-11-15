@@ -16,3 +16,5 @@ export type NowSettingsInput = S['NowSettingsInput'];
 export type NowCorners = S['NowCorners'];
 export type NowLink = S['NowLink'];
 export type NowWeather = S['NowWeather'];
+export type NowDay = S['NowDay'];
+export type FocusStats = S['FocusStats'];

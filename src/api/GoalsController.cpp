@@ -21,6 +21,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "api/Caller.hpp"
 #include "api/FieldChecks.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
@@ -46,7 +47,6 @@ namespace {
 
 using json = nlohmann::json;
 using Api::Fields::date_field;
-using Api::Fields::is_calendar_date;
 using Api::Fields::number_range;
 using Api::Fields::opt_int;
 using Api::Fields::opt_number;
@@ -68,30 +68,14 @@ const std::vector<std::string> kKinds = listed(::Goals::Fields::kKinds);
 const std::vector<std::string> kStatuses = listed(::Goals::Fields::kStatuses);
 const std::vector<std::string> kResults = {"pass", "fail"};
 
-/// The date the progress is computed at: ?date=, today in UTC by default; nullopt (answered) when bad.
+/// The date the progress is computed at: ?date=, the caller's today by default; nullopt (answered) when bad.
 std::optional<std::string> at_date(const HttpRequestPtr& req, const GoalsController::Callback& callback) {
-    const std::string date = request_day(req, &Repositories::Zones::today_in, today_utc());
-    if (!is_calendar_date(date)) {
-        callback(ErrorResponse::bad_request("invalid_query", "date must be a calendar day"));
-        return std::nullopt;
-    }
-    return date;
-}
-
-/// The caller's permission bits, the fitness read bit set when the caller passes
-/// that check (an admin, or no auth enforced), as /api/v1/metrics counts them.
-std::uint32_t permissions_of(const HttpRequestPtr& req) {
-    std::uint32_t p = Security::Auth::current_permissions(req);
-    if (Security::Auth::require_permission(req, Domain::Permission::kFitnessRead) == nullptr) {
-        p |= Domain::Permission::kFitnessRead;
-    }
-    return p;
+    return Fields::day_param(req, callback, &Repositories::Zones::today_in);
 }
 
 /// The sources of the request: their days counted in ?tz= (UTC when absent or not a zone).
 Sources sources_of(const HttpRequestPtr& req, const std::string& owner) {
-    const std::string tz = req->getParameter("tz");
-    return Sources(owner, !tz.empty() && Repositories::Zones::is_zone(tz) ? tz : "UTC", permissions_of(req));
+    return Sources(owner, zone_or_utc(req, &Repositories::Zones::is_zone), permissions_of(req));
 }
 
 /// The goal row with its progress block and source_why; @p with_points adds the

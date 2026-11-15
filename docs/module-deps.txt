@@ -47,7 +47,6 @@ api -> agent
 api -> billing
 api -> cache
 api -> core
-api -> database
 api -> domain
 api -> email
 api -> fitness
@@ -138,6 +137,7 @@ net -> utils
 fitness -> cache
 fitness -> fitness/xiaomi
 fitness -> repositories/fitness
+fitness -> utils
 fitness/sync -> database
 fitness/sync -> fitness/xiaomi
 fitness/sync -> repositories/fitness
@@ -148,7 +148,6 @@ fitness/jobs -> jobs
 fitness/jobs -> repositories/fitness
 fitness/jobs -> repositories/workout
 fitness/jobs -> utils
-fitness/now -> money
 fitness/now -> now
 fitness/now -> repositories/fitness
 fitness/now -> repositories/food
@@ -172,6 +171,7 @@ repositories -> database
 repositories -> domain
 repositories -> utils
 repositories/agent -> domain
+repositories/agent -> repositories
 repositories/agent -> database
 repositories/agent -> utils
 repositories/fitness -> database
@@ -187,6 +187,7 @@ repositories/money -> repositories
 repositories/now -> database
 repositories/now -> now
 repositories/now -> repositories
+repositories/now -> repositories/tasks
 repositories/workout -> database
 repositories/workout -> repositories
 root -> agent
@@ -250,6 +251,7 @@ api -> travel
 api -> travel/now
 habits -> utils
 habits -> metrics
+metrics -> utils
 habits/now -> habits
 habits/now -> repositories/habits
 repositories/habits -> database
@@ -302,6 +304,7 @@ leetcode -> repositories/leetcode
 leetcode/jobs -> jobs
 leetcode/jobs -> leetcode
 repositories/leetcode -> database
+repositories/leetcode -> repositories
 repositories/metrics -> repositories/leetcode
 mcp -> security
 agent -> telegram

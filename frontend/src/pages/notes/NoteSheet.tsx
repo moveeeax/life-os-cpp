@@ -1,10 +1,10 @@
-import { useState, type FormEvent } from 'react';
+import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 
 import { useSaveNote } from '@/hooks/useNotes';
 import { useProjects } from '@/hooks/useProjects';
 import { tagsFrom } from '@/lib/notes';
-import { Sheet } from '@/shell/kit';
+import { Sheet, useFormFields } from '@/shell/kit';
 
 /** A new note: title, topic, tags, its project or course and the day it is about; it opens in the editor. */
 export function NoteSheet({
@@ -22,7 +22,7 @@ export function NoteSheet({
   const projects = (useProjects().data ?? []).filter(
     (p) => p.status !== 'done' || p.id === projectId,
   );
-  const [f, setF] = useState({
+  const [f, set] = useFormFields({
     title: initialTitle,
     topic: '',
     tags: '',
@@ -33,8 +33,6 @@ export function NoteSheet({
     onClose();
     navigate(`/notes/${n.id}`);
   });
-  const set = (k: keyof typeof f) => (e: { target: { value: string } }) =>
-    setF({ ...f, [k]: e.target.value });
   const submit = (e: FormEvent) => {
     e.preventDefault();
     save.mutate({

@@ -2,7 +2,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { aniBase, useAni } from './state';
+import { aniBase, useAni } from './ani';
 
 describe('aniBase', () => {
   it('puts Ani next to the wallpapers in the bucket', () => {
@@ -26,5 +26,19 @@ describe('useAni', () => {
     expect(localStorage.getItem('now:ani')).toBe('1');
     expect(localStorage.getItem('now:ani:outfit')).toBe('p2');
     act(() => result.current[1]({ on: false, outfit: 'p1' }));
+  });
+});
+
+describe('album', () => {
+  it('HerAlbum: keeps each moment once, newest first', async () => {
+    const { addMoment, readAlbum } = await import('./ani');
+    localStorage.clear();
+    addMoment('2026-10-30', 'Десять часов фокуса за неделю');
+    addMoment('2026-10-31', 'Уговор выполнен: Зал');
+    addMoment('2026-10-31', 'Уговор выполнен: Зал');
+    expect(readAlbum()).toEqual([
+      { date: '2026-10-31', title: 'Уговор выполнен: Зал' },
+      { date: '2026-10-30', title: 'Десять часов фокуса за неделю' },
+    ]);
   });
 });

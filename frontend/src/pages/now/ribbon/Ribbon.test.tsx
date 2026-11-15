@@ -19,11 +19,14 @@ const free = {
 };
 
 // A day with the calendar linked and one free window; a tap on the track lands in it.
-vi.mock('./layout', async (orig) => ({
-  ...(await orig<typeof import('./layout')>()),
+vi.mock('@/hooks/useNow', async (orig) => ({
+  ...(await orig<typeof import('@/hooks/useNow')>()),
   useNowDay: () => ({
     data: { calendar: 'ok', events: [], free: [], focus: [], workouts: [], tasks: [] },
   }),
+}));
+vi.mock('./layout', async (orig) => ({
+  ...(await orig<typeof import('./layout')>()),
   blocksOf: () => [free],
   pinsOf: () => [],
   nextEvent: () => null,

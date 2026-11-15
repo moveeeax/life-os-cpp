@@ -20,7 +20,7 @@
 
 namespace Repositories::Money {
 
-class AdvisorReportRepository {
+class AdvisorReportRepository : public JobRows::JobTable<AdvisorReportRepository> {
 public:
     static constexpr const char* kTable = "money_advisor_reports";
 
@@ -129,18 +129,6 @@ public:
         });
     }
 
-    /// queued (or stale running) -> running, one more attempt; 0 when not claimable.
-    int start(const std::string& id) { return JobRows::start(kTable, id); }
-
-    /// The row's status now; nullopt when the row is gone.
-    std::optional<std::string> status(const std::string& id) { return JobRows::status(kTable, id); }
-
-    /// running -> queued, for an outage the queue will retry; only by the holder of @p attempt.
-    void requeue(const std::string& id, int attempt) { JobRows::requeue(kTable, id, attempt); }
-
-    /// Milliseconds until a running row may be claimed again; 0 when it is not running.
-    long long stale_in_ms(const std::string& id) { return JobRows::stale_in_ms(kTable, id); }
-
     /// Only the holder of @p attempt (what start() returned) writes the result.
     void finish(const std::string& id,
                 int attempt,
@@ -160,19 +148,6 @@ public:
                 model,
                 prompt_tokens,
                 completion_tokens,
-                attempt);
-            return true;
-        });
-    }
-
-    void fail(const std::string& id, const std::string& code, const std::string& message, int attempt = 0) {
-        Database::get().execute_write([&](auto& txn) {
-            txn.exec_params(
-                "UPDATE money_advisor_reports SET status = 'failed', error = $2, finished_at = now() WHERE id = "
-                "$1::uuid" +
-                    JobRows::while_open(3),
-                id,
-                message.empty() ? code : code + ": " + message,
                 attempt);
             return true;
         });

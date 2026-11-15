@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { useDateTask, useDeleteVisit, usePeople, useVisits } from '@/hooks/useMedical';
 import { useErrorToast } from '@/hooks/useErrorToast';
 import { formatDay, todayLocal } from '@/lib/dates';
@@ -41,8 +41,8 @@ export function MedicalVisitsPage() {
   const visits = useVisits();
   const people = usePeople();
   const [editing, setEditing] = useState<MedicalVisit | 'new' | null>(null);
-  const [deleting, setDeleting] = useState<MedicalVisit | null>(null);
-  const remove = useDeleteVisit(() => setDeleting(null));
+  const deleting = useConfirmDelete<MedicalVisit>();
+  const remove = useDeleteVisit(deleting.close);
   useErrorToast(remove.error);
   const list = visits.data ?? [];
   const ahead = upcomingFollowUps(list, today);
@@ -63,7 +63,7 @@ export function MedicalVisitsPage() {
         <button type="button" className="k-link" onClick={() => setEditing(v)}>
           Edit
         </button>
-        <button type="button" className="k-link k-error-text" onClick={() => setDeleting(v)}>
+        <button type="button" className="k-link k-error-text" onClick={() => deleting.ask(v)}>
           Delete
         </button>
       </span>
@@ -133,17 +133,10 @@ export function MedicalVisitsPage() {
           onClose={() => setEditing(null)}
         />
       )}
-      {deleting && (
-        <ConfirmDialog
-          title={`Delete the visit “${deleting.reason}”?`}
-          description="Records from it stay, without the link. This cannot be undone."
-          confirmLabel="Delete"
-          destructive
-          busy={remove.isPending}
-          onConfirm={() => remove.mutate(deleting.id)}
-          onClose={() => setDeleting(null)}
-        />
-      )}
+      {deleting.dialog(remove, (d) => ({
+        title: `Delete the visit “${d.reason}”?`,
+        description: 'Records from it stay, without the link. This cannot be undone.',
+      }))}
     </MedicalFrame>
   );
 }

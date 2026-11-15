@@ -46,7 +46,6 @@ public:
                 "SET token = EXCLUDED.token, rotated_at = now()",
                 owner,
                 token);
-            return true;
         });
         return token;
     }
@@ -65,7 +64,6 @@ public:
     void touch(const std::string& owner) {
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params("UPDATE ani_hooks SET last_used_at = now() WHERE owner_id = $1::uuid", owner);
-            return true;
         });
     }
 

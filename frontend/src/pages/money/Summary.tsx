@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { useMoneySummary } from '@/hooks/useMoney';
+import { formatDay } from '@/lib/dates';
 import {
   SUMMARY_CURRENCIES,
   SUMMARY_PERIODS,
@@ -72,12 +73,7 @@ function Segmented<T extends string | number>({
   );
 }
 
-const shortDay = (iso: string) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  });
+const shortDay = (iso: string) => formatDay(iso, { locale: 'en-GB' });
 
 function Trend({
   days,

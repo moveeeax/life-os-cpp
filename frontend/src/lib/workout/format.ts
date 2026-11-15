@@ -1,7 +1,7 @@
 // Display formats shared by the session pages.
 
-/** "Mon, Oct 5" in the browser's zone. */
-export const formatDay = (iso: string): string =>
+/** "Mon, Oct 5" for an instant, in the browser's zone; a calendar day goes through lib/dates formatDay. */
+export const formatInstantDay = (iso: string): string =>
   new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
 /** "09:30" in the browser's zone. */

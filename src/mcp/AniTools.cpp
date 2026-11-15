@@ -6,11 +6,14 @@
 #include "mcp/AniTools.hpp"
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
 #include <exception>
 #include <memory>
-#include <set>
+#include <string_view>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include <drogon/drogon.h>
 #include <spdlog/spdlog.h>
@@ -50,13 +53,24 @@ json refusal(const std::string& line) {
     return tool_text(line, true);
 }
 
-/// Her moves as a JSON enum.
-json acts() {
+/// A list of the webhook's (her moves, her outfits) as a JSON enum.
+template <std::size_t N>
+json enum_of(const std::array<std::string_view, N>& names) {
     json a = json::array();
-    for (const auto n : Agent::Hook::kActs) {
+    for (const auto n : names) {
         a.push_back(std::string(n));
     }
     return a;
+}
+
+/// Whether @p name is one of the webhook's commands as an MCP tool: "ani_" and a Hook type.
+bool is_command(const std::string& name) {
+    constexpr std::string_view kPrefix = "ani_";
+    if (name.size() <= kPrefix.size() || name.compare(0, kPrefix.size(), kPrefix) != 0) {
+        return false;
+    }
+    const std::string_view type = std::string_view(name).substr(kPrefix.size());
+    return std::find(Agent::Hook::kTypes.begin(), Agent::Hook::kTypes.end(), type) != Agent::Hook::kTypes.end();
 }
 
 json schema(json properties, json required = json::array()) {
@@ -68,7 +82,7 @@ json schema(json properties, json required = json::array()) {
 }
 
 const json kId{{"type", "string"},
-               {"maxLength", 200},
+               {"maxLength", Agent::Hook::kIdMax},
                {"description", "Your id for this item; a repeat within 24 hours is refused"}};
 const json kTtl{{"type", "integer"},
                 {"minimum", 1},
@@ -177,16 +191,16 @@ json chat(const std::string& owner, const json& args) {
         return refusal("Her agent is off.");
     }
     const std::string text = args.value("text", "");
-    if (text.find_first_not_of(" \t\r\n") == std::string::npos || Utils::Utf8::length(text) > Agent::kTurnTextMax) {
+    if (!Agent::message_text_ok(text)) {
         return refusal("text is 1 to " + std::to_string(Agent::kTurnTextMax) + " characters.");
     }
     if (!Jobs::is_initialized()) {
         return refusal("The job queue is not enabled.");
     }
-    TurnRepository turns;
-    if (turns.count_since(owner, 3600) >= Agent::kTurnsPerHour) {
+    if (Agent::turns_spent(owner)) {
         return refusal("At most " + std::to_string(Agent::kTurnsPerHour) + " messages an hour; try later.");
     }
+    TurnRepository turns;
     auto sent = Agent::send(owner, text, turns.last_tz(owner), "mcp");
     switch (sent.status) {
         case Agent::Send::Queued:
@@ -203,21 +217,33 @@ json chat(const std::string& owner, const json& args) {
     return refusal("Her agent is not configured.");
 }
 
-/// The MCP's proposal tools and the write tools of her agent they stand for.
-const std::vector<std::pair<std::string, std::string>> kProposals = {{"ani_task", "create_task"},
-                                                                     {"ani_habit", "check_habit"},
-                                                                     {"ani_note", "add_note"},
-                                                                     {"ani_food", "add_food"},
-                                                                     {"ani_spend", "add_spend"}};
+/// The MCP's proposal tools: each stands for one of her agent's write tools and takes its schema.
+struct ProposalTool {
+    const char* name;
+    const char* write_tool;
+    const char* description;
+};
+
+const ProposalTool kProposalTools[] = {
+    {"ani_task", "create_task", "Proposes a new task; the user confirms it on Now before anything is written."},
+    {"ani_habit",
+     "check_habit",
+     "Proposes to tick a habit (today unless a date is given) or add an amount; confirmed by the user on Now."},
+    {"ani_note", "add_note", "Proposes a note to the user's inbox; confirmed by the user on Now."},
+    {"ani_food",
+     "add_food",
+     "Proposes food diary entries of one meal (a line per dish with its numbers); confirmed by the user on Now."},
+    {"ani_spend",
+     "add_spend",
+     "Proposes posted expenses, each amount in its account's currency (never converted); the account is "
+     "account_id, else the merchant's last one, else the only open account of the currency, and an answer "
+     "without one lists the accounts to pick from. Confirmed by the user on Now."},
+};
 
 /// The input schema of one of her agent's write tools.
 json write_schema(const std::string& tool) {
-    for (const auto& t : Agent::Actions::definitions()) {
-        if (t["function"].value("name", "") == tool) {
-            return t["function"]["parameters"];
-        }
-    }
-    return schema(json::object());
+    json s = Agent::Actions::schema_of(tool);
+    return s.is_null() ? schema(json::object()) : s;
 }
 
 json propose(const std::string& owner, const std::string& tool, const json& args) {
@@ -230,8 +256,7 @@ json propose(const std::string& owner, const std::string& tool, const json& args
     if (!Jobs::is_initialized()) {
         return refusal("The job queue is not enabled.");
     }
-    TurnRepository turns;
-    if (turns.count_since(owner, 3600) >= Agent::kTurnsPerHour) {
+    if (Agent::turns_spent(owner)) {
         return refusal("At most " + std::to_string(Agent::kTurnsPerHour) + " messages an hour; try later.");
     }
     auto sent = Agent::propose(owner, tool, args);
@@ -298,19 +323,24 @@ Server ani_server(const std::string& owner, Scheduler after) {
     s.tools = {
         {"ani_say",
          "Ani says a line aloud on the Now page (1-200 characters).",
-         schema({{"text", {{"type", "string"}, {"minLength", 1}, {"maxLength", 200}}}, {"id", kId}, {"ttl", kTtl}},
+         schema({{"text", {{"type", "string"}, {"minLength", 1}, {"maxLength", Agent::Hook::kLineCharsMax}}},
+                 {"id", kId},
+                 {"ttl", kTtl}},
                 {"text"})},
         {"ani_outfit",
          "Ani changes her outfit: p1 the dress, p2 the slip.",
-         schema({{"outfit", {{"type", "string"}, {"enum", {"p1", "p2"}}}}, {"id", kId}, {"ttl", kTtl}}, {"outfit"})},
+         schema(
+             {{"outfit", {{"type", "string"}, {"enum", enum_of(Agent::Hook::kOutfits)}}}, {"id", kId}, {"ttl", kTtl}},
+             {"outfit"})},
         {"ani_act",
          "Ani plays one of her moves.",
-         schema({{"name", {{"type", "string"}, {"enum", acts()}}}, {"id", kId}, {"ttl", kTtl}}, {"name"})},
+         schema({{"name", {{"type", "string"}, {"enum", enum_of(Agent::Hook::kActs)}}}, {"id", kId}, {"ttl", kTtl}},
+                {"name"})},
         {"ani_event",
          "An event for her agent, which decides whether to tell the user or stay silent.",
-         schema({{"text", {{"type", "string"}, {"minLength", 1}, {"maxLength", 2000}}},
-                 {"source", {{"type", "string"}, {"maxLength", 60}}},
-                 {"title", {{"type", "string"}, {"maxLength", 60}}},
+         schema({{"text", {{"type", "string"}, {"minLength", 1}, {"maxLength", Agent::Hook::kEventTextMax}}},
+                 {"source", {{"type", "string"}, {"maxLength", Agent::Hook::kLabelMax}}},
+                 {"title", {{"type", "string"}, {"maxLength", Agent::Hook::kLabelMax}}},
                  {"id", kId},
                  {"ttl", kTtl}},
                 {"text"})},
@@ -330,14 +360,20 @@ Server ani_server(const std::string& owner, Scheduler after) {
         {"ani_mood",
          "Her mood shows in her face for a while: -1 a little cross, 0 as usual, 1 happy.",
          schema({{"level", {{"type", "integer"}, {"minimum", -1}, {"maximum", 1}}},
-                 {"seconds", {{"type", "integer"}, {"minimum", 60}, {"maximum", 3600}}},
+                 {"seconds",
+                  {{"type", "integer"},
+                   {"minimum", Agent::Hook::kMoodSecondsMin},
+                   {"maximum", Agent::Hook::kMoodSecondsMax}}},
                  {"id", kId},
                  {"ttl", kTtl}},
                 {"level"})},
         {"ani_remind",
          "She says a line later: in_seconds (60 to a week) or at (ISO-8601 with a zone), one of them.",
-         schema({{"text", {{"type", "string"}, {"minLength", 1}, {"maxLength", 200}}},
-                 {"in_seconds", {{"type", "integer"}, {"minimum", 60}, {"maximum", 604800}}},
+         schema({{"text", {{"type", "string"}, {"minLength", 1}, {"maxLength", Agent::Hook::kLineCharsMax}}},
+                 {"in_seconds",
+                  {{"type", "integer"},
+                   {"minimum", Agent::Hook::kRemindMinSeconds},
+                   {"maximum", Agent::Hook::kRemindMaxSeconds}}},
                  {"at", {{"type", "string"}, {"description", "e.g. 2026-10-28T18:30:00+05:00"}}},
                  {"id", kId},
                  {"ttl", kTtl}},
@@ -345,12 +381,12 @@ Server ani_server(const std::string& owner, Scheduler after) {
         {"ani_ask",
          "She asks the user with answer buttons on Now (default Да / Нет); read the answer with ani_item, or "
          "give an https callback to get it POSTed.",
-         schema({{"text", {{"type", "string"}, {"minLength", 1}, {"maxLength", 200}}},
+         schema({{"text", {{"type", "string"}, {"minLength", 1}, {"maxLength", Agent::Hook::kLineCharsMax}}},
                  {"options",
                   {{"type", "array"},
                    {"minItems", 1},
-                   {"maxItems", 4},
-                   {"items", {{"type", "string"}, {"minLength", 1}, {"maxLength", 30}}}}},
+                   {"maxItems", Agent::Hook::kAskOptionsMax},
+                   {"items", {{"type", "string"}, {"minLength", 1}, {"maxLength", Agent::Hook::kAskOptionMax}}}}},
                  {"callback", {{"type", "string"}, {"description", "https URL"}}},
                  {"id", kId},
                  {"ttl", kTtl}},
@@ -358,16 +394,19 @@ Server ani_server(const std::string& owner, Scheduler after) {
         {"ani_focus",
          "Starts (minutes 1-180) or stops the focus timer on Now.",
          schema({{"action", {{"type", "string"}, {"enum", {"start", "stop"}}}},
-                 {"minutes", {{"type", "integer"}, {"minimum", 1}, {"maximum", 180}}},
+                 {"minutes", {{"type", "integer"}, {"minimum", 1}, {"maximum", Agent::Hook::kFocusMaxMinutes}}},
                  {"id", kId},
                  {"ttl", kTtl}},
                 {"action"})},
         {"ani_card",
          "A small card above her ledge for a few seconds, not spoken; a url opens on click.",
-         schema({{"title", {{"type", "string"}, {"minLength", 1}, {"maxLength", 60}}},
-                 {"text", {{"type", "string"}, {"maxLength", 200}}},
+         schema({{"title", {{"type", "string"}, {"minLength", 1}, {"maxLength", Agent::Hook::kLabelMax}}},
+                 {"text", {{"type", "string"}, {"maxLength", Agent::Hook::kCardTextMax}}},
                  {"url", {{"type", "string"}, {"description", "https URL"}}},
-                 {"seconds", {{"type", "integer"}, {"minimum", 5}, {"maximum", 120}}},
+                 {"seconds",
+                  {{"type", "integer"},
+                   {"minimum", Agent::Hook::kCardSecondsMin},
+                   {"maximum", Agent::Hook::kCardSecondsMax}}},
                  {"id", kId},
                  {"ttl", kTtl}},
                 {"title"})},
@@ -383,22 +422,14 @@ Server ani_server(const std::string& owner, Scheduler after) {
          schema({{"which", {{"type", "string"}}}, {"list", {{"type", "boolean"}}}, {"id", kId}, {"ttl", kTtl}})},
         {"ani_hold",
          "Holds everything back from the page for some minutes (0 to 480; 0 ends a hold).",
-         schema({{"minutes", {{"type", "integer"}, {"minimum", 0}, {"maximum", 480}}}, {"id", kId}}, {"minutes"})},
-        {"ani_task",
-         "Proposes a new task; the user confirms it on Now before anything is written.",
-         write_schema("create_task")},
-        {"ani_habit",
-         "Proposes to tick a habit (today unless a date is given) or add an amount; confirmed by the user on Now.",
-         write_schema("check_habit")},
-        {"ani_note", "Proposes a note to the user's inbox; confirmed by the user on Now.", write_schema("add_note")},
-        {"ani_food",
-         "Proposes food diary entries of one meal (a line per dish with its numbers); confirmed by the user on Now.",
-         write_schema("add_food")},
-        {"ani_spend",
-         "Proposes posted expenses, each amount in its account's currency (never converted); the account is "
-         "account_id, else the merchant's last one, else the only open account of the currency, and an answer "
-         "without one lists the accounts to pick from. Confirmed by the user on Now.",
-         write_schema("add_spend")},
+         schema({{"minutes", {{"type", "integer"}, {"minimum", 0}, {"maximum", Agent::Hook::kHoldMaxMinutes}}},
+                 {"id", kId}},
+                {"minutes"})},
+    };
+    for (const auto& p : kProposalTools) {
+        s.tools.push_back({p.name, p.description, write_schema(p.write_tool)});
+    }
+    const std::vector<Tool> after_proposals = {
         {"ani_reminders", "Her recurring reminders: text, local time, weekdays.", schema(json::object())},
         {"ani_reminder_add",
          "A recurring reminder: she says the text at a local time on the given weekdays (Monday = 1; default every "
@@ -417,25 +448,14 @@ Server ani_server(const std::string& owner, Scheduler after) {
          "The latest messages of her chat, from every source.",
          schema({{"limit", {{"type", "integer"}, {"minimum", 1}, {"maximum", kListMax}}}})},
     };
+    s.tools.insert(s.tools.end(), after_proposals.begin(), after_proposals.end());
     s.run = [owner, after](const std::string& name, const json& args, Reply done) {
         try {
             if ((name == "ani_wallpaper" || name == "ani_sound") && args.value("list", false) == true) {
                 const std::string device = args.value("device", "desktop") == "phone" ? "phone" : "desktop";
                 return done(result("The ids to switch to.", choices(name.substr(4), device)));
             }
-            static const std::set<std::string> commands = {"ani_say",
-                                                           "ani_outfit",
-                                                           "ani_act",
-                                                           "ani_event",
-                                                           "ani_mood",
-                                                           "ani_remind",
-                                                           "ani_ask",
-                                                           "ani_focus",
-                                                           "ani_card",
-                                                           "ani_wallpaper",
-                                                           "ani_sound",
-                                                           "ani_hold"};
-            if (commands.count(name)) {
+            if (is_command(name)) {
                 json body = args;
                 body.erase("list");
                 return done(command(owner, name.substr(4), body));
@@ -457,9 +477,9 @@ Server ani_server(const std::string& owner, Scheduler after) {
             if (name == "ani_reply") {
                 return reply(owner, args, after, std::move(done));
             }
-            for (const auto& [mcp_name, tool] : kProposals) {
-                if (name == mcp_name) {
-                    return done(propose(owner, tool, args));
+            for (const auto& p : kProposalTools) {
+                if (name == p.name) {
+                    return done(propose(owner, p.write_tool, args));
                 }
             }
             if (name == "ani_reminders") {
@@ -471,19 +491,14 @@ Server ani_server(const std::string& owner, Scheduler after) {
                     return done(refusal(*err));
                 }
                 const auto& r = std::get<Agent::Reminders::Input>(in);
-                const auto made = Repositories::Agent::ReminderRepository().add(owner, r.text, r.at, r.days, r.tz);
-                if (made) {
-                    Security::Audit::record(
-                        owner, "ani.reminder.add", "ani_reminder", (*made)["id"], json{{"via", "mcp"}});
-                }
+                const auto made = Agent::Reminders::add(owner, r, "mcp");
                 return done(made ? result("Added.", *made) : refusal("At most 20 reminders."));
             }
             if (name == "ani_reminder_remove") {
                 const std::string id = args.value("id", "");
-                if (!Repositories::Agent::ReminderRepository().remove(owner, id)) {
+                if (!Agent::Reminders::remove(owner, id, "mcp")) {
                     return done(refusal("No such reminder."));
                 }
-                Security::Audit::record(owner, "ani.reminder.remove", "ani_reminder", id, json{{"via", "mcp"}});
                 return done(result("Removed.", json::object()));
             }
             if (name == "ani_history") {

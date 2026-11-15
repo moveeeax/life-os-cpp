@@ -6,6 +6,7 @@
 #include "agent/Hook.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <regex>
 #include <utility>
@@ -14,6 +15,8 @@
 #include "utils/Utf8.hpp"
 
 namespace Agent::Hook {
+
+static_assert(kLineCharsMax == Now::Voice::kLineCharsMax, "a hook's line is a spoken line");
 
 namespace {
 
@@ -123,163 +126,214 @@ std::optional<std::string> line_of(const json& body) {
     return std::string(trim(t.get<std::string>()));
 }
 
-std::variant<Item, Error> more_of(const std::string& type, const json& body) {
-    if (type == "mood") {
-        const auto level = int_in(body, "level", -1, 1);
-        if (!level || !body.contains("level")) {
-            return bad("invalid_level", "level is -1, 0 or 1");
-        }
-        const auto seconds = int_in(body, "seconds", 60, 3600, kMoodSecondsDefault);
-        if (!seconds) {
-            return bad("invalid_seconds", "seconds is 60 to 3600");
-        }
-        return Item{"mood", json{{"level", *level}, {"seconds", *seconds}}, std::nullopt, kTtlDefault};
+/// say: one spoken line.
+std::variant<Item, Error> say_of(const std::string& /*type*/, const json& body) {
+    const auto text = line_of(body);
+    if (!text) {
+        return bad("invalid_text", "a say item's text is one line of 1 to 200 characters");
     }
-    if (type == "remind") {
-        const auto text = line_of(body);
-        if (!text) {
-            return bad("invalid_text", "a reminder's text is one line of 1 to 200 characters");
-        }
-        const bool has_in = body.contains("in_seconds");
-        const bool has_at = body.contains("at");
-        Item item{"remind", json{{"text", *text}}, std::nullopt, kTtlDefault};
-        if (has_in == has_at) {
-            return bad("invalid_when", "give in_seconds (60 to 604800) or at (ISO-8601), one of them");
-        }
-        if (has_in) {
-            const auto in = int_in(body, "in_seconds", kRemindMinSeconds, kRemindMaxSeconds);
-            if (!in) {
-                return bad("invalid_when", "in_seconds is 60 to 604800");
-            }
-            item.delay_seconds = *in;
-        } else {
-            const json& at = body["at"];
-            if (!at.is_string() || !is_iso_time(at.get<std::string>())) {
-                return bad("invalid_when", "at is an ISO-8601 time with a zone, like 2026-10-28T18:30:00+05:00");
-            }
-            item.at = at.get<std::string>();
-        }
-        return item;
+    return Item{"say", json{{"text", *text}}, std::nullopt, kTtlDefault};
+}
+
+std::variant<Item, Error> outfit_of(const std::string& /*type*/, const json& body) {
+    const json& o = body.value("outfit", json());
+    if (!o.is_string() || !one_of(kOutfits, o.get<std::string>())) {
+        return Error{422, "unknown_outfit", "outfit is p1 or p2"};
     }
-    if (type == "ask") {
-        const auto text = line_of(body);
-        if (!text) {
-            return bad("invalid_text", "a question is one line of 1 to 200 characters");
+    return Item{"outfit", json{{"outfit", o}}, std::nullopt, kTtlDefault};
+}
+
+std::variant<Item, Error> act_of(const std::string& /*type*/, const json& body) {
+    const json& n = body.value("name", json());
+    if (!n.is_string() || !one_of(kActs, n.get<std::string>())) {
+        return Error{422, "unknown_act", "name is one of her moves"};
+    }
+    return Item{"act", json{{"name", n}}, std::nullopt, kTtlDefault};
+}
+
+std::variant<Item, Error> event_item(const std::string& /*type*/, const json& body) {
+    return event_of(body);
+}
+
+std::variant<Item, Error> mood_of(const std::string& /*type*/, const json& body) {
+    const auto level = int_in(body, "level", -1, 1);
+    if (!level || !body.contains("level")) {
+        return bad("invalid_level", "level is -1, 0 or 1");
+    }
+    const auto seconds = int_in(body, "seconds", kMoodSecondsMin, kMoodSecondsMax, kMoodSecondsDefault);
+    if (!seconds) {
+        return bad("invalid_seconds", "seconds is 60 to 3600");
+    }
+    return Item{"mood", json{{"level", *level}, {"seconds", *seconds}}, std::nullopt, kTtlDefault};
+}
+
+std::variant<Item, Error> remind_of(const std::string& /*type*/, const json& body) {
+    const auto text = line_of(body);
+    if (!text) {
+        return bad("invalid_text", "a reminder's text is one line of 1 to 200 characters");
+    }
+    const bool has_in = body.contains("in_seconds");
+    const bool has_at = body.contains("at");
+    Item item{"remind", json{{"text", *text}}, std::nullopt, kTtlDefault};
+    if (has_in == has_at) {
+        return bad("invalid_when", "give in_seconds (60 to 604800) or at (ISO-8601), one of them");
+    }
+    if (has_in) {
+        const auto in = int_in(body, "in_seconds", kRemindMinSeconds, kRemindMaxSeconds);
+        if (!in) {
+            return bad("invalid_when", "in_seconds is 60 to 604800");
         }
-        json options = json::array({"Да", "Нет"});
-        if (const auto it = body.find("options"); it != body.end()) {
-            if (!it->is_array() || it->empty() || it->size() > 4) {
+        item.delay_seconds = *in;
+    } else {
+        const json& at = body["at"];
+        if (!at.is_string() || !is_iso_time(at.get<std::string>())) {
+            return bad("invalid_when", "at is an ISO-8601 time with a zone, like 2026-10-28T18:30:00+05:00");
+        }
+        item.at = at.get<std::string>();
+    }
+    return item;
+}
+
+std::variant<Item, Error> ask_of(const std::string& /*type*/, const json& body) {
+    const auto text = line_of(body);
+    if (!text) {
+        return bad("invalid_text", "a question is one line of 1 to 200 characters");
+    }
+    json options = json::array({"Да", "Нет"});
+    if (const auto it = body.find("options"); it != body.end()) {
+        if (!it->is_array() || it->empty() || it->size() > kAskOptionsMax) {
+            return bad("invalid_options", "options are 1 to 4 answers of 1 to 30 characters");
+        }
+        options = json::array();
+        for (const auto& o : *it) {
+            const auto label = text_of(o, kAskOptionMax, false);
+            if (!label) {
                 return bad("invalid_options", "options are 1 to 4 answers of 1 to 30 characters");
             }
-            options = json::array();
-            for (const auto& o : *it) {
-                const auto label = text_of(o, 30, false);
-                if (!label) {
-                    return bad("invalid_options", "options are 1 to 4 answers of 1 to 30 characters");
-                }
-                options.push_back(*label);
-            }
+            options.push_back(*label);
         }
-        Item item{"ask", json{{"text", *text}, {"options", options}}, std::nullopt, kAskTtlDefault};
-        if (const auto it = body.find("callback"); it != body.end()) {
-            if (!is_https(*it)) {
-                return bad("invalid_callback", "callback is an https URL");
-            }
-            item.callback = it->get<std::string>();
-        }
-        return item;
     }
-    if (type == "focus") {
-        const std::string action = body.value("action", json()).is_string() ? body["action"].get<std::string>() : "";
-        if (action == "stop") {
-            return Item{"focus", json{{"action", "stop"}}, std::nullopt, kTtlDefault};
+    Item item{"ask", json{{"text", *text}, {"options", options}}, std::nullopt, kAskTtlDefault};
+    if (const auto it = body.find("callback"); it != body.end()) {
+        if (!is_https(*it)) {
+            return bad("invalid_callback", "callback is an https URL");
         }
-        if (action != "start") {
-            return bad("invalid_action", "action is start or stop");
-        }
-        const auto minutes = int_in(body, "minutes", 1, kFocusMaxMinutes);
-        if (!minutes || !body.contains("minutes")) {
-            return bad("invalid_minutes", "minutes is 1 to 180");
-        }
-        return Item{"focus", json{{"action", "start"}, {"minutes", *minutes}}, std::nullopt, kTtlDefault};
+        item.callback = it->get<std::string>();
     }
-    if (type == "card") {
-        const auto title = text_of(body.value("title", json()), kLabelMax, false);
-        if (!title) {
-            return bad("invalid_title", "title is 1 to 60 characters");
-        }
-        json payload{{"title", *title}};
-        if (const auto it = body.find("text");
-            it != body.end() && !(it->is_string() && it->get<std::string>().empty())) {
-            const auto text = text_of(*it, 200, true);
-            if (!text) {
-                return bad("invalid_text", "text is up to 200 characters");
-            }
-            payload["text"] = *text;
-        }
-        if (const auto it = body.find("url"); it != body.end()) {
-            if (!is_https(*it)) {
-                return bad("invalid_url", "url is an https URL");
-            }
-            payload["url"] = *it;
-        }
-        const auto seconds = int_in(body, "seconds", 5, 120, kCardSecondsDefault);
-        if (!seconds) {
-            return bad("invalid_seconds", "seconds is 5 to 120");
-        }
-        payload["seconds"] = *seconds;
-        return Item{"card", std::move(payload), std::nullopt, kTtlDefault};
+    return item;
+}
+
+std::variant<Item, Error> focus_of(const std::string& /*type*/, const json& body) {
+    const std::string action = body.value("action", json()).is_string() ? body["action"].get<std::string>() : "";
+    if (action == "stop") {
+        return Item{"focus", json{{"action", "stop"}}, std::nullopt, kTtlDefault};
     }
-    if (type == "wallpaper" || type == "sound") {
-        json payload = json::object();
-        if (const auto it = body.find("which"); it != body.end()) {
-            const bool off = type == "sound" && it->is_string() && it->get<std::string>() == "off";
-            if (!off && !(it->is_string() && is_uuid(it->get<std::string>()))) {
-                return bad("invalid_which",
-                           type == "sound" ? "which is a sound's id or off" : "which is a wallpaper's id");
-            }
-            payload["which"] = *it;
-        }
-        return Item{type, std::move(payload), std::nullopt, kTtlDefault};
+    if (action != "start") {
+        return bad("invalid_action", "action is start or stop");
     }
-    if (type == "hold") {
-        const auto minutes = int_in(body, "minutes", 0, kHoldMaxMinutes);
-        if (!minutes || !body.contains("minutes")) {
-            return bad("invalid_minutes", "minutes is 0 to 480");
-        }
-        return Item{"hold", json{{"minutes", *minutes}}, std::nullopt, kTtlDefault};
+    const auto minutes = int_in(body, "minutes", 1, kFocusMaxMinutes);
+    if (!minutes || !body.contains("minutes")) {
+        return bad("invalid_minutes", "minutes is 1 to 180");
     }
-    return bad("invalid_type",
-               "type is say, outfit, act, event, mood, remind, ask, focus, card, wallpaper, sound or hold");
+    return Item{"focus", json{{"action", "start"}, {"minutes", *minutes}}, std::nullopt, kTtlDefault};
+}
+
+std::variant<Item, Error> card_of(const std::string& /*type*/, const json& body) {
+    const auto title = text_of(body.value("title", json()), kLabelMax, false);
+    if (!title) {
+        return bad("invalid_title", "title is 1 to 60 characters");
+    }
+    json payload{{"title", *title}};
+    if (const auto it = body.find("text"); it != body.end() && !(it->is_string() && it->get<std::string>().empty())) {
+        const auto text = text_of(*it, kCardTextMax, true);
+        if (!text) {
+            return bad("invalid_text", "text is up to 200 characters");
+        }
+        payload["text"] = *text;
+    }
+    if (const auto it = body.find("url"); it != body.end()) {
+        if (!is_https(*it)) {
+            return bad("invalid_url", "url is an https URL");
+        }
+        payload["url"] = *it;
+    }
+    const auto seconds = int_in(body, "seconds", kCardSecondsMin, kCardSecondsMax, kCardSecondsDefault);
+    if (!seconds) {
+        return bad("invalid_seconds", "seconds is 5 to 120");
+    }
+    payload["seconds"] = *seconds;
+    return Item{"card", std::move(payload), std::nullopt, kTtlDefault};
+}
+
+/// wallpaper or sound: which one, or none for the next (a sound also "off").
+std::variant<Item, Error> choice_of(const std::string& type, const json& body) {
+    json payload = json::object();
+    if (const auto it = body.find("which"); it != body.end()) {
+        const bool off = type == "sound" && it->is_string() && it->get<std::string>() == "off";
+        if (!off && !(it->is_string() && is_uuid(it->get<std::string>()))) {
+            return bad("invalid_which", type == "sound" ? "which is a sound's id or off" : "which is a wallpaper's id");
+        }
+        payload["which"] = *it;
+    }
+    return Item{type, std::move(payload), std::nullopt, kTtlDefault};
+}
+
+std::variant<Item, Error> hold_of(const std::string& /*type*/, const json& body) {
+    const auto minutes = int_in(body, "minutes", 0, kHoldMaxMinutes);
+    if (!minutes || !body.contains("minutes")) {
+        return bad("invalid_minutes", "minutes is 0 to 480");
+    }
+    return Item{"hold", json{{"minutes", *minutes}}, std::nullopt, kTtlDefault};
+}
+
+/// The parser of each type, in the order of kTypes.
+struct Parser {
+    std::string_view type;
+    std::variant<Item, Error> (*of)(const std::string&, const json&);
+};
+
+constexpr std::array<Parser, kTypes.size()> kParsers = {{{"say", say_of},
+                                                         {"outfit", outfit_of},
+                                                         {"act", act_of},
+                                                         {"event", event_item},
+                                                         {"mood", mood_of},
+                                                         {"remind", remind_of},
+                                                         {"ask", ask_of},
+                                                         {"focus", focus_of},
+                                                         {"card", card_of},
+                                                         {"wallpaper", choice_of},
+                                                         {"sound", choice_of},
+                                                         {"hold", hold_of}}};
+
+constexpr bool parsers_follow_types() {
+    for (std::size_t i = 0; i < kTypes.size(); ++i) {
+        if (kParsers[i].type != kTypes[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static_assert(parsers_follow_types(), "every type in kTypes has its parser, in the same order");
+
+/// "type is say, outfit, ... or hold", from kTypes.
+std::string types_words() {
+    std::string out = "type is ";
+    for (std::size_t i = 0; i < kTypes.size(); ++i) {
+        out += i == 0 ? "" : i + 1 == kTypes.size() ? " or " : ", ";
+        out += kTypes[i];
+    }
+    return out;
 }
 
 std::variant<Item, Error> item_of(const json& body) {
     const std::string type = body.value("type", json()).is_string() ? body["type"].get<std::string>() : "";
-    if (type == "say") {
-        const json& t = body.value("text", json());
-        if (!t.is_string() || !Now::Voice::line_ok(t.get<std::string>())) {
-            return bad("invalid_text", "a say item's text is one line of 1 to 200 characters");
+    for (const auto& p : kParsers) {
+        if (p.type == type) {
+            return p.of(type, body);
         }
-        return Item{"say", json{{"text", std::string(trim(t.get<std::string>()))}}, std::nullopt, kTtlDefault};
     }
-    if (type == "outfit") {
-        const json& o = body.value("outfit", json());
-        if (!o.is_string() || !one_of(kOutfits, o.get<std::string>())) {
-            return Error{422, "unknown_outfit", "outfit is p1 or p2"};
-        }
-        return Item{"outfit", json{{"outfit", o}}, std::nullopt, kTtlDefault};
-    }
-    if (type == "act") {
-        const json& n = body.value("name", json());
-        if (!n.is_string() || !one_of(kActs, n.get<std::string>())) {
-            return Error{422, "unknown_act", "name is one of her moves"};
-        }
-        return Item{"act", json{{"name", n}}, std::nullopt, kTtlDefault};
-    }
-    if (type == "event") {
-        return event_of(body);
-    }
-    return more_of(type, body);
+    return bad("invalid_type", types_words());
 }
 
 }  // namespace

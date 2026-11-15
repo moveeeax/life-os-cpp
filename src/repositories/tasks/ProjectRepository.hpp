@@ -16,6 +16,8 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/JsonRows.hpp"
+#include "repositories/SqlErrors.hpp"
 #include "repositories/SqlTime.hpp"
 #include "repositories/tasks/Errors.hpp"
 
@@ -94,10 +96,8 @@ public:
 
     /// Whether the project or course is the owner's.
     bool owns(const std::string& owner, const std::string& id) {
-        return Database::get().execute_read([&](auto& txn) {
-            return !txn.exec_params("SELECT 1 FROM projects WHERE owner_id = $1::uuid AND id = $2::uuid", owner, id)
-                        .empty();
-        });
+        return Database::get().execute_read(
+            [&](auto& txn) { return Repositories::JsonRows::owns_in(txn, "projects", owner, id); });
     }
 
     /// @throws NotFound, CodeTaken, Invariant, InvalidDate.
@@ -149,20 +149,20 @@ public:
             if (r.empty()) {
                 throw NotFound("project");
             }
-            return true;
         });
     }
 
     /// Projects of @p kind ("" any) and @p status ("" any) in their order.
     nlohmann::json list(const std::string& owner, const std::string& kind, const std::string& status) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
-                                         " FROM projects p WHERE p.owner_id = $1::uuid AND ($2 = '' OR p.kind = $2) "
-                                         " AND ($3 = '' OR p.status = $3) ORDER BY p.position, p.created_at) t",
-                                     owner,
-                                     kind,
-                                     status);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
+            return Repositories::JsonRows::many(
+                txn,
+                "SELECT " + std::string(kColumns) +
+                    " FROM projects p WHERE p.owner_id = $1::uuid AND ($2 = '' OR p.kind = $2) "
+                    " AND ($3 = '' OR p.status = $3) ORDER BY p.position, p.created_at",
+                owner,
+                kind,
+                status);
         });
     }
 
@@ -186,7 +186,7 @@ private:
         " " SQL_ISO_UTC("p.updated_at") " AS updated_at";
 
     static void translate(std::string_view sqlstate) {
-        if (sqlstate == "23505") {  // unique_violation: the (owner, code) index
+        if (Repositories::detail::is_unique_violation(sqlstate)) {  // unique_violation: the (owner, code) index
             throw CodeTaken();
         }
         detail::translate(sqlstate);
@@ -194,14 +194,11 @@ private:
 
     template <typename Txn>
     static std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& id) {
-        auto r = txn.exec_params("SELECT row_to_json(t) FROM (SELECT " + std::string(kColumns) +
-                                     " FROM projects p WHERE p.owner_id = $1::uuid AND p.id = $2::uuid) t",
-                                 owner,
-                                 id);
-        if (r.empty()) {
-            return std::nullopt;
-        }
-        return nlohmann::json::parse(r[0][0].template as<std::string>());
+        return Repositories::JsonRows::one(
+            txn,
+            "SELECT " + std::string(kColumns) + " FROM projects p WHERE p.owner_id = $1::uuid AND p.id = $2::uuid",
+            owner,
+            id);
     }
 };
 

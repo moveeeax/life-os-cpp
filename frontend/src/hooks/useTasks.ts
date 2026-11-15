@@ -3,10 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { useBatchMutation } from '@/hooks/useBatchMutation';
 import { useParseJob } from '@/hooks/useParseJob';
+import { todayLocal } from '@/lib/dates';
 import { api } from '@/lib/api/client';
 import { NOW_RIBBON, qk } from '@/lib/api/queryKeys';
+import type { ResponseOf } from '@/lib/api/types';
 import {
-  localToday,
   localZone,
   type Task,
   type TaskAgenda,
@@ -47,7 +48,8 @@ export function useTasksStatus() {
     queryKey: qk.tasks.status(),
     staleTime: 5 * 60_000,
     queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: { llm_available: boolean } }>(`${BASE}/status`, { signal })).data,
+      (await api.getJson<ResponseOf<'/api/v1/tasks/status', 'get'>>(`${BASE}/status`, { signal }))
+        .data,
   });
 }
 
@@ -140,7 +142,7 @@ export function useTasksParse() {
   return useParseJob({
     enqueue: async (text: string, noteId?: string) => {
       const { data } = await api.postJson<{ data: { id: string } }>(`${BASE}/parse`, {
-        body: { text, hint_date: localToday(), ...(noteId ? { note_id: noteId } : {}) },
+        body: { text, hint_date: todayLocal(), ...(noteId ? { note_id: noteId } : {}) },
       });
       return { id: data.id, status: 'queued' } as TaskParseJob;
     },

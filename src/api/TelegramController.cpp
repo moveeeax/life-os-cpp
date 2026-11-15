@@ -134,18 +134,6 @@ json list_of(const Telegram::Reply& r) {
     return d.is_array() ? d : json::array();
 }
 
-int int_param(const HttpRequestPtr& req, const char* key, int fallback, int max) {
-    const std::string v = req->getParameter(key);
-    if (v.empty()) {
-        return fallback;
-    }
-    try {
-        return std::clamp(std::stoi(v), 1, max);
-    } catch (const std::exception&) {
-        return fallback;
-    }
-}
-
 /// A text of 1 to 4096 bytes from @p body[key], or a 400.
 std::optional<std::string> text_field(const json& body, const TelegramController::Callback& callback) {
     const auto t = body.find("text");
@@ -246,7 +234,7 @@ void TelegramController::chats(const HttpRequestPtr& req, Callback&& callback) {
     if (!s) {
         return;
     }
-    const int limit = int_param(req, "limit", 20, 50);
+    const int limit = clamp_int(req->getParameter("limit"), 20, 1, 50);
     Outbound::run(std::move(callback), "telegram.chats", [gw = *s, limit](const Callback& reply) {
         const auto r =
             Telegram::call(Net::Http::transport(), gw, "GET", "/v1/chats", {{"limit", std::to_string(limit)}});
@@ -284,7 +272,7 @@ void TelegramController::messages(const HttpRequestPtr& req, Callback&& callback
     if (!s || !ids_ok(id, callback)) {
         return;
     }
-    Telegram::Query q{{"limit", std::to_string(int_param(req, "limit", 20, 30))}};
+    Telegram::Query q{{"limit", std::to_string(clamp_int(req->getParameter("limit"), 20, 1, 30))}};
     const std::string before = req->getParameter("before");
     if (!before.empty()) {
         if (!Telegram::valid_id(before)) {
@@ -472,7 +460,7 @@ void TelegramController::search(const HttpRequestPtr& req, Callback&& callback) 
         callback(ErrorResponse::bad_request("invalid_chat", "chat is a chat id"));
         return;
     }
-    const std::string limit = std::to_string(int_param(req, "limit", 10, 20));
+    const std::string limit = std::to_string(clamp_int(req->getParameter("limit"), 10, 1, 20));
     Outbound::run(std::move(callback), "telegram.search", [gw = *s, q, chat, limit](const Callback& reply) {
         const auto r =
             chat.empty()

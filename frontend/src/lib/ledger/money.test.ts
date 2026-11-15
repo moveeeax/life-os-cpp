@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { shiftDays } from '@/lib/dates';
+
 import {
   budgetState,
   draftFromJob,
@@ -15,7 +17,6 @@ import {
   merchantsByCategory,
   nearbyDuplicate,
   periodFromSearch,
-  shiftDay,
   periodRange,
   rateLine,
   shiftPeriod,
@@ -127,8 +128,8 @@ describe('periods', () => {
     expect(customRangeFromSearch(new URLSearchParams('kind=month'), '2026-10-07')).toBeNull();
   });
   it('shifts a day across months', () => {
-    expect(shiftDay('2026-03-01', -1)).toBe('2026-02-28');
-    expect(shiftDay('2026-12-31', 1)).toBe('2027-01-01');
+    expect(shiftDays('2026-03-01', -1)).toBe('2026-02-28');
+    expect(shiftDays('2026-12-31', 1)).toBe('2027-01-01');
   });
   it('mirrors the server ranges', () => {
     expect(periodRange('week', '2026-10-01')).toEqual({ from: '2026-09-28', to: '2026-10-04' });
