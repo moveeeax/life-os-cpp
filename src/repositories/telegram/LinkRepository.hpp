@@ -125,7 +125,6 @@ public:
                 owner,
                 chat,
                 last_id);
-            return true;
         });
     }
 
@@ -136,7 +135,6 @@ public:
                 "UPDATE telegram_link SET polled_at = now(), primed = true, last_error = NULL WHERE owner_id = "
                 "$1::uuid",
                 owner);
-            return true;
         });
     }
 
@@ -144,7 +142,6 @@ public:
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params(
                 "UPDATE telegram_link SET last_error = left($2, 200) WHERE owner_id = $1::uuid", owner, error);
-            return true;
         });
     }
 
@@ -162,7 +159,6 @@ public:
                     c.value("since", 0LL));
             }
             txn.exec_params("UPDATE telegram_link SET waiting_at = now() WHERE owner_id = $1::uuid", owner);
-            return true;
         });
     }
 
@@ -203,14 +199,12 @@ public:
             } else {
                 txn.exec_params("DELETE FROM telegram_quiet WHERE owner_id = $1::uuid AND chat_id = $2", owner, chat);
             }
-            return true;
         });
     }
 
     void set_review_to_self(const std::string& owner, bool on) {
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params("UPDATE telegram_link SET review_to_self = $2 WHERE owner_id = $1::uuid", owner, on);
-            return true;
         });
     }
 
@@ -229,7 +223,6 @@ public:
     void set_voice_to_self(const std::string& owner, bool on) {
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params("UPDATE telegram_link SET voice_to_self = $2 WHERE owner_id = $1::uuid", owner, on);
-            return true;
         });
     }
 
@@ -257,7 +250,6 @@ public:
                 owner,
                 kind,
                 day);
-            return true;
         });
     }
 
@@ -268,7 +260,6 @@ public:
                 "UPDATE telegram_link SET review_sent_week = NULL WHERE owner_id = $1::uuid AND review_sent_week = $2",
                 owner,
                 week);
-            return true;
         });
     }
 };

@@ -39,10 +39,10 @@ using Repositories::detail::translate_sql;
 
 /// CHECK violations as Invariant; a bad date as Invariant too.
 inline void translate(std::string_view sqlstate) {
-    if (sqlstate == "23514") {  // check_violation
+    if (Repositories::detail::is_check_violation(sqlstate)) {
         throw Invariant();
     }
-    if (sqlstate == "22008" || sqlstate == "22007") {  // datetime_field_overflow, invalid_datetime_format
+    if (Repositories::detail::is_bad_datetime(sqlstate)) {
         throw Invariant("not a valid date");
     }
     if (Repositories::detail::is_fk_violation(sqlstate)) {  // a client or deal that is not there

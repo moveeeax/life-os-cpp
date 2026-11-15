@@ -18,6 +18,7 @@
 
 #include "database/Database.hpp"
 #include "habits/Habits.hpp"
+#include "repositories/JsonRows.hpp"
 #include "repositories/RepoErrors.hpp"
 #include "repositories/SqlErrors.hpp"
 
@@ -36,7 +37,7 @@ namespace detail {
 using Repositories::detail::translate_sql;
 
 inline void translate(std::string_view sqlstate) {
-    if (sqlstate == "23514") {  // check_violation
+    if (Repositories::detail::is_check_violation(sqlstate)) {
         throw Invariant();
     }
 }
@@ -132,20 +133,19 @@ public:
             if (r.empty()) {
                 throw NotFound();
             }
-            return true;
         });
     }
 
     /// The active habits, or the archived ones, in their order.
     nlohmann::json list(const std::string& owner, bool archived) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params(
-                "SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
+            return Repositories::JsonRows::many(
+                txn,
+                "SELECT " + std::string(kColumns) +
                     " FROM habits WHERE owner_id = $1::uuid AND (archived_at IS NOT NULL) = $2::boolean "
-                    "ORDER BY position, created_at) t",
+                    "ORDER BY position, created_at",
                 owner,
                 archived);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
         });
     }
 
@@ -206,7 +206,6 @@ public:
                 owner,
                 habit,
                 date);
-            return true;
         });
     }
 
@@ -254,14 +253,11 @@ private:
 
     template <typename Txn>
     std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& id) {
-        auto r = txn.exec_params("SELECT row_to_json(t) FROM (SELECT " + std::string(kColumns) +
-                                     " FROM habits WHERE owner_id = $1::uuid AND id = $2::uuid) t",
-                                 owner,
-                                 id);
-        if (r.empty()) {
-            return std::nullopt;
-        }
-        return nlohmann::json::parse(r[0][0].template as<std::string>());
+        return Repositories::JsonRows::one(
+            txn,
+            "SELECT " + std::string(kColumns) + " FROM habits WHERE owner_id = $1::uuid AND id = $2::uuid",
+            owner,
+            id);
     }
 };
 

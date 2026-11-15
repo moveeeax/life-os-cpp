@@ -18,8 +18,10 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/JsonRows.hpp"
 #include "repositories/RepoErrors.hpp"
 #include "repositories/SqlErrors.hpp"
+#include "repositories/SqlTime.hpp"
 
 namespace Repositories::Files {
 
@@ -79,13 +81,8 @@ public:
         if (table == nullptr) {
             return false;
         }
-        return Database::get().execute_read([&](auto& txn) {
-            return !txn.exec_params(
-                           std::string("SELECT 1 FROM ") + table + " WHERE owner_id = $1::uuid AND id = $2::uuid",
-                           owner,
-                           parent_id)
-                        .empty();
-        });
+        return Database::get().execute_read(
+            [&](auto& txn) { return Repositories::JsonRows::owns_in(txn, table, owner, parent_id); });
     }
 
     /// A pending row. @throws ParentNotFound, TooManyFiles.
@@ -137,13 +134,14 @@ public:
     /// The ready files of one parent, oldest first.
     nlohmann::json list(const std::string& owner, const std::string& kind, const std::string& parent_id) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
-                                         " FROM private_files WHERE owner_id = $1::uuid AND parent_kind = $2 "
-                                         " AND parent_id = $3::uuid AND status = 'ready' ORDER BY created_at, id) t",
-                                     owner,
-                                     kind,
-                                     parent_id);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
+            return Repositories::JsonRows::many(
+                txn,
+                "SELECT " + std::string(kColumns) +
+                    " FROM private_files WHERE owner_id = $1::uuid AND parent_kind = $2 "
+                    " AND parent_id = $3::uuid AND status = 'ready' ORDER BY created_at, id",
+                owner,
+                kind,
+                parent_id);
         });
     }
 
@@ -226,33 +224,28 @@ public:
 
     /// Forgets a purge once its object is gone.
     void forget_purge(const std::string& key) {
-        Database::get().execute_write([&](auto& txn) {
-            txn.exec_params("DELETE FROM private_file_purges WHERE object_key = $1", key);
-            return true;
-        });
+        Database::get().execute_write(
+            [&](auto& txn) { txn.exec_params("DELETE FROM private_file_purges WHERE object_key = $1", key); });
     }
 
 private:
     static constexpr const char* kColumns =
-        "id::text AS id, parent_kind, parent_id::text AS parent_id, name, content_type, bytes, object_key, status, "
-        "to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at";
+        "id::text AS id, parent_kind, parent_id::text AS parent_id, name, content_type, bytes, object_key, "
+        "status, " SQL_ISO_UTC_Z("created_at") " AS created_at";
 
     static void translate(std::string_view sqlstate) {
-        if (sqlstate == "23514" || sqlstate == "23505") {  // check_violation, unique_violation
+        if (Repositories::detail::is_check_violation(sqlstate) || Repositories::detail::is_unique_violation(sqlstate)) {
             throw FileInvariant();
         }
     }
 
     template <typename Txn>
     static std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& id) {
-        auto r = txn.exec_params("SELECT row_to_json(t) FROM (SELECT " + std::string(kColumns) +
-                                     " FROM private_files WHERE owner_id = $1::uuid AND id = $2::uuid) t",
-                                 owner,
-                                 id);
-        if (r.empty()) {
-            return std::nullopt;
-        }
-        return nlohmann::json::parse(r[0][0].template as<std::string>());
+        return Repositories::JsonRows::one(
+            txn,
+            "SELECT " + std::string(kColumns) + " FROM private_files WHERE owner_id = $1::uuid AND id = $2::uuid",
+            owner,
+            id);
     }
 };
 

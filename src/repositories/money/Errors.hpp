@@ -28,10 +28,7 @@ struct Duplicate : ConflictError {
     Duplicate() : ConflictError("duplicate", "a row with this external_id already exists") {}
 };
 
-struct AlreadyAccepted : ConflictError {
-    AlreadyAccepted()
-        : ConflictError("already_accepted", "the parse is not finished or its lines were accepted already") {}
-};
+using Repositories::AlreadyAccepted;
 
 /// A delete that lost a race: a row referencing the account or category
 /// arrived after the "is it used" check of the same delete.
@@ -48,9 +45,7 @@ struct DecimalsInUse : ConflictError {
                         "would leave their amounts unrepresentable") {}
 };
 
-struct InvalidDate : ValidationError {
-    InvalidDate() : ValidationError("invalid_date", "not a valid date") {}
-};
+using Repositories::InvalidDate;
 
 namespace detail {
 
@@ -60,16 +55,17 @@ using Repositories::detail::translate_sql;
 
 /// CHECK and FK violations of the money tables as Invariant; a bad date as InvalidDate.
 inline void translate(std::string_view sqlstate) {
-    if (sqlstate == "23514") {  // check_violation
+    if (Repositories::detail::is_check_violation(sqlstate)) {
         throw Invariant("the row breaks a rule of the money model");
     }
     if (Repositories::detail::is_fk_violation(sqlstate)) {  // foreign_key_violation, restrict_violation
         throw Invariant("the row refers to an account, category or currency that is not there");
     }
-    if (sqlstate == "23505") {  // unique_violation: only external_id is unique among user-written columns
+    // unique_violation: only external_id is unique among user-written columns
+    if (Repositories::detail::is_unique_violation(sqlstate)) {
         throw Duplicate();
     }
-    if (sqlstate == "22008" || sqlstate == "22007") {  // datetime_field_overflow, invalid_datetime_format
+    if (Repositories::detail::is_bad_datetime(sqlstate)) {
         throw InvalidDate();
     }
 }

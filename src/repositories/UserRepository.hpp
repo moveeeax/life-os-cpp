@@ -96,7 +96,7 @@ private:
                 return std::nullopt;
             return user_with_role_from_row(r[0]);
         };
-        return from_primary ? Database::get().execute_read_primary(query) : Database::get().execute_read(query);
+        return Database::get().execute_read(from_primary, query);
     }
 
 public:

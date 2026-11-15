@@ -145,7 +145,6 @@ public:
                 Database::get().execute_write([&](auto& txn) {
                     txn.exec_params("UPDATE sync_runs SET heartbeat_at = now() WHERE id = $1 AND status = 'running'",
                                     run_id_);
-                    return true;
                 });
             } catch (const std::exception& e) {
                 // A missed beat only shortens the time a redelivery waits.
@@ -187,7 +186,6 @@ void bump_sync_state(const std::string& xiaomi_user_id, const std::string& data_
             data_type,
             added,
             xiaomi_user_id);
-        return true;
     });
 }
 

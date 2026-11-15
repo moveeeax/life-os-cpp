@@ -15,6 +15,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/JsonRows.hpp"
 #include "repositories/RepoErrors.hpp"
 
 namespace Repositories {
@@ -28,14 +29,13 @@ public:
     /// The owner's routines without their exercises, ordered by weekday.
     nlohmann::json list(const std::string& owner) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params(
-                "SELECT COALESCE(json_agg(t), '[]'::json) FROM ("
+            return Repositories::JsonRows::many(
+                txn,
                 " SELECT r.id, r.name, r.weekday, r.position, r.note, "
                 "  (SELECT COUNT(*) FROM routine_exercises re WHERE re.routine_id = r.id) AS exercise_count "
                 " FROM routines r WHERE r.owner_id = $1::uuid "
-                " ORDER BY r.weekday NULLS LAST, r.position, r.name) t",
+                " ORDER BY r.weekday NULLS LAST, r.position, r.name",
                 owner);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
         });
     }
 
@@ -119,8 +119,8 @@ public:
 private:
     template <typename Txn>
     static std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& id) {
-        auto r = txn.exec_params(
-            "SELECT row_to_json(t) FROM ("
+        return Repositories::JsonRows::one(
+            txn,
             " SELECT r.id, r.name, r.weekday, r.position, r.note, "
             "  COALESCE((SELECT json_agg(x ORDER BY x.position) FROM ("
             "    SELECT re.id, re.exercise_id, re.position, re.target_sets, re.target_reps_min, "
@@ -128,13 +128,9 @@ private:
             "           e.name AS exercise_name, e.tracking_mode, e.images, e.primary_muscles "
             "    FROM routine_exercises re JOIN exercises e ON e.id = re.exercise_id "
             "    WHERE re.routine_id = r.id) x), '[]'::json) AS exercises "
-            " FROM routines r WHERE r.id = $2::uuid AND r.owner_id = $1::uuid) t",
+            " FROM routines r WHERE r.id = $2::uuid AND r.owner_id = $1::uuid",
             owner,
             id);
-        if (r.empty()) {
-            return std::nullopt;
-        }
-        return nlohmann::json::parse(r[0][0].template as<std::string>());
     }
 };
 

@@ -33,13 +33,13 @@ namespace detail {
 using Repositories::detail::translate_sql;
 
 inline void translate(std::string_view sqlstate) {
-    if (sqlstate == "23514") {  // check_violation
+    if (Repositories::detail::is_check_violation(sqlstate)) {
         throw Invariant("the row breaks a rule of the travel model");
     }
     if (Repositories::detail::is_fk_violation(sqlstate)) {  // foreign_key_violation, restrict_violation
         throw Invariant("the row refers to a trip that is not there");
     }
-    if (sqlstate == "22008" || sqlstate == "22007") {  // datetime_field_overflow, invalid_datetime_format
+    if (Repositories::detail::is_bad_datetime(sqlstate)) {
         throw InvalidDate();
     }
 }

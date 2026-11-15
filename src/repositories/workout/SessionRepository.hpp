@@ -465,17 +465,15 @@ private:
     /// SQLSTATE -> typed error: a CHECK on the session times, a malformed or
     /// out-of-range timestamp. Anything else is rethrown by translate_sql.
     static void translate(std::string_view sqlstate) {
-        if (sqlstate == "23514") {
+        if (Repositories::detail::is_check_violation(sqlstate)) {
             throw InvalidSessionTimes();
         }
-        if (sqlstate == "22007" || sqlstate == "22008") {
+        if (Repositories::detail::is_bad_datetime(sqlstate)) {
             throw InvalidTimestamp();
         }
     }
 
-    static std::string iso(const std::string& expr) {
-        return "to_char(" + expr + " AT TIME ZONE 'UTC', " SQL_ISO_UTC_FORMAT ")";
-    }
+    static std::string iso(const std::string& expr) { return Repositories::iso_utc(expr, false); }
 
     // Reconciliation, one statement. The band data is that of the session
     // owner's Mi account (cand.acct; NULL without a link, and then nothing

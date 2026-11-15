@@ -62,6 +62,7 @@
 #include <vector>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 #include "utils/Time.hpp"
 
 namespace Repositories {
@@ -218,7 +219,7 @@ public:
             auto skipped_rows = txn.exec_params(
                 "SELECT r.provider_refund_id, r.payment_id::text AS payment_id, p.user_id::text AS user_id, "
                 "       COALESCE(u.email, '') AS email, r.amount_cents, r.outcome, "
-                "       to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at "
+                "       " SQL_ISO_UTC_Z("r.created_at") " AS created_at "
                 "FROM billing_refunds r "
                 "JOIN payments p ON p.id = r.payment_id "
                 "LEFT JOIN users u ON u.id = p.user_id "

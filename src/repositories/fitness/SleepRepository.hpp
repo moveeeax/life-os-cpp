@@ -82,7 +82,6 @@ public:
                     ++counts.updated;
                 }
             }
-            return true;
         });
         return counts;
     }

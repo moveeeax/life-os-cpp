@@ -217,7 +217,7 @@ private:
 
     /// A malformed date reaches Postgres as 22007/22008.
     static void translate(std::string_view sqlstate) {
-        if (sqlstate == "22007" || sqlstate == "22008") {
+        if (Repositories::detail::is_bad_datetime(sqlstate)) {
             throw InvalidFoodDate();
         }
     }

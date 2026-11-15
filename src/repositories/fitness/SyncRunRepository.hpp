@@ -70,7 +70,6 @@ public:
                 id,
                 status,
                 result.dump());
-            return true;
         });
     }
 
@@ -102,7 +101,6 @@ public:
                 "WHERE id = $1 AND status = 'queued'",
                 id,
                 result.dump());
-            return true;
         });
     }
 

@@ -137,7 +137,6 @@ public:
                 sealed,
                 nonce,
                 scopes);
-            return true;
         });
     }
 
@@ -148,7 +147,6 @@ public:
                 "UPDATE github_links SET synced_at = now(), sync_error = NULL, org_hint = $2 WHERE owner_id = $1::uuid",
                 owner,
                 org_hint);
-            return true;
         });
     }
 
@@ -156,7 +154,6 @@ public:
     void mark_failed(const std::string& owner, const std::string& why) {
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params("UPDATE github_links SET sync_error = left($2, 200) WHERE owner_id = $1::uuid", owner, why);
-            return true;
         });
     }
 

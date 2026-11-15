@@ -32,6 +32,39 @@ std::int64_t read_balance(Txn& txn, const std::string& user_id) {
     return r[0]["credits"].template as<std::int64_t>();
 }
 
+/**
+ * @brief Materialize @p user_id's wallet_balances row, then lock it and
+ *        answer its credits. The row is written FIRST so the lock always has
+ *        something to hold: `SELECT ... FOR UPDATE` cannot lock a row that
+ *        does not exist yet, and for a brand-new user the first pair of
+ *        concurrent balance-changing writes would both read 0 unlocked, the
+ *        second one overwriting the first's total with a stale-based one.
+ *        `DO NOTHING` is safe: only existence matters here, not the value.
+ */
+template <typename Txn>
+std::int64_t lock_balance(Txn& txn, const std::string& user_id) {
+    txn.exec_params("INSERT INTO wallet_balances (user_id, credits) VALUES ($1, 0) ON CONFLICT (user_id) DO NOTHING",
+                    user_id);
+    auto wb = txn.exec_params("SELECT credits FROM wallet_balances WHERE user_id = $1 FOR UPDATE", user_id);
+    return wb[0]["credits"].template as<std::int64_t>();
+}
+
+/**
+ * @brief Set the balance locked by lock_balance to @p new_total, computed
+ *        by the caller from the locked read (never `SET credits =
+ *        wallet_balances.credits + ...`, see the header's file-level note),
+ *        and answer the credits stored. A plain UPDATE, not an upsert: the
+ *        row is present and locked, so there is nothing to conflict against.
+ */
+template <typename Txn>
+std::int64_t write_balance(Txn& txn, const std::string& user_id, std::int64_t new_total) {
+    auto br = txn.exec_params(
+        "UPDATE wallet_balances SET credits = $2, updated_at = now() WHERE user_id = $1 RETURNING credits",
+        user_id,
+        new_total);
+    return br[0]["credits"].template as<std::int64_t>();
+}
+
 /// Result of validating a single id against `users`, without ever letting a
 /// malformed literal's SQLSTATE 22P02 escape mid-transaction (see
 /// check_user_id's doc for why that matters).
@@ -67,7 +100,7 @@ IdCheck check_user_id(const std::string& id) {
 
 std::int64_t balance_of(const std::string& user_id, bool from_primary) {
     auto query = [&](auto& txn) -> std::int64_t { return detail::read_balance(txn, user_id); };
-    return from_primary ? Database::get().execute_read_primary(query) : Database::get().execute_read(query);
+    return Database::get().execute_read(from_primary, query);
 }
 
 std::vector<Domain::WalletEntry> history(const std::string& user_id, int limit, int offset, bool from_primary) {
@@ -84,7 +117,7 @@ std::vector<Domain::WalletEntry> history(const std::string& user_id, int limit, 
             out.push_back(Domain::WalletEntry::from_row(row));
         return out;
     };
-    return from_primary ? Database::get().execute_read_primary(query) : Database::get().execute_read(query);
+    return Database::get().execute_read(from_primary, query);
 }
 
 CreditResult credit_capture(const std::string& provider_order_id,
@@ -161,39 +194,15 @@ CreditResult credit_capture(const std::string& provider_order_id,
                     credits_expected,
                     payment_id);
 
-                // Materialize the row FIRST so the lock below always has
-                // something to hold. `SELECT ... FOR UPDATE` cannot lock a
-                // row that doesn't exist yet: for a brand-new user (no
-                // wallet_balances row), the FIRST pair of concurrent
-                // balance-changing writes would both fall through to
-                // `current = 0` unlocked, and the second writer's upsert
-                // would silently overwrite the first's result with a
-                // stale-based total — wallet_balances.credits then disagrees
-                // with SUM(wallet_entries.delta_credits) even though the
-                // ledger itself stays correct. `DO NOTHING` is safe: this
-                // statement only needs a row to exist so the next statement
-                // has something to lock; the real value is written by the
-                // plain UPDATE below, under that lock.
-                txn.exec_params(
-                    "INSERT INTO wallet_balances (user_id, credits) VALUES ($1, 0) ON CONFLICT (user_id) DO NOTHING",
-                    user_id);
-
-                // Lock the balance row (now guaranteed to exist) and compute
-                // the new total explicitly — see the file-level note on why
-                // this never uses `SET credits = wallet_balances.credits +
-                // EXCLUDED.credits`.
-                auto wb = txn.exec_params("SELECT credits FROM wallet_balances WHERE user_id = $1 FOR UPDATE", user_id);
-                const std::int64_t current_balance = wb[0]["credits"].template as<std::int64_t>();
+                // Materialize and lock the balance row (see lock_balance:
+                // without the row a brand-new user's first two concurrent
+                // writes would race, and wallet_balances.credits would then
+                // disagree with SUM(wallet_entries.delta_credits)), then
+                // write the new total computed from the locked read.
+                const std::int64_t current_balance = detail::lock_balance(txn, user_id);
                 const std::int64_t new_total = current_balance + credits_expected;
-                // Plain UPDATE, not an upsert: the row is provably present
-                // (materialized above) and locked (SELECT ... FOR UPDATE
-                // above), so there is nothing left to conflict against.
-                auto br = txn.exec_params(
-                    "UPDATE wallet_balances SET credits = $2, updated_at = now() WHERE user_id = $1 RETURNING credits",
-                    user_id,
-                    new_total);
 
-                return CreditResult{true, br[0]["credits"].template as<std::int64_t>(), payment_id};
+                return CreditResult{true, detail::write_balance(txn, user_id, new_total), payment_id};
             });
         },
         [](std::string_view ss) {
@@ -276,23 +285,12 @@ CreditResult refund_capture(const std::string& provider_capture_id,
         // 2^63 for a large rate; the quotient is at most credits_expected.
         const std::int64_t refund_credits = *mul_div(credits_expected, refunded_amount_cents, amount_cents);
 
-        // Materialize the row FIRST so the lock below always has something
-        // to hold — see credit_capture's comments for the full lost-update
-        // diagnosis this guards against (a not-yet-existing row can't be
-        // locked by `FOR UPDATE`, so the first pair of concurrent
-        // balance-changing writes for a brand-new user could both read
-        // current=0 unlocked and the second silently clobber the first).
-        // `DO NOTHING` is safe: only existence matters here, not the value.
-        txn.exec_params(
-            "INSERT INTO wallet_balances (user_id, credits) VALUES ($1, 0) ON CONFLICT (user_id) DO NOTHING", user_id);
-
-        // Lock the balance row (now guaranteed to exist) ONCE, up front,
-        // whatever the outcome turns out to be — its value seeds the
+        // Materialize and lock the balance row (see lock_balance) ONCE, up
+        // front, whatever the outcome turns out to be — its value seeds the
         // response in all three branches below and is the
         // sufficiency-decision input in one of them, so there's no second
         // (and, on the zero-credit path, wasted) query.
-        auto br = txn.exec_params("SELECT credits FROM wallet_balances WHERE user_id = $1 FOR UPDATE", user_id);
-        std::int64_t new_balance = br[0]["credits"].template as<std::int64_t>();
+        std::int64_t new_balance = detail::lock_balance(txn, user_id);
 
         std::string outcome;
         std::int64_t credits_deducted = 0;
@@ -341,13 +339,7 @@ CreditResult refund_capture(const std::string& provider_capture_id,
                 user_id,
                 -refund_credits,
                 provider_refund_id);
-            // Plain UPDATE, not an upsert: the row is provably present
-            // (materialized above) and locked (SELECT ... FOR UPDATE above).
-            auto updated = txn.exec_params(
-                "UPDATE wallet_balances SET credits = $2, updated_at = now() WHERE user_id = $1 RETURNING credits",
-                user_id,
-                computed_new_balance);
-            new_balance = updated[0]["credits"].template as<std::int64_t>();
+            new_balance = detail::write_balance(txn, user_id, computed_new_balance);
             outcome = "applied";
             credits_deducted = refund_credits;
         }
@@ -433,28 +425,13 @@ CreditResult adjust(const std::string& user_id,
     return Repositories::detail::translate_sql(
         [&] {
             return Database::get().execute_write([&](auto& txn) -> CreditResult {
-                // Materialize the row FIRST so the lock below always has
-                // something to hold — see credit_capture's comments for
-                // the full lost-update diagnosis this guards against (a
-                // not-yet-existing row can't be locked by `FOR UPDATE`, so
-                // the first pair of concurrent balance-changing writes for a
-                // brand-new user could both read current=0 unlocked and the
-                // second silently clobber the first). `DO NOTHING` is safe:
-                // only existence matters here, not the value.
-                txn.exec_params(
-                    "INSERT INTO wallet_balances (user_id, credits) VALUES ($1, 0) ON CONFLICT (user_id) DO NOTHING",
-                    user_id);
-
-                // Lock the balance row (now guaranteed to exist) and compute
-                // the new total explicitly — see the header's file-level note
-                // on why this never uses `SET credits = wallet_balances.credits
-                // + EXCLUDED.credits`. A negative new_total is still written
-                // as-is: the CHECK (credits >= 0) then reliably rejects it
-                // (this is now a plain "does this literal value satisfy the
-                // constraint" check, not a self-referencing expression),
-                // caught below as SQLSTATE 23514.
-                auto wb = txn.exec_params("SELECT credits FROM wallet_balances WHERE user_id = $1 FOR UPDATE", user_id);
-                const std::int64_t current_balance = wb[0]["credits"].template as<std::int64_t>();
+                // Materialize and lock the balance row (see lock_balance)
+                // and compute the new total explicitly. A negative new_total
+                // is still written as-is: the CHECK (credits >= 0) then
+                // reliably rejects it (a plain "does this literal value
+                // satisfy the constraint" check, not a self-referencing
+                // expression), caught below as SQLSTATE 23514.
+                const std::int64_t current_balance = detail::lock_balance(txn, user_id);
                 std::int64_t new_total = 0;
                 if (__builtin_add_overflow(current_balance, delta_credits, &new_total))
                     throw AdjustmentTooLarge{};
@@ -466,14 +443,7 @@ CreditResult adjust(const std::string& user_id,
                     delta_credits,
                     note,
                     admin_id);
-                // Plain UPDATE, not an upsert: the row is provably present
-                // (materialized above) and locked (SELECT ... FOR UPDATE
-                // above), so there is nothing left to conflict against.
-                auto br = txn.exec_params(
-                    "UPDATE wallet_balances SET credits = $2, updated_at = now() WHERE user_id = $1 RETURNING credits",
-                    user_id,
-                    new_total);
-                return CreditResult{true, br[0]["credits"].template as<std::int64_t>(), std::string{}};
+                return CreditResult{true, detail::write_balance(txn, user_id, new_total), std::string{}};
             });
         },
         [](std::string_view ss) {
@@ -509,20 +479,12 @@ CreditResult spend(const std::string& user_id,
     }
 
     auto attempt = [&](auto& txn) -> CreditResult {
-        // Materialize the row FIRST so the lock below always has something
-        // to hold — see credit_capture's comments for the full lost-update
-        // diagnosis this guards against. `DO NOTHING` is safe: only
-        // existence matters here, not the value.
-        txn.exec_params(
-            "INSERT INTO wallet_balances (user_id, credits) VALUES ($1, 0) ON CONFLICT (user_id) DO NOTHING", user_id);
-
-        // Lock the balance row (now guaranteed to exist) BEFORE the
-        // idempotency check: a same-user concurrent duplicate then
+        // Materialize and lock the balance row (see lock_balance) BEFORE
+        // the idempotency check: a same-user concurrent duplicate then
         // serializes here, and the loser's check below reliably sees the
         // winner's committed spend row instead of racing it (mirrors
         // refund_capture, where the payments lock plays this role).
-        auto wb = txn.exec_params("SELECT credits FROM wallet_balances WHERE user_id = $1 FOR UPDATE", user_id);
-        const std::int64_t current_balance = wb[0]["credits"].template as<std::int64_t>();
+        const std::int64_t current_balance = detail::lock_balance(txn, user_id);
 
         // Idempotency: the reference IS the marker — unlike a skipped
         // refund, a refused spend writes nothing at all (see below), so a
@@ -562,13 +524,7 @@ CreditResult spend(const std::string& user_id,
             -credits,
             reference,
             note);
-        // Plain UPDATE, not an upsert: the row is provably present
-        // (materialized above) and locked (SELECT ... FOR UPDATE above).
-        auto br = txn.exec_params(
-            "UPDATE wallet_balances SET credits = $2, updated_at = now() WHERE user_id = $1 RETURNING credits",
-            user_id,
-            new_total);
-        return CreditResult{true, br[0]["credits"].template as<std::int64_t>(), std::string{}};
+        return CreditResult{true, detail::write_balance(txn, user_id, new_total), std::string{}};
     };
 
     try {

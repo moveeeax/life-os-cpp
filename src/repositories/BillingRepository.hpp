@@ -184,7 +184,7 @@ public:
                 return std::nullopt;
             return Domain::Payment::from_row(r[0]);
         };
-        return from_primary ? Database::get().execute_read_primary(query) : Database::get().execute_read(query);
+        return Database::get().execute_read(from_primary, query);
     }
 
     std::optional<Domain::Payment> find_by_capture_id(const std::string& provider_capture_id) {
@@ -287,7 +287,7 @@ public:
                 throw std::runtime_error("billing_settings row missing — migration 008 did not seed it");
             return Domain::BillingSettings::from_row(r[0]);
         };
-        return from_primary ? Database::get().execute_read_primary(query) : Database::get().execute_read(query);
+        return Database::get().execute_read(from_primary, query);
     }
 
     Domain::BillingSettings update(std::int64_t credits_per_unit,

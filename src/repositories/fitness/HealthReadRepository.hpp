@@ -278,9 +278,7 @@ private:
     }
 
     /// ISO UTC with an explicit +00:00: timestamptz goes out without losing meaning.
-    static std::string iso(const std::string& column) {
-        return "to_char(" + column + " AT TIME ZONE 'UTC', " SQL_ISO_UTC_FORMAT ")";
-    }
+    static std::string iso(const std::string& column) { return Repositories::iso_utc(column, false); }
 
     /// UTC days over timestamptz: a half-open interval, index friendly.
     /// Explicit AT TIME ZONE 'UTC': the date -> timestamptz cast takes

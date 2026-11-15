@@ -16,6 +16,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/JsonRows.hpp"
 #include "repositories/LikePattern.hpp"
 #include "repositories/RepoErrors.hpp"
 #include "repositories/SqlTime.hpp"
@@ -188,13 +189,13 @@ public:
     /// many products still has the current ones in front of the model.
     nlohmann::json for_prompt(const std::string& owner, long limit) {
         return Database::get().execute_read([&](auto& txn) {
-            auto rows = txn.exec_params(
-                "SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT id::text AS id, name, brand, per, kcal, "
+            return Repositories::JsonRows::many(
+                txn,
+                "SELECT id::text AS id, name, brand, per, kcal, "
                 " protein_g, fat_g, carbs_g FROM food_items WHERE owner_id = $1::uuid AND NOT archived "
-                " ORDER BY updated_at DESC, id LIMIT $2) t",
+                " ORDER BY updated_at DESC, id LIMIT $2",
                 owner,
                 limit);
-            return nlohmann::json::parse(rows[0][0].template as<std::string>());
         });
     }
 

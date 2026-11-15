@@ -13,6 +13,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/JsonRows.hpp"
 #include "repositories/travel/Errors.hpp"
 #include "travel/Days.hpp"
 
@@ -83,21 +84,20 @@ public:
             if (r.empty()) {
                 throw NotFound("crossing");
             }
-            return true;
         });
     }
 
     /// Newest first, a page.
     nlohmann::json list(const std::string& owner, int limit, int offset) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r =
-                txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
-                                    " FROM travel_crossings WHERE owner_id = $1::uuid "
-                                    " ORDER BY date DESC, time DESC NULLS LAST, created_at DESC LIMIT $2 OFFSET $3) t",
-                                owner,
-                                limit,
-                                offset);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
+            return Repositories::JsonRows::many(
+                txn,
+                "SELECT " + std::string(kColumns) +
+                    " FROM travel_crossings WHERE owner_id = $1::uuid "
+                    " ORDER BY date DESC, time DESC NULLS LAST, created_at DESC LIMIT $2 OFFSET $3",
+                owner,
+                limit,
+                offset);
         });
     }
 
@@ -133,14 +133,11 @@ private:
 
     template <typename Txn>
     std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& id) {
-        auto r = txn.exec_params("SELECT row_to_json(t) FROM (SELECT " + std::string(kColumns) +
-                                     " FROM travel_crossings WHERE owner_id = $1::uuid AND id = $2::uuid) t",
-                                 owner,
-                                 id);
-        if (r.empty()) {
-            return std::nullopt;
-        }
-        return nlohmann::json::parse(r[0][0].template as<std::string>());
+        return Repositories::JsonRows::one(
+            txn,
+            "SELECT " + std::string(kColumns) + " FROM travel_crossings WHERE owner_id = $1::uuid AND id = $2::uuid",
+            owner,
+            id);
     }
 };
 

@@ -35,10 +35,7 @@ public:
 
     /// Adds @p delta_ml (negative takes back) to @p date, kept between 0 and 20 000 ml; the day after it.
     nlohmann::json add(const std::string& owner, const std::string& date, int delta_ml) {
-        Database::get().execute_write([&](auto& txn) {
-            add_in(txn, owner, date, delta_ml);
-            return true;
-        });
+        Database::get().execute_write([&](auto& txn) { add_in(txn, owner, date, delta_ml); });
         return day(owner, date);
     }
 
@@ -62,7 +59,6 @@ public:
                 "SET water_ml = EXCLUDED.water_ml",
                 owner,
                 ml);
-            return true;
         });
     }
 };
