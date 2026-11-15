@@ -10,11 +10,11 @@
 
 #include <spdlog/spdlog.h>
 
+#include "agent/SiteApi.hpp"
 #include "agent/ToolArgs.hpp"
 #include "agent/Tools.hpp"
 #include "calendar/Google.hpp"
 #include "repositories/calendar/LinkRepository.hpp"
-#include "storage/S3Presign.hpp"
 #include "utils/Date.hpp"
 
 namespace Agent::CalendarTools {
@@ -109,27 +109,7 @@ Gateway::ToolRunner runner(Net::Http::Transport& transport,
         if (!refusal.empty()) {
             return refusal;
         }
-        std::string url = api_url + req.value("path", std::string());
-        char sep = '?';
-        for (const auto& kv : req.value("query", json::array())) {
-            url += sep + kv[0].get<std::string>() + "=" + Storage::S3::uri_encode(kv[1].get<std::string>(), true);
-            sep = '&';
-        }
-        Net::Http::Request r;
-        r.url = url;
-        r.headers = {{"Authorization", "Bearer " + access_token}, {"Accept", "application/json"}};
-        r.timeout_seconds = 20;
-        try {
-            const auto res = transport.send(r);
-            const auto body = json::parse(res.body, nullptr, /*allow_exceptions=*/false);
-            if (res.status == 200 && body.is_object() && body.contains("data")) {
-                return body["data"].dump();
-            }
-            return Tools::result_text(res);
-        } catch (const Net::Http::TransportError& e) {
-            spdlog::warn("ani agent: the tool {} got no answer: {}", name, e.what());
-            return ToolArgs::refusal("unavailable", "Life OS did not answer");
-        }
+        return SiteApi::tool_result(transport, api_url, access_token, req, /*keep_ids=*/true, name);
     };
 }
 

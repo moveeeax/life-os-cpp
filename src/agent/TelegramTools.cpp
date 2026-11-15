@@ -10,11 +10,11 @@
 
 #include <spdlog/spdlog.h>
 
+#include "agent/SiteApi.hpp"
 #include "agent/ToolArgs.hpp"
 #include "agent/Tools.hpp"
 #include "repositories/UserRepository.hpp"
 #include "repositories/telegram/LinkRepository.hpp"
-#include "storage/S3Presign.hpp"
 #include "telegram/Gateway.hpp"
 
 namespace Agent::TelegramTools {
@@ -37,16 +37,6 @@ std::string id_arg(const json& args, const char* key) {
 std::string number_arg(const json& args, const char* key, int max) {
     const auto n = ToolArgs::int_arg(args, key, 1, max);
     return n ? std::to_string(*n) : std::string();
-}
-
-std::string url_of(const std::string& api_url, const json& req) {
-    std::string url = api_url + req.value("path", std::string());
-    char sep = '?';
-    for (const auto& kv : req.value("query", json::array())) {
-        url += sep + kv[0].get<std::string>() + "=" + Storage::S3::uri_encode(kv[1].get<std::string>(), true);
-        sep = '&';
-    }
-    return url;
 }
 
 }  // namespace
@@ -183,27 +173,7 @@ Gateway::ToolRunner runner(Net::Http::Transport& transport,
         if (!refusal.empty()) {
             return refusal;
         }
-        Net::Http::Request r;
-        r.method = req.value("method", "GET");
-        r.url = url_of(api_url, req);
-        r.headers = {{"Authorization", "Bearer " + access_token}, {"Accept", "application/json"}};
-        if (req.contains("body")) {
-            r.body = req["body"].dump();
-            r.content_type = "application/json";
-        }
-        r.timeout_seconds = 20;
-        try {
-            const auto res = transport.send(r);
-            const auto body = json::parse(res.body, nullptr, /*allow_exceptions=*/false);
-            if (res.status == 200 && body.is_object() && body.contains("data")) {
-                // Unlike the other tools the ids stay: they are what she reacts and replies with.
-                return body["data"].dump();
-            }
-            return Tools::result_text(res);
-        } catch (const Net::Http::TransportError& e) {
-            spdlog::warn("ani agent: the tool {} got no answer: {}", name, e.what());
-            return ToolArgs::refusal("unavailable", "Life OS did not answer");
-        }
+        return SiteApi::tool_result(transport, api_url, access_token, req, /*keep_ids=*/true, name);
     };
 }
 

@@ -21,6 +21,7 @@
 #include <spdlog/spdlog.h>
 
 #include "agent/Settings.hpp"
+#include "agent/SiteApi.hpp"
 #include "agent/ToolArgs.hpp"
 #include "agent/Tools.hpp"
 #include "calendar/Google.hpp"
@@ -28,7 +29,6 @@
 #include "money/Currencies.hpp"
 #include "money/Merchant.hpp"
 #include "repositories/agent/ActionRepository.hpp"
-#include "storage/S3Presign.hpp"
 #include "telegram/Gateway.hpp"
 #include "utils/Crypto.hpp"
 #include "utils/Date.hpp"
@@ -67,43 +67,6 @@ std::string cut(const std::string& s, std::size_t max) {
     return Utils::Utf8::clip(s, max);
 }
 
-std::string url_of(const std::string& api_url, const std::string& path, const json& query) {
-    std::string url = api_url + path;
-    char sep = '?';
-    for (const auto& kv : query) {
-        url += sep + kv[0].get<std::string>() + "=" + Storage::S3::uri_encode(kv[1].get<std::string>(), true);
-        sep = '&';
-    }
-    return url;
-}
-
-Net::Http::Request request_of(const std::string& api_url, const std::string& token, const json& req) {
-    Net::Http::Request r;
-    r.method = req.value("method", "GET");
-    r.url = url_of(api_url, req.value("path", ""), req.value("query", json::array()));
-    r.headers = {{"Authorization", "Bearer " + token}, {"Accept", "application/json"}};
-    if (req.contains("body")) {
-        r.body = req["body"].dump();
-        r.content_type = "application/json";
-    }
-    r.timeout_seconds = 20;
-    return r;
-}
-
-/// The data of a GET as the user; nullopt when the API refused it.
-std::optional<json> read(Net::Http::Transport& transport,
-                         const std::string& api_url,
-                         const std::string& token,
-                         const std::string& path,
-                         json query) {
-    const auto res = transport.send(request_of(api_url, token, json{{"path", path}, {"query", std::move(query)}}));
-    const auto body = json::parse(res.body, nullptr, /*allow_exceptions=*/false);
-    if (res.status != 200 || !body.is_object() || !body.contains("data")) {
-        return std::nullopt;
-    }
-    return std::optional<json>(std::in_place, body["data"]);
-}
-
 Proposed create_task(const json& args, const std::string& tz) {
     const std::string title = text_arg(args, "title");
     if (title.empty() || length(title) > 200) {
@@ -136,12 +99,12 @@ Proposed complete_task(Net::Http::Transport& transport,
     if (words.empty()) {
         return refusal("invalid", "say which task: words of its title");
     }
-    const auto found =
-        read(transport,
-             api_url,
-             token,
-             "/api/v1/tasks/items",
-             json::array({json::array({"q", cut(words, 200)}), json::array({"limit", "10"}), json::array({"tz", tz})}));
+    const auto found = SiteApi::read_data(
+        transport,
+        api_url,
+        token,
+        "/api/v1/tasks/items",
+        json::array({json::array({"q", cut(words, 200)}), json::array({"limit", "10"}), json::array({"tz", tz})}));
     if (!found || !found->is_array()) {
         return refusal("unavailable", "the tasks could not be read");
     }
@@ -186,7 +149,7 @@ Proposed check_habit(Net::Http::Transport& transport,
     if (name.empty()) {
         return refusal("invalid", "say which habit: its name as the habits tool gives it");
     }
-    const auto habits = read(transport, api_url, token, "/api/v1/habits", json::array());
+    const auto habits = SiteApi::read_data(transport, api_url, token, "/api/v1/habits", json::array());
     if (!habits || !habits->is_array()) {
         return refusal("unavailable", "the habits could not be read");
     }
@@ -435,9 +398,9 @@ Proposed add_spend(Net::Http::Transport& transport,
         return refusal("invalid", "lines are 1 to " + std::to_string(kMaxLines) + " objects");
     }
     const json archived = json::array({json::array({"archived", "true"})});
-    const auto accounts = read(transport, api_url, token, "/api/v1/money/accounts", archived);
-    const auto categories = read(transport, api_url, token, "/api/v1/money/categories", archived);
-    const auto currencies = read(transport, api_url, token, "/api/v1/money/currencies", json::array());
+    const auto accounts = SiteApi::read_data(transport, api_url, token, "/api/v1/money/accounts", archived);
+    const auto categories = SiteApi::read_data(transport, api_url, token, "/api/v1/money/categories", archived);
+    const auto currencies = SiteApi::read_data(transport, api_url, token, "/api/v1/money/currencies", json::array());
     if (!accounts || !accounts->is_array() || !categories || !categories->is_array() || !currencies ||
         !currencies->is_array()) {
         return refusal("unavailable", "the money accounts could not be read");
@@ -465,11 +428,12 @@ Proposed add_spend(Net::Http::Transport& transport,
         // What the ledger remembers of the merchant: its category and the account used last.
         json memory = json::object();
         if (!merchant.empty()) {
-            const auto found = read(transport,
-                                    api_url,
-                                    token,
-                                    "/api/v1/money/merchants",
-                                    json::array({json::array({"q", merchant}), json::array({"limit", "5"})}));
+            const auto found =
+                SiteApi::read_data(transport,
+                                   api_url,
+                                   token,
+                                   "/api/v1/money/merchants",
+                                   json::array({json::array({"q", merchant}), json::array({"limit", "5"})}));
             for (const auto& m : found && found->is_array() ? *found : json::array()) {
                 if (m.is_object() && m.value("merchant_key", "") == ::Money::merchant_key(merchant)) {
                     memory = m;
@@ -567,7 +531,7 @@ std::variant<std::string, Proposed> chat_title(Net::Http::Transport& transport,
                                                const std::string& api_url,
                                                const std::string& token,
                                                const std::string& chat) {
-    const auto data = read(transport, api_url, token, "/api/v1/telegram/chats/" + chat, json::array());
+    const auto data = SiteApi::read_data(transport, api_url, token, "/api/v1/telegram/chats/" + chat, json::array());
     if (!data || !data->is_object()) {
         return Proposed{refusal("not_available", "this chat is not known or Telegram is off for the person")};
     }
@@ -713,8 +677,8 @@ std::variant<json, Proposed> calendar_event(Net::Http::Transport& transport,
                                             const std::string& token,
                                             const std::string& tz,
                                             const std::string& id) {
-    const auto data =
-        read(transport, api_url, token, "/api/v1/calendar/events/" + id, json::array({json::array({"tz", tz})}));
+    const auto data = SiteApi::read_data(
+        transport, api_url, token, "/api/v1/calendar/events/" + id, json::array({json::array({"tz", tz})}));
     if (!data || !data->is_object() || (!data->value("all_day", false) && !offset_of(data->value("start_local", "")))) {
         return Proposed{refusal("not_available", "this event is not in the person's calendar")};
     }
@@ -976,7 +940,7 @@ std::string execute(Net::Http::Transport& transport,
     const int attempts = request.value("retry", false) ? 2 : 1;
     for (int attempt = 1;; ++attempt) {
         try {
-            res = transport.send(request_of(api_url, access_token, request));
+            res = transport.send(SiteApi::request_of(api_url, access_token, request));
             break;
         } catch (const Net::Http::TransportError& e) {
             spdlog::warn("ani agent: an action got no answer (try {} of {}): {}", attempt, attempts, e.what());

@@ -5,17 +5,15 @@
 
 #include "agent/Tools.hpp"
 
-#include <spdlog/spdlog.h>
-
 #include "agent/Actions.hpp"
 #include "agent/CalendarTools.hpp"
+#include "agent/SiteApi.hpp"
 #include "agent/TelegramTools.hpp"
 #include "agent/ToolArgs.hpp"
 #include "repositories/UserRepository.hpp"
 #include "security/ApiKeys.hpp"
 #include "security/Auth.hpp"
 #include "security/Jwt.hpp"
-#include "storage/S3Presign.hpp"
 #include "utils/Date.hpp"
 #include "utils/Time.hpp"
 #include "utils/Utf8.hpp"
@@ -169,22 +167,12 @@ Gateway::ToolRunner runner(Net::Http::Transport& transport,
         if (!call) {
             return ToolArgs::refusal("unknown_tool", "there is no tool " + name);
         }
-        std::string url = api_url + call->path;
-        char sep = '?';
+        json query = json::array();
         for (const auto& [k, v] : call->query) {
-            url += sep + k + "=" + Storage::S3::uri_encode(v, true);
-            sep = '&';
+            query.push_back(json::array({k, v}));
         }
-        Net::Http::Request r;
-        r.url = url;
-        r.headers = {{"Authorization", "Bearer " + access_token}, {"Accept", "application/json"}};
-        r.timeout_seconds = 20;
-        try {
-            return result_text(transport.send(r));
-        } catch (const Net::Http::TransportError& e) {
-            spdlog::warn("ani agent: the tool {} got no answer: {}", name, e.what());
-            return ToolArgs::refusal("unavailable", "Life OS did not answer");
-        }
+        return SiteApi::tool_result(
+            transport, api_url, access_token, json{{"path", call->path}, {"query", query}}, /*keep_ids=*/false, name);
     };
 }
 
