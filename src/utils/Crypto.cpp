@@ -20,14 +20,7 @@ namespace Utils::Crypto {
 namespace detail {
 
 std::string bytes_to_hex(const unsigned char* data, std::size_t n) {
-    static const char* hex = "0123456789abcdef";
-    std::string out;
-    out.reserve(n * 2);
-    for (std::size_t i = 0; i < n; ++i) {
-        out.push_back(hex[data[i] >> 4]);
-        out.push_back(hex[data[i] & 0xF]);
-    }
-    return out;
+    return to_hex(data, n);
 }
 
 }  // namespace detail
@@ -60,7 +53,7 @@ std::string random_hex(std::size_t byte_count) {
     if (RAND_bytes(buf, static_cast<int>(byte_count)) != 1) {
         throw std::runtime_error("CSPRNG (RAND_bytes) failed");
     }
-    return detail::bytes_to_hex(buf, byte_count);
+    return to_hex(buf, byte_count);
 }
 
 std::string sha256_hex(std::string_view s) {
@@ -78,7 +71,7 @@ std::string sha256_hex(std::string_view s) {
         throw std::runtime_error("EVP SHA-256 digest failed");
     }
     EVP_MD_CTX_free(ctx);
-    return detail::bytes_to_hex(hash, len);
+    return to_hex(hash, len);
 }
 
 }  // namespace Utils::Crypto

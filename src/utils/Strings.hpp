@@ -139,4 +139,20 @@ std::unordered_set<std::string> merge_csv_sets(const std::string& base_csv, cons
 /// PII stays out of the logs.
 std::string mask_email(const std::string& email);
 
+/// RFC 3986 percent-encoding: every byte outside the unreserved set
+/// (ALPHA DIGIT - _ . ~) becomes %XX with upper-case hex, UTF-8 bytes
+/// included. A space is %20, never '+'. With @p keep_slash a '/' stays as
+/// is (an S3 object key path). Explicit ASCII ranges, so the locale cannot
+/// change the output. This is percent-encoding, not base64url
+/// (Utils::Base64::url_encode).
+std::string percent_encode(std::string_view s, bool keep_slash = false);
+
+/// @p s with ASCII 'A'-'Z' lowered; every other byte (UTF-8 included) is
+/// kept as is, whatever the locale.
+std::string ascii_lower(std::string_view s);
+
+/// A UUID in the 8-4-4-4-12 hex form, any case: dashes at 8, 13, 18 and 23,
+/// hex digits everywhere else, 36 characters in all.
+bool is_uuid(std::string_view s);
+
 }  // namespace Utils::Strings

@@ -6,6 +6,7 @@
 
 #include "utils/Strings.hpp"
 
+#include <cstddef>
 #include <cstdlib>
 #include <sstream>
 #include <utility>
@@ -81,6 +82,59 @@ std::string mask_email(const std::string& email) {
     const std::string domain = (at == std::string::npos) ? std::string() : email.substr(at);  // includes '@'
     const std::string masked = (local.size() > 1) ? (std::string(1, local[0]) + "***") : "***";
     return masked + domain;
+}
+
+namespace {
+
+bool is_unreserved(unsigned char c) {
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' ||
+           c == '.' || c == '~';
+}
+
+bool is_hex_digit(char c) {
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+}  // namespace
+
+std::string percent_encode(std::string_view s, bool keep_slash) {
+    static constexpr char kHex[] = "0123456789ABCDEF";
+    std::string out;
+    out.reserve(s.size());
+    for (const char c : s) {
+        const auto byte = static_cast<unsigned char>(c);
+        if (is_unreserved(byte) || (keep_slash && byte == '/')) {
+            out.push_back(c);
+        } else {
+            out.push_back('%');
+            out.push_back(kHex[byte >> 4]);
+            out.push_back(kHex[byte & 0x0f]);
+        }
+    }
+    return out;
+}
+
+std::string ascii_lower(std::string_view s) {
+    std::string out(s);
+    for (char& c : out) {
+        if (c >= 'A' && c <= 'Z') {
+            c = static_cast<char>(c - 'A' + 'a');
+        }
+    }
+    return out;
+}
+
+bool is_uuid(std::string_view s) {
+    if (s.size() != 36) {
+        return false;
+    }
+    for (std::size_t i = 0; i < s.size(); ++i) {
+        const bool dash = i == 8 || i == 13 || i == 18 || i == 23;
+        if (dash ? s[i] != '-' : !is_hex_digit(s[i])) {
+            return false;
+        }
+    }
+    return true;
 }
 
 }  // namespace Utils::Strings

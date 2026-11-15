@@ -8,8 +8,10 @@
 # carries the parser under test; those TUs are kept std-only (or std+nlohmann
 # for the config expander) exactly so this works:
 #
-#   fuzz_traceparent   <- src/observability/Trace.cpp      (std only)
-#   fuzz_decimal_cents <- src/billing/PayPalParse.cpp      (std only)
+#   fuzz_traceparent   <- src/observability/Trace.cpp      (std only;
+#                         + src/utils/Strings.cpp for ascii_lower)
+#   fuzz_decimal_cents <- src/billing/PayPalParse.cpp      (std only;
+#                         + src/utils/Strings.cpp for percent_encode)
 #   fuzz_path_match    <- src/utils/Strings.cpp            (std only;
 #                         normalize_path_for_metrics is header-only)
 #   fuzz_config_expand <- src/utils/ConfigExpand.cpp       (std + nlohmann)
@@ -64,8 +66,10 @@ function(add_fuzz_target name)
     target_link_options(${name} PRIVATE ${FUZZ_SAN_FLAGS})
 endfunction()
 
-add_fuzz_target(fuzz_traceparent   ${FUZZ_REPO_ROOT}/src/observability/Trace.cpp)
-add_fuzz_target(fuzz_decimal_cents ${FUZZ_REPO_ROOT}/src/billing/PayPalParse.cpp)
+add_fuzz_target(fuzz_traceparent   ${FUZZ_REPO_ROOT}/src/observability/Trace.cpp
+                                   ${FUZZ_REPO_ROOT}/src/utils/Strings.cpp)
+add_fuzz_target(fuzz_decimal_cents ${FUZZ_REPO_ROOT}/src/billing/PayPalParse.cpp
+                                   ${FUZZ_REPO_ROOT}/src/utils/Strings.cpp)
 add_fuzz_target(fuzz_path_match    ${FUZZ_REPO_ROOT}/src/utils/Strings.cpp)
 add_fuzz_target(fuzz_config_expand ${FUZZ_REPO_ROOT}/src/utils/ConfigExpand.cpp)
 
