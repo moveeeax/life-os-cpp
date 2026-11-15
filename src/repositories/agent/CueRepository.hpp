@@ -84,7 +84,6 @@ public:
                             owner,
                             date,
                             kKeepDays);
-            return true;
         });
     }
 

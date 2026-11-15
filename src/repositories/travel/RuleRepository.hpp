@@ -130,7 +130,6 @@ public:
             if (r.empty()) {
                 throw NotFound("rule");
             }
-            return true;
         });
     }
 

@@ -67,7 +67,7 @@ IdCheck check_user_id(const std::string& id) {
 
 std::int64_t balance_of(const std::string& user_id, bool from_primary) {
     auto query = [&](auto& txn) -> std::int64_t { return detail::read_balance(txn, user_id); };
-    return from_primary ? Database::get().execute_read_primary(query) : Database::get().execute_read(query);
+    return Database::get().execute_read(from_primary, query);
 }
 
 std::vector<Domain::WalletEntry> history(const std::string& user_id, int limit, int offset, bool from_primary) {
@@ -84,7 +84,7 @@ std::vector<Domain::WalletEntry> history(const std::string& user_id, int limit, 
             out.push_back(Domain::WalletEntry::from_row(row));
         return out;
     };
-    return from_primary ? Database::get().execute_read_primary(query) : Database::get().execute_read(query);
+    return Database::get().execute_read(from_primary, query);
 }
 
 CreditResult credit_capture(const std::string& provider_order_id,

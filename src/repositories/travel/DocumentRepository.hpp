@@ -79,7 +79,6 @@ public:
             if (r.empty()) {
                 throw NotFound("document");
             }
-            return true;
         });
     }
 

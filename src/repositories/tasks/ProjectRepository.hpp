@@ -149,7 +149,6 @@ public:
             if (r.empty()) {
                 throw NotFound("project");
             }
-            return true;
         });
     }
 

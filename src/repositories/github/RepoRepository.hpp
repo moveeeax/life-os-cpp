@@ -108,7 +108,6 @@ public:
                     r.has_readme,
                     r.attention.dump());
             }
-            return true;
         });
     }
 
@@ -257,7 +256,6 @@ public:
                 owner,
                 full_name,
                 rule);
-            return true;
         });
     }
 

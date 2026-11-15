@@ -47,7 +47,6 @@ public:
                 owner,
                 tz,
                 kBackfillDays);
-            return true;
         });
         return Database::get().execute_read_primary([&](auto& txn) {
             return txn

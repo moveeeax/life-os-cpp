@@ -129,7 +129,6 @@ public:
                     .empty()) {
                 throw NotFound("entry");
             }
-            return true;
         });
     }
 

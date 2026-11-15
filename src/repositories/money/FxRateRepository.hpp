@@ -36,7 +36,6 @@ public:
                     quote,
                     rate);
             }
-            return true;
         });
     }
 

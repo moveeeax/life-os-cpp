@@ -59,7 +59,7 @@ public:
                 return std::nullopt;
             return Entity::from_row(r[0]);
         };
-        return from_primary ? Database::get().execute_read_primary(query) : Database::get().execute_read(query);
+        return Database::get().execute_read(from_primary, query);
     }
 
     std::vector<Entity> list(int limit = 100, int offset = 0) {
@@ -97,7 +97,7 @@ public:
                 return std::nullopt;
             return Entity::from_row(r[0]);
         };
-        return from_primary ? Database::get().execute_read_primary(query) : Database::get().execute_read(query);
+        return Database::get().execute_read(from_primary, query);
     }
 
     std::vector<Entity> list_owned(const std::string& owner_id, int limit = 100, int offset = 0) {

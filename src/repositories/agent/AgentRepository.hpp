@@ -65,7 +65,6 @@ public:
                 "UPDATE ani_agents SET last_active_at = now() WHERE owner_id = $1::uuid AND state IN ('starting', "
                 "'running')",
                 owner);
-            return true;
         });
     }
 
@@ -170,7 +169,6 @@ public:
                 "INSERT INTO ani_agents (owner_id, chat_session) VALUES ($1::uuid, 1) "
                 "ON CONFLICT (owner_id) DO UPDATE SET chat_session = ani_agents.chat_session + 1",
                 owner);
-            return true;
         });
     }
 
@@ -195,7 +193,6 @@ public:
                 owner,
                 prompt_tokens,
                 completion_tokens);
-            return true;
         });
     }
 

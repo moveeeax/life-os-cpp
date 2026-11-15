@@ -180,7 +180,6 @@ public:
             if (r.empty()) {
                 throw NotFound("trip");
             }
-            return true;
         });
     }
 
@@ -272,7 +271,6 @@ public:
             if (r.empty()) {
                 throw NotFound("trip_item");
             }
-            return true;
         });
     }
 

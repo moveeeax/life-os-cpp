@@ -132,7 +132,6 @@ public:
                     .empty()) {
                 throw MeasurementNotFound();
             }
-            return true;
         });
     }
 

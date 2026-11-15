@@ -278,7 +278,6 @@ public:
             if (r.empty()) {
                 throw NotFound("money_transaction");
             }
-            return true;
         });
     }
 

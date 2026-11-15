@@ -98,7 +98,6 @@ public:
             if (r.empty()) {
                 throw WallpaperNotFound();
             }
-            return true;
         });
     }
 
@@ -151,7 +150,6 @@ public:
             if (r.empty()) {
                 throw WallpaperNotFound();
             }
-            return true;
         });
     }
 

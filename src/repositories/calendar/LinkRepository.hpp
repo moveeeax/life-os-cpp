@@ -34,7 +34,6 @@ public:
             txn.exec_params("DELETE FROM calendar_states WHERE created_at < now() - make_interval(secs => $1)",
                             kStateSeconds);
             txn.exec_params("INSERT INTO calendar_states (state, owner_id) VALUES ($1, $2::uuid)", state, owner);
-            return true;
         });
         return state;
     }
@@ -120,7 +119,6 @@ public:
                 email,
                 sealed,
                 nonce);
-            return true;
         });
     }
 

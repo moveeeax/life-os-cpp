@@ -89,7 +89,6 @@ public:
             if (r.empty()) {
                 throw SoundNotFound();
             }
-            return true;
         });
     }
 
@@ -139,7 +138,6 @@ public:
             if (r.empty()) {
                 throw SoundNotFound();
             }
-            return true;
         });
     }
 

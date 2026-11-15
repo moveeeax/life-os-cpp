@@ -132,7 +132,6 @@ public:
             if (r.empty()) {
                 throw NotFound();
             }
-            return true;
         });
     }
 
@@ -206,7 +205,6 @@ public:
                 owner,
                 habit,
                 date);
-            return true;
         });
     }
 

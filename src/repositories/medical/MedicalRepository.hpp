@@ -201,7 +201,6 @@ public:
                 throw PersonInUse();
             }
             txn.exec_params("DELETE FROM medical_people WHERE owner_id = $1::uuid AND id = $2::uuid", owner, id);
-            return true;
         });
     }
 
@@ -301,7 +300,6 @@ public:
             if (r.empty()) {
                 throw NotFound("provider");
             }
-            return true;
         });
     }
 
@@ -407,7 +405,6 @@ public:
             if (r.empty()) {
                 throw NotFound("visit");
             }
-            return true;
         });
     }
 
@@ -579,7 +576,6 @@ public:
             if (r.empty()) {
                 throw NotFound("record");
             }
-            return true;
         });
     }
 
@@ -711,7 +707,6 @@ public:
             if (r.empty()) {
                 throw NotFound("medication");
             }
-            return true;
         });
     }
 

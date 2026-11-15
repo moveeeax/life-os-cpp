@@ -252,7 +252,6 @@ public:
             if (r.empty()) {
                 throw NotFound("task");
             }
-            return true;
         });
     }
 

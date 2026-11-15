@@ -178,7 +178,6 @@ public:
                 nonce_b64,
                 credentials.region,
                 region_detected);
-            return true;
         });
     }
 
@@ -262,7 +261,6 @@ public:
                 "UPDATE mi_accounts SET status = 'ok', last_ok_at = now(), last_error = NULL "
                 "WHERE owner_id = $1::uuid",
                 owner_id);
-            return true;
         });
     }
 

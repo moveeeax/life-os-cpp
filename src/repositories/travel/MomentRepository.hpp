@@ -94,7 +94,6 @@ public:
             if (r.empty()) {
                 throw NotFound("trip_moment");
             }
-            return true;
         });
     }
 

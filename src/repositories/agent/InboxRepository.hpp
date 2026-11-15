@@ -178,7 +178,6 @@ public:
                 txn.exec_params(
                     "UPDATE ani_inbox SET turn_id = $2::uuid WHERE id::text = $1 AND status = 'thinking'", id, turn_id);
             }
-            return true;
         });
     }
 
@@ -198,7 +197,6 @@ public:
                 "$1::text) ELSE i.payload END WHERE i.turn_id = $1::uuid AND i.status = 'thinking'",
                 turn_id,
                 say);
-            return true;
         });
     }
 
@@ -207,7 +205,6 @@ public:
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params("UPDATE ani_inbox SET status = 'failed' WHERE turn_id = $1::uuid AND status = 'thinking'",
                             turn_id);
-            return true;
         });
     }
 
@@ -219,7 +216,6 @@ public:
                 "UPDATE ani_inbox SET status = 'failed' WHERE owner_id = $1::uuid AND status = 'thinking' AND "
                 "turn_id IS NULL",
                 owner);
-            return true;
         });
     }
 
@@ -326,10 +322,8 @@ public:
 
     /// Puts a callback back to be sent again (its job could not be queued).
     void unsend(const std::string& id) {
-        Database::get().execute_write([&](auto& txn) {
-            txn.exec_params("UPDATE ani_inbox SET callback_sent = false WHERE id::text = $1", id);
-            return true;
-        });
+        Database::get().execute_write(
+            [&](auto& txn) { txn.exec_params("UPDATE ani_inbox SET callback_sent = false WHERE id::text = $1", id); });
     }
 
     /// Marks unplayed items past their time expired and deletes ended rows

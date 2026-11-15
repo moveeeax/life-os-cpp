@@ -88,7 +88,6 @@ public:
             if (r.empty()) {
                 throw NotFound("task_note");
             }
-            return true;
         });
     }
 

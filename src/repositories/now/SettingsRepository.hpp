@@ -79,7 +79,6 @@ public:
                 "ON CONFLICT (owner_id) DO UPDATE SET corners = EXCLUDED.corners",
                 owner,
                 corners.dump());
-            return true;
         });
     }
 
@@ -91,7 +90,6 @@ public:
                 "ON CONFLICT (owner_id) DO UPDATE SET widgets = EXCLUDED.widgets",
                 owner,
                 widgets.dump());
-            return true;
         });
     }
 
@@ -103,7 +101,6 @@ public:
                 "ON CONFLICT (owner_id) DO UPDATE SET links = EXCLUDED.links",
                 owner,
                 links.dump());
-            return true;
         });
     }
 };

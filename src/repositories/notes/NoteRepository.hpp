@@ -167,7 +167,6 @@ public:
                     .empty()) {
                 throw NotFound();
             }
-            return true;
         });
     }
 

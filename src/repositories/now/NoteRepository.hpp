@@ -34,14 +34,12 @@ public:
                 owner,
                 date,
                 text);
-            return true;
         });
     }
 
     void remove(const std::string& owner, const std::string& date) {
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params("DELETE FROM day_note WHERE owner_id = $1::uuid AND date = $2::date", owner, date);
-            return true;
         });
     }
 };

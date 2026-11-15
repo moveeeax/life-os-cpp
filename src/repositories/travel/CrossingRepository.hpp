@@ -83,7 +83,6 @@ public:
             if (r.empty()) {
                 throw NotFound("crossing");
             }
-            return true;
         });
     }
 

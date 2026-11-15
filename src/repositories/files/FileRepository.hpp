@@ -226,10 +226,8 @@ public:
 
     /// Forgets a purge once its object is gone.
     void forget_purge(const std::string& key) {
-        Database::get().execute_write([&](auto& txn) {
-            txn.exec_params("DELETE FROM private_file_purges WHERE object_key = $1", key);
-            return true;
-        });
+        Database::get().execute_write(
+            [&](auto& txn) { txn.exec_params("DELETE FROM private_file_purges WHERE object_key = $1", key); });
     }
 
 private:

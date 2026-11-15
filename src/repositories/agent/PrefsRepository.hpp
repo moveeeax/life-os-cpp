@@ -43,7 +43,6 @@ public:
                 "jsonb_array_elements_text($2::jsonb))) ON CONFLICT (owner_id) DO UPDATE SET muted = EXCLUDED.muted",
                 owner,
                 list.dump());
-            return true;
         });
     }
 
@@ -56,7 +55,6 @@ public:
                 "EXCLUDED.hold_until",
                 owner,
                 minutes);
-            return true;
         });
     }
 

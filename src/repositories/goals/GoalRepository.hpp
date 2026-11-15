@@ -148,7 +148,6 @@ public:
             if (r.empty()) {
                 throw NotFound("goal");
             }
-            return true;
         });
     }
 
@@ -471,7 +470,6 @@ private:
             if (r.empty()) {
                 throw NotFound(what);
             }
-            return true;
         });
     }
 };

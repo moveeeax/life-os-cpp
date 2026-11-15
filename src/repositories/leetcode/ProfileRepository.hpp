@@ -61,7 +61,6 @@ public:
                 owner,
                 username,
                 tz);
-            return true;
         });
     }
 
@@ -102,7 +101,6 @@ public:
                 hard);
             txn.exec_params(
                 "UPDATE leetcode_profiles SET synced_at = now(), last_error = NULL WHERE owner_id = $1::uuid", owner);
-            return true;
         });
     }
 
@@ -110,7 +108,6 @@ public:
         Database::get().execute_write([&](auto& txn) {
             txn.exec_params(
                 "UPDATE leetcode_profiles SET last_error = left($2, 200) WHERE owner_id = $1::uuid", owner, why);
-            return true;
         });
     }
 };

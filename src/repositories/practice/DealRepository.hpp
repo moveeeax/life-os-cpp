@@ -145,7 +145,6 @@ public:
                     .empty()) {
                 throw NotFound("deal");
             }
-            return true;
         });
     }
 
