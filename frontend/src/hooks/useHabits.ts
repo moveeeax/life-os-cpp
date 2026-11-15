@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { useDeleteEntity, useSaveEntity } from '@/hooks/crud';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { HABITS_PROBE } from '@/hooks/moduleProbes';
 import { useModuleOn } from '@/hooks/useModuleProbe';
@@ -60,13 +61,7 @@ export function useHabitDays(from: string, to: string, enabled = true) {
 }
 
 export function useSaveHabit(id: string | null, onSuccess?: () => void) {
-  return useApiMutation(
-    async (body: HabitInput) =>
-      id
-        ? (await api.patchJson<{ data: Habit }>(`${BASE}/${id}`, { body })).data
-        : (await api.postJson<{ data: Habit }>(BASE, { body })).data,
-    { invalidate: HABIT_WRITES, onSuccess },
-  );
+  return useSaveEntity<HabitInput, Habit>(BASE, id, { invalidate: HABIT_WRITES, onSuccess });
 }
 
 export function useArchiveHabit(onSuccess?: () => void) {
@@ -78,10 +73,7 @@ export function useArchiveHabit(onSuccess?: () => void) {
 }
 
 export function useDeleteHabit(onSuccess?: () => void) {
-  return useApiMutation((id: string) => api.deleteJson<unknown>(`${BASE}/${id}`), {
-    invalidate: HABIT_WRITES,
-    onSuccess,
-  });
+  return useDeleteEntity(BASE, { invalidate: HABIT_WRITES, onSuccess });
 }
 
 /**

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { useDeleteEntity } from '@/hooks/crud';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
 import { NOW_DIGEST, qk } from '@/lib/api/queryKeys';
@@ -90,10 +91,7 @@ export function useSaveGoal(id: string | null, onSuccess?: () => void) {
 }
 
 export function useDeleteGoal(onSuccess?: () => void) {
-  return useApiMutation((id: string) => api.deleteJson<unknown>(`${BASE}/${id}`), {
-    invalidate: ALL,
-    onSuccess,
-  });
+  return useDeleteEntity(BASE, { invalidate: ALL, onSuccess });
 }
 
 export function usePutCheckin(goalId: string, onSuccess?: () => void) {

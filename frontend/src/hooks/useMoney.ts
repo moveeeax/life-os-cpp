@@ -6,6 +6,7 @@ import {
   type QueryClient,
 } from '@tanstack/react-query';
 
+import { useSaveEntity } from '@/hooks/crud';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { useBatchMutation } from '@/hooks/useBatchMutation';
 import { useParseJob } from '@/hooks/useParseJob';
@@ -396,13 +397,10 @@ export function useDeleteTransfer(onSuccess?: () => void) {
 
 /** A new code goes through POST (upsert); an existing one through PATCH. */
 export function useSaveCurrency(code: string | null, onSuccess?: () => void) {
-  return useApiMutation(
-    async (body: CurrencyInput | CurrencyPatch) =>
-      code
-        ? (await api.patchJson<{ data: Currency }>(`${BASE}/currencies/${code}`, { body })).data
-        : (await api.postJson<{ data: Currency }>(`${BASE}/currencies`, { body })).data,
-    { invalidate: ALL, onSuccess },
-  );
+  return useSaveEntity<CurrencyInput | CurrencyPatch, Currency>(`${BASE}/currencies`, code, {
+    invalidate: ALL,
+    onSuccess,
+  });
 }
 
 /** Where a merchant's next rows are suggested; past rows keep their category. */
@@ -415,13 +413,10 @@ export function useMoveMerchant(onSuccess?: () => void) {
 }
 
 export function useSaveAccount(id: string | null, onSuccess?: () => void) {
-  return useApiMutation(
-    async (body: AccountInput | AccountPatch) =>
-      id
-        ? (await api.patchJson<{ data: Account }>(`${BASE}/accounts/${id}`, { body })).data
-        : (await api.postJson<{ data: Account }>(`${BASE}/accounts`, { body })).data,
-    { invalidate: ALL, onSuccess },
-  );
+  return useSaveEntity<AccountInput | AccountPatch, Account>(`${BASE}/accounts`, id, {
+    invalidate: ALL,
+    onSuccess,
+  });
 }
 
 export function useDeleteAccount(onSuccess?: (outcome: string) => void) {
@@ -433,13 +428,10 @@ export function useDeleteAccount(onSuccess?: (outcome: string) => void) {
 }
 
 export function useSaveCategory(id: string | null, onSuccess?: () => void) {
-  return useApiMutation(
-    async (body: CategoryInput | CategoryPatch) =>
-      id
-        ? (await api.patchJson<{ data: Category }>(`${BASE}/categories/${id}`, { body })).data
-        : (await api.postJson<{ data: Category }>(`${BASE}/categories`, { body })).data,
-    { invalidate: ALL, onSuccess },
-  );
+  return useSaveEntity<CategoryInput | CategoryPatch, Category>(`${BASE}/categories`, id, {
+    invalidate: ALL,
+    onSuccess,
+  });
 }
 
 export function useDeleteCategory(onSuccess?: (outcome: string) => void) {
