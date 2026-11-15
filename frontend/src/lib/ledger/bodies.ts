@@ -1,4 +1,5 @@
 /** The POST bodies of the add form, as the form built them inline (pinned by bodies.test.ts). */
+import { isDay } from '@/lib/dates';
 
 export interface ManualInput {
   type: 'expense' | 'income';
@@ -56,4 +57,25 @@ export function transferBody(i: TransferInput) {
     name: `${i.fromName} → ${i.toName}`.slice(0, 200),
     note: i.note,
   };
+}
+
+export interface TransferAmounts {
+  date: string;
+  sent: number | null;
+  received: number | null;
+  needsReceived: boolean;
+  fee: string;
+  f: number | null;
+}
+
+/**
+ * The first field that keeps a transfer from being sent, or null when it can
+ * go: the add form's transfer tab and the transfer editor share this rule.
+ */
+export function transferProblem(i: TransferAmounts): 'sent' | 'received' | 'fee' | 'date' | null {
+  if (i.sent === null || !(i.sent > 0)) return 'sent';
+  if (i.needsReceived && (i.received === null || !(i.received > 0))) return 'received';
+  if (i.fee.trim() !== '' && (i.f === null || !(i.f >= 0))) return 'fee';
+  if (!isDay(i.date)) return 'date';
+  return null;
 }

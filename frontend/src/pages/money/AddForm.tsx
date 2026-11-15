@@ -29,7 +29,7 @@ import {
   type Category,
   type DraftLine,
 } from '@/lib/ledger';
-import { manualBody, transferBody } from '@/lib/ledger/bodies';
+import { manualBody, transferBody, transferProblem } from '@/lib/ledger/bodies';
 import { parseAmount } from '@/lib/amounts';
 import { cn } from '@/lib/utils';
 
@@ -41,6 +41,8 @@ import {
   secondaryButton,
   textareaClass,
 } from '@/shell/kit/styles';
+
+import { AccountSelect, CategorySelect } from './bits';
 
 type Tab = 'manual' | 'describe' | 'receipt' | 'transfer';
 
@@ -60,78 +62,6 @@ const writeLast = (id: string) => {
     // a private window: the form just does not remember
   }
 };
-
-function AccountSelect({
-  id,
-  value,
-  onChange,
-  accounts,
-  label = 'Account',
-}: {
-  id: string;
-  value: string;
-  onChange: (v: string) => void;
-  accounts: Account[];
-  label?: string;
-}) {
-  return (
-    <div>
-      <label htmlFor={id} className={labelClass}>
-        {label}
-      </label>
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={inputClass}
-      >
-        <option value="">Pick the account</option>
-        {accounts.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.name} · {a.currency}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function CategorySelect({
-  id,
-  value,
-  onChange,
-  categories,
-  kind,
-}: {
-  id: string;
-  value: string;
-  onChange: (v: string) => void;
-  categories: Category[];
-  kind: 'income' | 'expense';
-}) {
-  return (
-    <div>
-      <label htmlFor={id} className={labelClass}>
-        Category
-      </label>
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={inputClass}
-      >
-        <option value="">Pick a category</option>
-        {categories
-          .filter((c) => c.kind === kind)
-          .map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-      </select>
-    </div>
-  );
-}
 
 // ── manual ─────────────────────────────────────────────────────────────────
 
@@ -647,11 +577,7 @@ function TransferTab({ onDone, accounts }: { onDone: () => void; accounts: Accou
     !!from &&
     !!to &&
     from !== to &&
-    s !== null &&
-    s > 0 &&
-    (!needsReceived || (r !== null && r > 0)) &&
-    (fee.trim() === '' || (f !== null && f >= 0)) &&
-    isDay(date);
+    transferProblem({ date, sent: s, received: r, needsReceived, fee, f }) === null;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();

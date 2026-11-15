@@ -7,12 +7,12 @@ import {
   decimalsOf,
   formatDay,
   formatMoney,
-  isDay,
   rateLine,
   type Account,
   type Currency,
   type Transfer,
 } from '@/lib/ledger';
+import { transferProblem } from '@/lib/ledger/bodies';
 import { parseAmount } from '@/lib/amounts';
 
 import { Num, Row } from '@/shell/kit';
@@ -42,12 +42,7 @@ function TransferEditor({ transfer, onClose }: { transfer: Transfer; onClose: ()
   const s = num(sent);
   const r = num(received);
   const f = num(fee);
-  const ok =
-    isDay(date) &&
-    s !== null &&
-    s > 0 &&
-    (!cross || (r !== null && r > 0)) &&
-    (fee.trim() === '' || (f !== null && f >= 0));
+  const ok = transferProblem({ date, sent: s, received: r, needsReceived: cross, fee, f }) === null;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();

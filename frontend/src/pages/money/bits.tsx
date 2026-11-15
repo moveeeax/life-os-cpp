@@ -6,12 +6,94 @@ import {
   periodRange,
   shiftPeriod,
   signedAmount,
+  type Account,
+  type Category,
   type CurrencyTotal,
   type Currency,
   type PeriodKind,
   type Transaction,
 } from '@/lib/ledger';
 import { cn } from '@/lib/utils';
+import { inputClass, labelClass } from '@/shell/kit/styles';
+
+/** A labelled account picker: name and currency per option. */
+export function AccountSelect({
+  id,
+  value,
+  onChange,
+  accounts,
+  label = 'Account',
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  accounts: Account[];
+  label?: string;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className={labelClass}>
+        {label}
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={inputClass}
+      >
+        <option value="">Pick the account</option>
+        {accounts.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.name} · {a.currency}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+/**
+ * A labelled category picker over the categories of one kind. `placeholder`
+ * is the empty first option; null leaves it out (a saved row always has one).
+ */
+export function CategorySelect({
+  id,
+  value,
+  onChange,
+  categories,
+  kind,
+  placeholder = 'Pick a category',
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  categories: Category[];
+  kind: 'income' | 'expense';
+  placeholder?: string | null;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className={labelClass}>
+        Category
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={inputClass}
+      >
+        {placeholder !== null && <option value="">{placeholder}</option>}
+        {categories
+          .filter((c) => c.kind === kind)
+          .map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+      </select>
+    </div>
+  );
+}
 
 /** An amount in its currency, signed and colored by direction. */
 export function Amount({
