@@ -18,9 +18,9 @@
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
 #include "api/Validation.hpp"
-#include "database/Database.hpp"
 #include "email/AccountEmails.hpp"
 #include "repositories/ApiKeyRepository.hpp"
+#include "repositories/UsedTokenRepository.hpp"
 #include "repositories/UserRepository.hpp"
 #include "security/Auth.hpp"
 #include "security/Password.hpp"
@@ -343,16 +343,7 @@ std::optional<Domain::User> AccountController::verify_password_or_401(
 
 bool AccountController::consume_once(const std::string& token, int ttl_sec) {
     try {
-        const std::string hash = Utils::Crypto::sha256_hex(token);
-        return Database::get().execute_write([&](auto& txn) {
-            auto r = txn.exec_params(
-                "INSERT INTO used_tokens (token_hash, expires_at) "
-                "VALUES ($1, now() + make_interval(secs => $2)) "
-                "ON CONFLICT (token_hash) DO NOTHING RETURNING token_hash",
-                hash,
-                ttl_sec);
-            return !r.empty();  // a row came back ⇒ this is the first use
-        });
+        return Repositories::UsedTokenRepository().consume(Utils::Crypto::sha256_hex(token), ttl_sec);
     } catch (const std::exception& e) {
         spdlog::warn("consume_once: nonce write failed ({}) — refusing token (fail-closed)", e.what());
         return false;

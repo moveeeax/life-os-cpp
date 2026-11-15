@@ -154,19 +154,9 @@ std::optional<std::string> query_param(const HttpRequestPtr& req, const char* na
     return v;
 }
 
+/// An optional currency code field, as every Money body names one.
 void code_field(Validation::Errors& errs, const json& body, const std::string& field) {
-    if (!body.contains(field) || body[field].is_null()) {
-        return;
-    }
-    if (!body[field].is_string() || !std::regex_match(body[field].get<std::string>(), kCodeRe)) {
-        errs.add(field, "bad_format", "expected an ISO code like KZT");
-    }
-}
-
-void uuid_field(Validation::Errors& errs, const json& body, const std::string& field) {
-    if (body.contains(field) && !body[field].is_null()) {
-        Validation::uuid(errs, body, field);
-    }
+    Fields::currency_code(errs, body, field, "KZT");
 }
 
 /// Reads the owner's settings for the "as if" currency the pages remember.
@@ -191,20 +181,16 @@ bool transaction_input(const json& body,
         return false;
     }
     Validation::Errors local;
-    if (body.contains("type")) {
-        Validation::one_of(local, body, "type", kTypes);
-    }
+    Validation::one_of(local, body, "type", kTypes);
     Validation::require_string(local, body, "date");
     date_field(local, body, "date");
-    if (body.contains("time") && !body["time"].is_null()) {
-        Validation::regex_match(local, body, "time", std::regex(R"(^([01]\d|2[0-3]):[0-5]\d$)"), "expected HH:MM");
-    }
+    Validation::regex_match(local, body, "time", Fields::kTimeRe, "expected HH:MM");
     Validation::require_string(local, body, "account_id");
     Validation::uuid(local, body, "account_id");
     Validation::require(local, body, "amount");
     amount_range(local, body, "amount", -kAmountMax, kAmountMax);
-    uuid_field(local, body, "category_id");
-    uuid_field(local, body, "adjusts_id");
+    Validation::uuid(local, body, "category_id");
+    Validation::uuid(local, body, "adjusts_id");
     text_length(local, body, "merchant", 0, kNameMax);
     Validation::require_string(local, body, "name");
     text_length(local, body, "name", 1, kNameMax);
@@ -217,12 +203,8 @@ bool transaction_input(const json& body,
     text_length(local, body, "fx_note", 0, 200);
     text_length(local, body, "trip", 0, 60);
     text_length(local, body, "note", 0, kNoteMax);
-    if (body.contains("source")) {
-        Validation::one_of(local, body, "source", kSources);
-    }
-    if (body.contains("status")) {
-        Validation::one_of(local, body, "status", kStatuses);
-    }
+    Validation::one_of(local, body, "source", kSources);
+    Validation::one_of(local, body, "status", kStatuses);
     text_length(local, body, "external_id", 1, 120);
     if (local.any()) {
         for (const auto& e : local.errors_json()) {
@@ -312,9 +294,7 @@ void MoneyController::upsertCurrency(const HttpRequestPtr& req, Callback&& callb
     Validation::require_string(errs, body, "code");
     code_field(errs, body, "code");
     text_length(errs, body, "name", 0, 60);
-    if (body.contains("role") && !body["role"].is_null()) {
-        Validation::one_of(errs, body, "role", kRoles);
-    }
+    Validation::one_of(errs, body, "role", kRoles);
     Validation::int_range(errs, body, "decimals", 0, 8);
     text_length(errs, body, "minor_unit", 0, 30);
     Validation::boolean(errs, body, "archived");
@@ -356,9 +336,7 @@ void MoneyController::patchCurrency(const HttpRequestPtr& req, Callback&& callba
     }
     Validation::Errors errs;
     text_length(errs, body, "name", 0, 60);
-    if (body.contains("role") && !body["role"].is_null()) {
-        Validation::one_of(errs, body, "role", kRoles);
-    }
+    Validation::one_of(errs, body, "role", kRoles);
     Validation::int_range(errs, body, "decimals", 0, 8);
     text_length(errs, body, "minor_unit", 0, 30);
     Validation::boolean(errs, body, "archived");
@@ -396,13 +374,9 @@ namespace {
 void account_fields(Validation::Errors& errs, const json& body) {
     text_length(errs, body, "name", 1, 120);
     text_length(errs, body, "bank", 0, 60);
-    if (body.contains("kind")) {
-        Validation::one_of(errs, body, "kind", kAccountKinds);
-    }
+    Validation::one_of(errs, body, "kind", kAccountKinds);
     code_field(errs, body, "currency");
-    if (body.contains("last4") && !body["last4"].is_null()) {
-        Validation::regex_match(errs, body, "last4", kLast4Re, "up to four digits");
-    }
+    Validation::regex_match(errs, body, "last4", kLast4Re, "up to four digits");
     amount_range(errs, body, "opening_balance", -kAmountMax, kAmountMax);
     date_field(errs, body, "opening_date");
     Validation::int_range(errs, body, "position", 0, 10000);
@@ -519,12 +493,8 @@ namespace {
 
 void category_fields(Validation::Errors& errs, const json& body) {
     text_length(errs, body, "name", 1, 60);
-    if (body.contains("kind")) {
-        Validation::one_of(errs, body, "kind", kKinds);
-    }
-    if (body.contains("flexibility")) {
-        Validation::one_of(errs, body, "flexibility", kFlex);
-    }
+    Validation::one_of(errs, body, "kind", kKinds);
+    Validation::one_of(errs, body, "flexibility", kFlex);
     amount_range(errs, body, "budget_max", kAmountMin, kAmountMax);
     code_field(errs, body, "budget_currency");
     const bool has_max = body.contains("budget_max") && !body["budget_max"].is_null();
@@ -723,12 +693,10 @@ void MoneyController::updateTransaction(const HttpRequestPtr& req, Callback&& ca
     }
     Validation::Errors errs;
     date_field(errs, body, "date");
-    if (body.contains("time") && !body["time"].is_null()) {
-        Validation::regex_match(errs, body, "time", std::regex(R"(^([01]\d|2[0-3]):[0-5]\d$)"), "expected HH:MM");
-    }
-    uuid_field(errs, body, "account_id");
+    Validation::regex_match(errs, body, "time", Fields::kTimeRe, "expected HH:MM");
+    Validation::uuid(errs, body, "account_id");
     amount_range(errs, body, "amount", -kAmountMax, kAmountMax);
-    uuid_field(errs, body, "category_id");
+    Validation::uuid(errs, body, "category_id");
     text_length(errs, body, "merchant", 0, kNameMax);
     text_length(errs, body, "name", 1, kNameMax);
     amount_range(errs, body, "receipt_amount", kAmountMin, kAmountMax);
@@ -832,8 +800,8 @@ namespace {
 
 void transfer_fields(Validation::Errors& errs, const json& body) {
     date_field(errs, body, "date");
-    uuid_field(errs, body, "from_account_id");
-    uuid_field(errs, body, "to_account_id");
+    Validation::uuid(errs, body, "from_account_id");
+    Validation::uuid(errs, body, "to_account_id");
     amount_range(errs, body, "amount_sent", kAmountMin, kAmountMax);
     amount_range(errs, body, "amount_received", kAmountMin, kAmountMax);
     amount_range(errs, body, "fee", 0, kAmountMax);
@@ -963,7 +931,7 @@ void MoneyController::patchMerchant(const HttpRequestPtr& req, Callback&& callba
     Validation::Errors errs;
     Validation::require_string(errs, body, "merchant_key");
     text_length(errs, body, "merchant_key", 1, 200);
-    uuid_field(errs, body, "category_id");
+    Validation::uuid(errs, body, "category_id");
     if (!body.contains("category_id")) {
         errs.add("category_id", "missing", "category_id (or null) is required");
     }

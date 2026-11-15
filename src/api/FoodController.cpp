@@ -159,10 +159,9 @@ bool plan_meal(Validation::Errors& errs, const json& body, const std::string& pr
         errs.add(prefix.substr(0, prefix.size() - 1), "invalid", "must be an object");
         return false;
     }
-    static const std::regex kTime(R"(^([01]?\d|2[0-3]):[0-5]\d$)");
     Validation::Errors local;
     Validation::require_string(local, body, "time");
-    Validation::regex_match(local, body, "time", kTime, "HH:MM");
+    Validation::regex_match(local, body, "time", Fields::kLooseTimeRe, "HH:MM");
     Validation::require_string(local, body, "title");
     text_length(local, body, "title", 1, kNameMax);
     Validation::require_string(local, body, "meal");
@@ -227,16 +226,10 @@ bool entry_input(Validation::Errors& errs,
     date_field(local, body, "date");
     Validation::require_string(local, body, "meal");
     Validation::one_of(local, body, "meal", kMeals);
-    if (body.contains("item_id") && !body["item_id"].is_null()) {
-        Validation::uuid(local, body, "item_id");
-    }
+    Validation::uuid(local, body, "item_id");
     number_range(local, body, "grams", 0.01, kGramsMax);
-    if (body.contains("name")) {
-        text_length(local, body, "name", 1, kNameMax);
-    }
-    if (body.contains("note")) {
-        text_length(local, body, "note", 0, kNoteMax);
-    }
+    text_length(local, body, "name", 1, kNameMax);
+    text_length(local, body, "note", 0, kNoteMax);
     nutrient_fields(local, body);
     const bool has_item = body.contains("item_id") && body["item_id"].is_string();
     // require() rejects a missing or null value; the type is checked by the
@@ -314,24 +307,18 @@ void FoodController::getGoals(const HttpRequestPtr& req, Callback&& callback) {
 void FoodController::putGoals(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
     Validation::int_range(errs, body, "height_cm", 100, 250);
     date_field(errs, body, "birth_date");
-    if (body.contains("sex") && !body["sex"].is_null()) {
-        Validation::one_of(errs, body, "sex", kSexes);
-    }
-    if (body.contains("activity")) {
-        Validation::one_of(errs, body, "activity", kActivities);
-    }
+    Validation::one_of(errs, body, "sex", kSexes);
+    Validation::one_of(errs, body, "activity", kActivities);
     number_range(errs, body, "target_weight_kg", 30, 300);
     number_range(errs, body, "pace_kg_per_week", -1, 1.5);
     number_range(errs, body, "manual_weight_kg", 30, 300);
-    if (body.contains("profile_note")) {
-        text_length(errs, body, "profile_note", 0, kProfileNoteMax);
-    }
+    text_length(errs, body, "profile_note", 0, kProfileNoteMax);
     Validation::int_range(errs, body, "kcal_override", 500, 10000);
     Validation::int_range(errs, body, "protein_override_g", 0, 1000);
     Validation::int_range(errs, body, "fat_override_g", 0, 1000);
@@ -390,18 +377,14 @@ void FoodController::listItems(const HttpRequestPtr& req, Callback&& callback) {
 void FoodController::createItem(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
     Validation::require_string(errs, body, "name");
     text_length(errs, body, "name", 1, kNameMax);
-    if (body.contains("brand")) {
-        text_length(errs, body, "brand", 0, kNameMax);
-    }
-    if (body.contains("per")) {
-        Validation::one_of(errs, body, "per", kPer);
-    }
+    text_length(errs, body, "brand", 0, kNameMax);
+    Validation::one_of(errs, body, "per", kPer);
     Validation::require(errs, body, "kcal");
     nutrient_fields(errs, body);
     const auto servings = servings_json(errs, body);
@@ -432,23 +415,15 @@ void FoodController::updateItem(const HttpRequestPtr& req, Callback&& callback, 
         return;
     }
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
-    if (body.contains("name")) {
-        text_length(errs, body, "name", 1, kNameMax);
-    }
-    if (body.contains("brand")) {
-        text_length(errs, body, "brand", 0, kNameMax);
-    }
-    if (body.contains("per")) {
-        Validation::one_of(errs, body, "per", kPer);
-    }
+    text_length(errs, body, "name", 1, kNameMax);
+    text_length(errs, body, "brand", 0, kNameMax);
+    Validation::one_of(errs, body, "per", kPer);
     nutrient_fields(errs, body);
-    if (body.contains("archived")) {
-        Validation::boolean(errs, body, "archived");
-    }
+    Validation::boolean(errs, body, "archived");
     const auto servings = servings_json(errs, body);
     if (errs.any()) {
         callback(Validation::response_400(errs));
@@ -546,7 +521,7 @@ void FoodController::offSearch(const HttpRequestPtr& req, Callback&& callback) {
 void FoodController::itemFromOff(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     const auto code = Validation::opt_string(body, "code").value_or("");
@@ -633,7 +608,7 @@ void FoodController::water(const HttpRequestPtr& req, Callback&& callback) {
 void FoodController::addWater(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     const std::string date =
@@ -657,7 +632,7 @@ void FoodController::addWater(const HttpRequestPtr& req, Callback&& callback) {
 void FoodController::waterGoal(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     const auto ml = body.find("ml");
@@ -685,11 +660,7 @@ void FoodController::plan(const HttpRequestPtr& req, Callback&& callback) {
 void FoodController::putPlan(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
-        return;
-    }
-    if (!body.is_object()) {
-        callback(ErrorResponse::bad_request("invalid_body", "body must be an object with date and meals"));
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -730,11 +701,7 @@ void FoodController::planTemplates(const HttpRequestPtr& req, Callback&& callbac
 void FoodController::putPlanTemplate(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
-        return;
-    }
-    if (!body.is_object()) {
-        callback(ErrorResponse::bad_request("invalid_body", "body must be an object with weekday and meals"));
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
@@ -780,7 +747,7 @@ void FoodController::week(const HttpRequestPtr& req, Callback&& callback) {
 void FoodController::createEntry(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     with_repo_errors(callback, "food.createEntry", [&] {
@@ -797,10 +764,10 @@ void FoodController::createEntry(const HttpRequestPtr& req, Callback&& callback)
 void FoodController::createEntries(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::food_enabled(), "food", req, callback, owner);
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
-    if (!body.is_object() || !body.contains("entries") || !body["entries"].is_array() || body["entries"].empty() ||
+    if (!body.contains("entries") || !body["entries"].is_array() || body["entries"].empty() ||
         body["entries"].size() > kBatchMax) {
         callback(ErrorResponse::bad_request("invalid_body", "entries must be an array of 1..50 entries"));
         return;
@@ -831,18 +798,14 @@ void FoodController::updateEntry(const HttpRequestPtr& req, Callback&& callback,
         return;
     }
     json body;
-    if (!Validation::parse_body(req, body, callback)) {
+    if (!parse_object(req, body, callback)) {
         return;
     }
     Validation::Errors errs;
     date_field(errs, body, "date");
-    if (body.contains("meal")) {
-        Validation::one_of(errs, body, "meal", kMeals);
-    }
+    Validation::one_of(errs, body, "meal", kMeals);
     number_range(errs, body, "grams", 0.01, kGramsMax);
-    if (body.contains("note")) {
-        text_length(errs, body, "note", 0, kNoteMax);
-    }
+    text_length(errs, body, "note", 0, kNoteMax);
     if (errs.any()) {
         callback(Validation::response_400(errs));
         return;

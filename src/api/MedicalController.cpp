@@ -47,16 +47,6 @@ std::string text(const json& body, const char* field) {
     return Validation::opt_string(body, field).value_or("");
 }
 
-/// A string field or null: nullopt for null or absent.
-std::optional<std::string> nullable(const json& body, const char* field) {
-    return Validation::opt_string(body, field);
-}
-
-/// An optional uuid field: null or absent is unset.
-void opt_uuid(Validation::Errors& errs, const json& body, const char* field) {
-    Validation::uuid(errs, body, field);
-}
-
 bool answer_errors(const Validation::Errors& errs, const Callback& callback) {
     if (errs.any()) {
         callback(Validation::response_400(errs));
@@ -122,7 +112,7 @@ std::optional<VisitRepository::Input> visit_input(const json& body, const Callba
     Validation::require_string(errs, body, "date");
     Validation::require_string(errs, body, "reason");
     Validation::uuid(errs, body, "person_id");
-    opt_uuid(errs, body, "provider_id");
+    Validation::uuid(errs, body, "provider_id");
     date_field(errs, body, "date");
     date_field(errs, body, "follow_up");
     text_length(errs, body, "reason", 1, 200);
@@ -131,11 +121,11 @@ std::optional<VisitRepository::Input> visit_input(const json& body, const Callba
         return std::nullopt;
     }
     return VisitRepository::Input{body["person_id"].get<std::string>(),
-                                  nullable(body, "provider_id"),
+                                  Validation::opt_string(body, "provider_id"),
                                   body["date"].get<std::string>(),
                                   body["reason"].get<std::string>(),
                                   text(body, "outcome"),
-                                  nullable(body, "follow_up")};
+                                  Validation::opt_string(body, "follow_up")};
 }
 
 std::optional<RecordRepository::Input> record_input(const json& body, const Callback& callback) {
@@ -144,7 +134,7 @@ std::optional<RecordRepository::Input> record_input(const json& body, const Call
         Validation::require_string(errs, body, f);
     }
     Validation::uuid(errs, body, "person_id");
-    opt_uuid(errs, body, "visit_id");
+    Validation::uuid(errs, body, "visit_id");
     date_field(errs, body, "date");
     Validation::one_of(errs, body, "kind", kRecordKinds);
     text_length(errs, body, "title", 1, 200);
@@ -153,7 +143,7 @@ std::optional<RecordRepository::Input> record_input(const json& body, const Call
         return std::nullopt;
     }
     return RecordRepository::Input{body["person_id"].get<std::string>(),
-                                   nullable(body, "visit_id"),
+                                   Validation::opt_string(body, "visit_id"),
                                    body["date"].get<std::string>(),
                                    body["kind"].get<std::string>(),
                                    body["title"].get<std::string>(),
@@ -171,8 +161,8 @@ std::optional<MedicationRepository::Input> medication_input(const json& body, co
     text_length(errs, body, "note", 0, 1000);
     date_field(errs, body, "start_date");
     date_field(errs, body, "end_date");
-    const auto start = nullable(body, "start_date");
-    const auto end = nullable(body, "end_date");
+    const auto start = Validation::opt_string(body, "start_date");
+    const auto end = Validation::opt_string(body, "end_date");
     if (!errs.any() && start && end && *end < *start) {
         errs.add("end_date", "before_start", "the end is before the start");
     }

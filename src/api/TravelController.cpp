@@ -49,7 +49,6 @@ using Api::Fields::date_field;
 using Api::Fields::is_calendar_date;
 using Api::Fields::opt_int;
 using Api::Fields::text_length;
-using Api::Fields::today_utc;
 using Repositories::Travel::ContactRepository;
 using Repositories::Travel::CrossingRepository;
 using Repositories::Travel::MomentRepository;
@@ -72,21 +71,6 @@ bool is_country(const std::string& s) {
     return s.size() == 2 && s[0] >= 'A' && s[0] <= 'Z' && s[1] >= 'A' && s[1] <= 'Z';
 }
 
-bool is_time(const std::string& s) {
-    static const std::regex re(R"(^([01][0-9]|2[0-3]):[0-5][0-9]$)");
-    return std::regex_match(s, re);
-}
-
-/// ?date=, today in UTC by default; nullopt (answered) when bad.
-std::optional<std::string> at_date(const HttpRequestPtr& req, const TravelController::Callback& callback) {
-    const std::string date = request_day(req, &Repositories::Zones::today_in, today_utc());
-    if (!is_calendar_date(date)) {
-        callback(ErrorResponse::bad_request("invalid_query", "date must be a calendar day"));
-        return std::nullopt;
-    }
-    return date;
-}
-
 void country_field(Validation::Errors& errs, const json& body, const char* field) {
     if (!body.contains(field) || body[field].is_null()) {
         return;
@@ -100,7 +84,7 @@ void time_field(Validation::Errors& errs, const json& body, const char* field) {
     if (!body.contains(field) || body[field].is_null()) {
         return;
     }
-    if (!body[field].is_string() || !is_time(body[field].get<std::string>())) {
+    if (!body[field].is_string() || !Fields::is_hhmm(body[field].get<std::string>())) {
         errs.add(field, "invalid", "must be HH:MM");
     }
 }
@@ -133,13 +117,9 @@ std::optional<std::set<std::string>> countries_field(
     return out;
 }
 
-std::optional<std::string> opt_text(const json& body, const char* field) {
-    return Validation::opt_string(body, field);
-}
-
 /// A link field: empty, or a web address (https:// or http://).
 void web_link_field(Validation::Errors& errs, const json& body, const char* field) {
-    if (const auto link = opt_text(body, field);
+    if (const auto link = Validation::opt_string(body, field);
         link && !link->empty() && link->rfind("https://", 0) != 0 && link->rfind("http://", 0) != 0) {
         errs.add(field, "bad_format", "a link starts with https:// or http://");
     }
@@ -217,9 +197,9 @@ std::optional<CrossingRepository::Input> crossing_input(const json& body, const 
     return CrossingRepository::Input{body["date"].get<std::string>(),
                                      body["from"].get<std::string>(),
                                      body["to"].get<std::string>(),
-                                     opt_text(body, "time"),
-                                     opt_text(body, "place").value_or(""),
-                                     opt_text(body, "note").value_or("")};
+                                     Validation::opt_string(body, "time"),
+                                     Validation::opt_string(body, "place").value_or(""),
+                                     Validation::opt_string(body, "note").value_or("")};
 }
 
 std::optional<RuleRepository::Input> rule_input(const json& body, const TravelController::Callback& callback) {
@@ -236,7 +216,7 @@ std::optional<RuleRepository::Input> rule_input(const json& body, const TravelCo
     if (!threshold || *threshold < 1 || *threshold > 3650) {
         errs.add("threshold_days", "invalid", "a whole number of days from 1 to 3650");
     }
-    const std::string window = opt_text(body, "window_kind").value_or("");
+    const std::string window = Validation::opt_string(body, "window_kind").value_or("");
     const auto window_days = opt_int(body, "window_days");
     if (window == "rolling_days" && (!window_days || *window_days < 1 || *window_days > 3650)) {
         errs.add("window_days", "invalid", "a rolling window needs window_days from 1 to 3650");
@@ -259,7 +239,7 @@ std::optional<RuleRepository::Input> rule_input(const json& body, const TravelCo
         *threshold,
         body["threshold_kind"].get<std::string>(),
         body.value("count_crossing_days", true),
-        opt_text(body, "source").value_or(""),
+        Validation::opt_string(body, "source").value_or(""),
     };
 }
 
@@ -280,10 +260,10 @@ std::optional<TripRepository::ItemInput> item_input(const json& body, const Trav
     }
     web_link_field(errs, body, "link");
     date_field(errs, body, "end_date");
-    const auto end_date = opt_text(body, "end_date");
-    if (end_date && opt_text(body, "kind").value_or("") != "stay") {
+    const auto end_date = Validation::opt_string(body, "end_date");
+    if (end_date && Validation::opt_string(body, "kind").value_or("") != "stay") {
         errs.add("end_date", "not_allowed", "only a stay has an end date");
-    } else if (end_date && opt_text(body, "date") && *end_date < *opt_text(body, "date")) {
+    } else if (end_date && Validation::opt_string(body, "date") && *end_date < *Validation::opt_string(body, "date")) {
         errs.add("end_date", "invalid", "a stay ends on or after its first day");
     }
     if (errs.any()) {
@@ -292,11 +272,11 @@ std::optional<TripRepository::ItemInput> item_input(const json& body, const Trav
     }
     return TripRepository::ItemInput{body["kind"].get<std::string>(),
                                      body["date"].get<std::string>(),
-                                     opt_text(body, "time"),
+                                     Validation::opt_string(body, "time"),
                                      body["title"].get<std::string>(),
-                                     opt_text(body, "reference").value_or(""),
-                                     opt_text(body, "link").value_or(""),
-                                     opt_text(body, "note").value_or(""),
+                                     Validation::opt_string(body, "reference").value_or(""),
+                                     Validation::opt_string(body, "link").value_or(""),
+                                     Validation::opt_string(body, "note").value_or(""),
                                      body.value("no_crossing", false),
                                      end_date};
 }
@@ -311,7 +291,7 @@ std::optional<ContactRepository::Input> contact_input(const json& body, const Tr
     text_length(errs, body, "email", 0, 200);
     text_length(errs, body, "link", 0, 500);
     text_length(errs, body, "note", 0, 500);
-    if (!opt_text(body, "email").value_or("").empty()) {
+    if (!Validation::opt_string(body, "email").value_or("").empty()) {
         Validation::email(errs, body, "email");
     }
     web_link_field(errs, body, "link");
@@ -320,11 +300,11 @@ std::optional<ContactRepository::Input> contact_input(const json& body, const Tr
         return std::nullopt;
     }
     return ContactRepository::Input{body["name"].get<std::string>(),
-                                    opt_text(body, "role").value_or(""),
-                                    opt_text(body, "phone").value_or(""),
-                                    opt_text(body, "email").value_or(""),
-                                    opt_text(body, "link").value_or(""),
-                                    opt_text(body, "note").value_or("")};
+                                    Validation::opt_string(body, "role").value_or(""),
+                                    Validation::opt_string(body, "phone").value_or(""),
+                                    Validation::opt_string(body, "email").value_or(""),
+                                    Validation::opt_string(body, "link").value_or(""),
+                                    Validation::opt_string(body, "note").value_or("")};
 }
 
 /// A trip moment body, checked; nullopt (answered) when bad.
@@ -339,8 +319,9 @@ std::optional<MomentRepository::Input> moment_input(const json& body, const Trav
         callback(Validation::response_400(errs));
         return std::nullopt;
     }
-    return MomentRepository::Input{
-        body["date"].get<std::string>(), body["text"].get<std::string>(), opt_text(body, "place").value_or("")};
+    return MomentRepository::Input{body["date"].get<std::string>(),
+                                   body["text"].get<std::string>(),
+                                   Validation::opt_string(body, "place").value_or("")};
 }
 
 /// A document body, checked; nullopt (answered) when bad.
@@ -361,24 +342,27 @@ std::optional<Repositories::Travel::DocumentRepository::Input> document_input(
     }
     return Repositories::Travel::DocumentRepository::Input{body["holder"].get<std::string>(),
                                                            body["kind"].get<std::string>(),
-                                                           opt_text(body, "number").value_or(""),
+                                                           Validation::opt_string(body, "number").value_or(""),
                                                            body["valid_until"].get<std::string>(),
-                                                           opt_text(body, "note").value_or("")};
+                                                           Validation::opt_string(body, "note").value_or("")};
 }
 
 /// The trip's spends in each currency and in @p target at each spend's day rate.
 json spends_summary(const json& spends, const std::string& target) {
     std::map<std::string, double> by_currency;
     std::set<std::string> currencies{target};
+    std::vector<::Money::Summary::Spend> rows;
     std::string first;
     std::string last;
     for (const auto& s : spends) {
         const std::string c = s["currency"].get<std::string>();
-        by_currency[c] += s["amount"].get<double>();
+        const double amount = s["amount"].get<double>();
+        by_currency[c] += amount;
         currencies.insert(c);
         const std::string d = s["date"].get<std::string>();
         first = first.empty() ? d : std::min(first, d);
         last = std::max(last, d);
+        rows.push_back(::Money::Summary::Spend{c, d, amount});
     }
     json list = json::array();
     for (const auto& [c, amount] : by_currency) {
@@ -389,31 +373,10 @@ json spends_summary(const json& spends, const std::string& target) {
         return {{"by_currency", list}, {"total", total}, {"count", 0}};
     }
     const auto quotes = Repositories::Money::SummaryRepository().quotes(currencies, first, last);
-    double sum = 0;
-    bool partial = false;
-    std::string rate_date;
-    for (const auto& s : spends) {
-        const std::string c = s["currency"].get<std::string>();
-        const std::string d = s["date"].get<std::string>();
-        const auto rate = ::Money::Summary::rate_per_target(quotes, c, target, d);
-        if (!rate || *rate <= 0) {
-            partial = true;
-            continue;
-        }
-        sum += s["amount"].get<double>() / *rate;
-        // The day of each quote used; USD is the base and needs none, so a spend
-        // already in the target currency adds no rate day.
-        for (const auto& code : {c, target}) {
-            if (code == "USD" || c == target) {
-                continue;
-            }
-            const std::string used = ::Money::Summary::nearest(quotes, code, d)->date;
-            rate_date = rate_date.empty() ? used : std::min(rate_date, used);
-        }
-    }
-    total["amount"] = sum;
-    total["partial"] = partial;
-    total["rate_date"] = rate_date.empty() ? json() : json(rate_date);
+    const auto sum = ::Money::Summary::total_in(rows, quotes, target);
+    total["amount"] = sum.amount;
+    total["partial"] = sum.partial;
+    total["rate_date"] = sum.rate_date.empty() ? json() : json(sum.rate_date);
     return {{"by_currency", list}, {"total", total}, {"count", spends.size()}};
 }
 
@@ -603,7 +566,7 @@ void TravelController::deleteRule(const HttpRequestPtr& req, Callback&& callback
 
 void TravelController::counters(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::travel_enabled(), "travel", req, callback, owner);
-    const auto date = at_date(req, callback);
+    const auto date = Fields::day_param(req, callback, &Repositories::Zones::today_in);
     if (!date) {
         return;
     }
@@ -711,7 +674,7 @@ void TravelController::createTrip(const HttpRequestPtr& req, Callback&& callback
                                       body["start_date"].get<std::string>(),
                                       body["end_date"].get<std::string>(),
                                       countries.value_or(std::set<std::string>{}),
-                                      opt_text(body, "note").value_or(""),
+                                      Validation::opt_string(body, "note").value_or(""),
                                       extras.purpose.value_or(std::nullopt),
                                       extras.booked_cost.value_or(std::nullopt)});
         callback(Response::created(json{{"data", trip_view(repo, owner, row, *currency, true)}}));
@@ -727,7 +690,7 @@ void TravelController::getTrip(const HttpRequestPtr& req, Callback&& callback, c
     if (!currency) {
         return;
     }
-    const auto date = at_date(req, callback);
+    const auto date = Fields::day_param(req, callback, &Repositories::Zones::today_in);
     if (!date) {
         return;
     }
@@ -771,11 +734,11 @@ void TravelController::updateTrip(const HttpRequestPtr& req, Callback&& callback
         return;
     }
     TripRepository::Patch p;
-    p.name = opt_text(body, "name");
-    p.start_date = opt_text(body, "start_date");
-    p.end_date = opt_text(body, "end_date");
+    p.name = Validation::opt_string(body, "name");
+    p.start_date = Validation::opt_string(body, "start_date");
+    p.end_date = Validation::opt_string(body, "end_date");
     p.countries = countries;
-    p.note = opt_text(body, "note");
+    p.note = Validation::opt_string(body, "note");
     p.purpose = extras.purpose;
     p.booked_cost = extras.booked_cost;
     with_repo_errors(callback, "travel.trips.update", [&] {

@@ -97,6 +97,16 @@ inline std::string local_today(const drogon::HttpRequestPtr& req,
     return utc_today;
 }
 
+/// Whether a name is an IANA zone. Controllers pass Repositories::Zones::is_zone.
+using IsZone = std::function<bool(const std::string& tz)>;
+
+/// ?tz= when it names a zone, else "UTC" (absent and unknown alike). A route
+/// that refuses an unknown zone checks it itself.
+inline std::string zone_or_utc(const drogon::HttpRequestPtr& req, const IsZone& is_zone) {
+    const std::string tz = req->getParameter("tz");
+    return !tz.empty() && is_zone(tz) ? tz : std::string("UTC");
+}
+
 /// The day a request is about: ?date= as given (the caller checks it), else local_today.
 inline std::string request_day(const drogon::HttpRequestPtr& req,
                                const ZoneToday& zone_today,

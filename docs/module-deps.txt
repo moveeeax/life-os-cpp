@@ -47,7 +47,6 @@ api -> agent
 api -> billing
 api -> cache
 api -> core
-api -> database
 api -> domain
 api -> email
 api -> fitness
@@ -188,6 +187,7 @@ repositories/money -> repositories
 repositories/now -> database
 repositories/now -> now
 repositories/now -> repositories
+repositories/now -> repositories/tasks
 repositories/workout -> database
 repositories/workout -> repositories
 root -> agent
