@@ -20,6 +20,7 @@
 #include <nlohmann/json.hpp>
 
 #include "llm/Chat.hpp"
+#include "utils/Strings.hpp"
 #include "utils/Utf8.hpp"
 
 namespace Food::Parse {
@@ -68,22 +69,7 @@ inline double number(
     return v;
 }
 
-inline bool is_uuid(std::string_view s) {
-    if (s.size() != 36) {
-        return false;
-    }
-    for (std::size_t i = 0; i < s.size(); ++i) {
-        const char c = s[i];
-        if (i == 8 || i == 13 || i == 18 || i == 23) {
-            if (c != '-') {
-                return false;
-            }
-        } else if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
-            return false;
-        }
-    }
-    return true;
-}
+using Utils::Strings::is_uuid;
 
 }  // namespace detail
 
