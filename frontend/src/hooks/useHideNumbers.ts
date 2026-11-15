@@ -33,6 +33,16 @@ function apply(v: boolean) {
   for (const l of listeners) l();
 }
 
+/** Whether numbers are hidden now, for code outside a render (a timer, a callback). */
+export function numbersHidden(): boolean {
+  return hidden;
+}
+
+/** Turns Hide numbers on or off from outside a component (tests, a one-off call). */
+export function setNumbersHidden(v: boolean): void {
+  apply(v);
+}
+
 /**
  * "Hide numbers" for a shared screen: a class on the root that blurs every
  * marked number (`.num`) and chart (`.num-chart`).

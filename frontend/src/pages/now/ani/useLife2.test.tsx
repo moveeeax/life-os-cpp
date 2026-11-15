@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { setNumbersHidden } from '@/hooks/useHideNumbers';
 import { api } from '@/lib/api/client';
 
 import type { Answer } from './touch';
@@ -81,7 +82,7 @@ async function minutes(n: number) {
 
 beforeEach(() => {
   localStorage.clear();
-  document.documentElement.classList.remove('hide-numbers');
+  setNumbersHidden(false);
   answers = { '/api/v1/fitness/sleep': SLEEPS };
   sleepHeld = null;
   vi.spyOn(api, 'getJson').mockImplementation(async (path: string) => {
@@ -122,11 +123,11 @@ describe('useLife2', () => {
   it('HideNumbersTab: the month spend on Money waits while Hide numbers is on', async () => {
     vi.useFakeTimers({ now: atLocal(15) });
     answers['/api/v1/money/reports/period'] = { as_if: { expense: 345_000, currency: 'KZT' } };
-    document.documentElement.classList.add('hide-numbers');
+    setNumbersHidden(true);
     const { said } = run(useLife2, '/money');
     await minutes(8);
     expect(said.some((a) => /\d/.test(a.text))).toBe(false);
-    document.documentElement.classList.remove('hide-numbers');
+    setNumbersHidden(false);
     await minutes(2);
     expect(said.map((a) => a.text)).toContainEqual(
       expect.stringMatching(/ушло около 345\s000 KZT/),
@@ -139,7 +140,7 @@ describe('useLife2', () => {
       date: `2026-10-${String(22 + i).padStart(2, '0')}`,
       value: i === 9 ? 20_000 : 5_000,
     }));
-    document.documentElement.classList.add('hide-numbers');
+    setNumbersHidden(true);
     const { said } = run(useLife2);
     await minutes(15);
     for (const a of said) expect(a.text).not.toMatch(/\d/);

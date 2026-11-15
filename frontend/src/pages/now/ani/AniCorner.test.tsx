@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
+import { setNumbersHidden } from '@/hooks/useHideNumbers';
 import { api } from '@/lib/api/client';
 import type { Today } from '@/lib/now/types';
 
@@ -141,8 +142,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.restoreAllMocks();
-  document.documentElement.classList.remove('hide-numbers');
   cleanup();
+  setNumbersHidden(false);
   vi.useRealTimers();
   engine.opts = null;
   engine.ani = null;
@@ -496,7 +497,7 @@ describe('AniCorner', () => {
   });
 
   it('claims nothing while Hide numbers is on, and shows the dot', async () => {
-    document.documentElement.classList.add('hide-numbers');
+    setNumbersHidden(true);
     inbox.waiting = 2;
     await mount();
     await tick(20_000);
@@ -580,7 +581,7 @@ describe('AniCorner', () => {
     await mount();
     await tick(30_000);
     engine.ani!.say.mockClear();
-    document.documentElement.classList.add('hide-numbers');
+    act(() => setNumbersHidden(true));
     await act(async () => {
       (globalThis as { aniSay?: (a: unknown) => void }).aniSay?.({
         text: 'В этом месяце ушло около 345 000 KZT.',
@@ -611,7 +612,7 @@ describe('AniCorner', () => {
     await mount();
     await tick(30_000);
     engine.ani!.say.mockClear();
-    document.documentElement.classList.add('hide-numbers');
+    act(() => setNumbersHidden(true));
     await act(async () => {
       (globalThis as { aniSay?: (a: unknown) => void }).aniSay?.({ text: 'Пора размяться.' });
       await vi.advanceTimersByTimeAsync(10);

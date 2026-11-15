@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 
 import { useHabitDays } from '@/hooks/useHabits';
+import { numbersHidden } from '@/hooks/useHideNumbers';
 import { useMoneySettings } from '@/hooks/useMoney';
 import { useCrossings } from '@/hooks/useTravel';
 import { api } from '@/lib/api/client';
@@ -59,9 +60,6 @@ function mark(k: string, v: string) {
     // At worst a line comes once more.
   }
 }
-
-/** Hide numbers is on: her lines that carry a personal number wait until it is off. */
-const numbersHidden = () => document.documentElement.classList.contains('hide-numbers');
 
 let reads = 0;
 

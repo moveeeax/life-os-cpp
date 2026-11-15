@@ -6,6 +6,7 @@ import { qk } from '@/lib/api/queryKeys';
 import { clockIn } from '@/lib/dates';
 
 import { useAniPrefs, useMuteKind } from '@/hooks/useAni';
+import { numbersHidden, useHideNumbers } from '@/hooks/useHideNumbers';
 import { HOLD_KEY, useAni, type AniOutfit } from '@/lib/now/ani';
 import type { NowWeather, Today } from '@/lib/now/types';
 
@@ -92,8 +93,6 @@ function setDayOf(key: string, day: string) {
 }
 const helloDay = () => dayOf(HELLO_KEY);
 const setHelloDay = (day: string) => setDayOf(HELLO_KEY, day);
-/** Hide numbers is on (a shared screen). */
-const numbersHidden = () => document.documentElement.classList.contains('hide-numbers');
 /** A text with a digit in it: under Hide numbers it is blurred and not said aloud. */
 const hasNumber = (text: string) => /\d/.test(text);
 
@@ -225,15 +224,7 @@ export function AniCorner({
   const [chatKey, setChatKey] = useState(0);
   const ledgeRef = useRef<HTMLDivElement>(null);
   // Hide numbers (a shared screen): her webhook items and cards wait.
-  const [hideNums, setHideNums] = useState(() =>
-    document.documentElement.classList.contains('hide-numbers'),
-  );
-  useEffect(() => {
-    const root = document.documentElement;
-    const mo = new MutationObserver(() => setHideNums(root.classList.contains('hide-numbers')));
-    mo.observe(root, { attributes: true, attributeFilter: ['class'] });
-    return () => mo.disconnect();
-  }, []);
+  const [hideNums] = useHideNumbers();
   // The first state the engine starts from; later changes go through calls.
   const mountRef = useRef({ outfit: ani.outfit, here: ani.here });
   mountRef.current = { outfit: ani.outfit, here: ani.here };
@@ -339,7 +330,7 @@ export function AniCorner({
       ani: () => engine.current,
       today: () => contextRef.current.today,
       focusField: () => document.querySelector<HTMLInputElement>('.n-input'),
-      hidden: () => document.documentElement.classList.contains('hide-numbers'),
+      hidden: numbersHidden,
     }),
   );
   const sayTimer = useRef(0);
