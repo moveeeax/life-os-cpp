@@ -27,7 +27,7 @@
 
 namespace Repositories::UnifiedParse {
 
-class ParseJobRepository {
+class ParseJobRepository : public JobRows::JobTable<ParseJobRepository> {
 public:
     static constexpr const char* kTable = "parse_jobs";
 
@@ -117,18 +117,6 @@ public:
         });
     }
 
-    /// queued (or stale running) -> running, one more attempt; 0 when not claimable.
-    int start(const std::string& id) { return JobRows::start(kTable, id); }
-
-    /// The row's status now; nullopt when the row is gone.
-    std::optional<std::string> status(const std::string& id) { return JobRows::status(kTable, id); }
-
-    /// running -> queued, for an outage the queue will retry; only by the holder of @p attempt.
-    void requeue(const std::string& id, int attempt) { JobRows::requeue(kTable, id, attempt); }
-
-    /// Milliseconds until a running row may be claimed again; 0 when it is not running.
-    long long stale_in_ms(const std::string& id) { return JobRows::stale_in_ms(kTable, id); }
-
     /**
      * Closes the claimed row as done and runs @p write(txn, row) in the same
      * transaction: it files the child rows (and, when row.apply, creates the
@@ -187,22 +175,6 @@ public:
             run(false);
         }
     }
-
-    /// @p error is stored as "<code>: <message>".
-    void fail(const std::string& id, const std::string& code, const std::string& message, int attempt = 0) {
-        Database::get().execute_write([&](auto& txn) {
-            txn.exec_params(
-                "UPDATE parse_jobs SET status = 'failed', error = $2, finished_at = now() WHERE id = $1::uuid" +
-                    JobRows::while_open(3),
-                id,
-                message.empty() ? code : code + ": " + message,
-                attempt);
-            return true;
-        });
-    }
-
-    /// Jobs of the owner that are queued or running (a stale queued or running row is not counted).
-    long open_count(const std::string& owner) { return JobRows::open_count(kTable, owner); }
 
 private:
     template <typename Txn>

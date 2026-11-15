@@ -25,6 +25,7 @@
 #include "api/FieldChecks.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
+#include "api/ParseJobStart.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "cache/Cache.hpp"
@@ -891,68 +892,20 @@ void FoodController::parseStart(const HttpRequestPtr& req, Callback&& callback) 
         callback(ErrorResponse::service_unavailable("not_configured", "the text parse is not set up on this server"));
         return;
     }
-    Repositories::ParseJobRepository repo;
-    std::string id;
-    // The worker may run with another retry limit; the job carries the one it was submitted with.
-    const int max_attempts = Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries;
-    const auto payload = [&](const std::string& job_id) {
-        return json{{"job_id", job_id}, {"owner_id", owner}, {"max_attempts", max_attempts}};
-    };
-    // The job rides the row's transaction as an outbox row when a drain is configured
-    // (Jobs::Outbox::enqueue_if_drained): a crash after the commit cannot leave the row
-    // queued with no job behind it. With the drain off (OUTBOX_DRAIN_INTERVAL_SEC=0: the
-    // compose stack, the test suites) the direct submit below follows the commit, as before.
-    bool via_outbox = false;
-    try {
-        // Each parse costs provider tokens: a few in flight per user is plenty.
-        if (repo.open_count(owner) >= Repositories::JobRows::kOpenMax) {
-            callback(ErrorResponse::make({drogon::k429TooManyRequests,
-                                          "too_many_parses",
-                                          "wait for your running parses to finish",
-                                          json{{"retry_after_sec", 30}}}));
-            return;
-        }
-        const json job = repo.create(
-            owner,
-            body["text"].get<std::string>(),
-            body["meal"].get<std::string>(),
-            body["date"].get<std::string>(),
-            [&](auto& txn, const std::string& job_id) {
-                // The cap again, under the lock: two creates at once
-                // cannot both pass the count above.
-                Repositories::JobRows::hold_slot(txn, Repositories::ParseJobRepository::kTable, owner);
-                via_outbox = Jobs::Outbox::enqueue_if_drained(txn, Jobs::FoodParse::kJobType, payload(job_id));
-            });
-        id = job["id"].get<std::string>();
-    } catch (const Repositories::JobRows::SlotsTaken&) {
-        callback(ErrorResponse::make({drogon::k429TooManyRequests,
-                                      "too_many_parses",
-                                      "wait for your running parses to finish",
-                                      json{{"retry_after_sec", 30}}}));
-        return;
-    } catch (const std::exception& e) {
-        spdlog::warn("food parse create failed: {}", e.what());
-        callback(ErrorResponse::service_unavailable("storage_unavailable"));
-        return;
-    }
-    try {
-        if (!via_outbox) {
-            Jobs::get().submit(Jobs::FoodParse::kJobType, payload(id));
-        }
-    } catch (const std::exception& e) {
-        spdlog::warn("food parse enqueue unavailable: {}", e.what());
-        // Nothing will ever run it: the row must not look queued to the page.
-        try {
-            repo.fail(id, "queue_unavailable", "the job queue did not take the job");
-        } catch (const std::exception& inner) {
-            spdlog::warn("food parse {}: could not mark failed: {}", id, inner.what());
-        }
-        callback(ErrorResponse::service_unavailable("queue_unavailable"));
-        return;
-    }
-    auto resp = Response::ok(json{{"data", {{"id", id}, {"status", "queued"}}}});
-    resp->setStatusCode(k202Accepted);
-    callback(resp);
+    const std::string text = body["text"].get<std::string>();
+    const std::string meal = body["meal"].get<std::string>();
+    const std::string date = body["date"].get<std::string>();
+    // No Idempotency-Key replay on this route: food_parse_jobs keeps no key.
+    start_parse_job<Repositories::ParseJobRepository>(
+        owner,
+        callback,
+        std::nullopt,
+        ParseJobSpec{
+            Repositories::ParseJobRepository::kTable, Jobs::FoodParse::kJobType, "food parse", "food.parse.keyed"},
+        [&](Repositories::ParseJobRepository& repo, bool&, auto&& in_txn) {
+            return repo.create(owner, text, meal, date, in_txn);
+        },
+        no_create_errors);
 }
 
 void FoodController::parseStatus(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {

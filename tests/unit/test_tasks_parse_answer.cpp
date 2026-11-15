@@ -41,6 +41,12 @@ TEST(TasksParseAnswer, ReadsAFencedAnswer) {
     ASSERT_EQ(lines.size(), 1u);
 }
 
+TEST(TasksParseAnswer, ReadsAFenceWithATabBeforeAndSpaceAfter) {
+    const auto lines =
+        parse_answer("\t```json\n{\"lines\": [{\"title\": \"x\", \"area\": \"finance\"}]}\n```\n \t", {});
+    ASSERT_EQ(lines.size(), 1u);
+}
+
 TEST(TasksParseAnswer, AnEmptyDueReadsAsNoDate) {
     const auto lines = parse_answer(R"({"lines": [{"title": "x", "area": "projects", "due": ""}]})", {});
     ASSERT_EQ(lines.size(), 1u);
