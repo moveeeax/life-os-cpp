@@ -56,11 +56,8 @@ public:
     }
 
     bool owns(const std::string& owner, const std::string& id) {
-        return Database::get().execute_read([&](auto& txn) {
-            return !txn.exec_params(
-                           "SELECT 1 FROM practice_clients WHERE owner_id = $1::uuid AND id = $2::uuid", owner, id)
-                        .empty();
-        });
+        return Database::get().execute_read(
+            [&](auto& txn) { return Repositories::JsonRows::owns_in(txn, "practice_clients", owner, id); });
     }
 
     /// @throws NotFound, Invariant.

@@ -95,10 +95,8 @@ public:
 
     /// Whether the project or course is the owner's.
     bool owns(const std::string& owner, const std::string& id) {
-        return Database::get().execute_read([&](auto& txn) {
-            return !txn.exec_params("SELECT 1 FROM projects WHERE owner_id = $1::uuid AND id = $2::uuid", owner, id)
-                        .empty();
-        });
+        return Database::get().execute_read(
+            [&](auto& txn) { return Repositories::JsonRows::owns_in(txn, "projects", owner, id); });
     }
 
     /// @throws NotFound, CodeTaken, Invariant, InvalidDate.

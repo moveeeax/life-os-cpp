@@ -80,13 +80,8 @@ public:
         if (table == nullptr) {
             return false;
         }
-        return Database::get().execute_read([&](auto& txn) {
-            return !txn.exec_params(
-                           std::string("SELECT 1 FROM ") + table + " WHERE owner_id = $1::uuid AND id = $2::uuid",
-                           owner,
-                           parent_id)
-                        .empty();
-        });
+        return Database::get().execute_read(
+            [&](auto& txn) { return Repositories::JsonRows::owns_in(txn, table, owner, parent_id); });
     }
 
     /// A pending row. @throws ParentNotFound, TooManyFiles.
