@@ -1,3 +1,5 @@
+import { readJson, writeJson } from '@/lib/browserStore';
+
 /*
  * Her mood of the day in this browser: a score that kind taps lift and rude
  * ones lower (touch.ts), kept between -10 and 10 and started afresh each
@@ -16,12 +18,8 @@ interface Stored {
 }
 
 function read(day: string): number {
-  try {
-    const s = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Stored | null;
-    return s && s.day === day && Number.isFinite(s.score) ? s.score : 0;
-  } catch {
-    return 0;
-  }
+  const s = readJson<Stored | null>(KEY, null);
+  return s && s.day === day && Number.isFinite(s.score) ? s.score : 0;
 }
 
 /** Today's mood score. */
@@ -32,11 +30,8 @@ export function moodOf(day: string): number {
 /** Moves today's mood by @p delta; the new score. */
 export function moveMood(day: string, delta: number): number {
   const score = Math.max(-LIMIT, Math.min(LIMIT, read(day) + delta));
-  try {
-    localStorage.setItem(KEY, JSON.stringify({ day, score } satisfies Stored));
-  } catch {
-    // Private mode: the mood lasts for this page.
-  }
+  // Private mode: the mood lasts for this page.
+  writeJson(KEY, { day, score } satisfies Stored);
   return score;
 }
 

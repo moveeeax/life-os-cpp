@@ -3,11 +3,16 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 
 import { useHabitDays } from '@/hooks/useHabits';
+import { numbersHidden } from '@/hooks/useHideNumbers';
 import { useMoneySettings } from '@/hooks/useMoney';
+import { useArrivalRate } from '@/hooks/useNow';
+import { useTelegramWaiting } from '@/hooks/useTelegram';
 import { useCrossings } from '@/hooks/useTravel';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
-import { clockIn } from '@/lib/dates';
+import { clockIn, shiftDays } from '@/lib/dates';
+import { addMoment } from '@/lib/now/ani';
+import { markOn, readMarks } from '@/lib/now/once';
 import { CURRENCY_OF } from '@/lib/now/currency';
 
 import type { AniContext } from './AniCorner';
@@ -34,33 +39,15 @@ import {
 } from './life2';
 import { arrival } from '../modes/modes';
 import { useWarm } from './warm';
-import { addMoment, MORNING_FROM } from './life';
+import { MORNING_FROM } from './life';
 import type { Changed } from './refresh';
 import type { Answer } from './touch';
 
 const TICK_MS = 60_000;
 const KEY = 'now:ani:life2';
-const DAY_MS = 86_400_000;
-const shift = (date: string, by: number) =>
-  new Date(Date.parse(`${date}T00:00:00Z`) + by * DAY_MS).toISOString().slice(0, 10);
 
-function read(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, string>;
-  } catch {
-    return {};
-  }
-}
-function mark(k: string, v: string) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify({ ...read(), [k]: v }));
-  } catch {
-    // At worst a line comes once more.
-  }
-}
-
-/** Hide numbers is on: her lines that carry a personal number wait until it is off. */
-const numbersHidden = () => document.documentElement.classList.contains('hide-numbers');
+const read = () => readMarks(KEY);
+const mark = (k: string, v: string) => markOn(KEY, k, v);
 
 let reads = 0;
 
@@ -153,15 +140,15 @@ export function useLife2({
   const sleeps = useRead<Sleep[]>(
     ['ani', 'life', 'sleep', date],
     '/api/v1/fitness/sleep',
-    { from: shift(date, -30), to: date },
+    { from: shiftDays(date, -30), to: date },
     on,
   );
   // The Habits section's own read: a tick there reaches her streak line.
-  const habits = useHabitDays(shift(date, -5), date, useWarm(on, 3 + useStep()));
+  const habits = useHabitDays(shiftDays(date, -5), date, useWarm(on, 3 + useStep()));
   const steps = useRead<{ date: string; value: number | null }[]>(
     ['ani', 'life', 'steps', date],
     '/api/v1/metrics/series',
-    { source: 'fitness:steps', from: shift(date, -30), to: date, tz },
+    { source: 'fitness:steps', from: shiftDays(date, -30), to: date, tz },
     on,
   );
   const food = useRead<{
@@ -175,12 +162,7 @@ export function useLife2({
     {},
     on,
   );
-  const waiting = useRead<{ title: string }[]>(
-    qk.telegramWaiting(),
-    '/api/v1/telegram/waiting',
-    {},
-    on,
-  );
+  const waiting = useTelegramWaiting({ enabled: useWarm(on, 3 + useStep()) });
   const spends = useRead<Tx[]>(
     ['ani', 'life', 'tx-today', date],
     '/api/v1/money/transactions',
@@ -193,13 +175,10 @@ export function useLife2({
   const arrived = arrival(crossings.data, date);
   const local = arrived ? CURRENCY_OF[arrived.to_country] : undefined;
   // The trip mode card's key: one read of the rate for both.
-  const rate = useRead<{ amount: number }>(
-    qk.now.arrivalRate(local ?? '', view, date),
-    '/api/v1/money/rates/convert',
-    { amount: 1, from: local ?? '', to: view, date },
-    on && !!local && local !== view,
-    60 * 60_000,
-  );
+  const rate = useArrivalRate(local, view, date, {
+    enabled: useWarm(on && !!local && local !== view, 3 + useStep()),
+    retry: false,
+  });
   const report = useRead<{ as_if?: { expense: number; currency: string } | null }>(
     ['ani', 'life', 'report', date],
     '/api/v1/money/reports/period',
@@ -340,7 +319,7 @@ export function useLife2({
         }
       }
       if (hour >= 8 && hour < 12 && age >= 240 && d.got.steps && !hidden && once('guess')) {
-        const y = arr(d.steps).find((p) => p.date === shift(day, -1))?.value;
+        const y = arr(d.steps).find((p) => p.date === shiftDays(day, -1))?.value;
         mark('guess', day);
         if (y != null && y > 0) {
           const opts = guessOptions(y, day);
@@ -452,8 +431,8 @@ export function useLife2({
               query: {
                 category: group.category,
                 currency: group.currency,
-                from: shift(day, -90),
-                to: shift(day, -1),
+                from: shiftDays(day, -90),
+                to: shiftDays(day, -1),
                 status: 'posted',
                 limit: 100,
               },

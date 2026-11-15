@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { widgetKey } from '@/lib/now/widgets';
+
 import {
   documentLeft,
   documentName,
@@ -8,7 +10,6 @@ import {
   sparkPoints,
   trendWords,
   weekRange,
-  widgetKey,
 } from './widgets';
 
 describe('widgets', () => {

@@ -4,8 +4,8 @@ import { useHabitsEnabled } from '@/hooks/useHabits';
 import { MetricPicker } from '@/components/MetricPicker';
 import { useSaveNowSettings } from '@/hooks/useNow';
 import { useMetrics } from '@/hooks/useMetrics';
-import { MODE_KEY } from '@/pages/now/modes/modes';
-import { FIXED, WIDGETS_MAX, widgetKey, type Widget } from '@/pages/now/widgets/widgets';
+import { modePin, setModePin } from '@/lib/now/mode';
+import { FIXED, WIDGETS_MAX, widgetKey, type Widget } from '@/lib/now/widgets';
 import {
   CHIP_LABEL,
   CORNER_KEYS,
@@ -76,13 +76,7 @@ export function ArrangeSheet({
     [next[i], next[j]] = [next[j], next[i]];
     setWidgets(next);
   };
-  const [modesOn, setModesOn] = useState(() => {
-    try {
-      return localStorage.getItem(MODE_KEY) !== 'off';
-    } catch {
-      return true;
-    }
-  });
+  const [modesOn, setModesOn] = useState(() => modePin() !== 'off');
   // Picking a chip already in another corner moves it: that corner turns empty.
   const pick = (corner: (typeof CORNER_KEYS)[number], value: string) => {
     const chip = value === '' ? null : (value as Chip['key']);
@@ -99,12 +93,7 @@ export function ArrangeSheet({
     const clean = cleanLinks(links.map(({ title, url }) => ({ title, url })));
     const linksChanged = JSON.stringify(clean) !== JSON.stringify(settings.links ?? []);
     const widgetsChanged = JSON.stringify(widgets) !== JSON.stringify(settings.widgets ?? []);
-    try {
-      if (modesOn) localStorage.removeItem(MODE_KEY);
-      else localStorage.setItem(MODE_KEY, 'off');
-    } catch {
-      // A convenience of this browser.
-    }
+    setModePin(modesOn ? null : 'off');
     save.mutate({
       ...(widgetsChanged ? { widgets } : {}),
       corners,

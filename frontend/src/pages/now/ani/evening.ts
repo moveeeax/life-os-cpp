@@ -1,16 +1,10 @@
+import type { TelegramWaiting } from '@/hooks/useTelegram';
 import type { Today } from '@/lib/now/types';
 
 /*
  * Her evening word with the day's tasks: how many of today's are done, and
  * an offer to move the open ones to tomorrow (the page asks with buttons).
  */
-
-/** The local day after @p date (YYYY-MM-DD), as YYYY-MM-DD. */
-export function tomorrowOf(date: string): string {
-  const d = new Date(`${date}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
 
 /** The line and the open tasks to move; null without tasks today. */
 export function evening(
@@ -26,11 +20,7 @@ export function evening(
   return { text: `Сделано ${done} из ${all.length}. Перенести ${move.length} на завтра?`, move };
 }
 
-export interface Waiting {
-  chat: string;
-  title: string;
-  since: string;
-}
+export type Waiting = TelegramWaiting;
 
 const SINCE_DAY = [
   'воскресенья',

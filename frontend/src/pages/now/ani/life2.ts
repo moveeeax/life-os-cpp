@@ -1,3 +1,5 @@
+import { clockIn, shiftDays } from '@/lib/dates';
+
 /**
  * Ani's second set of her own lines, as pure decisions (useLife plays them):
  * the question of the day, follow-ups and wishes from her facts, the mood
@@ -8,8 +10,6 @@
 
 const DAY_MS = 86_400_000;
 const dayIndex = (date: string) => Math.floor(Date.parse(`${date}T00:00:00Z`) / DAY_MS);
-const shift = (date: string, by: number) =>
-  new Date(Date.parse(`${date}T00:00:00Z`) + by * DAY_MS).toISOString().slice(0, 10);
 
 export const QUESTIONS = [
   'Как ты больше всего любишь отдыхать?',
@@ -40,7 +40,7 @@ export function followUpOf(
   facts: readonly Fact[],
   today: string,
 ): { id: string; what: string } | null {
-  const yesterday = shift(today, -1);
+  const yesterday = shiftDays(today, -1);
   for (const f of facts) {
     const m = /^(\d{4}-\d{2}-\d{2}): (.+)$/.exec(f.text.trim());
     if (m && m[1] === yesterday) return { id: f.id, what: m[2] };
@@ -70,14 +70,7 @@ export function moodLow(
 
 /** The local minute a sleep started, past midnight counted as the night before (25:30 for 01:30). */
 function nightMinute(iso: string, tz: string): number {
-  const p = new Intl.DateTimeFormat('en-GB', {
-    timeZone: tz,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(new Date(iso));
-  const h = Number(p.find((x) => x.type === 'hour')?.value ?? 0);
-  const m = Number(p.find((x) => x.type === 'minute')?.value ?? 0);
+  const { hour: h, minute: m } = clockIn(tz, new Date(iso));
   return (h < 12 ? h + 24 : h) * 60 + m;
 }
 
@@ -127,7 +120,7 @@ type HabitDays = {
 
 /** A daily habit done three days running and missed yesterday: a lighter version is worth offering. */
 export function brokenStreakOf(habits: readonly HabitDays[], today: string): string | null {
-  const back = (n: number) => shift(today, -n);
+  const back = (n: number) => shiftDays(today, -n);
   for (const h of habits) {
     if (h.schedule !== 'daily') continue;
     const done = new Map(h.days.map((d) => [d.date, d.done]));

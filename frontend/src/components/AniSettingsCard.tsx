@@ -12,7 +12,7 @@ import {
   useRevokeAniMcpKey,
   useRotateAniWebhook,
   type AniWebhook,
-} from '@/hooks/useAni';
+} from '@/hooks/useAniPrefs';
 
 const SAY = `curl -X POST "$URL" -H 'Content-Type: application/json' \\
   -d '{"type":"say","text":"Сборка прошла."}'`;

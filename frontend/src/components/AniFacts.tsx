@@ -1,31 +1,26 @@
-import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useApiMutation } from '@/hooks/useApiMutation';
-import { api } from '@/lib/api/client';
+import {
+  useAddAniFact,
+  useAniDeals,
+  useAniFacts,
+  useAniPrefs,
+  useDeleteAniDeal,
+  useDeleteAniFact,
+  useUnmuteKind,
+  useUpdateAniFact,
+  type AniFact,
+} from '@/hooks/useAniPrefs';
 import { formatDay } from '@/lib/dates';
-import type { components } from '@/lib/api/schema.gen';
-import { readAlbum } from '@/pages/now/ani/life';
-import { HOLD_KEY, LINE_KINDS } from '@/pages/now/ani/lines';
+import { HOLD_KEY, LINE_KINDS, readAlbum } from '@/lib/now/ani';
 
-type Fact = components['schemas']['AniFact'];
-type Prefs = components['schemas']['AniPrefs'];
-
-const KEY = ['ani', 'facts'] as const;
-const PREFS = ['ani', 'prefs'] as const;
-
-function FactRow({ fact }: { fact: Fact }) {
+function FactRow({ fact }: { fact: AniFact }) {
   const [text, setText] = useState<string | null>(null);
-  const save = useApiMutation(
-    async (t: string) => await api.patchJson(`/api/v1/ani/facts/${fact.id}`, { body: { text: t } }),
-    { invalidate: [KEY], onSuccess: () => setText(null) },
-  );
-  const remove = useApiMutation(async () => await api.deleteJson(`/api/v1/ani/facts/${fact.id}`), {
-    invalidate: [KEY],
-  });
+  const save = useUpdateAniFact(fact.id, () => setText(null));
+  const remove = useDeleteAniFact(fact.id);
   return (
     <li className="flex items-center gap-2 py-1.5">
       {text === null ? (
@@ -71,25 +66,11 @@ function FactRow({ fact }: { fact: Fact }) {
   );
 }
 
-/** What Ani keeps about the user, and the kinds of her lines they muted on Now. */
-type Deal = { id: string; text: string; kind: string; target: number; done: number };
-const DEALS = ['ani', 'deals'] as const;
-
 /** This week's promises to Ani with how far each is; dropping one. */
 function Deals() {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const deals = useQuery({
-    queryKey: [...DEALS, tz],
-    retry: false,
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: Deal[] }>('/api/v1/ani/deals', { query: { tz }, signal })).data,
-  });
-  const drop = useApiMutation(
-    async (id: string) => await api.deleteJson(`/api/v1/ani/deals/${id}`),
-    {
-      invalidate: [DEALS],
-    },
-  );
+  const deals = useAniDeals(tz);
+  const drop = useDeleteAniDeal();
   const list = Array.isArray(deals.data) ? deals.data : [];
   return (
     <div className="space-y-1">
@@ -161,28 +142,12 @@ function Album() {
   );
 }
 
+/** What Ani keeps about the user, and the kinds of her lines they muted on Now. */
 export function AniFacts() {
-  const facts = useQuery({
-    queryKey: KEY,
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: Fact[] }>('/api/v1/ani/facts', { signal })).data,
-  });
-  const prefs = useQuery({
-    queryKey: PREFS,
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: Prefs }>('/api/v1/ani/prefs', { signal })).data,
-  });
-  const add = useApiMutation(
-    async (t: string) => await api.postJson('/api/v1/ani/facts', { body: { text: t } }),
-    { invalidate: [KEY], onSuccess: () => setDraft('') },
-  );
-  const unmute = useApiMutation(
-    async (kind: string) =>
-      await api.putJson('/api/v1/ani/prefs', {
-        body: { muted: (prefs.data?.muted ?? []).filter((k) => k !== kind) },
-      }),
-    { invalidate: [PREFS] },
-  );
+  const facts = useAniFacts();
+  const prefs = useAniPrefs();
+  const add = useAddAniFact(() => setDraft(''));
+  const unmute = useUnmuteKind(prefs.data?.muted ?? []);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [hold, setHold] = useState(() => {

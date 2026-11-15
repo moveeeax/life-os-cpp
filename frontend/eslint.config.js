@@ -26,6 +26,30 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     },
   },
+  // The shared layers never reach into a page; what a page shares lives in
+  // lib/ (the shell's lazy Now import is a dynamic import, not checked here).
+  {
+    files: [
+      'src/shell/**/*.{ts,tsx}',
+      'src/components/**/*.{ts,tsx}',
+      'src/hooks/**/*.{ts,tsx}',
+      'src/lib/**/*.{ts,tsx}',
+    ],
+    ignores: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@/pages/*'],
+              message: 'Shared code must not import from pages; move the piece to lib/.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Plain-JS config files at the frontend root (this file).
   {
     files: ['*.js'],

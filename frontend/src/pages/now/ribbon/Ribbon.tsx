@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { useNowDay } from '@/hooks/useNow';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
+import { hhmm, minutesIn } from '@/lib/dates';
 
 import {
   RIBBON_FROM,
@@ -16,8 +18,6 @@ import {
   pinsOf,
   type Block,
   RIBBON_POINT,
-  hhmm,
-  useNowDay,
 } from './layout';
 import { giveProps } from '@/lib/now/drag';
 import './ribbon.css';
@@ -98,9 +98,7 @@ export function Ribbon({
 
   if (!day.data) return null;
   const today = date === new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date(now));
-  const nowPct = today
-    ? pctOf(Number(hhmm(now, tz).slice(0, 2)) * 60 + Number(hhmm(now, tz).slice(3)))
-    : null;
+  const nowPct = today ? pctOf(minutesIn(tz, now)) : null;
   const hours = [];
   for (let h = RIBBON_FROM; h <= RIBBON_TO; h += 2) hours.push(h);
   const freeMinutes = blocks

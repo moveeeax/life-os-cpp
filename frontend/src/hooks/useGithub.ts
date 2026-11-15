@@ -1,8 +1,6 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useApiMutation } from '@/hooks/useApiMutation';
-import { GITHUB_PROBE } from '@/hooks/moduleProbes';
-import { useModuleOn } from '@/hooks/useModuleProbe';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import {
@@ -20,11 +18,6 @@ const PAGE = 50;
 /** A mute or a sync moves the lists and the counts; a task made from a repository moves Tasks and Now too. */
 const WRITES = [qk.github.all()] as const;
 const TASK_WRITES = [qk.github.all(), qk.tasks.all(), qk.now.all()] as const;
-
-/** Whether the GitHub module is on (undefined while asked). */
-export function useGithubOn(enabled = true): boolean | undefined {
-  return useModuleOn('github', GITHUB_PROBE, enabled);
-}
 
 /** GET /github: whether the server has an OAuth App and whether the caller linked. */
 export function useGithubStatus(enabled = true) {

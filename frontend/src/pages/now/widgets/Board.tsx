@@ -2,29 +2,27 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { useMetrics } from '@/hooks/useMetrics';
-import { useCreateEntry, useFoodDay, useFoodRecent } from '@/hooks/useFood';
+import { useCreateEntry, useFoodDay, useFoodRecent, useWater } from '@/hooks/useFood';
 import { useReport } from '@/hooks/useMoney';
+import { useTelegramWaiting } from '@/hooks/useTelegram';
 import { api, ApiClientError } from '@/lib/api/client';
-import { shiftDays } from '@/lib/dates';
+import { clockIn, shiftDays } from '@/lib/dates';
 import { qk } from '@/lib/api/queryKeys';
 import { formatTotal } from '@/lib/networth';
 import { shortDay } from '@/lib/travel';
 import type { Today } from '@/lib/now/types';
+import { FIXED, widgetKey, type Widget } from '@/lib/now/widgets';
 
-import { hourIn } from '../modes/modes';
 import {
   documentLeft,
   documentName,
   DOCUMENTS_SHOWN,
-  FIXED,
   GLASS_ML,
   mealAt,
   quickFoods,
   sparkPoints,
   trendWords,
   weekRange,
-  widgetKey,
-  type Widget,
 } from './widgets';
 import './widgets.css';
 
@@ -202,12 +200,7 @@ const litres = (ml: number) =>
 /** Water of the day: a glass in one tap, and one back if it was a slip. */
 function WaterWidget({ date }: { date: string }) {
   const qc = useQueryClient();
-  const water = useQuery({
-    queryKey: qk.food.water(date),
-    retry: false,
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: Water }>('/api/v1/food/water', { query: { date }, signal })).data,
-  });
+  const water = useWater(date);
   const [busy, setBusy] = useState(false);
   const add = async (ml: number) => {
     setBusy(true);
@@ -288,7 +281,7 @@ function ProteinWidget({ date, tz }: { date: string; tz: string }) {
               onClick={() =>
                 create.mutate({
                   date,
-                  meal: mealAt(hourIn(new Date(), tz)),
+                  meal: mealAt(clockIn(tz, new Date()).hour),
                   item_id: item.id,
                   grams,
                 })
@@ -304,15 +297,7 @@ function ProteinWidget({ date, tz }: { date: string; tz: string }) {
 }
 
 function TelegramWidget() {
-  const waiting = useQuery({
-    queryKey: qk.telegramWaiting(),
-    staleTime: 10 * 60_000,
-    retry: false,
-    refetchInterval: retryLater,
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: { title: string }[] }>('/api/v1/telegram/waiting', { signal }))
-        .data,
-  });
+  const waiting = useTelegramWaiting({ refetchInterval: retryLater });
   const list = Array.isArray(waiting.data) ? waiting.data : [];
   return (
     <Frame

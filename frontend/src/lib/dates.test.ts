@@ -5,7 +5,9 @@ import {
   daysBetween,
   formatDateTime,
   formatDay,
+  hhmm,
   isDay,
+  minutesIn,
   mondayOf,
   shiftDays,
   todayLocal,
@@ -132,5 +134,28 @@ describe('clockIn', () => {
     const at = new Date(Date.UTC(2026, 9, 26, 19, 30));
     expect(clockIn('Asia/Almaty', at)).toEqual({ hour: 0, minute: 30, weekday: 2 });
     expect(clockIn('America/New_York', at)).toEqual({ hour: 15, minute: 30, weekday: 1 });
+  });
+});
+
+describe('minutesIn and hhmm', () => {
+  it('ModeInTheProfileZone: the hour of the profile zone, not the browser', () => {
+    const at = new Date('2026-10-30T05:30:00Z');
+    expect(clockIn('Asia/Tashkent', at).hour).toBe(10);
+    expect(clockIn('America/New_York', at).hour).toBe(1);
+    expect(clockIn('Asia/Tashkent', new Date('2026-10-30T19:00:00Z')).hour).toBe(0);
+  });
+
+  it('counts minutes past local midnight and prints HH:MM in the zone', () => {
+    const ms = Date.UTC(2026, 9, 26, 19, 30);
+    expect(minutesIn('Asia/Almaty', ms)).toBe(30);
+    expect(minutesIn('America/New_York', new Date(ms))).toBe(15 * 60 + 30);
+    expect(hhmm(ms, 'Asia/Almaty')).toBe('00:30');
+    expect(hhmm(ms, 'America/New_York')).toBe('15:30');
+  });
+
+  it('shiftDays(date, 1) is the next day across months (the evening word and the review)', () => {
+    expect(shiftDays('2026-10-28', 1)).toBe('2026-10-29');
+    expect(shiftDays('2026-10-31', 1)).toBe('2026-11-01');
+    expect(shiftDays('2026-12-31', 1)).toBe('2027-01-01');
   });
 });

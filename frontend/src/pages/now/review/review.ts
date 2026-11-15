@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { REVIEW_EVENT } from '@/lib/now/act';
 import type { Today } from '@/lib/now/types';
 
 /*
@@ -8,8 +9,6 @@ import type { Today } from '@/lib/now/types';
  * habits under their weekly target, each row closable for the week.
  */
 
-/** Opens the review from anywhere on Now (the account menu). */
-export const REVIEW_EVENT = 'now:review';
 export const SEEN_KEY = 'now:review:seen';
 export const closedKey = (week: string) => `now:review:closed:${week}`;
 

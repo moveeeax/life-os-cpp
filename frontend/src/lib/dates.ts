@@ -56,6 +56,21 @@ export function clockIn(
   };
 }
 
+/** Minutes past local midnight at @p at on the clock of @p tz (the browser's zone without it). */
+export function minutesIn(tz?: string, at: number | Date = new Date()): number {
+  const c = clockIn(tz, typeof at === 'number' ? new Date(at) : at);
+  return c.hour * 60 + c.minute;
+}
+
+/** HH:MM of @p ms in @p tz. */
+export const hhmm = (ms: number, tz: string) =>
+  new Intl.DateTimeFormat('en-GB', {
+    timeZone: tz,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date(ms));
+
 /** The day @p by days from @p date; a broken @p date counts from today. */
 export function shiftDays(date: string, by: number): string {
   const t = utcOf(date) ?? utcOf(todayLocal())!;

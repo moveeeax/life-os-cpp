@@ -7,11 +7,15 @@ import { qk } from '@/lib/api/queryKeys';
 import type { components } from '@/lib/api/schema.gen';
 
 export type AniPrefs = components['schemas']['AniPrefs'];
+export type AniFact = components['schemas']['AniFact'];
+export type AniDeal = components['schemas']['AniDeal'];
 export type AniWebhook = components['schemas']['AniWebhook'];
 export type ApiKey = components['schemas']['ApiKey'];
 export type ApiKeyCreated = components['schemas']['ApiKeyCreated'];
 
 const PREFS = '/api/v1/ani/prefs';
+const FACTS = '/api/v1/ani/facts';
+const DEALS = '/api/v1/ani/deals';
 const WEBHOOK = '/api/v1/ani/webhook';
 const KEYS = '/api/v1/account/api-keys';
 
@@ -43,6 +47,59 @@ export function useMuteKind() {
     },
     [qc],
   );
+}
+
+/** Turns a muted kind of her lines back on; @p muted is the list the page shows. */
+export function useUnmuteKind(muted: readonly string[]) {
+  return useApiMutation(
+    async (kind: string) =>
+      await api.putJson(PREFS, { body: { muted: muted.filter((k) => k !== kind) } }),
+    { invalidate: [qk.ani.prefs()] },
+  );
+}
+
+/** What Ani keeps about the user (Account → Ani). */
+export function useAniFacts() {
+  return useQuery({
+    queryKey: qk.ani.facts(),
+    queryFn: async ({ signal }) => (await api.getJson<{ data: AniFact[] }>(FACTS, { signal })).data,
+  });
+}
+
+export function useAddAniFact(onSuccess?: () => void) {
+  return useApiMutation(async (text: string) => await api.postJson(FACTS, { body: { text } }), {
+    invalidate: [qk.ani.facts()],
+    onSuccess,
+  });
+}
+
+export function useUpdateAniFact(id: string, onSuccess?: () => void) {
+  return useApiMutation(
+    async (text: string) => await api.patchJson(`${FACTS}/${id}`, { body: { text } }),
+    { invalidate: [qk.ani.facts()], onSuccess },
+  );
+}
+
+export function useDeleteAniFact(id: string) {
+  return useApiMutation(async () => await api.deleteJson(`${FACTS}/${id}`), {
+    invalidate: [qk.ani.facts()],
+  });
+}
+
+/** This week's promises to Ani, counted in the browser's zone. */
+export function useAniDeals(tz: string) {
+  return useQuery({
+    queryKey: qk.ani.deals(tz),
+    retry: false,
+    queryFn: async ({ signal }) =>
+      (await api.getJson<{ data: AniDeal[] }>(DEALS, { query: { tz }, signal })).data,
+  });
+}
+
+export function useDeleteAniDeal() {
+  return useApiMutation(async (id: string) => await api.deleteJson(`${DEALS}/${id}`), {
+    invalidate: [qk.ani.deals()],
+  });
 }
 
 /** The user's webhook URL (made on first read) and its last calls. */
