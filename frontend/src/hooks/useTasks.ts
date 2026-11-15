@@ -6,6 +6,7 @@ import { useParseJob } from '@/hooks/useParseJob';
 import { todayLocal } from '@/lib/dates';
 import { api } from '@/lib/api/client';
 import { NOW_RIBBON, qk } from '@/lib/api/queryKeys';
+import type { ResponseOf } from '@/lib/api/types';
 import {
   localZone,
   type Task,
@@ -47,7 +48,8 @@ export function useTasksStatus() {
     queryKey: qk.tasks.status(),
     staleTime: 5 * 60_000,
     queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: { llm_available: boolean } }>(`${BASE}/status`, { signal })).data,
+      (await api.getJson<ResponseOf<'/api/v1/tasks/status', 'get'>>(`${BASE}/status`, { signal }))
+        .data,
   });
 }
 

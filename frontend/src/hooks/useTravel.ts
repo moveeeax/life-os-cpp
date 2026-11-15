@@ -4,6 +4,7 @@ import { listQuery, useDeleteEntity, useSaveEntity } from '@/hooks/crud';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
 import { NOW_DIGEST, qk } from '@/lib/api/queryKeys';
+import type { ResponseOf } from '@/lib/api/types';
 import type { Task } from '@/lib/tasks';
 import type {
   TravelCounter,
@@ -34,8 +35,11 @@ export function useTravelSettings() {
   return useQuery({
     queryKey: qk.travel.settings(),
     queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: { home_country: string | null } }>(`${BASE}/settings`, { signal }))
-        .data,
+      (
+        await api.getJson<ResponseOf<'/api/v1/travel/settings', 'get'>>(`${BASE}/settings`, {
+          signal,
+        })
+      ).data,
   });
 }
 

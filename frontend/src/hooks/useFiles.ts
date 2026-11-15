@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api, apiErrorMessage } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
+import type { ResponseOf } from '@/lib/api/types';
 import { checkFile, storageMessage, type ParentKind, type PrivateFile } from '@/lib/files';
 import { putWithProgress } from '@/lib/now/upload';
 
@@ -44,7 +45,9 @@ export function useOpenFile() {
     setError(null);
     const tab = window.open('', '_blank');
     try {
-      const { data } = await api.getJson<{ data: { url: string } }>(`${BASE}/${id}/download`);
+      const { data } = await api.getJson<ResponseOf<'/api/v1/files/{id}/download', 'get'>>(
+        `${BASE}/${id}/download`,
+      );
       if (tab) {
         tab.opener = null;
         tab.location.href = data.url;
