@@ -1,4 +1,4 @@
-import type { NowDay } from '../ribbon/layout';
+import type { NowDay } from '@/lib/now/types';
 
 /** The kinds of her own lines the person may put off ("Later") or mute ("Not about this"). */
 export type LineKind =

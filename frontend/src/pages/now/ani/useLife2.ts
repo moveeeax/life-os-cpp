@@ -5,6 +5,8 @@ import { useLocation } from 'react-router';
 import { useHabitDays } from '@/hooks/useHabits';
 import { numbersHidden } from '@/hooks/useHideNumbers';
 import { useMoneySettings } from '@/hooks/useMoney';
+import { useArrivalRate } from '@/hooks/useNow';
+import { useTelegramWaiting } from '@/hooks/useTelegram';
 import { useCrossings } from '@/hooks/useTravel';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
@@ -160,12 +162,7 @@ export function useLife2({
     {},
     on,
   );
-  const waiting = useRead<{ title: string }[]>(
-    qk.telegramWaiting(),
-    '/api/v1/telegram/waiting',
-    {},
-    on,
-  );
+  const waiting = useTelegramWaiting({ enabled: useWarm(on, 3 + useStep()) });
   const spends = useRead<Tx[]>(
     ['ani', 'life', 'tx-today', date],
     '/api/v1/money/transactions',
@@ -178,13 +175,10 @@ export function useLife2({
   const arrived = arrival(crossings.data, date);
   const local = arrived ? CURRENCY_OF[arrived.to_country] : undefined;
   // The trip mode card's key: one read of the rate for both.
-  const rate = useRead<{ amount: number }>(
-    qk.now.arrivalRate(local ?? '', view, date),
-    '/api/v1/money/rates/convert',
-    { amount: 1, from: local ?? '', to: view, date },
-    on && !!local && local !== view,
-    60 * 60_000,
-  );
+  const rate = useArrivalRate(local, view, date, {
+    enabled: useWarm(on && !!local && local !== view, 3 + useStep()),
+    retry: false,
+  });
   const report = useRead<{ as_if?: { expense: number; currency: string } | null }>(
     ['ani', 'life', 'report', date],
     '/api/v1/money/reports/period',

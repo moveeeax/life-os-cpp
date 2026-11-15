@@ -1,9 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { MONEY_PROBE, TRAVEL_PROBE } from '@/hooks/moduleProbes';
 import { useModuleOn } from '@/hooks/useModuleProbe';
 import { useMoneySettings } from '@/hooks/useMoney';
+import { useArrivalRate } from '@/hooks/useNow';
+import { useTelegramWaiting } from '@/hooks/useTelegram';
 import {
   useCounters,
   useCrossings,
@@ -11,14 +12,12 @@ import {
   useTrip,
   useTrips,
 } from '@/hooks/useTravel';
-import { api } from '@/lib/api/client';
-import type { Today } from '@/lib/now/types';
+import type { NowDay, Today } from '@/lib/now/types';
 import { clockIn, hhmm } from '@/lib/dates';
 import { CURRENCY_OF } from '@/lib/now/currency';
 import { modePin, setModePin } from '@/lib/now/mode';
 import { countryName } from '@/lib/travel';
 
-import type { NowDay } from '../ribbon/layout';
 import { arrival, flightsToday, minutesUntil, modeNeeds, modeOf, type Mode } from './modes';
 import './modes.css';
 
@@ -97,27 +96,10 @@ export function ModeCards({
     useMoneySettings(mode === 'arrive' && !!arrived && moneyOn === true).data?.view_currency ??
     'KZT';
   const local = arrived ? CURRENCY_OF[arrived.to_country] : undefined;
-  const rate = useQuery({
-    queryKey: ['now', 'mode-rate', local, view, date],
-    enabled: mode === 'arrive' && !!local && local !== view && moneyOn === true,
-    staleTime: 60 * 60_000,
-    queryFn: async ({ signal }) =>
-      (
-        await api.getJson<{ data: { amount: number } }>('/api/v1/money/rates/convert', {
-          query: { amount: 1, from: local!, to: view, date },
-          signal,
-        })
-      ).data,
+  const rate = useArrivalRate(local, view, date, {
+    enabled: mode === 'arrive' && moneyOn === true,
   });
-  const waiting = useQuery({
-    queryKey: ['telegram', 'waiting'],
-    enabled: mode === 'evening',
-    staleTime: 10 * 60_000,
-    retry: false,
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: { title: string }[] }>('/api/v1/telegram/waiting', { signal }))
-        .data,
-  });
+  const waiting = useTelegramWaiting({ enabled: mode === 'evening' });
 
   if (!mode) return null;
   const hide = () => {

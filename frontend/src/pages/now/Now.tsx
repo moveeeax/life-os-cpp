@@ -6,6 +6,7 @@ import { useHabitsEnabled } from '@/hooks/useHabits';
 import { api } from '@/lib/api/client';
 import { useMe } from '@/hooks/useMe';
 import {
+  useNowDay,
   useNowSettings,
   useSaveDockOrder,
   useSounds,
@@ -40,7 +41,6 @@ import { FocusPicker } from './FocusPicker';
 import { FocusStart } from './FocusStart';
 import { ModeCards } from './modes/ModeCards';
 import { Board } from './widgets/Board';
-import { useNowDay } from './ribbon/layout';
 import { Ribbon } from './ribbon/Ribbon';
 import './now.css';
 

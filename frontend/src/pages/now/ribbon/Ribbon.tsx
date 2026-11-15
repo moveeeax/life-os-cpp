@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { useNowDay } from '@/hooks/useNow';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import { hhmm, minutesIn } from '@/lib/dates';
@@ -17,7 +18,6 @@ import {
   pinsOf,
   type Block,
   RIBBON_POINT,
-  useNowDay,
 } from './layout';
 import { giveProps } from '@/lib/now/drag';
 import './ribbon.css';

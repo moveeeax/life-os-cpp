@@ -1,11 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-
-import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
-import type { components } from '@/lib/api/schema.gen';
 import { minutesIn } from '@/lib/dates';
-
-export type NowDay = components['schemas']['NowDay'];
+import type { NowDay } from '@/lib/now/types';
 
 /** The ribbon's hours: 08:00 to 23:00 local. */
 export const RIBBON_FROM = 8;
@@ -184,14 +178,3 @@ export function freeAt(blocks: Block[], pct: number): Block | null {
 
 /** Ani points at a block of the ribbon with this event (detail: the calendar event's id). */
 export const RIBBON_POINT = 'now:ribbon:point';
-
-export function useNowDay(date: string, tz: string) {
-  return useQuery({
-    queryKey: qk.now.day(date, tz),
-    staleTime: 60_000,
-    refetchInterval: 5 * 60_000,
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: NowDay }>('/api/v1/now/day', { query: { date, tz }, signal }))
-        .data,
-  });
-}

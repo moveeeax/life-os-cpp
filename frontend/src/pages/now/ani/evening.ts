@@ -1,3 +1,4 @@
+import type { TelegramWaiting } from '@/hooks/useTelegram';
 import type { Today } from '@/lib/now/types';
 
 /*
@@ -19,11 +20,7 @@ export function evening(
   return { text: `Сделано ${done} из ${all.length}. Перенести ${move.length} на завтра?`, move };
 }
 
-export interface Waiting {
-  chat: string;
-  title: string;
-  since: string;
-}
+export type Waiting = TelegramWaiting;
 
 const SINCE_DAY = [
   'воскресенья',

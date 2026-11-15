@@ -7,8 +7,9 @@ import { clockIn, shiftDays } from '@/lib/dates';
 
 import { useAniPrefs, useMuteKind } from '@/hooks/useAni';
 import { numbersHidden, useHideNumbers } from '@/hooks/useHideNumbers';
+import { fetchTelegramWaiting } from '@/hooks/useTelegram';
 import { HOLD_KEY, useAni, type AniOutfit } from '@/lib/now/ani';
-import type { NowWeather, Today } from '@/lib/now/types';
+import type { NowDay, NowWeather, Today } from '@/lib/now/types';
 
 import { AniChat, SpeakerIcon } from './AniChat';
 import { soundOn, speechUrl, useSound } from './chat';
@@ -28,7 +29,7 @@ import { firstFreeSlot, topCategory } from './give';
 import { reactionTo, ReactionGate } from './reactions';
 import { useRefresh } from './refresh';
 import { eventOfLine, quietKind, snooze, type LineKind } from './lines';
-import { RIBBON_POINT, type NowDay } from '../ribbon/layout';
+import { RIBBON_POINT } from '../ribbon/layout';
 import './ani.css';
 
 function holdToTalk(): boolean {
@@ -455,17 +456,16 @@ export function AniCorner({
         setDayOf(EVENING_KEY, c.date);
         // Telegram answers still owed go after the day's line (none without Telegram).
         // Through the cache Now's Telegram widget reads, so the two agree.
-        const read = async () =>
-          (await api.getJson<{ data: Waiting[] }>('/api/v1/telegram/waiting')).data;
+        // A fresher read than the widget's ten minutes: the list as of this evening.
         void (
           qcRef.current
             ? qcRef.current.fetchQuery({
                 queryKey: qk.telegramWaiting(),
-                queryFn: read,
+                queryFn: () => fetchTelegramWaiting(),
                 staleTime: 60_000,
                 retry: false,
               })
-            : read()
+            : fetchTelegramWaiting()
         )
           .then((r) => (Array.isArray(r) ? r : []))
           .catch(() => [] as Waiting[])

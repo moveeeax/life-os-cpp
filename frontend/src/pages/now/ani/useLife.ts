@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 
+import { useWater } from '@/hooks/useFood';
+import { useFocusStats } from '@/hooks/useNow';
 import { useCrossings } from '@/hooks/useTravel';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
@@ -78,32 +80,8 @@ export function useLife({
       (await api.getJson<{ data: DealView[] }>('/api/v1/ani/deals', { query: { tz }, signal }))
         .data,
   });
-  const focus = useQuery({
-    queryKey: ['now', 'focus-stats', tz],
-    enabled: warmFocus,
-    retry: false,
-    staleTime: 10 * 60_000,
-    queryFn: async ({ signal }) =>
-      (
-        await api.getJson<{ data: { week_minutes: number; longest_minutes: number } }>(
-          '/api/v1/now/focus-stats',
-          { query: { tz }, signal },
-        )
-      ).data,
-  });
-  const water = useQuery({
-    queryKey: ['food', 'water', date],
-    enabled: warmWater,
-    retry: false,
-    staleTime: 60_000,
-    queryFn: async ({ signal }) =>
-      (
-        await api.getJson<{ data: { ml: number } }>('/api/v1/food/water', {
-          query: { date },
-          signal,
-        })
-      ).data,
-  });
+  const focus = useFocusStats(tz, { enabled: warmFocus });
+  const water = useWater(date, { enabled: warmWater, staleTime: 60_000 });
   const crossings = useCrossings();
 
   const live = useRef({
