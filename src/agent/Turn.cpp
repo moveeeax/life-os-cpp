@@ -5,7 +5,6 @@
 
 #include "agent/Turn.hpp"
 
-#include <chrono>
 #include <exception>
 #include <optional>
 #include <utility>
@@ -15,8 +14,6 @@
 #include <spdlog/spdlog.h>
 
 #include "agent/Actions.hpp"
-#include "agent/CalendarTools.hpp"
-#include "agent/CueTools.hpp"
 #include "agent/DealTools.hpp"
 #include "agent/FactTools.hpp"
 #include "agent/Gateway.hpp"
@@ -25,9 +22,9 @@
 #include "agent/Lifecycle.hpp"
 #include "agent/Manifest.hpp"
 #include "agent/Settings.hpp"
-#include "agent/TelegramTools.hpp"
 #include "agent/Tools.hpp"
-#include "cache/Lock.hpp"
+#include "agent/Toolset.hpp"
+#include "agent/TurnShared.hpp"
 #include "jobs/Job.hpp"
 #include "jobs/Jobs.hpp"
 #include "net/Http.hpp"
@@ -42,6 +39,33 @@
 
 namespace Agent {
 
+namespace detail {
+
+bool over_budget(Repositories::Agent::AgentRepository& agents, const std::string& owner, long long budget) {
+    const nlohmann::json used = agents.month_usage(owner);
+    return used.value("prompt_tokens", 0LL) + used.value("completion_tokens", 0LL) >= budget;
+}
+
+void more_events(const std::string& owner) {
+    try {
+        if (!Repositories::Agent::InboxRepository().thinking_unlinked(owner).empty()) {
+            Intake::queue_event_job(owner);
+        }
+    } catch (const std::exception& e) {
+        spdlog::warn("ani agent {}: the waiting events were not queued: {}", Manifest::owner_hash(owner), e.what());
+    }
+}
+
+void reap(const std::string& owner) {
+    Repositories::Agent::InboxRepository inbox;
+    for (const auto& id : Repositories::Agent::TurnRepository().reap_stale(owner)) {
+        spdlog::warn("ani agent {}: turn {} went stale", Manifest::owner_hash(owner), id);
+        inbox.fail_turn(id);
+    }
+}
+
+}  // namespace detail
+
 namespace {
 
 // A running turn untouched for kRunningStaleSeconds is reaped: that must outlast a whole turn in the
@@ -53,38 +77,15 @@ static_assert(Tools::kTokenSeconds >= Gateway::kMaxRounds * Gateway::kCallTimeou
               "the tools' token would expire inside the longest turn");
 
 using json = nlohmann::json;
+using detail::more_events;
+using detail::over_budget;
+using detail::reap;
 using Repositories::Agent::ActionRepository;
 using Repositories::Agent::AgentRepository;
 using Repositories::Agent::DealRepository;
 using Repositories::Agent::FactRepository;
 using Repositories::Agent::InboxRepository;
 using Repositories::Agent::TurnRepository;
-
-bool over_budget(AgentRepository& agents, const std::string& owner, long long budget) {
-    const json used = agents.month_usage(owner);
-    return used.value("prompt_tokens", 0LL) + used.value("completion_tokens", 0LL) >= budget;
-}
-
-/// Queues the event job again while events of the user wait for a turn.
-void more_events(const std::string& owner) {
-    try {
-        if (!InboxRepository().thinking_unlinked(owner).empty()) {
-            Intake::queue_event_job(owner);
-        }
-    } catch (const std::exception& e) {
-        spdlog::warn("ani agent {}: the waiting events were not queued: {}", Manifest::owner_hash(owner), e.what());
-    }
-}
-
-/// Fails the user's turns that went stale (and their webhook events), so a
-/// lost job or a dead worker never holds the chat or the webhook.
-void reap(const std::string& owner) {
-    InboxRepository inbox;
-    for (const auto& id : TurnRepository().reap_stale(owner)) {
-        spdlog::warn("ani agent {}: turn {} went stale", Manifest::owner_hash(owner), id);
-        inbox.fail_turn(id);
-    }
-}
 
 json ended(const std::string& id, const std::string& owner, const std::string& error, const std::string& why) {
     spdlog::warn("ani agent {}: turn {} failed ({}): {}", Manifest::owner_hash(owner), id, error, why);
@@ -102,13 +103,6 @@ std::string trimmed(const std::string& s) {
     }
     return s.substr(a, s.find_last_not_of(" \t\r\n") - a + 1);
 }
-
-/// One event job of a user at a time (Redis), so two never take the same events.
-class EventLock : public Cache::Lock {
-public:
-    explicit EventLock(const std::string& owner)
-        : Cache::Lock("ani:hook:event:lock:" + owner, std::chrono::seconds(60)) {}
-};
 
 /// What became of a proposal, as the agent is told.
 std::string outcome_words(const std::string& status) {
@@ -363,62 +357,9 @@ json process_turn(const json& payload) {
 
         const std::string tz = turn->value("tz", "UTC");
         const std::string local = turns.local_now(tz).value_or("");
-        json tools = json::array();
-        Gateway::ToolRunner run = [](const std::string&, const json&) { return json{{"error", "unavailable"}}.dump(); };
-        if (!s->api_url.empty()) {
-            if (const auto token = Tools::access_token(owner)) {
-                tools = Tools::definitions();
-                run = Tools::runner(Net::Http::transport(), s->api_url, *token, tz);
-                // The owner's Telegram, for the one user it serves.
-                const bool telegram = TelegramTools::available(owner);
-                if (telegram) {
-                    for (const auto& t : TelegramTools::definitions()) {
-                        tools.push_back(t);
-                    }
-                    run = TelegramTools::runner(Net::Http::transport(), s->api_url, *token, std::move(run));
-                }
-                for (const auto& t : FactTools::definitions()) {
-                    tools.push_back(t);
-                }
-                run = FactTools::runner(owner, std::move(run));
-                for (const auto& t : DealTools::definitions()) {
-                    tools.push_back(t);
-                }
-                run = DealTools::runner(owner, tz, std::move(run));
-                for (const auto& t : CueTools::definitions()) {
-                    tools.push_back(t);
-                }
-                run = CueTools::runner(owner, tz, std::move(run));
-                const bool calendar = CalendarTools::available(owner);
-                if (calendar) {
-                    for (const auto& t : CalendarTools::definitions()) {
-                        tools.push_back(t);
-                    }
-                    run = CalendarTools::runner(Net::Http::transport(), s->api_url, *token, tz, std::move(run));
-                }
-                // Changes need the person's day (a habit is ticked for today or before).
-                if (local.size() >= 10) {
-                    for (const auto& t : Actions::definitions()) {
-                        tools.push_back(t);
-                    }
-                    if (telegram) {
-                        for (const auto& t : Actions::telegram_definitions()) {
-                            tools.push_back(t);
-                        }
-                    }
-                    if (calendar) {
-                        for (const auto& t : Actions::calendar_definitions()) {
-                            tools.push_back(t);
-                        }
-                    }
-                    run = Actions::runner(
-                        Net::Http::transport(), s->api_url, *token, tz, local.substr(0, 10), owner, id, std::move(run));
-                }
-                // A webhook turn reads and proposes only; an MCP one leaves Telegram alone.
-                tools = Tools::offered(origin, tools);
-                run = Tools::offered_runner(origin, std::move(run));
-            }
-        }
+        auto toolset = build_toolset(s->api_url, owner, tz, local, id, origin);
+        json tools = std::move(toolset.tools);
+        Gateway::ToolRunner run = std::move(toolset.run);
         const json outcomes = ActionRepository().of_previous_turn(owner, id);
         // The gateway ignores system messages: the context goes in front of the text.
         const std::string said = (started ? *started : *turn).value("text", "");
@@ -491,120 +432,6 @@ void fail_turn(const std::string& turn_id, const std::string& error) {
     } catch (const std::exception& e) {
         spdlog::warn("ani agent: the dead turn {} was not marked failed: {}", turn_id, e.what());
     }
-}
-
-namespace {
-
-/// One pass of the user's event job; a DeferJob brings the same job back.
-json hook_event_pass(const std::string& owner) {
-    EventLock lock(owner);
-    if (!lock.held()) {
-        throw Jobs::DeferJob("another event job of the user runs", 1000);
-    }
-    reap(owner);
-    InboxRepository inbox;
-    TurnRepository turns;
-    const json waiting = inbox.thinking_unlinked(owner);
-    json live = json::array();
-    for (const auto& item : waiting) {
-        if (item.value("expires_in", 0LL) > 0) {
-            live.push_back(item);
-        }
-    }
-    if (live.empty()) {
-        // Nothing left the agent could still answer in time.
-        inbox.fail_unlinked(owner);
-        return json{{"status", "skipped"}, {"reason", waiting.empty() ? "no_events" : "expired"}};
-    }
-    const auto s = read_settings();
-    AgentRepository agents;
-    if (!s || over_budget(agents, owner, s->monthly_tokens)) {
-        inbox.fail_unlinked(owner);
-        return json{{"status", "failed"}, {"error", s ? "budget" : "unavailable"}};
-    }
-
-    // Events that came while a webhook turn waits join it.
-    if (const auto open = turns.open_hook_turn(owner)) {
-        const std::string turn_id = (*open)["id"];
-        if (open->value("status", "") != "queued") {
-            // The only event job of the user waits for the turn (new events do not queue another).
-            throw Jobs::DeferJob("a webhook turn of the user runs", 5000);
-        }
-        std::vector<std::string> joined;
-        for (const auto& item : live) {
-            if (!turns.append_text(turn_id, event_line(item["payload"]))) {
-                break;
-            }
-            joined.push_back(item["id"].get<std::string>());
-        }
-        inbox.link(joined, turn_id);
-        if (joined.size() < live.size()) {
-            throw Jobs::DeferJob("the webhook turn is full", 5000);
-        }
-        return json{{"status", "joined"}, {"events", joined.size()}};
-    }
-
-    // Webhook turns have their own hourly cap: a busy Telegram never takes the person's chat.
-    if (turns.count_since(owner, 3600, /*hooks=*/true) >= kHookTurnsPerHour) {
-        throw Jobs::DeferJob("the user's webhook turns for this hour are spent", 60000);
-    }
-    // No slot to wake the agent: the events wait (until their time is out, above).
-    if (wake(owner) == Wake::Busy) {
-        throw Jobs::DeferJob("every agent slot is taken", 30000);
-    }
-    std::string text;
-    std::vector<std::string> ids;
-    for (const auto& item : live) {
-        const std::string line = event_line(item["payload"]);
-        if (!text.empty() && Utils::Utf8::length(text) + 1 + Utils::Utf8::length(line) > kTurnTextMax) {
-            break;
-        }
-        text += (text.empty() ? "" : "\n") + line;
-        ids.push_back(item["id"].get<std::string>());
-    }
-    const auto turn = turns.open(owner, text, turns.last_tz(owner), "hook");
-    if (!turn) {
-        throw Jobs::DeferJob("a webhook turn opened meanwhile", 1000);
-    }
-    const std::string turn_id = (*turn)["id"];
-    inbox.link(ids, turn_id);
-    Jobs::get().submit(kTurnJob, json{{"turn", turn_id}});
-    // Events that did not fit wait unlinked: event_job_ended queues the next pass for them.
-    return json{{"status", "queued"}, {"turn", turn_id}, {"events", ids.size()}};
-}
-
-}  // namespace
-
-json process_hook_event(const json& payload) {
-    const std::string owner = payload.value("owner", std::string());
-    if (owner.empty()) {
-        throw Jobs::PermanentJobError("ani hook event job without an owner");
-    }
-    Intake::event_job_alive(owner);
-    // A deferral or an error keeps the marker: this job comes back (an error is retried, a
-    // dead letter clears the marker in fail_hook_events).
-    json out = hook_event_pass(owner);
-    Intake::event_job_ended(owner);
-    return out;
-}
-
-void fail_hook_events(const std::string& owner, const std::string& error) {
-    try {
-        if (!owner.empty()) {
-            InboxRepository().fail_unlinked(owner);
-            spdlog::warn(
-                "ani agent {}: event job dead-lettered: {}", Manifest::owner_hash(owner), error.substr(0, 200));
-            Intake::event_job_ended(owner);
-        }
-    } catch (const std::exception& e) {
-        spdlog::warn("ani agent: the waiting events were not failed: {}", e.what());
-    }
-}
-
-json process_inbox_purge(const json& /*payload*/) {
-    // Asks that ran out unanswered tell their senders before they are purged.
-    const int callbacks = Intake::send_callbacks();
-    return json{{"status", "done"}, {"rows", InboxRepository().purge()}, {"callbacks", callbacks}};
 }
 
 }  // namespace Agent
