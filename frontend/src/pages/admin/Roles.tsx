@@ -8,21 +8,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useConfirmDelete } from '@/hooks/useConfirmDelete';
-import { useAdminRoles } from '@/hooks/useAdminRoles';
-import { useApiMutation } from '@/hooks/useApiMutation';
+import {
+  useAdminRoles,
+  useCreateRole,
+  useDeleteRole,
+  useUpdateRole,
+  type RoleFormState,
+} from '@/hooks/useAdminRoles';
 import { useErrorToast } from '@/hooks/useErrorToast';
-import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
 import type { Role } from '@/lib/api/types';
 import { PERMISSION_BITS, Permission } from '@/lib/auth/permissions';
 
 const ADMIN_ALL_BITS = Permission.Administer;
-
-interface RoleFormState {
-  name: string;
-  permissions: number;
-  is_default: boolean;
-}
 
 export function AdminRolesPage() {
   const [editing, setEditing] = useState<Role | null>(null);
@@ -31,27 +28,9 @@ export function AdminRolesPage() {
 
   const rolesQ = useAdminRoles();
 
-  const create = useApiMutation(
-    (form: RoleFormState) => api.postJson<{ data: Role }>('/api/v1/admin/roles', { body: form }),
-    {
-      invalidate: [qk.admin.roles()],
-      onSuccess: () => setCreating(false),
-    },
-  );
-
-  const update = useApiMutation(
-    (vars: { id: number; form: RoleFormState }) =>
-      api.patchJson<{ data: Role }>(`/api/v1/admin/roles/${vars.id}`, { body: vars.form }),
-    {
-      invalidate: [qk.admin.roles()],
-      onSuccess: () => setEditing(null),
-    },
-  );
-
-  const remove = useApiMutation((id: number) => api.deleteJson(`/api/v1/admin/roles/${id}`), {
-    invalidate: [qk.admin.roles()],
-    onSuccess: deleting.close,
-  });
+  const create = useCreateRole(() => setCreating(false));
+  const update = useUpdateRole(() => setEditing(null));
+  const remove = useDeleteRole(deleting.close);
 
   // Surface whichever mutation last failed as a toast (out of flow).
   useErrorToast(create.error ?? update.error ?? remove.error);

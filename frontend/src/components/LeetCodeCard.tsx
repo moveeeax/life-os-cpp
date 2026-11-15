@@ -1,37 +1,18 @@
-import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { useApiMutation } from '@/hooks/useApiMutation';
-import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
-import type { components } from '@/lib/api/schema.gen';
-
-type Profile = components['schemas']['LeetCodeProfile'];
-const PATH = '/api/v1/leetcode/profile';
+import { useLeetCodeProfile, useSaveLeetCodeProfile } from '@/hooks/useLeetCode';
 
 /**
  * The LeetCode username whose solved counts are pulled every hour; a
  * habit takes "LeetCode solved" as its source to tick itself.
  */
 export function LeetCodeCard() {
-  const profile = useQuery({
-    queryKey: qk.leetcode.profile(),
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: Profile | null }>(PATH, { signal })).data,
-  });
-  const save = useApiMutation(
-    async (username: string) =>
-      (
-        await api.putJson<{ data: Profile }>(PATH, {
-          body: { username, tz: Intl.DateTimeFormat().resolvedOptions().timeZone },
-        })
-      ).data,
-    { invalidate: [qk.leetcode.profile()] },
-  );
+  const profile = useLeetCodeProfile();
+  const save = useSaveLeetCodeProfile();
   const [name, setName] = useState('');
   useEffect(() => {
     if (profile.data?.username) setName(profile.data.username);

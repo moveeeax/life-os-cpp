@@ -1,5 +1,4 @@
 import { Link, useNavigate, useParams } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
 
 import { useState } from 'react';
 
@@ -10,12 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/toaster';
-import { useApiMutation } from '@/hooks/useApiMutation';
+import { useAdminUser, useDeleteAdminUser, useUpdateAdminUser } from '@/hooks/useAdminUser';
 import { useErrorToast } from '@/hooks/useErrorToast';
 import { useMe } from '@/hooks/useMe';
-import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
-import type { UserDetailResponse } from '@/lib/api/types';
 import { AdjustDialog } from '@/pages/admin/billing/AdjustDialog';
 
 export function AdminUserDetailPage() {
@@ -29,24 +25,9 @@ export function AdminUserDetailPage() {
   // self-protection UI.
   const me = useMe().data ?? null;
 
-  const userQ = useQuery({
-    queryKey: qk.admin.user(id),
-    queryFn: () => api.getJson<UserDetailResponse>('/api/v1/admin/users/' + id),
-  });
-
-  const update = useApiMutation(
-    (patch: Record<string, unknown>) =>
-      api.patchJson<UserDetailResponse>('/api/v1/admin/users/' + id, { body: patch }),
-    {
-      invalidate: [qk.admin.user(id), qk.admin.users()],
-      onSuccess: () => toast.success('Changes saved.'),
-    },
-  );
-
-  const remove = useApiMutation(() => api.deleteJson('/api/v1/admin/users/' + id), {
-    invalidate: [qk.admin.users()],
-    onSuccess: () => navigate('/admin/users'),
-  });
+  const userQ = useAdminUser(id);
+  const update = useUpdateAdminUser(id, () => toast.success('Changes saved.'));
+  const remove = useDeleteAdminUser(id, () => navigate('/admin/users'));
 
   useErrorToast(update.error ?? remove.error);
 
