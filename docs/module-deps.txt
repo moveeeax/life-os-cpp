@@ -149,7 +149,6 @@ fitness/jobs -> jobs
 fitness/jobs -> repositories/fitness
 fitness/jobs -> repositories/workout
 fitness/jobs -> utils
-fitness/now -> money
 fitness/now -> now
 fitness/now -> repositories/fitness
 fitness/now -> repositories/food
