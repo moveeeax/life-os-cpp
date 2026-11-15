@@ -204,7 +204,7 @@ std::uint32_t token_permissions(std::uint32_t role) {
 }
 
 bool may_offer(const std::string& origin, const std::string& name) {
-    const bool telegram = TelegramTools::is_telegram(name) || name == "tg_send" || name == "tg_edit";
+    const bool telegram = TelegramTools::is_telegram(name) || Actions::family_of(name) == Actions::Family::Telegram;
     if (origin == "mcp") {
         return !telegram;
     }
@@ -216,7 +216,7 @@ bool may_offer(const std::string& origin, const std::string& name) {
     if (Actions::is_write(name)) {
         return true;  // proposals: the person confirms each
     }
-    if (name == "tg_chats" || name == "tg_history" || name == "tg_search" || CalendarTools::is_calendar(name)) {
+    if (TelegramTools::is_offered_in_hook(name) || CalendarTools::is_calendar(name)) {
         return true;
     }
     return route(name, json::object(), "UTC").has_value();

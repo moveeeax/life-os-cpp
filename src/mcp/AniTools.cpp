@@ -212,12 +212,8 @@ const std::vector<std::pair<std::string, std::string>> kProposals = {{"ani_task"
 
 /// The input schema of one of her agent's write tools.
 json write_schema(const std::string& tool) {
-    for (const auto& t : Agent::Actions::definitions()) {
-        if (t["function"].value("name", "") == tool) {
-            return t["function"]["parameters"];
-        }
-    }
-    return schema(json::object());
+    json s = Agent::Actions::schema_of(tool);
+    return s.is_null() ? schema(json::object()) : s;
 }
 
 json propose(const std::string& owner, const std::string& tool, const json& args) {

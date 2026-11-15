@@ -91,6 +91,10 @@ bool is_telegram(const std::string& name) {
            name == "tg_mark_read";
 }
 
+bool is_offered_in_hook(const std::string& name) {
+    return name == "tg_chats" || name == "tg_history" || name == "tg_search";
+}
+
 json request_of(const std::string& name, const json& raw, std::string& refusal) {
     const json args = raw.is_object() ? raw : json::object();
     auto refuse = [&](const std::string& message) {

@@ -172,10 +172,12 @@ std::string preface(const std::string& local, const std::string& tz, const json&
     out += "Reply in one or two short spoken sentences.";
     std::string reads;
     std::string writes;
+    bool reacts = false;
     for (const auto& t : tools.is_array() ? tools : json::array()) {
         const std::string name = t.value(json::json_pointer("/function/name"), std::string());
         std::string& names = Actions::is_write(name) ? writes : reads;
         names += (names.empty() ? "" : ", ") + name;
+        reacts = reacts || name == "tg_react";
     }
     if (!reads.empty()) {
         // Left to itself the model answers from its memory of the person; it
@@ -185,7 +187,7 @@ std::string preface(const std::string& local, const std::string& tz, const json&
             "with the tools of this request (" +
             reads + ") every time it is asked about, never from memory.";
     }
-    if (reads.find("tg_react") != std::string::npos) {
+    if (reacts) {
         out += " The Telegram tools act on their real account: tg_react and tg_mark_read happen at once.";
     }
     if (!writes.empty()) {
