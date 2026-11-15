@@ -7,6 +7,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -76,4 +77,29 @@ TEST(MoneySummary, ConvertsAnAmountToTheTargetPerOneUnit) {
     EXPECT_DOUBLE_EQ(*Money::Summary::rate_per_target(quotes(), "KZT", "USD", "2026-10-11"), 490.0);
     EXPECT_NEAR(*Money::Summary::rate_per_target(quotes(), "KZT", "EUR", "2026-10-11"), 490.0 / 0.9, 1e-9);
     EXPECT_FALSE(Money::Summary::rate_per_target(quotes(), "THB", "USD", "2026-10-11").has_value());
+}
+
+TEST(MoneySummary, TotalsDatedSpendsEachAtItsOwnDayRate) {
+    const std::vector<Money::Summary::Spend> spends{
+        {"KZT", "2026-10-05", 50000.0}, {"KZT", "2026-10-11", 49000.0}, {"USD", "2026-10-11", 10.0}};
+    const auto t = Money::Summary::total_in(spends, quotes(), "USD");
+    EXPECT_DOUBLE_EQ(t.amount, 50000.0 / 500.0 + 49000.0 / 490.0 + 10.0);
+    EXPECT_FALSE(t.partial);
+    EXPECT_EQ(t.rate_date, "2026-10-01") << "the earliest quote day used";
+}
+
+TEST(MoneySummary, ASpendWithoutARateMakesTheTotalPartial) {
+    const std::vector<Money::Summary::Spend> spends{{"THB", "2026-10-05", 300.0}, {"KZT", "2026-10-11", 4900.0}};
+    const auto t = Money::Summary::total_in(spends, quotes(), "USD");
+    EXPECT_DOUBLE_EQ(t.amount, 4900.0 / 490.0);
+    EXPECT_TRUE(t.partial);
+    EXPECT_EQ(t.rate_date, "2026-10-10");
+}
+
+TEST(MoneySummary, SpendsInTheTargetAddNoRateDay) {
+    const std::vector<Money::Summary::Spend> spends{{"EUR", "2026-10-05", 20.0}};
+    const auto t = Money::Summary::total_in(spends, quotes(), "EUR");
+    EXPECT_DOUBLE_EQ(t.amount, 20.0);
+    EXPECT_TRUE(t.rate_date.empty());
+    EXPECT_TRUE(Money::Summary::total_in(std::vector<Money::Summary::Spend>(), quotes(), "USD").rate_date.empty());
 }
