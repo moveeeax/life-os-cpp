@@ -184,22 +184,6 @@ struct Parts {
 
 namespace detail {
 
-inline std::string unfenced(std::string_view content) {
-    const auto first = content.find_first_not_of(" \t\r\n");
-    if (first == std::string_view::npos) {
-        return {};
-    }
-    std::string_view body = content.substr(first);
-    if (body.rfind("```", 0) == 0) {
-        const auto line_end = body.find('\n');
-        const auto close = body.rfind("```");
-        if (line_end != std::string_view::npos && close != std::string_view::npos && close > line_end) {
-            body = body.substr(line_end + 1, close - line_end - 1);
-        }
-    }
-    return std::string(body);
-}
-
 /// A part that holds nothing: absent, null, or an object with an empty lines array.
 inline bool holds_nothing(const nlohmann::json& part) {
     return part.is_null() ||
@@ -215,7 +199,7 @@ inline bool holds_nothing(const nlohmann::json& part) {
  *         and one was dropped (a phrase that holds nothing gives empty parts).
  */
 inline Parts parse_answer(std::string_view content, const Setup& s, const Known& known) {
-    const nlohmann::json root = nlohmann::json::parse(detail::unfenced(content), nullptr, /*allow_exceptions=*/false);
+    const nlohmann::json root = nlohmann::json::parse(Chat::unfenced(content), nullptr, /*allow_exceptions=*/false);
     if (root.is_discarded() || !root.is_object()) {
         throw Invalid("answer is not a JSON object");
     }

@@ -18,6 +18,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "llm/Chat.hpp"
 #include "tasks/Fields.hpp"
 #include "utils/Date.hpp"
 #include "utils/Utf8.hpp"
@@ -41,22 +42,6 @@ struct Invalid : std::runtime_error {
 inline constexpr int kMaxLines = 20;
 
 namespace detail {
-
-/// The answer without a ```json fence around it, if the model added one.
-inline std::string unfenced(std::string_view content) {
-    std::string_view body = content;
-    while (!body.empty() && (body.front() == ' ' || body.front() == '\n' || body.front() == '\r')) {
-        body.remove_prefix(1);
-    }
-    if (body.rfind("```", 0) == 0) {
-        const auto line_end = body.find('\n');
-        const auto close = body.rfind("```");
-        if (line_end != std::string_view::npos && close != std::string_view::npos && close > line_end) {
-            body = body.substr(line_end + 1, close - line_end - 1);
-        }
-    }
-    return std::string(body);
-}
 
 /// Lower case for ASCII and Russian Cyrillic (А-Я, Ё), matching what the
 /// database's lower() gives the open titles; other bytes are kept.
@@ -98,7 +83,7 @@ inline std::string text_of(const nlohmann::json& o, const char* key) {
 inline std::vector<Line> parse_answer(std::string_view content, const std::set<std::string>& open_titles) {
     nlohmann::json doc;
     try {
-        doc = nlohmann::json::parse(detail::unfenced(content));
+        doc = nlohmann::json::parse(Chat::unfenced(content));
     } catch (const nlohmann::json::exception&) {
         throw Invalid("the answer is not JSON");
     }

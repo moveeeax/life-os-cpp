@@ -21,6 +21,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "llm/Chat.hpp"
 #include "utils/Date.hpp"
 #include "utils/Utf8.hpp"
 
@@ -53,35 +54,11 @@ inline constexpr double kAmountMax = 1e9;
 
 namespace detail {
 
-inline std::string unfenced(std::string_view content) {
-    std::string_view body = content;
-    while (!body.empty() && (body.front() == ' ' || body.front() == '\n' || body.front() == '\r')) {
-        body.remove_prefix(1);
-    }
-    if (body.rfind("```", 0) == 0) {
-        const auto line_end = body.find('\n');
-        const auto close = body.rfind("```");
-        if (line_end != std::string_view::npos && close != std::string_view::npos && close > line_end) {
-            body = body.substr(line_end + 1, close - line_end - 1);
-        }
-    }
-    return std::string(body);
-}
-
 inline std::optional<std::string> text(const nlohmann::json& line, const char* key) {
     if (line.contains(key) && line[key].is_string() && !line[key].get<std::string>().empty()) {
         return line[key].get<std::string>();
     }
     return std::nullopt;
-}
-
-inline bool is_date(const std::string& s) {
-    try {
-        Utils::Date::parse_ymd(s);
-        return true;
-    } catch (const std::invalid_argument&) {
-        return false;
-    }
 }
 
 inline void append_note(std::string& note, const char* what) {
@@ -101,7 +78,7 @@ inline std::vector<Line> parse_answer(std::string_view content,
                                       const std::string& hint_date,
                                       const std::set<std::string>& own_accounts,
                                       const std::map<std::string, std::string>& own_categories) {
-    const nlohmann::json root = nlohmann::json::parse(detail::unfenced(content), nullptr, /*allow_exceptions=*/false);
+    const nlohmann::json root = nlohmann::json::parse(Chat::unfenced(content), nullptr, /*allow_exceptions=*/false);
     if (root.is_discarded() || !root.is_object() || !root.contains("lines") || !root["lines"].is_array()) {
         throw Invalid("answer has no lines array");
     }
@@ -124,7 +101,7 @@ inline std::vector<Line> parse_answer(std::string_view content,
             line.type = *t;
         }
         line.date = detail::text(l, "date").value_or(hint_date);
-        if (!detail::is_date(line.date)) {
+        if (!Utils::Date::is_ymd(line.date)) {
             throw Invalid("a date is not a calendar day");
         }
         if (const auto t = detail::text(l, "time"); t && std::regex_match(*t, kTime)) {

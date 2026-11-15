@@ -67,6 +67,16 @@ TEST(MoneyParseAnswer, DefaultsAndAFence) {
     EXPECT_FALSE(lines[0].time.has_value());
 }
 
+TEST(MoneyParseAnswer, ReadsAFenceWithATabBeforeAndSpaceAfter) {
+    const auto lines =
+        Money::Parse::parse_answer("\t```json\n{\"lines\":[{\"amount\":5,\"merchant\":\"7-Eleven\"}]}\n```\n \t",
+                                   "2026-10-07",
+                                   kAccounts,
+                                   kCategories);
+    ASSERT_EQ(lines.size(), 1u);
+    EXPECT_EQ(lines[0].name, "7-Eleven");
+}
+
 TEST(MoneyParseAnswer, RejectsWhatCannotBeALine) {
     EXPECT_THROW(parse({{"lines", nlohmann::json::array()}}), Money::Parse::Invalid);
     EXPECT_THROW(parse({{"rows", {{{"amount", 1}}}}}), Money::Parse::Invalid);

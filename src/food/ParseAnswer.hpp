@@ -19,6 +19,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "llm/Chat.hpp"
 #include "utils/Utf8.hpp"
 
 namespace Food::Parse {
@@ -48,24 +49,6 @@ inline constexpr double kKcalMax = 10000;
 inline constexpr double kMacroMax = 1000;
 
 namespace detail {
-
-/// The JSON text with a ```json fence removed, when the model added one.
-inline std::string unfenced(std::string_view content) {
-    const auto first = content.find_first_not_of(" \t\r\n");
-    if (first == std::string_view::npos) {
-        return {};
-    }
-    const auto last = content.find_last_not_of(" \t\r\n");
-    std::string_view body = content.substr(first, last - first + 1);
-    if (body.rfind("```", 0) == 0) {
-        const auto line_end = body.find('\n');
-        const auto close = body.rfind("```");
-        if (line_end != std::string_view::npos && close != std::string_view::npos && close > line_end) {
-            body = body.substr(line_end + 1, close - line_end - 1);
-        }
-    }
-    return std::string(body);
-}
 
 inline double number(
     const nlohmann::json& line, const char* key, double lo, double hi, bool required, double fallback) {
@@ -110,7 +93,7 @@ inline bool is_uuid(std::string_view s) {
  * @throws Invalid
  */
 inline std::vector<Line> parse_answer(std::string_view content, const std::set<std::string>& own_item_ids) {
-    const nlohmann::json root = nlohmann::json::parse(detail::unfenced(content), nullptr, /*allow_exceptions=*/false);
+    const nlohmann::json root = nlohmann::json::parse(Chat::unfenced(content), nullptr, /*allow_exceptions=*/false);
     if (root.is_discarded() || !root.is_object()) {
         throw Invalid("answer is not a JSON object");
     }

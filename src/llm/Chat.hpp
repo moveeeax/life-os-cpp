@@ -10,6 +10,9 @@
  * request and asking again, one parameter per round: OpenAI's reasoning
  * models want max_completion_tokens and refuse a temperature, other servers
  * do not know response_format.
+ *
+ * The parse jobs and the advisor send their request through ask(); the parse
+ * answers lose a code fence through unfenced().
  */
 
 #pragma once
@@ -17,6 +20,8 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <variant>
 
 #include <nlohmann/json.hpp>
 
@@ -179,6 +184,83 @@ inline std::string content_of(const nlohmann::json& body) {
 /// The model the provider says answered, or the configured one.
 inline std::string model_of(const nlohmann::json& body, const Settings& s) {
     return body.contains("model") && body["model"].is_string() ? body["model"].get<std::string>() : s.model;
+}
+
+/// The JSON text with a ```json fence removed, when the model added one.
+/// Spaces, tabs and line breaks around the answer go first.
+inline std::string unfenced(std::string_view content) {
+    const auto first = content.find_first_not_of(" \t\r\n");
+    if (first == std::string_view::npos) {
+        return {};
+    }
+    const auto last = content.find_last_not_of(" \t\r\n");
+    std::string_view body = content.substr(first, last - first + 1);
+    if (body.rfind("```", 0) == 0) {
+        const auto line_end = body.find('\n');
+        const auto close = body.rfind("```");
+        if (line_end != std::string_view::npos && close != std::string_view::npos && close > line_end) {
+            body = body.substr(line_end + 1, close - line_end - 1);
+        }
+    }
+    return std::string(body);
+}
+
+/// The request of a job that wants a JSON object back: the system prompt,
+/// @p user_content (a string, or the parts of a message with an image),
+/// temperature 0. @p model is the configured one unless the job picks another.
+inline nlohmann::json json_request(const Settings& s, const nlohmann::json& user_content, const std::string& model) {
+    return nlohmann::json{
+        {"model", model},
+        {"messages", {{{"role", "system"}, {"content", s.prompt}}, {{"role", "user"}, {"content", user_content}}}},
+        {"max_tokens", s.max_tokens},
+        {"temperature", 0},
+        {"response_format", {{"type", "json_object"}}}};
+}
+
+inline nlohmann::json json_request(const Settings& s, const nlohmann::json& user_content) {
+    return json_request(s, user_content, s.model);
+}
+
+/// What the provider answered: the text of the first choice, the model that
+/// wrote it, and the token counts it reported.
+struct Answer {
+    std::string content;
+    std::string model;
+    std::optional<int> prompt_tokens;
+    std::optional<int> completion_tokens;
+};
+
+/// A refusal or an answer without text: the job fails with `code` and is not retried.
+struct Failure {
+    std::string code;
+    std::string message;
+};
+
+/**
+ * complete_adapting() and what it got. A provider error is a Failure with its
+ * code (provider_refused, provider_error_<status>) and message; an answer
+ * without text is a Failure invalid_answer. The model of the answer falls
+ * back to the request's.
+ * @throws Retryable on an outage, as complete() does.
+ */
+inline std::variant<Answer, Failure> ask(Net::Http::Transport& transport,
+                                         const Settings& s,
+                                         const nlohmann::json& request) {
+    std::string error_code;
+    const nlohmann::json body = complete_adapting(transport, s, request, error_code);
+    if (!error_code.empty()) {
+        return Failure{error_code, provider_message(body)};
+    }
+    Answer answer;
+    answer.content = content_of(body);
+    if (answer.content.empty()) {
+        return Failure{"invalid_answer", "no message content"};
+    }
+    answer.model = body.contains("model") && body["model"].is_string() ? body["model"].get<std::string>()
+                                                                       : request.value("model", s.model);
+    answer.prompt_tokens = usage(body, "prompt_tokens");
+    answer.completion_tokens = usage(body, "completion_tokens");
+    return answer;
 }
 
 }  // namespace Chat
