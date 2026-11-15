@@ -19897,6 +19897,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ani/level": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ani's level and the four scales it comes from
+         * @description Points for the days of the person's life by four scales (tasks, body, food, money), counted on each read from the person's own records. A scale earns up to 100 points a day for hitting the person's own goals (the tasks closed of those due and the focus, sleep, steps and workouts, the diary and the day's targets, spending within the budget) and half of that on the days a debt of attention holds. Nothing is taken away, so points and levels only grow. Reaching level L takes 100*(L-1) + 25*(L-1)*L points of a scale, and Ani's level is the lowest level of the four. The count starts 90 days before the first read and stays there; a local day is counted once it is closed (at 04:00 of the next), the day in progress is not.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The caller's IANA zone (UTC when absent) */
+                    tz?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Ani's level and the scales, in the order tasks, body, food, money */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AniLevel"];
+                        };
+                    };
+                };
+                /** @description A zone that is not one (invalid_query) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ani/webhook/rotate": {
         parameters: {
             query?: never;
@@ -28269,6 +28327,41 @@ export interface components {
             tz: string;
             /** Format: date-time */
             next_at: string;
+        };
+        AniLevel: {
+            /** @description The lowest level of the four scales */
+            level: number;
+            /**
+             * @description The scale with the fewest points (the first of them on a tie)
+             * @enum {string}
+             */
+            weakest: "tasks" | "body" | "food" | "money";
+            /**
+             * Format: date
+             * @description The day the count starts from
+             */
+            started_on: string;
+            /**
+             * Format: date
+             * @description The last closed local day counted
+             */
+            through: string;
+            scales: components["schemas"]["AniLevelScale"][];
+        };
+        AniLevelScale: {
+            /** @enum {string} */
+            id: "tasks" | "body" | "food" | "money";
+            level: number;
+            /** @description All points of the scale */
+            points: number;
+            /** @description Points that reached this level */
+            from: number;
+            /** @description Points that reach the next one */
+            to: number;
+            /** @description Points of the last 7 counted days */
+            week: number;
+            /** @description A debt of attention holds on the last counted day: the scale earns half until it is gone */
+            debt: boolean;
         };
         AniCue: {
             /** @description Stable for a rule and a day; agent-<uuid> for a cue her agent wrote */
