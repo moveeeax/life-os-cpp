@@ -6,6 +6,7 @@
 #include "calendar/Access.hpp"
 
 #include <chrono>
+#include <cstdint>
 #include <ctime>
 #include <exception>
 #include <map>
@@ -18,6 +19,7 @@
 
 #include "repositories/calendar/LinkRepository.hpp"
 #include "utils/Seal.hpp"
+#include "utils/Time.hpp"
 
 namespace Calendar {
 
@@ -97,12 +99,7 @@ std::variant<std::string, Problem> access(Net::Http::Transport& t, const std::st
 }
 
 std::string rfc3339(long long t) {
-    const std::time_t tt = static_cast<std::time_t>(t);
-    std::tm tm{};
-    gmtime_r(&tt, &tm);
-    char buf[32];
-    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm);
-    return buf;
+    return Utils::Time::epoch_to_iso8601(static_cast<std::int64_t>(t));
 }
 
 std::variant<std::vector<Event>, Problem> events(

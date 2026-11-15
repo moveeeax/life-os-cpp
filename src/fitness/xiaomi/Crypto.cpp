@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -16,22 +17,11 @@
 #include <openssl/sha.h>
 
 #include "fitness/xiaomi/Errors.hpp"
+#include "utils/Base64.hpp"
 
 namespace Xiaomi::Crypto {
 
 namespace {
-
-constexpr std::string_view kAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-/// Reverse alphabet table: 0xff means "not a base64 character".
-std::array<unsigned char, 256> build_reverse_table() {
-    std::array<unsigned char, 256> table{};
-    table.fill(0xff);
-    for (std::size_t i = 0; i < kAlphabet.size(); ++i) {
-        table[static_cast<unsigned char>(kAlphabet[i])] = static_cast<unsigned char>(i);
-    }
-    return table;
-}
 
 unsigned char byte_at(std::string_view s, std::size_t i) {
     return static_cast<unsigned char>(s[i]);
@@ -40,84 +30,17 @@ unsigned char byte_at(std::string_view s, std::size_t i) {
 }  // namespace
 
 std::string b64_encode(std::string_view raw) {
-    std::string out;
-    out.reserve(((raw.size() + 2) / 3) * 4);
-
-    std::size_t i = 0;
-    while (i + 3 <= raw.size()) {
-        const unsigned int triple = (static_cast<unsigned int>(byte_at(raw, i)) << 16) |
-                                    (static_cast<unsigned int>(byte_at(raw, i + 1)) << 8) |
-                                    static_cast<unsigned int>(byte_at(raw, i + 2));
-        out.push_back(kAlphabet[(triple >> 18) & 0x3f]);
-        out.push_back(kAlphabet[(triple >> 12) & 0x3f]);
-        out.push_back(kAlphabet[(triple >> 6) & 0x3f]);
-        out.push_back(kAlphabet[triple & 0x3f]);
-        i += 3;
-    }
-
-    const std::size_t rest = raw.size() - i;
-    if (rest == 1) {
-        const unsigned int triple = static_cast<unsigned int>(byte_at(raw, i)) << 16;
-        out.push_back(kAlphabet[(triple >> 18) & 0x3f]);
-        out.push_back(kAlphabet[(triple >> 12) & 0x3f]);
-        out.append("==");
-    } else if (rest == 2) {
-        const unsigned int triple =
-            (static_cast<unsigned int>(byte_at(raw, i)) << 16) | (static_cast<unsigned int>(byte_at(raw, i + 1)) << 8);
-        out.push_back(kAlphabet[(triple >> 18) & 0x3f]);
-        out.push_back(kAlphabet[(triple >> 12) & 0x3f]);
-        out.push_back(kAlphabet[(triple >> 6) & 0x3f]);
-        out.push_back('=');
-    }
-    return out;
+    return Utils::Base64::encode(raw);
 }
 
 std::string b64_decode(std::string_view encoded) {
-    static const std::array<unsigned char, 256> reverse = build_reverse_table();
-
-    if (encoded.size() % 4 != 0) {
-        throw MiFitnessAuthError("base64: length is not a multiple of four");
+    try {
+        return Utils::Base64::decode(encoded);
+    } catch (const std::runtime_error& e) {
+        // Same message, the protocol's error class: the callers catch
+        // MiFitnessAuthError, not a bare runtime_error.
+        throw MiFitnessAuthError(e.what());
     }
-    if (encoded.empty()) {
-        return {};
-    }
-
-    std::size_t padding = 0;
-    if (encoded[encoded.size() - 1] == '=') {
-        ++padding;
-        if (encoded.size() >= 2 && encoded[encoded.size() - 2] == '=') {
-            ++padding;
-        }
-    }
-
-    std::string out;
-    out.reserve((encoded.size() / 4) * 3);
-
-    for (std::size_t i = 0; i < encoded.size(); i += 4) {
-        unsigned int quad = 0;
-        for (std::size_t k = 0; k < 4; ++k) {
-            const std::size_t at = i + k;
-            const bool is_pad = encoded[at] == '=';
-            // Padding is allowed only at the very end: "=" in the middle is garbage.
-            if (is_pad && at + padding < encoded.size()) {
-                throw MiFitnessAuthError("base64: padding in the middle of the input");
-            }
-            const unsigned char value = is_pad ? 0 : reverse[byte_at(encoded, at)];
-            if (value == 0xff) {
-                throw MiFitnessAuthError("base64: character outside the standard alphabet");
-            }
-            quad = (quad << 6) | value;
-        }
-        out.push_back(static_cast<char>((quad >> 16) & 0xff));
-        out.push_back(static_cast<char>((quad >> 8) & 0xff));
-        out.push_back(static_cast<char>(quad & 0xff));
-    }
-
-    // std::min instead of a plain subtraction: GCC under -Werror=stringop-overflow
-    // cannot prove that padding never exceeds the size and assumes a memset of
-    // SIZE_MAX is possible. The clamp makes the result provably non-negative.
-    out.resize(out.size() - std::min(padding, out.size()));
-    return out;
 }
 
 std::string rc4(std::string_view key, std::string_view payload) {

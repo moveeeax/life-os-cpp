@@ -102,17 +102,6 @@ inline nlohmann::json to_json(const Rule& r) {
     return out;
 }
 
-inline std::string format_ymd(std::chrono::year_month_day d) {
-    char buf[16];
-    std::snprintf(buf,
-                  sizeof buf,
-                  "%04d-%02u-%02u",
-                  static_cast<int>(d.year()),
-                  static_cast<unsigned>(d.month()),
-                  static_cast<unsigned>(d.day()));
-    return buf;
-}
-
 /// The due date of the next occurrence (YYYY-MM-DD); @p due is "" when the task had none.
 /// @throws std::invalid_argument when a day is not YYYY-MM-DD.
 inline std::string next_due(const Rule& r, std::string_view due, std::string_view done_day) {
@@ -122,14 +111,14 @@ inline std::string next_due(const Rule& r, std::string_view due, std::string_vie
         anchor = std::max(anchor, sys_days{Utils::Date::parse_ymd(due)});
     }
     if (r.kind == "every_n_days") {
-        return format_ymd(year_month_day{anchor + days{r.every}});
+        return Utils::Date::format_ymd(year_month_day{anchor + days{r.every}});
     }
     if (r.kind == "weekly" && !r.weekdays.empty()) {
         for (int i = 1; i <= 7; ++i) {
             const sys_days d = anchor + days{i};
             const int wd = static_cast<int>(weekday{d}.iso_encoding());
             if (std::binary_search(r.weekdays.begin(), r.weekdays.end(), wd)) {
-                return format_ymd(year_month_day{d});
+                return Utils::Date::format_ymd(year_month_day{d});
             }
         }
     }
@@ -142,11 +131,11 @@ inline std::string next_due(const Rule& r, std::string_view due, std::string_vie
             const day d{std::min(static_cast<unsigned>(r.day), last)};
             const sys_days candidate{year_month_day{ym.year(), ym.month(), d}};
             if (candidate > anchor) {
-                return format_ymd(year_month_day{candidate});
+                return Utils::Date::format_ymd(year_month_day{candidate});
             }
         }
     }
-    return format_ymd(year_month_day{anchor + days{1}});  // daily
+    return Utils::Date::format_ymd(year_month_day{anchor + days{1}});  // daily
 }
 
 }  // namespace Tasks::Repeat

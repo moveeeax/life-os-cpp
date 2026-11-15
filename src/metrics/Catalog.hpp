@@ -22,6 +22,8 @@
 #include <utility>
 #include <vector>
 
+#include "utils/Strings.hpp"
+
 namespace Metrics {
 
 /// How the rows of one day become its value.
@@ -333,23 +335,11 @@ inline bool is_currency(std::string_view s) {
 
 /// A uuid in the 8-4-4-4-12 hex form, any case.
 inline bool is_uuid(std::string_view s) {
-    if (s.size() != 36) {
-        return false;
-    }
-    for (std::size_t i = 0; i < s.size(); ++i) {
-        const bool dash = i == 8 || i == 13 || i == 18 || i == 23;
-        if (dash ? s[i] != '-' : std::isxdigit(static_cast<unsigned char>(s[i])) == 0) {
-            return false;
-        }
-    }
-    return true;
+    return Utils::Strings::is_uuid(s);
 }
 
 inline std::string lower(std::string_view s) {
-    std::string out(s);
-    std::transform(
-        out.begin(), out.end(), out.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return out;
+    return Utils::Strings::ascii_lower(s);
 }
 
 /// The habit sources stored before the catalog, and the ids they mean now.

@@ -17,6 +17,7 @@
 #include "fitness/xiaomi/CloudClient.hpp"
 #include "fitness/xiaomi/Credentials.hpp"
 #include "fitness/xiaomi/Errors.hpp"
+#include "utils/Strings.hpp"
 
 namespace Xiaomi::QrLogin {
 
@@ -34,22 +35,6 @@ constexpr long kMaxTimeoutSeconds = 900;
 /// A QR image is a few kilobytes; anything far larger is not one.
 constexpr std::size_t kMaxQrBytes = 512 * 1024;
 
-std::string url_encode(std::string_view value) {
-    static constexpr char kHex[] = "0123456789ABCDEF";
-    std::string out;
-    for (const char c : value) {
-        const auto byte = static_cast<unsigned char>(c);
-        if (std::isalnum(byte) != 0 || byte == '-' || byte == '_' || byte == '.' || byte == '~') {
-            out.push_back(c);
-        } else {
-            out.push_back('%');
-            out.push_back(kHex[byte >> 4]);
-            out.push_back(kHex[byte & 0x0f]);
-        }
-    }
-    return out;
-}
-
 /// Xiaomi returns the confirmation link with HTML-escaped ampersands.
 std::string unescape_ampersands(std::string value) {
     static constexpr std::string_view kEscaped = "&amp;";
@@ -59,16 +44,10 @@ std::string unescape_ampersands(std::string value) {
     return value;
 }
 
-std::string lowercase(std::string value) {
-    std::transform(
-        value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return value;
-}
-
 /// name=value pairs of every Set-Cookie header, appended to @p cookies.
 void collect_cookies(const Headers& headers, std::string& cookies) {
     for (const auto& [name, value] : headers) {
-        if (lowercase(name) != "set-cookie") {
+        if (Utils::Strings::ascii_lower(name) != "set-cookie") {
             continue;
         }
         const std::string pair = value.substr(0, value.find(';'));
@@ -154,9 +133,11 @@ Attempt start(HttpTransport& transport) {
     const auto now_ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
             .count();
-    const std::string query = "?_qrsize=480&qs=" + url_encode(url_encode("?sid=miothealth&_json=true")) +
-                              "&callback=" + url_encode(callback) + "&_hasLogo=false&sid=miothealth" +
-                              "&serviceParam=&_locale=en_GB&_dc=" + std::to_string(now_ms);
+    const std::string query =
+        "?_qrsize=480&qs=" +
+        Utils::Strings::percent_encode(Utils::Strings::percent_encode("?sid=miothealth&_json=true")) +
+        "&callback=" + Utils::Strings::percent_encode(callback) + "&_hasLogo=false&sid=miothealth" +
+        "&serviceParam=&_locale=en_GB&_dc=" + std::to_string(now_ms);
     const HttpResponse issued = transport.send(get(std::string(kLoginUrlEndpoint) + query, attempt.cookies));
     if (issued.status != 200) {
         throw MiFitnessProtocolError("Xiaomi QR sign-in answered HTTP " + std::to_string(issued.status));

@@ -11,6 +11,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "utils/Strings.hpp"
+
 namespace Food::Off {
 
 namespace {
@@ -21,22 +23,6 @@ constexpr std::string_view kFields =
     "code,product_name,brands,nutriments,serving_size,serving_quantity,nutrition_data_per";
 // Open Food Facts asks API users to identify themselves.
 constexpr std::string_view kUserAgent = "LifeOS/1.10 (https://life-os.tarassov.me)";
-
-std::string url_encode(std::string_view value) {
-    static constexpr char kHex[] = "0123456789ABCDEF";
-    std::string out;
-    for (const char c : value) {
-        const auto byte = static_cast<unsigned char>(c);
-        if (std::isalnum(byte) != 0 || byte == '-' || byte == '_' || byte == '.' || byte == '~') {
-            out.push_back(c);
-        } else {
-            out.push_back('%');
-            out.push_back(kHex[byte >> 4]);
-            out.push_back(kHex[byte & 0x0f]);
-        }
-    }
-    return out;
-}
 
 std::string trimmed(std::string_view value) {
     const auto first = value.find_first_not_of(" \t\r\n");
@@ -159,7 +145,7 @@ std::vector<Product> search(Http::Transport& transport, std::string_view query) 
     if (q.empty()) {
         return out;
     }
-    const std::string url = std::string(kSearchUrl) + "?q=" + url_encode(q) +
+    const std::string url = std::string(kSearchUrl) + "?q=" + Utils::Strings::percent_encode(q) +
                             "&page_size=" + std::to_string(kMaxResults) + "&fields=" + std::string(kFields);
     const nlohmann::json body = fetch_json(transport, url);
     if (!body.contains("hits") || !body["hits"].is_array()) {

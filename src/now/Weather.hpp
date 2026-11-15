@@ -16,6 +16,8 @@
 #include <nlohmann/json.hpp>
 
 #include "net/Http.hpp"
+#include "utils/Strings.hpp"
+#include "utils/Utf8.hpp"
 
 namespace Now::Weather {
 
@@ -90,25 +92,9 @@ inline std::string words(int code) {
     }
 }
 
-/// Percent-encodes every byte outside the unreserved set (RFC 3986), UTF-8 included.
-inline std::string escape(const std::string& text) {
-    static const char* hex = "0123456789ABCDEF";
-    std::string out;
-    for (const unsigned char c : text) {
-        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' ||
-            c == '.' || c == '~') {
-            out.push_back(static_cast<char>(c));
-        } else {
-            out.push_back('%');
-            out.push_back(hex[c >> 4]);
-            out.push_back(hex[c & 0x0F]);
-        }
-    }
-    return out;
-}
-
 inline std::string geocode_url(const std::string& city) {
-    return "https://geocoding-api.open-meteo.com/v1/search?name=" + escape(city) + "&count=1&language=en&format=json";
+    return "https://geocoding-api.open-meteo.com/v1/search?name=" + Utils::Strings::percent_encode(city) +
+           "&count=1&language=en&format=json";
 }
 
 inline std::string forecast_url(double latitude, double longitude) {
@@ -137,19 +123,6 @@ inline std::string down_key(double latitude, double longitude) {
     return buf;
 }
 
-/// The first @p max_bytes of UTF-8 @p text, never half a character.
-inline std::string utf8_prefix(const std::string& text, std::size_t max_bytes) {
-    if (text.size() <= max_bytes) {
-        return text;
-    }
-    std::size_t end = max_bytes;
-    // Step back over continuation bytes (10xxxxxx) to the start of a character.
-    while (end > 0 && (static_cast<unsigned char>(text[end]) & 0xC0) == 0x80) {
-        --end;
-    }
-    return text.substr(0, end);
-}
-
 /// A string field of @p obj, or "" when it is missing or of another type.
 inline std::string text_field(const nlohmann::json& obj, const char* key) {
     const auto it = obj.find(key);
@@ -170,7 +143,7 @@ inline std::optional<Place> place_of(const nlohmann::json& answer) {
         return std::nullopt;
     }
     Place p;
-    p.city = utf8_prefix(r["name"].get<std::string>(), 120);
+    p.city = Utils::Utf8::prefix_bytes(r["name"].get<std::string>(), 120);
     p.latitude = r["latitude"].get<double>();
     p.longitude = r["longitude"].get<double>();
     if (p.city.empty() || p.latitude < -90 || p.latitude > 90 || p.longitude < -180 || p.longitude > 180) {
@@ -181,7 +154,7 @@ inline std::optional<Place> place_of(const nlohmann::json& answer) {
     if (p.country_code.size() != 2 || !upper(p.country_code[0]) || !upper(p.country_code[1])) {
         p.country_code.clear();
     }
-    p.timezone = utf8_prefix(text_field(r, "timezone"), 64);
+    p.timezone = Utils::Utf8::prefix_bytes(text_field(r, "timezone"), 64);
     return p;
 }
 

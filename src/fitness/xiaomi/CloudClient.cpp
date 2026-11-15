@@ -21,6 +21,7 @@
 
 #include "fitness/xiaomi/Crypto.hpp"
 #include "fitness/xiaomi/Regions.hpp"
+#include "utils/Strings.hpp"
 
 namespace Xiaomi {
 
@@ -48,19 +49,13 @@ bool host_is_xiaomi(const std::string& host) {
     return false;
 }
 
-std::string lowercase(std::string value) {
-    std::transform(
-        value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return value;
-}
-
 /// Header values matched by case-insensitive name. Returns every match:
 /// Set-Cookie arrives more than once.
 std::vector<std::string> header_values(const Headers& headers, std::string_view name) {
     std::vector<std::string> out;
-    const std::string wanted = lowercase(std::string(name));
+    const std::string wanted = Utils::Strings::ascii_lower(name);
     for (const auto& [key, value] : headers) {
-        if (lowercase(key) == wanted) {
+        if (Utils::Strings::ascii_lower(key) == wanted) {
             out.push_back(value);
         }
     }
@@ -117,7 +112,7 @@ bool is_allowed_login_redirect(std::string_view url) {
         }
         host.erase(colon);
     }
-    return host_is_xiaomi(lowercase(host));
+    return host_is_xiaomi(Utils::Strings::ascii_lower(host));
 }
 
 CloudClient::CloudClient(HttpTransport& transport,
@@ -229,29 +224,6 @@ void CloudClient::login() {
 
 namespace {
 
-/// Percent-encoding for application/x-www-form-urlencoded: everything except
-/// letters, digits and -_.~. Space becomes %20, not a plus: that is what
-/// Python's urlencode does with the upstream settings.
-std::string url_encode(std::string_view value) {
-    static constexpr char kHex[] = "0123456789ABCDEF";
-    std::string out;
-    out.reserve(value.size());
-    for (const char c : value) {
-        const auto byte = static_cast<unsigned char>(c);
-        const bool unreserved = (byte >= 'A' && byte <= 'Z') || (byte >= 'a' && byte <= 'z') ||
-                                (byte >= '0' && byte <= '9') || byte == '-' || byte == '_' || byte == '.' ||
-                                byte == '~';
-        if (unreserved) {
-            out.push_back(c);
-        } else {
-            out.push_back('%');
-            out.push_back(kHex[byte >> 4]);
-            out.push_back(kHex[byte & 0x0f]);
-        }
-    }
-    return out;
-}
-
 /// Upstream authentication codes. Such a refusal is not retried: a retry only
 /// burns attempts, a fresh token is needed.
 bool is_authentication_code(long long code) {
@@ -315,8 +287,12 @@ nlohmann::json CloudClient::post_signed_once(const std::string& base_url,
     HttpRequest request;
     request.method = "POST";
     request.url = base_url + std::string(api_path);
-    request.body = "data=" + url_encode(encrypted_data) + "&rc4_hash__=" + url_encode(encrypted_hash) +
-                   "&signature=" + url_encode(signature) + "&_nonce=" + url_encode(Crypto::b64_encode(nonce));
+    // Form fields percent-encoded with %20 for a space, not a plus: that is
+    // what Python's urlencode does with the upstream settings.
+    request.body = "data=" + Utils::Strings::percent_encode(encrypted_data) +
+                   "&rc4_hash__=" + Utils::Strings::percent_encode(encrypted_hash) +
+                   "&signature=" + Utils::Strings::percent_encode(signature) +
+                   "&_nonce=" + Utils::Strings::percent_encode(Crypto::b64_encode(nonce));
     request.headers.emplace_back("User-Agent", std::string(kUserAgent));
     request.headers.emplace_back("Cookie", cookies_);
     request.headers.emplace_back("Content-Type", "application/x-www-form-urlencoded");

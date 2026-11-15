@@ -26,6 +26,7 @@
 #include "repositories/fitness/SyncRunRepository.hpp"
 #include "repositories/fitness/WorkoutRepository.hpp"
 #include "utils/Config.hpp"
+#include "utils/Date.hpp"
 
 namespace Sync {
 
@@ -47,18 +48,7 @@ std::vector<Chunk> split_range(const std::string& from, const std::string& to, i
         if (chunk_end > end) {
             chunk_end = end;
         }
-        const auto iso = [](sys_days d) {
-            const year_month_day ymd{d};
-            char out[16];
-            std::snprintf(out,
-                          sizeof(out),
-                          "%04d-%02d-%02d",
-                          static_cast<int>(ymd.year()),
-                          static_cast<unsigned>(ymd.month()),
-                          static_cast<unsigned>(ymd.day()));
-            return std::string(out);
-        };
-        chunks.push_back({iso(cursor), iso(chunk_end)});
+        chunks.push_back({Utils::Date::format_ymd(cursor), Utils::Date::format_ymd(chunk_end)});
         cursor = chunk_end + days{1};
     }
     return chunks;
@@ -159,22 +149,6 @@ private:
     long run_id_;
     std::chrono::steady_clock::time_point last_beat_;
 };
-
-/// YYYY-MM-DD date shifted by days. The caller has already validated the format.
-std::string shift_date(const std::string& date, int days) {
-    std::chrono::year_month_day ymd{std::chrono::year(std::stoi(date.substr(0, 4))),
-                                    std::chrono::month(static_cast<unsigned>(std::stoi(date.substr(5, 2)))),
-                                    std::chrono::day(static_cast<unsigned>(std::stoi(date.substr(8, 2))))};
-    const auto shifted = std::chrono::year_month_day(std::chrono::sys_days(ymd) + std::chrono::days(days));
-    char out[16];
-    std::snprintf(out,
-                  sizeof(out),
-                  "%04d-%02u-%02u",
-                  static_cast<int>(shifted.year()),
-                  static_cast<unsigned>(shifted.month()),
-                  static_cast<unsigned>(shifted.day()));
-    return out;
-}
 
 void bump_sync_state(const std::string& xiaomi_user_id, const std::string& data_type, long added) {
     Database::get().execute_write([&](auto& txn) {
@@ -310,8 +284,8 @@ nlohmann::json SyncService::run(long run_id,
                 // before and after the window. A day of margin on both sides
                 // makes the edge days whole; days outside [from, to] are
                 // dropped after normalizing, as before.
-                chunks.front().from = shift_date(chunks.front().from, -1);
-                chunks.back().to = shift_date(chunks.back().to, 1);
+                chunks.front().from = Utils::Date::add_days(chunks.front().from, -1);
+                chunks.back().to = Utils::Date::add_days(chunks.back().to, 1);
             }
             for (const auto& chunk : chunks) {
                 const auto elapsed =
@@ -352,10 +326,9 @@ nlohmann::json SyncService::run(long run_id,
                             // A day of margin on both sides, like the reference: the
                             // report's zone may differ from the region's, and the
                             // edge day's report falls outside a narrow window.
-                            const auto reports =
-                                client.fetch_daily_sleep_reports(shift_date(report_from, -1), shift_date(report_to, 1));
-                            const int offset =
-                                credentials_.region.empty() || credentials_.region == "cn" ? 8 * 3600 : 0;
+                            const auto reports = client.fetch_daily_sleep_reports(
+                                Utils::Date::add_days(report_from, -1), Utils::Date::add_days(report_to, 1));
+                            const int offset = static_cast<int>(Xiaomi::offset_seconds(credentials_.region));
                             Xiaomi::apply_daily_sleep_scores(sessions, reports, offset);
                         } catch (const std::exception&) {
                             // Reports are optional: their failure does not affect sessions.

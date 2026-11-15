@@ -3,7 +3,8 @@
  * @brief The pure byte-facing parser helpers of Billing::detail — split out
  *        of PayPalClient.cpp so this TU is std-only (no curl/spdlog/json):
  *        the fuzz_decimal_cents libFuzzer harness in tests/fuzz compiles it
- *        directly, with no vcpkg dependencies. Contracts are documented on
+ *        directly (with the std-only utils/Strings.cpp), with no vcpkg
+ *        dependencies. Contracts are documented on
  *        the declarations in PayPalClient.hpp; keep network-touching or
  *        json-touching code (describe_error_body, the curl callback) in
  *        PayPalClient.cpp.
@@ -15,6 +16,7 @@
 #include <stdexcept>
 
 #include "billing/PayPalClient.hpp"
+#include "utils/Strings.hpp"
 
 namespace Billing {
 
@@ -84,19 +86,7 @@ std::string find_header_ci(const std::map<std::string, std::string>& headers, co
 }
 
 std::string url_encode_segment(const std::string& s) {
-    static const char* hex = "0123456789ABCDEF";
-    std::string out;
-    for (unsigned char c : s) {
-        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' ||
-            c == '.' || c == '~')
-            out.push_back(static_cast<char>(c));
-        else {
-            out.push_back('%');
-            out.push_back(hex[c >> 4]);
-            out.push_back(hex[c & 0xF]);
-        }
-    }
-    return out;
+    return Utils::Strings::percent_encode(s);
 }
 
 }  // namespace detail

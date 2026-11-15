@@ -9,7 +9,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include "money/Period.hpp"
 #include "now/Today.hpp"
 #include "repositories/fitness/HealthReadRepository.hpp"
 #include "repositories/fitness/MiAccountRepository.hpp"
@@ -34,8 +33,8 @@ nlohmann::json digest(const std::string& owner, const std::string& day) {
         const auto date = std::chrono::sys_days{Utils::Date::parse_ymd(day)};
         // Sleep rows are filed by the UTC day of their end; the account's day may start hours earlier.
         sleep_rows = ::Now::Today::sleep_on_local_day(
-            health.sleep(::Money::Period::detail::text_of(date - std::chrono::days{1}), day, 20, 0).rows, day, offset);
-        body_rows = health.body(::Money::Period::detail::text_of(date - std::chrono::days{8}), day, 50, 0).rows;
+            health.sleep(Utils::Date::format_ymd(date - std::chrono::days{1}), day, 20, 0).rows, day, offset);
+        body_rows = health.body(Utils::Date::format_ymd(date - std::chrono::days{8}), day, 50, 0).rows;
     }
     if (body_rows.empty()) {
         // No weighing synced from the scale: the latest weight the food profile knows, if any.

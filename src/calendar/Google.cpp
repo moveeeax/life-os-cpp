@@ -12,6 +12,8 @@
 
 #include "utils/Base64.hpp"
 #include "utils/Config.hpp"
+#include "utils/Strings.hpp"
+#include "utils/Time.hpp"
 
 namespace Calendar {
 
@@ -21,40 +23,6 @@ using json = nlohmann::json;
 
 constexpr const char* kTokenUrl = "https://oauth2.googleapis.com/token";
 constexpr const char* kApiBase = "https://www.googleapis.com/calendar/v3";
-
-/// Days since 1970-01-01 of a civil date (Howard Hinnant's algorithm).
-long long days_from_civil(long long y, unsigned m, unsigned d) {
-    y -= m <= 2;
-    const long long era = (y >= 0 ? y : y - 399) / 400;
-    const unsigned yoe = static_cast<unsigned>(y - era * 400);
-    const unsigned doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
-    const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    return era * 146097 + static_cast<long long>(doe) - 719468;
-}
-
-bool digits(const std::string& s, std::size_t at, std::size_t n, int& out) {
-    if (at + n > s.size()) {
-        return false;
-    }
-    int v = 0;
-    for (std::size_t i = at; i < at + n; ++i) {
-        if (s[i] < '0' || s[i] > '9') {
-            return false;
-        }
-        v = v * 10 + (s[i] - '0');
-    }
-    out = v;
-    return true;
-}
-
-std::string iso_utc(long long t) {
-    const std::time_t tt = static_cast<std::time_t>(t);
-    std::tm tm{};
-    gmtime_r(&tt, &tm);
-    char buf[32];
-    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm);
-    return buf;
-}
 
 Tokens tokens_of(const Net::Http::Response& r) {
     Tokens out;
@@ -124,18 +92,7 @@ std::optional<Settings> settings() {
 }
 
 std::string encode(const std::string& s) {
-    std::string out;
-    for (const unsigned char c : s) {
-        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' ||
-            c == '.' || c == '~') {
-            out += static_cast<char>(c);
-        } else {
-            char buf[4];
-            std::snprintf(buf, sizeof(buf), "%%%02X", c);
-            out += buf;
-        }
-    }
-    return out;
+    return Utils::Strings::percent_encode(s);
 }
 
 std::string auth_url(const Settings& s, const std::string& state) {
@@ -172,37 +129,11 @@ bool revoke(Net::Http::Transport& t, const std::string& token) {
 }
 
 std::optional<long long> parse_time(const std::string& s) {
-    int y = 0, mo = 0, d = 0, h = 0, mi = 0, se = 0;
-    if (!digits(s, 0, 4, y) || s.size() < 19 || s[4] != '-' || !digits(s, 5, 2, mo) || s[7] != '-' ||
-        !digits(s, 8, 2, d) || (s[10] != 'T' && s[10] != 't') || !digits(s, 11, 2, h) || s[13] != ':' ||
-        !digits(s, 14, 2, mi) || s[16] != ':' || !digits(s, 17, 2, se) || mo < 1 || mo > 12 || d < 1 || d > 31) {
+    const auto t = Utils::Time::parse_rfc3339(s);
+    if (!t) {
         return std::nullopt;
     }
-    std::size_t at = 19;
-    if (at < s.size() && s[at] == '.') {
-        ++at;
-        while (at < s.size() && s[at] >= '0' && s[at] <= '9') {
-            ++at;
-        }
-    }
-    long long offset = 0;
-    if (at < s.size() && (s[at] == 'Z' || s[at] == 'z')) {
-        ++at;
-    } else if (at < s.size() && (s[at] == '+' || s[at] == '-')) {
-        int oh = 0, om = 0;
-        if (!digits(s, at + 1, 2, oh) || at + 3 >= s.size() || s[at + 3] != ':' || !digits(s, at + 4, 2, om)) {
-            return std::nullopt;
-        }
-        offset = (oh * 3600LL + om * 60LL) * (s[at] == '-' ? -1 : 1);
-        at += 6;
-    } else {
-        return std::nullopt;
-    }
-    if (at != s.size()) {
-        return std::nullopt;
-    }
-    return days_from_civil(y, static_cast<unsigned>(mo), static_cast<unsigned>(d)) * 86400LL + h * 3600LL + mi * 60LL +
-           se - offset;
+    return static_cast<long long>(*t);
 }
 
 std::vector<Event> parse_events(const json& list, const std::function<long long(const std::string&)>& day_start) {
@@ -283,8 +214,8 @@ bool client_event_id_ok(const std::string& id) {
 json event_view(const Event& e) {
     return json{{"id", e.id},
                 {"title", e.title},
-                {"start", e.all_day ? e.start_text : iso_utc(e.start)},
-                {"end", e.all_day ? e.end_text : iso_utc(e.end)},
+                {"start", e.all_day ? e.start_text : Utils::Time::epoch_to_iso8601(e.start)},
+                {"end", e.all_day ? e.end_text : Utils::Time::epoch_to_iso8601(e.end)},
                 {"all_day", e.all_day},
                 {"location", e.location}};
 }
