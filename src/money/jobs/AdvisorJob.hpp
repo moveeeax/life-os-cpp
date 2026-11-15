@@ -16,12 +16,14 @@
 #include <map>
 #include <stdexcept>
 #include <string>
+#include <variant>
 
 #include <spdlog/spdlog.h>
 
 #include <nlohmann/json.hpp>
 
 #include "jobs/Jobs.hpp"
+#include "jobs/RowJob.hpp"
 #include "llm/Chat.hpp"
 #include "money/Llm.hpp"
 #include "money/Period.hpp"
@@ -86,49 +88,26 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
         payload["report_id"].get<std::string>().empty()) {
         throw std::invalid_argument("money_advisor: payload has no report_id");
     }
-    const std::string id = payload["report_id"].get<std::string>();
     Repositories::Money::AdvisorReportRepository reports;
-    int attempt = 0;  // 0 until the claim: a fail before it is not fenced by an attempt
-    const auto failed = [&](const std::string& code, const std::string& message) {
-        reports.fail(id, code, message, attempt);
-        spdlog::warn("money advisor {}: {}", id, code);
-        return nlohmann::json{{"report_id", id}, {"status", "failed"}, {"error", code}};
-    };
+    Jobs::RowJob<Repositories::Money::AdvisorReportRepository> job(
+        kJobType, "money advisor", "report_id", payload["report_id"].get<std::string>(), reports, payload);
 
     if (!Core::money_enabled()) {
-        return failed("money_disabled", "the money module is off on this worker");
+        return job.failed("money_disabled", "the money module is off on this worker");
     }
     const auto settings = Money::Llm::advisor_settings();
     if (!settings.has_value()) {
-        return failed("not_configured", "MONEY_LLM_* advisor settings are missing");
+        return job.failed("not_configured", "MONEY_LLM_* advisor settings are missing");
     }
-    const auto row = reports.load_for_worker(id);
+    const auto row = reports.load_for_worker(job.id());
     if (!row.has_value()) {
-        return {{"report_id", id}, {"status", "missing"}};
+        return {{"report_id", job.id()}, {"status", "missing"}};
     }
-    attempt = reports.start(id);
-    if (attempt == 0) {
-        // A row still `running` is held by another delivery, or by a worker that died less than
-        // JobRows::kStaleRunning ago: the job waits until the row turns stale, without spending an attempt.
-        const auto now = reports.status(id);
-        if (now == "running") {
-            throw Jobs::DeferJob("money_advisor: the row is running elsewhere", reports.stale_in_ms(id));
-        }
-        return {{"report_id", id}, {"status", now.value_or("missing")}};
+    if (const auto settled = job.claim()) {
+        return *settled;
     }
-    const int max_attempts =
-        payload.contains("max_attempts") && payload["max_attempts"].is_number_integer()
-            ? payload["max_attempts"].get<int>()
-            : (Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries);
-    const auto give_up_or_retry = [&](const char* code, const std::string& what) -> nlohmann::json {
-        if (attempt >= max_attempts) {
-            return failed(code, what);
-        }
-        reports.requeue(id, attempt);
-        throw std::runtime_error(std::string("money_advisor: ") + what);
-    };
 
-    try {
+    return job.run([&]() -> nlohmann::json {
         const std::string owner = row->value("owner_id", std::string());
         const nlohmann::json facts =
             facts_for(owner,
@@ -139,8 +118,8 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
                                     Money::Period::detail::text_of(
                                         std::chrono::floor<std::chrono::days>(std::chrono::system_clock::now()))));
         if (facts["blocks"].empty()) {
-            reports.finish(id, attempt, facts, kNothing, "", std::nullopt, std::nullopt);
-            return {{"report_id", id}, {"status", "done"}, {"empty", true}};
+            reports.finish(job.id(), job.attempt(), facts, kNothing, "", std::nullopt, std::nullopt);
+            return {{"report_id", job.id()}, {"status", "done"}, {"empty", true}};
         }
         const nlohmann::json request{
             {"model", settings->model},
@@ -148,36 +127,24 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
              {{{"role", "system"}, {"content", settings->prompt}}, {{"role", "user"}, {"content", facts.dump()}}}},
             {"max_tokens", settings->max_tokens},
             {"temperature", 0.3}};
-        nlohmann::json body;
-        std::string error_code;
+        std::variant<Chat::Answer, Chat::Failure> asked;
         try {
-            body = Chat::complete_adapting(Net::Http::transport(), *settings, request, error_code);
+            asked = Chat::ask(Net::Http::transport(), *settings, request);
         } catch (const Chat::Retryable& e) {
-            return give_up_or_retry("provider_unavailable", e.what());
+            return job.give_up_or_retry("provider_unavailable", e.what());
         }
-        if (!error_code.empty()) {
-            return failed(error_code, Chat::provider_message(body));
+        if (const auto* failure = std::get_if<Chat::Failure>(&asked)) {
+            return job.failed(failure->code, failure->message);
         }
-        const std::string content = Utils::Utf8::cut(Chat::content_of(body), 19000);
+        const auto& answer = std::get<Chat::Answer>(asked);
+        const std::string content = Utils::Utf8::cut(answer.content, 19000);
         if (content.empty()) {
-            return failed("invalid_answer", "no message content");
+            return job.failed("invalid_answer", "no message content");
         }
-        reports.finish(id,
-                       attempt,
-                       facts,
-                       content,
-                       Chat::model_of(body, *settings),
-                       Chat::usage(body, "prompt_tokens"),
-                       Chat::usage(body, "completion_tokens"));
-        return {{"report_id", id}, {"status", "done"}};
-    } catch (const std::runtime_error& e) {
-        if (std::string(e.what()).rfind("money_advisor: ", 0) == 0) {
-            throw;
-        }
-        return give_up_or_retry("internal_error", e.what());
-    } catch (const std::exception& e) {
-        return give_up_or_retry("internal_error", e.what());
-    }
+        reports.finish(
+            job.id(), job.attempt(), facts, content, answer.model, answer.prompt_tokens, answer.completion_tokens);
+        return {{"report_id", job.id()}, {"status", "done"}};
+    });
 }
 
 /// Hands one job payload to the queue; tests pass one that fails.
