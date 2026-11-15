@@ -20,6 +20,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 
 namespace Repositories::Agent {
 
@@ -215,8 +216,8 @@ public:
 private:
     static constexpr const char* kColumns =
         "owner_id::text AS owner_id, state, pod_name, pod_ip, generation, last_error, "
-        "to_char(started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS started_at, "
-        "to_char(last_active_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS last_active_at, "
+        SQL_ISO_UTC_Z("started_at") " AS started_at, "
+        SQL_ISO_UTC_Z("last_active_at") " AS last_active_at, "
         "EXTRACT(EPOCH FROM now() - started_at)::bigint AS running_seconds, "
         "EXTRACT(EPOCH FROM now() - last_active_at)::bigint AS idle_seconds, "
         "EXTRACT(EPOCH FROM now() - updated_at)::bigint AS state_seconds";

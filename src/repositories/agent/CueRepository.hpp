@@ -15,6 +15,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 
 namespace Repositories::Agent {
 
@@ -43,7 +44,7 @@ public:
                 " extract(epoch FROM ($1::date::timestamp AT TIME ZONE $2))::bigint, "
                 " extract(epoch FROM (($1::date + 1)::timestamp AT TIME ZONE $2))::bigint, "
                 " to_char((($1::date + 1)::timestamp AT TIME ZONE $2) AT TIME ZONE 'UTC', "
-                "  'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')",
+                "  " SQL_ISO_UTC_Z_FORMAT ")",
                 date,
                 tz);
             Clock c;

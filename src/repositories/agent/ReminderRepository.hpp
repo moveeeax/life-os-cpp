@@ -15,6 +15,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 
 namespace Repositories::Agent {
 
@@ -121,7 +122,7 @@ private:
 
     static std::string columns_of(const std::string& t) {
         return t + ".id::text AS id, " + t + ".text, to_char(" + t + ".at_time, 'HH24:MI') AS time, " + t + ".days, " +
-               t + ".tz, to_char(" + t + ".next_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS next_at";
+               t + ".tz, " + Repositories::iso_utc(t + ".next_at", true) + " AS next_at";
     }
 };
 

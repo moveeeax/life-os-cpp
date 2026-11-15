@@ -17,6 +17,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 
 namespace Repositories::Agent {
 
@@ -348,9 +349,7 @@ private:
                iso("not_before") + " AS not_before, " + iso("created_at") + " AS created_at";
     }
 
-    static std::string iso(const std::string& col) {
-        return "to_char(" + col + " AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')";
-    }
+    static std::string iso(const std::string& col) { return Repositories::iso_utc(col, true); }
 
     int count_(const std::string& owner, const std::string& statuses) {
         return Database::get().execute_read([&](auto& txn) {

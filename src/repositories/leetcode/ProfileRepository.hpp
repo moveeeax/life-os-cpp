@@ -13,6 +13,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 
 namespace Repositories::LeetCode {
 
@@ -29,8 +30,8 @@ public:
     std::optional<nlohmann::json> get(const std::string& owner) {
         return Database::get().execute_read([&](auto& txn) -> std::optional<nlohmann::json> {
             auto r = txn.exec_params(
-                "SELECT row_to_json(t)::text FROM (SELECT p.username, p.tz, to_char(p.synced_at AT TIME ZONE 'UTC', "
-                "'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS synced_at, p.last_error, s.total, s.easy, s.medium, s.hard "
+                "SELECT row_to_json(t)::text FROM (SELECT p.username, p.tz, " SQL_ISO_UTC_Z("p.synced_at")
+                " AS synced_at, p.last_error, s.total, s.easy, s.medium, s.hard "
                 "FROM leetcode_profiles p LEFT JOIN LATERAL (SELECT * FROM leetcode_snapshots x WHERE x.owner_id = "
                 "p.owner_id ORDER BY x.day DESC LIMIT 1) s ON true WHERE p.owner_id = $1::uuid) t",
                 owner);

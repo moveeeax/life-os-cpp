@@ -18,6 +18,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 #include "repositories/agent/ActionRepository.hpp"
 
 namespace Repositories::Agent {
@@ -339,9 +340,8 @@ public:
 private:
     /// The turn as the panel shows it, with the actions it proposed.
     static std::string columns() {
-        return "id::text AS id, status, origin, text, reply, error, tools, "
-               "to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at, "
-               "to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS updated_at, " +
+        return "id::text AS id, status, origin, text, reply, error, tools, " SQL_ISO_UTC_Z(
+                   "created_at") " AS created_at, " SQL_ISO_UTC_Z("updated_at") " AS updated_at, " +
                ActionRepository::of_turn_sql();
     }
 

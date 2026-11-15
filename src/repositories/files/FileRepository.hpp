@@ -21,6 +21,7 @@
 #include "repositories/JsonRows.hpp"
 #include "repositories/RepoErrors.hpp"
 #include "repositories/SqlErrors.hpp"
+#include "repositories/SqlTime.hpp"
 
 namespace Repositories::Files {
 
@@ -229,8 +230,8 @@ public:
 
 private:
     static constexpr const char* kColumns =
-        "id::text AS id, parent_kind, parent_id::text AS parent_id, name, content_type, bytes, object_key, status, "
-        "to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at";
+        "id::text AS id, parent_kind, parent_id::text AS parent_id, name, content_type, bytes, object_key, "
+        "status, " SQL_ISO_UTC_Z("created_at") " AS created_at";
 
     static void translate(std::string_view sqlstate) {
         if (Repositories::detail::is_check_violation(sqlstate) || Repositories::detail::is_unique_violation(sqlstate)) {

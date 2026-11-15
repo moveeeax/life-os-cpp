@@ -172,6 +172,7 @@ repositories -> database
 repositories -> domain
 repositories -> utils
 repositories/agent -> domain
+repositories/agent -> repositories
 repositories/agent -> database
 repositories/agent -> utils
 repositories/fitness -> database
@@ -302,6 +303,7 @@ leetcode -> repositories/leetcode
 leetcode/jobs -> jobs
 leetcode/jobs -> leetcode
 repositories/leetcode -> database
+repositories/leetcode -> repositories
 repositories/metrics -> repositories/leetcode
 mcp -> security
 agent -> telegram

@@ -12,6 +12,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/SqlTime.hpp"
 
 namespace Repositories::Now {
 
@@ -72,7 +73,7 @@ public:
             // The local day as two instants: its midnight and the next.
             const char* kLo = "(($2::date)::timestamp AT TIME ZONE $3)";
             const char* kHi = "((($2::date) + 1)::timestamp AT TIME ZONE $3)";
-            const char* kIso = "'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'";
+            const char* kIso = SQL_ISO_UTC_Z_FORMAT;
             auto focus = txn.exec_params(
                 std::string("SELECT COALESCE(json_agg(json_build_object('start', to_char(started_at AT TIME ZONE "
                             "'UTC', ") +

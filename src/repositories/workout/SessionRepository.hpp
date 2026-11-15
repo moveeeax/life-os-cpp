@@ -473,9 +473,7 @@ private:
         }
     }
 
-    static std::string iso(const std::string& expr) {
-        return "to_char(" + expr + " AT TIME ZONE 'UTC', " SQL_ISO_UTC_FORMAT ")";
-    }
+    static std::string iso(const std::string& expr) { return Repositories::iso_utc(expr, false); }
 
     // Reconciliation, one statement. The band data is that of the session
     // owner's Mi account (cand.acct; NULL without a link, and then nothing
