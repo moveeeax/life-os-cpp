@@ -68,6 +68,22 @@ inline void no_content(const std::function<void(const drogon::HttpResponsePtr&)>
     cb(resp);
 }
 
+/// 202 Accepted for a queued job: `{data: {id, status}}` of @p job (a row
+/// that has at least those two).
+inline drogon::HttpResponsePtr job_accepted(const nlohmann::json& job) {
+    auto resp = Response::ok(nlohmann::json{{"data", {{"id", job["id"]}, {"status", job["status"]}}}});
+    resp->setStatusCode(drogon::k202Accepted);
+    return resp;
+}
+
+/// 429 too_many_parses: the owner has as many parses open as a table allows.
+inline drogon::HttpResponsePtr too_many_parses() {
+    return ErrorResponse::make({drogon::k429TooManyRequests,
+                                "too_many_parses",
+                                "wait for your running parses to finish",
+                                nlohmann::json{{"retry_after_sec", 30}}});
+}
+
 /**
  * @brief Collect a range of json-convertible items into a JSON array — the
  *        `json::array()` + push_back loop every list handler repeats.

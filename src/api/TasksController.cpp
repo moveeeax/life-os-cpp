@@ -21,6 +21,7 @@
 #include "api/FieldChecks.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
+#include "api/ParseJobStart.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "jobs/Jobs.hpp"
@@ -573,94 +574,24 @@ void TasksController::parse(const HttpRequestPtr& req, Callback&& callback) {
     Repo::ParseJobRepository::Apply apply;
     apply.apply = body.contains("apply") && body["apply"].is_boolean() && body["apply"].get<bool>();
     apply.idempotency_key = key;
-    const auto accepted = [&](const json& job) {
-        auto resp = Response::ok(json{{"data", {{"id", job["id"]}, {"status", job["status"]}}}});
-        resp->setStatusCode(k202Accepted);
-        callback(resp);
-    };
-    // A retry of a request already taken answers with its job, before the cap.
-    if (key) {
-        std::optional<json> earlier;
-        if (!with_repo_errors(callback, "tasks.parse.keyed", [&] {
-                earlier = Repositories::JobRows::keyed(Repo::ParseJobRepository::kTable, owner, *key);
-            })) {
-            return;
-        }
-        if (earlier) {
-            accepted(*earlier);
-            return;
-        }
-    }
-    Repo::ParseJobRepository repo;
-    std::string id;
-    bool replayed = false;
-    // The job carries the retry limit it was submitted with.
-    const int max_attempts = Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries;
-    const auto payload = [&](const std::string& job_id) {
-        return json{{"job_id", job_id}, {"owner_id", owner}, {"max_attempts", max_attempts}};
-    };
-    // The job rides the row's transaction as an outbox row when a drain is configured
-    // (Jobs::Outbox::enqueue_if_drained): a crash after the commit cannot leave the row
-    // queued with no job behind it. With the drain off (OUTBOX_DRAIN_INTERVAL_SEC=0: the
-    // compose stack, the test suites) the direct submit below follows the commit, as before.
-    bool via_outbox = false;
-    try {
-        if (repo.open_count(owner) >= Repositories::JobRows::kOpenMax) {
-            callback(ErrorResponse::make({k429TooManyRequests,
-                                          "too_many_parses",
-                                          "wait for your running parses to finish",
-                                          json{{"retry_after_sec", 30}}}));
-            return;
-        }
-        const json job =
-            repo.create(owner, text, hint, note_id, apply, replayed, [&](auto& txn, const std::string& job_id) {
-                // The cap again, under the lock: two creates at once cannot both pass the count above.
-                Repositories::JobRows::hold_slot(txn, Repo::ParseJobRepository::kTable, owner);
-                via_outbox = Jobs::Outbox::enqueue_if_drained(txn, Jobs::TasksParse::kJobType, payload(job_id));
-            });
-        if (replayed) {
-            accepted(job);
-            return;
-        }
-        id = job["id"].get<std::string>();
-    } catch (const Repositories::JobRows::SlotsTaken&) {
-        callback(ErrorResponse::make({k429TooManyRequests,
-                                      "too_many_parses",
-                                      "wait for your running parses to finish",
-                                      json{{"retry_after_sec", 30}}}));
-        return;
-    } catch (const Repositories::NotFoundError&) {
-        callback(ErrorResponse::not_found("task_note"));
-        return;
-    } catch (const Repositories::ValidationError& e) {
-        callback(ErrorResponse::bad_request(e.code(), e.message()));
-        return;
-    } catch (const std::exception&) {
-        // The server's DETAIL would quote the phrase: no message.
-        spdlog::warn("tasks parse create failed");
-        callback(ErrorResponse::service_unavailable("storage_unavailable"));
-        return;
-    }
-    try {
-        if (!via_outbox) {
-            if (!Jobs::is_initialized()) {
-                throw std::runtime_error("the job queue is not initialized");
+    start_parse_job<Repo::ParseJobRepository>(
+        owner,
+        callback,
+        key,
+        ParseJobSpec{Repo::ParseJobRepository::kTable, Jobs::TasksParse::kJobType, "tasks parse", "tasks.parse.keyed"},
+        [&](Repo::ParseJobRepository& repo, bool& replayed, auto&& in_txn) {
+            return repo.create(owner, text, hint, note_id, apply, replayed, in_txn);
+        },
+        [](const std::exception& e) -> HttpResponsePtr {
+            // A note_id that is not one of the owner's inbox notes.
+            if (dynamic_cast<const Repositories::NotFoundError*>(&e) != nullptr) {
+                return ErrorResponse::not_found("task_note");
             }
-            Jobs::get().submit(Jobs::TasksParse::kJobType, payload(id));
-        }
-    } catch (const std::exception& e) {
-        spdlog::warn("tasks parse enqueue unavailable: {}", e.what());
-        try {
-            repo.fail(id, "queue_unavailable", "the job queue did not take the job");
-        } catch (const std::exception& inner) {
-            spdlog::warn("tasks parse {}: could not mark failed: {}", id, inner.what());
-        }
-        callback(ErrorResponse::service_unavailable("queue_unavailable"));
-        return;
-    }
-    auto resp = Response::ok(json{{"data", {{"id", id}, {"status", "queued"}}}});
-    resp->setStatusCode(k202Accepted);
-    callback(resp);
+            if (const auto* v = dynamic_cast<const Repositories::ValidationError*>(&e)) {
+                return ErrorResponse::bad_request(v->code(), v->message());
+            }
+            return nullptr;
+        });
 }
 
 void TasksController::parseStatus(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {

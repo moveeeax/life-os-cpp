@@ -17,6 +17,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <drogon/drogon.h>
@@ -27,6 +28,7 @@
 #include "api/FieldChecks.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
+#include "api/ParseJobStart.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "jobs/Jobs.hpp"
@@ -1327,9 +1329,10 @@ std::optional<DataUrl> data_url(const std::string& url, std::string& problem) {
     return out;
 }
 
-/// The shared tail of both parse routes: the cap, the row, the job. @p create(repo, replayed, in_txn)
-/// inserts the row and runs in_txn(txn, id) inside the same transaction; it sets replayed (and
-/// skips in_txn) when it returns the job an earlier request with the same @p key created.
+/// The shared tail of both parse routes: the cap, the row, the job (Api::start_parse_job).
+/// @p create(repo, replayed, in_txn) inserts the row and runs in_txn(txn, id) inside the same
+/// transaction; it sets replayed (and skips in_txn) when it returns the job an earlier request
+/// with the same @p key created.
 template <typename Create>
 void start_parse(const std::string& owner,
                  MoneyController::Callback& callback,
@@ -1339,94 +1342,18 @@ void start_parse(const std::string& owner,
         callback(ErrorResponse::service_unavailable("not_configured", "the money parse is not set up on this server"));
         return;
     }
-    const auto accepted = [&](const json& job) {
-        auto resp = Response::ok(json{{"data", {{"id", job["id"]}, {"status", job["status"]}}}});
-        resp->setStatusCode(k202Accepted);
-        callback(resp);
-    };
-    Repo::ParseJobRepository repo;
-    // A retry of a request already taken answers with its job, before the cap.
-    if (key) {
-        std::optional<json> earlier;
-        if (!with_repo_errors(callback, "money.parse.keyed", [&] {
-                earlier = Repositories::JobRows::keyed(Repo::ParseJobRepository::kTable, owner, *key);
-            })) {
-            return;
-        }
-        if (earlier) {
-            accepted(*earlier);
-            return;
-        }
-    }
-    std::string id;
-    bool replayed = false;
-    // The job carries the retry limit it was submitted with.
-    const int max_attempts = Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries;
-    const auto payload = [&](const std::string& job_id) {
-        return json{{"job_id", job_id}, {"owner_id", owner}, {"max_attempts", max_attempts}};
-    };
-    // The job rides the row's transaction as an outbox row when a drain is configured
-    // (Jobs::Outbox::enqueue_if_drained): a crash after the commit cannot leave the row
-    // queued with no job behind it. With the drain off (OUTBOX_DRAIN_INTERVAL_SEC=0: the
-    // compose stack, the test suites) the direct submit below follows the commit, as before.
-    bool via_outbox = false;
-    try {
-        if (repo.open_count(owner) >= Repositories::JobRows::kOpenMax) {
-            callback(ErrorResponse::make({k429TooManyRequests,
-                                          "too_many_parses",
-                                          "wait for your running parses to finish",
-                                          json{{"retry_after_sec", 30}}}));
-            return;
-        }
-        const json job = create(repo, replayed, [&](auto& txn, const std::string& job_id) {
-            // The cap again, under the lock: two creates at once cannot both pass the count above.
-            Repositories::JobRows::hold_slot(txn, Repo::ParseJobRepository::kTable, owner);
-            via_outbox = Jobs::Outbox::enqueue_if_drained(txn, Jobs::MoneyParse::kJobType, payload(job_id));
-        });
-        if (replayed) {
-            accepted(job);
-            return;
-        }
-        id = job["id"].template get<std::string>();
-    } catch (const Repositories::JobRows::SlotsTaken&) {
-        callback(ErrorResponse::make({k429TooManyRequests,
-                                      "too_many_parses",
-                                      "wait for your running parses to finish",
-                                      json{{"retry_after_sec", 30}}}));
-        return;
-    } catch (const Repositories::ValidationError& e) {
-        callback(ErrorResponse::bad_request(e.code(), e.message()));
-        return;
-    } catch (const pqxx::sql_error& e) {
-        // The server's DETAIL would quote the row (the bank text, the photo): the state only.
-        spdlog::warn("money parse create failed: SQLSTATE {}", e.sqlstate());
-        callback(ErrorResponse::service_unavailable("storage_unavailable"));
-        return;
-    } catch (const std::exception&) {
-        spdlog::warn("money parse create failed");
-        callback(ErrorResponse::service_unavailable("storage_unavailable"));
-        return;
-    }
-    try {
-        if (!via_outbox) {
-            if (!Jobs::is_initialized()) {
-                throw std::runtime_error("the job queue is not initialized");
+    start_parse_job<Repo::ParseJobRepository>(
+        owner,
+        callback,
+        key,
+        ParseJobSpec{Repo::ParseJobRepository::kTable, Jobs::MoneyParse::kJobType, "money parse", "money.parse.keyed"},
+        std::forward<Create>(create),
+        [](const std::exception& e) -> HttpResponsePtr {
+            if (const auto* v = dynamic_cast<const Repositories::ValidationError*>(&e)) {
+                return ErrorResponse::bad_request(v->code(), v->message());
             }
-            Jobs::get().submit(Jobs::MoneyParse::kJobType, payload(id));
-        }
-    } catch (const std::exception& e) {
-        spdlog::warn("money parse enqueue unavailable: {}", e.what());
-        try {
-            repo.fail(id, "queue_unavailable", "the job queue did not take the job");
-        } catch (const std::exception& inner) {
-            spdlog::warn("money parse {}: could not mark failed: {}", id, inner.what());
-        }
-        callback(ErrorResponse::service_unavailable("queue_unavailable"));
-        return;
-    }
-    auto resp = Response::ok(json{{"data", {{"id", id}, {"status", "queued"}}}});
-    resp->setStatusCode(k202Accepted);
-    callback(resp);
+            return nullptr;
+        });
 }
 
 }  // namespace
