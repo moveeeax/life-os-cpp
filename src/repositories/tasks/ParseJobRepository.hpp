@@ -25,7 +25,7 @@
 
 namespace Repositories::Tasks {
 
-class ParseJobRepository {
+class ParseJobRepository : public JobRows::JobTable<ParseJobRepository> {
 public:
     static constexpr const char* kTable = "task_parse_jobs";
 
@@ -154,18 +154,6 @@ public:
         });
     }
 
-    /// queued (or stale running) -> running, one more attempt; 0 when not claimable.
-    int start(const std::string& id) { return JobRows::start(kTable, id); }
-
-    /// The row's status now; nullopt when the row is gone.
-    std::optional<std::string> status(const std::string& id) { return JobRows::status(kTable, id); }
-
-    /// running -> queued, for an outage the queue will retry; only by the holder of @p attempt.
-    void requeue(const std::string& id, int attempt) { JobRows::requeue(kTable, id, attempt); }
-
-    /// Milliseconds until a running row may be claimed again; 0 when it is not running.
-    long long stale_in_ms(const std::string& id) { return JobRows::stale_in_ms(kTable, id); }
-
     /// Only the holder of @p attempt (what start() returned) writes the result.
     void finish(const std::string& id,
                 int attempt,
@@ -173,19 +161,7 @@ public:
                 const std::string& model,
                 std::optional<int> prompt_tokens,
                 std::optional<int> completion_tokens) {
-        Database::get().execute_write([&](auto& txn) {
-            txn.exec_params(
-                "UPDATE task_parse_jobs SET status = 'done', result = $2::jsonb, error = NULL, model = $3, "
-                " prompt_tokens = $4, completion_tokens = $5, finished_at = now() WHERE id = $1::uuid" +
-                    JobRows::while_claimed(6),
-                id,
-                lines.dump(),
-                model,
-                prompt_tokens,
-                completion_tokens,
-                attempt);
-            return true;
-        });
+        JobRows::finish(kTable, id, attempt, lines, model, prompt_tokens, completion_tokens);
     }
 
     /// finish() and, for a job created with apply, @p apply(txn, owner) in the
@@ -202,16 +178,13 @@ public:
                          std::optional<int> completion_tokens,
                          ApplyFn&& apply) {
         const auto close = [&](auto& txn) {
-            return txn.exec_params(
-                "UPDATE task_parse_jobs SET status = 'done', result = $2::jsonb, error = NULL, model = $3, "
-                " prompt_tokens = $4, completion_tokens = $5, finished_at = now() WHERE id = $1::uuid" +
-                    JobRows::while_claimed(6) + " RETURNING owner_id::text, auto_apply",
-                id,
-                lines.dump(),
-                model,
-                prompt_tokens,
-                completion_tokens,
-                attempt);
+            return txn.exec_params(JobRows::finish_sql(kTable) + " RETURNING owner_id::text, auto_apply",
+                                   id,
+                                   lines.dump(),
+                                   model,
+                                   prompt_tokens,
+                                   completion_tokens,
+                                   attempt);
         };
         try {
             Database::get().execute_write([&](auto& txn) {
@@ -238,19 +211,6 @@ public:
                 return true;
             });
         }
-    }
-
-    /// @p error is stored as "<code>: <message>".
-    void fail(const std::string& id, const std::string& code, const std::string& message, int attempt = 0) {
-        Database::get().execute_write([&](auto& txn) {
-            txn.exec_params(
-                "UPDATE task_parse_jobs SET status = 'failed', error = $2, finished_at = now() WHERE id = $1::uuid" +
-                    JobRows::while_open(3),
-                id,
-                message.empty() ? code : code + ": " + message,
-                attempt);
-            return true;
-        });
     }
 
     /// The edited lines as tasks, the note (if any) archived and linked to the first one, the job
@@ -282,9 +242,6 @@ public:
             },
             &detail::translate);
     }
-
-    /// Jobs of the owner that are queued or running (a stale queued or running row is not counted).
-    long open_count(const std::string& owner) { return JobRows::open_count(kTable, owner); }
 
     /// The note a job came from, if any.
     template <typename Txn>
