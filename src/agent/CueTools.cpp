@@ -12,6 +12,7 @@
 #include <spdlog/spdlog.h>
 
 #include "agent/Cues.hpp"
+#include "agent/ToolArgs.hpp"
 #include "repositories/agent/CueRepository.hpp"
 #include "security/Audit.hpp"
 #include "utils/Utf8.hpp"
@@ -22,10 +23,7 @@ namespace {
 
 using json = nlohmann::json;
 
-json tool(const char* name, const char* description, json parameters) {
-    return json{{"type", "function"},
-                {"function", {{"name", name}, {"description", description}, {"parameters", std::move(parameters)}}}};
-}
+using ToolArgs::tool;
 
 const json kScreen = {{"type", "string"},
                       {"enum", {"today", "food", "body", "money"}},
@@ -79,36 +77,34 @@ Gateway::ToolRunner runner(const std::string& owner, const std::string& tz, Gate
             return rest(name, raw);
         }
         const json args = raw.is_object() ? raw : json::object();
-        const auto str = [&](const char* k) {
-            return args.contains(k) && args[k].is_string() ? args[k].get<std::string>() : std::string();
-        };
+        const auto str = [&](const char* k) { return ToolArgs::text_arg(args, k); };
         const std::string screen = str("screen");
         if (!known_screen(screen)) {
-            return json{{"error", "invalid"}, {"message", "screen is today, food, body or money"}}.dump();
+            return ToolArgs::refusal("invalid", "screen is today, food, body or money");
         }
         try {
             Repositories::Agent::CueRepository cues;
             if (name == "clear_cue") {
                 if (!cues.clear(owner, tz, screen)) {
-                    return json{{"error", "not_found"}, {"message", "no line of yours is on that screen today"}}.dump();
+                    return ToolArgs::refusal("not_found", "no line of yours is on that screen today");
                 }
                 return json{{"cleared", true}}.dump();
             }
             const std::string text = str("text");
             const std::size_t n = Utils::Utf8::length(text);
             if (n < 1 || n > 200) {
-                return json{{"error", "invalid"}, {"message", "the line is 1 to 200 characters"}}.dump();
+                return ToolArgs::refusal("invalid", "the line is 1 to 200 characters");
             }
             const json action = args.contains("action") ? args["action"] : json();
             if (const auto problem = Cues::action_problem(action)) {
-                return json{{"error", "invalid"}, {"message", *problem}}.dump();
+                return ToolArgs::refusal("invalid", *problem);
             }
             const std::string id = cues.put(owner, tz, screen, text, action);
             Security::Audit::record(owner, "ani.cue.set", "ani_cue", id);
             return json{{"set", "agent-" + id}}.dump();
         } catch (const std::exception& e) {
             spdlog::warn("ani agent: the cue tool {} failed: {}", name, e.what());
-            return json{{"error", "failed"}, {"message", "the line was not put"}}.dump();
+            return ToolArgs::refusal("failed", "the line was not put");
         }
     };
 }

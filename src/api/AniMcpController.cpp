@@ -22,6 +22,7 @@
 #include "mcp/AniTools.hpp"
 #include "mcp/Protocol.hpp"
 #include "security/Auth.hpp"
+#include "utils/BaseUrl.hpp"
 #include "utils/Config.hpp"
 #include "utils/ErrorResponse.hpp"
 #include "utils/Strings.hpp"
@@ -61,13 +62,11 @@ bool origin_allowed(const std::string& origin) {
     if (origin.empty()) {
         return true;
     }
-    std::string base = "http://localhost:8080";
     std::string cors;
     if (Config::is_initialized()) {
-        base = Config::get().get<std::string>("app.base_url", "APP_BASE_URL", base);
         cors = Config::get().get<std::string>("cors.allowed_origins", "CORS_ALLOWED_ORIGINS", "");
     }
-    if (origin == origin_of(base)) {
+    if (origin == origin_of(::Utils::base_url())) {
         return true;
     }
     const auto allowed = Utils::Strings::split_csv_vec(cors);

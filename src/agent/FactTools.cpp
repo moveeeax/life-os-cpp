@@ -10,6 +10,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include "agent/ToolArgs.hpp"
 #include "repositories/agent/FactRepository.hpp"
 #include "security/Audit.hpp"
 #include "utils/Utf8.hpp"
@@ -20,10 +21,7 @@ namespace {
 
 using json = nlohmann::json;
 
-json tool(const char* name, const char* description, json parameters) {
-    return json{{"type", "function"},
-                {"function", {{"name", name}, {"description", description}, {"parameters", std::move(parameters)}}}};
-}
+using ToolArgs::tool;
 
 using Utils::Utf8::length;
 
@@ -62,25 +60,24 @@ Gateway::ToolRunner runner(const std::string& owner, Gateway::ToolRunner rest) {
             if (name == "remember") {
                 const std::string fact = args.value("fact", std::string());
                 if (fact.empty() || length(fact) > 200) {
-                    return json{{"error", "invalid"}, {"message", "a fact is 1 to 200 characters"}}.dump();
+                    return ToolArgs::refusal("invalid", "a fact is 1 to 200 characters");
                 }
                 const auto id = facts.add(owner, fact, "chat");
                 if (!id) {
-                    return json{{"error", "too_many"}, {"message", "50 facts are kept already: forget one first"}}
-                        .dump();
+                    return ToolArgs::refusal("too_many", "50 facts are kept already: forget one first");
                 }
                 Security::Audit::record(owner, "ani.fact.add", "ani_fact", *id);
                 return json{{"remembered", *id}}.dump();
             }
             const std::string id = args.value("id", std::string());
             if (id.empty() || !facts.remove(owner, id)) {
-                return json{{"error", "not_found"}, {"message", "there is no such fact"}}.dump();
+                return ToolArgs::refusal("not_found", "there is no such fact");
             }
             Security::Audit::record(owner, "ani.fact.remove", "ani_fact", id);
             return json{{"forgotten", true}}.dump();
         } catch (const std::exception& e) {
             spdlog::warn("ani agent: the fact tool {} failed: {}", name, e.what());
-            return json{{"error", "failed"}, {"message", "it was not kept"}}.dump();
+            return ToolArgs::refusal("failed", "it was not kept");
         }
     };
 }

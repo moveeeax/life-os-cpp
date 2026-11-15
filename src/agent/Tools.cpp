@@ -5,16 +5,15 @@
 
 #include "agent/Tools.hpp"
 
-#include <spdlog/spdlog.h>
-
 #include "agent/Actions.hpp"
 #include "agent/CalendarTools.hpp"
+#include "agent/SiteApi.hpp"
 #include "agent/TelegramTools.hpp"
+#include "agent/ToolArgs.hpp"
 #include "repositories/UserRepository.hpp"
 #include "security/ApiKeys.hpp"
 #include "security/Auth.hpp"
 #include "security/Jwt.hpp"
-#include "storage/S3Presign.hpp"
 #include "utils/Date.hpp"
 #include "utils/Time.hpp"
 #include "utils/Utf8.hpp"
@@ -25,32 +24,12 @@ namespace {
 
 using json = nlohmann::json;
 
-json object(json properties, json required = json::array()) {
-    json schema = {{"type", "object"}, {"properties", std::move(properties)}, {"additionalProperties", false}};
-    if (!required.empty()) {
-        schema["required"] = std::move(required);
-    }
-    return schema;
-}
-
-json tool(const char* name, const char* description, json parameters) {
-    return json{{"type", "function"},
-                {"function", {{"name", name}, {"description", description}, {"parameters", std::move(parameters)}}}};
-}
+using ToolArgs::day_arg;
+using ToolArgs::object;
+using ToolArgs::text_arg;
+using ToolArgs::tool;
 
 const json kDay = {{"type", "string"}, {"description", "A day as YYYY-MM-DD; today when left out"}};
-
-/// A string argument, or empty when it is missing or not a string.
-std::string text_arg(const json& args, const char* key) {
-    const auto it = args.find(key);
-    return it != args.end() && it->is_string() ? it->get<std::string>() : std::string();
-}
-
-/// A day argument; anything that is not a real YYYY-MM-DD day is dropped.
-std::string day_arg(const json& args, const char* key) {
-    const std::string v = text_arg(args, key);
-    return Utils::Date::is_ymd(v) ? v : std::string();
-}
 
 void put(Call& c, const char* key, const std::string& value) {
     if (!value.empty()) {
@@ -169,7 +148,7 @@ std::string result_text(const Net::Http::Response& r) {
         return compact(body.contains("data") ? body["data"] : body).dump();
     }
     if (r.status == 404) {
-        return json{{"error", "not_available"}, {"message", "this part of Life OS is off for the person"}}.dump();
+        return ToolArgs::refusal("not_available", "this part of Life OS is off for the person");
     }
     json err = {{"error", body.is_object() ? body.value("error", json("failed")) : json("failed")},
                 {"status", r.status}};
@@ -186,24 +165,14 @@ Gateway::ToolRunner runner(Net::Http::Transport& transport,
     return [&transport, api_url, access_token, tz](const std::string& name, const json& args) -> std::string {
         const auto call = route(name, args, tz);
         if (!call) {
-            return json{{"error", "unknown_tool"}, {"message", "there is no tool " + name}}.dump();
+            return ToolArgs::refusal("unknown_tool", "there is no tool " + name);
         }
-        std::string url = api_url + call->path;
-        char sep = '?';
+        json query = json::array();
         for (const auto& [k, v] : call->query) {
-            url += sep + k + "=" + Storage::S3::uri_encode(v, true);
-            sep = '&';
+            query.push_back(json::array({k, v}));
         }
-        Net::Http::Request r;
-        r.url = url;
-        r.headers = {{"Authorization", "Bearer " + access_token}, {"Accept", "application/json"}};
-        r.timeout_seconds = 20;
-        try {
-            return result_text(transport.send(r));
-        } catch (const Net::Http::TransportError& e) {
-            spdlog::warn("ani agent: the tool {} got no answer: {}", name, e.what());
-            return json{{"error", "unavailable"}, {"message", "Life OS did not answer"}}.dump();
-        }
+        return SiteApi::tool_result(
+            transport, api_url, access_token, json{{"path", call->path}, {"query", query}}, /*keep_ids=*/false, name);
     };
 }
 
@@ -235,7 +204,7 @@ std::uint32_t token_permissions(std::uint32_t role) {
 }
 
 bool may_offer(const std::string& origin, const std::string& name) {
-    const bool telegram = TelegramTools::is_telegram(name) || name == "tg_send" || name == "tg_edit";
+    const bool telegram = TelegramTools::is_telegram(name) || Actions::family_of(name) == Actions::Family::Telegram;
     if (origin == "mcp") {
         return !telegram;
     }
@@ -247,7 +216,7 @@ bool may_offer(const std::string& origin, const std::string& name) {
     if (Actions::is_write(name)) {
         return true;  // proposals: the person confirms each
     }
-    if (name == "tg_chats" || name == "tg_history" || name == "tg_search" || CalendarTools::is_calendar(name)) {
+    if (TelegramTools::is_offered_in_hook(name) || CalendarTools::is_calendar(name)) {
         return true;
     }
     return route(name, json::object(), "UTC").has_value();
@@ -266,8 +235,7 @@ json offered(const std::string& origin, const json& tools) {
 Gateway::ToolRunner offered_runner(const std::string& origin, Gateway::ToolRunner run) {
     return [origin, run = std::move(run)](const std::string& name, const json& args) -> std::string {
         if (!may_offer(origin, name)) {
-            return json{{"error", "not_offered"}, {"message", "the tool " + name + " is not offered in this message"}}
-                .dump();
+            return ToolArgs::refusal("not_offered", "the tool " + name + " is not offered in this message");
         }
         return run(name, args);
     };

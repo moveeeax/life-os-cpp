@@ -45,6 +45,8 @@ inline constexpr int kTtlMax = 604800;
 inline constexpr std::size_t kEventTextMax = 2000;
 inline constexpr std::size_t kLabelMax = 60;
 inline constexpr std::size_t kIdMax = 200;
+/// The longest spoken line (say, remind, ask): now/Voice.hpp kLineCharsMax.
+inline constexpr std::size_t kLineCharsMax = 200;
 
 /// Her moves a hook may ask for: the gestures she plays on her ledge (the
 /// EMOTES and the greeting of CLIPS in frontend/src/pages/now/ani/engine.ts).
@@ -53,10 +55,22 @@ inline constexpr std::array<std::string_view, 9> kActs = {
 
 inline constexpr std::array<std::string_view, 2> kOutfits = {"p1", "p2"};
 
+/// The item types, in the order the invalid_type message names them.
+inline constexpr std::array<std::string_view, 12> kTypes = {
+    "say", "outfit", "act", "event", "mood", "remind", "ask", "focus", "card", "wallpaper", "sound", "hold"};
+
 /// An ask waits for the page this long unless it says otherwise.
 inline constexpr int kAskTtlDefault = 3600;
+/// An ask's answers: at most this many, each 1 to kAskOptionMax characters.
+inline constexpr std::size_t kAskOptionsMax = 4;
+inline constexpr std::size_t kAskOptionMax = 30;
 inline constexpr int kMoodSecondsDefault = 600;
+inline constexpr int kMoodSecondsMin = 60;
+inline constexpr int kMoodSecondsMax = 3600;
 inline constexpr int kCardSecondsDefault = 20;
+inline constexpr int kCardSecondsMin = 5;
+inline constexpr int kCardSecondsMax = 120;
+inline constexpr std::size_t kCardTextMax = 200;
 inline constexpr long long kRemindMinSeconds = 60;
 inline constexpr long long kRemindMaxSeconds = 604800;
 inline constexpr int kHoldMaxMinutes = 480;
