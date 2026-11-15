@@ -11,13 +11,24 @@ import {
 import {
   RECORD_KIND,
   RECORD_KINDS,
-  orNull,
   type MedicalMedication,
   type MedicalPerson,
   type MedicalProvider,
   type MedicalRecord,
   type MedicalVisit,
 } from '@/lib/medical';
+import {
+  medicationBody,
+  personBody,
+  providerBody,
+  recordBody,
+  visitBody,
+  type MedicationForm,
+  type PersonForm,
+  type ProviderForm,
+  type RecordForm,
+  type VisitForm,
+} from '@/lib/medical/bodies';
 import { todayLocal } from '@/lib/dates';
 import {
   Sheet,
@@ -55,7 +66,7 @@ function useFirstPerson(): string {
 }
 
 export function PersonSheet({ person, onClose }: { person?: MedicalPerson; onClose: () => void }) {
-  const [f, set] = useFormFields({
+  const [f, set] = useFormFields<PersonForm>({
     name: person?.name ?? '',
     relation: person?.relation ?? '',
     note: person?.note ?? '',
@@ -63,11 +74,7 @@ export function PersonSheet({ person, onClose }: { person?: MedicalPerson; onClo
   const save = useSavePerson(person?.id ?? null, onClose);
   return (
     <Sheet title={person ? 'Edit the person' : 'New person'} onClose={onClose} width={440}>
-      <SheetForm
-        onSubmit={() =>
-          save.mutate({ name: f.name.trim(), relation: f.relation.trim(), note: f.note.trim() })
-        }
-      >
+      <SheetForm onSubmit={() => save.mutate(personBody(f))}>
         <div className="k-fields">
           <label className="k-field">
             <span>Name</span>
@@ -107,7 +114,7 @@ export function ProviderSheet({
   provider?: MedicalProvider;
   onClose: () => void;
 }) {
-  const [f, set] = useFormFields({
+  const [f, set] = useFormFields<ProviderForm>({
     kind: provider?.kind ?? ('doctor' as MedicalProvider['kind']),
     name: provider?.name ?? '',
     specialty: provider?.specialty ?? '',
@@ -125,20 +132,7 @@ export function ProviderSheet({
       onClose={onClose}
       width={480}
     >
-      <SheetForm
-        onSubmit={() =>
-          save.mutate({
-            kind: f.kind,
-            name: f.name.trim(),
-            specialty: f.specialty.trim(),
-            clinic: doctor ? f.clinic.trim() : '',
-            phone: f.phone.trim(),
-            email: f.email.trim(),
-            address: f.address.trim(),
-            note: f.note.trim(),
-          })
-        }
-      >
+      <SheetForm onSubmit={() => save.mutate(providerBody(f))}>
         <div className="k-fields">
           <label className="k-field">
             <span>Kind</span>
@@ -197,7 +191,7 @@ export function ProviderSheet({
 export function VisitSheet({ visit, onClose }: { visit?: MedicalVisit; onClose: () => void }) {
   const first = useFirstPerson();
   const providers = useProviders().data ?? [];
-  const [f, set] = useFormFields({
+  const [f, set] = useFormFields<VisitForm>({
     person_id: visit?.person_id ?? first,
     provider_id: visit?.provider_id ?? '',
     date: visit?.date ?? todayLocal(),
@@ -208,18 +202,7 @@ export function VisitSheet({ visit, onClose }: { visit?: MedicalVisit; onClose: 
   const save = useSaveVisit(visit?.id ?? null, onClose);
   return (
     <Sheet title={visit ? 'Edit the visit' : 'New visit'} onClose={onClose} width={480}>
-      <SheetForm
-        onSubmit={() =>
-          save.mutate({
-            person_id: f.person_id,
-            provider_id: orNull(f.provider_id),
-            date: f.date,
-            reason: f.reason.trim(),
-            outcome: f.outcome.trim(),
-            follow_up: orNull(f.follow_up),
-          })
-        }
-      >
+      <SheetForm onSubmit={() => save.mutate(visitBody(f))}>
         <div className="k-fields">
           <PersonField value={f.person_id} onChange={set('person_id')} />
           <label className="k-field">
@@ -281,7 +264,7 @@ export function RecordSheet({
 }) {
   const first = useFirstPerson();
   const visits = useVisits().data ?? [];
-  const [f, set, setF] = useFormFields({
+  const [f, set, setF] = useFormFields<RecordForm>({
     person_id: record?.person_id ?? first,
     visit_id: record?.visit_id ?? '',
     date: record?.date ?? todayLocal(),
@@ -296,18 +279,7 @@ export function RecordSheet({
   const theirVisits = visits.filter((v) => v.person_id === f.person_id);
   return (
     <Sheet title={record ? 'Edit the record' : 'New record'} onClose={onClose} width={480}>
-      <SheetForm
-        onSubmit={() =>
-          save.mutate({
-            person_id: f.person_id,
-            visit_id: orNull(f.visit_id),
-            date: f.date,
-            kind: f.kind,
-            title: f.title.trim(),
-            note: f.note.trim(),
-          })
-        }
-      >
+      <SheetForm onSubmit={() => save.mutate(recordBody(f))}>
         <div className="k-fields">
           <PersonField
             value={f.person_id}
@@ -371,7 +343,7 @@ export function MedicationSheet({
   onClose: () => void;
 }) {
   const first = useFirstPerson();
-  const [f, set] = useFormFields({
+  const [f, set] = useFormFields<MedicationForm>({
     person_id: medication?.person_id ?? first,
     name: medication?.name ?? '',
     dose: medication?.dose ?? '',
@@ -387,19 +359,7 @@ export function MedicationSheet({
       onClose={onClose}
       width={480}
     >
-      <SheetForm
-        onSubmit={() =>
-          save.mutate({
-            person_id: f.person_id,
-            name: f.name.trim(),
-            dose: f.dose.trim(),
-            schedule: f.schedule.trim(),
-            start_date: orNull(f.start_date),
-            end_date: orNull(f.end_date),
-            note: f.note.trim(),
-          })
-        }
-      >
+      <SheetForm onSubmit={() => save.mutate(medicationBody(f))}>
         <div className="k-fields">
           <PersonField value={f.person_id} onChange={set('person_id')} />
           <label className="k-field">
