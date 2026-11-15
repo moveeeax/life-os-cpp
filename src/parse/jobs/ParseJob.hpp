@@ -25,14 +25,13 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <variant>
 #include <vector>
-
-#include <spdlog/spdlog.h>
 
 #include <nlohmann/json.hpp>
 
 #include "food/jobs/ParseJob.hpp"
-#include "jobs/Jobs.hpp"
+#include "jobs/RowJob.hpp"
 #include "llm/Chat.hpp"
 #include "money/jobs/ParseApply.hpp"
 #include "money/jobs/ParseJob.hpp"
@@ -86,52 +85,29 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
     if (!payload.contains("job_id") || !payload["job_id"].is_string() || payload["job_id"].get<std::string>().empty()) {
         throw std::invalid_argument("unified_parse: payload has no job_id");
     }
-    const std::string job_id = payload["job_id"].get<std::string>();
     Repositories::UnifiedParse::ParseJobRepository jobs;
-    int attempt = 0;  // 0 until the claim: a fail before it is not fenced by an attempt
-    const auto failed = [&](const std::string& code, const std::string& message) {
-        jobs.fail(job_id, code, message, attempt);
-        spdlog::warn("unified parse {}: {}", job_id, code);
-        return nlohmann::json{{"job_id", job_id}, {"status", "failed"}, {"error", code}};
-    };
+    Jobs::RowJob<Repositories::UnifiedParse::ParseJobRepository> job(
+        kJobType, "unified parse", "job_id", payload["job_id"].get<std::string>(), jobs, payload);
 
     const auto setup = ::UnifiedParse::setup();
     if (!setup.has_value()) {
-        return failed("not_configured", "no module parse is on and set up on this worker");
+        return job.failed("not_configured", "no module parse is on and set up on this worker");
     }
-    const auto job = jobs.load_for_worker(job_id);
-    if (!job.has_value()) {
-        return {{"job_id", job_id}, {"status", "missing"}};
+    const auto loaded = jobs.load_for_worker(job.id());
+    if (!loaded.has_value()) {
+        return {{"job_id", job.id()}, {"status", "missing"}};
     }
-    attempt = jobs.start(job_id);
-    if (attempt == 0) {
-        // A row still `running` is held by another delivery, or by a worker that died less than
-        // JobRows::kStaleRunning ago: the job waits until the row turns stale, without spending an attempt.
-        const auto now = jobs.status(job_id);
-        if (now == "running") {
-            throw Jobs::DeferJob("unified_parse: the row is running elsewhere", jobs.stale_in_ms(job_id));
-        }
-        return {{"job_id", job_id}, {"status", now.value_or("missing")}};
+    if (const auto settled = job.claim()) {
+        return *settled;
     }
-    const std::string owner = job->value("owner_id", std::string());
-    const int max_attempts =
-        payload.contains("max_attempts") && payload["max_attempts"].is_number_integer()
-            ? payload["max_attempts"].get<int>()
-            : (Jobs::is_initialized() ? Jobs::get().default_max_retries() : Jobs::kDefaultMaxRetries);
-    const auto give_up_or_retry = [&](const char* code, const std::string& what) -> nlohmann::json {
-        if (attempt >= max_attempts) {
-            return failed(code, what);
-        }
-        jobs.requeue(job_id, attempt);
-        throw std::runtime_error(std::string("unified_parse: ") + what);
-    };
+    const std::string owner = loaded->value("owner_id", std::string());
 
-    try {
-        const std::string date = job->value("date", std::string());
-        const std::string meal = job->value("meal", std::string());
+    return job.run([&]() -> nlohmann::json {
+        const std::string date = loaded->value("date", std::string());
+        const std::string meal = loaded->value("meal", std::string());
         ::UnifiedParse::Known known;
         known.date = date;
-        nlohmann::json user_message{{"text", job->value("text", std::string())}};
+        nlohmann::json user_message{{"text", loaded->value("text", std::string())}};
         if (setup->food) {
             const auto ctx = Jobs::FoodParse::prompt_context(owner);
             known.food_items = ctx.own_ids;
@@ -148,45 +124,33 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
             user_message["tasks"] = Jobs::TasksParse::prompt_context(date);
         }
         const auto& settings = setup->settings;
-        const nlohmann::json request{{"model", settings.model},
-                                     {"messages",
-                                      {{{"role", "system"}, {"content", settings.prompt}},
-                                       {{"role", "user"}, {"content", user_message.dump()}}}},
-                                     {"max_tokens", settings.max_tokens},
-                                     {"temperature", 0},
-                                     {"response_format", {{"type", "json_object"}}}};
 
-        nlohmann::json body;
-        std::string error_code;
+        std::variant<Chat::Answer, Chat::Failure> asked;
         try {
-            body = Chat::complete_adapting(Net::Http::transport(), settings, request, error_code);
+            asked = Chat::ask(Net::Http::transport(), settings, Chat::json_request(settings, user_message.dump()));
         } catch (const Chat::Retryable& e) {
-            return give_up_or_retry("provider_unavailable", e.what());
+            return job.give_up_or_retry("provider_unavailable", e.what());
         }
-        if (!error_code.empty()) {
-            return failed(error_code, Chat::provider_message(body));
+        if (const auto* failure = std::get_if<Chat::Failure>(&asked)) {
+            return job.failed(failure->code, failure->message);
         }
-        const std::string content = Chat::content_of(body);
-        if (content.empty()) {
-            return failed("invalid_answer", "no message content");
-        }
+        const auto& answer = std::get<Chat::Answer>(asked);
         ::UnifiedParse::Parts parts;
         try {
-            parts = ::UnifiedParse::parse_answer(content, *setup, known);
+            parts = ::UnifiedParse::parse_answer(answer.content, *setup, known);
         } catch (const ::UnifiedParse::Invalid& e) {
-            return failed("invalid_answer", e.what());
+            return job.failed("invalid_answer", e.what());
         }
-        const std::string model =
-            body.contains("model") && body["model"].is_string() ? body["model"].get<std::string>() : settings.model;
+        const std::string& model = answer.model;
         const nlohmann::json food_lines = ::Food::Parse::to_json(parts.food);
         const nlohmann::json money_lines = ::Money::Parse::to_json(parts.money);
         const nlohmann::json task_lines = ::Tasks::Parse::to_json(parts.tasks);
 
-        jobs.finish(job_id,
-                    attempt,
+        jobs.finish(job.id(),
+                    job.attempt(),
                     model,
-                    Chat::usage(body, "prompt_tokens"),
-                    Chat::usage(body, "completion_tokens"),
+                    answer.prompt_tokens,
+                    answer.completion_tokens,
                     [&](auto& txn, const Repositories::UnifiedParse::ParseJobRepository::Row& row) {
                         nlohmann::json ids{{"food", nullptr}, {"money", nullptr}, {"tasks", nullptr}};
                         nlohmann::json applied{{"food", nlohmann::json::array()},
@@ -239,20 +203,12 @@ inline nlohmann::json process_job(const nlohmann::json& payload) {
                             {"errors", parts.errors}};
                         return nlohmann::json{{"result", result}, {"applied", row.apply ? applied : nlohmann::json()}};
                     });
-        return {{"job_id", job_id},
+        return {{"job_id", job.id()},
                 {"status", "done"},
                 {"food", parts.food.size()},
                 {"money", parts.money.size()},
                 {"tasks", parts.tasks.size()}};
-    } catch (const std::runtime_error& e) {
-        // give_up_or_retry's own throw: the queue retries.
-        if (std::string(e.what()).rfind("unified_parse: ", 0) == 0) {
-            throw;
-        }
-        return give_up_or_retry("internal_error", e.what());
-    } catch (const std::exception& e) {
-        return give_up_or_retry("internal_error", e.what());
-    }
+    });
 }
 
 }  // namespace Jobs::UnifiedParse
