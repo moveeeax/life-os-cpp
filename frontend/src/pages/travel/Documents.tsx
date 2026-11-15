@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { Attachments } from '@/components/Attachments';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { useDeleteDocument, useDocuments } from '@/hooks/useTravel';
 import { useErrorToast } from '@/hooks/useErrorToast';
 import {
@@ -21,8 +21,8 @@ import { DocumentSheet } from './Sheets';
 export function TravelDocumentsPage() {
   const today = todayLocal();
   const docs = useDocuments();
-  const [deleting, setDeleting] = useState<TravelDocument | null>(null);
-  const remove = useDeleteDocument(() => setDeleting(null));
+  const deleting = useConfirmDelete<TravelDocument>();
+  const remove = useDeleteDocument(deleting.close);
   useErrorToast(remove.error);
   const [editing, setEditing] = useState<TravelDocument | 'new' | null>(null);
   const list = docs.data ?? [];
@@ -88,7 +88,7 @@ export function TravelDocumentsPage() {
                   <button
                     type="button"
                     className="k-link k-error-text"
-                    onClick={() => setDeleting(d)}
+                    onClick={() => deleting.ask(d)}
                   >
                     Delete
                   </button>
@@ -98,17 +98,10 @@ export function TravelDocumentsPage() {
           })}
         </Group>
       )}
-      {deleting && (
-        <ConfirmDialog
-          title={`Delete ${deleting.holder}'s ${DOCUMENT_KIND[deleting.kind].toLowerCase()}?`}
-          description="Trips stop checking it, and its scans are deleted. This cannot be undone."
-          confirmLabel="Delete"
-          destructive
-          busy={remove.isPending}
-          onConfirm={() => remove.mutate(deleting.id)}
-          onClose={() => setDeleting(null)}
-        />
-      )}
+      {deleting.dialog(remove, (d) => ({
+        title: `Delete ${d.holder}'s ${DOCUMENT_KIND[d.kind].toLowerCase()}?`,
+        description: 'Trips stop checking it, and its scans are deleted. This cannot be undone.',
+      }))}
       {editing && (
         <DocumentSheet
           document={editing === 'new' ? undefined : editing}

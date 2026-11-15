@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { useApiMutation } from '@/hooks/useApiMutation';
+import { useDeleteEntity, useSaveEntity } from '@/hooks/crud';
 import { api } from '@/lib/api/client';
 import { NOW_RIBBON, qk } from '@/lib/api/queryKeys';
 import { loadProjectTasks, type Project, type ProjectInput, type Task } from '@/lib/tasks';
@@ -47,18 +47,9 @@ export function useProjectTasks(id: string) {
 }
 
 export function useSaveProject(id: string | null, onSuccess?: (p: Project) => void) {
-  return useApiMutation(
-    async (body: ProjectInput) =>
-      id
-        ? (await api.patchJson<{ data: Project }>(`${BASE}/${id}`, { body })).data
-        : (await api.postJson<{ data: Project }>(BASE, { body })).data,
-    { invalidate: WRITES, onSuccess },
-  );
+  return useSaveEntity<ProjectInput, Project>(BASE, id, { invalidate: WRITES, onSuccess });
 }
 
 export function useDeleteProject(onSuccess?: () => void) {
-  return useApiMutation((id: string) => api.deleteJson<unknown>(`${BASE}/${id}`), {
-    invalidate: WRITES,
-    onSuccess,
-  });
+  return useDeleteEntity(BASE, { invalidate: WRITES, onSuccess });
 }

@@ -1,4 +1,4 @@
-import { daysBetween, formatDay } from '@/lib/dates';
+import { daysBetween, shortDay } from '@/lib/dates';
 
 import type {
   TravelCounter,
@@ -11,7 +11,7 @@ import type {
 } from './types';
 
 export type * from './types';
-export { daysBetween, todayLocal } from '@/lib/dates';
+export { daysBetween, shortDay, todayLocal } from '@/lib/dates';
 
 let names: Intl.DisplayNames | null = null;
 
@@ -72,11 +72,6 @@ export function headlineTrip<T extends Pick<TravelTrip, 'start_date'>>(
   today: string,
 ): T | undefined {
   return coming.find((t) => t.start_date <= today) ?? coming.find((t) => t.start_date > today);
-}
-
-/** "Nov 1" for a day of this year, "Nov 1, 2025" otherwise. */
-export function shortDay(iso: string, today: string): string {
-  return formatDay(iso, { yearUnless: today });
 }
 
 /**

@@ -8,5 +8,7 @@ export { Meter } from './Meter';
 export { Row } from './Row';
 export { SectionFrame } from './SectionFrame';
 export { Sheet } from './Sheet';
+export { SheetActions, SheetError, SheetForm } from './SheetParts';
 export { Tabs } from './Tabs';
+export { useFormFields, type FieldChange } from './useFormFields';
 export { dialogWidth, formatAmount, splitTabs, type TabItem } from './logic';

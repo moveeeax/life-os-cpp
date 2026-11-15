@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react';
 
-import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import {
   useAdminWallpapers,
   useCreateWallpaper,
@@ -43,7 +43,7 @@ export function WallpapersSection() {
   const [device, setDevice] = useState<'desktop' | 'phone'>('desktop');
   const [progress, setProgress] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<AdminWallpaper | null>(null);
+  const deleting = useConfirmDelete<AdminWallpaper>();
   // A new key empties the file input after an upload, so the same file can be picked again.
   const [inputKey, setInputKey] = useState(0);
 
@@ -206,7 +206,7 @@ export function WallpapersSection() {
                       {w.status === 'pending' ? ' · not finished' : ''}
                     </div>
                   </div>
-                  <Button variant="ghost" onClick={() => setDeleting(w)}>
+                  <Button variant="ghost" onClick={() => deleting.ask(w)}>
                     Delete
                   </Button>
                 </li>
@@ -216,16 +216,13 @@ export function WallpapersSection() {
         </CardContent>
       </Card>
 
-      {deleting && (
-        <ConfirmDialog
-          title="Delete this wallpaper?"
-          description="It goes from the bucket and from every screen."
-          confirmLabel="Delete"
-          destructive
-          busy={remove.isPending}
-          onConfirm={() => remove.mutate(deleting.id, { onSuccess: () => setDeleting(null) })}
-          onClose={() => setDeleting(null)}
-        />
+      {deleting.dialog(
+        remove,
+        () => ({
+          title: 'Delete this wallpaper?',
+          description: 'It goes from the bucket and from every screen.',
+        }),
+        { closeOnSuccess: true },
       )}
     </section>
   );

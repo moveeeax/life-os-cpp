@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import {
   useArchiveHabit,
   useDeleteHabit,
@@ -177,8 +177,8 @@ function HabitRow({
 function Archived() {
   const list = useHabits(true);
   const restore = useArchiveHabit();
-  const [deleting, setDeleting] = useState<Habit | null>(null);
-  const remove = useDeleteHabit(() => setDeleting(null));
+  const deleting = useConfirmDelete<Habit>();
+  const remove = useDeleteHabit(deleting.close);
   useErrorToast(restore.error ?? remove.error);
   const rows = list.data ?? [];
   if (list.isPending) return <Placeholder />;
@@ -199,23 +199,16 @@ function Archived() {
             >
               Restore
             </button>
-            <button type="button" className="k-link k-error-text" onClick={() => setDeleting(h)}>
+            <button type="button" className="k-link k-error-text" onClick={() => deleting.ask(h)}>
               Delete
             </button>
           </span>
         </Row>
       ))}
-      {deleting && (
-        <ConfirmDialog
-          title={`Delete ${deleting.name}?`}
-          description="Its ticks go with it. This cannot be undone."
-          confirmLabel="Delete"
-          destructive
-          busy={remove.isPending}
-          onConfirm={() => remove.mutate(deleting.id)}
-          onClose={() => setDeleting(null)}
-        />
-      )}
+      {deleting.dialog(remove, (d) => ({
+        title: `Delete ${d.name}?`,
+        description: 'Its ticks go with it. This cannot be undone.',
+      }))}
     </Group>
   );
 }

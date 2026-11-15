@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { listQuery, useDeleteEntity, useSaveEntity } from '@/hooks/crud';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { MEDICAL_PROBE } from '@/hooks/moduleProbes';
 import { useModuleOn } from '@/hooks/useModuleProbe';
@@ -30,13 +31,7 @@ export function useMedicalOn(enabled = true): boolean | undefined {
   return useModuleOn('medical', MEDICAL_PROBE, enabled);
 }
 
-function list<T>(key: readonly unknown[], path: string) {
-  return {
-    queryKey: key,
-    queryFn: async ({ signal }: { signal: AbortSignal }) =>
-      (await api.getJson<{ data: T[] }>(`${BASE}/${path}`, { signal })).data,
-  };
-}
+const list = <T>(key: readonly unknown[], path: string) => listQuery<T>(key, `${BASE}/${path}`);
 
 export const usePeople = () => useQuery(list<MedicalPerson>(qk.medical.people(), 'people'));
 export const useProviders = () =>
@@ -46,22 +41,11 @@ export const useRecords = () => useQuery(list<MedicalRecord>(qk.medical.records(
 export const useMedications = () =>
   useQuery(list<MedicalMedication>(qk.medical.medications(), 'medications'));
 
-function useSave<I, T>(path: string, id: string | null, onSuccess?: (row: T) => void) {
-  return useApiMutation(
-    async (body: I) =>
-      id
-        ? (await api.patchJson<{ data: T }>(`${BASE}/${path}/${id}`, { body })).data
-        : (await api.postJson<{ data: T }>(`${BASE}/${path}`, { body })).data,
-    { invalidate: WRITES, onSuccess },
-  );
-}
+const useSave = <I, T>(path: string, id: string | null, onSuccess?: (row: T) => void) =>
+  useSaveEntity<I, T>(`${BASE}/${path}`, id, { invalidate: WRITES, onSuccess });
 
-function useRemove(path: string, onSuccess?: () => void) {
-  return useApiMutation((id: string) => api.deleteJson<unknown>(`${BASE}/${path}/${id}`), {
-    invalidate: WRITES,
-    onSuccess,
-  });
-}
+const useRemove = (path: string, onSuccess?: () => void) =>
+  useDeleteEntity(`${BASE}/${path}`, { invalidate: WRITES, onSuccess });
 
 export const useSavePerson = (id: string | null, onSuccess?: (p: MedicalPerson) => void) =>
   useSave<MedicalPersonInput, MedicalPerson>('people', id, onSuccess);

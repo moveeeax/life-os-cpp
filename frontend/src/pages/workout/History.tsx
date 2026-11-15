@@ -1,7 +1,7 @@
 import { Link } from 'react-router';
 
 import { useSessions } from '@/hooks/useWorkoutSession';
-import { formatDay, formatDuration, formatTime, formatVolume } from '@/lib/workout/format';
+import { formatInstantDay, formatDuration, formatTime, formatVolume } from '@/lib/workout/format';
 import { durationMinutes } from '@/lib/workout/session';
 
 import { HealthBadge } from './bits';
@@ -35,7 +35,7 @@ export function WorkoutHistoryPage() {
                 title={s.name || 'Workout'}
                 sub={
                   <>
-                    {formatDay(s.started_at)}, {formatTime(s.started_at)} ·{' '}
+                    {formatInstantDay(s.started_at)}, {formatTime(s.started_at)} ·{' '}
                     {formatDuration(durationMinutes(s.started_at, s.finished_at))} ·{' '}
                     <HealthBadge status={s.health_status} />
                   </>

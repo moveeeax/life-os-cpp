@@ -4,10 +4,10 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useGoal, useGoals } from '@/hooks/useGoals';
 import { useProjects } from '@/hooks/useProjects';
 import { useDeleteTask, useUpdateTask } from '@/hooks/useTasks';
+import { todayLocal } from '@/lib/dates';
 import {
   AREAS,
   EFFORT_LABEL,
-  localToday,
   repeatDraft,
   repeatOf,
   WEEKDAYS,
@@ -48,7 +48,7 @@ export function TaskForm({ task, onClose }: { task: Task; onClose: () => void })
   const projects = (useProjects().data ?? []).filter(
     (p) => p.status !== 'done' || p.id === task.project_id,
   );
-  const today = localToday();
+  const today = todayLocal();
   const active = useGoals('active', today).data ?? [];
   // A task of a done or dropped goal still shows that goal, by its title.
   const goals =

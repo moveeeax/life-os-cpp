@@ -12,6 +12,7 @@ import { onActivateKey } from '@/lib/a11y';
 import { usePagedQuery } from '@/hooks/usePagedQuery';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
+import { formatDateTime } from '@/lib/dates';
 import type { AuditEntry } from '@/lib/api/types';
 
 const PER_PAGE = 50;
@@ -25,11 +26,6 @@ interface Filters {
 }
 
 const EMPTY_FILTERS: Filters = { action: '', target_type: '', actor_id: '', from: '', to: '' };
-
-function formatTimestamp(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
-}
 
 /**
  * A <input type="datetime-local"> emits `YYYY-MM-DDTHH:mm` (no zone). The
@@ -74,7 +70,7 @@ export function AdminAuditPage() {
     {
       header: 'When',
       className: 'whitespace-nowrap',
-      cell: (e) => formatTimestamp(e.created_at),
+      cell: (e) => formatDateTime(e.created_at),
     },
     {
       header: 'Actor',
@@ -262,7 +258,7 @@ function AuditDetailModal({ entry, onClose }: { entry: AuditEntry; onClose: () =
                 {entry.action}
               </p>
               <p className="text-muted-foreground">
-                {formatTimestamp(entry.created_at)} · {entry.target_type}
+                {formatDateTime(entry.created_at)} · {entry.target_type}
                 {entry.target_id ? ` ${entry.target_id}` : ''}
               </p>
             </div>

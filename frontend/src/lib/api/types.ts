@@ -11,7 +11,7 @@
  * docs/openapi.yaml, so there are no hand-written envelope types left to
  * drift against the backend.
  */
-import type { components } from './schema.gen';
+import type { components, paths } from './schema.gen';
 
 type Schemas = components['schemas'];
 
@@ -65,3 +65,20 @@ export type AdjustResponse = Schemas['AdjustResponse'];
 export type BillingMetricsResponse = Schemas['BillingMetricsResponse'];
 /** A refund that took no credits back (outcome skipped_*), from the metrics. */
 export type SkippedRefund = BillingMetricsResponse['data']['refunds_skipped'][number];
+
+type Method = 'get' | 'post' | 'put' | 'patch' | 'delete';
+type JsonOf<T> = T extends { content: { 'application/json': infer J } } ? J : never;
+
+/**
+ * The JSON body of an operation's 200 (else 201) answer, read from the
+ * generated paths: for a response without a named schema, so a field renamed
+ * in docs/openapi.yaml breaks the build instead of reading undefined.
+ */
+export type ResponseOf<P extends keyof paths, M extends Method> =
+  paths[P] extends Record<M, { responses: infer R }>
+    ? 200 extends keyof R
+      ? JsonOf<R[200]>
+      : 201 extends keyof R
+        ? JsonOf<R[201]>
+        : never
+    : never;

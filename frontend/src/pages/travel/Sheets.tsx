@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import type { FormEvent } from 'react';
 
 import {
   useSaveContact,
@@ -32,36 +32,7 @@ import {
   type TravelTripItem,
   type TravelTripMoment,
 } from '@/lib/travel';
-import { Sheet } from '@/shell/kit';
-
-function Actions({
-  busy,
-  label,
-  onCancel,
-}: {
-  busy: boolean;
-  label: string;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="k-dlg-actions">
-      <button type="button" className="k-btn" onClick={onCancel}>
-        Cancel
-      </button>
-      <button type="submit" className="k-btn k-solid" disabled={busy}>
-        {busy ? 'Saving…' : label}
-      </button>
-    </div>
-  );
-}
-
-function ErrorLine({ error }: { error: string | null }) {
-  return error ? (
-    <p role="alert" className="k-error">
-      {error}
-    </p>
-  ) : null;
-}
+import { Sheet, SheetActions, SheetError, SheetForm, useFormFields } from '@/shell/kit';
 
 /** Record or edit a border crossing. */
 export function CrossingSheet({
@@ -73,7 +44,7 @@ export function CrossingSheet({
   initial?: Partial<{ date: string; from: string; to: string; time: string; place: string }>;
   onClose: () => void;
 }) {
-  const [f, setF] = useState({
+  const [f, set] = useFormFields({
     date: crossing?.date ?? initial?.date ?? '',
     from: crossing?.from_country ?? initial?.from ?? '',
     to: crossing?.to_country ?? initial?.to ?? '',
@@ -82,8 +53,6 @@ export function CrossingSheet({
     note: crossing?.note ?? '',
   });
   const save = useSaveCrossing(crossing?.id ?? null, onClose);
-  const set = (k: keyof typeof f) => (e: { target: { value: string } }) =>
-    setF({ ...f, [k]: e.target.value });
   const submit = (e: FormEvent) => {
     e.preventDefault();
     save.mutate(crossingBody(f));
@@ -123,8 +92,12 @@ export function CrossingSheet({
           <span>Note</span>
           <input maxLength={500} value={f.note} onChange={set('note')} />
         </label>
-        <ErrorLine error={save.error} />
-        <Actions busy={save.isPending} label={crossing ? 'Save' : 'Record'} onCancel={onClose} />
+        <SheetError error={save.error} />
+        <SheetActions
+          busy={save.isPending}
+          label={crossing ? 'Save' : 'Record'}
+          onCancel={onClose}
+        />
       </form>
     </Sheet>
   );
@@ -138,7 +111,7 @@ export function TripSheet({
   trip?: TravelTrip;
   onClose: (created?: TravelTrip) => void;
 }) {
-  const [f, setF] = useState<TripForm>({
+  const [f, set] = useFormFields<TripForm>({
     name: trip?.name ?? '',
     start_date: trip?.start_date ?? '',
     end_date: trip?.end_date ?? '',
@@ -149,14 +122,10 @@ export function TripSheet({
     booked_currency: trip?.booked_cost?.currency ?? '',
   });
   const save = useSaveTrip(trip?.id ?? null, (t) => onClose(t));
-  const set = (k: keyof TripForm) => (e: { target: { value: string } }) =>
-    setF({ ...f, [k]: e.target.value } as TripForm);
   return (
     <Sheet title={trip ? 'Edit the trip' : 'New trip'} onClose={() => onClose()} width={460}>
-      <form
-        className="k-form"
-        onSubmit={(e) => {
-          e.preventDefault();
+      <SheetForm
+        onSubmit={() => {
           save.mutate(tripBody(f));
         }}
       >
@@ -226,13 +195,13 @@ export function TripSheet({
             onChange={set('note')}
           />
         </label>
-        <ErrorLine error={save.error} />
-        <Actions
+        <SheetError error={save.error} />
+        <SheetActions
           busy={save.isPending}
           label={trip ? 'Save' : 'Create'}
           onCancel={() => onClose()}
         />
-      </form>
+      </SheetForm>
     </Sheet>
   );
 }
@@ -249,7 +218,7 @@ export function ItemSheet({
   date: string;
   onClose: () => void;
 }) {
-  const [f, setF] = useState<ItemForm>({
+  const [f, set, setF] = useFormFields<ItemForm>({
     kind: item?.kind ?? 'flight',
     date: item?.date ?? date,
     time: item?.time ?? '',
@@ -261,14 +230,10 @@ export function ItemSheet({
     end_date: item?.end_date ?? '',
   });
   const save = useSaveItem(tripId, item?.id ?? null, onClose);
-  const set = (k: keyof ItemForm) => (e: { target: { value: string } }) =>
-    setF({ ...f, [k]: e.target.value } as ItemForm);
   return (
     <Sheet title={item ? 'Edit the plan item' : 'Add to the plan'} onClose={onClose} width={460}>
-      <form
-        className="k-form"
-        onSubmit={(e) => {
-          e.preventDefault();
+      <SheetForm
+        onSubmit={() => {
           save.mutate(itemBody(f));
         }}
       >
@@ -329,9 +294,9 @@ export function ItemSheet({
             No border crossing for me: domestic, or I am not on this flight
           </label>
         )}
-        <ErrorLine error={save.error} />
-        <Actions busy={save.isPending} label={item ? 'Save' : 'Add'} onCancel={onClose} />
-      </form>
+        <SheetError error={save.error} />
+        <SheetActions busy={save.isPending} label={item ? 'Save' : 'Add'} onCancel={onClose} />
+      </SheetForm>
     </Sheet>
   );
 }
@@ -346,7 +311,7 @@ export function ContactSheet({
   contact?: TravelTripContact;
   onClose: () => void;
 }) {
-  const [f, setF] = useState<ContactForm>({
+  const [f, set] = useFormFields<ContactForm>({
     name: contact?.name ?? '',
     role: contact?.role ?? '',
     phone: contact?.phone ?? '',
@@ -355,14 +320,10 @@ export function ContactSheet({
     note: contact?.note ?? '',
   });
   const save = useSaveContact(tripId, contact?.id ?? null, onClose);
-  const set = (k: keyof ContactForm) => (e: { target: { value: string } }) =>
-    setF({ ...f, [k]: e.target.value });
   return (
     <Sheet title={contact ? 'Edit the contact' : 'Add a contact'} onClose={onClose} width={460}>
-      <form
-        className="k-form"
-        onSubmit={(e) => {
-          e.preventDefault();
+      <SheetForm
+        onSubmit={() => {
           save.mutate(contactBody(f));
         }}
       >
@@ -394,9 +355,9 @@ export function ContactSheet({
           <span>Note</span>
           <input maxLength={500} value={f.note} onChange={set('note')} />
         </label>
-        <ErrorLine error={save.error} />
-        <Actions busy={save.isPending} label={contact ? 'Save' : 'Add'} onCancel={onClose} />
-      </form>
+        <SheetError error={save.error} />
+        <SheetActions busy={save.isPending} label={contact ? 'Save' : 'Add'} onCancel={onClose} />
+      </SheetForm>
     </Sheet>
   );
 }
@@ -413,20 +374,16 @@ export function MomentSheet({
   date: string;
   onClose: () => void;
 }) {
-  const [f, setF] = useState<MomentForm>({
+  const [f, set] = useFormFields<MomentForm>({
     date: moment?.date ?? date,
     text: moment?.text ?? '',
     place: moment?.place ?? '',
   });
   const save = useSaveMoment(tripId, moment?.id ?? null, onClose);
-  const set = (k: keyof MomentForm) => (e: { target: { value: string } }) =>
-    setF({ ...f, [k]: e.target.value });
   return (
     <Sheet title={moment ? 'Edit the moment' : 'Add a moment'} onClose={onClose} width={460}>
-      <form
-        className="k-form"
-        onSubmit={(e) => {
-          e.preventDefault();
+      <SheetForm
+        onSubmit={() => {
           save.mutate(momentBody(f));
         }}
       >
@@ -450,16 +407,16 @@ export function MomentSheet({
             onChange={set('text')}
           />
         </label>
-        <ErrorLine error={save.error} />
-        <Actions busy={save.isPending} label={moment ? 'Save' : 'Add'} onCancel={onClose} />
-      </form>
+        <SheetError error={save.error} />
+        <SheetActions busy={save.isPending} label={moment ? 'Save' : 'Add'} onCancel={onClose} />
+      </SheetForm>
     </Sheet>
   );
 }
 
 /** Create or edit a day counter rule. */
 export function RuleSheet({ rule, onClose }: { rule?: TravelRule; onClose: () => void }) {
-  const [f, setF] = useState({
+  const [f, set, setF] = useFormFields({
     name: rule?.name ?? '',
     countries: (rule?.countries ?? []).join(', '),
     window_kind: rule?.window_kind ?? ('since_last_entry' as TravelRule['window_kind']),
@@ -470,14 +427,10 @@ export function RuleSheet({ rule, onClose }: { rule?: TravelRule; onClose: () =>
     source: rule?.source ?? '',
   });
   const save = useSaveRule(rule?.id ?? null, onClose);
-  const set = (k: keyof typeof f) => (e: { target: { value: string } }) =>
-    setF({ ...f, [k]: e.target.value } as typeof f);
   return (
     <Sheet title={rule ? 'Edit the rule' : 'New rule'} onClose={onClose} width={480}>
-      <form
-        className="k-form"
-        onSubmit={(e) => {
-          e.preventDefault();
+      <SheetForm
+        onSubmit={() => {
           save.mutate(ruleBody(f));
         }}
       >
@@ -552,9 +505,9 @@ export function RuleSheet({ rule, onClose }: { rule?: TravelRule; onClose: () =>
             onChange={set('source')}
           />
         </label>
-        <ErrorLine error={save.error} />
-        <Actions busy={save.isPending} label={rule ? 'Save' : 'Add'} onCancel={onClose} />
-      </form>
+        <SheetError error={save.error} />
+        <SheetActions busy={save.isPending} label={rule ? 'Save' : 'Add'} onCancel={onClose} />
+      </SheetForm>
     </Sheet>
   );
 }
@@ -567,7 +520,7 @@ export function DocumentSheet({
   document?: TravelDocument;
   onClose: () => void;
 }) {
-  const [f, setF] = useState({
+  const [f, set] = useFormFields({
     holder: document?.holder ?? '',
     kind: document?.kind ?? ('passport' as TravelDocument['kind']),
     number: document?.number ?? '',
@@ -575,14 +528,10 @@ export function DocumentSheet({
     note: document?.note ?? '',
   });
   const save = useSaveDocument(document?.id ?? null, onClose);
-  const set = (k: keyof typeof f) => (e: { target: { value: string } }) =>
-    setF({ ...f, [k]: e.target.value });
   return (
     <Sheet title={document ? 'Edit the document' : 'New document'} onClose={onClose} width={440}>
-      <form
-        className="k-form"
-        onSubmit={(e) => {
-          e.preventDefault();
+      <SheetForm
+        onSubmit={() => {
           save.mutate({
             holder: f.holder.trim(),
             kind: f.kind,
@@ -627,9 +576,9 @@ export function DocumentSheet({
           <span>Note</span>
           <input maxLength={500} value={f.note} onChange={set('note')} />
         </label>
-        <ErrorLine error={save.error} />
-        <Actions busy={save.isPending} label={document ? 'Save' : 'Add'} onCancel={onClose} />
-      </form>
+        <SheetError error={save.error} />
+        <SheetActions busy={save.isPending} label={document ? 'Save' : 'Add'} onCancel={onClose} />
+      </SheetForm>
     </Sheet>
   );
 }

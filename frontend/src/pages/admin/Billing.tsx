@@ -1,8 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
 
-import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DataTable, type Column } from '@/components/DataTable';
 import { Modal } from '@/components/Modal';
 import { PaginationFooter } from '@/components/PaginationFooter';
@@ -11,21 +9,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/toaster';
-import { useApiMutation } from '@/hooks/useApiMutation';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
+import {
+  useAdminPackages,
+  useAdminPayments,
+  useBillingSettings,
+  useCreatePackage,
+  useDeletePackage,
+  useSaveBillingSettings,
+  useUpdatePackage,
+  type PackageBody,
+} from '@/hooks/useAdminBilling';
 import { useErrorToast } from '@/hooks/useErrorToast';
-import { usePagedQuery } from '@/hooks/usePagedQuery';
-import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
-import type {
-  AdminPackageListResponse,
-  AdminPackageResponse,
-  AdminPaymentListResponse,
-  BillingPackage,
-  BillingSettings,
-  BillingSettingsResponse,
-  MessageResponse,
-  Payment,
-} from '@/lib/api/types';
+import type { BillingPackage, BillingSettings, Payment } from '@/lib/api/types';
 import { formatDateTime } from '@/lib/dates';
 import { dollarsToCents, formatCents } from '@/lib/money';
 import { AdjustDialog } from '@/pages/admin/billing/AdjustDialog';
@@ -137,31 +133,13 @@ interface PackageForm {
 function PackagesTab() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<BillingPackage | null>(null);
-  const [deleting, setDeleting] = useState<BillingPackage | null>(null);
+  const deleting = useConfirmDelete<BillingPackage>();
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: qk.admin.billing.packages(),
-    queryFn: () => api.getJson<AdminPackageListResponse>('/api/v1/admin/billing/packages'),
-  });
+  const { data, isLoading, error } = useAdminPackages();
 
-  const create = useApiMutation(
-    (form: PackageForm) =>
-      api.postJson<AdminPackageResponse>('/api/v1/admin/billing/packages', {
-        body: packageBody(form),
-      }),
-    { invalidate: [qk.admin.billing.packages()], onSuccess: () => setCreating(false) },
-  );
-  const update = useApiMutation(
-    (vars: { id: string; form: PackageForm }) =>
-      api.patchJson<AdminPackageResponse>(`/api/v1/admin/billing/packages/${vars.id}`, {
-        body: packageBody(vars.form),
-      }),
-    { invalidate: [qk.admin.billing.packages()], onSuccess: () => setEditing(null) },
-  );
-  const remove = useApiMutation(
-    (id: string) => api.deleteJson<MessageResponse>(`/api/v1/admin/billing/packages/${id}`),
-    { invalidate: [qk.admin.billing.packages()], onSuccess: () => setDeleting(null) },
-  );
+  const create = useCreatePackage(() => setCreating(false));
+  const update = useUpdatePackage(() => setEditing(null));
+  const remove = useDeletePackage(deleting.close);
   useErrorToast(create.error ?? update.error ?? remove.error);
 
   const columns: Column<BillingPackage>[] = [
@@ -194,7 +172,7 @@ function PackagesTab() {
           <Button size="sm" variant="ghost" onClick={() => setEditing(p)}>
             Edit
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setDeleting(p)}>
+          <Button size="sm" variant="ghost" onClick={() => deleting.ask(p)}>
             <span className="text-destructive">Delete</span>
           </Button>
         </>
@@ -226,7 +204,7 @@ function PackagesTab() {
             title="New package"
             submitting={create.isPending}
             initial={{ title: '', amount: '', credits: '', active: true, sort: '0' }}
-            onSubmit={(form) => create.mutate(form)}
+            onSubmit={(form) => create.mutate(packageBody(form))}
             onCancel={() => setCreating(false)}
           />
         </Modal>
@@ -243,27 +221,21 @@ function PackagesTab() {
               active: editing.active,
               sort: String(editing.sort),
             }}
-            onSubmit={(form) => update.mutate({ id: editing.id, form })}
+            onSubmit={(form) => update.mutate({ id: editing.id, body: packageBody(form) })}
             onCancel={() => setEditing(null)}
           />
         </Modal>
       )}
-      {deleting && (
-        <ConfirmDialog
-          title="Delete package"
-          description={`Delete "${deleting.title}"? This cannot be undone.`}
-          confirmLabel="Delete package"
-          destructive
-          busy={remove.isPending}
-          onConfirm={() => remove.mutate(deleting.id)}
-          onClose={() => setDeleting(null)}
-        />
-      )}
+      {deleting.dialog(remove, (d) => ({
+        title: 'Delete package',
+        description: `Delete "${d.title}"? This cannot be undone.`,
+        confirmLabel: 'Delete package',
+      }))}
     </div>
   );
 }
 
-function packageBody(form: PackageForm) {
+function packageBody(form: PackageForm): PackageBody {
   const amount_cents = dollarsToCents(form.amount) ?? 0;
   return {
     title: form.title.trim(),
@@ -380,14 +352,10 @@ function PackageFormCard({
 function PaymentsTab() {
   const [status, setStatus] = useState<'' | Payment['status']>('');
 
-  const { data, isLoading, error, isPlaceholderData, page, setPage, totalPages } = usePagedQuery({
-    queryKey: qk.admin.billing.payments(status),
-    queryFn: ({ limit, offset }) =>
-      api.getJson<AdminPaymentListResponse>('/api/v1/admin/billing/payments', {
-        query: { limit, offset, ...(status ? { status } : {}) },
-      }),
-    perPage: PER_PAGE,
-  });
+  const { data, isLoading, error, isPlaceholderData, page, setPage, totalPages } = useAdminPayments(
+    status,
+    PER_PAGE,
+  );
 
   const columns: Column<Payment>[] = [
     { header: 'ID', className: 'font-mono text-xs', cell: (p) => `${p.id.slice(0, 8)}…` },
@@ -465,19 +433,9 @@ function PaymentsTab() {
 
 function SettingsTab() {
   const toast = useToast();
-  const { data, isLoading, error } = useQuery({
-    queryKey: qk.admin.billing.settings(),
-    queryFn: () => api.getJson<BillingSettingsResponse>('/api/v1/admin/billing/settings'),
-  });
+  const { data, isLoading, error } = useBillingSettings();
 
-  const save = useApiMutation(
-    (body: { credits_per_unit: number; min_amount_cents: number; max_amount_cents: number }) =>
-      api.putJson<BillingSettingsResponse>('/api/v1/admin/billing/settings', { body }),
-    {
-      invalidate: [qk.admin.billing.settings()],
-      onSuccess: () => toast.success('Settings saved.'),
-    },
-  );
+  const save = useSaveBillingSettings(() => toast.success('Settings saved.'));
   useErrorToast(save.error);
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;

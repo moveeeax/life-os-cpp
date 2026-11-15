@@ -21,36 +21,7 @@ import {
   type PracticeDeal,
   type PracticeEntry,
 } from '@/lib/practice';
-import { Sheet } from '@/shell/kit';
-
-function Actions({
-  busy,
-  label,
-  onCancel,
-}: {
-  busy: boolean;
-  label: string;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="k-dlg-actions">
-      <button type="button" className="k-btn" onClick={onCancel}>
-        Cancel
-      </button>
-      <button type="submit" className="k-btn k-solid" disabled={busy}>
-        {busy ? 'Saving…' : label}
-      </button>
-    </div>
-  );
-}
-
-function ErrorLine({ error }: { error: string | null }) {
-  return error ? (
-    <p role="alert" className="k-error">
-      {error}
-    </p>
-  ) : null;
-}
+import { Sheet, SheetActions, SheetError, SheetForm, useFormFields } from '@/shell/kit';
 
 /** Add or edit a client. */
 export function ClientSheet({
@@ -60,20 +31,16 @@ export function ClientSheet({
   client?: PracticeClient;
   onClose: (saved?: PracticeClient) => void;
 }) {
-  const [f, setF] = useState({
+  const [f, set] = useFormFields({
     name: client?.name ?? '',
     contact: client?.contact ?? '',
     note: client?.note ?? '',
   });
   const save = useSaveClient(client?.id ?? null, (c) => onClose(c));
-  const set = (k: keyof typeof f) => (e: { target: { value: string } }) =>
-    setF({ ...f, [k]: e.target.value });
   return (
     <Sheet title={client ? 'Edit the client' : 'New client'} onClose={() => onClose()} width={440}>
-      <form
-        className="k-form"
-        onSubmit={(e) => {
-          e.preventDefault();
+      <SheetForm
+        onSubmit={() => {
           save.mutate({ name: f.name.trim(), contact: f.contact.trim(), note: f.note.trim() });
         }}
       >
@@ -100,9 +67,13 @@ export function ClientSheet({
           <span>Note</span>
           <textarea rows={3} maxLength={2000} value={f.note} onChange={set('note')} />
         </label>
-        <ErrorLine error={save.error} />
-        <Actions busy={save.isPending} label={client ? 'Save' : 'Add'} onCancel={() => onClose()} />
-      </form>
+        <SheetError error={save.error} />
+        <SheetActions
+          busy={save.isPending}
+          label={client ? 'Save' : 'Add'}
+          onCancel={() => onClose()}
+        />
+      </SheetForm>
     </Sheet>
   );
 }
@@ -118,7 +89,7 @@ export function DealSheet({
   onClose: () => void;
 }) {
   const clients = useClients().data ?? [];
-  const [f, setF] = useState<DealForm>({
+  const [f, set, setF] = useFormFields<DealForm>({
     client_id: deal?.client_id ?? clientId ?? '',
     title: deal?.title ?? '',
     stage: deal?.stage ?? 'lead',
@@ -130,8 +101,6 @@ export function DealSheet({
   });
   const [problem, setProblem] = useState<string | null>(null);
   const save = useSaveDeal(deal?.id ?? null, onClose);
-  const set = (k: keyof DealForm) => (e: { target: { value: string } }) =>
-    setF({ ...f, [k]: e.target.value });
   const client = f.client_id || clients[0]?.id || '';
   return (
     <Sheet title={deal ? 'Edit the deal' : 'New deal'} onClose={onClose} width={480}>
@@ -145,10 +114,8 @@ export function DealSheet({
           </div>
         </div>
       ) : (
-        <form
-          className="k-form"
-          onSubmit={(e) => {
-            e.preventDefault();
+        <SheetForm
+          onSubmit={() => {
             const out = dealBody({ ...f, client_id: client });
             if ('error' in out) {
               setProblem(out.error);
@@ -225,9 +192,9 @@ export function DealSheet({
             <span>Note</span>
             <textarea rows={3} maxLength={2000} value={f.note} onChange={set('note')} />
           </label>
-          <ErrorLine error={problem ?? save.error} />
-          <Actions busy={save.isPending} label={deal ? 'Save' : 'Add'} onCancel={onClose} />
-        </form>
+          <SheetError error={problem ?? save.error} />
+          <SheetActions busy={save.isPending} label={deal ? 'Save' : 'Add'} onCancel={onClose} />
+        </SheetForm>
       )}
     </Sheet>
   );
@@ -245,7 +212,7 @@ export function EntrySheet({
 }) {
   const clients = useClients().data ?? [];
   const deals = useDeals().data ?? [];
-  const [f, setF] = useState<EntryForm>({
+  const [f, set, setF] = useFormFields<EntryForm>({
     kind: entry?.kind ?? initial?.kind ?? 'income',
     date: entry?.date ?? initial?.date ?? todayLocal(),
     amount: entry ? String(entry.amount) : (initial?.amount ?? ''),
@@ -256,8 +223,6 @@ export function EntrySheet({
   });
   const [problem, setProblem] = useState<string | null>(null);
   const save = useSaveEntry(entry?.id ?? null, onClose);
-  const set = (k: keyof EntryForm) => (e: { target: { value: string } }) =>
-    setF({ ...f, [k]: e.target.value });
   // Open deals first; a closed deal stays pickable for a late payment.
   const pickable = [...deals].sort(
     (a, b) => Number(!OPEN_STAGES.includes(a.stage)) - Number(!OPEN_STAGES.includes(b.stage)),
@@ -271,10 +236,8 @@ export function EntrySheet({
       : 'New expense';
   return (
     <Sheet title={title} onClose={onClose} width={480}>
-      <form
-        className="k-form"
-        onSubmit={(e) => {
-          e.preventDefault();
+      <SheetForm
+        onSubmit={() => {
           const out = entryBody(f);
           if ('error' in out) {
             setProblem(out.error);
@@ -357,9 +320,9 @@ export function EntrySheet({
             onChange={set('note')}
           />
         </label>
-        <ErrorLine error={problem ?? save.error} />
-        <Actions busy={save.isPending} label={entry ? 'Save' : 'Add'} onCancel={onClose} />
-      </form>
+        <SheetError error={problem ?? save.error} />
+        <SheetActions busy={save.isPending} label={entry ? 'Save' : 'Add'} onCancel={onClose} />
+      </SheetForm>
     </Sheet>
   );
 }
@@ -371,10 +334,8 @@ export function NextStepSheet({ deal, onClose }: { deal: PracticeDeal; onClose: 
   const add = useAddNextStep(onClose);
   return (
     <Sheet title={`Next step for ${deal.title}`} onClose={onClose} width={440}>
-      <form
-        className="k-form"
-        onSubmit={(e) => {
-          e.preventDefault();
+      <SheetForm
+        onSubmit={() => {
           add.mutate({ title: title.trim(), area: 'projects', due: due || null, deal_id: deal.id });
         }}
       >
@@ -392,9 +353,9 @@ export function NextStepSheet({ deal, onClose }: { deal: PracticeDeal; onClose: 
           <span>Due</span>
           <input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
         </label>
-        <ErrorLine error={add.error} />
-        <Actions busy={add.isPending} label="Add" onCancel={onClose} />
-      </form>
+        <SheetError error={add.error} />
+        <SheetActions busy={add.isPending} label="Add" onCancel={onClose} />
+      </SheetForm>
     </Sheet>
   );
 }

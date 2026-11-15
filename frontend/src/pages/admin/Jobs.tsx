@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
 import { RotateCcw } from 'lucide-react';
 
 import { DataTable, type Column } from '@/components/DataTable';
@@ -8,13 +7,10 @@ import { PaginationFooter } from '@/components/PaginationFooter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { usePagedQuery } from '@/hooks/usePagedQuery';
-import { useApiMutation } from '@/hooks/useApiMutation';
+import { useAdminJobs, useJobsDlq, useRequeueJob } from '@/hooks/useAdminJobs';
 import { useErrorToast } from '@/hooks/useErrorToast';
 import { onActivateKey } from '@/lib/a11y';
-import { api } from '@/lib/api/client';
-import { qk } from '@/lib/api/queryKeys';
-import type { DlqListResponse, Job } from '@/lib/api/types';
+import type { Job } from '@/lib/api/types';
 
 const PER_PAGE = 20;
 
@@ -131,15 +127,10 @@ function JobsTab() {
   const [selected, setSelected] = useState<Job | null>(null);
   const toggle = (j: Job) => setSelected(selected?.id === j.id ? null : j);
 
-  const { data, isLoading, error, isPlaceholderData, page, setPage, totalPages } = usePagedQuery({
-    queryKey: qk.admin.jobs(typeFilter),
-    queryFn: ({ limit, offset }) =>
-      api.getJson('/api/v1/jobs', {
-        query: { limit, offset, ...(typeFilter ? { type: typeFilter } : {}) },
-      }),
-    perPage: PER_PAGE,
-    refetchInterval: 5000,
-  });
+  const { data, isLoading, error, isPlaceholderData, page, setPage, totalPages } = useAdminJobs(
+    typeFilter,
+    PER_PAGE,
+  );
 
   const columns: Column<Job>[] = [
     { header: 'ID', className: 'font-mono text-xs', cell: (j) => `${j.id.slice(0, 8)}…` },
@@ -290,22 +281,9 @@ function DetailJson({ label, value }: { label: string; value: unknown }) {
 }
 
 function DlqTab() {
-  const {
-    data,
-    isLoading,
-    error: loadError,
-  } = useQuery({
-    queryKey: qk.admin.jobsDlq(),
-    queryFn: () => api.getJson<DlqListResponse>('/api/v1/jobs/dlq?limit=100'),
-    refetchInterval: 5000,
-  });
+  const { data, isLoading, error: loadError } = useJobsDlq();
 
-  const requeue = useApiMutation(
-    (id: string) => api.postJson(`/api/v1/jobs/dlq/${id}/requeue`, { body: {} }),
-    // Refresh the DLQ so the requeued row disappears (preventing a double
-    // requeue); also bump the jobs list since the job is back in flight.
-    { invalidate: [qk.admin.jobsDlq(), qk.admin.jobs()] },
-  );
+  const requeue = useRequeueJob();
   useErrorToast(requeue.error);
 
   const columns: Column<Job>[] = [

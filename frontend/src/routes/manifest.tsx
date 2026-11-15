@@ -1,4 +1,4 @@
-import { lazy, type ReactElement } from 'react';
+import { lazy, type ComponentType, type ReactElement } from 'react';
 import { Navigate } from 'react-router';
 import { Shield, ScrollText } from 'lucide-react';
 
@@ -6,222 +6,137 @@ import { Permission } from '@/lib/auth/permissions';
 
 import { LoginRedirect, RootPage } from '@/pages/Root';
 
+/**
+ * React.lazy over a page's named export: lazy needs a module with a `default`
+ * export, so the factory maps the name. The import() stays a literal at each
+ * call site, so Vite still splits every page into its own chunk.
+ */
+function lazyPage<K extends string, M extends Record<K, ComponentType>>(
+  load: () => Promise<M>,
+  name: K,
+) {
+  return lazy(() => load().then((m) => ({ default: m[name] })));
+}
+
 // The account, sign-up and billing pages are code-split too: they carry zod
 // and react-hook-form, which a signed-in visit to a section never needs.
 // Layout wraps their Outlet in a <Suspense> boundary.
-const AboutPage = lazy(() => import('@/pages/About').then((m) => ({ default: m.AboutPage })));
-const PrivacyPage = lazy(() => import('@/pages/Privacy').then((m) => ({ default: m.PrivacyPage })));
-const RegisterPage = lazy(() =>
-  import('@/pages/Register').then((m) => ({ default: m.RegisterPage })),
+const AboutPage = lazyPage(() => import('@/pages/About'), 'AboutPage');
+const PrivacyPage = lazyPage(() => import('@/pages/Privacy'), 'PrivacyPage');
+const RegisterPage = lazyPage(() => import('@/pages/Register'), 'RegisterPage');
+const CheckEmailPage = lazyPage(() => import('@/pages/CheckEmail'), 'CheckEmailPage');
+const ConfirmEmailPage = lazyPage(() => import('@/pages/ConfirmEmail'), 'ConfirmEmailPage');
+const ConfirmChangeEmailPage = lazyPage(
+  () => import('@/pages/ConfirmChangeEmail'),
+  'ConfirmChangeEmailPage',
 );
-const CheckEmailPage = lazy(() =>
-  import('@/pages/CheckEmail').then((m) => ({ default: m.CheckEmailPage })),
-);
-const ConfirmEmailPage = lazy(() =>
-  import('@/pages/ConfirmEmail').then((m) => ({ default: m.ConfirmEmailPage })),
-);
-const ConfirmChangeEmailPage = lazy(() =>
-  import('@/pages/ConfirmChangeEmail').then((m) => ({ default: m.ConfirmChangeEmailPage })),
-);
-const UnconfirmedPage = lazy(() =>
-  import('@/pages/Unconfirmed').then((m) => ({ default: m.UnconfirmedPage })),
-);
-const ProfilePage = lazy(() => import('@/pages/Profile').then((m) => ({ default: m.ProfilePage })));
-const ChangePasswordPage = lazy(() =>
-  import('@/pages/ChangePassword').then((m) => ({ default: m.ChangePasswordPage })),
-);
-const ChangeEmailPage = lazy(() =>
-  import('@/pages/ChangeEmail').then((m) => ({ default: m.ChangeEmailPage })),
-);
-const RequestResetPage = lazy(() =>
-  import('@/pages/RequestReset').then((m) => ({ default: m.RequestResetPage })),
-);
-const ResetPasswordPage = lazy(() =>
-  import('@/pages/ResetPassword').then((m) => ({ default: m.ResetPasswordPage })),
-);
-const JoinFromInvitePage = lazy(() =>
-  import('@/pages/JoinFromInvite').then((m) => ({ default: m.JoinFromInvitePage })),
-);
-const BillingPage = lazy(() => import('@/pages/Billing').then((m) => ({ default: m.BillingPage })));
-const BillingReturnPage = lazy(() =>
-  import('@/pages/BillingReturn').then((m) => ({ default: m.BillingReturnPage })),
-);
-const BillingCancelPage = lazy(() =>
-  import('@/pages/BillingCancel').then((m) => ({ default: m.BillingCancelPage })),
-);
+const UnconfirmedPage = lazyPage(() => import('@/pages/Unconfirmed'), 'UnconfirmedPage');
+const ProfilePage = lazyPage(() => import('@/pages/Profile'), 'ProfilePage');
+const ChangePasswordPage = lazyPage(() => import('@/pages/ChangePassword'), 'ChangePasswordPage');
+const ChangeEmailPage = lazyPage(() => import('@/pages/ChangeEmail'), 'ChangeEmailPage');
+const RequestResetPage = lazyPage(() => import('@/pages/RequestReset'), 'RequestResetPage');
+const ResetPasswordPage = lazyPage(() => import('@/pages/ResetPassword'), 'ResetPasswordPage');
+const JoinFromInvitePage = lazyPage(() => import('@/pages/JoinFromInvite'), 'JoinFromInvitePage');
+const BillingPage = lazyPage(() => import('@/pages/Billing'), 'BillingPage');
+const BillingReturnPage = lazyPage(() => import('@/pages/BillingReturn'), 'BillingReturnPage');
+const BillingCancelPage = lazyPage(() => import('@/pages/BillingCancel'), 'BillingCancelPage');
 
 // Admin pages are code-split: a logged-out visitor on /login should not pull
-// the whole admin bundle. React.lazy needs a module with a `default` export,
-// so each factory maps the page's named export. App.tsx wraps these routes in
-// a <Suspense> boundary. (named → default shim kept inline to avoid per-page
-// barrel files.)
+// the whole admin bundle. lazyPage maps each page's named export to the
+// `default` React.lazy needs, without per-page barrel files. App.tsx wraps
+// these routes in a <Suspense> boundary.
 // The Health section pulls in the chart library; keep it out of the sign-in bundle.
-const HealthPage = lazy(() => import('@/pages/Health').then((m) => ({ default: m.HealthPage })));
-const WorkoutHomePage = lazy(() =>
-  import('@/pages/workout/Home').then((m) => ({ default: m.WorkoutHomePage })),
+const HealthPage = lazyPage(() => import('@/pages/Health'), 'HealthPage');
+const WorkoutHomePage = lazyPage(() => import('@/pages/workout/Home'), 'WorkoutHomePage');
+const WorkoutSessionPage = lazyPage(() => import('@/pages/workout/Session'), 'WorkoutSessionPage');
+const WorkoutHistoryPage = lazyPage(() => import('@/pages/workout/History'), 'WorkoutHistoryPage');
+const WorkoutHistoryDetailPage = lazyPage(
+  () => import('@/pages/workout/HistoryDetail'),
+  'WorkoutHistoryDetailPage',
 );
-const WorkoutSessionPage = lazy(() =>
-  import('@/pages/workout/Session').then((m) => ({ default: m.WorkoutSessionPage })),
+const WorkoutExercisesPage = lazyPage(
+  () => import('@/pages/workout/Exercises'),
+  'WorkoutExercisesPage',
 );
-const WorkoutHistoryPage = lazy(() =>
-  import('@/pages/workout/History').then((m) => ({ default: m.WorkoutHistoryPage })),
+const WorkoutRoutinesPage = lazyPage(
+  () => import('@/pages/workout/Routines'),
+  'WorkoutRoutinesPage',
 );
-const WorkoutHistoryDetailPage = lazy(() =>
-  import('@/pages/workout/HistoryDetail').then((m) => ({ default: m.WorkoutHistoryDetailPage })),
+const WorkoutRoutineEditorPage = lazyPage(
+  () => import('@/pages/workout/RoutineEditor'),
+  'WorkoutRoutineEditorPage',
 );
-const WorkoutExercisesPage = lazy(() =>
-  import('@/pages/workout/Exercises').then((m) => ({ default: m.WorkoutExercisesPage })),
+const FoodDayPage = lazyPage(() => import('@/pages/food/Day'), 'FoodDayPage');
+const FoodWeekPage = lazyPage(() => import('@/pages/food/Week'), 'FoodWeekPage');
+const FoodItemsPage = lazyPage(() => import('@/pages/food/Items'), 'FoodItemsPage');
+const FoodGoalsPage = lazyPage(() => import('@/pages/food/Goals'), 'FoodGoalsPage');
+const MoneyLedgerPage = lazyPage(() => import('@/pages/money/Ledger'), 'MoneyLedgerPage');
+const MoneySummaryPage = lazyPage(() => import('@/pages/money/Summary'), 'MoneySummaryPage');
+const MoneyAccountsPage = lazyPage(() => import('@/pages/money/Accounts'), 'MoneyAccountsPage');
+const MoneyCategoriesPage = lazyPage(
+  () => import('@/pages/money/Categories'),
+  'MoneyCategoriesPage',
 );
-const WorkoutRoutinesPage = lazy(() =>
-  import('@/pages/workout/Routines').then((m) => ({ default: m.WorkoutRoutinesPage })),
+const MoneyCurrenciesPage = lazyPage(
+  () => import('@/pages/money/Currencies'),
+  'MoneyCurrenciesPage',
 );
-const WorkoutRoutineEditorPage = lazy(() =>
-  import('@/pages/workout/RoutineEditor').then((m) => ({ default: m.WorkoutRoutineEditorPage })),
+const MoneyReportsPage = lazyPage(() => import('@/pages/money/Reports'), 'MoneyReportsPage');
+const MoneyAdvisorPage = lazyPage(() => import('@/pages/money/Advisor'), 'MoneyAdvisorPage');
+const TasksTodayPage = lazyPage(() => import('@/pages/tasks/Today'), 'TasksTodayPage');
+const TasksLaterPage = lazyPage(() => import('@/pages/tasks/Later'), 'TasksLaterPage');
+const TasksInboxPage = lazyPage(() => import('@/pages/tasks/Inbox'), 'TasksInboxPage');
+const TasksProjectsPage = lazyPage(() => import('@/pages/tasks/Projects'), 'TasksProjectsPage');
+const TasksProjectPage = lazyPage(() => import('@/pages/tasks/Project'), 'TasksProjectPage');
+const NowPage = lazyPage(() => import('@/pages/now/Now'), 'NowPage');
+const GoalsPage = lazyPage(() => import('@/pages/goals/Goals'), 'GoalsPage');
+const HabitsTodayPage = lazyPage(() => import('@/pages/habits/Today'), 'HabitsTodayPage');
+const HabitsWeekPage = lazyPage(() => import('@/pages/habits/Week'), 'HabitsWeekPage');
+const TravelTripsPage = lazyPage(() => import('@/pages/travel/Trips'), 'TravelTripsPage');
+const TravelDaysPage = lazyPage(() => import('@/pages/travel/Days'), 'TravelDaysPage');
+const LearningPage = lazyPage(() => import('@/pages/learning/List'), 'LearningPage');
+const LearningCoursePage = lazyPage(() => import('@/pages/learning/Course'), 'LearningCoursePage');
+const NotesPage = lazyPage(() => import('@/pages/notes/List'), 'NotesPage');
+const NoteEditorPage = lazyPage(() => import('@/pages/notes/Editor'), 'NoteEditorPage');
+const PracticeDealsPage = lazyPage(() => import('@/pages/practice/Deals'), 'PracticeDealsPage');
+const PracticeMoneyPage = lazyPage(() => import('@/pages/practice/Money'), 'PracticeMoneyPage');
+const PracticeMonthsPage = lazyPage(() => import('@/pages/practice/Months'), 'PracticeMonthsPage');
+const PracticeMonthPage = lazyPage(() => import('@/pages/practice/Month'), 'PracticeMonthPage');
+const PracticeClientsPage = lazyPage(
+  () => import('@/pages/practice/Clients'),
+  'PracticeClientsPage',
 );
-const FoodDayPage = lazy(() =>
-  import('@/pages/food/Day').then((m) => ({ default: m.FoodDayPage })),
+const GithubAttentionPage = lazyPage(() => import('@/pages/github/List'), 'GithubAttentionPage');
+const GithubAllPage = lazyPage(() => import('@/pages/github/List'), 'GithubAllPage');
+const GithubArchivedPage = lazyPage(() => import('@/pages/github/List'), 'GithubArchivedPage');
+const TravelRulesPage = lazyPage(() => import('@/pages/travel/Rules'), 'TravelRulesPage');
+const TravelDocumentsPage = lazyPage(
+  () => import('@/pages/travel/Documents'),
+  'TravelDocumentsPage',
 );
-const FoodWeekPage = lazy(() =>
-  import('@/pages/food/Week').then((m) => ({ default: m.FoodWeekPage })),
+const MedicalRecordsPage = lazyPage(() => import('@/pages/medical/Records'), 'MedicalRecordsPage');
+const MedicalVisitsPage = lazyPage(() => import('@/pages/medical/Visits'), 'MedicalVisitsPage');
+const MedicalMedicinesPage = lazyPage(
+  () => import('@/pages/medical/Medicines'),
+  'MedicalMedicinesPage',
 );
-const FoodItemsPage = lazy(() =>
-  import('@/pages/food/Items').then((m) => ({ default: m.FoodItemsPage })),
+const MedicalFamilyPage = lazyPage(() => import('@/pages/medical/Family'), 'MedicalFamilyPage');
+const TravelTripPage = lazyPage(() => import('@/pages/travel/Trip'), 'TravelTripPage');
+const AdminDashboardPage = lazyPage(() => import('@/pages/admin/Dashboard'), 'AdminDashboardPage');
+const AdminUsersPage = lazyPage(() => import('@/pages/admin/Users'), 'AdminUsersPage');
+const AdminUserDetailPage = lazyPage(
+  () => import('@/pages/admin/UserDetail'),
+  'AdminUserDetailPage',
 );
-const FoodGoalsPage = lazy(() =>
-  import('@/pages/food/Goals').then((m) => ({ default: m.FoodGoalsPage })),
+const AdminInviteUserPage = lazyPage(
+  () => import('@/pages/admin/InviteUser'),
+  'AdminInviteUserPage',
 );
-const MoneyLedgerPage = lazy(() =>
-  import('@/pages/money/Ledger').then((m) => ({ default: m.MoneyLedgerPage })),
-);
-const MoneySummaryPage = lazy(() =>
-  import('@/pages/money/Summary').then((m) => ({ default: m.MoneySummaryPage })),
-);
-const MoneyAccountsPage = lazy(() =>
-  import('@/pages/money/Accounts').then((m) => ({ default: m.MoneyAccountsPage })),
-);
-const MoneyCategoriesPage = lazy(() =>
-  import('@/pages/money/Categories').then((m) => ({ default: m.MoneyCategoriesPage })),
-);
-const MoneyCurrenciesPage = lazy(() =>
-  import('@/pages/money/Currencies').then((m) => ({ default: m.MoneyCurrenciesPage })),
-);
-const MoneyReportsPage = lazy(() =>
-  import('@/pages/money/Reports').then((m) => ({ default: m.MoneyReportsPage })),
-);
-const MoneyAdvisorPage = lazy(() =>
-  import('@/pages/money/Advisor').then((m) => ({ default: m.MoneyAdvisorPage })),
-);
-const TasksTodayPage = lazy(() =>
-  import('@/pages/tasks/Today').then((m) => ({ default: m.TasksTodayPage })),
-);
-const TasksLaterPage = lazy(() =>
-  import('@/pages/tasks/Later').then((m) => ({ default: m.TasksLaterPage })),
-);
-const TasksInboxPage = lazy(() =>
-  import('@/pages/tasks/Inbox').then((m) => ({ default: m.TasksInboxPage })),
-);
-const TasksProjectsPage = lazy(() =>
-  import('@/pages/tasks/Projects').then((m) => ({ default: m.TasksProjectsPage })),
-);
-const TasksProjectPage = lazy(() =>
-  import('@/pages/tasks/Project').then((m) => ({ default: m.TasksProjectPage })),
-);
-const NowPage = lazy(() => import('@/pages/now/Now').then((m) => ({ default: m.NowPage })));
-const GoalsPage = lazy(() => import('@/pages/goals/Goals').then((m) => ({ default: m.GoalsPage })));
-const HabitsTodayPage = lazy(() =>
-  import('@/pages/habits/Today').then((m) => ({ default: m.HabitsTodayPage })),
-);
-const HabitsWeekPage = lazy(() =>
-  import('@/pages/habits/Week').then((m) => ({ default: m.HabitsWeekPage })),
-);
-const TravelTripsPage = lazy(() =>
-  import('@/pages/travel/Trips').then((m) => ({ default: m.TravelTripsPage })),
-);
-const TravelDaysPage = lazy(() =>
-  import('@/pages/travel/Days').then((m) => ({ default: m.TravelDaysPage })),
-);
-const LearningPage = lazy(() =>
-  import('@/pages/learning/List').then((m) => ({ default: m.LearningPage })),
-);
-const LearningCoursePage = lazy(() =>
-  import('@/pages/learning/Course').then((m) => ({ default: m.LearningCoursePage })),
-);
-const NotesPage = lazy(() => import('@/pages/notes/List').then((m) => ({ default: m.NotesPage })));
-const NoteEditorPage = lazy(() =>
-  import('@/pages/notes/Editor').then((m) => ({ default: m.NoteEditorPage })),
-);
-const PracticeDealsPage = lazy(() =>
-  import('@/pages/practice/Deals').then((m) => ({ default: m.PracticeDealsPage })),
-);
-const PracticeMoneyPage = lazy(() =>
-  import('@/pages/practice/Money').then((m) => ({ default: m.PracticeMoneyPage })),
-);
-const PracticeMonthsPage = lazy(() =>
-  import('@/pages/practice/Months').then((m) => ({ default: m.PracticeMonthsPage })),
-);
-const PracticeMonthPage = lazy(() =>
-  import('@/pages/practice/Month').then((m) => ({ default: m.PracticeMonthPage })),
-);
-const PracticeClientsPage = lazy(() =>
-  import('@/pages/practice/Clients').then((m) => ({ default: m.PracticeClientsPage })),
-);
-const GithubAttentionPage = lazy(() =>
-  import('@/pages/github/List').then((m) => ({ default: m.GithubAttentionPage })),
-);
-const GithubAllPage = lazy(() =>
-  import('@/pages/github/List').then((m) => ({ default: m.GithubAllPage })),
-);
-const GithubArchivedPage = lazy(() =>
-  import('@/pages/github/List').then((m) => ({ default: m.GithubArchivedPage })),
-);
-const TravelRulesPage = lazy(() =>
-  import('@/pages/travel/Rules').then((m) => ({ default: m.TravelRulesPage })),
-);
-const TravelDocumentsPage = lazy(() =>
-  import('@/pages/travel/Documents').then((m) => ({ default: m.TravelDocumentsPage })),
-);
-const MedicalRecordsPage = lazy(() =>
-  import('@/pages/medical/Records').then((m) => ({ default: m.MedicalRecordsPage })),
-);
-const MedicalVisitsPage = lazy(() =>
-  import('@/pages/medical/Visits').then((m) => ({ default: m.MedicalVisitsPage })),
-);
-const MedicalMedicinesPage = lazy(() =>
-  import('@/pages/medical/Medicines').then((m) => ({ default: m.MedicalMedicinesPage })),
-);
-const MedicalFamilyPage = lazy(() =>
-  import('@/pages/medical/Family').then((m) => ({ default: m.MedicalFamilyPage })),
-);
-const TravelTripPage = lazy(() =>
-  import('@/pages/travel/Trip').then((m) => ({ default: m.TravelTripPage })),
-);
-const AdminDashboardPage = lazy(() =>
-  import('@/pages/admin/Dashboard').then((m) => ({ default: m.AdminDashboardPage })),
-);
-const AdminUsersPage = lazy(() =>
-  import('@/pages/admin/Users').then((m) => ({ default: m.AdminUsersPage })),
-);
-const AdminUserDetailPage = lazy(() =>
-  import('@/pages/admin/UserDetail').then((m) => ({ default: m.AdminUserDetailPage })),
-);
-const AdminInviteUserPage = lazy(() =>
-  import('@/pages/admin/InviteUser').then((m) => ({ default: m.AdminInviteUserPage })),
-);
-const AdminRolesPage = lazy(() =>
-  import('@/pages/admin/Roles').then((m) => ({ default: m.AdminRolesPage })),
-);
-const AdminJobsPage = lazy(() =>
-  import('@/pages/admin/Jobs').then((m) => ({ default: m.AdminJobsPage })),
-);
-const AdminAuditPage = lazy(() =>
-  import('@/pages/admin/Audit').then((m) => ({ default: m.AdminAuditPage })),
-);
-const AdminLibraryPage = lazy(() =>
-  import('@/pages/admin/Library').then((m) => ({ default: m.AdminLibraryPage })),
-);
-const AdminBillingPage = lazy(() =>
-  import('@/pages/admin/Billing').then((m) => ({ default: m.AdminBillingPage })),
-);
+const AdminRolesPage = lazyPage(() => import('@/pages/admin/Roles'), 'AdminRolesPage');
+const AdminJobsPage = lazyPage(() => import('@/pages/admin/Jobs'), 'AdminJobsPage');
+const AdminAuditPage = lazyPage(() => import('@/pages/admin/Audit'), 'AdminAuditPage');
+const AdminLibraryPage = lazyPage(() => import('@/pages/admin/Library'), 'AdminLibraryPage');
+const AdminBillingPage = lazyPage(() => import('@/pages/admin/Billing'), 'AdminBillingPage');
 
 /**
  * Single routes manifest — THE source of truth for both:
@@ -269,6 +184,14 @@ export interface RouteEntry {
    */
   layout?: RouteLayout;
 }
+
+/** A dashboard section: signed in and confirmed, in the glass shell. */
+const shell = (path: string, element: ReactElement): RouteEntry => ({
+  path,
+  element,
+  guard: 'confirmed',
+  layout: 'shell',
+});
 
 export const routes: RouteEntry[] = [
   // ── Public ────────────────────────────────────────────────────────────
@@ -321,171 +244,76 @@ export const routes: RouteEntry[] = [
   // a "no access" card: the guards' permission fallback is `/`, which would
   // bounce a signed-in user straight back here.
   // Now: the landing screen of the glass shell (DASHBOARD_HOME).
-  { path: '/now', element: <NowPage />, guard: 'confirmed', layout: 'shell' },
-  { path: '/health', element: <HealthPage />, guard: 'confirmed', layout: 'shell' },
+  shell('/now', <NowPage />),
+  shell('/health', <HealthPage />),
   // The medical archive: tabs of Body; the medical module switch is the only gate.
-  {
-    path: '/health/records',
-    element: <MedicalRecordsPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
-  { path: '/health/visits', element: <MedicalVisitsPage />, guard: 'confirmed', layout: 'shell' },
-  {
-    path: '/health/medicines',
-    element: <MedicalMedicinesPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
-  { path: '/health/family', element: <MedicalFamilyPage />, guard: 'confirmed', layout: 'shell' },
-  { path: '/workout', element: <WorkoutHomePage />, guard: 'confirmed', layout: 'shell' },
-  {
-    path: '/workout/session',
-    element: <WorkoutSessionPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
-  {
-    path: '/workout/history',
-    element: <WorkoutHistoryPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
-  {
-    path: '/workout/history/:id',
-    element: <WorkoutHistoryDetailPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
-  {
-    path: '/workout/exercises',
-    element: <WorkoutExercisesPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
-  {
-    path: '/workout/routines',
-    element: <WorkoutRoutinesPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
+  shell('/health/records', <MedicalRecordsPage />),
+  shell('/health/visits', <MedicalVisitsPage />),
+  shell('/health/medicines', <MedicalMedicinesPage />),
+  shell('/health/family', <MedicalFamilyPage />),
+  shell('/workout', <WorkoutHomePage />),
+  shell('/workout/session', <WorkoutSessionPage />),
+  shell('/workout/history', <WorkoutHistoryPage />),
+  shell('/workout/history/:id', <WorkoutHistoryDetailPage />),
+  shell('/workout/exercises', <WorkoutExercisesPage />),
+  shell('/workout/routines', <WorkoutRoutinesPage />),
   // `new` is a reserved id: the editor makes a fresh one and creates on save.
-  {
-    path: '/workout/routines/:id',
-    element: <WorkoutRoutineEditorPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
+  shell('/workout/routines/:id', <WorkoutRoutineEditorPage />),
 
   // ── Food — any confirmed user; the module switch is the only gate ────────
-  { path: '/food', element: <FoodDayPage />, guard: 'confirmed', layout: 'shell' },
-  { path: '/food/week', element: <FoodWeekPage />, guard: 'confirmed', layout: 'shell' },
-  { path: '/food/items', element: <FoodItemsPage />, guard: 'confirmed', layout: 'shell' },
-  { path: '/food/goals', element: <FoodGoalsPage />, guard: 'confirmed', layout: 'shell' },
+  shell('/food', <FoodDayPage />),
+  shell('/food/week', <FoodWeekPage />),
+  shell('/food/items', <FoodItemsPage />),
+  shell('/food/goals', <FoodGoalsPage />),
 
   // ── Money — any confirmed user; the module switch is the only gate ───────
-  { path: '/money', element: <MoneyLedgerPage />, guard: 'confirmed', layout: 'shell' },
-  { path: '/money/summary', element: <MoneySummaryPage />, guard: 'confirmed', layout: 'shell' },
-  { path: '/money/accounts', element: <MoneyAccountsPage />, guard: 'confirmed', layout: 'shell' },
-  {
-    path: '/money/categories',
-    element: <MoneyCategoriesPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
-  {
-    path: '/money/currencies',
-    element: <MoneyCurrenciesPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
-  { path: '/money/reports', element: <MoneyReportsPage />, guard: 'confirmed', layout: 'shell' },
-  { path: '/money/advisor', element: <MoneyAdvisorPage />, guard: 'confirmed', layout: 'shell' },
+  shell('/money', <MoneyLedgerPage />),
+  shell('/money/summary', <MoneySummaryPage />),
+  shell('/money/accounts', <MoneyAccountsPage />),
+  shell('/money/categories', <MoneyCategoriesPage />),
+  shell('/money/currencies', <MoneyCurrenciesPage />),
+  shell('/money/reports', <MoneyReportsPage />),
+  shell('/money/advisor', <MoneyAdvisorPage />),
 
   // ── Tasks — any confirmed user; the module switch is the only gate ───────
-  { path: '/tasks', element: <TasksTodayPage />, guard: 'confirmed', layout: 'shell' },
-  { path: '/tasks/later', element: <TasksLaterPage />, guard: 'confirmed', layout: 'shell' },
-  { path: '/tasks/inbox', element: <TasksInboxPage />, guard: 'confirmed', layout: 'shell' },
-  {
-    path: '/tasks/projects',
-    element: <TasksProjectsPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
-  {
-    path: '/tasks/projects/:id',
-    element: <TasksProjectPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
+  shell('/tasks', <TasksTodayPage />),
+  shell('/tasks/later', <TasksLaterPage />),
+  shell('/tasks/inbox', <TasksInboxPage />),
+  shell('/tasks/projects', <TasksProjectsPage />),
+  shell('/tasks/projects/:id', <TasksProjectPage />),
 
   // ── Goals — any confirmed user; the module switch is the only gate ───────
-  { path: '/goals', element: <GoalsPage />, guard: 'confirmed', layout: 'shell' },
+  shell('/goals', <GoalsPage />),
 
   // ── Habits — any confirmed user; the module switch is the only gate ──────
-  { path: '/habits', element: <HabitsTodayPage />, guard: 'confirmed', layout: 'shell' },
-  { path: '/habits/week', element: <HabitsWeekPage />, guard: 'confirmed', layout: 'shell' },
+  shell('/habits', <HabitsTodayPage />),
+  shell('/habits/week', <HabitsWeekPage />),
   // ── Learning — courses are projects of Tasks; the tasks switch gates it ──
-  { path: '/learning', element: <LearningPage />, guard: 'confirmed', layout: 'shell' },
-  {
-    path: '/learning/:id',
-    element: <LearningCoursePage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
+  shell('/learning', <LearningPage />),
+  shell('/learning/:id', <LearningCoursePage />),
 
   // ── Notes — any confirmed user; the module switch is the only gate ───────
-  { path: '/notes', element: <NotesPage />, guard: 'confirmed', layout: 'shell' },
-  { path: '/notes/:id', element: <NoteEditorPage />, guard: 'confirmed', layout: 'shell' },
+  shell('/notes', <NotesPage />),
+  shell('/notes/:id', <NoteEditorPage />),
 
   // ── Practice — any confirmed user; the module switch is the only gate ────
-  { path: '/practice', element: <PracticeDealsPage />, guard: 'confirmed', layout: 'shell' },
-  {
-    path: '/practice/money',
-    element: <PracticeMoneyPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
-  {
-    path: '/practice/months',
-    element: <PracticeMonthsPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
-  {
-    path: '/practice/months/:month',
-    element: <PracticeMonthPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
-  {
-    path: '/practice/clients',
-    element: <PracticeClientsPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
+  shell('/practice', <PracticeDealsPage />),
+  shell('/practice/money', <PracticeMoneyPage />),
+  shell('/practice/months', <PracticeMonthsPage />),
+  shell('/practice/months/:month', <PracticeMonthPage />),
+  shell('/practice/clients', <PracticeClientsPage />),
 
   // ── GitHub — any confirmed user; the module switch is the only gate ──────
-  { path: '/github', element: <GithubAttentionPage />, guard: 'confirmed', layout: 'shell' },
-  { path: '/github/all', element: <GithubAllPage />, guard: 'confirmed', layout: 'shell' },
-  {
-    path: '/github/archived',
-    element: <GithubArchivedPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
+  shell('/github', <GithubAttentionPage />),
+  shell('/github/all', <GithubAllPage />),
+  shell('/github/archived', <GithubArchivedPage />),
 
   // ── Travel — any confirmed user; the module switch is the only gate ──────
-  { path: '/travel', element: <TravelTripsPage />, guard: 'confirmed', layout: 'shell' },
-  { path: '/travel/days', element: <TravelDaysPage />, guard: 'confirmed', layout: 'shell' },
-  { path: '/travel/rules', element: <TravelRulesPage />, guard: 'confirmed', layout: 'shell' },
-  {
-    path: '/travel/documents',
-    element: <TravelDocumentsPage />,
-    guard: 'confirmed',
-    layout: 'shell',
-  },
-  { path: '/travel/trips/:id', element: <TravelTripPage />, guard: 'confirmed', layout: 'shell' },
+  shell('/travel', <TravelTripsPage />),
+  shell('/travel/days', <TravelDaysPage />),
+  shell('/travel/rules', <TravelRulesPage />),
+  shell('/travel/documents', <TravelDocumentsPage />),
+  shell('/travel/trips/:id', <TravelTripPage />),
 
   // ── Admin — gated by Permission.Administer (0x40000000 sentinel) ────────
   {

@@ -123,3 +123,8 @@ export function formatDateTime(iso: string): string {
     return iso;
   }
 }
+
+/** "Oct 3" for a day of the year of @p today, "Oct 3, 2025" otherwise. */
+export function shortDay(iso: string, today: string): string {
+  return formatDay(iso, { yearUnless: today });
+}

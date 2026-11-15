@@ -10,6 +10,7 @@ import {
   minutesIn,
   mondayOf,
   shiftDays,
+  shortDay,
   todayLocal,
 } from './dates';
 
@@ -157,5 +158,12 @@ describe('minutesIn and hhmm', () => {
     expect(shiftDays('2026-10-28', 1)).toBe('2026-10-29');
     expect(shiftDays('2026-10-31', 1)).toBe('2026-11-01');
     expect(shiftDays('2026-12-31', 1)).toBe('2027-01-01');
+  });
+});
+
+describe('shortDay', () => {
+  it('adds the year only outside the year of today', () => {
+    expect(shortDay('2026-10-03', '2026-11-15')).toBe('Oct 3');
+    expect(shortDay('2025-10-03', '2026-11-15')).toBe('Oct 3, 2025');
   });
 });

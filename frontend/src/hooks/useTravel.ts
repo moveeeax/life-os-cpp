@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { listQuery, useDeleteEntity, useSaveEntity } from '@/hooks/crud';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
 import { NOW_DIGEST, qk } from '@/lib/api/queryKeys';
+import type { ResponseOf } from '@/lib/api/types';
 import type { Task } from '@/lib/tasks';
 import type {
   TravelCounter,
@@ -33,8 +35,11 @@ export function useTravelSettings() {
   return useQuery({
     queryKey: qk.travel.settings(),
     queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: { home_country: string | null } }>(`${BASE}/settings`, { signal }))
-        .data,
+      (
+        await api.getJson<ResponseOf<'/api/v1/travel/settings', 'get'>>(`${BASE}/settings`, {
+          signal,
+        })
+      ).data,
   });
 }
 
@@ -83,38 +88,25 @@ export function useRecentCrossings(enabled = true) {
 }
 
 export function useSaveCrossing(id: string | null, onSuccess?: () => void) {
-  return useApiMutation(
-    async (body: TravelCrossingInput) =>
-      id
-        ? (await api.patchJson<{ data: TravelCrossing }>(`${BASE}/crossings/${id}`, { body })).data
-        : (await api.postJson<{ data: TravelCrossing }>(`${BASE}/crossings`, { body })).data,
-    { invalidate: TRAVEL_WRITES, onSuccess },
-  );
-}
-
-export function useDeleteCrossing(onSuccess?: () => void) {
-  return useApiMutation((id: string) => api.deleteJson<unknown>(`${BASE}/crossings/${id}`), {
+  return useSaveEntity<TravelCrossingInput, TravelCrossing>(`${BASE}/crossings`, id, {
     invalidate: TRAVEL_WRITES,
     onSuccess,
   });
 }
 
+export function useDeleteCrossing(onSuccess?: () => void) {
+  return useDeleteEntity(`${BASE}/crossings`, { invalidate: TRAVEL_WRITES, onSuccess });
+}
+
 export function useRules() {
-  return useQuery({
-    queryKey: qk.travel.rules(),
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: TravelRule[] }>(`${BASE}/rules`, { signal })).data,
-  });
+  return useQuery(listQuery<TravelRule>(qk.travel.rules(), `${BASE}/rules`));
 }
 
 export function useSaveRule(id: string | null, onSuccess?: () => void) {
-  return useApiMutation(
-    async (body: TravelRuleInput) =>
-      id
-        ? (await api.patchJson<{ data: TravelRule }>(`${BASE}/rules/${id}`, { body })).data
-        : (await api.postJson<{ data: TravelRule }>(`${BASE}/rules`, { body })).data,
-    { invalidate: TRAVEL_WRITES, onSuccess },
-  );
+  return useSaveEntity<TravelRuleInput, TravelRule>(`${BASE}/rules`, id, {
+    invalidate: TRAVEL_WRITES,
+    onSuccess,
+  });
 }
 
 export function useAddRuleTemplate(onSuccess?: () => void) {
@@ -126,10 +118,7 @@ export function useAddRuleTemplate(onSuccess?: () => void) {
 }
 
 export function useDeleteRule(onSuccess?: () => void) {
-  return useApiMutation((id: string) => api.deleteJson<unknown>(`${BASE}/rules/${id}`), {
-    invalidate: TRAVEL_WRITES,
-    onSuccess,
-  });
+  return useDeleteEntity(`${BASE}/rules`, { invalidate: TRAVEL_WRITES, onSuccess });
 }
 
 export function useCounters(date: string, enabled = true) {
@@ -170,40 +159,34 @@ export function useTrip(id: string, currency = 'USD') {
 }
 
 export function useSaveTrip(id: string | null, onSuccess?: (trip: TravelTrip) => void) {
-  return useApiMutation(
-    async (body: TravelTripInput) =>
-      id
-        ? (await api.patchJson<{ data: TravelTrip }>(`${BASE}/trips/${id}`, { body })).data
-        : (await api.postJson<{ data: TravelTrip }>(`${BASE}/trips`, { body })).data,
-    { invalidate: TRAVEL_WRITES, onSuccess },
-  );
+  return useSaveEntity<TravelTripInput, TravelTrip>(`${BASE}/trips`, id, {
+    invalidate: TRAVEL_WRITES,
+    onSuccess,
+  });
 }
 
 export function useDeleteTrip(onSuccess?: () => void) {
-  return useApiMutation((id: string) => api.deleteJson<unknown>(`${BASE}/trips/${id}`), {
+  return useDeleteEntity(`${BASE}/trips`, {
     invalidate: [...TRAVEL_WRITES, qk.tasks.all(), qk.money.all()],
     onSuccess,
   });
 }
 
 export function useSaveItem(tripId: string, id: string | null, onSuccess?: () => void) {
-  return useApiMutation(
-    async (body: TravelTripItemInput) =>
-      id
-        ? (
-            await api.patchJson<{ data: TravelTripItem }>(`${BASE}/trips/${tripId}/items/${id}`, {
-              body,
-            })
-          ).data
-        : (await api.postJson<{ data: TravelTripItem }>(`${BASE}/trips/${tripId}/items`, { body }))
-            .data,
-    { invalidate: TRAVEL_WRITES, onSuccess },
-  );
+  return useSaveEntity<TravelTripItemInput, TravelTripItem>(`${BASE}/trips/${tripId}/items`, id, {
+    invalidate: TRAVEL_WRITES,
+    onSuccess,
+  });
 }
 
 export function useDeleteItem(tripId: string, onSuccess?: () => void) {
-  return useApiMutation(
-    (id: string) => api.deleteJson<unknown>(`${BASE}/trips/${tripId}/items/${id}`),
+  return useDeleteEntity(`${BASE}/trips/${tripId}/items`, { invalidate: TRAVEL_WRITES, onSuccess });
+}
+
+export function useSaveContact(tripId: string, id: string | null, onSuccess?: () => void) {
+  return useSaveEntity<TravelTripContactInput, TravelTripContact>(
+    `${BASE}/trips/${tripId}/contacts`,
+    id,
     {
       invalidate: TRAVEL_WRITES,
       onSuccess,
@@ -211,56 +194,29 @@ export function useDeleteItem(tripId: string, onSuccess?: () => void) {
   );
 }
 
-export function useSaveContact(tripId: string, id: string | null, onSuccess?: () => void) {
-  return useApiMutation(
-    async (body: TravelTripContactInput) =>
-      id
-        ? (
-            await api.patchJson<{ data: TravelTripContact }>(
-              `${BASE}/trips/${tripId}/contacts/${id}`,
-              { body },
-            )
-          ).data
-        : (
-            await api.postJson<{ data: TravelTripContact }>(`${BASE}/trips/${tripId}/contacts`, {
-              body,
-            })
-          ).data,
-    { invalidate: TRAVEL_WRITES, onSuccess },
-  );
-}
-
 export function useDeleteContact(tripId: string, onSuccess?: () => void) {
-  return useApiMutation(
-    (id: string) => api.deleteJson<unknown>(`${BASE}/trips/${tripId}/contacts/${id}`),
-    { invalidate: TRAVEL_WRITES, onSuccess },
-  );
+  return useDeleteEntity(`${BASE}/trips/${tripId}/contacts`, {
+    invalidate: TRAVEL_WRITES,
+    onSuccess,
+  });
 }
 
 export function useSaveMoment(tripId: string, id: string | null, onSuccess?: () => void) {
-  return useApiMutation(
-    async (body: TravelTripMomentInput) =>
-      id
-        ? (
-            await api.patchJson<{ data: TravelTripMoment }>(
-              `${BASE}/trips/${tripId}/moments/${id}`,
-              { body },
-            )
-          ).data
-        : (
-            await api.postJson<{ data: TravelTripMoment }>(`${BASE}/trips/${tripId}/moments`, {
-              body,
-            })
-          ).data,
-    { invalidate: TRAVEL_WRITES, onSuccess },
+  return useSaveEntity<TravelTripMomentInput, TravelTripMoment>(
+    `${BASE}/trips/${tripId}/moments`,
+    id,
+    {
+      invalidate: TRAVEL_WRITES,
+      onSuccess,
+    },
   );
 }
 
 export function useDeleteMoment(tripId: string, onSuccess?: () => void) {
-  return useApiMutation(
-    (id: string) => api.deleteJson<unknown>(`${BASE}/trips/${tripId}/moments/${id}`),
-    { invalidate: TRAVEL_WRITES, onSuccess },
-  );
+  return useDeleteEntity(`${BASE}/trips/${tripId}/moments`, {
+    invalidate: TRAVEL_WRITES,
+    onSuccess,
+  });
 }
 
 export function useCandidateSpends(tripId: string, enabled: boolean) {
@@ -303,26 +259,16 @@ export function usePacking(tripId: string) {
 }
 
 export function useDocuments() {
-  return useQuery({
-    queryKey: qk.travel.documents(),
-    queryFn: async ({ signal }) =>
-      (await api.getJson<{ data: TravelDocument[] }>(`${BASE}/documents`, { signal })).data,
-  });
+  return useQuery(listQuery<TravelDocument>(qk.travel.documents(), `${BASE}/documents`));
 }
 
 export function useSaveDocument(id: string | null, onSuccess?: () => void) {
-  return useApiMutation(
-    async (body: TravelDocumentInput) =>
-      id
-        ? (await api.patchJson<{ data: TravelDocument }>(`${BASE}/documents/${id}`, { body })).data
-        : (await api.postJson<{ data: TravelDocument }>(`${BASE}/documents`, { body })).data,
-    { invalidate: TRAVEL_WRITES, onSuccess },
-  );
-}
-
-export function useDeleteDocument(onSuccess?: () => void) {
-  return useApiMutation((id: string) => api.deleteJson<unknown>(`${BASE}/documents/${id}`), {
+  return useSaveEntity<TravelDocumentInput, TravelDocument>(`${BASE}/documents`, id, {
     invalidate: TRAVEL_WRITES,
     onSuccess,
   });
+}
+
+export function useDeleteDocument(onSuccess?: () => void) {
+  return useDeleteEntity(`${BASE}/documents`, { invalidate: TRAVEL_WRITES, onSuccess });
 }

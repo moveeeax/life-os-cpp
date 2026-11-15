@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { manualBody, transferBody } from './bodies';
+import { manualBody, transferBody, transferProblem } from './bodies';
 
 describe('manualBody', () => {
   it('posts what the manual form posted', () => {
@@ -96,5 +96,30 @@ describe('transferBody', () => {
     });
     expect(b.amount_received).toBeNull();
     expect(b.fee).toBeNull();
+  });
+});
+
+describe('transferProblem', () => {
+  const ok = {
+    date: '2026-10-12',
+    sent: 10,
+    received: null,
+    needsReceived: false,
+    fee: '',
+    f: null,
+  };
+  it('lets a plain transfer go', () => {
+    expect(transferProblem(ok)).toBeNull();
+    expect(transferProblem({ ...ok, fee: '0', f: 0 })).toBeNull();
+    expect(transferProblem({ ...ok, needsReceived: true, received: 4 })).toBeNull();
+  });
+  it('names the first field that is wrong', () => {
+    expect(transferProblem({ ...ok, sent: null })).toBe('sent');
+    expect(transferProblem({ ...ok, sent: 0 })).toBe('sent');
+    expect(transferProblem({ ...ok, needsReceived: true })).toBe('received');
+    expect(transferProblem({ ...ok, needsReceived: true, received: 0 })).toBe('received');
+    expect(transferProblem({ ...ok, fee: 'x', f: null })).toBe('fee');
+    expect(transferProblem({ ...ok, fee: '-1', f: -1 })).toBe('fee');
+    expect(transferProblem({ ...ok, date: '2026-13-40' })).toBe('date');
   });
 });

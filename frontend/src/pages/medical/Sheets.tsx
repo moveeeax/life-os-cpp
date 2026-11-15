@@ -1,5 +1,3 @@
-import { useState, type ReactNode } from 'react';
-
 import {
   usePeople,
   useProviders,
@@ -13,63 +11,36 @@ import {
 import {
   RECORD_KIND,
   RECORD_KINDS,
-  orNull,
   type MedicalMedication,
   type MedicalPerson,
   type MedicalProvider,
   type MedicalRecord,
   type MedicalVisit,
 } from '@/lib/medical';
+import {
+  medicationBody,
+  personBody,
+  providerBody,
+  recordBody,
+  visitBody,
+  type MedicationForm,
+  type PersonForm,
+  type ProviderForm,
+  type RecordForm,
+  type VisitForm,
+} from '@/lib/medical/bodies';
 import { todayLocal } from '@/lib/dates';
-import { Sheet } from '@/shell/kit';
-
-function Actions({
-  busy,
-  label,
-  onCancel,
-}: {
-  busy: boolean;
-  label: string;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="k-dlg-actions">
-      <button type="button" className="k-btn" onClick={onCancel}>
-        Cancel
-      </button>
-      <button type="submit" className="k-btn k-solid" disabled={busy}>
-        {busy ? 'Saving…' : label}
-      </button>
-    </div>
-  );
-}
-
-function ErrorLine({ error }: { error: string | null }) {
-  return error ? (
-    <p role="alert" className="k-error">
-      {error}
-    </p>
-  ) : null;
-}
-
-function Form({ onSubmit, children }: { onSubmit: () => void; children: ReactNode }) {
-  return (
-    <form
-      className="k-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit();
-      }}
-    >
-      {children}
-    </form>
-  );
-}
-
-type Change = { target: { value: string } };
+import {
+  Sheet,
+  SheetActions,
+  SheetError,
+  SheetForm,
+  useFormFields,
+  type FieldChange,
+} from '@/shell/kit';
 
 /** The person select every visit, record and medication starts with. */
-function PersonField({ value, onChange }: { value: string; onChange: (e: Change) => void }) {
+function PersonField({ value, onChange }: { value: string; onChange: (e: FieldChange) => void }) {
   const people = usePeople();
   return (
     <label className="k-field">
@@ -95,20 +66,15 @@ function useFirstPerson(): string {
 }
 
 export function PersonSheet({ person, onClose }: { person?: MedicalPerson; onClose: () => void }) {
-  const [f, setF] = useState({
+  const [f, set] = useFormFields<PersonForm>({
     name: person?.name ?? '',
     relation: person?.relation ?? '',
     note: person?.note ?? '',
   });
   const save = useSavePerson(person?.id ?? null, onClose);
-  const set = (k: keyof typeof f) => (e: Change) => setF({ ...f, [k]: e.target.value });
   return (
     <Sheet title={person ? 'Edit the person' : 'New person'} onClose={onClose} width={440}>
-      <Form
-        onSubmit={() =>
-          save.mutate({ name: f.name.trim(), relation: f.relation.trim(), note: f.note.trim() })
-        }
-      >
+      <SheetForm onSubmit={() => save.mutate(personBody(f))}>
         <div className="k-fields">
           <label className="k-field">
             <span>Name</span>
@@ -134,9 +100,9 @@ export function PersonSheet({ person, onClose }: { person?: MedicalPerson; onClo
             onChange={set('note')}
           />
         </label>
-        <ErrorLine error={save.error} />
-        <Actions busy={save.isPending} label={person ? 'Save' : 'Add'} onCancel={onClose} />
-      </Form>
+        <SheetError error={save.error} />
+        <SheetActions busy={save.isPending} label={person ? 'Save' : 'Add'} onCancel={onClose} />
+      </SheetForm>
     </Sheet>
   );
 }
@@ -148,7 +114,7 @@ export function ProviderSheet({
   provider?: MedicalProvider;
   onClose: () => void;
 }) {
-  const [f, setF] = useState({
+  const [f, set] = useFormFields<ProviderForm>({
     kind: provider?.kind ?? ('doctor' as MedicalProvider['kind']),
     name: provider?.name ?? '',
     specialty: provider?.specialty ?? '',
@@ -159,7 +125,6 @@ export function ProviderSheet({
     note: provider?.note ?? '',
   });
   const save = useSaveProvider(provider?.id ?? null, onClose);
-  const set = (k: keyof typeof f) => (e: Change) => setF({ ...f, [k]: e.target.value });
   const doctor = f.kind === 'doctor';
   return (
     <Sheet
@@ -167,20 +132,7 @@ export function ProviderSheet({
       onClose={onClose}
       width={480}
     >
-      <Form
-        onSubmit={() =>
-          save.mutate({
-            kind: f.kind,
-            name: f.name.trim(),
-            specialty: f.specialty.trim(),
-            clinic: doctor ? f.clinic.trim() : '',
-            phone: f.phone.trim(),
-            email: f.email.trim(),
-            address: f.address.trim(),
-            note: f.note.trim(),
-          })
-        }
-      >
+      <SheetForm onSubmit={() => save.mutate(providerBody(f))}>
         <div className="k-fields">
           <label className="k-field">
             <span>Kind</span>
@@ -229,9 +181,9 @@ export function ProviderSheet({
           <span>Note</span>
           <input maxLength={1000} value={f.note} onChange={set('note')} />
         </label>
-        <ErrorLine error={save.error} />
-        <Actions busy={save.isPending} label={provider ? 'Save' : 'Add'} onCancel={onClose} />
-      </Form>
+        <SheetError error={save.error} />
+        <SheetActions busy={save.isPending} label={provider ? 'Save' : 'Add'} onCancel={onClose} />
+      </SheetForm>
     </Sheet>
   );
 }
@@ -239,7 +191,7 @@ export function ProviderSheet({
 export function VisitSheet({ visit, onClose }: { visit?: MedicalVisit; onClose: () => void }) {
   const first = useFirstPerson();
   const providers = useProviders().data ?? [];
-  const [f, setF] = useState({
+  const [f, set] = useFormFields<VisitForm>({
     person_id: visit?.person_id ?? first,
     provider_id: visit?.provider_id ?? '',
     date: visit?.date ?? todayLocal(),
@@ -248,21 +200,9 @@ export function VisitSheet({ visit, onClose }: { visit?: MedicalVisit; onClose: 
     follow_up: visit?.follow_up ?? '',
   });
   const save = useSaveVisit(visit?.id ?? null, onClose);
-  const set = (k: keyof typeof f) => (e: Change) => setF({ ...f, [k]: e.target.value });
   return (
     <Sheet title={visit ? 'Edit the visit' : 'New visit'} onClose={onClose} width={480}>
-      <Form
-        onSubmit={() =>
-          save.mutate({
-            person_id: f.person_id,
-            provider_id: orNull(f.provider_id),
-            date: f.date,
-            reason: f.reason.trim(),
-            outcome: f.outcome.trim(),
-            follow_up: orNull(f.follow_up),
-          })
-        }
-      >
+      <SheetForm onSubmit={() => save.mutate(visitBody(f))}>
         <div className="k-fields">
           <PersonField value={f.person_id} onChange={set('person_id')} />
           <label className="k-field">
@@ -305,9 +245,9 @@ export function VisitSheet({ visit, onClose }: { visit?: MedicalVisit; onClose: 
           <span>Follow-up</span>
           <input type="date" value={f.follow_up} onChange={set('follow_up')} />
         </label>
-        <ErrorLine error={save.error} />
-        <Actions busy={save.isPending} label={visit ? 'Save' : 'Add'} onCancel={onClose} />
-      </Form>
+        <SheetError error={save.error} />
+        <SheetActions busy={save.isPending} label={visit ? 'Save' : 'Add'} onCancel={onClose} />
+      </SheetForm>
     </Sheet>
   );
 }
@@ -324,7 +264,7 @@ export function RecordSheet({
 }) {
   const first = useFirstPerson();
   const visits = useVisits().data ?? [];
-  const [f, setF] = useState({
+  const [f, set, setF] = useFormFields<RecordForm>({
     person_id: record?.person_id ?? first,
     visit_id: record?.visit_id ?? '',
     date: record?.date ?? todayLocal(),
@@ -336,22 +276,10 @@ export function RecordSheet({
     if (!record) onCreated?.(r);
     onClose();
   });
-  const set = (k: keyof typeof f) => (e: Change) => setF({ ...f, [k]: e.target.value });
   const theirVisits = visits.filter((v) => v.person_id === f.person_id);
   return (
     <Sheet title={record ? 'Edit the record' : 'New record'} onClose={onClose} width={480}>
-      <Form
-        onSubmit={() =>
-          save.mutate({
-            person_id: f.person_id,
-            visit_id: orNull(f.visit_id),
-            date: f.date,
-            kind: f.kind,
-            title: f.title.trim(),
-            note: f.note.trim(),
-          })
-        }
-      >
+      <SheetForm onSubmit={() => save.mutate(recordBody(f))}>
         <div className="k-fields">
           <PersonField
             value={f.person_id}
@@ -400,9 +328,9 @@ export function RecordSheet({
           <textarea maxLength={2000} rows={3} value={f.note} onChange={set('note')} />
         </label>
         {!record && <p className="k-sub">Scans go on the record once it is saved.</p>}
-        <ErrorLine error={save.error} />
-        <Actions busy={save.isPending} label={record ? 'Save' : 'Add'} onCancel={onClose} />
-      </Form>
+        <SheetError error={save.error} />
+        <SheetActions busy={save.isPending} label={record ? 'Save' : 'Add'} onCancel={onClose} />
+      </SheetForm>
     </Sheet>
   );
 }
@@ -415,7 +343,7 @@ export function MedicationSheet({
   onClose: () => void;
 }) {
   const first = useFirstPerson();
-  const [f, setF] = useState({
+  const [f, set] = useFormFields<MedicationForm>({
     person_id: medication?.person_id ?? first,
     name: medication?.name ?? '',
     dose: medication?.dose ?? '',
@@ -425,26 +353,13 @@ export function MedicationSheet({
     note: medication?.note ?? '',
   });
   const save = useSaveMedication(medication?.id ?? null, onClose);
-  const set = (k: keyof typeof f) => (e: Change) => setF({ ...f, [k]: e.target.value });
   return (
     <Sheet
       title={medication ? 'Edit the medication' : 'New medication'}
       onClose={onClose}
       width={480}
     >
-      <Form
-        onSubmit={() =>
-          save.mutate({
-            person_id: f.person_id,
-            name: f.name.trim(),
-            dose: f.dose.trim(),
-            schedule: f.schedule.trim(),
-            start_date: orNull(f.start_date),
-            end_date: orNull(f.end_date),
-            note: f.note.trim(),
-          })
-        }
-      >
+      <SheetForm onSubmit={() => save.mutate(medicationBody(f))}>
         <div className="k-fields">
           <PersonField value={f.person_id} onChange={set('person_id')} />
           <label className="k-field">
@@ -491,9 +406,13 @@ export function MedicationSheet({
           <span>Note</span>
           <input maxLength={1000} value={f.note} onChange={set('note')} />
         </label>
-        <ErrorLine error={save.error} />
-        <Actions busy={save.isPending} label={medication ? 'Save' : 'Add'} onCancel={onClose} />
-      </Form>
+        <SheetError error={save.error} />
+        <SheetActions
+          busy={save.isPending}
+          label={medication ? 'Save' : 'Add'}
+          onCancel={onClose}
+        />
+      </SheetForm>
     </Sheet>
   );
 }

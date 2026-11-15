@@ -1,5 +1,5 @@
 import { formatAmount, parseAmount } from '@/lib/amounts';
-import { formatDay } from '@/lib/dates';
+import { shortDay } from '@/lib/dates';
 
 import type {
   PracticeAmount,
@@ -11,7 +11,7 @@ import type {
 } from './types';
 
 export type * from './types';
-export { todayLocal } from '@/lib/dates';
+export { shortDay, todayLocal } from '@/lib/dates';
 
 /** The stages in the order the deal list shows them: open ones first. */
 export const STAGES: readonly PracticeDealStage[] = [
@@ -86,11 +86,6 @@ export function monthLabel(month: string): string {
 /** The month of a day: "2026-10-19" → "2026-10". */
 export function monthOf(day: string): string {
   return day.slice(0, 7);
-}
-
-/** "Oct 3" for a day of this year, "Oct 3, 2025" otherwise. */
-export function shortDay(iso: string, today: string): string {
-  return formatDay(iso, { yearUnless: today });
 }
 
 /** The row title of an entry: its note, else its deal, else its client, else its kind. */
