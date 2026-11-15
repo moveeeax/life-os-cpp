@@ -112,9 +112,6 @@ export function withSearch(
   return next;
 }
 
-/** The day `by` days from `date` (YYYY-MM-DD in, YYYY-MM-DD out). */
-export const shiftDay = shiftDays;
-
 /**
  * A posted row the draft may repeat: the same account, type and amount within
  * a day, the rule the inbox uses for its "possible duplicate" mark.
@@ -124,8 +121,8 @@ export function nearbyDuplicate(
   draft: { account_id: string; type: string; amount: number | null; date: string },
 ): Transaction | undefined {
   if (!rows || draft.amount === null || !(draft.amount > 0)) return undefined;
-  const lo = shiftDay(draft.date, -1);
-  const hi = shiftDay(draft.date, 1);
+  const lo = shiftDays(draft.date, -1);
+  const hi = shiftDays(draft.date, 1);
   return rows.find(
     (r) =>
       r.status === 'posted' &&

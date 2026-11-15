@@ -8,6 +8,7 @@ import {
   isDay,
   mondayOf,
   shiftDays,
+  shortDay,
   todayLocal,
 } from './dates';
 
@@ -132,5 +133,12 @@ describe('clockIn', () => {
     const at = new Date(Date.UTC(2026, 9, 26, 19, 30));
     expect(clockIn('Asia/Almaty', at)).toEqual({ hour: 0, minute: 30, weekday: 2 });
     expect(clockIn('America/New_York', at)).toEqual({ hour: 15, minute: 30, weekday: 1 });
+  });
+});
+
+describe('shortDay', () => {
+  it('adds the year only outside the year of today', () => {
+    expect(shortDay('2026-10-03', '2026-11-15')).toBe('Oct 3');
+    expect(shortDay('2025-10-03', '2026-11-15')).toBe('Oct 3, 2025');
   });
 });

@@ -14,13 +14,14 @@ import {
   useSessionHeartRate,
   useSetQueue,
 } from '@/hooks/useWorkoutSession';
+import { todayLocal } from '@/lib/dates';
 import { apiErrorMessage } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import { Permission, userCan } from '@/lib/auth/permissions';
-import { rangeForDays, today } from '@/lib/health';
+import { rangeForDays } from '@/lib/health';
 import { SYNC_DATA_TYPES } from '@/lib/health/types';
 import { needsLink } from '@/lib/mi';
-import { formatDay, formatDuration, formatTime, formatVolume } from '@/lib/workout/format';
+import { formatInstantDay, formatDuration, formatTime, formatVolume } from '@/lib/workout/format';
 import {
   describeSet,
   durationMinutes,
@@ -121,7 +122,7 @@ function HealthBlock({ session }: { session: WorkoutSession & { finished_at: str
         <p className={cn(muted, 'mt-2')}>
           The band has not synced past the end of this workout yet.{' '}
           {latest
-            ? `Its newest heart-rate sample is from ${formatDay(latest)}, ${formatTime(latest)}.`
+            ? `Its newest heart-rate sample is from ${formatInstantDay(latest)}, ${formatTime(latest)}.`
             : hr.isPending
               ? ''
               : 'There are no heart-rate samples at all.'}{' '}
@@ -163,7 +164,7 @@ function HealthBlock({ session }: { session: WorkoutSession & { finished_at: str
             disabled={syncing}
             onClick={() =>
               startSync.mutate(
-                { ...rangeForDays(2, today()), data_types: [...SYNC_DATA_TYPES] },
+                { ...rangeForDays(2, todayLocal()), data_types: [...SYNC_DATA_TYPES] },
                 { onSuccess: (r) => setRunId(r.run_id) },
               )
             }
@@ -314,7 +315,7 @@ function Detail({ session }: { session: WorkoutSession & { finished_at: string }
     <>
       <section className={cardClass} aria-label="Summary">
         <p className={muted}>
-          {formatDay(session.started_at)}, {formatTime(session.started_at)}–
+          {formatInstantDay(session.started_at)}, {formatTime(session.started_at)}–
           {formatTime(session.finished_at)}
         </p>
         <div className="k-facts">

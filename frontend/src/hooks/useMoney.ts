@@ -10,10 +10,11 @@ import { useSaveEntity } from '@/hooks/crud';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { useBatchMutation } from '@/hooks/useBatchMutation';
 import { useParseJob } from '@/hooks/useParseJob';
+import { shiftDays } from '@/lib/dates';
 import { api } from '@/lib/api/client';
 import { NOW_DIGEST, qk } from '@/lib/api/queryKeys';
 import type { components } from '@/lib/api/schema.gen';
-import { isDay, shiftDay, type AcceptLine } from '@/lib/ledger';
+import { isDay, type AcceptLine } from '@/lib/ledger';
 import type {
   AdvisorReport,
   AdvisorReportSummary,
@@ -249,8 +250,8 @@ export function useNearbyRows(account: string, date: string) {
         await api.getJson<{ data: Transaction[] }>(`${BASE}/transactions`, {
           query: {
             account,
-            from: shiftDay(date, -1),
-            to: shiftDay(date, 1),
+            from: shiftDays(date, -1),
+            to: shiftDays(date, 1),
             status: 'posted',
             limit: 200,
           },

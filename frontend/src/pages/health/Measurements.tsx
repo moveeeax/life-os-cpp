@@ -4,8 +4,7 @@ import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { useErrorToast } from '@/hooks/useErrorToast';
 import { useDeleteMeasurement, useMeasurements, useSaveMeasurement } from '@/hooks/useMeasurements';
 import { apiErrorMessage } from '@/lib/api/client';
-import { formatDay } from '@/lib/dates';
-import { today } from '@/lib/health';
+import { formatDay, todayLocal } from '@/lib/dates';
 import {
   GIRTHS,
   changeFrom,
@@ -23,7 +22,7 @@ import { Facts, Group, Num, Row, Sheet } from '@/shell/kit';
 const SHOWN = 5;
 
 function MeasurementSheet({ m, onClose }: { m?: TapeMeasurement; onClose: () => void }) {
-  const [f, setF] = useState<MeasurementForm>(() => measurementForm(today(), m));
+  const [f, setF] = useState<MeasurementForm>(() => measurementForm(todayLocal(), m));
   const [problem, setProblem] = useState<string | null>(null);
   const save = useSaveMeasurement(m?.id ?? null, onClose);
   const set = (k: keyof MeasurementForm) => (e: { target: { value: string } }) =>
@@ -41,7 +40,7 @@ function MeasurementSheet({ m, onClose }: { m?: TapeMeasurement; onClose: () => 
       >
         <label className="k-field">
           <span>Day</span>
-          <input type="date" required max={today()} value={f.date} onChange={set('date')} />
+          <input type="date" required max={todayLocal()} value={f.date} onChange={set('date')} />
         </label>
         <div className="k-fields k-fields-3">
           {GIRTHS.map(({ key, label }) => (
@@ -97,7 +96,7 @@ function MeasurementRow({
   const waist = m.waist_cm;
   return (
     <Row
-      title={<span data-num-ok>{formatDay(m.date, { yearUnless: today() })}</span>}
+      title={<span data-num-ok>{formatDay(m.date, { yearUnless: todayLocal() })}</span>}
       sub={girths.map((g) => g.label).join(', ')}
       right={waist != null ? <Num>{formatCm(waist)}</Num> : undefined}
     >
@@ -181,7 +180,7 @@ export function Measurements() {
       {adding && <MeasurementSheet onClose={() => setAdding(false)} />}
       {editing && <MeasurementSheet m={editing} onClose={() => setEditing(null)} />}
       {deleting.dialog(remove, (d) => ({
-        title: `Delete the measurement of ${formatDay(d.date, { yearUnless: today() })}?`,
+        title: `Delete the measurement of ${formatDay(d.date, { yearUnless: todayLocal() })}?`,
         description: 'This cannot be undone.',
       }))}
     </Group>

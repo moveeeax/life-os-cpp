@@ -15,7 +15,7 @@ import { Permission, userCan } from '@/lib/auth/permissions';
 import { formatMinutes } from '@/lib/health';
 import { needsLink } from '@/lib/mi';
 import { weekdayLabel } from '@/lib/workout';
-import { formatDay, formatDuration, formatTime, formatVolume } from '@/lib/workout/format';
+import { formatInstantDay, formatDuration, formatTime, formatVolume } from '@/lib/workout/format';
 import { durationMinutes, weekdayOf, workSetCount } from '@/lib/workout/session';
 import type { RoutineSummary } from '@/lib/workout/types';
 
@@ -116,7 +116,7 @@ function Recent() {
             }
             sub={
               <>
-                {formatDay(s.started_at)} ·{' '}
+                {formatInstantDay(s.started_at)} ·{' '}
                 {formatDuration(durationMinutes(s.started_at, s.finished_at))} ·{' '}
                 <Num>{s.set_count} sets</Num> · <HealthBadge status={s.health_status} />
               </>
@@ -199,8 +199,8 @@ export function WorkoutHomePage() {
         <LoadError error={active.error} onRetry={() => active.refetch()} />
       ) : active.data ? (
         <Banner to="/workout/session" action="Continue">
-          Started {formatDay(active.data.started_at)} at {formatTime(active.data.started_at)} ·{' '}
-          <Num>{workSetCount(active.data)}</Num> work sets logged
+          Started {formatInstantDay(active.data.started_at)} at {formatTime(active.data.started_at)}{' '}
+          · <Num>{workSetCount(active.data)}</Num> work sets logged
         </Banner>
       ) : (
         <Group label="Start a workout">

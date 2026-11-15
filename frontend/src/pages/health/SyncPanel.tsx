@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 
 import { isFinalStatus, useCoverage, useProbe, useStartSync, useSyncRun } from '@/hooks/useHealth';
+import { todayLocal } from '@/lib/dates';
 import { apiErrorMessage } from '@/lib/api/client';
-import { rangeForDays, today } from '@/lib/health';
+import { rangeForDays } from '@/lib/health';
 import { SYNC_DATA_TYPES } from '@/lib/health/types';
 
 import { Num, Row } from '@/shell/kit';
@@ -44,7 +45,7 @@ function CoverageTable() {
 
 /** Sync controls: coverage, a form that starts a sync run, and a cloud probe. */
 export function SyncPanel() {
-  const initial = rangeForDays(2, today());
+  const initial = rangeForDays(2, todayLocal());
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
   const [types, setTypes] = useState<string[]>([...SYNC_DATA_TYPES]);

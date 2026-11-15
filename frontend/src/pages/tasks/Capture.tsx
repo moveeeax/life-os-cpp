@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 
 import { useProjects } from '@/hooks/useProjects';
+import { todayLocal } from '@/lib/dates';
 import { captureBody } from '@/lib/tasks/bodies';
 import {
   useAcceptTasksParse,
@@ -13,7 +14,6 @@ import {
   areaOf,
   dueLabel,
   EFFORT_LABEL,
-  localToday,
   parseErrorText,
   takeProjectCode,
   type TaskParseLine,
@@ -59,7 +59,7 @@ export function Capture({
   const projects = useProjects().data ?? [];
   const [projectId, setProjectId] = useState<string | null>(null);
   const project = projects.find((p) => p.id === projectId) ?? null;
-  const today = localToday();
+  const today = todayLocal();
   const finish = () => {
     setLines(null);
     setText('');
