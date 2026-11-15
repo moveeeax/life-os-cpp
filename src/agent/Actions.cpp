@@ -21,6 +21,7 @@
 #include <spdlog/spdlog.h>
 
 #include "agent/Settings.hpp"
+#include "agent/ToolArgs.hpp"
 #include "agent/Tools.hpp"
 #include "calendar/Google.hpp"
 #include "jobs/Job.hpp"
@@ -45,35 +46,18 @@ const json kAreas = {"finance", "health", "travel", "growth", "relationships", "
 /// The longest event the calendar route takes (api/CalendarController.cpp, span_of).
 constexpr long long kMaxEventSeconds = 24 * 3600;
 
-json object(json properties, json required) {
-    return json{{"type", "object"},
-                {"properties", std::move(properties)},
-                {"required", std::move(required)},
-                {"additionalProperties", false}};
-}
+using ToolArgs::object;
+using ToolArgs::refusal;
+using ToolArgs::tool;
 
-json tool(const char* name, const char* description, json parameters) {
-    return json{{"type", "function"},
-                {"function", {{"name", name}, {"description", description}, {"parameters", std::move(parameters)}}}};
-}
-
+/// A string argument without the spaces around it; empty when missing or not a string.
 std::string text_arg(const json& args, const char* key) {
-    const auto it = args.find(key);
-    if (it == args.end() || !it->is_string()) {
-        return {};
-    }
-    std::string v = it->get<std::string>();
-    const auto first = v.find_first_not_of(" \t\r\n");
-    if (first == std::string::npos) {
-        return {};
-    }
-    return v.substr(first, v.find_last_not_of(" \t\r\n") - first + 1);
+    return ToolArgs::text_arg(args, key, /*trim=*/true);
 }
 
 /// A day argument; anything that is not a real YYYY-MM-DD day is dropped.
 std::string day_arg(const json& args, const char* key) {
-    const std::string v = text_arg(args, key);
-    return Utils::Date::is_ymd(v) ? v : std::string();
+    return ToolArgs::day_arg(args, key, /*trim=*/true);
 }
 
 using Utils::Utf8::length;
@@ -81,12 +65,6 @@ using Utils::Utf8::length;
 /// The first @p max characters of @p s, with an ellipsis when it was longer.
 std::string cut(const std::string& s, std::size_t max) {
     return Utils::Utf8::clip(s, max);
-}
-
-std::string refusal(const char* error, const std::string& message, json extra = json::object()) {
-    extra["error"] = error;
-    extra["message"] = message;
-    return extra.dump();
 }
 
 std::string url_of(const std::string& api_url, const std::string& path, const json& query) {
@@ -581,14 +559,7 @@ Proposed add_spend(Net::Http::Transport& transport,
 
 /// A Telegram chat or message id argument (digits, a minus for a group); empty when it is not one.
 std::string tg_id(const json& args, const char* key) {
-    static const std::regex kIdRe("^-?\\d{1,20}$");
-    std::string v = text_arg(args, key);
-    if (v.empty()) {
-        if (const auto it = args.find(key); it != args.end() && it->is_number_integer()) {
-            v = std::to_string(it->get<long long>());
-        }
-    }
-    return std::regex_match(v, kIdRe) ? v : std::string();
+    return ToolArgs::tg_id(args, key, /*trim=*/true);
 }
 
 /// The title of the person's chat, or a refusal when Telegram is not theirs or the chat is unknown.
