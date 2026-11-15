@@ -6,6 +6,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.65.0] - 2026-11-15
+
+### Added
+- `GET /api/v1/ani/level` counts Ani's level from the person's own records: four scales (tasks, body, food, money) earn up to 100 points a day for hitting the person's own goals, half on the days a debt of attention holds, and Ani's level is the lowest of the four (reaching level L takes `100*(L-1) + 25*(L-1)*L` points of a scale). Points are counted on each read from the days since the count started (`ani_level_start`, migration 086, set 90 days back on the first read); nothing is taken away. The rules are in `src/domain/AniLevel.hpp`, the days are read by `src/repositories/agent/LevelRepository.hpp`.
+
 ## [1.64.0] - 2026-11-14
 
 ### Added
