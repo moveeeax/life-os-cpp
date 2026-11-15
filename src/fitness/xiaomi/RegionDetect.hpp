@@ -24,6 +24,7 @@
 #include "fitness/xiaomi/CloudClient.hpp"
 #include "fitness/xiaomi/Errors.hpp"
 #include "fitness/xiaomi/Regions.hpp"
+#include "utils/Date.hpp"
 
 namespace Xiaomi {
 
@@ -44,14 +45,7 @@ inline constexpr int kRegionProbeDays = 30;
  */
 inline std::optional<std::string> detect_region(CloudClient& client, std::string_view today) {
     const std::chrono::sys_days end = detail::parse_date(today);
-    const std::chrono::year_month_day start_ymd{end - std::chrono::days{kRegionProbeDays - 1}};
-    char start[16];
-    std::snprintf(start,
-                  sizeof(start),
-                  "%04d-%02u-%02u",
-                  static_cast<int>(start_ymd.year()),
-                  static_cast<unsigned>(start_ymd.month()),
-                  static_cast<unsigned>(start_ymd.day()));
+    const std::string start = Utils::Date::format_ymd(end - std::chrono::days{kRegionProbeDays - 1});
 
     for (const std::string_view region : kRegionProbeOrder) {
         try {

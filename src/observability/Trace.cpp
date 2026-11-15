@@ -1,8 +1,11 @@
 /**
  * @file Trace.cpp
  * @brief Bodies for src/observability/Trace.hpp — compiled once into
- *        app_core: the W3C traceparent parser/formatter, the hex/random
- *        helpers (file-local) and the thread-local ambient traceparent. The
+ *        app_core: the W3C traceparent parser/formatter, the random-id
+ *        helpers (file-local) and the thread-local ambient traceparent.
+ *        Hex output and ASCII lowercase come from utils: Crypto::to_hex is
+ *        inline and Strings::ascii_lower lives in std-only Strings.cpp, which
+ *        the fuzz harness compiles alongside this file. The
  *        attribute keys and the TraceContext struct stay in the header; every
  *        contract is documented on the declarations there.
  *
@@ -20,6 +23,9 @@
 #include <chrono>
 #include <cstdint>
 #include <random>
+
+#include "utils/Crypto.hpp"
+#include "utils/Strings.hpp"
 
 namespace Observability::Trace {
 
@@ -39,24 +45,6 @@ bool is_hex_string(std::string_view s, size_t expected_len) {
     return true;
 }
 
-std::string to_lower_ascii(std::string_view s) {
-    std::string out(s);
-    std::transform(
-        out.begin(), out.end(), out.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return out;
-}
-
-std::string to_hex(const uint8_t* bytes, size_t n) {
-    static const char* hex = "0123456789abcdef";
-    std::string out;
-    out.reserve(n * 2);
-    for (size_t i = 0; i < n; ++i) {
-        out.push_back(hex[(bytes[i] >> 4) & 0xF]);
-        out.push_back(hex[bytes[i] & 0xF]);
-    }
-    return out;
-}
-
 std::mt19937_64& rng() {
     thread_local std::mt19937_64 r(static_cast<uint64_t>(std::chrono::steady_clock::now().time_since_epoch().count()));
     return r;
@@ -71,7 +59,7 @@ std::string random_hex(size_t byte_count) {
             v >>= 8;
         }
     }
-    return to_hex(buf.data(), byte_count);
+    return Utils::Crypto::to_hex(buf.data(), byte_count);
 }
 
 bool is_all_zero_hex(std::string_view s) {
@@ -116,9 +104,9 @@ std::optional<TraceContext> parse_traceparent(std::string_view header) {
         return std::nullopt;
     }
     TraceContext ctx;
-    ctx.trace_id = detail::to_lower_ascii(parts[1]);
-    ctx.parent_id = detail::to_lower_ascii(parts[2]);
-    ctx.flags = detail::to_lower_ascii(parts[3]);
+    ctx.trace_id = Utils::Strings::ascii_lower(parts[1]);
+    ctx.parent_id = Utils::Strings::ascii_lower(parts[2]);
+    ctx.flags = Utils::Strings::ascii_lower(parts[3]);
     return ctx;
 }
 

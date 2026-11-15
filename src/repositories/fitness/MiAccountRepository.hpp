@@ -381,7 +381,7 @@ inline long long region_offset_seconds(const std::string& owner) {
     } catch (const std::exception&) {
         // An unreachable database is reported by the query that follows.
     }
-    return (region.empty() || region == "cn") ? 8 * 3600 : 0;
+    return Xiaomi::offset_seconds(region);
 }
 
 }  // namespace Repositories

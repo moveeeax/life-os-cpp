@@ -9,6 +9,7 @@
 #include <ctime>
 
 #include "utils/Crypto.hpp"
+#include "utils/Strings.hpp"
 
 namespace Storage::S3 {
 
@@ -17,28 +18,10 @@ namespace {
 using Utils::Crypto::hmac_sha256;
 using Utils::Crypto::sha256_hex;
 
-bool unreserved(unsigned char ch) {
-    return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' ||
-           ch == '.' || ch == '~';
-}
-
 }  // namespace
 
 std::string uri_encode(std::string_view s, bool keep_slash) {
-    static constexpr const char* kDigits = "0123456789ABCDEF";
-    std::string out;
-    out.reserve(s.size());
-    for (const char c : s) {
-        const auto ch = static_cast<unsigned char>(c);
-        if (unreserved(ch) || (keep_slash && ch == '/')) {
-            out.push_back(c);
-        } else {
-            out.push_back('%');
-            out.push_back(kDigits[ch >> 4]);
-            out.push_back(kDigits[ch & 0xf]);
-        }
-    }
-    return out;
+    return Utils::Strings::percent_encode(s, keep_slash);
 }
 
 std::string amz_date_now() {

@@ -30,6 +30,8 @@
 #include "fitness/xiaomi/RegionDetect.hpp"
 #include "fitness/xiaomi/Service.hpp"
 #include "repositories/fitness/MiAccountRepository.hpp"
+#include "utils/Crypto.hpp"
+#include "utils/Date.hpp"
 
 namespace Fitness::Link {
 
@@ -76,15 +78,7 @@ struct Step {
 namespace detail {
 
 inline std::string hex(std::string_view bytes) {
-    static constexpr char kHex[] = "0123456789abcdef";
-    std::string out;
-    out.reserve(bytes.size() * 2);
-    for (const char c : bytes) {
-        const auto byte = static_cast<unsigned char>(c);
-        out.push_back(kHex[byte >> 4]);
-        out.push_back(kHex[byte & 0x0f]);
-    }
-    return out;
+    return Utils::Crypto::to_hex(bytes);
 }
 
 inline std::string attempt_key(const std::string& link_id) {
@@ -92,15 +86,7 @@ inline std::string attempt_key(const std::string& link_id) {
 }
 
 inline std::string today_utc() {
-    const std::chrono::year_month_day ymd{std::chrono::floor<std::chrono::days>(std::chrono::system_clock::now())};
-    char out[16];
-    std::snprintf(out,
-                  sizeof(out),
-                  "%04d-%02u-%02u",
-                  static_cast<int>(ymd.year()),
-                  static_cast<unsigned>(ymd.month()),
-                  static_cast<unsigned>(ymd.day()));
-    return out;
+    return Utils::Date::today_utc();
 }
 
 /// A link id is 32 lowercase hex characters; anything else is not looked up.

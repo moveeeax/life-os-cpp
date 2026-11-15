@@ -8,6 +8,7 @@
 #include <cstdio>
 
 #include "utils/Config.hpp"
+#include "utils/Strings.hpp"
 
 namespace Telegram {
 
@@ -56,19 +57,7 @@ bool valid_id(const std::string& id) {
 }
 
 std::string encode(const std::string& s) {
-    std::string out;
-    out.reserve(s.size() * 3);
-    for (const unsigned char c : s) {
-        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' ||
-            c == '.' || c == '~') {
-            out += static_cast<char>(c);
-        } else {
-            char buf[4];
-            std::snprintf(buf, sizeof(buf), "%%%02X", c);
-            out += buf;
-        }
-    }
-    return out;
+    return Utils::Strings::percent_encode(s);
 }
 
 std::string text_of(const json& message) {

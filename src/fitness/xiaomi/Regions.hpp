@@ -36,9 +36,25 @@ inline bool is_known_region(std::string_view region) {
     return false;
 }
 
+/// Region cn, and the empty string as its synonym.
+inline bool is_cn(std::string_view region) {
+    return region.empty() || region == "cn";
+}
+
+/**
+ * @brief Seconds the region's day is ahead of UTC: cn counts days in a fixed
+ *        UTC+8, the rest in UTC. That is what upstream does, and every place
+ *        that cuts a Mi day (range bounds, the sync window, sleep scores, the
+ *        Now digest) must use this one rule: a mistake shifts the day and
+ *        corrupts daily aggregates.
+ */
+inline std::int64_t offset_seconds(std::string_view region) {
+    return is_cn(region) ? 8 * 3600 : 0;
+}
+
 /// Region cn and the empty string live on hlth.io.mi.com, the rest on a subdomain.
 inline std::string host_for_region(std::string_view region) {
-    if (region.empty() || region == "cn") {
+    if (is_cn(region)) {
         return "https://hlth.io.mi.com";
     }
     return "https://" + std::string(region) + ".hlth.io.mi.com";
@@ -85,7 +101,7 @@ inline std::chrono::sys_days parse_date(std::string_view text) {
 inline std::pair<std::int64_t, std::int64_t> range_to_timestamps(std::string_view start_date,
                                                                  std::string_view end_date,
                                                                  std::string_view region) {
-    const std::int64_t offset = (region.empty() || region == "cn") ? 8 * 3600 : 0;
+    const std::int64_t offset = offset_seconds(region);
     const std::int64_t start_days = detail::parse_date(start_date).time_since_epoch().count();
     const std::int64_t end_days = detail::parse_date(end_date).time_since_epoch().count();
     if (start_days > end_days) {

@@ -25,12 +25,12 @@
 
 namespace Xiaomi::Crypto {
 
-/// Standard base64 with padding. Utils::Base64 does not fit here: it is
-/// base64url without padding, while the Xiaomi protocol needs the plain alphabet.
+/// Standard base64 with padding (Utils::Base64::encode).
 std::string b64_encode(std::string_view raw);
 
-/// Throws MiFitnessAuthError on any input that is not valid standard base64:
-/// silently returning garbage is more dangerous here than failing.
+/// Utils::Base64::decode, strict. Throws MiFitnessAuthError on any input that
+/// is not valid standard base64: silently returning garbage is more dangerous
+/// here than failing.
 std::string b64_decode(std::string_view encoded);
 
 /**
