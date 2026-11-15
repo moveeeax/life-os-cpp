@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { useErrorToast } from '@/hooks/useErrorToast';
 import { useDealTasks, useDeals, useDeleteDeal, useMonth } from '@/hooks/usePractice';
 import {
@@ -116,8 +116,8 @@ export function PracticeDealsPage() {
   const [editing, setEditing] = useState<PracticeDeal | 'new' | null>(null);
   const [step, setStep] = useState<PracticeDeal | null>(null);
   const [income, setIncome] = useState<PracticeDeal | null>(null);
-  const [deleting, setDeleting] = useState<PracticeDeal | null>(null);
-  const remove = useDeleteDeal(() => setDeleting(null));
+  const deleting = useConfirmDelete<PracticeDeal>();
+  const remove = useDeleteDeal(deleting.close);
   useErrorToast(remove.error);
   const list = deals.data ?? [];
   const openCount = list.filter((d) => OPEN_STAGES.includes(d.stage)).length;
@@ -169,7 +169,7 @@ export function PracticeDealsPage() {
                 deal={d}
                 today={today}
                 onEdit={() => setEditing(d)}
-                onDelete={() => setDeleting(d)}
+                onDelete={() => deleting.ask(d)}
                 onStep={() => setStep(d)}
                 onIncome={() => setIncome(d)}
               />
@@ -194,17 +194,11 @@ export function PracticeDealsPage() {
           onClose={() => setIncome(null)}
         />
       )}
-      {deleting && (
-        <ConfirmDialog
-          title={`Delete ${deleting.title}?`}
-          description="Its incomes, expenses and tasks stay, without the deal. This cannot be undone."
-          confirmLabel="Delete"
-          destructive
-          busy={remove.isPending}
-          onConfirm={() => remove.mutate(deleting.id)}
-          onClose={() => setDeleting(null)}
-        />
-      )}
+      {deleting.dialog(remove, (d) => ({
+        title: `Delete ${d.title}?`,
+        description:
+          'Its incomes, expenses and tasks stay, without the deal. This cannot be undone.',
+      }))}
     </PracticeFrame>
   );
 }

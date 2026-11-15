@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { Attachments } from '@/components/Attachments';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { useDeleteRecord, usePeople, useRecords } from '@/hooks/useMedical';
 import { useErrorToast } from '@/hooks/useErrorToast';
 import { formatDay, todayLocal } from '@/lib/dates';
@@ -20,8 +20,8 @@ export function MedicalRecordsPage() {
   const [kind, setKind] = useState('');
   const [editing, setEditing] = useState<MedicalRecord | 'new' | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<MedicalRecord | null>(null);
-  const remove = useDeleteRecord(() => setDeleting(null));
+  const deleting = useConfirmDelete<MedicalRecord>();
+  const remove = useDeleteRecord(deleting.close);
   useErrorToast(remove.error);
 
   const all = records.data ?? [];
@@ -114,7 +114,7 @@ export function MedicalRecordsPage() {
                   <button
                     type="button"
                     className="k-link k-error-text"
-                    onClick={() => setDeleting(r)}
+                    onClick={() => deleting.ask(r)}
                   >
                     Delete
                   </button>
@@ -131,17 +131,10 @@ export function MedicalRecordsPage() {
           onCreated={(r) => setOpenId(r.id)}
         />
       )}
-      {deleting && (
-        <ConfirmDialog
-          title={`Delete “${deleting.title}”?`}
-          description="Its files are deleted from the storage too. This cannot be undone."
-          confirmLabel="Delete"
-          destructive
-          busy={remove.isPending}
-          onConfirm={() => remove.mutate(deleting.id)}
-          onClose={() => setDeleting(null)}
-        />
-      )}
+      {deleting.dialog(remove, (d) => ({
+        title: `Delete “${d.title}”?`,
+        description: 'Its files are deleted from the storage too. This cannot be undone.',
+      }))}
     </MedicalFrame>
   );
 }

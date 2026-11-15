@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 
-import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DataTable, type Column } from '@/components/DataTable';
 import { Modal } from '@/components/Modal';
 import { PaginationFooter } from '@/components/PaginationFooter';
@@ -11,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/toaster';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { useErrorToast } from '@/hooks/useErrorToast';
 import { usePagedQuery } from '@/hooks/usePagedQuery';
@@ -137,7 +137,7 @@ interface PackageForm {
 function PackagesTab() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<BillingPackage | null>(null);
-  const [deleting, setDeleting] = useState<BillingPackage | null>(null);
+  const deleting = useConfirmDelete<BillingPackage>();
 
   const { data, isLoading, error } = useQuery({
     queryKey: qk.admin.billing.packages(),
@@ -160,7 +160,7 @@ function PackagesTab() {
   );
   const remove = useApiMutation(
     (id: string) => api.deleteJson<MessageResponse>(`/api/v1/admin/billing/packages/${id}`),
-    { invalidate: [qk.admin.billing.packages()], onSuccess: () => setDeleting(null) },
+    { invalidate: [qk.admin.billing.packages()], onSuccess: deleting.close },
   );
   useErrorToast(create.error ?? update.error ?? remove.error);
 
@@ -194,7 +194,7 @@ function PackagesTab() {
           <Button size="sm" variant="ghost" onClick={() => setEditing(p)}>
             Edit
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setDeleting(p)}>
+          <Button size="sm" variant="ghost" onClick={() => deleting.ask(p)}>
             <span className="text-destructive">Delete</span>
           </Button>
         </>
@@ -248,17 +248,11 @@ function PackagesTab() {
           />
         </Modal>
       )}
-      {deleting && (
-        <ConfirmDialog
-          title="Delete package"
-          description={`Delete "${deleting.title}"? This cannot be undone.`}
-          confirmLabel="Delete package"
-          destructive
-          busy={remove.isPending}
-          onConfirm={() => remove.mutate(deleting.id)}
-          onClose={() => setDeleting(null)}
-        />
-      )}
+      {deleting.dialog(remove, (d) => ({
+        title: 'Delete package',
+        description: `Delete "${d.title}"? This cannot be undone.`,
+        confirmLabel: 'Delete package',
+      }))}
     </div>
   );
 }

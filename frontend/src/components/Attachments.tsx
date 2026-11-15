@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 
-import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { useDeleteFile, useFiles, useOpenFile, useUploadFile } from '@/hooks/useFiles';
 import { useErrorToast } from '@/hooks/useErrorToast';
 import { apiErrorMessage } from '@/lib/api/client';
@@ -17,7 +17,7 @@ export function Attachments({ kind, parentId }: { kind: ParentKind; parentId: st
   const files = useFiles(kind, parentId);
   const upload = useUploadFile(kind, parentId);
   const opener = useOpenFile();
-  const [deleting, setDeleting] = useState<PrivateFile | null>(null);
+  const deleting = useConfirmDelete<PrivateFile>();
   const remove = useDeleteFile(kind);
   useErrorToast(remove.error);
   const input = useRef<HTMLInputElement>(null);
@@ -46,7 +46,7 @@ export function Attachments({ kind, parentId }: { kind: ParentKind; parentId: st
               <span className="k-muted" data-num-ok>
                 {sizeLabel(f.bytes)}
               </span>
-              <button type="button" className="k-link k-error-text" onClick={() => setDeleting(f)}>
+              <button type="button" className="k-link k-error-text" onClick={() => deleting.ask(f)}>
                 Remove
               </button>
             </span>
@@ -84,16 +84,14 @@ export function Attachments({ kind, parentId }: { kind: ParentKind; parentId: st
           {upload.error ?? opener.error}
         </p>
       )}
-      {deleting && (
-        <ConfirmDialog
-          title={`Remove ${deleting.name}?`}
-          description="The file is deleted from the storage. This cannot be undone."
-          confirmLabel="Remove"
-          destructive
-          busy={remove.isPending}
-          onConfirm={() => remove.mutate(deleting.id, { onSuccess: () => setDeleting(null) })}
-          onClose={() => setDeleting(null)}
-        />
+      {deleting.dialog(
+        remove,
+        (d) => ({
+          title: `Remove ${d.name}?`,
+          description: 'The file is deleted from the storage. This cannot be undone.',
+          confirmLabel: 'Remove',
+        }),
+        { closeOnSuccess: true },
       )}
     </div>
   );

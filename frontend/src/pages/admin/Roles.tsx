@@ -2,12 +2,12 @@ import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { Trash2, Pencil } from 'lucide-react';
 
-import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DataTable, type Column } from '@/components/DataTable';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { useAdminRoles } from '@/hooks/useAdminRoles';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { useErrorToast } from '@/hooks/useErrorToast';
@@ -27,7 +27,7 @@ interface RoleFormState {
 export function AdminRolesPage() {
   const [editing, setEditing] = useState<Role | null>(null);
   const [creating, setCreating] = useState(false);
-  const [deleting, setDeleting] = useState<Role | null>(null);
+  const deleting = useConfirmDelete<Role, number>();
 
   const rolesQ = useAdminRoles();
 
@@ -50,7 +50,7 @@ export function AdminRolesPage() {
 
   const remove = useApiMutation((id: number) => api.deleteJson(`/api/v1/admin/roles/${id}`), {
     invalidate: [qk.admin.roles()],
-    onSuccess: () => setDeleting(null),
+    onSuccess: deleting.close,
   });
 
   // Surface whichever mutation last failed as a toast (out of flow).
@@ -87,7 +87,7 @@ export function AdminRolesPage() {
             variant="ghost"
             disabled={r.is_default}
             title={r.is_default ? 'Default role cannot be deleted' : ''}
-            onClick={() => setDeleting(r)}
+            onClick={() => deleting.ask(r)}
           >
             <Trash2 className="h-3.5 w-3.5 text-destructive" />
           </Button>
@@ -156,17 +156,11 @@ export function AdminRolesPage() {
           onCancel={() => setEditing(null)}
         />
       )}
-      {deleting && (
-        <ConfirmDialog
-          title="Delete role"
-          description={`Delete role "${deleting.name}"? Users referencing it must be reassigned first.`}
-          confirmLabel="Delete role"
-          destructive
-          busy={remove.isPending}
-          onConfirm={() => remove.mutate(deleting.id)}
-          onClose={() => setDeleting(null)}
-        />
-      )}
+      {deleting.dialog(remove, (d) => ({
+        title: 'Delete role',
+        description: `Delete role "${d.name}"? Users referencing it must be reassigned first.`,
+        confirmLabel: 'Delete role',
+      }))}
     </div>
   );
 }

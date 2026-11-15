@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
-import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { useErrorToast } from '@/hooks/useErrorToast';
 import { useClients, useDeleteEntry, useEntries } from '@/hooks/usePractice';
 import { byMonth, entryTitle, monthLabel, todayLocal, type PracticeEntry } from '@/lib/practice';
@@ -21,8 +21,8 @@ export function PracticeMoneyPage() {
   const entries = useEntries({ kind: kind || undefined, client, month });
   const clients = useClients().data ?? [];
   const [editing, setEditing] = useState<PracticeEntry | 'income' | 'expense' | null>(null);
-  const [deleting, setDeleting] = useState<PracticeEntry | null>(null);
-  const remove = useDeleteEntry(() => setDeleting(null));
+  const deleting = useConfirmDelete<PracticeEntry>();
+  const remove = useDeleteEntry(deleting.close);
   useErrorToast(remove.error);
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -101,7 +101,7 @@ export function PracticeMoneyPage() {
                   entry={e}
                   today={today}
                   onEdit={() => setEditing(e)}
-                  onDelete={() => setDeleting(e)}
+                  onDelete={() => deleting.ask(e)}
                 />
               ))}
             </Group>
@@ -121,17 +121,10 @@ export function PracticeMoneyPage() {
           onClose={() => setEditing(null)}
         />
       )}
-      {deleting && (
-        <ConfirmDialog
-          title={`Delete ${entryTitle(deleting)}?`}
-          description="The month totals change with it. This cannot be undone."
-          confirmLabel="Delete"
-          destructive
-          busy={remove.isPending}
-          onConfirm={() => remove.mutate(deleting.id)}
-          onClose={() => setDeleting(null)}
-        />
-      )}
+      {deleting.dialog(remove, (d) => ({
+        title: `Delete ${entryTitle(d)}?`,
+        description: 'The month totals change with it. This cannot be undone.',
+      }))}
     </PracticeFrame>
   );
 }

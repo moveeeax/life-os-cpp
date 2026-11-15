@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { useErrorToast } from '@/hooks/useErrorToast';
 import { useDeleteMeasurement, useMeasurements, useSaveMeasurement } from '@/hooks/useMeasurements';
 import { apiErrorMessage } from '@/lib/api/client';
@@ -137,9 +137,9 @@ export function Measurements() {
   const q = useMeasurements();
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<TapeMeasurement | null>(null);
-  const [deleting, setDeleting] = useState<TapeMeasurement | null>(null);
+  const deleting = useConfirmDelete<TapeMeasurement>();
   const [all, setAll] = useState(false);
-  const remove = useDeleteMeasurement(() => setDeleting(null));
+  const remove = useDeleteMeasurement(deleting.close);
   useErrorToast(remove.error);
   const rows = q.data ?? [];
   const shown = all ? rows : rows.slice(0, SHOWN);
@@ -166,7 +166,7 @@ export function Measurements() {
               m={m}
               before={rows[i + 1]}
               onEdit={() => setEditing(m)}
-              onDelete={() => setDeleting(m)}
+              onDelete={() => deleting.ask(m)}
             />
           ))}
           {rows.length > SHOWN && (
@@ -180,17 +180,10 @@ export function Measurements() {
       )}
       {adding && <MeasurementSheet onClose={() => setAdding(false)} />}
       {editing && <MeasurementSheet m={editing} onClose={() => setEditing(null)} />}
-      {deleting && (
-        <ConfirmDialog
-          title={`Delete the measurement of ${formatDay(deleting.date, { yearUnless: today() })}?`}
-          description="This cannot be undone."
-          confirmLabel="Delete"
-          destructive
-          busy={remove.isPending}
-          onConfirm={() => remove.mutate(deleting.id)}
-          onClose={() => setDeleting(null)}
-        />
-      )}
+      {deleting.dialog(remove, (d) => ({
+        title: `Delete the measurement of ${formatDay(d.date, { yearUnless: today() })}?`,
+        description: 'This cannot be undone.',
+      }))}
     </Group>
   );
 }
