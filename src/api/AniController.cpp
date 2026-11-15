@@ -138,8 +138,7 @@ void AniController::message(const HttpRequestPtr& req, Callback&& callback) {
     const auto text_it = body.find("text");
     const std::string text = text_it != body.end() && text_it->is_string() ? text_it->get<std::string>() : "";
     // Characters, not bytes: the limit of a message is what the person typed.
-    const std::size_t length = Utils::Utf8::length(text);
-    if (text.find_first_not_of(" \t\r\n") == std::string::npos || length > ::Agent::kTurnTextMax) {
+    if (!::Agent::message_text_ok(text)) {
         callback(ErrorResponse::bad_request("invalid_text",
                                             "text is 1 to " + std::to_string(::Agent::kTurnTextMax) + " characters"));
         return;
@@ -151,8 +150,7 @@ void AniController::message(const HttpRequestPtr& req, Callback&& callback) {
         return;
     }
     try {
-        Repositories::Agent::TurnRepository turns;
-        if (turns.count_since(owner, 3600) >= ::Agent::kTurnsPerHour) {
+        if (::Agent::turns_spent(owner)) {
             callback(ErrorResponse::too_many_requests(600));
             return;
         }

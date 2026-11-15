@@ -191,16 +191,16 @@ json chat(const std::string& owner, const json& args) {
         return refusal("Her agent is off.");
     }
     const std::string text = args.value("text", "");
-    if (text.find_first_not_of(" \t\r\n") == std::string::npos || Utils::Utf8::length(text) > Agent::kTurnTextMax) {
+    if (!Agent::message_text_ok(text)) {
         return refusal("text is 1 to " + std::to_string(Agent::kTurnTextMax) + " characters.");
     }
     if (!Jobs::is_initialized()) {
         return refusal("The job queue is not enabled.");
     }
-    TurnRepository turns;
-    if (turns.count_since(owner, 3600) >= Agent::kTurnsPerHour) {
+    if (Agent::turns_spent(owner)) {
         return refusal("At most " + std::to_string(Agent::kTurnsPerHour) + " messages an hour; try later.");
     }
+    TurnRepository turns;
     auto sent = Agent::send(owner, text, turns.last_tz(owner), "mcp");
     switch (sent.status) {
         case Agent::Send::Queued:
@@ -256,8 +256,7 @@ json propose(const std::string& owner, const std::string& tool, const json& args
     if (!Jobs::is_initialized()) {
         return refusal("The job queue is not enabled.");
     }
-    TurnRepository turns;
-    if (turns.count_since(owner, 3600) >= Agent::kTurnsPerHour) {
+    if (Agent::turns_spent(owner)) {
         return refusal("At most " + std::to_string(Agent::kTurnsPerHour) + " messages an hour; try later.");
     }
     auto sent = Agent::propose(owner, tool, args);
@@ -492,19 +491,14 @@ Server ani_server(const std::string& owner, Scheduler after) {
                     return done(refusal(*err));
                 }
                 const auto& r = std::get<Agent::Reminders::Input>(in);
-                const auto made = Repositories::Agent::ReminderRepository().add(owner, r.text, r.at, r.days, r.tz);
-                if (made) {
-                    Security::Audit::record(
-                        owner, "ani.reminder.add", "ani_reminder", (*made)["id"], json{{"via", "mcp"}});
-                }
+                const auto made = Agent::Reminders::add(owner, r, "mcp");
                 return done(made ? result("Added.", *made) : refusal("At most 20 reminders."));
             }
             if (name == "ani_reminder_remove") {
                 const std::string id = args.value("id", "");
-                if (!Repositories::Agent::ReminderRepository().remove(owner, id)) {
+                if (!Agent::Reminders::remove(owner, id, "mcp")) {
                     return done(refusal("No such reminder."));
                 }
-                Security::Audit::record(owner, "ani.reminder.remove", "ani_reminder", id, json{{"via", "mcp"}});
                 return done(result("Removed.", json::object()));
             }
             if (name == "ani_history") {

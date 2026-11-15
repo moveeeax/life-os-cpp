@@ -269,12 +269,11 @@ void AniSettingsController::addReminder(const HttpRequestPtr& req, Callback&& ca
     }
     const auto& r = std::get<::Agent::Reminders::Input>(in);
     try {
-        const auto made = Repositories::Agent::ReminderRepository().add(owner, r.text, r.at, r.days, r.tz);
+        const auto made = ::Agent::Reminders::add(owner, r, "api");
         if (!made) {
             callback(ErrorResponse::conflict("too_many", "at most 20 reminders"));
             return;
         }
-        Security::Audit::record(owner, "ani.reminder.add", "ani_reminder", (*made)["id"], json{{"via", "api"}});
         auto resp = Response::ok(json{{"data", *made}});
         resp->setStatusCode(k201Created);
         callback(resp);
@@ -287,11 +286,10 @@ void AniSettingsController::addReminder(const HttpRequestPtr& req, Callback&& ca
 void AniSettingsController::removeReminder(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     ANI_SETTINGS_GUARD(req, callback, owner);
     try {
-        if (!Repositories::Agent::ReminderRepository().remove(owner, id)) {
+        if (!::Agent::Reminders::remove(owner, id, "api")) {
             callback(ErrorResponse::not_found("not_found"));
             return;
         }
-        Security::Audit::record(owner, "ani.reminder.remove", "ani_reminder", id, json{{"via", "api"}});
         no_content(callback);
     } catch (const std::exception& e) {
         spdlog::error("ani.reminders remove failed: {}", e.what());

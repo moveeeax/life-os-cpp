@@ -58,6 +58,14 @@ struct Sent {
     nlohmann::json turn;
 };
 
+/// Whether @p text can be a message: not only spaces, at most kTurnTextMax
+/// characters (code points, what the person typed).
+bool message_text_ok(const std::string& text);
+
+/// Whether @p owner sent kTurnsPerHour messages within the last hour (the
+/// chat and the MCP together).
+bool turns_spent(const std::string& owner);
+
 /// Queues @p text (already checked: 1 to kTurnTextMax characters, a known zone)
 /// as a turn of @p origin: "user" (the chat on Now) or "mcp" (her MCP).
 Sent send(const std::string& owner, const std::string& text, const std::string& tz, const std::string& origin = "user");

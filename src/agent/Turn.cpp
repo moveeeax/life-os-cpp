@@ -208,6 +208,14 @@ std::string without_preface(const std::string& reply) {
     return rest == std::string::npos ? reply : reply.substr(rest);
 }
 
+bool message_text_ok(const std::string& text) {
+    return text.find_first_not_of(" \t\r\n") != std::string::npos && Utils::Utf8::length(text) <= kTurnTextMax;
+}
+
+bool turns_spent(const std::string& owner) {
+    return TurnRepository().count_since(owner, 3600) >= kTurnsPerHour;
+}
+
 Sent send(const std::string& owner, const std::string& text, const std::string& tz, const std::string& origin) {
     const auto s = read_settings();
     if (!s) {

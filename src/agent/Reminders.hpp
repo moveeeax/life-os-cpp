@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
 #include <variant>
 
@@ -26,6 +27,14 @@ struct Input {
 /// Checks {text, time: "HH:MM", days: [1..7] (Mon=1; default every day), tz?}
 /// (@p fallback_tz when tz is absent); an error message when wrong.
 std::variant<Input, std::string> parse(const nlohmann::json& body, const std::string& fallback_tz);
+
+/// Adds @p in as a reminder of @p owner and puts it in the audit trail with
+/// @p via ("api" or "mcp"); the row, or nullopt when they keep 20 already.
+std::optional<nlohmann::json> add(const std::string& owner, const Input& in, const std::string& via);
+
+/// Removes the reminder @p id of @p owner and puts it in the audit trail
+/// with @p via; false when they have no such reminder.
+bool remove(const std::string& owner, const std::string& id, const std::string& via);
 
 inline constexpr const char* kDueJob = "ani_reminders_due";
 /// How long a reminder's line waits for the page.
