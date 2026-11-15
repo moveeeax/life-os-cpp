@@ -171,6 +171,7 @@ observability -> utils
 repositories -> database
 repositories -> domain
 repositories -> utils
+repositories/agent -> domain
 repositories/agent -> database
 repositories/agent -> utils
 repositories/fitness -> database

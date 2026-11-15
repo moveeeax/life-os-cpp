@@ -31,6 +31,7 @@
 #include "api/AniController.hpp"
 #include "api/AniCuesController.hpp"
 #include "api/AniHookController.hpp"
+#include "api/AniLevelController.hpp"
 #include "api/AniMcpController.hpp"
 #include "api/AniSettingsController.hpp"
 #include "api/ApiKeyController.hpp"

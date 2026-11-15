@@ -1529,6 +1529,28 @@ components:
         days: { type: integer, minimum: 1, maximum: 127, description: Weekday bitmask, Monday = 1 .. Sunday = 64 }
         tz: { type: string }
         next_at: { type: string, format: date-time }
+    AniLevel:
+      type: object
+      required: [level, weakest, started_on, through, scales]
+      properties:
+        level: { type: integer, minimum: 1, description: 'The lowest level of the four scales' }
+        weakest: { type: string, enum: [tasks, body, food, money], description: 'The scale with the fewest points (the first of them on a tie)' }
+        started_on: { type: string, format: date, description: 'The day the count starts from' }
+        through: { type: string, format: date, description: 'The last closed local day counted' }
+        scales: { type: array, items: { $ref: '#/components/schemas/AniLevelScale' } }
+
+    AniLevelScale:
+      type: object
+      required: [id, level, points, from, to, week, debt]
+      properties:
+        id: { type: string, enum: [tasks, body, food, money] }
+        level: { type: integer, minimum: 1 }
+        points: { type: integer, description: 'All points of the scale' }
+        from: { type: integer, description: 'Points that reached this level' }
+        to: { type: integer, description: 'Points that reach the next one' }
+        week: { type: integer, description: 'Points of the last 7 counted days' }
+        debt: { type: boolean, description: 'A debt of attention holds on the last counted day: the scale earns half until it is gone' }
+
     AniCue:
       type: object
       required: [id, screen, text, action, expires_at]
@@ -12302,6 +12324,37 @@ paths:
         '400': { description: 'A date or zone that is not one (invalid_query)' }
         '401': { description: 'Not authenticated, or an API key (key_not_allowed)' }
         '404': { description: 'No such cue (cue_not_found): not a rule id, or not an agent cue of that day' }
+  /api/v1/ani/level:
+    get:
+      summary: Ani's level and the four scales it comes from
+      description: >-
+        Points for the days of the person's life by four scales (tasks, body,
+        food, money), counted on each read from the person's own records. A
+        scale earns up to 100 points a day for hitting the person's own goals
+        (the tasks closed of those due and the focus, sleep, steps and
+        workouts, the diary and the day's targets, spending within the budget)
+        and half of that on the days a debt of attention holds. Nothing is
+        taken away, so points and levels only grow. Reaching level L takes
+        100*(L-1) + 25*(L-1)*L points of a scale, and Ani's level is the
+        lowest level of the four. The count starts 90 days before the first
+        read and stays there; a local day is counted once it is closed (at
+        04:00 of the next), the day in progress is not.
+      tags: [ani]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: tz, in: query, description: The caller's IANA zone (UTC when absent), schema: { type: string } }
+      responses:
+        '200':
+          description: Ani's level and the scales, in the order tasks, body, food, money
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/AniLevel' }
+        '400': { description: 'A zone that is not one (invalid_query)' }
+        '401': { description: Not authenticated }
   /api/v1/ani/webhook/rotate:
     post:
       summary: Replace the caller's Ani webhook URL

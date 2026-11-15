@@ -321,6 +321,7 @@ public:
         "mood_checkins",
         "tape_measurements",
         "fitness_goals",
+        "ani_level_start",
         "habit_checks",
         "habits",
         "notes",
