@@ -14,28 +14,12 @@ import {
 import { api } from '@/lib/api/client';
 import type { Today } from '@/lib/now/types';
 import { CURRENCY_OF } from '@/lib/now/currency';
+import { modePin, setModePin } from '@/lib/now/mode';
 import { countryName } from '@/lib/travel';
 
 import { hhmm, type NowDay } from '../ribbon/layout';
-import {
-  MODE_KEY,
-  arrival,
-  flightsToday,
-  hourIn,
-  minutesUntil,
-  modeNeeds,
-  modeOf,
-  type Mode,
-} from './modes';
+import { arrival, flightsToday, hourIn, minutesUntil, modeNeeds, modeOf, type Mode } from './modes';
 import './modes.css';
-
-function readPin(): string | null {
-  try {
-    return localStorage.getItem(MODE_KEY);
-  } catch {
-    return null;
-  }
-}
 
 function Card({ k, v, s }: { k: string; v: React.ReactNode; s?: React.ReactNode }) {
   return (
@@ -71,7 +55,7 @@ export function ModeCards({
   today: Today | undefined;
   day: NowDay | undefined;
 }) {
-  const [pin, setPin] = useState<string | null>(readPin);
+  const [pin, setPin] = useState<string | null>(modePin);
   const travelOn = useModuleOn('travel', TRAVEL_PROBE, true);
   const moneyOn = useModuleOn('money', MONEY_PROBE, true);
   const hour = hourIn(now, tz);
@@ -135,11 +119,7 @@ export function ModeCards({
 
   if (!mode) return null;
   const hide = () => {
-    try {
-      localStorage.setItem(MODE_KEY, 'off');
-    } catch {
-      // Remembering it is a convenience.
-    }
+    setModePin('off');
     setPin('off');
   };
   const nowMs = now.getTime();

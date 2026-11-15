@@ -8,8 +8,7 @@ import { useApiMutation } from '@/hooks/useApiMutation';
 import { api } from '@/lib/api/client';
 import { formatDay } from '@/lib/dates';
 import type { components } from '@/lib/api/schema.gen';
-import { readAlbum } from '@/pages/now/ani/life';
-import { HOLD_KEY, LINE_KINDS } from '@/pages/now/ani/lines';
+import { HOLD_KEY, LINE_KINDS, readAlbum } from '@/lib/now/ani';
 
 type Fact = components['schemas']['AniFact'];
 type Prefs = components['schemas']['AniPrefs'];

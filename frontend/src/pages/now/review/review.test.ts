@@ -2,9 +2,10 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { REVIEW_EVENT } from '@/lib/now/act';
 import type { Today } from '@/lib/now/types';
 
-import { dueThisWeek, groupsOf, REVIEW_EVENT, SEEN_KEY, useWeeklyReview, weekOf } from './review';
+import { dueThisWeek, groupsOf, SEEN_KEY, useWeeklyReview, weekOf } from './review';
 
 describe('weekOf', () => {
   it('is the ISO week of a local day', () => {

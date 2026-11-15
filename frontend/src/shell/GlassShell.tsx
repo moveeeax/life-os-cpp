@@ -3,7 +3,7 @@ import { Outlet, useLocation } from 'react-router';
 
 import '@fontsource-variable/outfit';
 
-import { keepsNow } from '@/pages/now/wide';
+import { keepsNow } from '@/lib/now/wide';
 
 import { Backdrop } from './Backdrop';
 import { GlassAccountMenu } from './GlassAccountMenu';

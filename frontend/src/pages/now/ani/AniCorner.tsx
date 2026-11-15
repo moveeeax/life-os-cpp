@@ -6,28 +6,27 @@ import { qk } from '@/lib/api/queryKeys';
 import { clockIn } from '@/lib/dates';
 
 import { useAniPrefs, useMuteKind } from '@/hooks/useAni';
+import { HOLD_KEY, useAni, type AniOutfit } from '@/lib/now/ani';
 import type { NowWeather, Today } from '@/lib/now/types';
 
 import { AniChat, SpeakerIcon } from './AniChat';
 import { soundOn, speechUrl, useSound } from './chat';
 import type { Ani } from './engine';
-import { REVIEW_EVENT } from '../review/review';
 import { evening, tomorrowOf, waitingWords, type Waiting } from './evening';
 import { greeting, HELLO, hourOf } from './greet';
 import { useInbox, type Play } from './inbox';
 import { moodLevel, moodOf, moveMood } from './mood';
 import type { Talk, TalkState } from './talk';
-import { useAni, type AniOutfit } from './state';
 import { createToucher, say, type Answer } from './touch';
 import { AniOffers } from './AniOffers';
 import { useLife } from './useLife';
 import { useLife2 } from './useLife2';
-import { ACT_EVENT, type Act } from '@/lib/now/act';
+import { ACT_EVENT, REVIEW_EVENT, type Act } from '@/lib/now/act';
 import { carriesGive, readGive } from '@/lib/now/drag';
 import { firstFreeSlot, topCategory } from './give';
 import { reactionTo, ReactionGate } from './reactions';
 import { useRefresh } from './refresh';
-import { HOLD_KEY, eventOfLine, quietKind, snooze, type LineKind } from './lines';
+import { eventOfLine, quietKind, snooze, type LineKind } from './lines';
 import { RIBBON_POINT, type NowDay } from '../ribbon/layout';
 import './ani.css';
 

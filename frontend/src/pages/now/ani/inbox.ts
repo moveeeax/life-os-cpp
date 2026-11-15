@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema.gen';
+import type { AniOutfit } from '@/lib/now/ani';
 
 import { plural } from './greet';
 import { inboxKind, type LineKind } from './lines';
-import type { AniOutfit } from './state';
 
 /*
  * What came through her webhook (POST /api/v1/ani/hook/...), played on Now.

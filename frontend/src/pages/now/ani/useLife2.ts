@@ -8,6 +8,7 @@ import { useCrossings } from '@/hooks/useTravel';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import { clockIn } from '@/lib/dates';
+import { addMoment } from '@/lib/now/ani';
 import { CURRENCY_OF } from '@/lib/now/currency';
 
 import type { AniContext } from './AniCorner';
@@ -34,7 +35,7 @@ import {
 } from './life2';
 import { arrival } from '../modes/modes';
 import { useWarm } from './warm';
-import { addMoment, MORNING_FROM } from './life';
+import { MORNING_FROM } from './life';
 import type { Changed } from './refresh';
 import type { Answer } from './touch';
 

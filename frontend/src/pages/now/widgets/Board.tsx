@@ -10,21 +10,19 @@ import { qk } from '@/lib/api/queryKeys';
 import { formatTotal } from '@/lib/networth';
 import { shortDay } from '@/lib/travel';
 import type { Today } from '@/lib/now/types';
+import { FIXED, widgetKey, type Widget } from '@/lib/now/widgets';
 
 import { hourIn } from '../modes/modes';
 import {
   documentLeft,
   documentName,
   DOCUMENTS_SHOWN,
-  FIXED,
   GLASS_ML,
   mealAt,
   quickFoods,
   sparkPoints,
   trendWords,
   weekRange,
-  widgetKey,
-  type Widget,
 } from './widgets';
 import './widgets.css';
 

@@ -3,9 +3,6 @@ import type { TravelCrossing, TravelTrip, TravelTripItem } from '@/lib/travel';
 
 export type Mode = 'flight' | 'arrive' | 'morning' | 'evening';
 
-/** Pinned to one mode, "off", or empty for by itself (localStorage). */
-export const MODE_KEY = 'now:mode';
-
 /** Morning cards until this hour, evening cards from this one. */
 export const MORNING_UNTIL = 10;
 export const EVENING_FROM = 21;

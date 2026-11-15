@@ -5,12 +5,12 @@ import { useCrossings } from '@/hooks/useTravel';
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import { clockIn } from '@/lib/dates';
+import { addMoment } from '@/lib/now/ani';
 
 import type { Ani } from './engine';
 import type { AniContext } from './AniCorner';
 import {
   achievementsOf,
-  addMoment,
   anniversaryOf,
   dealLine,
   energyLine,

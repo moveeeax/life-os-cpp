@@ -79,3 +79,43 @@ export function aniBase(wallpaperUrl: string | undefined): string | null {
   if (i < 0) return null;
   return `${wallpaperUrl.slice(0, i)}/wallpapers/ani/`;
 }
+
+/** The browser's choice of hold to talk (Account → Ani): "1" holds. */
+export const HOLD_KEY = 'now:ani:hold';
+
+/** Her mutable kinds of lines, as the page names them. */
+export const LINE_KINDS: Record<string, string> = {
+  brief: 'Morning brief',
+  evening: 'Evening word',
+  break: 'Break after focus',
+  stretch: 'Stretch reminders',
+  hello: 'Hellos',
+  telegram: 'Telegram news',
+  webhook: 'Webhook events',
+  reminder: 'Reminders',
+  calendar: 'Calendar news',
+};
+
+const ALBUM_KEY = 'now:ani:album';
+export type Moment = { date: string; title: string };
+
+/** The moments of her album in this browser, newest first. */
+export function readAlbum(): Moment[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(ALBUM_KEY) ?? '[]') as Moment[];
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Keeps a moment (an achievement, a kept promise, an anniversary, a record) once per title and day. */
+export function addMoment(date: string, title: string): void {
+  try {
+    const all = readAlbum();
+    if (all.some((m) => m.date === date && m.title === title)) return;
+    localStorage.setItem(ALBUM_KEY, JSON.stringify([{ date, title }, ...all].slice(0, 200)));
+  } catch {
+    // The album is a convenience of this browser.
+  }
+}

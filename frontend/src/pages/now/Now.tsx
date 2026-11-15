@@ -23,13 +23,14 @@ import {
   weatherLine,
   withoutChip,
 } from '@/lib/now';
+import { aniBase, useAni } from '@/lib/now/ani';
+import { KEEP_FROM, keepsNow, useWide } from '@/lib/now/wide';
 import { homeOf } from '@/shell/sections';
 import { useGlassNav } from '@/shell/useGlassNav';
 
 import { useFocusInbox } from './ani/inbox';
 import { useWeeklyReview } from './review/review';
 import { WeeklyReview } from './review/WeeklyReview';
-import { aniBase, useAni } from './ani/state';
 import { Corners } from './corners/Corners';
 import { FocusMode } from './focus/FocusMode';
 import { useFocusSession } from './focus/useFocusSession';
@@ -41,7 +42,6 @@ import { ModeCards } from './modes/ModeCards';
 import { Board } from './widgets/Board';
 import { useNowDay } from './ribbon/layout';
 import { Ribbon } from './ribbon/Ribbon';
-import { KEEP_FROM, keepsNow, useWide } from './wide';
 import './now.css';
 
 // Ani's corner (her chat, shelf, life and the engine import) only comes with

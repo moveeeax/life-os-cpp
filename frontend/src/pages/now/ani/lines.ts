@@ -12,22 +12,6 @@ export type LineKind =
   | 'reminder'
   | 'calendar';
 
-/** The browser's choice of hold to talk (Account → Ani): "1" holds. */
-export const HOLD_KEY = 'now:ani:hold';
-
-/** Her mutable kinds of lines, as the page names them. */
-export const LINE_KINDS: Record<string, string> = {
-  brief: 'Morning brief',
-  evening: 'Evening word',
-  break: 'Break after focus',
-  stretch: 'Stretch reminders',
-  hello: 'Hellos',
-  telegram: 'Telegram news',
-  webhook: 'Webhook events',
-  reminder: 'Reminders',
-  calendar: 'Calendar news',
-};
-
 export const SNOOZE_MS = 60 * 60_000;
 const snoozeKey = (kind: LineKind) => `now:ani:snooze:${kind}`;
 

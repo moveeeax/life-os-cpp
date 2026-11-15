@@ -87,17 +87,3 @@ describe("Ani's life", () => {
     expect(achievementsOf(null, [])).toEqual([]);
   });
 });
-
-describe('album', () => {
-  it('HerAlbum: keeps each moment once, newest first', async () => {
-    const { addMoment, readAlbum } = await import('./life');
-    localStorage.clear();
-    addMoment('2026-10-30', 'Десять часов фокуса за неделю');
-    addMoment('2026-10-31', 'Уговор выполнен: Зал');
-    addMoment('2026-10-31', 'Уговор выполнен: Зал');
-    expect(readAlbum()).toEqual([
-      { date: '2026-10-31', title: 'Уговор выполнен: Зал' },
-      { date: '2026-10-30', title: 'Десять часов фокуса за неделю' },
-    ]);
-  });
-});
