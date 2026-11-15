@@ -14,6 +14,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/JsonRows.hpp"
 #include "repositories/RepoErrors.hpp"
 #include "repositories/SqlErrors.hpp"
 
@@ -101,15 +102,12 @@ private:
 
     template <typename Txn>
     static std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& date) {
-        auto r = txn.exec_params(
-            "SELECT row_to_json(t) FROM (SELECT to_char(date, 'YYYY-MM-DD') AS date, kind, ref_id::text AS ref_id, "
-            " text, done_at IS NOT NULL AS done FROM day_focus WHERE owner_id = $1::uuid AND date = $2::date) t",
+        return Repositories::JsonRows::one(
+            txn,
+            "SELECT to_char(date, 'YYYY-MM-DD') AS date, kind, ref_id::text AS ref_id, "
+            " text, done_at IS NOT NULL AS done FROM day_focus WHERE owner_id = $1::uuid AND date = $2::date",
             owner,
             date);
-        if (r.empty()) {
-            return std::nullopt;
-        }
-        return nlohmann::json::parse(r[0][0].template as<std::string>());
     }
 };
 

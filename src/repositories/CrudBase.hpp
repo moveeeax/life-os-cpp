@@ -19,6 +19,10 @@
  * joined loads (e.g. UserRepository, which joins roles) keep their own queries;
  * the base is for the plain single-table case.
  *
+ * This base and the typed-DTO conventions below serve the domain-struct repos
+ * (users, roles, billing). The owner-scoped life modules build their answer in
+ * SQL instead and go through JsonRows.hpp (one / many / owns_in).
+ *
  * ── Data-layer ergonomics conventions (recommended for new resources) ────────
  *  - Sorting/filtering: never concatenate a client `?sort=` column into SQL;
  *    map it through a fixed column allowlist first.

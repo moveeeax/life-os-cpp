@@ -18,6 +18,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/JsonRows.hpp"
 #include "repositories/RepoErrors.hpp"
 #include "repositories/SqlErrors.hpp"
 
@@ -137,13 +138,14 @@ public:
     /// The ready files of one parent, oldest first.
     nlohmann::json list(const std::string& owner, const std::string& kind, const std::string& parent_id) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
-                                         " FROM private_files WHERE owner_id = $1::uuid AND parent_kind = $2 "
-                                         " AND parent_id = $3::uuid AND status = 'ready' ORDER BY created_at, id) t",
-                                     owner,
-                                     kind,
-                                     parent_id);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
+            return Repositories::JsonRows::many(
+                txn,
+                "SELECT " + std::string(kColumns) +
+                    " FROM private_files WHERE owner_id = $1::uuid AND parent_kind = $2 "
+                    " AND parent_id = $3::uuid AND status = 'ready' ORDER BY created_at, id",
+                owner,
+                kind,
+                parent_id);
         });
     }
 
@@ -243,14 +245,11 @@ private:
 
     template <typename Txn>
     static std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& id) {
-        auto r = txn.exec_params("SELECT row_to_json(t) FROM (SELECT " + std::string(kColumns) +
-                                     " FROM private_files WHERE owner_id = $1::uuid AND id = $2::uuid) t",
-                                 owner,
-                                 id);
-        if (r.empty()) {
-            return std::nullopt;
-        }
-        return nlohmann::json::parse(r[0][0].template as<std::string>());
+        return Repositories::JsonRows::one(
+            txn,
+            "SELECT " + std::string(kColumns) + " FROM private_files WHERE owner_id = $1::uuid AND id = $2::uuid",
+            owner,
+            id);
     }
 };
 

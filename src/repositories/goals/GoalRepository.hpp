@@ -16,6 +16,7 @@
 
 #include "database/Database.hpp"
 #include "goals/Progress.hpp"
+#include "repositories/JsonRows.hpp"
 #include "repositories/SqlTime.hpp"
 #include "repositories/goals/Errors.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
@@ -87,12 +88,13 @@ public:
     /// The owner's goals of one status ("" for all), by due date.
     nlohmann::json list(const std::string& owner, const std::string& status) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
-                                         " FROM goal_items WHERE owner_id = $1::uuid AND ($2 = '' OR status = $2) "
-                                         " ORDER BY due, created_at) t",
-                                     owner,
-                                     status);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
+            return Repositories::JsonRows::many(
+                txn,
+                "SELECT " + std::string(kColumns) +
+                    " FROM goal_items WHERE owner_id = $1::uuid AND ($2 = '' OR status = $2) "
+                    " ORDER BY due, created_at",
+                owner,
+                status);
         });
     }
 
@@ -187,12 +189,12 @@ public:
     /// Check-ins newest first, as the page lists them.
     nlohmann::json checkins(const std::string& owner, const std::string& goal) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params(
-                "SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kCheckinColumns) +
-                    " FROM goal_checkins WHERE owner_id = $1::uuid AND goal_id = $2::uuid ORDER BY date DESC) t",
+            return Repositories::JsonRows::many(
+                txn,
+                "SELECT " + std::string(kCheckinColumns) +
+                    " FROM goal_checkins WHERE owner_id = $1::uuid AND goal_id = $2::uuid ORDER BY date DESC",
                 owner,
                 goal);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
         });
     }
 
@@ -238,13 +240,13 @@ public:
 
     nlohmann::json sections(const std::string& owner, const std::string& goal) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " +
-                                         std::string(kSectionColumns) +
-                                         " FROM goal_sections WHERE owner_id = $1::uuid AND goal_id = $2::uuid "
-                                         " ORDER BY position, created_at) t",
-                                     owner,
-                                     goal);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
+            return Repositories::JsonRows::many(
+                txn,
+                "SELECT " + std::string(kSectionColumns) +
+                    " FROM goal_sections WHERE owner_id = $1::uuid AND goal_id = $2::uuid "
+                    " ORDER BY position, created_at",
+                owner,
+                goal);
         });
     }
 
@@ -309,13 +311,13 @@ public:
 
     nlohmann::json milestones(const std::string& owner, const std::string& goal) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " +
-                                         std::string(kMilestoneColumns) +
-                                         " FROM goal_milestones WHERE owner_id = $1::uuid AND goal_id = $2::uuid "
-                                         " ORDER BY date) t",
-                                     owner,
-                                     goal);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
+            return Repositories::JsonRows::many(
+                txn,
+                "SELECT " + std::string(kMilestoneColumns) +
+                    " FROM goal_milestones WHERE owner_id = $1::uuid AND goal_id = $2::uuid "
+                    " ORDER BY date",
+                owner,
+                goal);
         });
     }
 
@@ -368,15 +370,14 @@ public:
     /// The goal's tasks, in section order then by creation.
     nlohmann::json tasks_of(const std::string& owner, const std::string& goal) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params(
-                "SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " +
-                    std::string(Repositories::Tasks::TaskRepository::kColumns) +
+            return Repositories::JsonRows::many(
+                txn,
+                "SELECT " + std::string(Repositories::Tasks::TaskRepository::kColumns) +
                     " FROM task_items WHERE owner_id = $1::uuid AND goal_id = $2::uuid "
                     " ORDER BY (SELECT s.position FROM goal_sections s WHERE s.id = task_items.goal_section_id) "
-                    " NULLS LAST, created_at) t",
+                    " NULLS LAST, created_at",
                 owner,
                 goal);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
         });
     }
 
@@ -435,14 +436,11 @@ public:
 private:
     template <typename Txn>
     static std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& id) {
-        auto r = txn.exec_params("SELECT row_to_json(t) FROM (SELECT " + std::string(kColumns) +
-                                     " FROM goal_items WHERE owner_id = $1::uuid AND id = $2::uuid) t",
-                                 owner,
-                                 id);
-        if (r.empty()) {
-            return std::nullopt;
-        }
-        return nlohmann::json::parse(r[0][0].template as<std::string>());
+        return Repositories::JsonRows::one(
+            txn,
+            "SELECT " + std::string(kColumns) + " FROM goal_items WHERE owner_id = $1::uuid AND id = $2::uuid",
+            owner,
+            id);
     }
 
     template <typename Txn>

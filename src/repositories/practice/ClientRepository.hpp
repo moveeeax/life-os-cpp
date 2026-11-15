@@ -13,6 +13,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/JsonRows.hpp"
 #include "repositories/SqlTime.hpp"
 #include "repositories/practice/Errors.hpp"
 
@@ -109,11 +110,11 @@ public:
     /// Every client of the owner by name.
     nlohmann::json list(const std::string& owner) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
-                                         " FROM practice_clients c WHERE c.owner_id = $1::uuid "
-                                         " ORDER BY lower(c.name), c.created_at) t",
-                                     owner);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
+            return Repositories::JsonRows::many(txn,
+                                                "SELECT " + std::string(kColumns) +
+                                                    " FROM practice_clients c WHERE c.owner_id = $1::uuid "
+                                                    " ORDER BY lower(c.name), c.created_at",
+                                                owner);
         });
     }
 
@@ -130,14 +131,12 @@ private:
 
     template <typename Txn>
     static std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& id) {
-        auto r = txn.exec_params("SELECT row_to_json(t) FROM (SELECT " + std::string(kColumns) +
-                                     " FROM practice_clients c WHERE c.owner_id = $1::uuid AND c.id = $2::uuid) t",
-                                 owner,
-                                 id);
-        if (r.empty()) {
-            return std::nullopt;
-        }
-        return nlohmann::json::parse(r[0][0].template as<std::string>());
+        return Repositories::JsonRows::one(
+            txn,
+            "SELECT " + std::string(kColumns) +
+                " FROM practice_clients c WHERE c.owner_id = $1::uuid AND c.id = $2::uuid",
+            owner,
+            id);
     }
 };
 

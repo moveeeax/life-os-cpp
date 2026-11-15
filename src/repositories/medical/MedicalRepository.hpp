@@ -18,6 +18,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/JsonRows.hpp"
 #include "repositories/RepoErrors.hpp"
 #include "repositories/SqlErrors.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
@@ -66,32 +67,12 @@ inline void translate(std::string_view sqlstate) {
     }
 }
 
-/// One JSON object (row_to_json) or nullopt.
-template <typename Txn, typename... Args>
-std::optional<nlohmann::json> one(Txn& txn, const std::string& sql, Args&&... args) {
-    auto r = txn.exec_params("SELECT row_to_json(t) FROM (" + sql + ") t", std::forward<Args>(args)...);
-    if (r.empty()) {
-        return std::nullopt;
-    }
-    return nlohmann::json::parse(r[0][0].template as<std::string>());
-}
-
-/// A JSON array (json_agg) of the rows of @p sql, in its order.
-template <typename Txn, typename... Args>
-nlohmann::json many(Txn& txn, const std::string& sql, Args&&... args) {
-    auto r =
-        txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (" + sql + ") t", std::forward<Args>(args)...);
-    return nlohmann::json::parse(r[0][0].template as<std::string>());
-}
+using Repositories::JsonRows::many;
+using Repositories::JsonRows::one;
 
 template <typename Txn>
 bool owns(Txn& txn, const char* table, const std::string& owner, const std::optional<std::string>& id) {
-    if (!id) {
-        return true;
-    }
-    return !txn.exec_params(
-                   std::string("SELECT 1 FROM ") + table + " WHERE owner_id = $1::uuid AND id = $2::uuid", owner, *id)
-                .empty();
+    return Repositories::JsonRows::owns_in(txn, table, owner, id);
 }
 
 /// A task title of at most 200 characters (task_items' CHECK).

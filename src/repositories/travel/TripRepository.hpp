@@ -16,6 +16,7 @@
 #include <nlohmann/json.hpp>
 
 #include "database/Database.hpp"
+#include "repositories/JsonRows.hpp"
 #include "repositories/travel/Errors.hpp"
 
 namespace Repositories::Travel {
@@ -98,13 +99,14 @@ public:
     /// One page of the owner's trips, the latest start first.
     nlohmann::json list(const std::string& owner, int limit, int offset) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r = txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kColumns) +
-                                         " FROM travel_trips WHERE owner_id = $1::uuid ORDER BY start_date DESC, id "
-                                         " LIMIT $2 OFFSET $3) t",
-                                     owner,
-                                     limit,
-                                     offset);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
+            return Repositories::JsonRows::many(
+                txn,
+                "SELECT " + std::string(kColumns) +
+                    " FROM travel_trips WHERE owner_id = $1::uuid ORDER BY start_date DESC, id "
+                    " LIMIT $2 OFFSET $3",
+                owner,
+                limit,
+                offset);
         });
     }
 
@@ -112,15 +114,13 @@ public:
     /// the next one, if any.
     std::optional<nlohmann::json> next(const std::string& owner, const std::string& date) {
         return Database::get().execute_read([&](auto& txn) -> std::optional<nlohmann::json> {
-            auto r = txn.exec_params("SELECT row_to_json(t) FROM (SELECT " + std::string(kColumns) +
-                                         " FROM travel_trips WHERE owner_id = $1::uuid AND end_date >= $2::date "
-                                         " ORDER BY start_date, id LIMIT 1) t",
-                                     owner,
-                                     date);
-            if (r.empty()) {
-                return std::nullopt;
-            }
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
+            return Repositories::JsonRows::one(
+                txn,
+                "SELECT " + std::string(kColumns) +
+                    " FROM travel_trips WHERE owner_id = $1::uuid AND end_date >= $2::date "
+                    " ORDER BY start_date, id LIMIT 1",
+                owner,
+                date);
         });
     }
 
@@ -187,13 +187,13 @@ public:
 
     nlohmann::json items(const std::string& owner, const std::string& trip) {
         return Database::get().execute_read([&](auto& txn) {
-            auto r =
-                txn.exec_params("SELECT COALESCE(json_agg(t), '[]'::json) FROM (SELECT " + std::string(kItemColumns) +
-                                    " FROM travel_trip_items WHERE owner_id = $1::uuid AND trip_id = $2::uuid "
-                                    " ORDER BY date, time NULLS FIRST, position, id) t",
-                                owner,
-                                trip);
-            return nlohmann::json::parse(r[0][0].template as<std::string>());
+            return Repositories::JsonRows::many(
+                txn,
+                "SELECT " + std::string(kItemColumns) +
+                    " FROM travel_trip_items WHERE owner_id = $1::uuid AND trip_id = $2::uuid "
+                    " ORDER BY date, time NULLS FIRST, position, id",
+                owner,
+                trip);
         });
     }
 
@@ -362,26 +362,20 @@ private:
 
     template <typename Txn>
     std::optional<nlohmann::json> find_in(Txn& txn, const std::string& owner, const std::string& id) {
-        auto r = txn.exec_params("SELECT row_to_json(t) FROM (SELECT " + std::string(kColumns) +
-                                     " FROM travel_trips WHERE owner_id = $1::uuid AND id = $2::uuid) t",
-                                 owner,
-                                 id);
-        if (r.empty()) {
-            return std::nullopt;
-        }
-        return nlohmann::json::parse(r[0][0].template as<std::string>());
+        return Repositories::JsonRows::one(
+            txn,
+            "SELECT " + std::string(kColumns) + " FROM travel_trips WHERE owner_id = $1::uuid AND id = $2::uuid",
+            owner,
+            id);
     }
 
     template <typename Txn>
     std::optional<nlohmann::json> find_item_in(Txn& txn, const std::string& owner, const std::string& id) {
-        auto r = txn.exec_params("SELECT row_to_json(t) FROM (SELECT " + std::string(kItemColumns) +
-                                     " FROM travel_trip_items WHERE owner_id = $1::uuid AND id = $2::uuid) t",
-                                 owner,
-                                 id);
-        if (r.empty()) {
-            return std::nullopt;
-        }
-        return nlohmann::json::parse(r[0][0].template as<std::string>());
+        return Repositories::JsonRows::one(txn,
+                                           "SELECT " + std::string(kItemColumns) +
+                                               " FROM travel_trip_items WHERE owner_id = $1::uuid AND id = $2::uuid",
+                                           owner,
+                                           id);
     }
 };
 
