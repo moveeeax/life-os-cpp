@@ -169,7 +169,7 @@ private:
             "created_at") " AS created_at, " SQL_ISO_UTC("updated_at") " AS updated_at";
 
     static void translate(std::string_view sqlstate) {
-        if (sqlstate == "23514") {  // check_violation
+        if (Repositories::detail::is_check_violation(sqlstate)) {
             throw MeasurementInvariant();
         }
     }

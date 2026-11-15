@@ -252,10 +252,10 @@ private:
         " " SQL_ISO_UTC("n.updated_at") " AS updated_at";
 
     static void translate(std::string_view sqlstate) {
-        if (sqlstate == "23505") {  // unique_violation: (owner, slug)
+        if (Repositories::detail::is_unique_violation(sqlstate)) {  // unique_violation: (owner, slug)
             throw SlugTaken();
         }
-        if (sqlstate == "23514" || Repositories::detail::is_fk_violation(sqlstate)) {  // check, foreign key
+        if (Repositories::detail::is_check_violation(sqlstate) || Repositories::detail::is_fk_violation(sqlstate)) {
             throw Invariant();
         }
     }

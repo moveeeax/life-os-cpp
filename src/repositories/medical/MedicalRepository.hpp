@@ -34,9 +34,7 @@ struct Invariant : ValidationError {
     Invariant() : ValidationError("invariant", "the row breaks a rule of the medical archive") {}
 };
 
-struct InvalidDate : ValidationError {
-    InvalidDate() : ValidationError("invalid_date", "not a valid date") {}
-};
+using Repositories::InvalidDate;
 
 /// A person, doctor or visit id that is not the caller's (or not there).
 struct UnknownReference : ValidationError {
@@ -59,10 +57,10 @@ namespace detail {
 using Repositories::detail::translate_sql;
 
 inline void translate(std::string_view sqlstate) {
-    if (sqlstate == "23514") {  // check_violation
+    if (Repositories::detail::is_check_violation(sqlstate)) {
         throw Invariant();
     }
-    if (sqlstate == "22008" || sqlstate == "22007") {  // datetime_field_overflow, invalid_datetime_format
+    if (Repositories::detail::is_bad_datetime(sqlstate)) {
         throw InvalidDate();
     }
 }

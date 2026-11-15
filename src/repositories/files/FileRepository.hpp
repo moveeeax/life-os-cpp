@@ -233,7 +233,7 @@ private:
         "to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at";
 
     static void translate(std::string_view sqlstate) {
-        if (sqlstate == "23514" || sqlstate == "23505") {  // check_violation, unique_violation
+        if (Repositories::detail::is_check_violation(sqlstate) || Repositories::detail::is_unique_violation(sqlstate)) {
             throw FileInvariant();
         }
     }

@@ -465,10 +465,10 @@ private:
     /// SQLSTATE -> typed error: a CHECK on the session times, a malformed or
     /// out-of-range timestamp. Anything else is rethrown by translate_sql.
     static void translate(std::string_view sqlstate) {
-        if (sqlstate == "23514") {
+        if (Repositories::detail::is_check_violation(sqlstate)) {
             throw InvalidSessionTimes();
         }
-        if (sqlstate == "22007" || sqlstate == "22008") {
+        if (Repositories::detail::is_bad_datetime(sqlstate)) {
             throw InvalidTimestamp();
         }
     }

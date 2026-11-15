@@ -17,6 +17,7 @@
 
 #include "database/Database.hpp"
 #include "repositories/JsonRows.hpp"
+#include "repositories/SqlErrors.hpp"
 #include "repositories/SqlTime.hpp"
 #include "repositories/tasks/Errors.hpp"
 
@@ -185,7 +186,7 @@ private:
         " " SQL_ISO_UTC("p.updated_at") " AS updated_at";
 
     static void translate(std::string_view sqlstate) {
-        if (sqlstate == "23505") {  // unique_violation: the (owner, code) index
+        if (Repositories::detail::is_unique_violation(sqlstate)) {  // unique_violation: the (owner, code) index
             throw CodeTaken();
         }
         detail::translate(sqlstate);

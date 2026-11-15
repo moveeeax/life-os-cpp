@@ -160,7 +160,7 @@ private:
         "status, created_by::text AS created_by, created_at";
 
     static void translate(std::string_view sqlstate) {
-        if (sqlstate == "23514") {  // check_violation
+        if (Repositories::detail::is_check_violation(sqlstate)) {
             throw WallpaperInvariant();
         }
     }

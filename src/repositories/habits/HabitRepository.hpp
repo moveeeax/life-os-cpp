@@ -37,7 +37,7 @@ namespace detail {
 using Repositories::detail::translate_sql;
 
 inline void translate(std::string_view sqlstate) {
-    if (sqlstate == "23514") {  // check_violation
+    if (Repositories::detail::is_check_violation(sqlstate)) {
         throw Invariant();
     }
 }
