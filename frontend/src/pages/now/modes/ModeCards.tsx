@@ -13,12 +13,13 @@ import {
 } from '@/hooks/useTravel';
 import { api } from '@/lib/api/client';
 import type { Today } from '@/lib/now/types';
+import { clockIn, hhmm } from '@/lib/dates';
 import { CURRENCY_OF } from '@/lib/now/currency';
 import { modePin, setModePin } from '@/lib/now/mode';
 import { countryName } from '@/lib/travel';
 
-import { hhmm, type NowDay } from '../ribbon/layout';
-import { arrival, flightsToday, hourIn, minutesUntil, modeNeeds, modeOf, type Mode } from './modes';
+import type { NowDay } from '../ribbon/layout';
+import { arrival, flightsToday, minutesUntil, modeNeeds, modeOf, type Mode } from './modes';
 import './modes.css';
 
 function Card({ k, v, s }: { k: string; v: React.ReactNode; s?: React.ReactNode }) {
@@ -58,7 +59,8 @@ export function ModeCards({
   const [pin, setPin] = useState<string | null>(modePin);
   const travelOn = useModuleOn('travel', TRAVEL_PROBE, true);
   const moneyOn = useModuleOn('money', MONEY_PROBE, true);
-  const hour = hourIn(now, tz);
+  // The hour of the profile zone, not the browser's.
+  const hour = clockIn(tz, now).hour;
   // Each read waits until the mode can use it: no trips without a trip today,
   // no crossings once a flight wins, the rest only for the mode that shows them.
   const first = modeNeeds(

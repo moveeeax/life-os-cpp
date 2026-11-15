@@ -1,4 +1,5 @@
 import type { components } from '@/lib/api/schema.gen';
+import { mondayOf, shiftDays } from '@/lib/dates';
 import { DOCUMENT_KIND } from '@/lib/travel';
 
 /**
@@ -38,14 +39,8 @@ export function sparkPoints(values: (number | null)[]): string {
 
 /** Monday to Sunday of the week of @p date (YYYY-MM-DD). */
 export function weekRange(date: string): { from: string; to: string; days: string[] } {
-  const d = new Date(`${date}T12:00:00Z`);
-  const dow = (d.getUTCDay() + 6) % 7;
-  d.setUTCDate(d.getUTCDate() - dow);
-  const days: string[] = [];
-  for (let i = 0; i < 7; i++) {
-    days.push(d.toISOString().slice(0, 10));
-    d.setUTCDate(d.getUTCDate() + 1);
-  }
+  const monday = mondayOf(date);
+  const days = Array.from({ length: 7 }, (_, i) => shiftDays(monday, i));
   return { from: days[0], to: days[6], days };
 }
 

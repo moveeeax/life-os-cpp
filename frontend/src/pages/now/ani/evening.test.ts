@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Today } from '@/lib/now/types';
 
-import { evening, tomorrowOf, waitingWords } from './evening';
+import { evening, waitingWords } from './evening';
 
 const day = (statuses: ('open' | 'in_progress' | 'done')[]): Today => ({
   tasks: {
@@ -16,14 +16,6 @@ const day = (statuses: ('open' | 'in_progress' | 'done')[]): Today => ({
   focus: null,
   note: null,
   errors: [],
-});
-
-describe('tomorrowOf', () => {
-  it('is the next local day, across months', () => {
-    expect(tomorrowOf('2026-10-28')).toBe('2026-10-29');
-    expect(tomorrowOf('2026-10-31')).toBe('2026-11-01');
-    expect(tomorrowOf('2026-12-31')).toBe('2027-01-01');
-  });
 });
 
 describe('evening', () => {

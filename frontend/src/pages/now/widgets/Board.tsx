@@ -5,14 +5,13 @@ import { useMetrics } from '@/hooks/useMetrics';
 import { useCreateEntry, useFoodDay, useFoodRecent } from '@/hooks/useFood';
 import { useReport } from '@/hooks/useMoney';
 import { api, ApiClientError } from '@/lib/api/client';
-import { shiftDays } from '@/lib/dates';
+import { clockIn, shiftDays } from '@/lib/dates';
 import { qk } from '@/lib/api/queryKeys';
 import { formatTotal } from '@/lib/networth';
 import { shortDay } from '@/lib/travel';
 import type { Today } from '@/lib/now/types';
 import { FIXED, widgetKey, type Widget } from '@/lib/now/widgets';
 
-import { hourIn } from '../modes/modes';
 import {
   documentLeft,
   documentName,
@@ -286,7 +285,7 @@ function ProteinWidget({ date, tz }: { date: string; tz: string }) {
               onClick={() =>
                 create.mutate({
                   date,
-                  meal: mealAt(hourIn(new Date(), tz)),
+                  meal: mealAt(clockIn(tz, new Date()).hour),
                   item_id: item.id,
                   grams,
                 })

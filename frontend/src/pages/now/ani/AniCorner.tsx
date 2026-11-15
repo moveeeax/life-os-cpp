@@ -3,7 +3,7 @@ import { useContext, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
-import { clockIn } from '@/lib/dates';
+import { clockIn, shiftDays } from '@/lib/dates';
 
 import { useAniPrefs, useMuteKind } from '@/hooks/useAni';
 import { numbersHidden, useHideNumbers } from '@/hooks/useHideNumbers';
@@ -13,7 +13,7 @@ import type { NowWeather, Today } from '@/lib/now/types';
 import { AniChat, SpeakerIcon } from './AniChat';
 import { soundOn, speechUrl, useSound } from './chat';
 import type { Ani } from './engine';
-import { evening, tomorrowOf, waitingWords, type Waiting } from './evening';
+import { evening, waitingWords, type Waiting } from './evening';
 import { greeting, HELLO, hourOf } from './greet';
 import { useInbox, type Play } from './inbox';
 import { moodLevel, moodOf, moveMood } from './mood';
@@ -474,7 +474,7 @@ export function AniCorner({
             // The day's tasks first: done of all, and an offer to move the rest.
             const sum = evening(c.today, numbersHidden());
             if (sum) {
-              if (sum.move.length > 0) setMoveOffer({ ids: sum.move, due: tomorrowOf(c.date) });
+              if (sum.move.length > 0) setMoveOffer({ ids: sum.move, due: shiftDays(c.date, 1) });
               answer.current({ text: owed ? `${sum.text} ${owed}` : sum.text, kind: 'evening' });
               return;
             }

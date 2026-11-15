@@ -5,13 +5,6 @@ import type { Today } from '@/lib/now/types';
  * an offer to move the open ones to tomorrow (the page asks with buttons).
  */
 
-/** The local day after @p date (YYYY-MM-DD), as YYYY-MM-DD. */
-export function tomorrowOf(date: string): string {
-  const d = new Date(`${date}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
-
 /** The line and the open tasks to move; null without tasks today. */
 export function evening(
   today: Today | undefined,

@@ -5,11 +5,11 @@ import { Link } from 'react-router';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { api } from '@/lib/api/client';
 import { readJson, writeJson } from '@/lib/browserStore';
+import { shiftDays } from '@/lib/dates';
 import { qk } from '@/lib/api/queryKeys';
 import type { Today } from '@/lib/now/types';
 import { Group, Row, Sheet } from '@/shell/kit';
 
-import { tomorrowOf } from '../ani/evening';
 import { closedKey, githubLine, groupsOf, reviewText, weekOf } from './review';
 
 function readClosed(week: string): string[] {
@@ -114,7 +114,7 @@ export function WeeklyReview({
                     type="button"
                     aria-label={`Tomorrow: ${t.title}`}
                     disabled={pending.has(t.id)}
-                    onClick={() => void patch(t.id, { due: tomorrowOf(date) })}
+                    onClick={() => void patch(t.id, { due: shiftDays(date, 1) })}
                   >
                     Tomorrow
                   </button>
