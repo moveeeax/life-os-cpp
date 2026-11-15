@@ -10,6 +10,7 @@ import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import { clockIn } from '@/lib/dates';
 import { addMoment } from '@/lib/now/ani';
+import { markOn, readMarks } from '@/lib/now/once';
 import { CURRENCY_OF } from '@/lib/now/currency';
 
 import type { AniContext } from './AniCorner';
@@ -46,20 +47,8 @@ const DAY_MS = 86_400_000;
 const shift = (date: string, by: number) =>
   new Date(Date.parse(`${date}T00:00:00Z`) + by * DAY_MS).toISOString().slice(0, 10);
 
-function read(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, string>;
-  } catch {
-    return {};
-  }
-}
-function mark(k: string, v: string) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify({ ...read(), [k]: v }));
-  } catch {
-    // At worst a line comes once more.
-  }
-}
+const read = () => readMarks(KEY);
+const mark = (k: string, v: string) => markOn(KEY, k, v);
 
 let reads = 0;
 

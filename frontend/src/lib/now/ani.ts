@@ -1,5 +1,7 @@
 import { useCallback, useSyncExternalStore } from 'react';
 
+import { readJson, writeJson } from '@/lib/browserStore';
+
 /*
  * Ani's switches, remembered per browser: whether she is on Now at all (off
  * by default; the account menu turns her on), whether she is in her corner
@@ -101,21 +103,13 @@ export type Moment = { date: string; title: string };
 
 /** The moments of her album in this browser, newest first. */
 export function readAlbum(): Moment[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(ALBUM_KEY) ?? '[]') as Moment[];
-    return Array.isArray(v) ? v : [];
-  } catch {
-    return [];
-  }
+  const v = readJson<Moment[]>(ALBUM_KEY, []);
+  return Array.isArray(v) ? v : [];
 }
 
 /** Keeps a moment (an achievement, a kept promise, an anniversary, a record) once per title and day. */
 export function addMoment(date: string, title: string): void {
-  try {
-    const all = readAlbum();
-    if (all.some((m) => m.date === date && m.title === title)) return;
-    localStorage.setItem(ALBUM_KEY, JSON.stringify([{ date, title }, ...all].slice(0, 200)));
-  } catch {
-    // The album is a convenience of this browser.
-  }
+  const all = readAlbum();
+  if (all.some((m) => m.date === date && m.title === title)) return;
+  writeJson(ALBUM_KEY, [{ date, title }, ...all].slice(0, 200));
 }

@@ -6,6 +6,7 @@ import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import { clockIn } from '@/lib/dates';
 import { addMoment } from '@/lib/now/ani';
+import { markOn, readMarks, seenOn } from '@/lib/now/once';
 
 import type { Ani } from './engine';
 import type { AniContext } from './AniCorner';
@@ -37,21 +38,8 @@ export const DIARY_SEED = 'Давай запишем мой день в днев
 
 const KEY = 'now:ani:life';
 
-function read(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, string>;
-  } catch {
-    return {};
-  }
-}
-
-function mark(k: string, v: string) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify({ ...read(), [k]: v }));
-  } catch {
-    // Remembering it is a convenience: at worst she says it once more.
-  }
-}
+const read = () => readMarks(KEY);
+const mark = (k: string, v: string) => markOn(KEY, k, v);
 
 /**
  * Her own lines through the day, played by the corner: the energy of the
@@ -181,16 +169,7 @@ export function useLife({
 
       // The quest of the day: given once, praised once when it is done.
       // A low mood checked in today (useLife2 marks it): no quest that day, she does not push.
-      const lowMood = (() => {
-        try {
-          return (
-            (JSON.parse(localStorage.getItem('now:ani:life2') ?? '{}') as Record<string, string>)
-              .mood === day
-          );
-        } catch {
-          return false;
-        }
-      })();
+      const lowMood = seenOn('now:ani:life2', 'mood') === day;
       if (!lowMood && age >= AFTER_S.quest && hour >= 7 && hour < 20 && once('quest')) {
         const q = questOf(input);
         mark('quest', day);
