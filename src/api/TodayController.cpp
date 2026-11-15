@@ -42,6 +42,7 @@
 #include "repositories/goals/GoalRepository.hpp"
 #include "repositories/metrics/Series.hpp"
 #include "repositories/now/FocusRepository.hpp"
+#include "repositories/now/FocusTask.hpp"
 #include "repositories/now/NoteRepository.hpp"
 #include "repositories/now/SettingsRepository.hpp"
 #include "repositories/tasks/TaskRepository.hpp"
@@ -58,7 +59,6 @@ namespace {
 
 using json = nlohmann::json;
 using Api::Fields::is_calendar_date;
-using Api::Fields::today_utc;
 using Repositories::Goals::GoalRepository;
 using Repositories::Now::FocusRepository;
 using Repositories::Tasks::TaskRepository;
@@ -99,11 +99,11 @@ json focus_out(const std::string& owner, json row) {
 
 void TodayController::today(const HttpRequestPtr& req, Callback&& callback) {
     API_MODULE_USER_GUARD(Core::now_enabled(), "now", req, callback, owner);
-    const std::string date = request_day(req, &Repositories::Zones::today_in, today_utc());
-    if (!is_calendar_date(date)) {
-        callback(ErrorResponse::bad_request("invalid_query", "date must be a calendar day"));
+    const auto day = Fields::day_param(req, callback, &Repositories::Zones::today_in);
+    if (!day) {
         return;
     }
+    const std::string date = *day;
     const std::string tz = req->getParameter("tz").empty() ? "UTC" : req->getParameter("tz");
     const bool fitness_read = Security::Auth::require_permission(req, Domain::Permission::kFitnessRead) == nullptr;
     with_repo_errors(callback, "today.get", [&] {
@@ -236,14 +236,7 @@ void TodayController::focusDone(const HttpRequestPtr& req, Callback&& callback) 
                     p.today = date;  // a repeating task counts its next occurrence from the focus day
                     // One transaction: a focus ticked without its task (or the
                     // other way round) is a lie the Now screen would show.
-                    const json ticked = Repositories::Tasks::detail::translate_sql(
-                        [&] {
-                            return Database::get().execute_write([&](auto& txn) {
-                                TaskRepository::update_in(txn, owner, ref, p);
-                                return FocusRepository::set_done_in(txn, owner, date, done);
-                            });
-                        },
-                        &Repositories::Tasks::detail::translate);
+                    const json ticked = Repositories::Now::set_done_with_task(owner, date, done, ref, p);
                     callback(Response::ok(json{{"data", focus_out(owner, ticked)}}));
                     return;
                 }

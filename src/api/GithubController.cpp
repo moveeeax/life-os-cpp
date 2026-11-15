@@ -21,6 +21,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "api/Caller.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
 #include "api/RequestUtils.hpp"
@@ -36,8 +37,6 @@
 #include "repositories/tasks/TaskRepository.hpp"
 #include "security/Audit.hpp"
 #include "security/Auth.hpp"
-#include "security/SessionCookies.hpp"
-#include "security/SessionStore.hpp"
 #include "tasks/Fields.hpp"
 #include "utils/BlockingPool.hpp"
 #include "utils/ErrorResponse.hpp"
@@ -51,30 +50,6 @@ namespace {
 
 using json = nlohmann::json;
 using Repositories::Github::LinkRepository;
-
-/// The user signed in on this browser (the access cookie; SameSite=Lax rides the top-level return from
-/// GitHub), or "" when there is none. The callback path is public, so the middleware did not resolve it.
-std::string github_session_of(const HttpRequestPtr& req) {
-    if (!Security::Auth::is_initialized()) {
-        return "";
-    }
-    const auto& auth = Security::Auth::get();
-    const auto& cfg = auth.config();
-    const std::string token = Security::Auth::extract_access_token(req, cfg.cookies);
-    if (token.empty()) {
-        return "";
-    }
-    try {
-        std::string err;
-        const auto p = auth.verify_jwt(token, err);
-        if (!p || p->subject.empty() || Security::Sessions::access_revoked(cfg.cookies, p->subject, p->raw_claims)) {
-            return "";
-        }
-        return p->subject;
-    } catch (const std::exception&) {
-        return "";
-    }
-}
 
 drogon::HttpResponsePtr github_redirect(const std::string& outcome) {
     return drogon::HttpResponse::newRedirectionResponse("/account?github=" + outcome);
@@ -139,7 +114,7 @@ void GithubController::oauthCallback(const HttpRequestPtr& req, Callback&& callb
     }
     std::optional<std::string> owner;
     try {
-        owner = LinkRepository().take_state(req->getParameter("state"), github_session_of(req));
+        owner = LinkRepository().take_state(req->getParameter("state"), signed_in_user(req));
     } catch (const std::exception& e) {
         spdlog::error("github.oauth.callback: the state could not be read: {}", e.what());
         callback(github_redirect("error"));

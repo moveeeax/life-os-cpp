@@ -106,18 +106,12 @@ void common_fields(Validation::Errors& errs, const json& body, const std::string
             errs.add("code", "invalid", "lower-case letters, digits and dashes, up to 24");
         }
     }
-    if (body.contains("status")) {
-        Validation::one_of(errs, body, "status", kind == "course" ? kCourseStatuses : kProjectStatuses);
-    }
+    Validation::one_of(errs, body, "status", kind == "course" ? kCourseStatuses : kProjectStatuses);
     if (kind == "course") {
         text_length(errs, body, "platform", 0, 80);
         web_field(errs, body, "certificate");
-        if (body.contains("starts_on") && !body["starts_on"].is_null()) {
-            date_field(errs, body, "starts_on");
-        }
-        if (body.contains("ends_on") && !body["ends_on"].is_null()) {
-            date_field(errs, body, "ends_on");
-        }
+        date_field(errs, body, "starts_on");
+        date_field(errs, body, "ends_on");
         const auto starts = Validation::opt_string(body, "starts_on");
         const auto ends = Validation::opt_string(body, "ends_on");
         if (!errs.any() && starts && ends && *ends < *starts) {
@@ -129,12 +123,8 @@ void common_fields(Validation::Errors& errs, const json& body, const std::string
             }
         }
     } else {
-        if (body.contains("deadline") && !body["deadline"].is_null()) {
-            date_field(errs, body, "deadline");
-        }
-        if (body.contains("priority") && !body["priority"].is_null()) {
-            Validation::one_of(errs, body, "priority", kPriorities);
-        }
+        date_field(errs, body, "deadline");
+        Validation::one_of(errs, body, "priority", kPriorities);
         for (const char* field : {"platform", "starts_on", "ends_on", "certificate"}) {
             if (body.contains(field) && !body[field].is_null() &&
                 !(body[field].is_string() && body[field].get<std::string>().empty())) {
@@ -142,13 +132,6 @@ void common_fields(Validation::Errors& errs, const json& body, const std::string
             }
         }
     }
-}
-
-std::optional<std::optional<std::string>> nullable_text(const json& body, const char* field) {
-    if (!body.contains(field)) {
-        return std::nullopt;
-    }
-    return body[field].is_null() ? std::optional<std::string>() : std::optional(body[field].get<std::string>());
 }
 
 }  // namespace
@@ -177,9 +160,7 @@ void ProjectsController::createProject(const HttpRequestPtr& req, Callback&& cal
     }
     Validation::Errors errs;
     Validation::require_string(errs, body, "name");
-    if (body.contains("kind")) {
-        Validation::one_of(errs, body, "kind", kKinds);
-    }
+    Validation::one_of(errs, body, "kind", kKinds);
     // opt_string: a null or non-string kind is the one_of error above, not a throw.
     const std::string kind =
         Validation::opt_string(body, "kind").value_or("project") == "course" ? "course" : "project";
@@ -257,12 +238,12 @@ void ProjectsController::updateProject(const HttpRequestPtr& req, Callback&& cal
         p.status = Validation::opt_string(body, "status");
         if (kind == "course") {
             p.platform = Validation::opt_string(body, "platform");
-            p.starts_on = nullable_text(body, "starts_on");
-            p.ends_on = nullable_text(body, "ends_on");
+            p.starts_on = Fields::patch_text(body, "starts_on");
+            p.ends_on = Fields::patch_text(body, "ends_on");
             p.certificate = Validation::opt_string(body, "certificate");
         } else {
-            p.deadline = nullable_text(body, "deadline");
-            p.priority = nullable_text(body, "priority");
+            p.deadline = Fields::patch_text(body, "deadline");
+            p.priority = Fields::patch_text(body, "priority");
         }
         callback(Response::ok(json{{"data", repo.update(owner, id, p)}}));
     });

@@ -22,6 +22,7 @@
 #include "api/FieldChecks.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
+#include "api/LinkChecks.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "notes/Slug.hpp"
@@ -104,27 +105,9 @@ void note_fields(Validation::Errors& errs, const json& body, const std::string& 
     if (errs.any()) {
         return;
     }
-    if (body.contains("project_id") && !body["project_id"].is_null() &&
-        !Repositories::Tasks::ProjectRepository().owns(owner, body["project_id"].get<std::string>())) {
-        errs.add("project_id", "not_yours", "the project is not yours");
-    }
-    if (body.contains("task_id") && !body["task_id"].is_null() &&
-        !Repositories::Tasks::TaskRepository().get(owner, body["task_id"].get<std::string>())) {
-        errs.add("task_id", "not_yours", "the task is not yours");
-    }
-    // A deal of the caller's practice, as a task's deal link (TasksController).
-    if (body.contains("deal_id") && !body["deal_id"].is_null() &&
-        (!Core::practice_enabled() ||
-         !Repositories::Practice::DealRepository().client_of(owner, body["deal_id"].get<std::string>()))) {
-        errs.add("deal_id", "not_yours", "the deal is not yours");
-    }
-}
-
-std::optional<std::optional<std::string>> nullable(const json& body, const char* field) {
-    if (!body.contains(field)) {
-        return std::nullopt;
-    }
-    return body[field].is_null() ? std::optional<std::string>() : std::optional(body[field].get<std::string>());
+    Links::project(errs, body, owner);
+    Links::task(errs, body, owner);
+    Links::deal(errs, body, owner);
 }
 
 }  // namespace
@@ -229,10 +212,10 @@ void NotesController::updateNote(const HttpRequestPtr& req, Callback&& callback,
         p.body = Validation::opt_string(body, "body");
         p.topic = Validation::opt_string(body, "topic");
         p.tags = tags;
-        p.project_id = nullable(body, "project_id");
-        p.task_id = nullable(body, "task_id");
-        p.date = nullable(body, "date");
-        p.deal_id = nullable(body, "deal_id");
+        p.project_id = Fields::patch_text(body, "project_id");
+        p.task_id = Fields::patch_text(body, "task_id");
+        p.date = Fields::patch_text(body, "date");
+        p.deal_id = Fields::patch_text(body, "deal_id");
         callback(Response::ok(json{{"data", NoteRepository().update(owner, id, p)}}));
     });
 }

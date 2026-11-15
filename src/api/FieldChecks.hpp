@@ -1,26 +1,32 @@
 /**
  * @file FieldChecks.hpp
  * @brief Field checks the data controllers share beyond Validation.hpp: a
- *        calendar day, a number in a range, text measured in characters,
- *        today's date, and the "null means unset" readers.
+ *        calendar day, a time of day, a currency code, a number in a range,
+ *        text measured in characters, today's date, the "null means unset"
+ *        readers, and the ?date= of a date-scoped route.
  */
 
 #pragma once
 
 #include <chrono>
 #include <cstdio>
+#include <functional>
 #include <limits>
 #include <optional>
 #include <regex>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #include <drogon/HttpRequest.h>
+#include <drogon/HttpResponse.h>
 
 #include <nlohmann/json.hpp>
 
+#include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "utils/Date.hpp"
+#include "utils/ErrorResponse.hpp"
 #include "utils/Utf8.hpp"
 
 namespace Api::Fields {
@@ -48,6 +54,33 @@ inline void date_field(Validation::Errors& errs, const nlohmann::json& body, con
     }
     if (!body[field].is_string() || !is_calendar_date(body[field].get<std::string>())) {
         errs.add(field, "bad_format", "expected a calendar day as YYYY-MM-DD");
+    }
+}
+
+/// A time of day as HH:MM, 00:00 to 23:59.
+inline const std::regex kTimeRe(R"(^([01]\d|2[0-3]):[0-5]\d$)");
+/// kTimeRe that also takes a one-digit hour ("8:30").
+inline const std::regex kLooseTimeRe(R"(^([01]?\d|2[0-3]):[0-5]\d$)");
+
+/// A time of day as HH:MM; @p allow_single_digit_hour takes "8:30" too.
+inline bool is_hhmm(const std::string& text, bool allow_single_digit_hour = false) {
+    return std::regex_match(text, allow_single_digit_hour ? kLooseTimeRe : kTimeRe);
+}
+
+/// A currency code: three upper-case letters (ISO 4217 shape).
+inline const std::regex kCurrencyRe(R"(^[A-Z]{3}$)");
+
+/// Optional currency code field; null is "unset". @p example is the code the
+/// message shows ("KZT"), so each module keeps its own wording.
+inline void currency_code(Validation::Errors& errs,
+                          const nlohmann::json& body,
+                          const std::string& field,
+                          const std::string& example) {
+    if (!body.contains(field) || body[field].is_null()) {
+        return;
+    }
+    if (!body[field].is_string() || !std::regex_match(body[field].get<std::string>(), kCurrencyRe)) {
+        errs.add(field, "bad_format", "expected an ISO code like " + example);
     }
 }
 
@@ -137,6 +170,16 @@ inline std::optional<std::string> text_or_empty(const nlohmann::json& body, cons
     return it->get<std::string>();
 }
 
+/// A nullable text field of a patch: the outer optional is empty when the field
+/// is absent, the inner one when it is null (or not a string: the caller's
+/// checks refuse that before the read), else the text.
+inline std::optional<std::optional<std::string>> patch_text(const nlohmann::json& body, const std::string& field) {
+    if (!body.contains(field)) {
+        return std::nullopt;
+    }
+    return std::optional<std::optional<std::string>>(std::in_place, Validation::opt_string(body, field));
+}
+
 inline std::optional<double> opt_number(const nlohmann::json& body, const std::string& field) {
     if (body.contains(field) && body[field].is_number()) {
         return body[field].get<double>();
@@ -175,6 +218,22 @@ inline std::string today_utc() {
                   static_cast<unsigned>(ymd.month()),
                   static_cast<unsigned>(ymd.day()));
     return out;
+}
+
+/**
+ * @brief The day a date-scoped route is about: ?date= when given, else the
+ *        caller's today (Api::request_day with @p zone_today); nullopt after
+ *        answering 400 invalid_query when it is not a calendar day.
+ */
+inline std::optional<std::string> day_param(const drogon::HttpRequestPtr& req,
+                                            const std::function<void(const drogon::HttpResponsePtr&)>& callback,
+                                            const ZoneToday& zone_today) {
+    const std::string date = request_day(req, zone_today, today_utc());
+    if (!is_calendar_date(date)) {
+        callback(ErrorResponse::bad_request("invalid_query", "date must be a calendar day"));
+        return std::nullopt;
+    }
+    return date;
 }
 
 /// The longest Idempotency-Key a parse job keeps on its row.

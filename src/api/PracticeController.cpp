@@ -10,7 +10,6 @@
 #include "api/PracticeController.hpp"
 
 #include <optional>
-#include <regex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -22,6 +21,7 @@
 #include "api/FieldChecks.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
+#include "api/LinkChecks.hpp"
 #include "api/RequestUtils.hpp"
 #include "api/Validation.hpp"
 #include "money/Currencies.hpp"
@@ -48,20 +48,10 @@ using Repositories::Practice::EntryRepository;
 constexpr double kAmountMax = 1e12;
 /// One unit of the eighth decimal, the finest the numeric(24,8) columns keep.
 constexpr double kAmountMin = 0.00000001;
-const std::regex kCodeRe("^[A-Z]{3}$");
 const std::vector<std::string> kKinds = {"income", "expense"};
 
 std::vector<std::string> stages() {
     return {::Practice::kStages.begin(), ::Practice::kStages.end()};
-}
-
-void code_field(Validation::Errors& errs, const json& body, const std::string& field) {
-    if (!body.contains(field) || body[field].is_null()) {
-        return;
-    }
-    if (!body[field].is_string() || !std::regex_match(body[field].get<std::string>(), kCodeRe)) {
-        errs.add(field, "bad_format", "expected an ISO code like USD");
-    }
 }
 
 /// An amount fits its currency: a known code has its own decimals, another code up to eight.
@@ -71,19 +61,6 @@ void amount_fits(Validation::Errors& errs, const char* field, double amount, con
     if (!::Money::Currencies::fits(amount, decimals)) {
         errs.add(field, "precision", currency + " has " + std::to_string(decimals) + " decimal(s)");
     }
-}
-
-void uuid_field(Validation::Errors& errs, const json& body, const char* field) {
-    if (body.contains(field) && !body[field].is_null()) {
-        Validation::uuid(errs, body, field);
-    }
-}
-
-std::optional<std::optional<std::string>> nullable(const json& body, const char* field) {
-    if (!body.contains(field)) {
-        return std::nullopt;
-    }
-    return std::optional<std::optional<std::string>>(std::in_place, Validation::opt_string(body, field));
 }
 
 bool given(const json& body, const char* field) {
@@ -111,14 +88,14 @@ void deal_fields(Validation::Errors& errs, const json& body, const std::string& 
     if (body.contains("client_id") && body["client_id"].is_null()) {
         errs.add("client_id", "missing", "a deal has a client");
     }
-    uuid_field(errs, body, "client_id");
+    Validation::uuid(errs, body, "client_id");
     text_length(errs, body, "title", 1, 200);
     if (body.contains("stage")) {
         Validation::require_string(errs, body, "stage");
         Validation::one_of(errs, body, "stage", stages());
     }
     amount_range(errs, body, "value", kAmountMin, kAmountMax);
-    code_field(errs, body, "currency");
+    Fields::currency_code(errs, body, "currency", "USD");
     // A value is an amount and a currency: both given, both null, or neither.
     if (body.contains("value") != body.contains("currency") || given(body, "value") != given(body, "currency")) {
         errs.add("currency", "invariant", "a value is an amount and a currency together");
@@ -158,9 +135,9 @@ void entry_fields(Validation::Errors& errs, const json& body, const std::string&
     Validation::one_of(errs, body, "kind", kKinds);
     date_field(errs, body, "date");
     amount_range(errs, body, "amount", kAmountMin, kAmountMax);
-    code_field(errs, body, "currency");
-    uuid_field(errs, body, "client_id");
-    uuid_field(errs, body, "deal_id");
+    Fields::currency_code(errs, body, "currency", "USD");
+    Validation::uuid(errs, body, "client_id");
+    Validation::uuid(errs, body, "deal_id");
     text_length(errs, body, "note", 0, 500);
     if (errs.any()) {
         return;
@@ -168,9 +145,7 @@ void entry_fields(Validation::Errors& errs, const json& body, const std::string&
     if (given(body, "client_id") && !ClientRepository().owns(owner, body["client_id"].get<std::string>())) {
         errs.add("client_id", "not_yours", "the client is not yours");
     }
-    if (given(body, "deal_id") && !DealRepository().client_of(owner, body["deal_id"].get<std::string>())) {
-        errs.add("deal_id", "not_yours", "the deal is not yours");
-    }
+    Links::deal(errs, body, owner);
 }
 
 /// The month of a query or a path: a YYYY-MM of 1900..2100.
@@ -338,9 +313,9 @@ void PracticeController::updateDeal(const HttpRequestPtr& req, Callback&& callba
         if (body.contains("value")) {
             p.value = std::optional<std::optional<double>>(std::in_place, opt_number(body, "value"));
         }
-        p.currency = nullable(body, "currency");
-        p.start_date = nullable(body, "start_date");
-        p.end_date = nullable(body, "end_date");
+        p.currency = Fields::patch_text(body, "currency");
+        p.start_date = Fields::patch_text(body, "start_date");
+        p.end_date = Fields::patch_text(body, "end_date");
         p.note = Validation::opt_string(body, "note");
         callback(Response::ok(json{{"data", DealRepository().update(owner, id, p)}}));
     });
@@ -465,8 +440,8 @@ void PracticeController::updateEntry(const HttpRequestPtr& req, Callback&& callb
         p.date = Validation::opt_string(body, "date");
         p.amount = opt_number(body, "amount");
         p.currency = Validation::opt_string(body, "currency");
-        p.client_id = nullable(body, "client_id");
-        p.deal_id = nullable(body, "deal_id");
+        p.client_id = Fields::patch_text(body, "client_id");
+        p.deal_id = Fields::patch_text(body, "deal_id");
         p.note = Validation::opt_string(body, "note");
         callback(Response::ok(json{{"data", repo.update(owner, id, p)}}));
     });

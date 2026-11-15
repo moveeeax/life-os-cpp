@@ -16,6 +16,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "api/Caller.hpp"
 #include "api/FieldChecks.hpp"
 #include "api/Guards.hpp"
 #include "api/HandlerSupport.hpp"
@@ -37,16 +38,6 @@ using Repositories::Metrics::Why;
 
 /// The most days one series read answers.
 constexpr int kRangeMax = 400;
-
-/// The caller's permission bits, the fitness read bit set when the caller passes
-/// that check (an admin, or no auth enforced).
-std::uint32_t permissions_of(const HttpRequestPtr& req) {
-    std::uint32_t p = Security::Auth::current_permissions(req);
-    if (Security::Auth::require_permission(req, Domain::Permission::kFitnessRead) == nullptr) {
-        p |= Domain::Permission::kFitnessRead;
-    }
-    return p;
-}
 
 json why_json(Why w) {
     return w == Why::Ok ? json() : json(std::string(Repositories::Metrics::why_name(w)));
