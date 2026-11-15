@@ -82,7 +82,7 @@ public:
                     break;
                 }
             }
-            const auto day = [&](const pqxx::row& r) -> Day* {
+            const auto day = [&](const auto& r) -> Day* {
                 const auto it = at.find(r[0].template as<std::string>());
                 return it == at.end() ? nullptr : &out[it->second];
             };
