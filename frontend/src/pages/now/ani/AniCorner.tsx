@@ -5,7 +5,7 @@ import { api } from '@/lib/api/client';
 import { qk } from '@/lib/api/queryKeys';
 import { clockIn, shiftDays } from '@/lib/dates';
 
-import { useAniPrefs, useMuteKind } from '@/hooks/useAni';
+import { useAniPrefs, useMuteKind } from '@/hooks/useAniPrefs';
 import { numbersHidden, useHideNumbers } from '@/hooks/useHideNumbers';
 import { fetchTelegramWaiting } from '@/hooks/useTelegram';
 import { HOLD_KEY, useAni, type AniOutfit } from '@/lib/now/ani';
@@ -63,7 +63,6 @@ function HangerIcon() {
 // Recorded ahead with the voice she talks in (OpenAI TTS, marin), under
 // v2/voice/: the hellos of the hour (greet.ts), the taps' lines
 // (touch.ts) and this one.
-/** The day the reward offer was made (localStorage): once a day. */
 const DIZZY: Answer = { text: 'Ой, голова кружится.', recorded: 'dizzy' };
 
 /** The hello of this hour, recorded. */

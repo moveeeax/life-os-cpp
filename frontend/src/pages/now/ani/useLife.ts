@@ -10,6 +10,7 @@ import { clockIn } from '@/lib/dates';
 import { addMoment } from '@/lib/now/ani';
 import { markOn, readMarks, seenOn } from '@/lib/now/once';
 
+import { DIARY_ASK } from './AniChat';
 import type { Ani } from './engine';
 import type { AniContext } from './AniCorner';
 import {
@@ -35,8 +36,6 @@ const TICK_MS = 60_000;
 const AFTER_S = { energy: 40, quest: 90, anniversary: 150 } as const;
 /** The evening diary is offered from this local time until 23:00. */
 const DIARY_FROM = { h: 21, m: 30 };
-
-export const DIARY_SEED = 'Давай запишем мой день в дневник.';
 
 const KEY = 'now:ani:life';
 
@@ -234,7 +233,7 @@ export function useLife({
       const late = hour > DIARY_FROM.h || (hour === DIARY_FROM.h && minute >= DIARY_FROM.m);
       if (late && hour < 23 && once('diary')) {
         mark('diary', day);
-        seedRef.current(DIARY_SEED);
+        seedRef.current(DIARY_ASK);
         sayRef.current({
           text: 'Запишем день в дневник? Нажми на меня, я задам два вопроса.',
           chat: true,

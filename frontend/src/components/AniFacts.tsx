@@ -13,7 +13,7 @@ import {
   useUnmuteKind,
   useUpdateAniFact,
   type AniFact,
-} from '@/hooks/useAni';
+} from '@/hooks/useAniPrefs';
 import { formatDay } from '@/lib/dates';
 import { HOLD_KEY, LINE_KINDS, readAlbum } from '@/lib/now/ani';
 

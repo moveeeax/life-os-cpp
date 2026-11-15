@@ -62,6 +62,17 @@ describe('greeting', () => {
     expect(hourOf(23)).toBe('night');
   });
 
+  it('keeps the hour boundaries of 5, 12, 18 and 23', () => {
+    const parts = Array.from({ length: 24 }, (_, h) => hourOf(h));
+    expect(parts.indexOf('morning')).toBe(5);
+    expect(parts.lastIndexOf('morning')).toBe(11);
+    expect(parts.indexOf('day')).toBe(12);
+    expect(parts.lastIndexOf('day')).toBe(17);
+    expect(parts.indexOf('evening')).toBe(18);
+    expect(parts.lastIndexOf('evening')).toBe(22);
+    expect(parts.filter((p) => p === 'night')).toHaveLength(6);
+  });
+
   it('names late tasks first, without the count while numbers are hidden', () => {
     expect(greeting(late(1), weather(61), 14, false).text).toBe(
       'Привет! Одна задача просрочена, глянешь?',

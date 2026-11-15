@@ -47,7 +47,7 @@ vi.mock('./useLife2', () => ({
   },
 }));
 
-vi.mock('@/hooks/useAni', () => ({
+vi.mock('@/hooks/useAniPrefs', () => ({
   useAniPrefs: () => ({ data: { muted: [] }, isPending: false, isSuccess: true }),
   useMuteKind: () => () => {},
 }));
