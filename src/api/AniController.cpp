@@ -86,18 +86,13 @@ HttpResponsePtr unanswered(Repositories::Agent::ActionRepository::Answer a) {
 
 void AniController::agent(const HttpRequestPtr& req, Callback&& callback) {
     ANI_AGENT_GUARD(req, callback, owner);
-    try {
-        callback(Response::ok(json{{"data", view(owner)}}));
-    } catch (const std::exception& e) {
-        spdlog::error("ani.agent failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    with_repo_errors(callback, "ani.agent", [&] { callback(Response::ok(json{{"data", view(owner)}})); });
 }
 
 void AniController::wake(const HttpRequestPtr& req, Callback&& callback) {
     ANI_AGENT_GUARD(req, callback, owner);
     API_REQUIRE_JOBS_READY(callback);
-    try {
+    with_repo_errors(callback, "ani.wake", [&] {
         switch (::Agent::wake(owner)) {
             case ::Agent::Wake::Off:
                 callback(ErrorResponse::service_unavailable("not_configured", "the agent is not configured"));
@@ -110,22 +105,16 @@ void AniController::wake(const HttpRequestPtr& req, Callback&& callback) {
                 callback(accepted(json{{"data", view(owner)}}));
                 return;
         }
-    } catch (const std::exception& e) {
-        spdlog::error("ani.wake failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniController::stop(const HttpRequestPtr& req, Callback&& callback) {
     ANI_AGENT_GUARD(req, callback, owner);
     API_REQUIRE_JOBS_READY(callback);
-    try {
+    with_repo_errors(callback, "ani.stop", [&] {
         ::Agent::request_stop(owner);
         callback(accepted(json{{"data", view(owner)}}));
-    } catch (const std::exception& e) {
-        spdlog::error("ani.stop failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniController::message(const HttpRequestPtr& req, Callback&& callback) {
@@ -149,7 +138,7 @@ void AniController::message(const HttpRequestPtr& req, Callback&& callback) {
         callback(ErrorResponse::bad_request("invalid_tz", "tz must be an IANA zone like Asia/Almaty"));
         return;
     }
-    try {
+    with_repo_errors(callback, "ani.message", [&] {
         if (::Agent::turns_spent(owner)) {
             callback(ErrorResponse::too_many_requests(600));
             return;
@@ -172,10 +161,7 @@ void AniController::message(const HttpRequestPtr& req, Callback&& callback) {
                 callback(ErrorResponse::service_unavailable("not_configured", "the agent is not configured"));
                 return;
         }
-    } catch (const std::exception& e) {
-        spdlog::error("ani.message failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniController::turns(const HttpRequestPtr& req, Callback&& callback) {
@@ -186,12 +172,9 @@ void AniController::turns(const HttpRequestPtr& req, Callback&& callback) {
         return;
     }
     const int limit = clamp_int(req->getParameter("limit"), 30, 1, 100);
-    try {
+    with_repo_errors(callback, "ani.turns", [&] {
         callback(Response::ok(json{{"data", Repositories::Agent::TurnRepository().list(owner, before, limit)}}));
-    } catch (const std::exception& e) {
-        spdlog::error("ani.turns failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniController::turn(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
@@ -200,17 +183,14 @@ void AniController::turn(const HttpRequestPtr& req, Callback&& callback, const s
         callback(ErrorResponse::not_found("turn_not_found"));
         return;
     }
-    try {
+    with_repo_errors(callback, "ani.turn", [&] {
         const auto t = Repositories::Agent::TurnRepository().get(owner, id);
         if (!t) {
             callback(ErrorResponse::not_found("turn_not_found"));
             return;
         }
         callback(Response::ok(json{{"data", *t}}));
-    } catch (const std::exception& e) {
-        spdlog::error("ani.turn failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniController::speech(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
@@ -282,7 +262,7 @@ void AniController::removeTurn(const HttpRequestPtr& req, Callback&& callback, c
         callback(ErrorResponse::not_found("turn_not_found"));
         return;
     }
-    try {
+    with_repo_errors(callback, "ani.removeTurn", [&] {
         using Removed = Repositories::Agent::TurnRepository::Removed;
         switch (Repositories::Agent::TurnRepository().remove(owner, id)) {
             case Removed::Done:
@@ -295,15 +275,12 @@ void AniController::removeTurn(const HttpRequestPtr& req, Callback&& callback, c
                 callback(ErrorResponse::not_found("turn_not_found"));
                 return;
         }
-    } catch (const std::exception& e) {
-        spdlog::error("ani.removeTurn failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniController::clearTurns(const HttpRequestPtr& req, Callback&& callback) {
     ANI_AGENT_GUARD(req, callback, owner);
-    try {
+    with_repo_errors(callback, "ani.clearTurns", [&] {
         Repositories::Agent::TurnRepository turns;
         if (turns.has_open(owner)) {
             callback(ErrorResponse::conflict("turn_open", "she is still answering the last message"));
@@ -312,10 +289,7 @@ void AniController::clearTurns(const HttpRequestPtr& req, Callback&& callback) {
         turns.clear(owner);
         Repositories::Agent::AgentRepository().next_chat_session(owner);
         no_content(callback);
-    } catch (const std::exception& e) {
-        spdlog::error("ani.clearTurns failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniController::confirmAction(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
@@ -340,7 +314,7 @@ void AniController::confirmAction(const HttpRequestPtr& req, Callback&& callback
             return;
         }
     }
-    try {
+    with_repo_errors(callback, "ani.confirmAction", [&] {
         Repositories::Agent::ActionRepository actions;
         if (!text.empty() && !actions.retext(owner, id, text)) {
             callback(ErrorResponse::conflict("action_not_editable", "only a pending Telegram message takes a text"));
@@ -354,10 +328,7 @@ void AniController::confirmAction(const HttpRequestPtr& req, Callback&& callback
         actions.cancel_sibling_drafts(owner, id);
         Jobs::get().submit(::Agent::Actions::kActionJob, json{{"action", id}});
         callback(accepted(json{{"data", actions.get(owner, id).value_or(json::object())}}));
-    } catch (const std::exception& e) {
-        spdlog::error("ani.confirmAction failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniController::cancelAction(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
@@ -366,17 +337,14 @@ void AniController::cancelAction(const HttpRequestPtr& req, Callback&& callback,
         callback(ErrorResponse::not_found("action_not_found"));
         return;
     }
-    try {
+    with_repo_errors(callback, "ani.cancelAction", [&] {
         Repositories::Agent::ActionRepository actions;
         if (auto refused = unanswered(actions.answer(owner, id, /*confirm=*/false))) {
             callback(refused);
             return;
         }
         callback(Response::ok(json{{"data", actions.get(owner, id).value_or(json::object())}}));
-    } catch (const std::exception& e) {
-        spdlog::error("ani.cancelAction failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 }  // namespace Api

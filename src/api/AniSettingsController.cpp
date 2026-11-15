@@ -29,7 +29,7 @@
 #include "repositories/agent/PrefsRepository.hpp"
 #include "repositories/agent/ReminderRepository.hpp"
 #include "security/Audit.hpp"
-#include "utils/Config.hpp"
+#include "utils/BaseUrl.hpp"
 #include "utils/ErrorResponse.hpp"
 #include "utils/Utf8.hpp"
 
@@ -43,20 +43,8 @@ using json = nlohmann::json;
     API_REQUIRE_USER(req, callback, owner);      \
     API_REFUSE_API_KEY(req, callback)
 
-/// The site's own address, as the account e-mails link to it.
-std::string base_url() {
-    std::string base = "http://localhost:8080";
-    if (Config::is_initialized()) {
-        base = Config::get().get<std::string>("app.base_url", "APP_BASE_URL", base);
-    }
-    while (!base.empty() && base.back() == '/') {
-        base.pop_back();
-    }
-    return base;
-}
-
 json hook_view(const std::string& owner, const std::string& token) {
-    return json{{"url", base_url() + "/api/v1/ani/hook/" + token},
+    return json{{"url", ::Utils::base_url() + "/api/v1/ani/hook/" + token},
                 {"recent", Repositories::Agent::InboxRepository().recent(owner, 20)}};
 }
 
@@ -64,12 +52,9 @@ json hook_view(const std::string& owner, const std::string& token) {
 
 void AniSettingsController::prefs(const HttpRequestPtr& req, Callback&& callback) {
     ANI_SETTINGS_GUARD(req, callback, owner);
-    try {
+    with_repo_errors(callback, "ani.prefs", [&] {
         callback(Response::ok(json{{"data", Repositories::Agent::PrefsRepository().get(owner)}}));
-    } catch (const std::exception& e) {
-        spdlog::error("ani.prefs failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniSettingsController::savePrefs(const HttpRequestPtr& req, Callback&& callback) {
@@ -98,14 +83,11 @@ void AniSettingsController::savePrefs(const HttpRequestPtr& req, Callback&& call
         }
         muted.push_back(k.get<std::string>());
     }
-    try {
+    with_repo_errors(callback, "ani.prefs save", [&] {
         Repositories::Agent::PrefsRepository repo;
         repo.set_muted(owner, muted);
         callback(Response::ok(json{{"data", repo.get(owner)}}));
-    } catch (const std::exception& e) {
-        spdlog::error("ani.prefs save failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 namespace {
@@ -125,12 +107,9 @@ std::optional<std::string> fact_text(const json& body, const AniSettingsControll
 
 void AniSettingsController::facts(const HttpRequestPtr& req, Callback&& callback) {
     ANI_SETTINGS_GUARD(req, callback, owner);
-    try {
+    with_repo_errors(callback, "ani.facts", [&] {
         callback(Response::ok(json{{"data", Repositories::Agent::FactRepository().list(owner)}}));
-    } catch (const std::exception& e) {
-        spdlog::error("ani.facts failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniSettingsController::addFact(const HttpRequestPtr& req, Callback&& callback) {
@@ -143,17 +122,14 @@ void AniSettingsController::addFact(const HttpRequestPtr& req, Callback&& callba
     if (!text) {
         return;
     }
-    try {
+    with_repo_errors(callback, "ani.facts add", [&] {
         const auto id = Repositories::Agent::FactRepository().add(owner, *text, "page");
         if (!id) {
             callback(ErrorResponse::conflict("too_many_facts", "50 facts at most"));
             return;
         }
         callback(Response::created(json{{"data", {{"id", *id}}}}));
-    } catch (const std::exception& e) {
-        spdlog::error("ani.facts add failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniSettingsController::editFact(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
@@ -166,57 +142,45 @@ void AniSettingsController::editFact(const HttpRequestPtr& req, Callback&& callb
     if (!text) {
         return;
     }
-    try {
+    with_repo_errors(callback, "ani.facts edit", [&] {
         if (!is_valid_uuid(id) || !Repositories::Agent::FactRepository().update(owner, id, *text)) {
             callback(ErrorResponse::not_found("fact_not_found"));
             return;
         }
         no_content(callback);
-    } catch (const std::exception& e) {
-        spdlog::error("ani.facts edit failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniSettingsController::removeFact(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     ANI_SETTINGS_GUARD(req, callback, owner);
-    try {
+    with_repo_errors(callback, "ani.facts remove", [&] {
         if (!is_valid_uuid(id) || !Repositories::Agent::FactRepository().remove(owner, id)) {
             callback(ErrorResponse::not_found("fact_not_found"));
             return;
         }
         no_content(callback);
-    } catch (const std::exception& e) {
-        spdlog::error("ani.facts remove failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniSettingsController::deals(const HttpRequestPtr& req, Callback&& callback) {
     ANI_SETTINGS_GUARD(req, callback, owner);
     const std::string tz = req->getParameter("tz");
-    try {
+    with_repo_errors(callback, "ani.deals", [&] {
         callback(Response::ok(json{{"data",
                                     Repositories::Agent::DealRepository().week(
                                         owner, Repositories::Zones::is_zone(tz) ? tz : std::string("UTC"))}}));
-    } catch (const std::exception& e) {
-        spdlog::error("ani.deals failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniSettingsController::removeDeal(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     ANI_SETTINGS_GUARD(req, callback, owner);
-    try {
+    with_repo_errors(callback, "ani.deals remove", [&] {
         if (!is_valid_uuid(id) || !Repositories::Agent::DealRepository().remove(owner, id)) {
             callback(ErrorResponse::not_found("deal_not_found"));
             return;
         }
         no_content(callback);
-    } catch (const std::exception& e) {
-        spdlog::error("ani.deals remove failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniSettingsController::bare(const HttpRequestPtr& req, Callback&& callback) {
@@ -227,36 +191,27 @@ void AniSettingsController::bare(const HttpRequestPtr& req, Callback&& callback)
 
 void AniSettingsController::webhook(const HttpRequestPtr& req, Callback&& callback) {
     ANI_SETTINGS_GUARD(req, callback, owner);
-    try {
+    with_repo_errors(callback, "ani.webhook", [&] {
         auto resp = Response::ok(json{{"data", hook_view(owner, Repositories::Agent::HookRepository().ensure(owner))}});
         resp->addHeader("Cache-Control", "no-store");
         callback(resp);
-    } catch (const std::exception& e) {
-        spdlog::error("ani.webhook failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniSettingsController::rotateWebhook(const HttpRequestPtr& req, Callback&& callback) {
     ANI_SETTINGS_GUARD(req, callback, owner);
-    try {
+    with_repo_errors(callback, "ani.webhook rotate", [&] {
         auto resp = Response::ok(json{{"data", hook_view(owner, Repositories::Agent::HookRepository().rotate(owner))}});
         resp->addHeader("Cache-Control", "no-store");
         callback(resp);
-    } catch (const std::exception& e) {
-        spdlog::error("ani.webhook rotate failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniSettingsController::reminders(const HttpRequestPtr& req, Callback&& callback) {
     ANI_SETTINGS_GUARD(req, callback, owner);
-    try {
+    with_repo_errors(callback, "ani.reminders", [&] {
         callback(Response::ok(json{{"data", Repositories::Agent::ReminderRepository().list(owner)}}));
-    } catch (const std::exception& e) {
-        spdlog::error("ani.reminders failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniSettingsController::addReminder(const HttpRequestPtr& req, Callback&& callback) {
@@ -268,7 +223,7 @@ void AniSettingsController::addReminder(const HttpRequestPtr& req, Callback&& ca
         return;
     }
     const auto& r = std::get<::Agent::Reminders::Input>(in);
-    try {
+    with_repo_errors(callback, "ani.reminders add", [&] {
         const auto made = ::Agent::Reminders::add(owner, r, "api");
         if (!made) {
             callback(ErrorResponse::conflict("too_many", "at most 20 reminders"));
@@ -277,24 +232,18 @@ void AniSettingsController::addReminder(const HttpRequestPtr& req, Callback&& ca
         auto resp = Response::ok(json{{"data", *made}});
         resp->setStatusCode(k201Created);
         callback(resp);
-    } catch (const std::exception& e) {
-        spdlog::error("ani.reminders add failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 void AniSettingsController::removeReminder(const HttpRequestPtr& req, Callback&& callback, const std::string& id) {
     ANI_SETTINGS_GUARD(req, callback, owner);
-    try {
+    with_repo_errors(callback, "ani.reminders remove", [&] {
         if (!::Agent::Reminders::remove(owner, id, "api")) {
             callback(ErrorResponse::not_found("not_found"));
             return;
         }
         no_content(callback);
-    } catch (const std::exception& e) {
-        spdlog::error("ani.reminders remove failed: {}", e.what());
-        callback(ErrorResponse::internal_error());
-    }
+    });
 }
 
 }  // namespace Api
